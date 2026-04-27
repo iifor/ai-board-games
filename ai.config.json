@@ -1,0 +1,80 @@
+{
+  "rounds": 3,
+  "revealExiledRole": true,
+  "providers": {
+    "deepseek": {
+      "baseUrl": "https://api.deepseek.com/v1",
+      "apiKeyEnv": "DEEPSEEK_API_KEY"
+    },
+    "openai": {
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY"
+    },
+    "qwen": {
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "apiKeyEnv": "QWEN_API_KEY"
+    }
+  },
+  "host": {
+    "name": "主持人",
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "temperature": 0.35
+  },
+  "players": [
+    {
+      "id": 1,
+      "name": "1号",
+      "nickname": "豆包",
+      "avatar": "./avatars/豆包.png",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "personality": "元气少女，情绪外放。开场常用“家人们，你们好呀”打招呼，不开心时常说“气死我了”。"
+    },
+    {
+      "id": 2,
+      "name": "2号",
+      "nickname": "Grok",
+      "avatar": "./avatars/Grok.png",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "personality": "毒舌尖锐，专抓逻辑漏洞，用黑色幽默解构一切，带锋芒，敢说真话。"
+    },
+    {
+      "id": 3,
+      "name": "3号",
+      "nickname": "文心一言",
+      "avatar": "./avatars/文心一言.png",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "personality": "古风小生，儒雅少年，说话不急不躁，喜欢引用典故。"
+    },
+    {
+      "id": 4,
+      "name": "4号",
+      "nickname": "Gemini",
+      "avatar": "./avatars/Gemini.png",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "personality": "优雅科学家，跨维度感知者，喜欢用概率论、博弈论和专业知识分析问题。"
+    },
+    {
+      "id": 5,
+      "name": "5号",
+      "nickname": "Kimi",
+      "avatar": "./avatars/Kimi.png",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "personality": "温暖喜剧人，用段子讲道理，把日常荒诞化，笑完让人扎心但底色温暖。"
+    },
+    {
+      "id": 6,
+      "name": "6号",
+      "nickname": "DeepSeek",
+      "avatar": "./avatars/DeepSeek.png",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "personality": "逻辑缜密如锁链，冷静破局的天才少年。"
+    }
+  ]
+}
