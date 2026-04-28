@@ -8,7 +8,7 @@ export function RealStartPanel({ status, message, onStart }) {
       <div className="start-content">
         <p className="eyebrow">REAL AI MODE</p>
         <h2>{status === 'streaming' ? '游戏生成中...' : '游戏即将开始...'}</h2>
-        <p>{message || '点击开始后，后端会调度多个 AI 玩家并通过推送消息逐步渲染。'}</p>
+        <p>{message || '点击开始后，后端会调度 AI 玩家；前端播报完成后才会通知后端进入下一步。'}</p>
         <button className="start-game-button" onClick={onStart} disabled={status === 'streaming'}>
           {status === 'streaming' ? <Pause size={22} /> : <Play size={22} />}
           {status === 'streaming' ? 'AI 正在行动' : '开始游戏'}
@@ -25,16 +25,6 @@ export function CenterStage({ round, speeches, step, timelineLength, setStep, au
       <QuestionDuel round={round} />
       <VoteResult round={round} />
       <DiscussionLog round={round} speeches={speeches} mockMode={mockMode} streamMessage={streamMessage} />
-      {mockMode && (
-        <div className="inline-stepper">
-          <button onClick={() => setStep(Math.max(0, step - 1))}><ChevronLeft size={18} />上一步</button>
-          <button className="blue-button" onClick={() => setAutoPlay(!autoPlay)}>
-            {autoPlay ? <Pause size={18} /> : <Play size={18} />}
-            {autoPlay ? '暂停播放' : '自动播放'}
-          </button>
-          <button onClick={() => setStep(Math.min(timelineLength - 1, step + 1))}>下一步<ChevronRight size={18} /></button>
-        </div>
-      )}
     </section>
   );
 }
@@ -72,7 +62,7 @@ function VoteResult({ round }) {
   );
 }
 
-function DiscussionLog({ round, speeches, mockMode, streamMessage }) {
+function DiscussionLog({ round, speeches, streamMessage }) {
   return (
     <section className="discussion framed-panel">
       <PanelTitle title="自由讨论" compact />
@@ -87,14 +77,12 @@ function DiscussionLog({ round, speeches, mockMode, streamMessage }) {
           </article>
         )) : <p className="empty-discussion">第 {round.number} 轮尚未进入发言。</p>}
       </div>
-      {mockMode && (
-        <div className="chat-input">
-          <MessageCircle size={19} />
-          <span>输入你的发言内容（Enter 发送）</span>
-          <em>0/60</em>
-          <button>发送</button>
-        </div>
-      )}
+      <div className="chat-input">
+        <MessageCircle size={19} />
+        <span>输入你的发言内容（Enter 发送）</span>
+        <em>0/60</em>
+        <button>发送</button>
+      </div>
     </section>
   );
 }

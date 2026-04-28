@@ -1,7 +1,7 @@
 import React from 'react';
-import { ChevronsRight, FileText, History, Pause, Play } from 'lucide-react';
+import { FileText, History, Pause, Play, RotateCcw } from 'lucide-react';
 
-export function ActionBar({ paused, mockMode, onHistory, onTogglePause, onExile, onNextStage }) {
+export function ActionBar({ paused, onHistory, onTogglePause, onStageInfo, onNextSentence }) {
   return (
     <footer className="action-bar">
       <button onClick={onHistory}><History size={30} />查看历史</button>
@@ -9,12 +9,12 @@ export function ActionBar({ paused, mockMode, onHistory, onTogglePause, onExile,
         {paused ? <Play size={34} /> : <Pause size={34} />}
         {paused ? '继续' : '暂停'}
       </button>
-      <button onClick={onExile}>
+      {/* <button onClick={onStageInfo}>
         <FileText size={30} />阶段信息
-      </button>
-      <button className="blue-action" onClick={onNextStage} disabled={!mockMode}>
-        <ChevronsRight size={38} />下一阶段
-        <small>{mockMode ? '输出当前阶段信息' : '真实模式由 AI 推送推进'}</small>
+      </button> */}
+      <button className="blue-action" onClick={onNextSentence}>
+        <RotateCcw size={34} />下一局
+        <small>重新开始一局后端调度</small>
       </button>
     </footer>
   );

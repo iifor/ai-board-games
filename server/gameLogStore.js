@@ -62,8 +62,25 @@ function getLatestGameLog() {
   return readGameLogs()[0] || null;
 }
 
+function readRealGameLogs() {
+  return readGameLogs().filter((record) => record.game?.mode === 'real' && record.game?.rounds?.length);
+}
+
+function getRandomRealGameLog(excludeGameId) {
+  const logs = readRealGameLogs();
+  if (!logs.length) return null;
+
+  const candidates = logs.length > 1
+    ? logs.filter((record) => record.game?.id !== excludeGameId)
+    : logs;
+  const pool = candidates.length ? candidates : logs;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 module.exports = {
   saveGameLog,
   readGameLogs,
-  getLatestGameLog
+  getLatestGameLog,
+  readRealGameLogs,
+  getRandomRealGameLog
 };

@@ -3,13 +3,13 @@ export function classNames(...items) {
 }
 
 export function createEmptyGame() {
+  const nicknames = ['豆包', 'Grok', '文心一言', 'Gemini', 'Kimi', 'DeepSeek'];
+  const personalities = ['记录者', '怀疑者', '调和者', '原则派', '机会主义者', '观察者'];
   return {
     id: 'pending',
     mode: 'real',
     players: Array.from({ length: 6 }).map((_, index) => {
       const id = index + 1;
-      const nicknames = ['星火', '夜鸦', '青砚', '赫兹', '暖场', '锁链'];
-      const personalities = ['记录者', '怀疑者', '调和者', '原则派', '机会主义者', '观察者'];
       return {
         id,
         name: `${id}号`,
@@ -37,6 +37,7 @@ export function createPendingRound() {
     votes: {},
     tally: { A: 0, B: 0 },
     threshold: 4,
+    exileThreshold: 4,
     consensus: false,
     stanceChanges: 0,
     speeches: [],
@@ -48,18 +49,20 @@ export function createPendingRound() {
 export function buildTimeline(game) {
   const events = [];
   game.rounds.forEach((round) => {
-    events.push({ type: 'round', title: `第 ${round.number} 轮议题`, roundData: round });
+    events.push({ type: 'round', title: `第 ${round.number} 轮议题`, roundData: round, game });
     if (Object.keys(round.votes || {}).length) {
-      events.push({ type: 'vote', title: '共识结果公布', roundData: round });
+      events.push({ type: 'vote', title: '共识结果公布', roundData: round, game });
     }
     round.speeches.forEach((speech) => {
-      events.push({ type: 'speech', title: `玩家 ${speech.playerId} 发言`, roundData: round, speech });
+      events.push({ type: 'speech', title: `玩家 ${speech.playerId} 发言`, roundData: round, speech, game });
     });
     if (Object.keys(round.exileVotes || {}).length) {
-      events.push({ type: 'exile', title: '放逐投票', roundData: round });
+      events.push({ type: 'exile', title: '放逐投票', roundData: round, game });
     }
   });
-  if (game.winner) events.push({ type: 'end', title: '胜负结算', roundData: game.rounds.at(-1) || createPendingRound() });
+  if (game.winner) {
+    events.push({ type: 'end', title: '胜负结算', roundData: game.rounds.at(-1) || createPendingRound(), game });
+  }
   return events;
 }
 
@@ -93,5 +96,7 @@ export function getWinnerName(winner) {
 }
 
 export function getChaosPlayers(game) {
-  return game.players.filter((player) => player.role === 'chaos').map((player) => `${player.nickname || player.name || `${player.id}号`}（${player.id}号）`);
+  return game.players
+    .filter((player) => player.role === 'chaos')
+    .map((player) => `${player.nickname || player.name || `${player.id}号`}（${player.id}号）`);
 }

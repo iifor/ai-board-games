@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Eye, EyeOff, MessageCircle, Pause, Power, Settings, Volume2, VolumeX } from 'lucide-react';
+import { Eye, EyeOff, MessageCircle, Pause, Power, Settings, Volume2, VolumeX } from 'lucide-react';
 import { classNames } from '../utils/gameState';
 
 export function TopNav({
@@ -8,13 +8,12 @@ export function TopNav({
   autoPlay,
   showRoles,
   mockMode,
-  status,
   speechEnabled,
-  setMockMode,
+  controlsLocked,
+  onModeToggle,
+  onSpeechToggle,
   setAutoPlay,
-  setShowRoles,
-  setSpeechEnabled,
-  resetGame
+  setShowRoles
 }) {
   return (
     <header className="top-nav">
@@ -42,17 +41,17 @@ export function TopNav({
           {showRoles ? <EyeOff size={23} /> : <Eye size={23} />}
           <span>身份</span>
         </button>
-        <button className="mode-switch" title="Mock 模式开关" onClick={() => setMockMode(!mockMode)}>
+        <button className="mode-switch" title="Mock 模式开关" onClick={onModeToggle} disabled={controlsLocked}>
           <span className={classNames('switch-track', mockMode && 'active')}><i /></span>
           <span>{mockMode ? 'Mock' : '真实'}</span>
         </button>
-        <button title={speechEnabled ? '关闭语音' : '开启语音'} onClick={() => setSpeechEnabled(!speechEnabled)}>
+        <button title={speechEnabled ? '关闭语音' : '开启语音'} onClick={onSpeechToggle} disabled={controlsLocked}>
           {speechEnabled ? <Volume2 size={23} /> : <VolumeX size={23} />}
           <span>语音</span>
         </button>
-        <button title={mockMode ? '重开' : '开始'} onClick={resetGame} disabled={!mockMode && status === 'streaming'}>
-          {mockMode ? <Settings size={23} /> : <BookOpen size={23} />}
-          <span>{mockMode ? '重开' : '开始'}</span>
+        <button title="设置">
+          <Settings size={23} />
+          <span>设置</span>
         </button>
         <button title={autoPlay ? '暂停' : '播放'} onClick={() => mockMode && setAutoPlay(!autoPlay)} disabled={!mockMode}>
           {autoPlay ? <Pause size={23} /> : <Power size={23} />}

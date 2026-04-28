@@ -65,11 +65,8 @@ async function testOpenAIConnection(target) {
 
   try {
     const response = await fetch(endpoint, {
-      headers: {
-        Authorization: `Bearer ${target.apiKey}`
-      }
+      headers: { Authorization: `Bearer ${target.apiKey}` }
     });
-
     const body = await response.text();
     return {
       ok: response.ok,
@@ -94,13 +91,11 @@ async function testOpenAIConnection(target) {
 
 function parseJsonObject(text) {
   if (!text) return null;
-
   try {
     return JSON.parse(text);
   } catch {
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
-
     try {
       return JSON.parse(match[0]);
     } catch {

@@ -32,14 +32,14 @@ export function StatusPanel({ game, round, showRoles }) {
             </article>
           ))}
         </div>
-        <p className="exile-note">{round.eliminated ? `${round.eliminated.id}号被放逐` : '需要最高票且非平票才会放逐'}</p>
+        <p className="exile-note">{round.eliminated ? `${round.eliminated.id}号被放逐` : `需要至少 ${round.exileThreshold || Math.floor(round.aliveIds.length / 2) + 1} 票才会放逐`}</p>
       </section>
 
       <section className="framed-panel rules-card">
         <h3><BookOpen size={19} />Lite 规则提醒</h3>
         <p>三轮打满后结算共识胜负；</p>
         <p>若破坏者全灭则守序方立即胜利；</p>
-        <p>若破坏者人数大于守序方人数则破坏者立即胜利。</p>
+        <p>若破坏者人数 ≥ 守序方人数则破坏者立即胜利。</p>
       </section>
     </aside>
   );

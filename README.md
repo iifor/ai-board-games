@@ -34,7 +34,7 @@ http://localhost:5173
       "apiKeyEnv": "OPENAI_API_KEY"
     },
     "deepseek": {
-      "baseUrl": "https://api.deepseek.com/v1",
+      "baseUrl": "https://api.deepseek.com",
       "apiKeyEnv": "DEEPSEEK_API_KEY"
     },
     "qwen": {

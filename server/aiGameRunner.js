@@ -1,5 +1,6 @@
 const { callOpenAIChat, parseJsonObject } = require('./openaiChat');
 const { createMockGame } = require('./mockGame');
+const { getRandomRealGameLog } = require('./gameLogStore');
 
 const QUESTIONS = [
   ['优先相信票型', '优先相信发言'],
@@ -15,6 +16,8 @@ const QUESTIONS = [
   ['快速行动', '充分讨论']
 ];
 
+let lastMockReplayGameId = null;
+
 function shuffle(items) {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -25,14 +28,11 @@ function shuffle(items) {
 }
 
 function countVotes(votes) {
-  return Object.values(votes).reduce(
-    (acc, vote) => {
-      if (vote === 'A') acc.A += 1;
-      if (vote === 'B') acc.B += 1;
-      return acc;
-    },
-    { A: 0, B: 0 }
-  );
+  return Object.values(votes).reduce((acc, vote) => {
+    if (vote === 'A') acc.A += 1;
+    if (vote === 'B') acc.B += 1;
+    return acc;
+  }, { A: 0, B: 0 });
 }
 
 function getThreshold(aliveCount) {
@@ -57,7 +57,7 @@ function chooseRoles(playerConfigs) {
 function buildSystemPrompt(player, allies) {
   const common = [
     '你正在玩 AI 桌游《共识迷雾》。你是一个独立玩家，不是主持人。',
-    `你的编号是 ${player.id}，人格倾向是：${player.personality}。`,
+    `你的编号是 ${player.id}，昵称是 ${player.nickname}，人格倾向是：${player.personality}。`,
     '每轮你会先秘密投 A 或 B，再公开发言，最后参与放逐投票。',
     '你发言时必须声明“我投了A”或“我投了B”，可以撒谎，但不能直接暴露阵营。',
     '禁止说“我是守序方”“我是破坏者”“我是好人”“我是坏人”等暴露身份的话。',
@@ -78,7 +78,8 @@ function buildSystemPrompt(player, allies) {
     '你的隐藏阵营是破坏者。目标：阻止守序方达成两轮共识，并尽量存活。',
     `你的破坏者同伴是：${allies.length ? allies.join('、') : '无'}号。`,
     '你可以任意改变真实投票，也可以假装遵守守序方限制。',
-    '你要伪装成认真推理的普通玩家，可以制造合理怀疑，但不要过度保护同伴。'
+    '你要伪装成认真推理的普通玩家，可以制造合理怀疑，但不要过度保护同伴。',
+    '放逐投票时尽量把怀疑集中到守序方身上；除非同伴已经明显暴露，不要主动投同伴。'
   ].join('\n');
 }
 
@@ -88,7 +89,6 @@ function createAgents(config) {
     const allies = players
       .filter((candidate) => candidate.role === 'chaos' && candidate.id !== player.id)
       .map((candidate) => candidate.id);
-
     return {
       ...player,
       allies,
@@ -110,22 +110,6 @@ async function askAgent(agent, prompt, options = {}) {
   });
   agent.messages.push({ role: 'assistant', content: reply });
   return reply;
-}
-
-async function askHost(config, prompt) {
-  if (!config.host?.model || !config.host?.apiKey) return '';
-  return callOpenAIChat({
-    apiKey: config.host.apiKey,
-    baseUrl: config.host.baseUrl,
-    provider: config.host.provider,
-    model: config.host.model,
-    temperature: config.host.temperature ?? 0.35,
-    messages: [
-      { role: 'system', content: '你是《共识迷雾》的主持人。只整理公开局势，不替玩家做决定。' },
-      { role: 'user', content: prompt }
-    ],
-    maxTokens: 160
-  });
 }
 
 function getPlayerState(agent) {
@@ -152,11 +136,7 @@ async function collectVote(agent, round, question, publicHistory) {
     const proposedVote = parsed?.vote === 'A' || parsed?.vote === 'B' ? parsed.vote : fallbackVote(agent, round);
     const previous = agent.votes.at(-1);
     let vote = proposedVote;
-
-    if (agent.role === 'order' && previous && previous !== vote && agent.changedOnce) {
-      vote = previous;
-    }
-
+    if (agent.role === 'order' && previous && previous !== vote && agent.changedOnce) vote = previous;
     agent.stanceChangedThisRound = Boolean(previous && previous !== vote);
     if (agent.stanceChangedThisRound) agent.changedOnce = true;
     agent.votes.push(vote);
@@ -190,7 +170,7 @@ async function collectSpeech(agent, round, question, publicLog, recentSpeeches) 
     return speech;
   } catch (error) {
     console.error(`玩家 ${agent.id} 发言失败，使用兜底发言：${error.message}`);
-    const speech = `${agent.id}号：我投了${realVote}。我会先观察票数和发言是否一致。`;
+    const speech = `${agent.nickname || agent.id + '号'}：我投了${realVote}。我会先观察票数和发言是否一致。`;
     agent.declared.push(realVote);
     return speech;
   }
@@ -239,7 +219,7 @@ function fallbackTarget(agent, validTargets) {
   return validTargets[(agent.id + agent.votes.length) % validTargets.length];
 }
 
-function decideExile(exileVotes) {
+function decideExile(exileVotes, aliveCount) {
   const counts = {};
   Object.values(exileVotes).forEach((target) => {
     counts[target] = (counts[target] || 0) + 1;
@@ -248,17 +228,21 @@ function decideExile(exileVotes) {
   if (!entries.length) return null;
   const max = Math.max(...entries.map(([, count]) => count));
   const candidates = entries.filter(([, count]) => count === max);
-  return candidates.length === 1 ? Number(candidates[0][0]) : null;
+  const exileThreshold = Math.floor(aliveCount / 2) + 1;
+  return candidates.length === 1 && max >= exileThreshold ? Number(candidates[0][0]) : null;
 }
 
-function checkWinner(agents, consensusResults) {
-  if (consensusResults.filter(Boolean).length >= 2) return 'order';
+function checkImmediateWinner(agents) {
   const alive = agents.filter((agent) => agent.alive);
   const orderAlive = alive.filter((agent) => agent.role === 'order').length;
   const chaosAlive = alive.filter((agent) => agent.role === 'chaos').length;
   if (chaosAlive === 0) return 'order';
-  if (chaosAlive > orderAlive) return 'chaos';
+  if (chaosAlive >= orderAlive) return 'chaos';
   return null;
+}
+
+function getConsensusWinner(consensusResults) {
+  return consensusResults.filter(Boolean).length >= 2 ? 'order' : 'chaos';
 }
 
 function serializeGame({ agents, rounds, winner, mode = 'real' }) {
@@ -288,19 +272,88 @@ function serializeGame({ agents, rounds, winner, mode = 'real' }) {
 
 async function createAiGame(config, options = {}) {
   if (config.mode !== 'real') {
-    const game = createMockGame(config);
-    options.onEvent?.({ type: 'game', game });
+    const game = getMockReplayGame(config);
+    if (options.onEvent) await replayMockGame(game, options.onEvent);
     return game;
   }
+  return runAiGame(config, options);
+}
 
-  const emit = (event) => options.onEvent?.(event);
+function getMockReplayGame(config) {
+  const selected = getRandomRealGameLog(lastMockReplayGameId);
+  if (selected?.game?.rounds?.length) {
+    lastMockReplayGameId = selected.game.id;
+    return {
+      ...clone(selected.game),
+      id: `mock-replay-${selected.game.id || Date.now()}`,
+      mode: 'mock',
+      replayFrom: {
+        id: selected.game.id,
+        savedAt: selected.savedAt,
+        filename: selected.filename
+      }
+    };
+  }
+  return createMockGame(config);
+}
+
+async function replayMockGame(game, onEvent) {
+  const partial = {
+    ...game,
+    rounds: [],
+    winner: null
+  };
+
+  await onEvent({ type: 'players', players: game.players, game: clone(partial) });
+
+  for (const sourceRound of game.rounds) {
+    const round = {
+      ...clone(sourceRound),
+      votes: {},
+      tally: { A: 0, B: 0 },
+      consensus: false,
+      stanceChanges: 0,
+      speeches: [],
+      exileVotes: {},
+      eliminated: null
+    };
+    partial.rounds.push(round);
+    await onEvent({ type: 'round-start', round: clone(round), game: clone(partial) });
+
+    Object.assign(round.votes, sourceRound.votes);
+    round.tally = clone(sourceRound.tally);
+    round.consensus = sourceRound.consensus;
+    round.threshold = sourceRound.threshold;
+    round.stanceChanges = sourceRound.stanceChanges;
+    await onEvent({ type: 'vote-result', round: clone(round), game: clone(partial) });
+
+    for (const speech of sourceRound.speeches || []) {
+      round.speeches.push(clone(speech));
+      await onEvent({ type: 'speech', round: clone(round), speech: clone(speech), game: clone(partial) });
+    }
+
+    round.exileVotes = clone(sourceRound.exileVotes || {});
+    round.eliminated = clone(sourceRound.eliminated || null);
+    await onEvent({ type: 'exile-result', round: clone(round), game: clone(partial) });
+  }
+
+  partial.winner = game.winner;
+  await onEvent({ type: 'game', game: clone(partial) });
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+async function runAiGame(config, options = {}) {
+  const emit = async (event) => options.onEvent ? options.onEvent(event) : undefined;
   const agents = createAgents(config);
   const questions = shuffle(QUESTIONS).slice(0, config.rounds || 3);
   const rounds = [];
   const consensusResults = [];
   const publicHistory = [];
 
-  emit({ type: 'players', players: serializeGame({ agents, rounds, winner: null }).players });
+  await emit({ type: 'players', players: serializeGame({ agents, rounds, winner: null }).players });
 
   for (let index = 0; index < questions.length; index += 1) {
     const roundNumber = index + 1;
@@ -315,31 +368,28 @@ async function createAiGame(config, options = {}) {
       votes: {},
       tally: { A: 0, B: 0 },
       threshold,
+      exileThreshold: Math.floor(aliveIds.length / 2) + 1,
       consensus: false,
       stanceChanges: 0,
       speeches: [],
       exileVotes: {},
-      eliminated: null,
-      hostSummary: ''
+      eliminated: null
     };
     rounds.push(round);
-    emit({ type: 'round-start', round, game: serializeGame({ agents, rounds, winner: null }) });
+    await emit({ type: 'round-start', round, game: serializeGame({ agents, rounds, winner: null }) });
 
-    const voteResults = await Promise.all(
-      aliveAgents.map(async (agent) => ({
-        id: agent.id,
-        vote: await collectVote(agent, roundNumber, question, publicHistory.join('\n'))
-      }))
-    );
+    const voteResults = await Promise.all(aliveAgents.map(async (agent) => ({
+      id: agent.id,
+      vote: await collectVote(agent, roundNumber, question, publicHistory.join('\n'))
+    })));
     voteResults.forEach((item) => {
       round.votes[item.id] = item.vote;
     });
-
     round.tally = countVotes(round.votes);
     round.consensus = Math.max(round.tally.A, round.tally.B) >= threshold;
     round.stanceChanges = aliveAgents.filter((agent) => agent.stanceChangedThisRound).length;
     consensusResults.push(round.consensus);
-    emit({ type: 'vote-result', round, game: serializeGame({ agents, rounds, winner: null }) });
+    await emit({ type: 'vote-result', round, game: serializeGame({ agents, rounds, winner: null }) });
 
     const publicLog = [
       `题目：A：${question[0]} / B：${question[1]}`,
@@ -348,33 +398,29 @@ async function createAiGame(config, options = {}) {
       `立场变更声明人数：${round.stanceChanges}`
     ].join('\n');
 
-    round.hostSummary = await safeHostSummary(config, publicLog);
-
     for (const agent of aliveAgents) {
       const speech = await collectSpeech(
         agent,
         roundNumber,
         question,
-        round.hostSummary ? `${publicLog}\n主持人摘要：${round.hostSummary}` : publicLog,
+        publicLog,
         round.speeches.map((item) => `${item.playerId}号：${item.text}`).join('\n')
       );
       const speechItem = { playerId: agent.id, text: speech };
       round.speeches.push(speechItem);
-      emit({ type: 'speech', round, speech: speechItem, game: serializeGame({ agents, rounds, winner: null }) });
+      await emit({ type: 'speech', round, speech: speechItem, game: serializeGame({ agents, rounds, winner: null }) });
     }
 
     const allSpeechText = round.speeches.map((item) => `${item.playerId}号：${item.text}`).join('\n');
-    const exileResults = await Promise.all(
-      aliveAgents.map(async (agent) => ({
-        id: agent.id,
-        target: await collectExileVote(agent, aliveIds, publicLog, allSpeechText)
-      }))
-    );
+    const exileResults = await Promise.all(aliveAgents.map(async (agent) => ({
+      id: agent.id,
+      target: await collectExileVote(agent, aliveIds, publicLog, allSpeechText)
+    })));
     exileResults.forEach((item) => {
       round.exileVotes[item.id] = item.target;
     });
 
-    const eliminatedId = decideExile(round.exileVotes);
+    const eliminatedId = decideExile(round.exileVotes, aliveIds.length);
     if (eliminatedId) {
       const target = agents.find((agent) => agent.id === eliminatedId);
       if (target) {
@@ -384,31 +430,19 @@ async function createAiGame(config, options = {}) {
       }
     }
 
-    const winnerAfterRound = checkWinner(agents, consensusResults);
-    emit({ type: 'exile-result', round, game: serializeGame({ agents, rounds, winner: winnerAfterRound }) });
-
+    const winnerAfterRound = checkImmediateWinner(agents);
+    await emit({ type: 'exile-result', round, game: serializeGame({ agents, rounds, winner: winnerAfterRound }) });
     publicHistory.push(`第 ${roundNumber} 轮：A ${round.tally.A}/B ${round.tally.B}，共识${round.consensus ? '成功' : '失败'}，放逐：${eliminatedId || '无'}`);
     if (winnerAfterRound) break;
   }
 
-  const winner = consensusResults.filter(Boolean).length >= 2 ? 'order' : checkWinner(agents, consensusResults) || 'chaos';
+  const winner = checkImmediateWinner(agents) || getConsensusWinner(consensusResults);
   const game = serializeGame({ agents, rounds, winner });
-  emit({ type: 'game', game });
+  await emit({ type: 'game', game });
   return game;
 }
 
-async function safeHostSummary(config, publicLog) {
-  try {
-    return await askHost(config, [
-      '请用一句话总结公开局势，不能替任何玩家发言，也不能猜隐藏身份。',
-      publicLog
-    ].join('\n\n'));
-  } catch (error) {
-    console.error(`主持人摘要失败，跳过摘要：${error.message}`);
-    return '';
-  }
-}
-
 module.exports = {
-  createAiGame
+  createAiGame,
+  runAiGame
 };

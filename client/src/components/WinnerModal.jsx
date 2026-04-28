@@ -1,8 +1,8 @@
 import React from 'react';
-import { RotateCcw, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { getChaosPlayers, getWinnerName } from '../utils/gameState';
 
-export function WinnerModal({ game, onClose, onNextGame }) {
+export function WinnerModal({ game, onClose }) {
   if (!game?.winner || !game.rounds?.length) return null;
 
   const winnerName = getWinnerName(game.winner);
@@ -20,10 +20,6 @@ export function WinnerModal({ game, onClose, onNextGame }) {
         </div>
         <div className="modal-actions">
           <button className="start-game-button" onClick={onClose}>返回棋盘</button>
-          <button className="start-game-button next-game-button" onClick={onNextGame}>
-            <RotateCcw size={20} />
-            开启下一局
-          </button>
         </div>
       </section>
     </div>

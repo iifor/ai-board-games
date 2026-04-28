@@ -1,26 +1,22 @@
-export async function fetchMockGame() {
-  const response = await fetch('/api/games/new?mode=mock');
-  if (!response.ok) throw new Error('无法获取 Mock 对局');
-  return response.json();
-}
+export function openGameSocket({ mode, onEvent, onError, onClose }) {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const socket = new WebSocket(`${protocol}//${window.location.host}/ws/game`);
 
-export async function fetchGameHistory() {
-  const response = await fetch('/api/history');
-  if (!response.ok) throw new Error('无法获取历史对局');
-  return response.json();
-}
-
-export function openGameStream({ onEvent, onError }) {
-  const source = new EventSource('/api/games/stream?mode=real');
-
-  source.onmessage = (message) => {
-    onEvent(JSON.parse(message.data));
+  socket.onopen = () => {
+    socket.send(JSON.stringify({ type: 'start', mode }));
   };
 
-  source.onerror = () => {
-    onError(new Error('推送连接中断，请检查后端、网络或 API 配置。'));
-    source.close();
+  socket.onmessage = (message) => {
+    onEvent(JSON.parse(message.data), socket);
   };
 
-  return source;
+  socket.onerror = () => {
+    onError(new Error('WebSocket 连接失败，请检查后端服务。'));
+  };
+
+  socket.onclose = () => {
+    onClose?.();
+  };
+
+  return socket;
 }

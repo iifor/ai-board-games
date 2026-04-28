@@ -202,7 +202,7 @@ p {
   gap: 22px;
   min-height: 0;
   overflow: hidden;
-  padding: 12px 28px 16px 24px;
+  padding: 12px 28px 12px 24px;
 }
 
 .framed-panel {
@@ -954,9 +954,10 @@ p {
 }
 
 .action-bar {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1.15fr;
+  display: flex;
+  /* grid-template-columns: 1fr 1fr 1fr 1.15fr; */
   gap: 46px;
+  justify-content: space-around;
   align-items: center;
   padding: 14px 24px 16px;
   border-top: 1px solid rgba(226, 194, 122, 0.22);
@@ -976,6 +977,7 @@ p {
   cursor: pointer;
   font-size: 24px;
   font-weight: 900;
+  flex: 1;
 }
 
 .action-bar button:disabled {
