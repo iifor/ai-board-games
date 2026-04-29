@@ -1,6 +1,6 @@
 const { callOpenAIChat, parseJsonObject } = require('./openaiChat');
 const { createMockGame } = require('./mockGame');
-const { getRandomRealGameLog } = require('./gameLogStore');
+const { readRealGameLogs } = require('./gameLogStore');
 
 const QUESTIONS = [
   ['优先相信票型', '优先相信发言'],
@@ -40,7 +40,7 @@ function getThreshold(aliveCount) {
 }
 
 function chooseRoles(playerConfigs) {
-  const roles = shuffle(['chaos', 'chaos', 'order', 'order', 'order', 'order']);
+  const roles = shuffle(createRoleSet(playerConfigs.length));
   return playerConfigs.map((config, index) => ({
     ...config,
     role: roles[index],
@@ -52,6 +52,14 @@ function chooseRoles(playerConfigs) {
     changedOnce: false,
     stanceChangedThisRound: false
   }));
+}
+
+function createRoleSet(playerCount) {
+  const chaosCount = playerCount >= 8 ? 3 : playerCount >= 6 ? 2 : 1;
+  return [
+    ...Array.from({ length: chaosCount }, () => 'chaos'),
+    ...Array.from({ length: playerCount - chaosCount }, () => 'order')
+  ];
 }
 
 function buildSystemPrompt(player, allies) {
@@ -280,7 +288,7 @@ async function createAiGame(config, options = {}) {
 }
 
 function getMockReplayGame(config) {
-  const selected = getRandomRealGameLog(lastMockReplayGameId);
+  const selected = getRandomMatchingRealGameLog(config.selectedPlayerIds || config.players.map((player) => player.id));
   if (selected?.game?.rounds?.length) {
     lastMockReplayGameId = selected.game.id;
     return {
@@ -295,6 +303,19 @@ function getMockReplayGame(config) {
     };
   }
   return createMockGame(config);
+}
+
+function getRandomMatchingRealGameLog(playerIds) {
+  const expected = normalizeIdSet(playerIds);
+  const logs = readRealGameLogs().filter((record) => normalizeIdSet(record.game?.players?.map((player) => player.id)).join(',') === expected.join(','));
+  if (!logs.length) return null;
+  const candidates = logs.length > 1 ? logs.filter((record) => record.game?.id !== lastMockReplayGameId) : logs;
+  const pool = candidates.length ? candidates : logs;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function normalizeIdSet(ids = []) {
+  return ids.map(Number).filter(Boolean).sort((a, b) => a - b);
 }
 
 async function replayMockGame(game, onEvent) {

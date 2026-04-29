@@ -27,7 +27,7 @@ function shuffle(items) {
 }
 
 function createPlayers(configPlayers = []) {
-  const roles = shuffle(['chaos', 'chaos', 'order', 'order', 'order', 'order']);
+  const roles = shuffle(createRoleSet(configPlayers.length || 6));
   return roles.map((role, index) => {
     const config = configPlayers[index] || {};
     const id = config.id || index + 1;
@@ -45,6 +45,14 @@ function createPlayers(configPlayers = []) {
       eliminatedRound: null
     };
   });
+}
+
+function createRoleSet(playerCount) {
+  const chaosCount = playerCount >= 8 ? 3 : playerCount >= 6 ? 2 : 1;
+  return [
+    ...Array.from({ length: chaosCount }, () => 'chaos'),
+    ...Array.from({ length: playerCount - chaosCount }, () => 'order')
+  ];
 }
 
 function tallyVotes(votes) {

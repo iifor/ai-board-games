@@ -14,7 +14,7 @@ function attachGameSocket(server) {
       if (!message) return;
 
       if (message.type === 'start') {
-        runSession(session, message.mode === 'real' ? 'real' : 'mock').catch((error) => {
+        runSession(session, message.mode === 'real' ? 'real' : 'mock', message.playerIds).catch((error) => {
           if (error.message === 'game-session-cancelled') return;
           console.error(error);
           session.send({ type: 'error', message: error.message });
@@ -28,8 +28,8 @@ function attachGameSocket(server) {
   });
 }
 
-async function runSession(session, mode) {
-  const config = getRequestConfig(mode);
+async function runSession(session, mode, playerIds) {
+  const config = getRequestConfig(mode, playerIds);
 
   await session.sendAndWait({
     type: 'host',
@@ -89,8 +89,8 @@ function createSession(socket) {
   };
 }
 
-function getRequestConfig(mode) {
-  const config = getAiConfig();
+function getRequestConfig(mode, playerIds) {
+  const config = withSelectedPlayers(getAiConfig(), playerIds);
   if (mode === 'mock') return { ...config, mode: 'mock' };
 
   if (config.missingProviders.length) {
@@ -98,6 +98,27 @@ function getRequestConfig(mode) {
     throw new Error(`真实模式缺少 API Key：${missing}。请在 .env 中配置，或切换到 Mock。`);
   }
   return { ...config, mode: 'real' };
+}
+
+function withSelectedPlayers(config, playerIds) {
+  const ids = Array.isArray(playerIds) ? playerIds.map(Number).filter(Boolean) : [];
+  const selected = ids.length
+    ? config.players.filter((player) => ids.includes(player.id))
+    : config.players.slice(0, 7);
+
+  if (selected.length < 5 || selected.length > 8) {
+    throw new Error('迷雾共识需要选择 5-8 位 AI 玩家。');
+  }
+
+  const selectedProviders = new Set([config.host.provider, ...selected.map((player) => player.provider)]);
+  const missingProviders = config.missingProviders.filter((item) => selectedProviders.has(item.provider));
+  return {
+    ...config,
+    players: selected,
+    selectedPlayerIds: selected.map((player) => player.id),
+    missingProviders,
+    realReady: missingProviders.length === 0
+  };
 }
 
 function parseMessage(raw) {

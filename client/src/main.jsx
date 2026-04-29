@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { ActionBar } from './components/ActionBar';
 import { CenterStage, RealStartPanel } from './components/CenterStage';
 import { ConfirmResetModal, CurrentGameHistory, InfoModal, StageInfo } from './components/InfoModal';
+import { GameSelectPage } from './components/GameSelectPage';
+import { HomePage } from './components/HomePage';
 import { PlayerList } from './components/PlayerList';
 import { StatusPanel } from './components/StatusPanel';
 import { ErrorView, LoadingView } from './components/StateViews';
@@ -14,6 +16,29 @@ import { useSpeechQueue } from './hooks/useSpeechQueue';
 import './styles.css';
 
 function App() {
+  const [screen, setScreen] = useState('home');
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState([]);
+
+  if (screen === 'home') {
+    return <HomePage onStart={() => setScreen('select')} />;
+  }
+
+  if (screen === 'select') {
+    return (
+      <GameSelectPage
+        onBack={() => setScreen('home')}
+        onStartConsensus={(playerIds) => {
+          setSelectedPlayerIds(playerIds);
+          setScreen('consensus');
+        }}
+      />
+    );
+  }
+
+  return <ConsensusGame selectedPlayerIds={selectedPlayerIds} onReturnToSelect={() => setScreen('select')} />;
+}
+
+function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
   const [mockMode, setMockMode] = useState(true);
   const [game, setGame] = useState(() => createEmptyGame());
   const [step, setStep] = useState(0);
@@ -82,6 +107,7 @@ function App() {
     setStreamMessage('正在连接后端调度器...');
     socketRef.current = openGameSocket({
       mode: mockMode ? 'mock' : 'real',
+      playerIds: selectedPlayerIds,
       onEvent: handleSocketEvent,
       onError: (error) => {
         setStatus('error');
@@ -195,6 +221,11 @@ function App() {
     setInfoModal({ type: 'stage', title: '阶段信息', eyebrow: 'STAGE INFO', event: currentEvent });
   }
 
+  function returnToSelect() {
+    if (isRunning) return;
+    onReturnToSelect();
+  }
+
   function closeSocket() {
     if (socketRef.current) {
       socketRef.current.close();
@@ -217,6 +248,8 @@ function App() {
         mockMode={mockMode}
         speechEnabled={speechEnabled}
         controlsLocked={controlsLocked}
+        returnDisabled={isRunning}
+        onReturn={returnToSelect}
         onModeToggle={requestModeToggle}
         onSpeechToggle={requestSpeechToggle}
         setAutoPlay={setAutoPlay}

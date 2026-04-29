@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, MessageCircle, Pause, Power, Settings, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, MessageCircle, Pause, Power, Settings, Volume2, VolumeX } from 'lucide-react';
 import { classNames } from '../utils/gameState';
 
 export function TopNav({
@@ -10,6 +10,8 @@ export function TopNav({
   mockMode,
   speechEnabled,
   controlsLocked,
+  returnDisabled,
+  onReturn,
   onModeToggle,
   onSpeechToggle,
   setAutoPlay,
@@ -37,6 +39,10 @@ export function TopNav({
       </div>
 
       <nav className="nav-actions" aria-label="游戏菜单">
+        <button title="返回游戏选择" onClick={onReturn} disabled={returnDisabled}>
+          <ArrowLeft size={23} />
+          <span>返回</span>
+        </button>
         <button title={showRoles ? '隐藏身份' : '显示身份'} onClick={() => setShowRoles(!showRoles)}>
           {showRoles ? <EyeOff size={23} /> : <Eye size={23} />}
           <span>身份</span>

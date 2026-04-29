@@ -1,9 +1,16 @@
-export function openGameSocket({ mode, onEvent, onError, onClose }) {
+export async function fetchAiPlayers() {
+  const response = await fetch('/api/health');
+  if (!response.ok) throw new Error('无法获取 AI 玩家配置');
+  const data = await response.json();
+  return data.players || [];
+}
+
+export function openGameSocket({ mode, playerIds = [], onEvent, onError, onClose }) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(`${protocol}//${window.location.host}/ws/game`);
 
   socket.onopen = () => {
-    socket.send(JSON.stringify({ type: 'start', mode }));
+    socket.send(JSON.stringify({ type: 'start', mode, playerIds }));
   };
 
   socket.onmessage = (message) => {
