@@ -13,7 +13,8 @@ function createApp() {
 
   app.use(express.json());
   app.use('/api/admin', adminRoutes);
-  app.use('/api', gameRoutes);
+  app.use('/api/toc', gameRoutes);
+  app.use('/avatars', express.static(path.join(__dirname, '..', 'avatars')));
   app.use('/admin', express.static(adminDistDir));
   app.use(express.static(clientDistDir));
 

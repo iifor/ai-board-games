@@ -5,8 +5,9 @@ import { PanelTitle } from './PanelTitle';
 
 export function StatusPanel({ game, round, showRoles }) {
   const clueCount = game.rounds.filter((item) => item.clue).length;
-  const marked = game.players.filter((player) => player.marked).map((player) => `${player.id}号`);
-  const excluded = game.players.filter((player) => player.excluded).map((player) => `${player.id}号`);
+  const formatPlayerNumber = createPlayerNumberFormatter(game.players);
+  const marked = game.players.filter((player) => player.marked).map((player) => `${formatPlayerNumber(player.id)}号`);
+  const excluded = game.players.filter((player) => player.excluded).map((player) => `${formatPlayerNumber(player.id)}号`);
   const activeCount = game.players.filter((player) => !player.excluded).length;
 
   return (
@@ -24,7 +25,7 @@ export function StatusPanel({ game, round, showRoles }) {
           <strong>{activeCount}</strong><span>人</span>
         </StatusRow>
         <StatusRow icon={<Users size={24} />} label="身份信息">
-          <span>{showRoles ? '上帝视角全公开' : '玩家视角单人查看'}</span>
+          <span>{showRoles ? '上帝视角公开' : '玩家视角隐藏'}</span>
         </StatusRow>
       </section>
 
@@ -33,12 +34,12 @@ export function StatusPanel({ game, round, showRoles }) {
         <div className="exile-cards">
           {buildVoteCards(getActionVotes(round), round.aliveIds).map((card, index) => (
             <article key={card.id} className={`exile-card ${index === 0 ? 'lead' : ''}`}>
-              <strong>{card.id}号</strong><span>得票数</span><b>{card.count}</b><em>票</em>
-              <p>{card.voters.length ? card.voters.map((id) => `${id}号`).join('、') : '暂无投票'}</p>
+              <strong>{formatPlayerNumber(card.id)}号</strong><span>得票数</span><b>{card.count}</b><em>票</em>
+              <p>{card.voters.length ? card.voters.map((id) => `${formatPlayerNumber(id)}号`).join('、') : '暂无投票'}</p>
             </article>
           ))}
         </div>
-        <p className="exile-note">{getActionResult(round)}</p>
+        <p className="exile-note">{getActionResult(round, formatPlayerNumber)}</p>
       </section>
 
       <section className="framed-panel rules-card">
@@ -81,6 +82,11 @@ function StatusRow({ icon, label, children }) {
   return <div className="status-row"><div className="status-icon">{icon}</div><span>{label}</span><div>{children}</div></div>;
 }
 
+function createPlayerNumberFormatter(players = []) {
+  const numbers = new Map(players.map((player, index) => [Number(player.id), index + 1]));
+  return (id) => numbers.get(Number(id)) || id;
+}
+
 function getPhaseName(phase) {
   if (phase === 'suspicion') return '风险标记';
   if (phase === 'exclusion') return '权限冻结';
@@ -102,15 +108,15 @@ function getActionVotes(round) {
   return {};
 }
 
-function getActionResult(round) {
+function getActionResult(round, formatPlayerNumber) {
   if (round.phase === 'suspicion') {
-    return round.markedSuspects?.length ? `风险标记：${round.markedSuspects.join('、')}号` : '等待风险标记投票';
+    return round.markedSuspects?.length ? `风险标记：${round.markedSuspects.map((id) => `${formatPlayerNumber(id)}号`).join('、')}` : '等待风险标记投票';
   }
   if (round.phase === 'exclusion') {
-    return round.excluded?.length ? `权限冻结：${round.excluded.map((item) => item.id).join('、')}号` : '等待权限冻结投票';
+    return round.excluded?.length ? `权限冻结：${round.excluded.map((item) => `${formatPlayerNumber(item.id)}号`).join('、')}` : '等待权限冻结投票';
   }
   if (round.phase === 'final') {
-    return round.finalTargets?.length ? `最高票指认：${round.finalTargets.join('、')}号` : '等待最终指认';
+    return round.finalTargets?.length ? `最高票指认：${round.finalTargets.map((id) => `${formatPlayerNumber(id)}号`).join('、')}` : '等待最终指认';
   }
   return '等待行动结果';
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BadgeCheck, MessageCircle, Pause, Play } from 'lucide-react';
+import { BadgeCheck, Pause, Play } from 'lucide-react';
 import { PanelTitle } from './PanelTitle';
 import { getConsensusTypeName } from '../utils/gameState';
 
@@ -19,12 +19,12 @@ export function RealStartPanel({ status, message, onStart }) {
   );
 }
 
-export function CenterStage({ game, round, speeches, step, timelineLength, setStep, autoPlay, setAutoPlay, mockMode, streamMessage }) {
+export function CenterStage({ game, round, speeches, streamMessage }) {
   return (
     <section className="center-stage">
       <PanelTitle title={game.event?.name || '迷雾调查'} large />
       <RoundCompactBar round={round} />
-      <DiscussionLog round={round} speeches={speeches} mockMode={mockMode} streamMessage={streamMessage} />
+      <DiscussionLog round={round} speeches={speeches} players={game.players || []} streamMessage={streamMessage} />
     </section>
   );
 }
@@ -56,26 +56,25 @@ function RoundCompactBar({ round }) {
   );
 }
 
-function DiscussionLog({ round, speeches, streamMessage }) {
+function DiscussionLog({ round, speeches, players, streamMessage }) {
+  const playerNumbers = new Map(players.map((player, index) => [Number(player.id), index + 1]));
+
   return (
     <section className="discussion framed-panel">
       <PanelTitle title="自由讨论" compact />
       <div className="discussion-scroll">
         {streamMessage && <p className="stream-message">{streamMessage}</p>}
-        {speeches.length ? speeches.map((speech, index) => (
-          <article className={`chat-line ${speech.type === 'host' ? 'host-line' : ''}`} key={`${speech.playerId}-${index}`}>
-            <span className={`chat-id id-${speech.playerId}`}>{speech.type === 'host' ? '主' : speech.playerId}</span>
-            <strong>{speech.type === 'host' ? '主持人：' : `${speech.playerId}号：`}</strong>
-            <p>{speech.text}</p>
-            <time>20:{String(15 + Math.min(index, 44)).padStart(2, '0')}</time>
-          </article>
-        )) : <p className="empty-discussion">第 {round.number} 轮尚未进入发言。</p>}
-      </div>
-      <div className="chat-input">
-        <MessageCircle size={19} />
-        <span>输入你的发言内容（Enter 发送）</span>
-        <em>0/60</em>
-        <button>发送</button>
+        {speeches.length ? speeches.map((speech, index) => {
+          const displayNumber = playerNumbers.get(Number(speech.playerId)) || speech.playerId;
+          return (
+            <article className={`chat-line ${speech.type === 'host' ? 'host-line' : ''}`} key={`${speech.playerId}-${index}`}>
+              <span className={`chat-id id-${displayNumber}`}>{speech.type === 'host' ? '主' : displayNumber}</span>
+              <strong>{speech.type === 'host' ? '主持人：' : `${displayNumber}号：`}</strong>
+              <p>{speech.text}</p>
+              <time>20:{String(15 + Math.min(index, 44)).padStart(2, '0')}</time>
+            </article>
+          );
+        }) : <p className="empty-discussion">第 {round.number} 轮尚未进入发言。</p>}
       </div>
     </section>
   );

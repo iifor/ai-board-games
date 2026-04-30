@@ -5,7 +5,7 @@ const { saveGameRecord } = require('./adminStore');
 const { saveGameLog } = require('./gameLogStore');
 
 function attachGameSocket(server) {
-  const wss = new WebSocketServer({ server, path: '/ws/game' });
+  const wss = new WebSocketServer({ server, path: '/api/toc/ws/game' });
 
   wss.on('connection', (socket) => {
     const session = createSession(socket);
@@ -103,7 +103,7 @@ function getRequestConfig(mode, playerIds) {
 function withSelectedPlayers(config, playerIds) {
   const ids = Array.isArray(playerIds) ? playerIds.map(Number).filter(Boolean) : [];
   const selected = ids.length
-    ? config.players.filter((player) => ids.includes(player.id))
+    ? ids.map((id) => config.players.find((player) => Number(player.id) === id)).filter(Boolean)
     : config.players.slice(0, 7);
 
   if (selected.length !== 7) {

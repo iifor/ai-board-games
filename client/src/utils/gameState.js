@@ -147,7 +147,7 @@ export function getConsensusTypeName(type) {
 }
 
 export function getRoleName(role, roleLabel) {
-  if (roleLabel && roleLabel !== '身份隐藏') return roleLabel;
+  if (roleLabel && !['身份隐藏', '玩家视角隐藏', '未知'].includes(roleLabel)) return roleLabel;
   if (role === 'investigator') return '安全调查员';
   if (role === 'keyFigure') return '违规操作者';
   if (role === 'cover') return '日志篡改者';

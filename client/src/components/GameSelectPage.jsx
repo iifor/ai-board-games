@@ -56,7 +56,10 @@ export function GameSelectPage({ onBack, onStartConsensus }) {
   const selectedCount = selectedIds.length;
   const canStart = selectedCount >= MIN_PLAYERS && selectedCount <= MAX_PLAYERS;
   const selectedNames = useMemo(
-    () => players.filter((player) => selectedIds.includes(player.id)).map((player) => player.nickname || player.name || `${player.id}号`),
+    () => selectedIds
+      .map((id) => players.find((player) => player.id === id))
+      .filter(Boolean)
+      .map((player) => player.nickname || player.name || `${player.id}号`),
     [players, selectedIds]
   );
 

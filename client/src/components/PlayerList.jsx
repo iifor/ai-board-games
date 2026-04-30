@@ -5,27 +5,28 @@ import { PanelTitle } from './PanelTitle';
 
 export function PlayerList({ players, round, showRoles, currentSpeakerId }) {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const selectedIndex = selectedPlayer ? players.findIndex((player) => player.id === selectedPlayer.id) : -1;
 
   return (
     <aside className="left-panel framed-panel">
       <PanelTitle title={`玩家列表（${players.length}人）`} />
       <div className="player-list">
-        {players.map((player) => {
+        {players.map((player, index) => {
           const vote = round.votes[player.id] || '-';
           const isAlive = !player.excluded;
           const roleText = getRoleName(player.role, player.roleLabel);
-          const suspicion = Math.min(5, Math.max(1, player.suspicion || player.id % 5));
-          const displayName = player.nickname || player.name || `${player.id}号`;
+          const displayName = player.nickname || player.name || `${index + 1}号`;
+          const displayNumber = index + 1;
 
           return (
             <article
               key={player.id}
               className={classNames('player-card', !isAlive && 'eliminated', currentSpeakerId === player.id && 'speaking')}
             >
-              <div className="rank-badge">{player.id}</div>
+              <div className="rank-badge">{displayNumber}</div>
               <button className="portrait-button" onClick={() => setSelectedPlayer(player)} aria-label={`查看${displayName}信息`}>
                 <PlayerPortrait player={player} />
-                <PlayerInfoCard player={player} canReveal={showRoles} />
+                <PlayerInfoCard player={player} displayNumber={displayNumber} canReveal={showRoles} />
               </button>
               <div className="player-info">
                 <div className="player-name-row">
@@ -34,12 +35,6 @@ export function PlayerList({ players, round, showRoles, currentSpeakerId }) {
                 </div>
                 <p>本轮投票：{vote}</p>
                 <p>{player.marked ? '已获风险标记' : '暂无风险标记'}</p>
-                <div className="suspicion-row">
-                  <span>嫌疑：</span>
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <i key={index} className={index < suspicion ? 'active' : ''} />
-                  ))}
-                </div>
                 <p className={classNames('role-line', showRoles && player.role)}>
                   {showRoles ? roleText : '玩家视角隐藏'}
                 </p>
@@ -56,7 +51,7 @@ export function PlayerList({ players, round, showRoles, currentSpeakerId }) {
         <div className="player-info-backdrop" role="presentation" onClick={() => setSelectedPlayer(null)}>
           <section className="player-info-modal framed-panel" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <button className="player-info-close" onClick={() => setSelectedPlayer(null)} aria-label="关闭">×</button>
-            <PlayerInfoContent player={selectedPlayer} canReveal />
+            <PlayerInfoContent player={selectedPlayer} displayNumber={selectedIndex + 1} canReveal={showRoles} />
           </section>
         </div>
       )}
@@ -71,7 +66,7 @@ function PlayerPortrait({ player }) {
     return (
       <div
         className={`portrait portrait-${player.id} custom-portrait`}
-        style={{ backgroundImage: `url("${player.avatar}")` }}
+        style={{ backgroundImage: `url("${formatAvatarUrl(player.avatar)}")` }}
         aria-label={`${player.nickname || player.name}头像`}
       />
     );
@@ -84,22 +79,23 @@ function PlayerPortrait({ player }) {
   );
 }
 
-function PlayerInfoCard({ player, canReveal }) {
+function PlayerInfoCard({ player, displayNumber, canReveal }) {
   return (
     <div className="player-hover-card">
-      <PlayerInfoContent player={player} compact canReveal={canReveal} />
+      <PlayerInfoContent player={player} displayNumber={displayNumber} compact canReveal={canReveal} />
     </div>
   );
 }
 
-function PlayerInfoContent({ player, compact = false, canReveal = false }) {
+function PlayerInfoContent({ player, displayNumber, compact = false, canReveal = false }) {
+  const safeNumber = displayNumber || player.id;
   return (
     <>
       <p className="eyebrow">PLAYER CARD</p>
-      <h3>{player.nickname || player.name || `${player.id}号`}（{player.id}号）</h3>
+      <h3>{player.nickname || player.name || `${safeNumber}号`}（{safeNumber}号）</h3>
       <dl>
         <div><dt>性别</dt><dd>{player.sex || '未知'}</dd></div>
-        <div><dt>角色</dt><dd>{canReveal ? getRoleName(player.role, player.roleLabel) : '玩家视角隐藏'}</dd></div>
+        <div><dt>身份</dt><dd>{canReveal ? getRoleName(player.role, player.roleLabel) : '玩家视角隐藏'}</dd></div>
         <div><dt>性格</dt><dd>{player.personality || '暂无'}</dd></div>
       </dl>
       {!compact && canReveal && (
@@ -108,8 +104,15 @@ function PlayerInfoContent({ player, compact = false, canReveal = false }) {
           <p>{player.memoryCard || '暂无角色卡。'}</p>
         </div>
       )}
-      {!compact && !canReveal && <p className="hover-hint">玩家视角下，点击头像后只查看这一位玩家的信息。</p>}
+      {!compact && !canReveal && <p className="hover-hint">玩家视角下，只展示这位玩家的公开信息。</p>}
       {compact && <p className="hover-hint">{canReveal ? '点击头像查看本局角色卡' : '点击头像查看这位玩家'}</p>}
     </>
   );
+}
+
+function formatAvatarUrl(value) {
+  const url = String(value || '').trim();
+  if (!url) return '';
+  if (/^(https?:|data:|blob:)/i.test(url)) return url.replace(/"/g, '%22');
+  return encodeURI(url.startsWith('/') ? url : `/${url}`).replace(/"/g, '%22');
 }

@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const apiPort = Number(process.env.API_PORT || process.env.PORT || 3001);
+const apiPort = Number(process.env.API_PORT || 3001);
 const adminPort = Number(process.env.ADMIN_PORT || 5175);
 
 export default defineConfig({
@@ -12,7 +12,10 @@ export default defineConfig({
     port: adminPort,
     strictPort: true,
     proxy: {
-      '/api': `http://localhost:${apiPort}`
+      '/api/admin': {
+        target: `http://127.0.0.1:${apiPort}`,
+        changeOrigin: true
+      }
     }
   },
   build: {

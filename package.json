@@ -5,7 +5,7 @@
   "main": "server/index.js",
   "type": "commonjs",
   "scripts": {
-    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\" \"npm:dev:admin\"",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:admin\"",
     "dev:server": "node server/index.js",
     "dev:client": "vite --config vite.client.config.mjs --host 0.0.0.0",
     "dev:admin": "vite --config vite.admin.config.mjs --host 0.0.0.0",

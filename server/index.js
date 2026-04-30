@@ -3,7 +3,7 @@ const { getAiConfig } = require('./aiConfig');
 const { createApp } = require('./app');
 const { attachGameSocket } = require('./gameSocket');
 
-const port = Number(process.env.PORT || 3001);
+const port = Number(process.env.API_PORT || (process.env.NODE_ENV === 'production' ? process.env.PORT : undefined) || 3001);
 const app = createApp();
 const server = http.createServer(app);
 
@@ -12,7 +12,7 @@ attachGameSocket(server);
 server.listen(port, () => {
   const config = getAiConfig();
   console.log(`Express API 已启动：http://localhost:${port}`);
-  console.log(`WebSocket 已启动：ws://localhost:${port}/ws/game`);
+  console.log(`WebSocket 已启动：ws://localhost:${port}/api/toc/ws/game`);
   console.log('AI 玩法模式：由前端页面 Mock/真实 开关决定');
   console.log(`真实模式可用：${config.realReady ? '是' : '否'}`);
   console.log(`主持人：${config.host.provider}/${config.host.model}`);

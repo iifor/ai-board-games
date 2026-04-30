@@ -1182,14 +1182,14 @@ p {
 
 .player-hover-card {
   position: absolute;
-  left: 50%;
+  left: calc(100% + 14px);
   top: calc(100% + 8px);
   z-index: 30;
   display: none;
   width: 260px;
-  transform: translateX(-28%);
+  transform: translateY(-18px);
   border: 1px solid rgba(226, 194, 122, 0.36);
-  padding: 12px;
+  padding: 18px;
   text-align: left;
   background: rgba(5, 10, 15, 0.96);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
@@ -1534,7 +1534,7 @@ p {
 
 .discussion {
   display: grid;
-  grid-template-rows: 32px minmax(0, 1fr) 54px;
+  grid-template-rows: 32px minmax(0, 1fr);
   min-height: 0;
   margin-top: 20px;
   padding: 10px 14px;
@@ -2470,7 +2470,7 @@ p {
   }
 
   .discussion {
-    grid-template-rows: 24px minmax(0, 1fr) 40px;
+    grid-template-rows: 24px minmax(0, 1fr);
     margin-top: 10px;
     padding: 7px 9px;
   }
