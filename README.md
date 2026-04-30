@@ -91,24 +91,31 @@ http://localhost:3001/api/diagnostics/openai?provider=qwen
 
 如果出现 `Connect Timeout Error`，说明 Node 进程连不到对应 provider 的 `baseUrl`，通常是网络、代理、中转地址或防火墙问题，不是游戏调度逻辑问题。
 
-## H5 真实玩法
+## Web 玩法
 
 页面右上角有 Mock / 真实开关。
 
 - Mock 模式：走本地模拟数据。
 - 真实模式：页面先显示“游戏即将开始...”，点击开始后才会调用后端。
-- 后端通过 SSE 接口逐步推送游戏状态：
+- 后端通过 WebSocket 逐步推送游戏状态：
 
 ```text
-GET /api/games/stream?mode=real
+ws://localhost:3001/ws/game
 ```
-
-注意：`npm.cmd run cli` 是独立命令行对局，不会同步到 H5 页面。
 
 ## 项目结构
 
 ```text
+admin/
+├── index.html
+└── src/
+    ├── main.jsx
+    ├── api/
+    ├── components/
+    └── styles.css
+
 client/
+├── index.html
 └── src/
     ├── main.jsx
     ├── api/
@@ -121,8 +128,13 @@ server/
 ├── app.js
 ├── routes/
 ├── utils/
+├── db.js
+├── adminStore.js
 ├── aiConfig.js
 ├── aiGameRunner.js
 ├── openaiChat.js
 └── mockGame.js
+
+vite.client.config.mjs
+vite.admin.config.mjs
 ```
