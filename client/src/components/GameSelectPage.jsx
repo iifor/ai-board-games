@@ -2,35 +2,25 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Bot, ChevronLeft, Filter, Flame, Gamepad2, Plus, Search, Settings, Sparkles, UsersRound, X } from 'lucide-react';
 import { fetchAiPlayers } from '../api/gameApi';
 
-const MIN_PLAYERS = 5;
-const MAX_PLAYERS = 8;
+const MIN_PLAYERS = 7;
+const MAX_PLAYERS = 7;
 const RECOMMENDED_PLAYERS = 7;
 
 const fallbackPlayers = [
-  { id: 1, nickname: '豆包', provider: 'deepseek', model: 'deepseek-chat' },
-  { id: 2, nickname: 'Grok', provider: 'deepseek', model: 'deepseek-chat' },
-  { id: 3, nickname: '文心一言', provider: 'deepseek', model: 'deepseek-chat' },
-  { id: 4, nickname: 'Gemini', provider: 'deepseek', model: 'deepseek-chat' },
-  { id: 5, nickname: 'Kimi', provider: 'deepseek', model: 'deepseek-chat' },
-  { id: 6, nickname: 'DeepSeek', provider: 'deepseek', model: 'deepseek-chat' },
-  { id: 7, nickname: 'Claude', provider: 'deepseek', model: 'deepseek-chat' }
 ];
 
 const games = [
   {
     title: '迷雾共识',
-    meta: '5-8人 · 推荐7人',
+    meta: '固定7人 · v3.2',
     tags: ['AI陪玩', '支持多人'],
     tone: 'consensus',
     badge: <Sparkles size={24} />,
     action: true
   },
-  { title: '狼人杀', meta: '6-12人 · 中等', tags: ['AI陪玩', '支持多人'], tone: 'wolf' },
-  { title: '阿瓦隆', meta: '5-10人 · 中等', tags: ['AI陪玩', '支持多人'], tone: 'avalon' },
-  { title: '谁是卧底', meta: '4-10人 · 简单', tags: ['AI陪玩', '支持多人'], tone: 'undercover' },
-  { title: '剧本推理', meta: '2-8人 · 中等', tags: ['AI陪玩', '支持多人'], tone: 'detective' },
-  { title: '三国杀', meta: '3-8人 · 中等偏高', tags: ['AI陪玩', '支持多人'], tone: 'sanguo' },
-  { title: '血染钟楼', meta: '5-10人 · 困难', tags: ['AI陪玩', '支持多人'], tone: 'clocktower' }
+  { title: '敬请期待', meta: '开发中', tags: ['即将上线'], tone: 'wolf' },
+  { title: '敬请期待', meta: '开发中', tags: ['即将上线'], tone: 'avalon' },
+  { title: '敬请期待', meta: '开发中', tags: ['即将上线'], tone: 'undercover' }
 ];
 
 const categories = ['热门推荐', '推理社交', '策略博弈', '轻松聚会'];
@@ -123,16 +113,11 @@ export function GameSelectPage({ onBack, onStartConsensus }) {
               </article>
             ))}
           </div>
-
-          <article className="today-pick">
-            <strong>今日推荐</strong>
-            <span>新手友好 · 规则简单 · 体验极佳</span>
-          </article>
         </aside>
 
         <section className="game-card-grid" aria-label="游戏列表">
           {games.map((game) => (
-            <article className={`game-card ${game.tone} ${game.action ? 'featured' : ''}`} key={game.title}>
+            <article className={`game-card ${game.tone} ${game.action ? 'featured' : ''}`} key={`${game.title}-${game.tone}`}>
               <div className="game-card-art">
                 <div className="game-card-symbol">{game.badge || <Gamepad2 size={30} />}</div>
               </div>
@@ -144,9 +129,9 @@ export function GameSelectPage({ onBack, onStartConsensus }) {
                 <p>{game.meta}</p>
                 {game.action && (
                   <div className="game-player-rule">
-                    <span>最少 {MIN_PLAYERS} 人</span>
-                    <span>推荐 {RECOMMENDED_PLAYERS} 人</span>
-                    <span>最多 {MAX_PLAYERS} 人</span>
+                    <span>固定 {RECOMMENDED_PLAYERS} 人</span>
+                    <span>三轮调查</span>
+                    <span>迷雾推理</span>
                   </div>
                 )}
               </div>
@@ -175,8 +160,19 @@ export function GameSelectPage({ onBack, onStartConsensus }) {
             </button>
             <p className="eyebrow">AI PLAYERS</p>
             <h2 id="player-select-title">选择加入本局的 AI</h2>
-            <p className="player-select-tip">迷雾共识最少 {MIN_PLAYERS} 人，最多 {MAX_PLAYERS} 人，推荐 {RECOMMENDED_PLAYERS} 人。本局游戏只会使用你勾选的玩家。</p>
+            <p className="player-select-tip">共识迷雾 v3.2 为固定 {RECOMMENDED_PLAYERS} 人标准局。本局游戏只会使用你勾选的玩家。</p>
             {loadError && <p className="player-select-warning">{loadError}，已使用默认玩家列表。</p>}
+
+            <div className="player-select-start-row">
+              <div>
+                <span>已选择 {selectedCount} / {RECOMMENDED_PLAYERS}</span>
+                <strong>{selectedNames.join('、') || '暂无'}</strong>
+              </div>
+              <button className="neon-button primary-start-button" onClick={confirmStart} disabled={!canStart}>
+                确认开局
+                <span>›</span>
+              </button>
+            </div>
 
             <div className="player-option-list">
               {players.map((player) => {
@@ -197,15 +193,11 @@ export function GameSelectPage({ onBack, onStartConsensus }) {
             <div className="player-select-summary">
               <span>已选择 {selectedCount} 位</span>
               <strong>{selectedNames.join('、') || '暂无'}</strong>
-              {!canStart && <em>请选择 {MIN_PLAYERS}-{MAX_PLAYERS} 位 AI 玩家后开始。</em>}
+              {!canStart && <em>请选择恰好 {RECOMMENDED_PLAYERS} 位 AI 玩家后开始。</em>}
             </div>
 
             <div className="player-select-actions">
               <button onClick={() => setShowPlayerModal(false)}>取消</button>
-              <button className="neon-button" onClick={confirmStart} disabled={!canStart}>
-                确认开局
-                <span>›</span>
-              </button>
             </div>
           </section>
         </div>

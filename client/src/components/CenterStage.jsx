@@ -1,6 +1,7 @@
 import React from 'react';
-import { BadgeCheck, ChevronLeft, ChevronRight, MessageCircle, Pause, Play } from 'lucide-react';
+import { BadgeCheck, MessageCircle, Pause, Play } from 'lucide-react';
 import { PanelTitle } from './PanelTitle';
+import { getConsensusTypeName } from '../utils/gameState';
 
 export function RealStartPanel({ status, message, onStart }) {
   return (
@@ -18,46 +19,39 @@ export function RealStartPanel({ status, message, onStart }) {
   );
 }
 
-export function CenterStage({ round, speeches, step, timelineLength, setStep, autoPlay, setAutoPlay, mockMode, streamMessage }) {
+export function CenterStage({ game, round, speeches, step, timelineLength, setStep, autoPlay, setAutoPlay, mockMode, streamMessage }) {
   return (
     <section className="center-stage">
-      <PanelTitle title="本轮议题" large />
-      <QuestionDuel round={round} />
-      <VoteResult round={round} />
+      <PanelTitle title={game.event?.name || '迷雾调查'} large />
+      <RoundCompactBar round={round} />
       <DiscussionLog round={round} speeches={speeches} mockMode={mockMode} streamMessage={streamMessage} />
     </section>
   );
 }
 
-function QuestionDuel({ round }) {
-  return (
-    <section className="question-duel">
-      <div className="choice-card choice-a"><span>A</span><strong>{round.question.a}</strong></div>
-      <div className="vs-ring">Vs</div>
-      <div className="choice-card choice-b"><span>B</span><strong>{round.question.b}</strong></div>
-    </section>
-  );
-}
-
-function VoteResult({ round }) {
+function RoundCompactBar({ round }) {
   const total = Math.max(1, round.aliveIds.length);
   const aPercent = Math.round((round.tally.A / total) * 100);
   const bPercent = 100 - aPercent;
   const hasVotes = Object.keys(round.votes || {}).length > 0;
 
   return (
-    <section className="vote-result framed-panel">
-      <div className="vote-count side-a"><span>A 票数</span><strong>{round.tally.A}</strong><em>票</em></div>
-      <div className="consensus-result">
-        <PanelTitle title="本轮共识投票结果" compact />
+    <section className="round-compact framed-panel">
+      <div className="round-question">
+        <p>{round.question.premise || '主持人要求在两个调查方向中选择其一。'}</p>
+        <div>
+          <span>A {round.question.a}</span>
+          <span>B {round.question.b}</span>
+        </div>
+      </div>
+      <div className="round-vote-mini">
         <strong className={round.consensus ? 'success' : 'failed'}>
-          本轮共识：{hasVotes ? (round.consensus ? '成功' : '失败') : '等待'}
-          {round.consensus && <BadgeCheck size={28} />}
+          {hasVotes ? getConsensusTypeName(round.consensusType) : '等待投票'}
+          {round.consensus && <BadgeCheck size={18} />}
         </strong>
-        <p>共识阈值：{round.threshold} 票（{round.aliveIds.length}人局需{round.threshold}票）</p>
+        <em>A {round.tally.A} / B {round.tally.B}</em>
         <div className="result-bars"><i style={{ width: `${aPercent}%` }} /><b style={{ width: `${bPercent}%` }} /></div>
       </div>
-      <div className="vote-count side-b"><span>B 票数</span><strong>{round.tally.B}</strong><em>票</em></div>
     </section>
   );
 }
@@ -69,9 +63,9 @@ function DiscussionLog({ round, speeches, streamMessage }) {
       <div className="discussion-scroll">
         {streamMessage && <p className="stream-message">{streamMessage}</p>}
         {speeches.length ? speeches.map((speech, index) => (
-          <article className="chat-line" key={`${speech.playerId}-${index}`}>
-            <span className={`chat-id id-${speech.playerId}`}>{speech.playerId}</span>
-            <strong>{speech.playerId}号：</strong>
+          <article className={`chat-line ${speech.type === 'host' ? 'host-line' : ''}`} key={`${speech.playerId}-${index}`}>
+            <span className={`chat-id id-${speech.playerId}`}>{speech.type === 'host' ? '主' : speech.playerId}</span>
+            <strong>{speech.type === 'host' ? '主持人：' : `${speech.playerId}号：`}</strong>
             <p>{speech.text}</p>
             <time>20:{String(15 + Math.min(index, 44)).padStart(2, '0')}</time>
           </article>

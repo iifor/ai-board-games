@@ -1,6 +1,7 @@
 const { WebSocketServer } = require('ws');
 const { getAiConfig } = require('./aiConfig');
 const { createAiGame } = require('./aiGameRunner');
+const { saveGameRecord } = require('./adminStore');
 const { saveGameLog } = require('./gameLogStore');
 
 function attachGameSocket(server) {
@@ -33,15 +34,14 @@ async function runSession(session, mode, playerIds) {
 
   await session.sendAndWait({
     type: 'host',
-    message: mode === 'real'
-      ? '游戏开始，AI 对局正在生成。'
-      : 'Mock 对局开始，后端将按流程逐条推送。'
+    message: '游戏开始'
   });
 
   const game = await createAiGame(config, {
     onEvent: (event) => session.sendAndWait(withNarration(event))
   });
 
+  saveGameRecord(game);
   if (mode === 'real') saveGameLog(game);
 
   await session.sendAndWait({
@@ -106,8 +106,8 @@ function withSelectedPlayers(config, playerIds) {
     ? config.players.filter((player) => ids.includes(player.id))
     : config.players.slice(0, 7);
 
-  if (selected.length < 5 || selected.length > 8) {
-    throw new Error('迷雾共识需要选择 5-8 位 AI 玩家。');
+  if (selected.length !== 7) {
+    throw new Error('共识迷雾 v3.2 标准局需要选择恰好 7 位 AI 玩家。');
   }
 
   const selectedProviders = new Set([config.host.provider, ...selected.map((player) => player.provider)]);
@@ -137,22 +137,46 @@ function withNarration(event) {
 }
 
 function getNarration(event) {
-  if (event.type === 'players') return '玩家信息已经就绪。';
+  if (event.type === 'players') return '七名玩家已经就绪。身份和个人记忆已经秘密分发。';
   if (event.type === 'round-start') {
-    return `第 ${event.round.number} 轮开始。本轮议题，A：${event.round.question.a}，B：${event.round.question.b}。现在开始投票。`;
+    const premise = event.round.question.premise ? `${event.round.question.premise}` : '';
+    return `第 ${event.round.number} 轮调查开始。${premise} 本轮调查题，A：${event.round.question.a}，B：${event.round.question.b}。现在进行匿名共识投票。`;
   }
   if (event.type === 'vote-result') {
-    return `投票结束。A 获得 ${event.round.tally.A} 票，B 获得 ${event.round.tally.B} 票。本轮共识${event.round.consensus ? '成功' : '失败'}。现在进入自由讨论。`;
+    return `投票结束。A 获得 ${event.round.tally.A} 票，B 获得 ${event.round.tally.B} 票。本轮结果是${getConsensusTypeName(event.round.consensusType)}。`;
+  }
+  if (event.type === 'clue-result') {
+    const clue = event.round.clue ? `公开${event.round.clue.title}。${event.round.clue.text}` : '本轮共识失败，不公开新线索。';
+    const appraisal = event.round.appraisal && event.round.appraisal !== '无' ? `鉴定报告：${event.round.appraisal}` : '';
+    const noise = event.round.noise ? `迷雾噪音：${event.round.noise}` : '';
+    return `${clue}${appraisal ? ` ${appraisal}` : ''}${noise ? ` ${noise}` : ''} 现在进入自然发言。`;
   }
   if (event.type === 'speech') {
     return `${event.speech.playerId}号发言。${event.speech.text}`;
   }
-  if (event.type === 'exile-result') {
-    const eliminated = event.round.eliminated?.id ? `${event.round.eliminated.id}号被放逐。` : '本轮无人被放逐。';
-    return `现在公布放逐投票结果。${eliminated}`;
+  if (event.type === 'suspicion-result') {
+    const marked = event.round.markedSuspects?.length ? `${event.round.markedSuspects.join('、')}号获得风险标记。` : '本轮无人获得风险标记。';
+    return `现在公布风险标记投票结果。${marked}`;
+  }
+  if (event.type === 'exclusion-result') {
+    const excluded = event.round.excluded?.length ? `${event.round.excluded.map((item) => `${item.id}号`).join('、')}被权限冻结。` : '本轮无人被权限冻结。';
+    return `现在公布权限冻结结果。${excluded}`;
+  }
+  if (event.type === 'last-testimony') {
+    return `${event.testimony.id}号留下离组记录。${event.testimony.testimony}`;
+  }
+  if (event.type === 'final-accusation-result') {
+    const targets = event.round.finalTargets?.length ? `${event.round.finalTargets.join('、')}号` : '无人';
+    return `最终指认结果公布。最高票对象是${targets}。`;
   }
   if (event.type === 'game') return '本局进入胜负结算。';
   return event.message || '';
+}
+
+function getConsensusTypeName(type) {
+  if (type === 'overConsensus') return '过度共识';
+  if (type === 'effective') return '有效共识';
+  return '共识失败';
 }
 
 module.exports = {

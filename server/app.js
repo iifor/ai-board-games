@@ -1,14 +1,27 @@
 const express = require('express');
 const path = require('path');
+const adminRoutes = require('./routes/adminRoutes');
 const gameRoutes = require('./routes/gameRoutes');
+const { initAdminData } = require('./adminStore');
 
 function createApp() {
   const app = express();
-  const distDir = path.join(__dirname, '..', 'dist');
+  const clientDistDir = path.join(__dirname, '..', 'dist', 'client');
+  const adminDistDir = path.join(__dirname, '..', 'dist', 'admin');
+
+  initAdminData();
 
   app.use(express.json());
+  app.use('/api/admin', adminRoutes);
   app.use('/api', gameRoutes);
-  app.use(express.static(distDir));
+  app.use('/admin', express.static(adminDistDir));
+  app.use(express.static(clientDistDir));
+
+  app.get('/admin/*', (request, response, next) => {
+    response.sendFile(path.join(adminDistDir, 'index.html'), (error) => {
+      if (error) next();
+    });
+  });
 
   app.get('*', (request, response, next) => {
     if (request.path.startsWith('/api')) {
@@ -16,7 +29,7 @@ function createApp() {
       return;
     }
 
-    response.sendFile(path.join(distDir, 'index.html'), (error) => {
+    response.sendFile(path.join(clientDistDir, 'index.html'), (error) => {
       if (error) next();
     });
   });

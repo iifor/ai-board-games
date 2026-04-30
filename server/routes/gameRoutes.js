@@ -3,11 +3,13 @@ const { getAiConfig } = require('../aiConfig');
 const { createAiGame } = require('../aiGameRunner');
 const { saveGameLog } = require('../gameLogStore');
 const { testOpenAIConnection } = require('../openaiChat');
+const { listSkins, saveGameRecord } = require('../adminStore');
 
 const router = express.Router();
 
 router.get('/health', (request, response) => {
   const config = getAiConfig();
+  const skins = listSkins({ enabledOnly: true });
   response.json({
     ok: true,
     service: 'consensus-mist-api',
@@ -16,6 +18,10 @@ router.get('/health', (request, response) => {
     missingProviders: config.missingProviders,
     usedProviders: config.usedProviderNames,
     configuredProviders: Object.keys(config.configuredProviders || {}),
+    skins: {
+      count: skins.length,
+      names: skins.map((skin) => skin.name)
+    },
     host: {
       provider: config.host.provider,
       model: config.host.model,
@@ -30,7 +36,9 @@ router.get('/health', (request, response) => {
       model: player.model,
       baseUrl: player.baseUrl,
       apiKeyEnv: player.apiKeyEnv,
-      hasApiKey: Boolean(player.apiKey)
+      hasApiKey: Boolean(player.apiKey),
+      sex: player.sex,
+      personality: player.personality
     }))
   });
 });
@@ -72,6 +80,7 @@ router.get('/games/new', async (request, response, next) => {
 
 async function createGameForMode(config) {
   const game = await createAiGame(config);
+  saveGameRecord(game);
   if (config.mode === 'real') saveGameLog(game);
   return game;
 }

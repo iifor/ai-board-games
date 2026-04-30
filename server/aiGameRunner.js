@@ -1,20 +1,8 @@
 const { callOpenAIChat, parseJsonObject } = require('./openaiChat');
 const { createMockGame } = require('./mockGame');
 const { readRealGameLogs } = require('./gameLogStore');
-
-const QUESTIONS = [
-  ['优先相信票型', '优先相信发言'],
-  ['效率优先', '公平优先'],
-  ['探索未知', '守护稳定'],
-  ['理性决策', '直觉决策'],
-  ['遵循规则', '灵活变通'],
-  ['个人权利', '集体利益'],
-  ['透明公开', '隐私保护'],
-  ['长期收益', '短期止损'],
-  ['严格惩罚', '给人机会'],
-  ['统一标准', '因人而异'],
-  ['快速行动', '充分讨论']
-];
+const { getRandomEnabledSkin } = require('./adminStore');
+const { buildMemoryCard, getInvestigationQuestions } = require('./mistTemplate');
 
 let lastMockReplayGameId = null;
 
@@ -27,82 +15,84 @@ function shuffle(items) {
   return copy;
 }
 
-function countVotes(votes) {
-  return Object.values(votes).reduce((acc, vote) => {
-    if (vote === 'A') acc.A += 1;
-    if (vote === 'B') acc.B += 1;
-    return acc;
-  }, { A: 0, B: 0 });
-}
+function createAgents(config, template) {
+  const selectedPlayers = config.players.slice(0, 7);
+  const roleSet = shuffle([
+    'keyFigure',
+    'cover',
+    'investigator',
+    'investigator',
+    'investigator',
+    'investigator',
+    'investigator'
+  ]);
+  const keyFigureIndex = roleSet.indexOf('keyFigure');
+  const coverIndex = roleSet.indexOf('cover');
+  const keyFigureId = selectedPlayers[keyFigureIndex].id;
+  const coverId = selectedPlayers[coverIndex].id;
 
-function getThreshold(aliveCount) {
-  return aliveCount <= 3 ? Math.max(2, aliveCount) : Math.ceil(aliveCount * 0.66);
-}
-
-function chooseRoles(playerConfigs) {
-  const roles = shuffle(createRoleSet(playerConfigs.length));
-  return playerConfigs.map((config, index) => ({
-    ...config,
-    role: roles[index],
+  const agents = selectedPlayers.map((player, index) => ({
+    ...player,
+    role: roleSet[index],
     alive: true,
+    excluded: false,
+    excludedRound: null,
     votes: [],
     declared: [],
     suspicion: (index % 5) + 1,
-    eliminatedRound: null,
-    changedOnce: false,
-    stanceChangedThisRound: false
+    marked: false,
+    lastTestimony: '',
+    allies: roleSet[index] === 'investigator' ? [] : [keyFigureId, coverId].filter((id) => id !== player.id),
+    messages: []
   }));
+
+  agents.forEach((agent) => {
+    agent.memoryCard = buildMemoryCard(agent, agents, keyFigureId, coverId, template);
+    agent.messages = [{ role: 'system', content: buildSystemPrompt(agent, keyFigureId, coverId, template) }];
+  });
+
+  return agents;
 }
 
-function createRoleSet(playerCount) {
-  const chaosCount = playerCount >= 8 ? 3 : playerCount >= 6 ? 2 : 1;
-  return [
-    ...Array.from({ length: chaosCount }, () => 'chaos'),
-    ...Array.from({ length: playerCount - chaosCount }, () => 'order')
-  ];
-}
-
-function buildSystemPrompt(player, allies) {
+function buildSystemPrompt(agent, keyFigureId, coverId, template) {
+  const terms = template.terms;
   const common = [
-    '你正在玩 AI 桌游《共识迷雾》。你是一个独立玩家，不是主持人。',
-    `你的编号是 ${player.id}，昵称是 ${player.nickname}，人格倾向是：${player.personality}。`,
-    '每轮你会先秘密投 A 或 B，再公开发言，最后参与放逐投票。',
-    '你发言时必须声明“我投了A”或“我投了B”，可以撒谎，但不能直接暴露阵营。',
-    '禁止说“我是守序方”“我是破坏者”“我是好人”“我是坏人”等暴露身份的话。',
-    '发言要像桌游玩家，简短、有立场、有怀疑对象，不要写分析报告。'
+    '你正在参与《共识迷雾·迷雾调查》v3.2 标准7人局。你是一个独立玩家，不是主持人。',
+    `你的编号是 ${agent.id}，昵称是 ${agent.nickname}，人格倾向是：${agent.personality}。`,
+    `本局皮肤：${template.name}`,
+    `事件背景：${template.background}`,
+    `你的个人记忆卡：\n${agent.memoryCard}`,
+    '共识投票为匿名 A/B，只公布总票数。你可以声称自己投了什么，但不需要每次都声明。',
+    '讨论阶段采用自然发言制。发言必须像桌游玩家，可以分析线索、质疑、辩护、补充记忆或转移讨论。',
+    `禁止直接公开阵营身份，禁止说“我是调查方/好人/${terms.mist}/${terms.keyFigure}/${terms.cover}”。`,
+    '禁止直接列出属性集合，禁止说“根据属性表”，禁止直接计算线索覆盖范围。',
+    '发言不超过 120 字，必须包含至少一个具体怀疑、辩护、证词或票型判断。'
   ];
 
-  if (player.role === 'order') {
+  if (agent.role === 'investigator') {
     return [
       ...common,
-      '你的隐藏阵营是守序方。目标：三轮里至少两轮达成共识，或放逐所有破坏者。',
-      '你的真实投票整局最多变更一次；如果改变真实投票，发言必须包含：[变更] 我从 X 改为 Y。',
-      '你不知道谁是破坏者，需要根据公开票数、发言声明和放逐投票推理。'
+      `你的隐藏阵营是${terms.investigators}。目标：找出真正的${terms.keyFigure}。`,
+      `第二轮如果${terms.exclusion}${terms.keyFigure}，调查方立即胜利；否则第三轮必须最终指认${terms.keyFigure}。`,
+      `你不知道谁是${terms.keyFigure}，也不知道谁是${terms.cover}。你应推动有效共识，警惕过度共识带来的噪音。`
+    ].join('\n');
+  }
+
+  if (agent.role === 'keyFigure') {
+    return [
+      ...common,
+      `你的隐藏身份是${terms.mist}中的${terms.keyFigure}。目标：避免第二轮被${terms.exclusion}，避免第三轮成为唯一最高票。`,
+      `你的同伴${terms.cover}是 ${coverId} 号。`,
+      '你可以误导、模糊、选择性表达信息，制造共识失败、诱导过度共识，或伪装成健康异议。'
     ].join('\n');
   }
 
   return [
     ...common,
-    '你的隐藏阵营是破坏者。目标：阻止守序方达成两轮共识，并尽量存活。',
-    `你的破坏者同伴是：${allies.length ? allies.join('、') : '无'}号。`,
-    '你可以任意改变真实投票，也可以假装遵守守序方限制。',
-    '你要伪装成认真推理的普通玩家，可以制造合理怀疑，但不要过度保护同伴。',
-    '放逐投票时尽量把怀疑集中到守序方身上；除非同伴已经明显暴露，不要主动投同伴。'
+    `你的隐藏身份是${terms.mist}中的${terms.cover}。目标：保护${terms.keyFigure}，制造错误判断。`,
+    `真正的${terms.keyFigure}是 ${keyFigureId} 号。`,
+    `你可以替${terms.keyFigure}吸引怀疑，把怀疑引向调查方，或在最终指认前制造分票。`
   ].join('\n');
-}
-
-function createAgents(config) {
-  const players = chooseRoles(config.players);
-  return players.map((player) => {
-    const allies = players
-      .filter((candidate) => candidate.role === 'chaos' && candidate.id !== player.id)
-      .map((candidate) => candidate.id);
-    return {
-      ...player,
-      allies,
-      messages: [{ role: 'system', content: buildSystemPrompt(player, allies) }]
-    };
-  });
 }
 
 async function askAgent(agent, prompt, options = {}) {
@@ -120,143 +110,205 @@ async function askAgent(agent, prompt, options = {}) {
   return reply;
 }
 
-function getPlayerState(agent) {
+function getPublicPlayerState(agent, template) {
+  const terms = template?.terms || {};
   return [
     `你的编号：${agent.id}`,
-    `你的历史真实投票：${agent.votes.join('、') || '暂无'}`,
-    `你的公开声明历史：${agent.declared.join('、') || '暂无'}`,
-    `你当前仍${agent.alive ? '存活' : '离场'}`
+    `你的历史真实共识投票：${agent.votes.join('、') || '暂无'}`,
+    `你当前${agent.excluded ? `已被${terms.exclusion || '排除'}，不能继续投票或发言` : '仍有投票权和发言权'}`,
+    agent.marked ? `你身上有${terms.suspicionMark || '嫌疑标记'}。` : `你当前没有${terms.suspicionMark || '嫌疑标记'}。`
   ].join('\n');
 }
 
-async function collectVote(agent, round, question, publicHistory) {
+async function collectConsensusVote(agent, round, question, publicHistory, template) {
   const prompt = [
-    `第 ${round} 轮议题：A：${question[0]} / B：${question[1]}`,
+    `第 ${round} 轮调查题前提：${question.premise || '主持人要求在两个调查方向中选择其一。'}`,
+    `选项：A：${question.a} / B：${question.b}`,
     `公开历史：\n${publicHistory || '暂无'}`,
-    `你的状态：\n${getPlayerState(agent)}`,
-    '请进行你的秘密真实投票。只返回 JSON，不要解释：',
+    `你的状态：\n${getPublicPlayerState(agent, template)}`,
+    '请选择你的秘密共识投票。只返回 JSON：',
     '{"vote":"A","reason":"一句话原因"}'
   ].join('\n\n');
 
   try {
     const reply = await askAgent(agent, prompt, { maxTokens: 120 });
     const parsed = parseJsonObject(reply);
-    const proposedVote = parsed?.vote === 'A' || parsed?.vote === 'B' ? parsed.vote : fallbackVote(agent, round);
-    const previous = agent.votes.at(-1);
-    let vote = proposedVote;
-    if (agent.role === 'order' && previous && previous !== vote && agent.changedOnce) vote = previous;
-    agent.stanceChangedThisRound = Boolean(previous && previous !== vote);
-    if (agent.stanceChangedThisRound) agent.changedOnce = true;
+    const vote = parsed?.vote === 'A' || parsed?.vote === 'B' ? parsed.vote : fallbackConsensusVote(agent, round);
     agent.votes.push(vote);
     return vote;
   } catch (error) {
-    console.error(`玩家 ${agent.id} 投票失败，使用兜底策略：${error.message}`);
-    const vote = fallbackVote(agent, round);
+    console.error(`玩家 ${agent.id} 共识投票失败，使用兜底策略：${error.message}`);
+    const vote = fallbackConsensusVote(agent, round);
     agent.votes.push(vote);
     return vote;
   }
 }
 
-async function collectSpeech(agent, round, question, publicLog, recentSpeeches) {
-  const realVote = agent.votes.at(-1) || 'A';
-  const previousVote = agent.votes.at(-2);
+async function collectSpeech(agent, round, question, publicLog, recentSpeeches, template) {
   const prompt = [
-    `第 ${round} 轮议题：A：${question[0]} / B：${question[1]}`,
-    `公开结果：\n${publicLog}`,
+    `第 ${round} 轮自然发言。调查题前提：${question.premise || '主持人要求在两个调查方向中选择其一。'}；A：${question.a} / B：${question.b}`,
+    `公开信息：\n${publicLog}`,
     `本轮前面玩家发言：\n${recentSpeeches || '暂无'}`,
-    `你的状态：\n${getPlayerState(agent)}`,
-    '请发言，不超过 90 字。必须包含“我投了A”或“我投了B”。可以撒谎，但不能直接暴露阵营。',
-    agent.role === 'order' && agent.stanceChangedThisRound
-      ? `你本轮真实投票发生变更，必须包含：[变更] 我从 ${previousVote} 改为 ${realVote}`
-      : ''
+    `你的状态：\n${getPublicPlayerState(agent, template)}`,
+    '请发表一段自然语言证词或推理。不需要声明你投了什么；禁止自曝阵营、列属性集合、说“根据属性表”。'
   ].join('\n\n');
 
   try {
-    const reply = await askAgent(agent, prompt, { maxTokens: 180 });
-    const speech = normalizeSpeech(reply, realVote);
-    agent.declared.push(extractDeclaredVote(speech) || realVote);
-    return speech;
+    const reply = await askAgent(agent, prompt, { maxTokens: 220 });
+    return normalizeSpeech(reply, agent);
   } catch (error) {
     console.error(`玩家 ${agent.id} 发言失败，使用兜底发言：${error.message}`);
-    const speech = `${agent.nickname || agent.id + '号'}：我投了${realVote}。我会先观察票数和发言是否一致。`;
-    agent.declared.push(realVote);
-    return speech;
+    return fallbackSpeech(agent, round);
   }
 }
 
-async function collectExileVote(agent, aliveIds, publicLog, speeches) {
+async function collectTargetVote(agent, phase, validTargetIds, publicLog, speeches, template) {
+  const terms = template?.terms || {};
+  const phaseText = phase === 'suspicion'
+    ? `${terms.suspicionMark || '嫌疑标记'}投票：选择一名你认为最可疑的玩家。`
+    : phase === 'exclusion'
+      ? `${terms.exclusion || '排除行动'}投票：选择一名你认为应被排除的玩家。`
+      : `最终指认：选择一名你认为是真正${terms.keyFigure || '关键人物'}的玩家。`;
   const prompt = [
-    '现在进行放逐投票。',
-    `存活玩家：${aliveIds.join('、')}`,
-    `公开结果：\n${publicLog}`,
+    phaseText,
+    `可选对象：${validTargetIds.join('、')}`,
+    `公开信息：\n${publicLog}`,
     `本轮发言：\n${speeches || '暂无'}`,
-    `你的状态：\n${getPlayerState(agent)}`,
-    '请选择一个不是自己的最可疑玩家。只返回 JSON：',
+    `你的状态：\n${getPublicPlayerState(agent, template)}`,
+    '只返回 JSON：',
     '{"target":2,"reason":"一句话原因"}'
   ].join('\n\n');
-  const validTargets = aliveIds.filter((id) => id !== agent.id);
 
   try {
     const reply = await askAgent(agent, prompt, { maxTokens: 120 });
     const parsed = parseJsonObject(reply);
     const target = Number(parsed?.target);
-    return validTargets.includes(target) ? target : fallbackTarget(agent, validTargets);
+    return validTargetIds.includes(target) ? target : fallbackTarget(agent, validTargetIds, phase);
   } catch (error) {
-    console.error(`玩家 ${agent.id} 放逐投票失败，使用兜底策略：${error.message}`);
-    return fallbackTarget(agent, validTargets);
+    console.error(`玩家 ${agent.id} ${phase} 投票失败，使用兜底策略：${error.message}`);
+    return fallbackTarget(agent, validTargetIds, phase);
   }
 }
 
-function normalizeSpeech(text, realVote) {
-  const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 120);
-  if (/我投了\s*[AB]/.test(clean)) return clean;
-  return `我投了${realVote}。${clean || '我会先观察票数和发言是否一致。'}`;
+async function collectLastTestimony(agent, publicLog, template) {
+  const terms = template?.terms || {};
+  const prompt = [
+    `你刚刚被${terms.exclusion || '排除'}，失去第三轮投票和发言权。请留下不超过80字的${terms.lastTestimony || '最后证词'}。`,
+    `公开信息：\n${publicLog}`,
+    '可以包含一条自然语言记忆、怀疑、解释或提醒；禁止自曝阵营或系统性证明身份。'
+  ].join('\n\n');
+
+  try {
+    const reply = await askAgent(agent, prompt, { maxTokens: 120 });
+    return String(reply || '').replace(/\s+/g, ' ').trim().slice(0, 80) || fallbackLastTestimony(agent, template);
+  } catch {
+    return fallbackLastTestimony(agent, template);
+  }
 }
 
-function extractDeclaredVote(speech) {
-  const match = speech.match(/我投了\s*([AB])/);
-  return match ? match[1] : null;
+function fallbackConsensusVote(agent, round) {
+  if (agent.role === 'investigator') return round === 1 || agent.id % 2 ? 'A' : 'B';
+  if (agent.role === 'keyFigure') return round === 2 ? 'B' : agent.id % 2 ? 'A' : 'B';
+  return round === 3 ? 'B' : agent.id % 2 ? 'B' : 'A';
 }
 
-function fallbackVote(agent, round) {
-  if (agent.role === 'order') return agent.votes.at(-1) || (agent.id % 2 ? 'A' : 'B');
-  return round % 2 === agent.id % 2 ? 'A' : 'B';
+function fallbackSpeech(agent, round) {
+  if (agent.role === 'keyFigure') return `我觉得现在不能只盯手册，公共终端那条也值得看。${round}轮的票型如果太顺，反而可能有人在带方向。`;
+  if (agent.role === 'cover') return '日志重写未必就是核心行为，我更担心有人把所有线索都压到同一个方向，像是在提前定案。';
+  return '我倾向把手册、权限撤回和备用终端连起来看。现在最需要解释的是谁接触过材料，又一直回避时间线。';
 }
 
-function fallbackTarget(agent, validTargets) {
-  return validTargets[(agent.id + agent.votes.length) % validTargets.length];
+function fallbackTarget(agent, validTargetIds, phase) {
+  if (agent.role === 'investigator') {
+    const markedCandidate = validTargetIds.find((id) => id !== agent.id);
+    return markedCandidate || validTargetIds[0];
+  }
+  const nonAlly = validTargetIds.find((id) => id !== agent.id && !agent.allies.includes(id));
+  if (phase === 'final' && agent.role === 'cover') return nonAlly || validTargetIds[0];
+  return nonAlly || validTargetIds[0];
 }
 
-function decideExile(exileVotes, aliveCount) {
+function fallbackLastTestimony(agent, template) {
+  const lastTestimony = template?.terms?.lastTestimony || '最后证词';
+  return `${agent.id}号${lastTestimony}：别只看单条线索，重点核对谁在淡化关键记录。`;
+}
+
+function normalizeSpeech(text, agent) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+  if (!clean) return fallbackSpeech(agent, agent.votes.length);
+  if (includesForbiddenReveal(clean)) return fallbackSpeech(agent, agent.votes.length);
+  return clean;
+}
+
+function includesForbiddenReveal(text) {
+  return /我是\s*(调查方|安全调查员|隐瞒者|迷雾方|关键人物|违规操作者|掩护者|日志篡改者|好人|坏人)/i.test(text);
+}
+
+function countVotes(votes) {
+  return Object.values(votes).reduce((acc, vote) => {
+    if (vote === 'A') acc.A += 1;
+    if (vote === 'B') acc.B += 1;
+    return acc;
+  }, { A: 0, B: 0 });
+}
+
+function getConsensusType(tally, voterCount) {
+  const max = Math.max(tally.A, tally.B);
+  if (max === voterCount && voterCount > 0) return 'overConsensus';
+  if (max >= Math.ceil(voterCount * 0.66)) return 'effective';
+  return 'failed';
+}
+
+function getTopTargets(votes) {
   const counts = {};
-  Object.values(exileVotes).forEach((target) => {
+  Object.values(votes).forEach((target) => {
     counts[target] = (counts[target] || 0) + 1;
   });
   const entries = Object.entries(counts);
-  if (!entries.length) return null;
+  if (!entries.length) return [];
   const max = Math.max(...entries.map(([, count]) => count));
-  const candidates = entries.filter(([, count]) => count === max);
-  const exileThreshold = Math.floor(aliveCount / 2) + 1;
-  return candidates.length === 1 && max >= exileThreshold ? Number(candidates[0][0]) : null;
+  return entries.filter(([, count]) => count === max).map(([id]) => Number(id));
 }
 
-function checkImmediateWinner(agents) {
-  const alive = agents.filter((agent) => agent.alive);
-  const orderAlive = alive.filter((agent) => agent.role === 'order').length;
-  const chaosAlive = alive.filter((agent) => agent.role === 'chaos').length;
-  if (chaosAlive === 0) return 'order';
-  if (chaosAlive >= orderAlive) return 'chaos';
-  return null;
+function buildPublicLog(round) {
+  const items = [
+    round.question.premise ? `调查前提：${round.question.premise}` : '',
+    `调查题：A：${round.question.a} / B：${round.question.b}`,
+    `共识票型：A ${round.tally.A} 票，B ${round.tally.B} 票`,
+    `共识类型：${getConsensusTypeLabel(round.consensusType)}`
+  ].filter(Boolean);
+  if (round.clue) items.push(`公开线索：${round.clue.title}：${round.clue.text}`);
+  if (round.appraisal) items.push(`鉴定报告：${round.appraisal}`);
+  if (round.noise) items.push(`迷雾噪音：${round.noise}`);
+  return items.join('\n');
 }
 
-function getConsensusWinner(consensusResults) {
-  return consensusResults.filter(Boolean).length >= 2 ? 'order' : 'chaos';
+function getConsensusTypeLabel(type) {
+  if (type === 'overConsensus') return '过度共识';
+  if (type === 'effective') return '有效共识';
+  return '共识失败';
 }
 
-function serializeGame({ agents, rounds, winner, mode = 'real' }) {
+function getRoleLabel(role, template) {
+  if (role === 'investigator') return template.terms.investigators;
+  if (role === 'keyFigure') return template.terms.keyFigure;
+  if (role === 'cover') return template.terms.cover;
+  return '未知';
+}
+
+function serializeGame({ agents, rounds, template, gameId, winner = null, winReason = '', mode = 'real' }) {
   return {
-    id: `game-${Date.now()}`,
+    id: gameId || `game-${Date.now()}`,
     mode,
+    event: {
+      id: template.id,
+      name: template.name,
+      version: template.version,
+      source: template.source,
+      background: template.background,
+      terms: template.terms,
+      truth: winner ? template.truth : ''
+    },
     players: agents.map((agent) => ({
       id: agent.id,
       name: agent.name,
@@ -264,16 +316,23 @@ function serializeGame({ agents, rounds, winner, mode = 'real' }) {
       avatar: agent.avatar,
       provider: agent.provider,
       role: agent.role,
-      alive: agent.alive,
+      roleLabel: getRoleLabel(agent.role, template),
+      sex: agent.sex || '未知',
+      alive: !agent.excluded,
+      excluded: agent.excluded,
+      excludedRound: agent.excludedRound,
+      marked: agent.marked,
       personality: agent.personality,
       model: agent.model,
+      memoryCard: agent.memoryCard,
       votes: agent.votes,
       declared: agent.declared,
       suspicion: agent.suspicion,
-      eliminatedRound: agent.eliminatedRound
+      lastTestimony: agent.lastTestimony
     })),
     rounds,
     winner,
+    winReason,
     createdAt: new Date().toISOString()
   };
 }
@@ -289,7 +348,7 @@ async function createAiGame(config, options = {}) {
 
 function getMockReplayGame(config) {
   const selected = getRandomMatchingRealGameLog(config.selectedPlayerIds || config.players.map((player) => player.id));
-  if (selected?.game?.rounds?.length) {
+  if (selected?.game?.rounds?.length && selected.game?.event?.version === 'v3.2') {
     lastMockReplayGameId = selected.game.id;
     return {
       ...clone(selected.game),
@@ -319,148 +378,242 @@ function normalizeIdSet(ids = []) {
 }
 
 async function replayMockGame(game, onEvent) {
-  const partial = {
-    ...game,
-    rounds: [],
-    winner: null
-  };
+  const partial = { ...clone(game), rounds: [], winner: null, winReason: '' };
+  partial.players = partial.players.map((player) => ({ ...player, role: 'unknown', roleLabel: '身份隐藏' }));
+  if (partial.event) partial.event.truth = '';
 
-  await onEvent({ type: 'players', players: game.players, game: clone(partial) });
+  await onEvent({ type: 'players', players: partial.players, game: clone(partial) });
 
   for (const sourceRound of game.rounds) {
     const round = {
       ...clone(sourceRound),
       votes: {},
       tally: { A: 0, B: 0 },
+      consensusType: 'failed',
       consensus: false,
-      stanceChanges: 0,
+      clue: null,
+      appraisal: '',
+      noise: '',
       speeches: [],
-      exileVotes: {},
-      eliminated: null
+      suspicionVotes: {},
+      markedSuspects: [],
+      exclusionVotes: {},
+      excluded: [],
+      finalAccusationVotes: {},
+      finalTargets: []
     };
     partial.rounds.push(round);
     await onEvent({ type: 'round-start', round: clone(round), game: clone(partial) });
 
     Object.assign(round.votes, sourceRound.votes);
     round.tally = clone(sourceRound.tally);
+    round.consensusType = sourceRound.consensusType;
     round.consensus = sourceRound.consensus;
-    round.threshold = sourceRound.threshold;
-    round.stanceChanges = sourceRound.stanceChanges;
     await onEvent({ type: 'vote-result', round: clone(round), game: clone(partial) });
+
+    round.clue = clone(sourceRound.clue || null);
+    round.appraisal = sourceRound.appraisal || '';
+    round.noise = sourceRound.noise || '';
+    await onEvent({ type: 'clue-result', round: clone(round), game: clone(partial) });
 
     for (const speech of sourceRound.speeches || []) {
       round.speeches.push(clone(speech));
       await onEvent({ type: 'speech', round: clone(round), speech: clone(speech), game: clone(partial) });
     }
 
-    round.exileVotes = clone(sourceRound.exileVotes || {});
-    round.eliminated = clone(sourceRound.eliminated || null);
-    await onEvent({ type: 'exile-result', round: clone(round), game: clone(partial) });
+    if (sourceRound.suspicionVotes) {
+      round.suspicionVotes = clone(sourceRound.suspicionVotes);
+      round.markedSuspects = clone(sourceRound.markedSuspects || []);
+      await onEvent({ type: 'suspicion-result', round: clone(round), game: clone(partial) });
+    }
+
+    if (sourceRound.exclusionVotes) {
+      round.exclusionVotes = clone(sourceRound.exclusionVotes);
+      round.excluded = clone(sourceRound.excluded || []);
+      await onEvent({ type: 'exclusion-result', round: clone(round), game: clone(partial) });
+      for (const item of round.excluded) {
+        await onEvent({ type: 'last-testimony', round: clone(round), testimony: clone(item), game: clone(partial) });
+      }
+    }
+
+    if (sourceRound.finalAccusationVotes) {
+      round.finalAccusationVotes = clone(sourceRound.finalAccusationVotes);
+      round.finalTargets = clone(sourceRound.finalTargets || []);
+      await onEvent({ type: 'final-accusation-result', round: clone(round), game: clone(partial) });
+    }
   }
 
-  partial.winner = game.winner;
-  await onEvent({ type: 'game', game: clone(partial) });
-}
-
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
+  await onEvent({ type: 'game', game: clone(game) });
 }
 
 async function runAiGame(config, options = {}) {
   const emit = async (event) => options.onEvent ? options.onEvent(event) : undefined;
-  const agents = createAgents(config);
-  const questions = shuffle(QUESTIONS).slice(0, config.rounds || 3);
+  const template = getRandomEnabledSkin();
+  const agents = createAgents(config, template);
+  const questions = getInvestigationQuestions(template);
+  const gameId = `game-${Date.now()}`;
   const rounds = [];
-  const consensusResults = [];
   const publicHistory = [];
+  let nextClueIndex = 0;
+  let winner = null;
+  let winReason = '';
 
-  await emit({ type: 'players', players: serializeGame({ agents, rounds, winner: null }).players });
+  await emit({ type: 'players', players: serializeGame({ agents, rounds, template, gameId, winner }).players, game: serializeGame({ agents, rounds, template, gameId, winner }) });
 
-  for (let index = 0; index < questions.length; index += 1) {
+  for (let index = 0; index < 3; index += 1) {
     const roundNumber = index + 1;
     const question = questions[index];
-    const aliveAgents = agents.filter((agent) => agent.alive);
-    const aliveIds = aliveAgents.map((agent) => agent.id);
-    const threshold = getThreshold(aliveIds.length);
+    const voters = agents.filter((agent) => !agent.excluded);
     const round = {
       number: roundNumber,
-      question: { a: question[0], b: question[1] },
-      aliveIds,
+      phase: roundNumber === 1 ? 'suspicion' : roundNumber === 2 ? 'exclusion' : 'final',
+      question,
+      aliveIds: voters.map((agent) => agent.id),
       votes: {},
       tally: { A: 0, B: 0 },
-      threshold,
-      exileThreshold: Math.floor(aliveIds.length / 2) + 1,
+      consensusType: 'failed',
       consensus: false,
-      stanceChanges: 0,
+      clue: null,
+      appraisal: '',
+      noise: '',
       speeches: [],
-      exileVotes: {},
-      eliminated: null
+      suspicionVotes: null,
+      markedSuspects: [],
+      exclusionVotes: null,
+      excluded: [],
+      finalAccusationVotes: null,
+      finalTargets: []
     };
     rounds.push(round);
-    await emit({ type: 'round-start', round, game: serializeGame({ agents, rounds, winner: null }) });
+    await emit({ type: 'round-start', round, game: serializeGame({ agents, rounds, template, gameId, winner, winReason }) });
 
-    const voteResults = await Promise.all(aliveAgents.map(async (agent) => ({
+    const voteResults = await Promise.all(voters.map(async (agent) => ({
       id: agent.id,
-      vote: await collectVote(agent, roundNumber, question, publicHistory.join('\n'))
+      vote: await collectConsensusVote(agent, roundNumber, question, publicHistory.join('\n'), template)
     })));
     voteResults.forEach((item) => {
       round.votes[item.id] = item.vote;
     });
     round.tally = countVotes(round.votes);
-    round.consensus = Math.max(round.tally.A, round.tally.B) >= threshold;
-    round.stanceChanges = aliveAgents.filter((agent) => agent.stanceChangedThisRound).length;
-    consensusResults.push(round.consensus);
-    await emit({ type: 'vote-result', round, game: serializeGame({ agents, rounds, winner: null }) });
+    round.consensusType = getConsensusType(round.tally, voters.length);
+    round.consensus = round.consensusType !== 'failed';
+    await emit({ type: 'vote-result', round, game: serializeGame({ agents, rounds, template, gameId, winner, winReason }) });
 
-    const publicLog = [
-      `题目：A：${question[0]} / B：${question[1]}`,
-      `投票结果：A ${round.tally.A} 票，B ${round.tally.B} 票`,
-      `共识${round.consensus ? '成功' : '失败'}，阈值 ${threshold} 票`,
-      `立场变更声明人数：${round.stanceChanges}`
-    ].join('\n');
+    if (round.consensus && nextClueIndex < template.clues.length) {
+      const sourceClue = template.clues[nextClueIndex];
+      round.clue = { title: sourceClue.title, text: sourceClue.text };
+      round.appraisal = sourceClue.appraisal;
+      nextClueIndex += 1;
+    }
+    if (round.consensusType === 'overConsensus') {
+      round.noise = template.noises[(roundNumber - 1) % template.noises.length];
+    }
+    await emit({ type: 'clue-result', round, game: serializeGame({ agents, rounds, template, gameId, winner, winReason }) });
 
-    for (const agent of aliveAgents) {
+    const publicLog = buildPublicLog(round);
+    for (const agent of voters) {
       const speech = await collectSpeech(
         agent,
         roundNumber,
         question,
         publicLog,
-        round.speeches.map((item) => `${item.playerId}号：${item.text}`).join('\n')
+        round.speeches.map((item) => `${item.playerId}号：${item.text}`).join('\n'),
+        template
       );
       const speechItem = { playerId: agent.id, text: speech };
       round.speeches.push(speechItem);
-      await emit({ type: 'speech', round, speech: speechItem, game: serializeGame({ agents, rounds, winner: null }) });
+      await emit({ type: 'speech', round, speech: speechItem, game: serializeGame({ agents, rounds, template, gameId, winner, winReason }) });
     }
 
     const allSpeechText = round.speeches.map((item) => `${item.playerId}号：${item.text}`).join('\n');
-    const exileResults = await Promise.all(aliveAgents.map(async (agent) => ({
-      id: agent.id,
-      target: await collectExileVote(agent, aliveIds, publicLog, allSpeechText)
-    })));
-    exileResults.forEach((item) => {
-      round.exileVotes[item.id] = item.target;
-    });
 
-    const eliminatedId = decideExile(round.exileVotes, aliveIds.length);
-    if (eliminatedId) {
-      const target = agents.find((agent) => agent.id === eliminatedId);
-      if (target) {
-        target.alive = false;
-        target.eliminatedRound = roundNumber;
-        round.eliminated = { id: target.id, role: target.role };
-      }
+    if (roundNumber === 1) {
+      const votes = {};
+      await Promise.all(voters.map(async (agent) => {
+        votes[agent.id] = await collectTargetVote(agent, 'suspicion', agents.map((item) => item.id), publicLog, allSpeechText, template);
+      }));
+      round.suspicionVotes = votes;
+      round.markedSuspects = getTopTargets(votes);
+      round.markedSuspects.forEach((id) => {
+        const target = agents.find((agent) => agent.id === id);
+        if (target) {
+          target.marked = true;
+          target.suspicion = Math.min(5, (target.suspicion || 1) + 2);
+        }
+      });
+      publicHistory.push(`第1轮：${getConsensusTypeLabel(round.consensusType)}；风险标记：${round.markedSuspects.join('、') || '无'}号`);
+      await emit({ type: 'suspicion-result', round, game: serializeGame({ agents, rounds, template, gameId, winner, winReason }) });
     }
 
-    const winnerAfterRound = checkImmediateWinner(agents);
-    await emit({ type: 'exile-result', round, game: serializeGame({ agents, rounds, winner: winnerAfterRound }) });
-    publicHistory.push(`第 ${roundNumber} 轮：A ${round.tally.A}/B ${round.tally.B}，共识${round.consensus ? '成功' : '失败'}，放逐：${eliminatedId || '无'}`);
-    if (winnerAfterRound) break;
+    if (roundNumber === 2) {
+      const votes = {};
+      await Promise.all(voters.map(async (agent) => {
+        votes[agent.id] = await collectTargetVote(agent, 'exclusion', voters.map((item) => item.id), publicLog, allSpeechText, template);
+      }));
+      round.exclusionVotes = votes;
+      const excludedIds = getTopTargets(votes);
+      for (const id of excludedIds) {
+        const target = agents.find((agent) => agent.id === id);
+        if (!target) continue;
+        target.excluded = true;
+        target.alive = false;
+        target.excludedRound = 2;
+      }
+      for (const id of excludedIds) {
+        const target = agents.find((agent) => agent.id === id);
+        if (!target) continue;
+        target.lastTestimony = await collectLastTestimony(target, publicLog, template);
+        round.excluded.push({ id: target.id, testimony: target.lastTestimony });
+      }
+      await emit({ type: 'exclusion-result', round, game: serializeGame({ agents, rounds, template, gameId, winner, winReason }) });
+      for (const item of round.excluded) {
+        await emit({ type: 'last-testimony', round, testimony: item, game: serializeGame({ agents, rounds, template, gameId, winner, winReason }) });
+      }
+
+      if (excludedIds.some((id) => agents.find((agent) => agent.id === id)?.role === 'keyFigure')) {
+        winner = 'investigators';
+        winReason = `第二轮${template.terms.exclusion}命中${template.terms.keyFigure}，调查方立即胜利。`;
+        break;
+      }
+      publicHistory.push(`第2轮：${getConsensusTypeLabel(round.consensusType)}；权限冻结：${excludedIds.join('、') || '无'}号；未命中违规操作者`);
+    }
+
+    if (roundNumber === 3) {
+      const votes = {};
+      const validTargets = agents.map((agent) => agent.id);
+      await Promise.all(voters.map(async (agent) => {
+        votes[agent.id] = await collectTargetVote(agent, 'final', validTargets, publicLog, allSpeechText, template);
+      }));
+      round.finalAccusationVotes = votes;
+      round.finalTargets = getTopTargets(votes);
+      const keyFigure = agents.find((agent) => agent.role === 'keyFigure');
+      if (round.finalTargets.length === 1 && round.finalTargets[0] === keyFigure?.id) {
+        winner = 'investigators';
+        winReason = `第三轮最终指认形成唯一最高票，并命中${template.terms.keyFigure}。`;
+      } else if (round.finalTargets.length > 1) {
+        winner = 'mist';
+        winReason = '第三轮最终指认出现最高票平票，迷雾方胜利。';
+      } else {
+        winner = 'mist';
+        winReason = `第三轮最终指认未命中${template.terms.keyFigure}，迷雾方胜利。`;
+      }
+      await emit({ type: 'final-accusation-result', round, game: serializeGame({ agents, rounds, template, gameId, winner, winReason }) });
+      break;
+    }
   }
 
-  const winner = checkImmediateWinner(agents) || getConsensusWinner(consensusResults);
-  const game = serializeGame({ agents, rounds, winner });
+  if (!winner) {
+    winner = 'mist';
+    winReason = '调查方未能在三轮内形成明确正确指认，迷雾方胜利。';
+  }
+
+  const game = serializeGame({ agents, rounds, template, gameId, winner, winReason });
   await emit({ type: 'game', game });
   return game;
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 module.exports = {

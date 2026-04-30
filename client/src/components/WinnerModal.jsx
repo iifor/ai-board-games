@@ -1,12 +1,13 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { getChaosPlayers, getWinnerName } from '../utils/gameState';
+import { getMistPlayers, getRoleName, getWinnerName } from '../utils/gameState';
 
 export function WinnerModal({ game, onClose }) {
   if (!game?.winner || !game.rounds?.length) return null;
 
   const winnerName = getWinnerName(game.winner);
-  const chaosPlayers = getChaosPlayers(game);
+  const mistPlayers = getMistPlayers(game);
+  const keyFigure = game.players.find((player) => player.role === 'keyFigure');
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -14,9 +15,13 @@ export function WinnerModal({ game, onClose }) {
         <button className="modal-close" onClick={onClose} aria-label="关闭结算弹窗"><X size={20} /></button>
         <p className="eyebrow">GAME SETTLEMENT</p>
         <h2 id="winner-title">恭喜{winnerName}获胜</h2>
+        <p>{game.winReason}</p>
         <div className="identity-reveal">
           <strong>身份公布</strong>
-          <p>破坏者是{chaosPlayers.length ? chaosPlayers.join('、') : '暂无'}。</p>
+          <p>违规操作者是{keyFigure ? `${keyFigure.nickname || keyFigure.name}（${keyFigure.id}号）` : '暂无'}。</p>
+          <p>迷雾方：{mistPlayers.length ? mistPlayers.join('、') : '暂无'}。</p>
+          <p>{game.players.map((player) => `${player.id}号 ${getRoleName(player.role, player.roleLabel)}`).join('；')}</p>
+          {game.event?.truth && <p>事件真相：{game.event.truth}</p>}
         </div>
         <div className="modal-actions">
           <button className="start-game-button" onClick={onClose}>返回棋盘</button>

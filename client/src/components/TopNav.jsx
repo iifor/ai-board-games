@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Eye, EyeOff, MessageCircle, Pause, Power, Settings, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Eye, MessageCircle, Pause, Power, Settings, Volume2, VolumeX } from 'lucide-react';
 import { classNames } from '../utils/gameState';
 
 export function TopNav({
@@ -23,7 +23,7 @@ export function TopNav({
         <div className="brand-mark">◎</div>
         <div>
           <h1>共识迷雾</h1>
-          <span>Lite v1.1</span>
+          <span>迷雾调查 v3.2</span>
         </div>
       </div>
 
@@ -43,9 +43,9 @@ export function TopNav({
           <ArrowLeft size={23} />
           <span>返回</span>
         </button>
-        <button title={showRoles ? '隐藏身份' : '显示身份'} onClick={() => setShowRoles(!showRoles)}>
-          {showRoles ? <EyeOff size={23} /> : <Eye size={23} />}
-          <span>身份</span>
+        <button title={showRoles ? '上帝视角：所有信息公开可见' : '玩家视角：点击一位玩家查看信息'} onClick={() => setShowRoles(!showRoles)}>
+          <Eye size={23} />
+          <span>{showRoles ? '上帝' : '玩家'}</span>
         </button>
         <button className="mode-switch" title="Mock 模式开关" onClick={onModeToggle} disabled={controlsLocked}>
           <span className={classNames('switch-track', mockMode && 'active')}><i /></span>

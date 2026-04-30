@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ActionBar } from './components/ActionBar';
 import { CenterStage, RealStartPanel } from './components/CenterStage';
-import { ConfirmResetModal, CurrentGameHistory, InfoModal, StageInfo } from './components/InfoModal';
+import { ConfirmResetModal, CurrentGameHistory, EventBackground, InfoModal, StageInfo } from './components/InfoModal';
 import { GameSelectPage } from './components/GameSelectPage';
 import { HomePage } from './components/HomePage';
 import { PlayerList } from './components/PlayerList';
@@ -44,16 +44,18 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
   const [step, setStep] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [showRoles, setShowRoles] = useState(false);
+  const [showRoles, setShowRoles] = useState(true);
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [infoModal, setInfoModal] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
   const [status, setStatus] = useState('idle');
   const [streamMessage, setStreamMessage] = useState('Mock 模式已就绪，点击开始后由后端逐条推送。');
+  const [messageLog, setMessageLog] = useState([]);
   const socketRef = useRef(null);
   const pendingAckRef = useRef(null);
   const pendingEventRef = useRef(null);
   const pausedRef = useRef(false);
+  const introEventIdRef = useRef('');
   const { speechEnabled, setSpeechEnabled, speak, cancel } = useSpeechQueue();
 
   useEffect(() => {
@@ -63,6 +65,7 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
   useEffect(() => () => closeSocket(), []);
 
   const timeline = useMemo(() => buildTimeline(game), [game]);
+  const historyTimeline = useMemo(() => buildTimeline(game, messageLog), [game, messageLog]);
   const displayGame = game || createEmptyGame();
   const currentEvent = timeline[Math.min(step, Math.max(0, timeline.length - 1))] || {
     type: 'idle',
@@ -70,7 +73,7 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
     roundData: displayGame.rounds[0] || createPendingRound()
   };
   const currentRound = currentEvent.roundData || displayGame.rounds.at(-1) || createPendingRound();
-  const visibleSpeeches = displayGame.rounds.flatMap((round) => round.speeches || []);
+  const visibleSpeeches = messageLog.length ? messageLog : displayGame.rounds.flatMap((round) => round.speeches || []);
   const currentSpeakerId = currentEvent.type === 'speech' ? currentEvent.speech.playerId : null;
   const canShowWinner = Boolean(displayGame.winner && displayGame.rounds.length > 0);
   const isRunning = status === 'streaming';
@@ -92,6 +95,8 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
     pausedRef.current = false;
     setShowWinnerModal(false);
     setInfoModal(null);
+    setMessageLog([]);
+    introEventIdRef.current = '';
     setStatus('idle');
     setStreamMessage(
       message ||
@@ -133,18 +138,21 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
     const narration = event.narration || getStreamNarration(event);
     if (pausedRef.current) return;
 
+    const speechOptions = getSpeechOptions(event);
     if (speechEnabled && narration) {
-      speak(narration, acknowledgePending);
+      speak(narration, acknowledgePending, speechOptions);
     } else {
       window.setTimeout(acknowledgePending, event.type === 'speech' ? 350 : 120);
     }
   }
 
   function applyServerEvent(event) {
+    recordServerMessage(event);
     if (event.message) setStreamMessage(event.message);
     if (event.game) {
       setGame(event.game);
       setStep(Math.max(0, buildTimeline(event.game).length - 1));
+      maybeOpenEventBackground(event.game);
     }
     if (event.players) {
       setGame((value) => ({ ...(value || createEmptyGame()), players: event.players }));
@@ -156,6 +164,34 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
       setStatus('ready');
       setStreamMessage(event.message || '对局已完成。');
     }
+  }
+
+  function recordServerMessage(event) {
+    if (!event || event.type === 'done') return;
+    if (event.type === 'speech' && event.speech) {
+      setMessageLog((items) => [
+        ...items,
+        {
+          type: 'player',
+          playerId: event.speech.playerId,
+          text: event.speech.text,
+          title: `${event.speech.playerId}号发言`
+        }
+      ]);
+      return;
+    }
+
+    const narration = event.narration || getStreamNarration(event) || event.message;
+    if (!narration) return;
+    setMessageLog((items) => [
+      ...items,
+      {
+        type: 'host',
+        playerId: '主持',
+        text: narration,
+        title: '主持人'
+      }
+    ]);
   }
 
   function acknowledgePending() {
@@ -174,7 +210,7 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
       if (!next && pendingAckRef.current) {
         const event = pendingEventRef.current;
         const narration = event?.narration || getStreamNarration(event);
-        if (speechEnabled && narration) speak(narration, acknowledgePending);
+        if (speechEnabled && narration) speak(narration, acknowledgePending, getSpeechOptions(event));
         else acknowledgePending();
       }
       return next;
@@ -214,11 +250,23 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
   }
 
   function openCurrentHistory() {
-    setInfoModal({ type: 'history', title: '本局历史', eyebrow: 'CURRENT MATCH', events: timeline });
+    setInfoModal({ type: 'history', title: '本局历史', eyebrow: 'CURRENT MATCH', events: historyTimeline });
   }
 
   function openStageInfo() {
     setInfoModal({ type: 'stage', title: '阶段信息', eyebrow: 'STAGE INFO', event: currentEvent });
+  }
+
+  function openEventBackground() {
+    setInfoModal({ type: 'background', title: displayGame.event?.name || '事件背景', eyebrow: 'CASE BRIEF', game: displayGame });
+  }
+
+  function maybeOpenEventBackground(nextGame) {
+    if (!nextGame?.event?.background || nextGame.id === 'pending') return;
+    const eventKey = `${nextGame.id}-${nextGame.event.name}`;
+    if (introEventIdRef.current === eventKey) return;
+    introEventIdRef.current = eventKey;
+    setInfoModal({ type: 'background', title: nextGame.event.name, eyebrow: 'CASE BRIEF', game: nextGame });
   }
 
   function returnToSelect() {
@@ -262,6 +310,7 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
           <RealStartPanel status={status} message={streamMessage} onStart={startGame} />
         ) : (
           <CenterStage
+            game={displayGame}
             round={currentRound}
             speeches={visibleSpeeches}
             step={step}
@@ -280,14 +329,20 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
         paused={paused}
         onHistory={openCurrentHistory}
         onTogglePause={togglePause}
-        onStageInfo={openStageInfo}
+        onBackground={openEventBackground}
         onNextSentence={startGame}
       />
 
       {showWinnerModal && canShowWinner && <WinnerModal game={displayGame} onClose={() => setShowWinnerModal(false)} />}
       {infoModal && (
         <InfoModal title={infoModal.title} eyebrow={infoModal.eyebrow} onClose={() => setInfoModal(null)}>
-          {infoModal.type === 'history' ? <CurrentGameHistory events={infoModal.events || []} /> : <StageInfo event={infoModal.event} />}
+          {infoModal.type === 'history' ? (
+            <CurrentGameHistory events={infoModal.events || []} />
+          ) : infoModal.type === 'background' ? (
+            <EventBackground game={infoModal.game || displayGame} />
+          ) : (
+            <StageInfo event={infoModal.event} />
+          )}
         </InfoModal>
       )}
       {confirmAction && <ConfirmResetModal onCancel={() => setConfirmAction(null)} onConfirm={confirmReset} />}
@@ -299,6 +354,11 @@ function getStreamNarration(event) {
   if (!event) return '';
   if (event.type === 'host' || event.type === 'status' || event.type === 'done') return event.message || '';
   return event.narration || '';
+}
+
+function getSpeechOptions(event) {
+  if (event?.type !== 'speech' || !event.speech?.playerId) return {};
+  return { playerId: event.speech.playerId };
 }
 
 createRoot(document.getElementById('root')).render(<App />);

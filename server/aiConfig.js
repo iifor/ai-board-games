@@ -186,7 +186,8 @@ function normalizeAgent(rawAgent, providers, fallback, index = 0) {
     apiKey: provider.apiKey,
     model: rawAgent.model || fallback.model || 'deepseek-chat',
     temperature: Number(rawAgent.temperature ?? fallback.temperature ?? 0.85),
-    personality: rawAgent.personality || fallback.personality || '记录者'
+    personality: rawAgent.personality || fallback.personality || '记录者',
+    sex: rawAgent.sex || fallback.sex || '未知'
   };
 }
 
@@ -223,7 +224,16 @@ function normalizeConfig(rawConfig) {
 
 function getAiConfig() {
   loadEnvFile();
-  return normalizeConfig(readJsonConfig());
+  const rawConfig = readJsonConfig();
+  try {
+    const { initAdminData, listPlayers } = require('./adminStore');
+    initAdminData();
+    const dbPlayers = listPlayers({ enabledOnly: true });
+    if (dbPlayers.length) return normalizeConfig({ ...rawConfig, players: dbPlayers });
+  } catch (error) {
+    console.warn(`数据库玩家配置加载失败，使用 ai.config.json：${error.message}`);
+  }
+  return normalizeConfig(rawConfig);
 }
 
 module.exports = {

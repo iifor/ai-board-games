@@ -8,6 +8,11 @@ const features = [
   { icon: Boxes, title: '热门聚合', subtitle: '一站体验' }
 ];
 
+function getAdminHref() {
+  if (window.location.port === '5173') return `${window.location.protocol}//${window.location.hostname}:5175/admin/`;
+  return '/admin/';
+}
+
 export function HomePage({ onStart }) {
   return (
     <main className="landing-page">
@@ -29,6 +34,9 @@ export function HomePage({ onStart }) {
           立即开始
           <span>›</span>
         </button>
+        <a className="admin-entry-button" href={getAdminHref()}>
+          B 端管理后台
+        </a>
       </section>
 
       <section className="landing-board" aria-hidden="true">
