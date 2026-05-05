@@ -5,12 +5,12 @@ export async function fetchAiPlayers() {
   return data.players || [];
 }
 
-export function openGameSocket({ mode, playerIds = [], onEvent, onError, onClose }) {
+export function openGameSocket({ mode, gameType = 'consensus', playerIds = [], onEvent, onError, onClose }) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(`${protocol}//${window.location.host}/api/toc/ws/game`);
 
   socket.onopen = () => {
-    socket.send(JSON.stringify({ type: 'start', mode, playerIds }));
+    socket.send(JSON.stringify({ type: 'start', mode, gameType, playerIds }));
   };
 
   socket.onmessage = (message) => {

@@ -1,10 +1,13 @@
 import React from 'react';
-import { ArrowLeft, Eye, MessageCircle, Pause, Power, Settings, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Eye, MessageCircle, Pause, Power, RotateCcw, Settings, Volume2, VolumeX } from 'lucide-react';
 import { classNames } from '../utils/gameState';
 
 export function TopNav({
   currentRound,
   currentEvent,
+  title = '共识迷雾',
+  subtitle = '迷雾调查 v3.2',
+  roundLabel,
   autoPlay,
   showRoles,
   mockMode,
@@ -15,22 +18,29 @@ export function TopNav({
   onModeToggle,
   onSpeechToggle,
   setAutoPlay,
-  setShowRoles
+  setShowRoles,
+  viewAction
 }) {
   return (
     <header className="top-nav">
       <div className="brand">
         <div className="brand-mark">◎</div>
         <div>
-          <h1>共识迷雾</h1>
-          <span>迷雾调查 v3.2</span>
+          <h1>{title}</h1>
+          <span>{subtitle}</span>
         </div>
       </div>
 
       <div className="round-title">
-        <span>第</span>
-        <strong>{currentRound.number}</strong>
-        <span>/ 3 轮</span>
+        {roundLabel ? (
+          <span>{roundLabel}</span>
+        ) : (
+          <>
+            <span>第</span>
+            <strong>{currentRound.number}</strong>
+            <span>/ 3 轮</span>
+          </>
+        )}
       </div>
 
       <div className="phase-badge">
@@ -43,10 +53,17 @@ export function TopNav({
           <ArrowLeft size={23} />
           <span>返回</span>
         </button>
-        <button title={showRoles ? '上帝视角：所有信息公开可见' : '玩家视角：点击一位玩家查看信息'} onClick={() => setShowRoles(!showRoles)}>
-          <Eye size={23} />
-          <span>{showRoles ? '上帝' : '玩家'}</span>
-        </button>
+        {viewAction ? (
+          <button title={viewAction.title} onClick={viewAction.onClick} disabled={viewAction.disabled}>
+            {viewAction.icon || <RotateCcw size={23} />}
+            <span>{viewAction.label}</span>
+          </button>
+        ) : (
+          <button title={showRoles ? '上帝视角：所有信息公开可见' : '玩家视角：点击一位玩家查看信息'} onClick={() => setShowRoles(!showRoles)}>
+            <Eye size={23} />
+            <span>{showRoles ? '上帝' : '玩家'}</span>
+          </button>
+        )}
         <button className="mode-switch" title="Mock 模式开关" onClick={onModeToggle} disabled={controlsLocked}>
           <span className={classNames('switch-track', mockMode && 'active')}><i /></span>
           <span>{mockMode ? 'Mock' : '真实'}</span>

@@ -7,7 +7,7 @@ export function RealStartPanel({ status, message, onStart }) {
   return (
     <section className="center-stage start-stage framed-panel">
       <div className="start-content">
-        <p className="eyebrow">REAL AI MODE</p>
+        <p className="eyebrow">AI 实战模式</p>
         <h2>{status === 'streaming' ? '游戏生成中...' : '游戏即将开始...'}</h2>
         <p>{message || '点击开始后，后端会调度 AI 玩家；前端播报完成后才会通知后端进入下一步。'}</p>
         <button className="start-game-button" onClick={onStart} disabled={status === 'streaming'}>

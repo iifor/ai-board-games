@@ -1,6 +1,8 @@
 const { WebSocketServer } = require('ws');
 const { getAiConfig } = require('./aiConfig');
 const { createAiGame } = require('./aiGameRunner');
+const { runAiDebate } = require('./aiDebateRunner');
+const { runAiWerewolf } = require('./aiWerewolfRunner');
 const { saveGameRecord } = require('./adminStore');
 const { saveGameLog } = require('./gameLogStore');
 
@@ -15,7 +17,7 @@ function attachGameSocket(server) {
       if (!message) return;
 
       if (message.type === 'start') {
-        runSession(session, message.mode === 'real' ? 'real' : 'mock', message.playerIds).catch((error) => {
+        runSession(session, message.mode === 'real' ? 'real' : 'mock', message.playerIds, message.gameType).catch((error) => {
           if (error.message === 'game-session-cancelled') return;
           console.error(error);
           session.send({ type: 'error', message: error.message });
@@ -29,15 +31,17 @@ function attachGameSocket(server) {
   });
 }
 
-async function runSession(session, mode, playerIds) {
-  const config = getRequestConfig(mode, playerIds);
+async function runSession(session, mode, playerIds, gameType = 'consensus') {
+  const safeGameType = normalizeGameType(gameType);
+  const config = getRequestConfig(mode, playerIds, safeGameType);
 
   await session.sendAndWait({
     type: 'host',
-    message: '游戏开始'
+    message: getStartMessage(safeGameType)
   });
 
-  const game = await createAiGame(config, {
+  const runner = getRunner(safeGameType);
+  const game = await runner(config, {
     onEvent: (event) => session.sendAndWait(withNarration(event))
   });
 
@@ -46,10 +50,34 @@ async function runSession(session, mode, playerIds) {
 
   await session.sendAndWait({
     type: 'done',
-    message: '游戏结束，完整比赛结果已生成。',
+    message: getDoneMessage(safeGameType),
     game
   });
   session.close();
+}
+
+function normalizeGameType(gameType) {
+  if (gameType === 'debate') return 'debate';
+  if (gameType === 'werewolf') return 'werewolf';
+  return 'consensus';
+}
+
+function getRunner(gameType) {
+  if (gameType === 'debate') return runAiDebate;
+  if (gameType === 'werewolf') return runAiWerewolf;
+  return createAiGame;
+}
+
+function getStartMessage(gameType) {
+  if (gameType === 'debate') return 'AI 辩论赛开始';
+  if (gameType === 'werewolf') return 'AI 狼人杀开始';
+  return '游戏开始';
+}
+
+function getDoneMessage(gameType) {
+  if (gameType === 'debate') return '辩论赛结束，完整赛果已生成。';
+  if (gameType === 'werewolf') return '狼人杀结束，完整战报已生成。';
+  return '游戏结束，完整比赛结果已生成。';
 }
 
 function createSession(socket) {
@@ -89,36 +117,56 @@ function createSession(socket) {
   };
 }
 
-function getRequestConfig(mode, playerIds) {
+function getRequestConfig(mode, playerIds, gameType = 'consensus') {
   const config = withSelectedPlayers(getAiConfig(), playerIds);
-  if (mode === 'mock') return { ...config, mode: 'mock' };
+  const selected = selectPlayersForGame(config, playerIds, gameType);
+  const selectedProviders = new Set([config.host.provider, ...selected.map((player) => player.provider)]);
+  const missingProviders = config.missingProviders.filter((item) => selectedProviders.has(item.provider));
+  const scopedConfig = {
+    ...config,
+    players: selected,
+    selectedPlayerIds: selected.map((player) => player.id),
+    gameType,
+    missingProviders,
+    realReady: missingProviders.length === 0
+  };
+  if (mode === 'mock') return { ...scopedConfig, mode: 'mock' };
 
-  if (config.missingProviders.length) {
-    const missing = config.missingProviders.map((item) => `${item.provider}(${item.apiKeyEnv})`).join('、');
+  if (scopedConfig.missingProviders.length) {
+    const missing = scopedConfig.missingProviders.map((item) => `${item.provider}(${item.apiKeyEnv})`).join('、');
     throw new Error(`真实模式缺少 API Key：${missing}。请在 .env 中配置，或切换到 Mock。`);
   }
-  return { ...config, mode: 'real' };
+  return { ...scopedConfig, mode: 'real' };
 }
 
-function withSelectedPlayers(config, playerIds) {
+function selectPlayersForGame(config, playerIds, gameType) {
   const ids = Array.isArray(playerIds) ? playerIds.map(Number).filter(Boolean) : [];
   const selected = ids.length
     ? ids.map((id) => config.players.find((player) => Number(player.id) === id)).filter(Boolean)
-    : config.players.slice(0, 7);
+    : config.players.slice(0, gameType === 'debate' || gameType === 'werewolf' ? 12 : 7);
+
+  if (gameType === 'debate') {
+    if (selected.length < 8 || selected.length > 12) {
+      throw new Error('AI 辩论赛需要选择 8-12 位 AI 玩家。');
+    }
+    return selected;
+  }
+
+  if (gameType === 'werewolf') {
+    if (selected.length !== 12) {
+      throw new Error('AI 狼人杀 12 人标准局需要选择恰好 12 位 AI 玩家。');
+    }
+    return selected;
+  }
 
   if (selected.length !== 7) {
     throw new Error('共识迷雾 v3.2 标准局需要选择恰好 7 位 AI 玩家。');
   }
+  return selected;
+}
 
-  const selectedProviders = new Set([config.host.provider, ...selected.map((player) => player.provider)]);
-  const missingProviders = config.missingProviders.filter((item) => selectedProviders.has(item.provider));
-  return {
-    ...config,
-    players: selected,
-    selectedPlayerIds: selected.map((player) => player.id),
-    missingProviders,
-    realReady: missingProviders.length === 0
-  };
+function withSelectedPlayers(config) {
+  return config;
 }
 
 function parseMessage(raw) {
@@ -137,6 +185,8 @@ function withNarration(event) {
 }
 
 function getNarration(event) {
+  if (event.game?.type === 'werewolf') return getWerewolfNarration(event);
+  if (event.game?.type === 'debate') return getDebateNarration(event);
   if (event.type === 'players') return '七名玩家已经就绪。身份和个人记忆已经秘密分发。';
   if (event.type === 'round-start') {
     const premise = event.round.question.premise ? `${event.round.question.premise}` : '';
@@ -170,6 +220,40 @@ function getNarration(event) {
     return `最终指认结果公布。最高票对象是${targets}。`;
   }
   if (event.type === 'game') return '本局进入胜负结算。';
+  return event.message || '';
+}
+
+function getWerewolfNarration(event) {
+  if (event.type === 'players') return '十二名玩家已经入场，身份牌已秘密分发。';
+  if (event.type === 'phase-start') return event.message || `第 ${event.round?.day || 1} 夜，天黑请闭眼。`;
+  if (event.type === 'night-result') return event.message || '夜晚行动结算完毕。';
+  if (event.type === 'day-start') return event.message || `第 ${event.round?.day || 1} 天，天亮了。`;
+  if (event.type === 'speech') return `${event.speech.playerId}号发言。${event.speech.text}`;
+  if (event.type === 'vote-result') return event.message || '白天投票结果公布。';
+  if (event.type === 'last-words' || event.type === 'exile-words') return `${event.testimony.playerId}号遗言。${event.testimony.text}`;
+  if (event.type === 'hunter-shot') return `猎人发动技能，${event.shot.from}号带走${event.shot.target}号。`;
+  if (event.type === 'game') {
+    const winner = event.game.winner === 'wolves' ? '狼人阵营胜利' : '好人阵营胜利';
+    return `狼人杀进入胜负结算。${winner}。${event.game.winReason || ''}`;
+  }
+  return event.message || '';
+}
+
+function getDebateNarration(event) {
+  if (event.type === 'players') return '辩论选手已经入场。正方、反方和评委席已随机分配。';
+  if (event.type === 'phase-start') return event.message || `现在进入${event.phase?.name || '下一'}环节。`;
+  if (event.type === 'phase-end') return event.message || `${event.phase?.name || '本'}环节结束。`;
+  if (event.type === 'speech') {
+    if (event.speech.side === 'host') return `主持人点评。${event.speech.text}`;
+    const player = event.game.players?.find((item) => Number(item.id) === Number(event.speech.playerId));
+    const label = player ? `${player.sideLabel}${player.debateRoleLabel}` : `${event.speech.playerId}号`;
+    return `${label}${event.speech.playerId}号发言。${event.speech.text}`;
+  }
+  if (event.type === 'game') {
+    const winner = event.game.winner === 'pro' ? '正方' : event.game.winner === 'con' ? '反方' : '双方平局';
+    const mvp = event.game.mvp ? `本场 MVP 是 ${event.game.mvp.nickname || `${event.game.mvp.id}号`}。` : '';
+    return `辩论赛进入赛果公布。${winner}。${mvp}`;
+  }
   return event.message || '';
 }
 

@@ -15,7 +15,7 @@
     "preview": "concurrently \"vite preview --config vite.client.config.mjs --host 0.0.0.0\" \"vite preview --config vite.admin.config.mjs --host 0.0.0.0 --port 5175\"",
     "server": "node server/index.js",
     "start": "node server/index.js",
-    "check": "node -e \"const fs=require('fs'),vm=require('vm'); for (const f of ['server/index.js','server/app.js','server/routes/gameRoutes.js','server/routes/adminRoutes.js','server/db.js','server/adminStore.js','server/mistTemplate.js','server/mockGame.js','server/aiConfig.js','server/aiGameRunner.js','server/openaiChat.js','server/gameLogStore.js','server/gameSocket.js']) { new vm.Script(fs.readFileSync(f,'utf8'), {filename:f}); console.log(f+': ok'); }\""
+    "check": "node -e \"const fs=require('fs'),vm=require('vm'); for (const f of ['server/index.js','server/app.js','server/routes/gameRoutes.js','server/routes/adminRoutes.js','server/db.js','server/adminStore.js','server/mistTemplate.js','server/mockGame.js','server/aiConfig.js','server/aiGameRunner.js','server/aiDebateRunner.js','server/aiWerewolfRunner.js','server/openaiChat.js','server/gameLogStore.js','server/gameSocket.js']) { new vm.Script(fs.readFileSync(f,'utf8'), {filename:f}); console.log(f+': ok'); }\""
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",

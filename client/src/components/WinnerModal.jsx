@@ -17,7 +17,7 @@ export function WinnerModal({ game, onClose }) {
     <div className="modal-backdrop" role="presentation">
       <section className="winner-modal framed-panel" role="dialog" aria-modal="true" aria-labelledby="winner-title">
         <button className="modal-close" onClick={onClose} aria-label="关闭结算弹窗"><X size={20} /></button>
-        <p className="eyebrow">GAME SETTLEMENT</p>
+        <p className="eyebrow">游戏结算</p>
         <h2 id="winner-title">恭喜{winnerName}获胜</h2>
         <p>{game.winReason}</p>
         <div className="identity-reveal">

@@ -3,12 +3,14 @@ import { createRoot } from 'react-dom/client';
 import { ActionBar } from './components/ActionBar';
 import { CenterStage, RealStartPanel } from './components/CenterStage';
 import { ConfirmResetModal, CurrentGameHistory, EventBackground, InfoModal, StageInfo } from './components/InfoModal';
+import { DebateGame } from './components/DebateGame';
 import { GameSelectPage } from './components/GameSelectPage';
 import { HomePage } from './components/HomePage';
 import { PlayerList } from './components/PlayerList';
 import { StatusPanel } from './components/StatusPanel';
 import { ErrorView, LoadingView } from './components/StateViews';
 import { TopNav } from './components/TopNav';
+import { WerewolfGame } from './components/WerewolfGame';
 import { WinnerModal } from './components/WinnerModal';
 import { openGameSocket } from './api/gameApi';
 import { buildTimeline, classNames, createEmptyGame, createPendingRound } from './utils/gameState';
@@ -31,8 +33,24 @@ function App() {
           setSelectedPlayerIds(playerIds);
           setScreen('consensus');
         }}
+        onStartDebate={(playerIds) => {
+          setSelectedPlayerIds(playerIds);
+          setScreen('debate');
+        }}
+        onStartWerewolf={(playerIds) => {
+          setSelectedPlayerIds(playerIds);
+          setScreen('werewolf');
+        }}
       />
     );
+  }
+
+  if (screen === 'werewolf') {
+    return <WerewolfGame selectedPlayerIds={selectedPlayerIds} onReturnToSelect={() => setScreen('select')} />;
+  }
+
+  if (screen === 'debate') {
+    return <DebateGame selectedPlayerIds={selectedPlayerIds} onReturnToSelect={() => setScreen('select')} />;
   }
 
   return <ConsensusGame selectedPlayerIds={selectedPlayerIds} onReturnToSelect={() => setScreen('select')} />;
@@ -112,6 +130,7 @@ function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
     setStreamMessage('正在连接后端调度器...');
     socketRef.current = openGameSocket({
       mode: mockMode ? 'mock' : 'real',
+      gameType: 'consensus',
       playerIds: selectedPlayerIds,
       onEvent: handleSocketEvent,
       onError: (error) => {
