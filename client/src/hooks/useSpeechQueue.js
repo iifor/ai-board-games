@@ -100,12 +100,12 @@ function getProfileForItem(item) {
 }
 
 export function useSpeechQueue() {
-  const [speechEnabled, setSpeechEnabledState] = useState(false);
+  const [speechEnabled, setSpeechEnabledState] = useState(true);
   const queueRef = useRef([]);
   const speakingRef = useRef(false);
   const currentItemRef = useRef(null);
   const cancellingRef = useRef(false);
-  const enabledRef = useRef(false);
+  const enabledRef = useRef(true);
   const voicesRef = useRef([]);
 
   const playNext = useCallback(() => {

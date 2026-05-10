@@ -267,13 +267,15 @@ function deletePlayer(id) {
 function saveGameRecord(game) {
   if (!game?.id) return null;
   const db = getDb();
+  const gameType = normalizeGameType(game.type || game.gameType || game.id);
   const requestedSkinId = game.event?.id || game.skinId || null;
-  const skinId = requestedSkinId && getSkin(requestedSkinId) ? requestedSkinId : null;
+  const skinId = gameType === 'consensus' && requestedSkinId && getSkin(requestedSkinId) ? requestedSkinId : null;
   const row = {
     id: game.id,
+    game_type: gameType,
     mode: game.mode || 'mock',
     skin_id: skinId,
-    skin_name: game.event?.name || '',
+    skin_name: game.event?.name || getGameTypeName(gameType),
     winner: game.winner || '',
     win_reason: game.winReason || '',
     players_json: toJson(game.players || []),
@@ -282,8 +284,8 @@ function saveGameRecord(game) {
   };
   const tx = db.transaction(() => {
     db.prepare(`
-      INSERT OR REPLACE INTO games (id, mode, skin_id, skin_name, winner, win_reason, players_json, rounds_json, event_json, created_at)
-      VALUES (@id, @mode, @skin_id, @skin_name, @winner, @win_reason, @players_json, @rounds_json, @event_json, COALESCE((SELECT created_at FROM games WHERE id = @id), CURRENT_TIMESTAMP))
+      INSERT OR REPLACE INTO games (id, game_type, mode, skin_id, skin_name, winner, win_reason, players_json, rounds_json, event_json, created_at)
+      VALUES (@id, @game_type, @mode, @skin_id, @skin_name, @winner, @win_reason, @players_json, @rounds_json, @event_json, COALESCE((SELECT created_at FROM games WHERE id = @id), CURRENT_TIMESTAMP))
     `).run(row);
     db.prepare('DELETE FROM game_players WHERE game_id = ?').run(game.id);
     (game.players || []).forEach((player) => {
@@ -297,6 +299,10 @@ function saveGameRecord(game) {
 function listGames(filters = {}) {
   const conditions = [];
   const params = {};
+  if (filters.gameType) {
+    conditions.push('game_type = @gameType');
+    params.gameType = normalizeGameType(filters.gameType);
+  }
   if (filters.mode) {
     conditions.push('mode = @mode');
     params.mode = filters.mode;
@@ -330,11 +336,14 @@ function deleteGame(id) {
 
 function rowToGameSummary(row) {
   const players = parseJson(row.players_json, []);
+  const gameType = normalizeGameType(row.game_type || row.id || row.event_json);
   return {
     id: row.id,
+    gameType,
+    gameTypeName: getGameTypeName(gameType),
     mode: row.mode,
     skinId: row.skin_id,
-    skinName: row.skin_name,
+    skinName: row.skin_name || getGameTypeName(gameType),
     winner: row.winner,
     winReason: row.win_reason,
     playerCount: players.length,
@@ -353,14 +362,34 @@ function rowToGame(row) {
 
 function getAdminStats() {
   const db = getDb();
+  const gameTypeRows = db.prepare('SELECT game_type AS gameType, COUNT(*) AS count FROM games GROUP BY game_type').all();
+  const gamesByType = Object.fromEntries(gameTypeRows.map((row) => [normalizeGameType(row.gameType), row.count]));
   return {
     databasePath: getDatabasePath(),
     skins: db.prepare('SELECT COUNT(*) AS count FROM skins').get().count,
     enabledSkins: db.prepare('SELECT COUNT(*) AS count FROM skins WHERE enabled = 1').get().count,
     players: db.prepare('SELECT COUNT(*) AS count FROM players').get().count,
     enabledPlayers: db.prepare('SELECT COUNT(*) AS count FROM players WHERE enabled = 1').get().count,
-    games: db.prepare('SELECT COUNT(*) AS count FROM games').get().count
+    games: db.prepare('SELECT COUNT(*) AS count FROM games').get().count,
+    gamesByType: {
+      consensus: gamesByType.consensus || 0,
+      debate: gamesByType.debate || 0,
+      werewolf: gamesByType.werewolf || 0
+    }
   };
+}
+
+function normalizeGameType(value) {
+  const text = String(value || '').toLowerCase();
+  if (text.includes('debate')) return 'debate';
+  if (text.includes('werewolf')) return 'werewolf';
+  return 'consensus';
+}
+
+function getGameTypeName(gameType) {
+  if (gameType === 'debate') return 'AI 辩论赛';
+  if (gameType === 'werewolf') return 'AI 狼人杀';
+  return '共识迷雾';
 }
 
 function slugifyId(text) {

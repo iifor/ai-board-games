@@ -54,6 +54,7 @@ function migrate(db) {
 
     CREATE TABLE IF NOT EXISTS games (
       id TEXT PRIMARY KEY,
+      game_type TEXT NOT NULL DEFAULT 'consensus',
       mode TEXT NOT NULL,
       skin_id TEXT,
       skin_name TEXT NOT NULL DEFAULT '',
@@ -74,7 +75,31 @@ function migrate(db) {
       FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
       FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE RESTRICT
     );
+
+    CREATE TABLE IF NOT EXISTS game_player_selections (
+      game_type TEXT PRIMARY KEY,
+      player_ids_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
+
+  ensureColumn(db, 'games', 'game_type', "TEXT NOT NULL DEFAULT 'consensus'");
+  db.exec(`
+    UPDATE games
+    SET game_type = CASE
+      WHEN id LIKE 'debate-%' OR id LIKE 'mock-debate-%' OR event_json LIKE '%ai-debate%' THEN 'debate'
+      WHEN id LIKE 'werewolf-%' OR id LIKE 'mock-werewolf-%' OR event_json LIKE '%ai-werewolf%' THEN 'werewolf'
+      ELSE COALESCE(NULLIF(game_type, ''), 'consensus')
+    END
+    WHERE game_type IS NULL OR game_type = '' OR game_type = 'consensus'
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_games_type_created ON games(game_type, created_at DESC)');
+}
+
+function ensureColumn(db, tableName, columnName, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  if (columns.some((column) => column.name === columnName)) return;
+  db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
 }
 
 function getDatabasePath() {

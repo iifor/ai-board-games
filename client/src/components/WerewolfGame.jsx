@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Moon, Shield, Vote, Wand2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { RotateCcw, Moon, Shield, Vote, Wand2 } from 'lucide-react';
 import { openGameSocket } from '../api/gameApi';
 import { classNames } from '../utils/gameState';
 import { useSpeechQueue } from '../hooks/useSpeechQueue';
-import { RealStartPanel } from './CenterStage';
+import { SpeechSubtitle } from './SpeechSubtitle';
 import { TopNav } from './TopNav';
+import '../styles/werewolf-game.css';
 
 const EMPTY_WEREWOLF = {
   id: 'pending-werewolf',
@@ -12,7 +13,7 @@ const EMPTY_WEREWOLF = {
   mode: 'real',
   event: {
     name: 'AI 狼人杀',
-    background: '12人标准局：4狼人、预言家、女巫、猎人、守卫、4村民。'
+    background: '12人标准局（预女猎白）：4狼人、预言家、女巫、猎人、白痴、4平民。'
   },
   players: [],
   rounds: [],
@@ -25,19 +26,54 @@ const ROLE_NAMES = {
   seer: '预言家',
   witch: '女巫',
   hunter: '猎人',
+  idiot: '白痴',
   guard: '守卫',
   villager: '村民'
 };
+
+const WEREWOLF_MODES = [
+  {
+    id: 'standard-12',
+    name: '标准12人局',
+    description: '预女猎白：4狼人、预言家、女巫、猎人、白痴、4平民。'
+  },
+  {
+    id: 'mirror-mist',
+    name: '镜隐迷踪',
+    description: '强调身份误导和镜像信息的迷踪局。'
+  },
+  {
+    id: 'white-wolf-king-knight',
+    name: '白狼王騎士',
+    description: '加入白狼王与骑士对抗，节奏更激烈。'
+  },
+  {
+    id: 'wolf-beauty-knight',
+    name: '狼美人騎士',
+    description: '狼美人与骑士同场，夜晚连接和白天决斗并重。'
+  },
+  {
+    id: 'gargoyle-gravekeeper',
+    name: '石像鬼守墓人',
+    description: '石像鬼查验身份，守墓人追踪放逐信息。'
+  },
+  {
+    id: 'thief-cupid',
+    name: '盗贼丘比特',
+    description: '盗贼换牌与丘比特情侣线改变阵营判断。'
+  }
+];
 
 export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
   const [mockMode, setMockMode] = useState(true);
   const [game, setGame] = useState(EMPTY_WEREWOLF);
   const [status, setStatus] = useState('idle');
-  const [streamMessage, setStreamMessage] = useState('Mock 模式已就绪，点击开始后由后端逐条推送狼人杀战报。');
+  const [streamMessage, setStreamMessage] = useState('等待开局');
   const [messageLog, setMessageLog] = useState([]);
   const [activeSpeech, setActiveSpeech] = useState(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [modeDialogOpen, setModeDialogOpen] = useState(false);
+  const [werewolfMode, setWerewolfMode] = useState(WEREWOLF_MODES[0]);
   const [visibleRolePlayerId, setVisibleRolePlayerId] = useState(null);
   const [showRoles, setShowRoles] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
@@ -45,6 +81,7 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
   const pendingAckRef = useRef(null);
   const pendingEventRef = useRef(null);
   const autoPlayRef = useRef(false);
+  const ackTimerRef = useRef(null);
   const { speechEnabled, setSpeechEnabled, speak, cancel } = useSpeechQueue();
 
   useEffect(() => () => closeSocket(), []);
@@ -59,6 +96,7 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
   const currentSpeakerId = activeSpeech?.playerId || null;
   const isRunning = status === 'streaming';
   const controlsLocked = isRunning;
+  const canStartNextGame = !isRunning || (mockMode && !autoPlay);
   const dayLabel = currentRound ? `第 ${currentRound.day} 天` : '等待开局';
   const phaseTitle = getPhaseTitle(currentRound, streamMessage);
 
@@ -79,6 +117,7 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
     cancel();
     pendingAckRef.current = null;
     pendingEventRef.current = null;
+    clearPendingAckTimer();
     setGame(EMPTY_WEREWOLF);
     setMessageLog([]);
     setActiveSpeech(null);
@@ -87,19 +126,22 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
     setStatus('idle');
     setAutoPlay(false);
     autoPlayRef.current = false;
-    setStreamMessage(message || (nextMockMode ? 'Mock 模式已就绪，点击开始后由后端逐条推送狼人杀战报。' : '真实模式已就绪，点击开始后才会调用 AI。'));
+    setStreamMessage(message || (nextMockMode ? '游戏准备' : 'AI游戏准备'));
   }
 
-  function startGame() {
+  function startGame(modeConfig = werewolfMode) {
     resetToIdle('');
+    setWerewolfMode(modeConfig);
+    setModeDialogOpen(false);
     setStatus('streaming');
     setAutoPlay(true);
     autoPlayRef.current = true;
-    setStreamMessage('正在连接 AI 狼人杀主持人...');
+    setStreamMessage('游戏准备中...');
     socketRef.current = openGameSocket({
       mode: mockMode ? 'mock' : 'real',
       gameType: 'werewolf',
       playerIds: selectedPlayerIds,
+      werewolfMode: modeConfig,
       onEvent: handleSocketEvent,
       onError: (error) => {
         setStatus('error');
@@ -135,6 +177,7 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
         playerId: event.speech.playerId,
         text: event.speech.text
       });
+      return;
     }
     if ((event.type === 'last-words' || event.type === 'exile-words') && event.testimony) {
       setStreamMessage(`${event.testimony.playerId}号遗言`);
@@ -142,6 +185,11 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
         playerId: event.testimony.playerId,
         text: event.testimony.text
       });
+      return;
+    }
+    const subtitleText = event.narration || getWerewolfNarration(event) || event.message;
+    if (subtitleText && event.type !== 'game') {
+      setActiveSpeech({ playerId: null, text: subtitleText });
     }
     if (event.type === 'done') {
       setStatus('ready');
@@ -181,16 +229,41 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
     pending.socket.send(JSON.stringify({ type: 'ack', ackId: pending.ackId }));
     pendingAckRef.current = null;
     pendingEventRef.current = null;
+    clearPendingAckTimer();
   }
 
   function continuePendingEvent() {
     const event = pendingEventRef.current;
     if (!event) return;
     cancel();
+    clearPendingAckTimer();
     const narration = event.narration || getWerewolfNarration(event);
     const speechOptions = event?.speech?.playerId ? { playerId: event.speech.playerId } : {};
     if (speechEnabled && narration) speak(narration, acknowledgePending, speechOptions);
-    else window.setTimeout(acknowledgePending, event.type === 'speech' ? 280 : 120);
+    else ackTimerRef.current = window.setTimeout(acknowledgePending, event.type === 'speech' ? 280 : 120);
+  }
+
+  function clearPendingAckTimer() {
+    if (!ackTimerRef.current) return;
+    window.clearTimeout(ackTimerRef.current);
+    ackTimerRef.current = null;
+  }
+
+  function sendPlaybackControl(paused) {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'control', action: paused ? 'pause' : 'resume' }));
+    }
+  }
+
+  function handleAutoPlayChange(value) {
+    const next = Boolean(value);
+    setAutoPlay(next);
+    autoPlayRef.current = next;
+    sendPlaybackControl(!next);
+    if (!next) {
+      cancel();
+      clearPendingAckTimer();
+    }
   }
 
   function requestModeToggle() {
@@ -228,17 +301,28 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
         onReturn={returnToSelect}
         onModeToggle={requestModeToggle}
         onSpeechToggle={() => !controlsLocked && setSpeechEnabled((value) => !value)}
-        setAutoPlay={setAutoPlay}
+        setAutoPlay={handleAutoPlayChange}
         setShowRoles={setShowRoles}
+        viewAction={{
+          title: isRunning && autoPlay ? '暂停后可以开始下一局' : displayGame.rounds?.length ? '开始下一局' : '开始游戏',
+          label: displayGame.rounds?.length ? '下一局' : '开始',
+          icon: <RotateCcw size={23} />,
+          disabled: !canStartNextGame,
+          onClick: () => startGame(WEREWOLF_MODES[0])
+        }}
       />
 
       {status === 'idle' || !displayGame.rounds?.length ? (
-        <section className="werewolf-start-wrap">
-          <RealStartPanel status={status} message={streamMessage} onStart={startGame} />
+        <section className="werewolf-idle-stage" aria-label="狼人杀待开始">
+          <div className="game-idle-loading" aria-live="polite">
+            <span aria-hidden="true" />
+            <strong>等待开局</strong>
+          </div>
         </section>
       ) : (
         <WerewolfArena
           game={displayGame}
+          messages={messageLog}
           currentRound={currentRound}
           currentSpeakerId={currentSpeakerId}
           activeSpeech={activeSpeech}
@@ -251,12 +335,16 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
 
       {status === 'error' && <p className="werewolf-error">{streamMessage}</p>}
 
-      <FloatingHistory
-        title="发言历史"
-        messages={messageLog}
-        open={historyOpen}
-        onToggle={() => setHistoryOpen((value) => !value)}
-      />
+      {modeDialogOpen && (
+        <WerewolfModeDialog
+          modes={WEREWOLF_MODES}
+          selectedMode={werewolfMode}
+          onSelect={setWerewolfMode}
+          onCancel={onReturnToSelect}
+          onStart={() => startGame(werewolfMode)}
+        />
+      )}
+
       {selectedPlayer && (
         <PlayerDetailModal
           player={selectedPlayer}
@@ -268,8 +356,8 @@ export function WerewolfGame({ selectedPlayerIds, onReturnToSelect }) {
   );
 }
 
-function WerewolfArena({ game, currentRound, currentSpeakerId, activeSpeech, showRoles, visibleRolePlayerId, streamMessage, onPlayerSelect }) {
-  const deadPlayers = useMemo(() => game.players.filter((player) => !player.alive), [game.players]);
+function WerewolfArena({ game, messages, currentRound, currentSpeakerId, activeSpeech, showRoles, visibleRolePlayerId, streamMessage, onPlayerSelect }) {
+  const orderedPlayers = (game.players || []).slice().sort((a, b) => Number(a.id) - Number(b.id));
 
   return (
     <section className="werewolf-arena">
@@ -280,14 +368,14 @@ function WerewolfArena({ game, currentRound, currentSpeakerId, activeSpeech, sho
       </section>
 
       <section className="werewolf-table">
-        {game.players.map((player, index) => (
+        {orderedPlayers.map((player, index) => (
           <WerewolfSeat
             player={player}
             seatIndex={index}
+            actionTarget={shouldShowWerewolfActionTargets(currentRound) ? getWerewolfActionTarget(currentRound, player) : null}
             showRoles={showRoles}
             visibleRolePlayerId={visibleRolePlayerId}
             currentSpeakerId={currentSpeakerId}
-            activeSpeech={activeSpeech}
             onPlayerSelect={onPlayerSelect}
             key={player.id}
           />
@@ -303,24 +391,75 @@ function WerewolfArena({ game, currentRound, currentSpeakerId, activeSpeech, sho
         <WerewolfResult game={game} />
 
         <aside className="werewolf-right">
-          <PanelHeader icon={<Skull size={18} />} title={`出局玩家（${deadPlayers.length}）`} />
-          <div className="werewolf-dead-list">
-            {deadPlayers.length ? deadPlayers.map((player) => (
-              <article key={player.id}>
-                <strong>{player.nickname || `${player.id}号`}</strong>
-                <span>{player.deathReason || '出局'} · 第{player.deathDay || '?'}天</span>
-                <em>{getVisibleRoleText(player, showRoles, visibleRolePlayerId)}</em>
-              </article>
-            )) : <p>暂无出局玩家。</p>}
-          </div>
-          <SkillLedger round={currentRound} />
+          <WerewolfGameRecord
+            rounds={game.rounds || []}
+            players={game.players || []}
+            showRoles={showRoles}
+            visibleRolePlayerId={visibleRolePlayerId}
+          />
+          <WerewolfHistory messages={messages} />
         </aside>
       </section>
+      <SpeechSubtitle speech={activeSpeech} />
     </section>
   );
 }
 
-function WerewolfSeat({ player, seatIndex, showRoles, visibleRolePlayerId, currentSpeakerId, activeSpeech, onPlayerSelect }) {
+function WerewolfHistory({ messages }) {
+  const [openKey, setOpenKey] = useState('');
+  const orderedMessages = messages.slice().reverse();
+
+  return (
+    <section className="werewolf-history-panel">
+      <PanelHeader icon={<Vote size={17} />} title={`发言历史（${messages.length}）`} />
+      <div className="werewolf-history-list">
+        {orderedMessages.length ? orderedMessages.map((message, index) => {
+          const key = `${message.playerId}-${messages.length - index}`;
+          const open = openKey === key;
+          return (
+            <article className={open ? 'open' : ''} key={key}>
+              <button type="button" onClick={() => setOpenKey(open ? '' : key)}>
+                {message.title || (message.type === 'host' ? '主持人' : `${message.playerId}号`)}
+              </button>
+              {open && <p>{message.text}</p>}
+            </article>
+          );
+        }) : <p className="floating-history-empty">暂无历史发言。</p>}
+      </div>
+    </section>
+  );
+}
+
+function WerewolfModeDialog({ modes, selectedMode, onSelect, onCancel, onStart }) {
+  return (
+    <div className="werewolf-mode-backdrop" role="presentation">
+      <section className="werewolf-mode-dialog" role="dialog" aria-modal="true" aria-label="选择狼人杀模式">
+        <header>
+          <h2>选择狼人杀模式</h2>
+          <button type="button" onClick={onCancel}>返回</button>
+        </header>
+        <div className="werewolf-mode-grid">
+          {modes.map((mode) => (
+            <button
+              type="button"
+              className={classNames('werewolf-mode-card', selectedMode.id === mode.id && 'active')}
+              onClick={() => onSelect(mode)}
+              key={mode.id}
+            >
+              <strong>{mode.name}</strong>
+              <span>{mode.description}</span>
+            </button>
+          ))}
+        </div>
+        <footer>
+          <button type="button" className="primary" onClick={onStart}>开始游戏</button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function WerewolfSeat({ player, seatIndex, actionTarget, showRoles, visibleRolePlayerId, currentSpeakerId, onPlayerSelect }) {
   const isSpeaking = Number(currentSpeakerId) === Number(player.id);
   return (
     <article
@@ -335,49 +474,76 @@ function WerewolfSeat({ player, seatIndex, showRoles, visibleRolePlayerId, curre
         aria-label={`查看${player.nickname || player.name || `${player.id}号`}信息`}
       >
         {!player.avatar && (player.nickname || player.name || `${player.id}`).slice(0, 1)}
+        <span className="werewolf-seat-number">{player.id}</span>
+        {!player.alive && <span className="werewolf-dead-badge">出局</span>}
       </button>
-      {isSpeaking && activeSpeech?.text && <div className="seat-speech-bubble">{activeSpeech.text}</div>}
+      {actionTarget && <span className="werewolf-action-badge">{actionTarget}</span>}
       <div className="werewolf-nameplate">
-        <strong>{player.nickname || player.name || `${player.id}号`} · {getVisibleRoleText(player, showRoles, visibleRolePlayerId)}</strong>
+        <strong>
+          {player.nickname || player.name || `${player.id}号`}
+          <br />
+          {getVisibleRoleText(player, showRoles, visibleRolePlayerId)}
+        </strong>
       </div>
     </article>
   );
 }
 
-function FloatingHistory({ title, messages, open, onToggle }) {
+function WerewolfGameRecord({ rounds, players, showRoles, visibleRolePlayerId }) {
+  if (!rounds?.length) return null;
+  const orderedRounds = rounds.slice().reverse();
+
   return (
-    <aside className={classNames('floating-history', open && 'open')}>
-      <button type="button" className="floating-history-toggle" onClick={onToggle}>
-        <span>{title}</span>
-        <strong>{messages.length}</strong>
-      </button>
-      {open && (
-        <div className="floating-history-panel">
-          {messages.length ? messages.slice().reverse().map((message, index) => (
-            <article key={`${message.playerId}-${messages.length - index}`}>
-              <strong>{message.title || (message.type === 'host' ? '主持人' : `${message.playerId}号`)}</strong>
-              <p>{message.text}</p>
-            </article>
-          )) : <p className="floating-history-empty">暂无历史发言。</p>}
-        </div>
-      )}
-    </aside>
+    <section className="skill-ledger werewolf-game-record">
+      <PanelHeader icon={<Wand2 size={17} />} title="游戏记录" />
+      <div className="werewolf-record-list">
+        {orderedRounds.map((round) => (
+          <article key={`round-${round.day}`}>
+            <strong>第 {round.day} 天</strong>
+            {round.sheriffId && <p>警长：{formatWerewolfRecordPlayer(round.sheriffId, players, showRoles, visibleRolePlayerId)}（放逐投票 1.5 票）</p>}
+            <p>夜晚：{formatNightSummary(round, players, showRoles, visibleRolePlayerId)}</p>
+            {showRoles && <WerewolfGodRecord round={round} players={players} />}
+            <p>
+              放逐：
+              {round.exile
+                ? formatWerewolfRecordPlayer(round.exile.id, players, showRoles, visibleRolePlayerId, round.exile.deathReason || round.exile.reason)
+                : round.idiotReveal
+                  ? `${formatWerewolfRecordPlayer(round.idiotReveal.id, players, showRoles, visibleRolePlayerId)} 翻牌免死`
+                  : '暂无'}
+            </p>
+            <p>
+              猎人：
+              {round.hunterShot
+                ? `${formatWerewolfRecordPlayer(round.hunterShot.from, players, showRoles, visibleRolePlayerId)} 带走 ${formatWerewolfRecordPlayer(round.hunterShot.target, players, showRoles, visibleRolePlayerId)}`
+                : '暂无开枪'}
+            </p>
+            <div className="vote-mini">
+              <Vote size={16} />
+              <span>{formatVotes(round.voteTally)}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
-function SkillLedger({ round }) {
-  if (!round) return null;
+function WerewolfGodRecord({ round, players }) {
+  const wolfChoices = Object.entries(round.night?.wolfChoices || {});
+  const seerCheck = round.night?.seerCheck;
+  const guardTarget = round.night?.guardTarget;
+  const witchSave = round.night?.witchSave;
+  const poisonTarget = round.night?.witchPoisonTarget;
+
   return (
-    <section className="skill-ledger">
-      <PanelHeader icon={<Wand2 size={17} />} title="本轮记录" />
-      <p>夜晚：{round.night?.deaths?.length ? `${round.night.deaths.map((item) => `${item.id}号`).join('、')}死亡` : '平安夜或等待结算'}</p>
-      <p>放逐：{round.exile ? `${round.exile.id}号` : '暂无'}</p>
-      <p>猎人：{round.hunterShot ? `${round.hunterShot.from}号带走${round.hunterShot.target}号` : '暂无开枪'}</p>
-      <div className="vote-mini">
-        <Vote size={16} />
-        <span>{formatVotes(round.voteTally)}</span>
-      </div>
-    </section>
+    <div className="werewolf-god-record">
+      <p>狼人部署：{round.night?.wolfStrategy || (wolfChoices.length ? '见刀口明细' : '暂无')}</p>
+      <p>刀口明细：{wolfChoices.length ? wolfChoices.map(([wolfId, target]) => `${formatWerewolfRecordPlayer(wolfId, players, true)} 刀 ${formatWerewolfRecordPlayer(target, players, true)}`).join('；') : '暂无'}</p>
+      <p>最终刀口：{round.night?.wolfTarget ? formatWerewolfRecordPlayer(round.night.wolfTarget, players, true) : '暂无'}</p>
+      <p>预言家：{seerCheck ? `查验 ${formatWerewolfRecordPlayer(seerCheck.target, players, true)}，结果 ${seerCheck.result}` : '暂无查验'}</p>
+      <p>女巫：{witchSave ? `使用解药救 ${formatWerewolfRecordPlayer(round.night?.wolfTarget, players, true)}` : '未使用解药'}；毒药：{poisonTarget ? formatWerewolfRecordPlayer(poisonTarget, players, true) : '未使用'}</p>
+      <p>守卫：{guardTarget ? `守护 ${formatWerewolfRecordPlayer(guardTarget, players, true)}` : '暂无守护'}</p>
+    </div>
   );
 }
 
@@ -422,6 +588,45 @@ function getPlayerLabel(players, playerId) {
   return `${player.nickname || player.name || `${player.id}号`}`;
 }
 
+function shouldShowWerewolfActionTargets(round) {
+  return Boolean(round?.voteTally && Object.keys(round.voteTally).length);
+}
+
+function getWerewolfActionTarget(round, player) {
+  if (!round || !player) return null;
+  return round.votes?.[player.id] || null;
+}
+
+function formatNightSummary(round, players, showRoles, visibleRolePlayerId) {
+  const deaths = round?.night?.deaths || [];
+  if (deaths.length) {
+    return `${deaths
+      .map((death) => formatWerewolfRecordPlayer(death.id, players, showRoles, visibleRolePlayerId, death.reason))
+      .join('、')} 死亡`;
+  }
+
+  const wolfTarget = round?.night?.wolfTarget;
+  const witchSaved = round?.night?.witchSave;
+  const guardTarget = round?.night?.guardTarget;
+  const guardSaved = wolfTarget && guardTarget && Number(wolfTarget) === Number(guardTarget);
+
+  if (wolfTarget) {
+    const target = formatWerewolfRecordPlayer(wolfTarget, players, showRoles, visibleRolePlayerId);
+    const result = witchSaved ? '女巫解救' : guardSaved ? '守护成功' : '无人死亡';
+    return `刀口 ${target}，${result}`;
+  }
+
+  return round?.phase === 'night' ? '等待夜晚结算' : '平安夜';
+}
+
+function formatWerewolfRecordPlayer(playerId, players, showRoles, visibleRolePlayerId, reason) {
+  const player = players.find((item) => Number(item.id) === Number(playerId));
+  const name = player ? (player.nickname || player.name || `${player.id}号`) : `${playerId}号`;
+  const role = player ? getVisibleRoleText(player, showRoles, visibleRolePlayerId) : '';
+  const detail = [role, reason].filter(Boolean).join(' · ');
+  return `${name}${detail ? `（${detail}）` : ''}`;
+}
+
 function formatVotes(tally = {}) {
   const entries = Object.entries(tally || {});
   if (!entries.length) return '暂无投票';
@@ -444,6 +649,7 @@ function getRoleDescription(player, roleVisible) {
     seer: '好人阵营神职，夜晚可以查验一名玩家阵营，白天需要谨慎传递信息。',
     witch: '好人阵营神职，拥有一次解药和一次毒药，需要根据夜晚死亡信息判断用药。',
     hunter: '好人阵营神职，死亡或被放逐时可选择开枪带走一名玩家。',
+    idiot: '好人阵营神职，被白天放逐时可翻牌免死，但之后失去投票权。',
     guard: '好人阵营神职，夜晚守护一名玩家，不能连续两晚守护同一人。',
     villager: '好人阵营平民，没有夜晚技能，依靠发言、票型和死亡信息寻找狼人。'
   };

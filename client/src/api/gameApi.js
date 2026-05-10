@@ -5,12 +5,32 @@ export async function fetchAiPlayers() {
   return data.players || [];
 }
 
-export function openGameSocket({ mode, gameType = 'consensus', playerIds = [], onEvent, onError, onClose }) {
+export async function fetchPlayerSelections() {
+  const response = await fetch('/api/toc/player-selections');
+  if (!response.ok) throw new Error('无法获取玩家选择配置');
+  const data = await response.json();
+  return data.selections || {};
+}
+
+export async function savePlayerSelection(gameType, playerIds) {
+  const response = await fetch(`/api/toc/player-selections/${gameType}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerIds })
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || data.message || '保存玩家选择失败');
+  }
+  return response.json();
+}
+
+export function openGameSocket({ mode, gameType = 'consensus', playerIds = [], topic, debateTeams, werewolfMode, onEvent, onError, onClose }) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(`${protocol}//${window.location.host}/api/toc/ws/game`);
 
   socket.onopen = () => {
-    socket.send(JSON.stringify({ type: 'start', mode, gameType, playerIds }));
+    socket.send(JSON.stringify({ type: 'start', mode, gameType, playerIds, topic, debateTeams, werewolfMode }));
   };
 
   socket.onmessage = (message) => {

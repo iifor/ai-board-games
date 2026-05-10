@@ -350,8 +350,10 @@ function getMockReplayGame(config) {
   const selected = getRandomMatchingRealGameLog(config.selectedPlayerIds || config.players.map((player) => player.id));
   if (selected?.game?.rounds?.length && selected.game?.event?.version === 'v3.2') {
     lastMockReplayGameId = selected.game.id;
+    const game = clone(selected.game);
+    game.players = resetReplayPlayers(game.players || []);
     return {
-      ...clone(selected.game),
+      ...game,
       id: `mock-replay-${selected.game.id || Date.now()}`,
       mode: 'mock',
       replayFrom: {
@@ -362,6 +364,17 @@ function getMockReplayGame(config) {
     };
   }
   return createMockGame(config);
+}
+
+function resetReplayPlayers(players = []) {
+  return players.map((player) => ({
+    ...player,
+    alive: true,
+    excluded: false,
+    excludedRound: null,
+    marked: false,
+    lastTestimony: ''
+  }));
 }
 
 function getRandomMatchingRealGameLog(playerIds) {
@@ -379,7 +392,6 @@ function normalizeIdSet(ids = []) {
 
 async function replayMockGame(game, onEvent) {
   const partial = { ...clone(game), rounds: [], winner: null, winReason: '' };
-  partial.players = partial.players.map((player) => ({ ...player, role: 'unknown', roleLabel: '身份隐藏' }));
   if (partial.event) partial.event.truth = '';
 
   await onEvent({ type: 'players', players: partial.players, game: clone(partial) });
@@ -430,6 +442,15 @@ async function replayMockGame(game, onEvent) {
     if (sourceRound.exclusionVotes) {
       round.exclusionVotes = clone(sourceRound.exclusionVotes);
       round.excluded = clone(sourceRound.excluded || []);
+      for (const item of round.excluded) {
+        const target = partial.players.find((player) => Number(player.id) === Number(item.id));
+        if (target) {
+          target.alive = false;
+          target.excluded = true;
+          target.excludedRound = round.number;
+          target.lastTestimony = item.testimony || '';
+        }
+      }
       await onEvent({ type: 'exclusion-result', round: clone(round), game: clone(partial) });
       for (const item of round.excluded) {
         await onEvent({ type: 'last-testimony', round: clone(round), testimony: clone(item), game: clone(partial) });

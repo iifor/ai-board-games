@@ -1,5 +1,6 @@
 const { WebSocketServer } = require('ws');
 const { getAiConfig } = require('./aiConfig');
+const { getDb } = require('./db');
 const { createAiGame } = require('./aiGameRunner');
 const { runAiDebate } = require('./aiDebateRunner');
 const { runAiWerewolf } = require('./aiWerewolfRunner');
@@ -17,7 +18,11 @@ function attachGameSocket(server) {
       if (!message) return;
 
       if (message.type === 'start') {
-        runSession(session, message.mode === 'real' ? 'real' : 'mock', message.playerIds, message.gameType).catch((error) => {
+        runSession(session, message.mode === 'real' ? 'real' : 'mock', message.playerIds, message.gameType, {
+          topic: message.topic,
+          debateTeams: message.debateTeams,
+          werewolfMode: message.werewolfMode
+        }).catch((error) => {
           if (error.message === 'game-session-cancelled') return;
           console.error(error);
           session.send({ type: 'error', message: error.message });
@@ -27,13 +32,17 @@ function attachGameSocket(server) {
       if (message.type === 'ack') {
         session.resolveAck(message.ackId);
       }
+
+      if (message.type === 'control') {
+        session.setPaused(message.action === 'pause');
+      }
     });
   });
 }
 
-async function runSession(session, mode, playerIds, gameType = 'consensus') {
+async function runSession(session, mode, playerIds, gameType = 'consensus', options = {}) {
   const safeGameType = normalizeGameType(gameType);
-  const config = getRequestConfig(mode, playerIds, safeGameType);
+  const config = getRequestConfig(mode, playerIds, safeGameType, options);
 
   await session.sendAndWait({
     type: 'host',
@@ -84,10 +93,15 @@ function createSession(socket) {
   let nextId = 1;
   const pending = new Map();
   let closed = false;
+  let paused = false;
+  const SPEECH_ACK_TIMEOUT_MS = 30000;
 
   socket.on('close', () => {
     closed = true;
-    for (const { reject } of pending.values()) reject(new Error('game-session-cancelled'));
+    for (const { reject, timer } of pending.values()) {
+      if (timer) clearTimeout(timer);
+      reject(new Error('game-session-cancelled'));
+    }
     pending.clear();
   });
 
@@ -102,24 +116,74 @@ function createSession(socket) {
       nextId += 1;
       socket.send(JSON.stringify({ ...payload, ackId }));
       return new Promise((resolve, reject) => {
-        pending.set(ackId, { resolve, reject });
+        const item = { resolve, reject, promptCount: 0, timer: null, payload };
+        if (isSpeechWaitPayload(payload)) {
+          item.timer = setTimeout(() => handleSpeechAckTimeout(ackId), SPEECH_ACK_TIMEOUT_MS);
+        }
+        pending.set(ackId, item);
       });
     },
     resolveAck(ackId) {
       const item = pending.get(ackId);
       if (!item) return;
+      if (item.timer) clearTimeout(item.timer);
       pending.delete(ackId);
       item.resolve();
     },
     close() {
       if (socket.readyState === socket.OPEN) socket.close();
+    },
+    setPaused(value) {
+      paused = Boolean(value);
+      for (const [ackId, item] of pending.entries()) {
+        if (!isSpeechWaitPayload(item.payload)) continue;
+        if (item.timer) {
+          clearTimeout(item.timer);
+          item.timer = null;
+        }
+        if (!paused) {
+          item.timer = setTimeout(() => handleSpeechAckTimeout(ackId), SPEECH_ACK_TIMEOUT_MS);
+        }
+      }
     }
   };
+
+  function handleSpeechAckTimeout(ackId) {
+    const item = pending.get(ackId);
+    if (!item || closed || socket.readyState !== socket.OPEN) return;
+    if (paused) {
+      item.timer = null;
+      return;
+    }
+
+    item.promptCount += 1;
+    if (item.promptCount <= 2) {
+      socket.send(JSON.stringify({
+        type: 'host',
+        message: `主持人提醒：当前玩家超过30秒未完成发言，请继续发言。（第${item.promptCount}次提醒）`
+      }));
+      item.timer = setTimeout(() => handleSpeechAckTimeout(ackId), SPEECH_ACK_TIMEOUT_MS);
+      return;
+    }
+
+    socket.send(JSON.stringify({
+      type: 'host',
+      message: '主持人提示：本次发言超时超过两次，跳过本次发言，进入下一位。'
+    }));
+    pending.delete(ackId);
+    item.resolve();
+  }
 }
 
-function getRequestConfig(mode, playerIds, gameType = 'consensus') {
+function isSpeechWaitPayload(payload) {
+  return payload?.type === 'speech' || payload?.type === 'last-words' || payload?.type === 'exile-words';
+}
+
+function getRequestConfig(mode, playerIds, gameType = 'consensus', options = {}) {
   const config = withSelectedPlayers(getAiConfig(), playerIds);
-  const selected = selectPlayersForGame(config, playerIds, gameType);
+  const selected = gameType === 'debate' && hasDebateTeamConfig(options.debateTeams)
+    ? selectDebateTeamPlayers(config, options.debateTeams)
+    : selectPlayersForGame(config, playerIds, gameType);
   const selectedProviders = new Set([config.host.provider, ...selected.map((player) => player.provider)]);
   const missingProviders = config.missingProviders.filter((item) => selectedProviders.has(item.provider));
   const scopedConfig = {
@@ -127,6 +191,9 @@ function getRequestConfig(mode, playerIds, gameType = 'consensus') {
     players: selected,
     selectedPlayerIds: selected.map((player) => player.id),
     gameType,
+    topic: options.topic || null,
+    debateTeams: options.debateTeams || null,
+    werewolfMode: options.werewolfMode || null,
     missingProviders,
     realReady: missingProviders.length === 0
   };
@@ -139,8 +206,38 @@ function getRequestConfig(mode, playerIds, gameType = 'consensus') {
   return { ...scopedConfig, mode: 'real' };
 }
 
+function hasDebateTeamConfig(value) {
+  return value && Array.isArray(value.proIds) && Array.isArray(value.conIds);
+}
+
+function selectDebateTeamPlayers(config, debateTeams) {
+  const ids = normalizeDebateTeamPlayerIds(debateTeams);
+  const selected = ids
+    .map((id) => config.players.find((player) => Number(player.id) === Number(id)))
+    .filter(Boolean);
+  if (selected.length < 8 || selected.length > 12) {
+    throw new Error('AI 辩论赛玩家配置无效：正方、反方和评委人数不正确。');
+  }
+  return selected;
+}
+
+function normalizeDebateTeamPlayerIds(debateTeams) {
+  const ids = [
+    ...normalizeIdList(debateTeams.proIds).slice(0, 4),
+    ...normalizeIdList(debateTeams.conIds).slice(0, 4),
+    ...normalizeIdList(debateTeams.judgeIds)
+  ];
+  return [...new Set(ids)];
+}
+
+function normalizeIdList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(Number).filter(Boolean);
+}
+
 function selectPlayersForGame(config, playerIds, gameType) {
-  const ids = Array.isArray(playerIds) ? playerIds.map(Number).filter(Boolean) : [];
+  const explicitIds = Array.isArray(playerIds) ? playerIds.map(Number).filter(Boolean) : [];
+  const ids = explicitIds.length ? explicitIds : getSavedPlayerIds(gameType);
   const selected = ids.length
     ? ids.map((id) => config.players.find((player) => Number(player.id) === id)).filter(Boolean)
     : config.players.slice(0, gameType === 'debate' || gameType === 'werewolf' ? 12 : 7);
@@ -167,6 +264,17 @@ function selectPlayersForGame(config, playerIds, gameType) {
 
 function withSelectedPlayers(config) {
   return config;
+}
+
+function getSavedPlayerIds(gameType) {
+  try {
+    const row = getDb().prepare('SELECT player_ids_json AS playerIdsJson FROM game_player_selections WHERE game_type = ?').get(gameType);
+    if (!row) return [];
+    const parsed = JSON.parse(row.playerIdsJson);
+    return Array.isArray(parsed) ? parsed.map(Number).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
 }
 
 function parseMessage(raw) {
@@ -240,14 +348,14 @@ function getWerewolfNarration(event) {
 }
 
 function getDebateNarration(event) {
-  if (event.type === 'players') return '辩论选手已经入场。正方、反方和评委席已随机分配。';
+  if (event.type === 'players') return '辩论选手已经入场。正方、反方和评委席已分配完成。';
   if (event.type === 'phase-start') return event.message || `现在进入${event.phase?.name || '下一'}环节。`;
   if (event.type === 'phase-end') return event.message || `${event.phase?.name || '本'}环节结束。`;
   if (event.type === 'speech') {
     if (event.speech.side === 'host') return `主持人点评。${event.speech.text}`;
     const player = event.game.players?.find((item) => Number(item.id) === Number(event.speech.playerId));
-    const label = player ? `${player.sideLabel}${player.debateRoleLabel}` : `${event.speech.playerId}号`;
-    return `${label}${event.speech.playerId}号发言。${event.speech.text}`;
+    const label = event.speech.speakerLabel || getDebatePlayerLabel(event.game.players || [], event.speech.playerId) || (player ? `${player.sideLabel}${player.debateRoleLabel}` : '辩手');
+    return `${label}发言。${event.speech.text}`;
   }
   if (event.type === 'game') {
     const winner = event.game.winner === 'pro' ? '正方' : event.game.winner === 'con' ? '反方' : '双方平局';
@@ -255,6 +363,16 @@ function getDebateNarration(event) {
     return `辩论赛进入赛果公布。${winner}。${mvp}`;
   }
   return event.message || '';
+}
+
+function getDebatePlayerLabel(players, playerId) {
+  const player = players.find((item) => Number(item.id) === Number(playerId));
+  if (!player) return '';
+  if (player.side === 'judge') return '评委';
+  const sidePlayers = players.filter((item) => item.side === player.side);
+  const index = sidePlayers.findIndex((item) => Number(item.id) === Number(playerId));
+  const sideLabel = player.side === 'pro' ? '正方' : '反方';
+  return `${sideLabel}${['零', '一', '二', '三', '四'][index + 1] || index + 1}辩`;
 }
 
 function getConsensusTypeName(type) {

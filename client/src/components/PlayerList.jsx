@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { classNames, getRoleName } from '../utils/gameState';
 
-export function PlayerList({ players, round, showRoles, currentSpeakerId }) {
+export function PlayerList({ players, round, showRoles, visibleRolePlayerId, currentSpeakerId }) {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const selectedIndex = selectedPlayer ? players.findIndex((player) => player.id === selectedPlayer.id) : -1;
 
@@ -12,9 +12,10 @@ export function PlayerList({ players, round, showRoles, currentSpeakerId }) {
           {players.map((player, index) => {
             const vote = round.votes[player.id] || '-';
             const isAlive = !player.excluded;
-            const roleText = getRoleName(player.role, player.roleLabel);
+            const roleText = getVisibleConsensusRole(player, showRoles);
             const displayName = player.nickname || player.name || `${index + 1}号`;
             const displayNumber = index + 1;
+            const canRevealRole = showRoles || Number(player.id) === Number(visibleRolePlayerId);
 
             return (
               <article
@@ -36,8 +37,8 @@ export function PlayerList({ players, round, showRoles, currentSpeakerId }) {
                   </div>
                   <p>本轮投票：{vote}</p>
                   <p>{player.marked ? '已获风险标记' : '暂无风险标记'}</p>
-                  <p className={classNames('role-line', showRoles && player.role)}>
-                    {showRoles ? roleText : '玩家视角隐藏'}
+                  <p className={classNames('role-line', canRevealRole && player.role)}>
+                    {canRevealRole ? roleText : '身份隐藏'}
                   </p>
                 </div>
               </article>
@@ -49,7 +50,11 @@ export function PlayerList({ players, round, showRoles, currentSpeakerId }) {
         <div className="player-info-backdrop" role="presentation" onClick={() => setSelectedPlayer(null)}>
           <section className="player-info-modal framed-panel" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <button className="player-info-close" onClick={() => setSelectedPlayer(null)} aria-label="关闭">×</button>
-            <PlayerInfoContent player={selectedPlayer} displayNumber={selectedIndex + 1} canReveal={showRoles} />
+            <PlayerInfoContent
+              player={selectedPlayer}
+              displayNumber={selectedIndex + 1}
+              canReveal={showRoles || Number(selectedPlayer.id) === Number(visibleRolePlayerId)}
+            />
           </section>
         </div>
       )}
@@ -85,7 +90,7 @@ function PlayerInfoContent({ player, displayNumber, compact = false, canReveal =
       <h3>{player.nickname || player.name || `${safeNumber}号`}（{safeNumber}号）</h3>
       <dl>
         <div><dt>性别</dt><dd>{player.sex || '未知'}</dd></div>
-        <div><dt>身份</dt><dd>{canReveal ? getRoleName(player.role, player.roleLabel) : '玩家视角隐藏'}</dd></div>
+        <div><dt>身份</dt><dd>{canReveal ? getVisibleConsensusRole(player, canReveal) : '身份隐藏'}</dd></div>
         <div><dt>性格</dt><dd>{player.personality || '暂无'}</dd></div>
       </dl>
       {!compact && canReveal && (
@@ -94,10 +99,16 @@ function PlayerInfoContent({ player, displayNumber, compact = false, canReveal =
           <p>{player.memoryCard || '暂无角色卡。'}</p>
         </div>
       )}
-      {!compact && !canReveal && <p className="hover-hint">玩家视角下，只展示这位玩家的公开信息。</p>}
+      {!compact && !canReveal && <p className="hover-hint">玩家视角下，这位玩家身份隐藏。</p>}
       {compact && <p className="hover-hint">{canReveal ? '点击头像查看本局角色卡' : '点击头像查看这位玩家'}</p>}
     </>
   );
+}
+
+function getVisibleConsensusRole(player, canReveal) {
+  if (!canReveal) return '身份隐藏';
+  const roleName = getRoleName(player.role, player.roleLabel);
+  return roleName === '身份隐藏' || roleName === '玩家视角隐藏' ? '未知身份' : roleName;
 }
 
 function formatAvatarUrl(value) {

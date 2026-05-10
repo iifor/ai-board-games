@@ -94,6 +94,7 @@ router.delete('/players/:id', handle((request, response) => {
 
 router.get('/games', (request, response) => {
   response.json(listGames({
+    gameType: request.query.gameType,
     mode: request.query.mode,
     skinId: request.query.skinId,
     winner: request.query.winner,

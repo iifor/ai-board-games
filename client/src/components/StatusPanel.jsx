@@ -3,12 +3,13 @@ import { BadgeCheck, BookOpen, FileSearch, Target, TriangleAlert, UserRound, Use
 import { buildVoteCards, getConsensusTypeName } from '../utils/gameState';
 import { PanelTitle } from './PanelTitle';
 
-export function StatusPanel({ game, round, showRoles }) {
+export function StatusPanel({ game, round, showRoles, visibleRolePlayerId }) {
   const clueCount = game.rounds.filter((item) => item.clue).length;
   const formatPlayerNumber = createPlayerNumberFormatter(game.players);
   const marked = game.players.filter((player) => player.marked).map((player) => `${formatPlayerNumber(player.id)}号`);
   const excluded = game.players.filter((player) => player.excluded).map((player) => `${formatPlayerNumber(player.id)}号`);
   const activeCount = game.players.filter((player) => !player.excluded).length;
+  const visibleRolePlayer = game.players.find((player) => Number(player.id) === Number(visibleRolePlayerId));
 
   return (
     <aside className="right-panel">
@@ -25,7 +26,13 @@ export function StatusPanel({ game, round, showRoles }) {
           <strong>{activeCount}</strong><span>人</span>
         </StatusRow>
         <StatusRow icon={<Users size={24} />} label="身份信息">
-          <span>{showRoles ? '上帝视角公开' : '玩家视角隐藏'}</span>
+          <span>
+            {showRoles
+              ? '上帝视角：所有玩家立场公开'
+              : visibleRolePlayer
+                ? `玩家视角：仅展示${formatPlayerNumber(visibleRolePlayer.id)}号身份`
+                : '玩家视角：身份隐藏'}
+          </span>
         </StatusRow>
       </section>
 

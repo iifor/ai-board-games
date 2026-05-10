@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #071019;
   --panel: rgba(11, 24, 36, 0.86);
   --line: rgba(119, 156, 190, 0.22);
@@ -16,8 +16,6 @@
 
 body {
   margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
   background: var(--bg);
   color: var(--text);
   font-family: "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif;
@@ -40,8 +38,7 @@ textarea {
 
 .admin-shell {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
-  min-height: 100vh;
+  grid-template-columns: 230px 1fr;
 }
 
 .admin-sidebar {
@@ -77,7 +74,6 @@ textarea {
 
 .admin-back {
   width: 100%;
-  min-height: 38px;
 }
 
 .admin-sidebar nav {
@@ -87,7 +83,6 @@ textarea {
 
 .admin-sidebar nav button {
   justify-content: flex-start;
-  min-height: 42px;
   padding: 0 12px;
 }
 
@@ -98,9 +93,8 @@ textarea {
 }
 
 .admin-main {
-  min-width: 0;
   padding: 22px;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .admin-header {
@@ -118,7 +112,6 @@ textarea {
 
 .admin-icon-button,
 .admin-toolbar button {
-  min-height: 38px;
   padding: 0 13px;
 }
 
@@ -133,7 +126,7 @@ textarea {
 
 .admin-stat-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, 140px);
   gap: 12px;
 }
 
@@ -196,18 +189,15 @@ textarea {
 }
 
 .admin-filters select {
-  min-height: 38px;
   padding: 0 10px;
 }
 
 .admin-table-wrap {
-  overflow: auto;
-  max-height: calc(100vh - 180px);
+  overflow: hidden;
 }
 
 .admin-table {
   width: 100%;
-  min-width: 900px;
   border-collapse: collapse;
 }
 
@@ -235,7 +225,6 @@ textarea {
 }
 
 .admin-ellipsis {
-  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -248,7 +237,6 @@ textarea {
 }
 
 .admin-actions button {
-  min-height: 30px;
   padding: 0 9px;
   font-size: 13px;
 }
@@ -271,10 +259,9 @@ textarea {
 }
 
 .admin-modal {
-  width: min(920px, 96vw);
-  max-height: 92vh;
+  width: 920px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr auto;
   border: 1px solid rgba(226, 194, 122, 0.34);
   border-radius: 8px;
   background: #0b1722;
@@ -302,7 +289,6 @@ textarea {
 }
 
 .admin-modal button {
-  min-height: 34px;
   padding: 0 13px;
 }
 
@@ -312,7 +298,7 @@ textarea {
 }
 
 .admin-modal-body {
-  overflow: auto;
+  overflow: hidden;
   padding: 14px 16px;
 }
 
@@ -327,12 +313,10 @@ textarea {
 .admin-field input,
 .admin-field textarea {
   width: 100%;
-  min-height: 38px;
   padding: 9px 10px;
 }
 
 .admin-field textarea {
-  min-height: 86px;
   resize: vertical;
 }
 
@@ -344,8 +328,7 @@ textarea {
 }
 
 .admin-detail pre {
-  max-height: 230px;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid rgba(119, 156, 190, 0.18);
   border-radius: 8px;
   padding: 10px;
@@ -354,25 +337,5 @@ textarea {
 }
 
 .admin-delete-wide {
-  min-height: 38px;
   padding: 0 14px;
-}
-
-@media (max-width: 860px) {
-  .admin-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .admin-sidebar nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .admin-stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }

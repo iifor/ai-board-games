@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Eye, MessageCircle, Pause, Power, RotateCcw, Settings, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Eye, MessageCircle, Pause, Power, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import { classNames } from '../utils/gameState';
 
 export function TopNav({
@@ -72,13 +72,9 @@ export function TopNav({
           {speechEnabled ? <Volume2 size={23} /> : <VolumeX size={23} />}
           <span>语音</span>
         </button>
-        <button title="设置">
-          <Settings size={23} />
-          <span>设置</span>
-        </button>
-        <button title={autoPlay ? '暂停' : '播放'} onClick={() => mockMode && setAutoPlay(!autoPlay)} disabled={!mockMode}>
+        <button title={autoPlay ? '暂停' : '开始'} onClick={() => mockMode && setAutoPlay(!autoPlay)} disabled={!mockMode}>
           {autoPlay ? <Pause size={23} /> : <Power size={23} />}
-          <span>{autoPlay ? '暂停' : '播放'}</span>
+          <span>{autoPlay ? '暂停' : '开始'}</span>
         </button>
       </nav>
     </header>

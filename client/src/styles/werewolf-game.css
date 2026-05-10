@@ -1,0 +1,286 @@
+/* Werewolf component overrides live beside WerewolfGame.jsx. */
+.werewolf-table .werewolf-seat {
+  overflow: visible;
+}
+
+.werewolf-table .werewolf-avatar {
+  position: relative;
+  overflow: visible;
+}
+
+.werewolf-table .werewolf-seat.dead {
+  opacity: 1;
+  filter: none;
+}
+
+.werewolf-table .werewolf-seat.dead .werewolf-avatar {
+  opacity: 0.58;
+  filter: grayscale(0.82);
+}
+
+.werewolf-table .werewolf-seat.dead::after {
+  content: none;
+}
+
+.werewolf-seat-number {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34.18px;
+  height: 34.18px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.58);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.18),
+    0 0 10px rgba(255, 255, 255, 0.24);
+  font-size: 24px;
+  font-weight: 1000;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  padding: 0;
+}
+
+.werewolf-table .werewolf-seat:nth-child(n + 7) .werewolf-seat-number {
+  left: 0;
+  right: auto;
+}
+
+.werewolf-dead-badge {
+  position: absolute;
+  right: -6.72px;
+  bottom: -3.78px;
+  z-index: 3;
+  padding: 2.7px 8.64px;
+  border: 1px solid rgba(255, 135, 135, 0.72);
+  border-radius: 999px;
+  color: #ffe1e1;
+  background: rgba(76, 8, 24, 0.88);
+  box-shadow: 0 0 12px rgba(255, 88, 88, 0.26);
+  font-size: 13.06px;
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.werewolf-action-badge {
+  position: absolute;
+  left: 95px;
+  top: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 31.68px;
+  height: 31.68px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(167, 226, 255, 0.85);
+  border-radius: 50%;
+  color: #ecfbff;
+  background: rgba(9, 42, 76, 0.92);
+  box-shadow: 0 0 12px rgba(98, 195, 255, 0.48);
+  font-size: 14.98px;
+  font-weight: 1000;
+  line-height: 1;
+}
+
+.werewolf-table .werewolf-seat:nth-child(n + 7) .werewolf-action-badge {
+  right: 95px;
+  left: auto;
+}
+
+.werewolf-god-record {
+  margin: 4.86px 0 5.94px;
+  padding: 4.86px 8.64px;
+  border: 1px solid rgba(255, 234, 155, 0.24);
+  border-radius: 6px;
+  background: rgba(65, 45, 12, 0.2);
+}
+
+.werewolf-god-record p {
+  color: rgba(255, 244, 203, 0.88);
+  font-size: 11.9px;
+  line-height: 1.22;
+}
+
+.werewolf-right .werewolf-game-record {
+}
+
+.werewolf-record-list {
+  gap: 4.86px;
+}
+
+.werewolf-record-list article {
+  padding: 5.94px 8.64px;
+}
+
+.werewolf-record-list strong {
+  margin-bottom: 2.7px;
+  font-size: 13.06px;
+}
+
+.werewolf-record-list p {
+  margin: 1.94px 0;
+  font-size: 11.9px;
+  line-height: 1.22;
+}
+
+.werewolf-history-panel {
+  flex: 0 0 auto;
+  padding-top: 6.48px;
+}
+
+.werewolf-history-panel .werewolf-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4.86px;
+  margin-top: 6.48px;
+}
+
+.werewolf-history-list article {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.werewolf-history-list button {
+  width: 100%;
+  padding: 5.18px 10.56px;
+  border: 1px solid rgba(166, 214, 255, 0.24);
+  border-radius: 6px;
+  color: rgba(240, 248, 255, 0.9);
+  background: rgba(7, 18, 33, 0.64);
+  box-shadow: inset 0 0 12px rgba(88, 155, 211, 0.08);
+  cursor: pointer;
+  font-size: 14.21px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.werewolf-history-list article.open button,
+.werewolf-history-list button:hover {
+  border-color: rgba(124, 207, 255, 0.45);
+  color: #ffffff;
+  background: rgba(18, 55, 82, 0.74);
+}
+
+.werewolf-history-list article p {
+  display: block;
+  margin: 4.54px 0 0;
+  padding: 5.4px 10.56px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: rgba(232, 242, 255, 0.88);
+  background: rgba(0, 0, 0, 0.26);
+  font-size: 13.44px;
+  line-height: 1.34;
+  -webkit-line-clamp: unset;
+}
+
+.werewolf-mode-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 43.2px 76.8px;
+  background: rgba(1, 6, 18, 0.68);
+  backdrop-filter: blur(10px);
+}
+
+.werewolf-mode-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 21.6px;
+  width: 1382.4px;
+  overflow: hidden;
+  padding: 23.76px 38.4px;
+  border: 1px solid rgba(176, 214, 255, 0.42);
+  border-radius: 8px;
+  color: #eef7ff;
+  background: rgba(2, 10, 28, 0.94);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58), inset 0 0 28px rgba(75, 143, 255, 0.14);
+}
+
+.werewolf-mode-dialog header,
+.werewolf-mode-dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 19.2px;
+}
+
+.werewolf-mode-dialog h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 38.4px;
+}
+
+.werewolf-mode-dialog button {
+  font-weight: 900;
+}
+
+.werewolf-mode-dialog header button,
+.werewolf-mode-dialog footer button {
+  padding: 0 21.12px;
+  border: 1px solid rgba(168, 211, 255, 0.42);
+  border-radius: 8px;
+  color: #eaf5ff;
+  background: rgba(8, 18, 50, 0.86);
+  cursor: pointer;
+}
+
+.werewolf-mode-dialog footer .primary {
+  border-color: rgba(111, 240, 160, 0.54);
+  color: #d8ffe2;
+}
+
+.werewolf-mode-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12.96px 17.28px;
+}
+
+.werewolf-mode-card {
+  flex: 1 1 100%;
+  padding: 14.04px 19.2px;
+  border: 1px solid rgba(149, 198, 255, 0.26);
+  border-radius: 8px;
+  color: #dfefff;
+  background: rgba(7, 24, 55, 0.68);
+  box-shadow: inset 0 0 18px rgba(70, 126, 255, 0.08);
+  text-align: left;
+  cursor: pointer;
+}
+
+.werewolf-mode-card.active {
+  border-color: rgba(255, 236, 162, 0.76);
+  color: #fff;
+  background: rgba(52, 40, 12, 0.78);
+  box-shadow: 0 0 22px rgba(255, 218, 91, 0.24), inset 0 0 18px rgba(255, 218, 91, 0.12);
+}
+
+.werewolf-mode-card strong,
+.werewolf-mode-card span {
+  display: block;
+}
+
+.werewolf-mode-card strong {
+  margin-bottom: 8.64px;
+  font-size: 20.16px;
+}
+
+.werewolf-mode-card span {
+  color: rgba(226, 240, 255, 0.72);
+  font-size: 15.74px;
+  line-height: 1.45;
+}

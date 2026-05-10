@@ -1,6 +1,7 @@
 const express = require('express');
 const { getAiConfig } = require('../aiConfig');
 const { createAiGame } = require('../aiGameRunner');
+const { getDb } = require('../db');
 const { saveGameLog } = require('../gameLogStore');
 const { testOpenAIConnection } = require('../openaiChat');
 const { listSkins, saveGameRecord } = require('../adminStore');
@@ -41,6 +42,32 @@ router.get('/health', (request, response) => {
       personality: player.personality
     }))
   });
+});
+
+router.get('/player-selections', (request, response, next) => {
+  try {
+    response.json({ selections: getPlayerSelections() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/player-selections/:gameType', express.json(), (request, response, next) => {
+  try {
+    const gameType = normalizeGameType(request.params.gameType);
+    const playerIds = normalizePlayerIds(request.body?.playerIds);
+    validatePlayerSelection(gameType, playerIds);
+    getDb().prepare(`
+      INSERT INTO game_player_selections (game_type, player_ids_json, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(game_type) DO UPDATE SET
+        player_ids_json = excluded.player_ids_json,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(gameType, JSON.stringify(playerIds));
+    response.json({ gameType, playerIds });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get('/diagnostics/openai', async (request, response, next) => {
@@ -113,6 +140,41 @@ function getRequestConfig(request) {
     return { ...config, mode: 'real' };
   }
   throw new Error(`未知游戏模式：${requestedMode}`);
+}
+
+function getPlayerSelections() {
+  const rows = getDb().prepare('SELECT game_type AS gameType, player_ids_json AS playerIdsJson FROM game_player_selections').all();
+  return rows.reduce((result, row) => {
+    result[row.gameType] = safeParseJson(row.playerIdsJson, []);
+    return result;
+  }, {});
+}
+
+function normalizeGameType(value) {
+  if (['consensus', 'debate', 'werewolf'].includes(value)) return value;
+  throw new Error(`未知游戏类型：${value}`);
+}
+
+function normalizePlayerIds(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(Number).filter(Boolean))];
+}
+
+function validatePlayerSelection(gameType, playerIds) {
+  if (gameType === 'debate') {
+    if (playerIds.length < 8 || playerIds.length > 12) throw new Error('AI 辩论赛需要选择 8-12 位 AI 玩家。');
+    return;
+  }
+  const expected = gameType === 'werewolf' ? 12 : 7;
+  if (playerIds.length !== expected) throw new Error(`${gameType === 'werewolf' ? 'AI 狼人杀' : '共识迷雾'}需要选择恰好 ${expected} 位 AI 玩家。`);
+}
+
+function safeParseJson(value, fallback) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
 }
 
 module.exports = router;

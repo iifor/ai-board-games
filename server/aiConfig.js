@@ -229,11 +229,18 @@ function getAiConfig() {
     const { initAdminData, listPlayers } = require('./adminStore');
     initAdminData();
     const dbPlayers = listPlayers({ enabledOnly: true });
-    if (dbPlayers.length) return normalizeConfig({ ...rawConfig, players: dbPlayers });
+    if (dbPlayers.length) return normalizeConfig({ ...rawConfig, players: mergeConfiguredPlayers(dbPlayers, rawConfig.players) });
   } catch (error) {
     console.warn(`数据库玩家配置加载失败，使用 ai.config.json：${error.message}`);
   }
   return normalizeConfig(rawConfig);
+}
+
+function mergeConfiguredPlayers(dbPlayers, configuredPlayers = []) {
+  if (!Array.isArray(configuredPlayers) || !configuredPlayers.length) return dbPlayers;
+  const seen = new Set(dbPlayers.map((player) => Number(player.id)));
+  const missingConfigured = configuredPlayers.filter((player) => !seen.has(Number(player.id)));
+  return [...dbPlayers, ...missingConfigured];
 }
 
 module.exports = {

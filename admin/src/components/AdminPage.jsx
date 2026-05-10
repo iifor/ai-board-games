@@ -9,6 +9,13 @@ const tabs = [
   { key: 'games', label: '对局管理', icon: Eye }
 ];
 
+const gameTypeOptions = [
+  { key: '', label: '全部游戏' },
+  { key: 'consensus', label: '共识迷雾' },
+  { key: 'debate', label: '辩论赛' },
+  { key: 'werewolf', label: '狼人杀' }
+];
+
 const emptySkin = {
   name: '',
   version: 'v3.2',
@@ -51,7 +58,7 @@ export function AdminPage() {
   const [gameDetail, setGameDetail] = useState(null);
   const [skinEditor, setSkinEditor] = useState(null);
   const [playerEditor, setPlayerEditor] = useState(null);
-  const [filters, setFilters] = useState({ mode: '', winner: '', skinId: '', playerId: '' });
+  const [filters, setFilters] = useState({ gameType: '', mode: '', winner: '', skinId: '', playerId: '' });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -207,7 +214,10 @@ function Dashboard({ stats }) {
     ['启用皮肤', stats?.enabledSkins ?? 0],
     ['玩家总数', stats?.players ?? 0],
     ['启用玩家', stats?.enabledPlayers ?? 0],
-    ['历史对局', stats?.games ?? 0]
+    ['历史对局', stats?.games ?? 0],
+    ['共识迷雾', stats?.gamesByType?.consensus ?? 0],
+    ['AI 辩论赛', stats?.gamesByType?.debate ?? 0],
+    ['AI 狼人杀', stats?.gamesByType?.werewolf ?? 0]
   ];
   return (
     <section className="admin-stat-grid">
@@ -285,6 +295,9 @@ function GameManager({ games, skins, players, filters, onFilter, onOpen, onDelet
   return (
     <section className="admin-panel">
       <div className="admin-filters">
+        <select value={filters.gameType} onChange={(event) => onFilter({ gameType: event.target.value, skinId: '', winner: '' })}>
+          {gameTypeOptions.map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}
+        </select>
         <select value={filters.mode} onChange={(event) => onFilter({ mode: event.target.value })}>
           <option value="">全部模式</option>
           <option value="mock">Mock</option>
@@ -294,8 +307,13 @@ function GameManager({ games, skins, players, filters, onFilter, onOpen, onDelet
           <option value="">全部胜方</option>
           <option value="investigators">调查方</option>
           <option value="mist">迷雾方</option>
+          <option value="pro">正方</option>
+          <option value="con">反方</option>
+          <option value="draw">平局</option>
+          <option value="good">好人阵营</option>
+          <option value="wolves">狼人阵营</option>
         </select>
-        <select value={filters.skinId} onChange={(event) => onFilter({ skinId: event.target.value })}>
+        <select value={filters.skinId} onChange={(event) => onFilter({ skinId: event.target.value })} disabled={filters.gameType && filters.gameType !== 'consensus'}>
           <option value="">全部皮肤</option>
           {skins.map((skin) => <option value={skin.id} key={skin.id}>{skin.name}</option>)}
         </select>
@@ -304,10 +322,11 @@ function GameManager({ games, skins, players, filters, onFilter, onOpen, onDelet
           {players.map((player) => <option value={player.id} key={player.id}>{player.nickname}</option>)}
         </select>
       </div>
-      <AdminTable headers={['时间', '模式', '皮肤', '胜方', '原因', '操作']}>
+      <AdminTable headers={['时间', '游戏', '模式', '主题/皮肤', '胜方', '原因', '操作']}>
         {games.map((game) => (
           <tr key={game.id}>
             <td>{formatTime(game.createdAt)}</td>
+            <td>{formatGameType(game.gameType)}</td>
             <td>{game.mode}</td>
             <td>{game.skinName}</td>
             <td>{formatWinner(game.winner)}</td>
@@ -392,13 +411,13 @@ function PlayerEditor({ player, onCancel, onSave }) {
 }
 
 function GameDetailModal({ game, onClose, onDelete }) {
-  const keyFigure = useMemo(() => game.players?.find((player) => player.role === 'keyFigure'), [game]);
+  const keyFigure = useMemo(() => game.gameType === 'consensus' ? game.players?.find((player) => player.role === 'keyFigure') : null, [game]);
   return (
     <EditorModal title="对局详情" onCancel={onClose} onSave={onClose} saveLabel="关闭">
       <div className="admin-detail">
-        <p><strong>{game.skinName}</strong> · {formatTime(game.createdAt)} · {formatWinner(game.winner)}</p>
+        <p><strong>{formatGameType(game.gameType)} · {game.skinName}</strong> · {formatTime(game.createdAt)} · {formatWinner(game.winner)}</p>
         <p>{game.winReason}</p>
-        <p>关键人物：{keyFigure ? `${keyFigure.id}号 ${keyFigure.nickname}` : '未记录'}</p>
+        {game.gameType === 'consensus' && <p>关键人物：{keyFigure ? `${keyFigure.id}号 ${keyFigure.nickname}` : '未记录'}</p>}
         <h3>玩家快照</h3>
         <pre>{JSON.stringify(game.players, null, 2)}</pre>
         <h3>回合数据</h3>
@@ -444,7 +463,18 @@ function jsonText(value) {
 function formatWinner(winner) {
   if (winner === 'investigators') return '调查方';
   if (winner === 'mist') return '迷雾方';
+  if (winner === 'pro') return '正方';
+  if (winner === 'con') return '反方';
+  if (winner === 'draw') return '平局';
+  if (winner === 'good') return '好人阵营';
+  if (winner === 'wolves') return '狼人阵营';
   return winner || '未结算';
+}
+
+function formatGameType(gameType) {
+  if (gameType === 'debate') return 'AI 辩论赛';
+  if (gameType === 'werewolf') return 'AI 狼人杀';
+  return '共识迷雾';
 }
 
 function formatTime(value) {
