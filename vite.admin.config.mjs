@@ -31,6 +31,7 @@ const adminPort = Number(process.env.ADMIN_PORT || 5175);
 export default defineConfig({
   root: 'admin',
   base: '/admin/',
+  cacheDir: '../node_modules/.vite-admin',
   plugins: [react(), px2vwPlugin()],
   server: {
     port: adminPort,

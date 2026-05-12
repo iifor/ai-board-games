@@ -44,7 +44,7 @@ const emptyPlayer = {
   sex: '未知',
   personality: '',
   provider: 'deepseek',
-  model: 'deepseek-chat',
+  model: 'deepseek-v4-pro',
   temperature: 0.85,
   enabled: true
 };

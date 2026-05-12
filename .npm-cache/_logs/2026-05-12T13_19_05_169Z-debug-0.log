@@ -1,0 +1,1872 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.9.2
+2 info using node@v22.14.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\.npmrc
+5 silly config load:file:C:\Users\Administrator\.npmrc
+6 silly config load:file:C:\Users\Administrator\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--cache" ".npm-cache"
+9 verbose logfile logs-max:10 dir:C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\.npm-cache\_logs\2026-05-12T13_19_05_169Z-
+10 verbose logfile C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\.npm-cache\_logs\2026-05-12T13_19_05_169Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 silly idealTree buildDeps
+14 silly reify mark retired [
+14 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\accepts'
+14 silly reify ]
+15 silly reify mark retired [
+15 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\array-flatten'
+15 silly reify ]
+16 silly reify mark retired [
+16 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\async-function'
+16 silly reify ]
+17 silly reify mark retired [
+17 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ansi-styles'
+17 silly reify ]
+18 silly reify mark retired [
+18 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ansi-regex'
+18 silly reify ]
+19 silly reify mark retired [
+19 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\async-generator-function'
+19 silly reify ]
+20 silly reify mark retired [
+20 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\base64-js'
+20 silly reify ]
+21 silly reify mark retired [
+21 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\bl'
+21 silly reify ]
+22 silly reify mark retired [
+22 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\bindings'
+22 silly reify ]
+23 silly reify mark retired [
+23 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\baseline-browser-mapping'
+23 silly reify ]
+24 silly reify mark retired [
+24 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\body-parser'
+24 silly reify ]
+25 silly reify mark retired [
+25 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\better-sqlite3'
+25 silly reify ]
+26 silly reify mark retired [
+26 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\browserslist'
+26 silly reify ]
+27 silly reify mark retired [
+27 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\bytes'
+27 silly reify ]
+28 silly reify mark retired [
+28 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\caniuse-lite'
+28 silly reify ]
+29 silly reify mark retired [
+29 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\call-bound'
+29 silly reify ]
+30 silly reify mark retired [
+30 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\chalk'
+30 silly reify ]
+31 silly reify mark retired [
+31 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\call-bind-apply-helpers'
+31 silly reify ]
+32 silly reify mark retired [
+32 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\buffer'
+32 silly reify ]
+33 silly reify mark retired [
+33 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\cliui'
+33 silly reify ]
+34 silly reify mark retired [
+34 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\color-convert'
+34 silly reify ]
+35 silly reify mark retired [
+35 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\chownr'
+35 silly reify ]
+36 silly reify mark retired [
+36 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\concurrently'
+36 silly reify ]
+37 silly reify mark retired [
+37 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\content-type'
+37 silly reify ]
+38 silly reify mark retired [
+38 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\content-disposition'
+38 silly reify ]
+39 silly reify mark retired [
+39 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\color-name'
+39 silly reify ]
+40 silly reify mark retired [
+40 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\cookie'
+40 silly reify ]
+41 silly reify mark retired [
+41 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\decompress-response'
+41 silly reify ]
+42 silly reify mark retired [
+42 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\cookie-signature'
+42 silly reify ]
+43 silly reify mark retired [
+43 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\convert-source-map'
+43 silly reify ]
+44 silly reify mark retired [
+44 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\debug'
+44 silly reify ]
+45 silly reify mark retired [
+45 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\deep-extend'
+45 silly reify ]
+46 silly reify mark retired [
+46 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\depd'
+46 silly reify ]
+47 silly reify mark retired [
+47 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\destroy'
+47 silly reify ]
+48 silly reify mark retired [
+48 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\detect-libc'
+48 silly reify ]
+49 silly reify mark retired [
+49 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\dunder-proto'
+49 silly reify ]
+50 silly reify mark retired [
+50 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\emoji-regex'
+50 silly reify ]
+51 silly reify mark retired [
+51 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ee-first'
+51 silly reify ]
+52 silly reify mark retired [
+52 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\es-define-property'
+52 silly reify ]
+53 silly reify mark retired [
+53 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\end-of-stream'
+53 silly reify ]
+54 silly reify mark retired [
+54 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\encodeurl'
+54 silly reify ]
+55 silly reify mark retired [
+55 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\electron-to-chromium'
+55 silly reify ]
+56 silly reify mark retired [
+56 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\es-object-atoms'
+56 silly reify ]
+57 silly reify mark retired [
+57 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\esbuild'
+57 silly reify ]
+58 silly reify mark retired [
+58 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\es-errors'
+58 silly reify ]
+59 silly reify mark retired [
+59 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\escape-html'
+59 silly reify ]
+60 silly reify mark retired [
+60 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\etag'
+60 silly reify ]
+61 silly reify mark retired [
+61 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\escalade'
+61 silly reify ]
+62 silly reify mark retired [
+62 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\finalhandler'
+62 silly reify ]
+63 silly reify mark retired [
+63 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\expand-template'
+63 silly reify ]
+64 silly reify mark retired [
+64 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\file-uri-to-path'
+64 silly reify ]
+65 silly reify mark retired [
+65 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\express'
+65 silly reify ]
+66 silly reify mark retired [
+66 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\fresh'
+66 silly reify ]
+67 silly reify mark retired [
+67 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\forwarded'
+67 silly reify ]
+68 silly reify mark retired [
+68 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\fs-constants'
+68 silly reify ]
+69 silly reify mark retired [
+69 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\fsevents'
+69 silly reify ]
+70 silly reify mark retired [
+70 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\generator-function'
+70 silly reify ]
+71 silly reify mark retired [
+71 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\gensync'
+71 silly reify ]
+72 silly reify mark retired [
+72 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\get-caller-file'
+72 silly reify ]
+73 silly reify mark retired [
+73 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\get-proto'
+73 silly reify ]
+74 silly reify mark retired [
+74 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\github-from-package'
+74 silly reify ]
+75 silly reify mark retired [
+75 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\function-bind'
+75 silly reify ]
+76 silly reify mark retired [
+76 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\gopd'
+76 silly reify ]
+77 silly reify mark retired [
+77 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\get-intrinsic'
+77 silly reify ]
+78 silly reify mark retired [
+78 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\has-symbols'
+78 silly reify ]
+79 silly reify mark retired [
+79 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\hasown'
+79 silly reify ]
+80 silly reify mark retired [
+80 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\iconv-lite'
+80 silly reify ]
+81 silly reify mark retired [
+81 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\has-flag'
+81 silly reify ]
+82 silly reify mark retired [
+82 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\http-errors'
+82 silly reify ]
+83 silly reify mark retired [
+83 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ieee754'
+83 silly reify ]
+84 silly reify mark retired [
+84 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\inherits'
+84 silly reify ]
+85 silly reify mark retired [
+85 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ipaddr.js'
+85 silly reify ]
+86 silly reify mark retired [
+86 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ini'
+86 silly reify ]
+87 silly reify mark retired [
+87 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\js-tokens'
+87 silly reify ]
+88 silly reify mark retired [
+88 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\jsesc'
+88 silly reify ]
+89 silly reify mark retired [
+89 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\loose-envify'
+89 silly reify ]
+90 silly reify mark retired [
+90 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\is-fullwidth-code-point'
+90 silly reify ]
+91 silly reify mark retired [
+91 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\lru-cache'
+91 silly reify ]
+92 silly reify mark retired [
+92 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\math-intrinsics'
+92 silly reify ]
+93 silly reify mark retired [
+93 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\json5'
+93 silly reify ]
+94 silly reify mark retired [
+94 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\merge-descriptors'
+94 silly reify ]
+95 silly reify mark retired [
+95 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mime'
+95 silly reify ]
+96 silly reify mark retired [
+96 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\media-typer'
+96 silly reify ]
+97 silly reify mark retired [
+97 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mime-db'
+97 silly reify ]
+98 silly reify mark retired [
+98 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\lucide-react'
+98 silly reify ]
+99 silly reify mark retired [
+99 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\methods'
+99 silly reify ]
+100 silly reify mark retired [
+100 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mime-types'
+100 silly reify ]
+101 silly reify mark retired [
+101 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mimic-response'
+101 silly reify ]
+102 silly reify mark retired [
+102 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\minimist'
+102 silly reify ]
+103 silly reify mark retired [
+103 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ms'
+103 silly reify ]
+104 silly reify mark retired [
+104 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mkdirp-classic'
+104 silly reify ]
+105 silly reify mark retired [
+105 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\napi-build-utils'
+105 silly reify ]
+106 silly reify mark retired [
+106 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\nanoid'
+106 silly reify ]
+107 silly reify mark retired [
+107 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\node-abi'
+107 silly reify ]
+108 silly reify mark retired [
+108 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\negotiator'
+108 silly reify ]
+109 silly reify mark retired [
+109 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\once'
+109 silly reify ]
+110 silly reify mark retired [
+110 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\node-releases'
+110 silly reify ]
+111 silly reify mark retired [
+111 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\object-inspect'
+111 silly reify ]
+112 silly reify mark retired [
+112 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\on-finished'
+112 silly reify ]
+113 silly reify mark retired [
+113 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\parseurl'
+113 silly reify ]
+114 silly reify mark retired [
+114 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\picocolors'
+114 silly reify ]
+115 silly reify mark retired [
+115 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\path-to-regexp'
+115 silly reify ]
+116 silly reify mark retired [
+116 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\prebuild-install'
+116 silly reify ]
+117 silly reify mark retired [
+117 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\proxy-addr'
+117 silly reify ]
+118 silly reify mark retired [
+118 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\qs'
+118 silly reify ]
+119 silly reify mark retired [
+119 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\postcss'
+119 silly reify ]
+120 silly reify mark retired [
+120 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\pump'
+120 silly reify ]
+121 silly reify mark retired [
+121 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\rc'
+121 silly reify ]
+122 silly reify mark retired [
+122 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\raw-body'
+122 silly reify ]
+123 silly reify mark retired [
+123 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\react'
+123 silly reify ]
+124 silly reify mark retired [
+124 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\range-parser'
+124 silly reify ]
+125 silly reify mark retired [
+125 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\react-dom'
+125 silly reify ]
+126 silly reify mark retired [
+126 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\require-directory'
+126 silly reify ]
+127 silly reify mark retired [
+127 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\react-refresh'
+127 silly reify ]
+128 silly reify mark retired [
+128 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\safer-buffer'
+128 silly reify ]
+129 silly reify mark retired [
+129 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\rxjs'
+129 silly reify ]
+130 silly reify mark retired [
+130 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\rollup'
+130 silly reify ]
+131 silly reify mark retired [
+131 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\readable-stream'
+131 silly reify ]
+132 silly reify mark retired [
+132 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\safe-buffer'
+132 silly reify ]
+133 silly reify mark retired [
+133 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\scheduler'
+133 silly reify ]
+134 silly reify mark retired [
+134 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\send'
+134 silly reify ]
+135 silly reify mark retired [
+135 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\side-channel'
+135 silly reify ]
+136 silly reify mark retired [
+136 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\semver'
+136 silly reify ]
+137 silly reify mark retired [
+137 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\setprototypeof'
+137 silly reify ]
+138 silly reify mark retired [
+138 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\shell-quote'
+138 silly reify ]
+139 silly reify mark retired [
+139 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\serve-static'
+139 silly reify ]
+140 silly reify mark retired [
+140 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\side-channel-list'
+140 silly reify ]
+141 silly reify mark retired [
+141 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\side-channel-map'
+141 silly reify ]
+142 silly reify mark retired [
+142 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\simple-get'
+142 silly reify ]
+143 silly reify mark retired [
+143 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\source-map-js'
+143 silly reify ]
+144 silly reify mark retired [
+144 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\side-channel-weakmap'
+144 silly reify ]
+145 silly reify mark retired [
+145 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\string-width'
+145 silly reify ]
+146 silly reify mark retired [
+146 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\string_decoder'
+146 silly reify ]
+147 silly reify mark retired [
+147 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\simple-concat'
+147 silly reify ]
+148 silly reify mark retired [
+148 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\statuses'
+148 silly reify ]
+149 silly reify mark retired [
+149 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\strip-json-comments'
+149 silly reify ]
+150 silly reify mark retired [
+150 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\supports-color'
+150 silly reify ]
+151 silly reify mark retired [
+151 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tar-stream'
+151 silly reify ]
+152 silly reify mark retired [
+152 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\strip-ansi'
+152 silly reify ]
+153 silly reify mark retired [
+153 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\toidentifier'
+153 silly reify ]
+154 silly reify mark retired [
+154 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tunnel-agent'
+154 silly reify ]
+155 silly reify mark retired [
+155 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tar-fs'
+155 silly reify ]
+156 silly reify mark retired [
+156 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tree-kill'
+156 silly reify ]
+157 silly reify mark retired [
+157 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tslib'
+157 silly reify ]
+158 silly reify mark retired [
+158 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\unpipe'
+158 silly reify ]
+159 silly reify mark retired [
+159 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\update-browserslist-db'
+159 silly reify ]
+160 silly reify mark retired [
+160 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\utils-merge'
+160 silly reify ]
+161 silly reify mark retired [
+161 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\type-is'
+161 silly reify ]
+162 silly reify mark retired [
+162 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\util-deprecate'
+162 silly reify ]
+163 silly reify mark retired [
+163 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ws'
+163 silly reify ]
+164 silly reify mark retired [
+164 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\vary'
+164 silly reify ]
+165 silly reify mark retired [
+165 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\vite'
+165 silly reify ]
+166 silly reify mark retired [
+166 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\wrappy'
+166 silly reify ]
+167 silly reify mark retired [
+167 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\wrap-ansi'
+167 silly reify ]
+168 silly reify mark retired [
+168 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\y18n'
+168 silly reify ]
+169 silly reify mark retired [
+169 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\yallist'
+169 silly reify ]
+170 silly reify mark retired [
+170 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\compat-data'
+170 silly reify ]
+171 silly reify mark retired [
+171 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\yargs'
+171 silly reify ]
+172 silly reify mark retired [
+172 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\generator'
+172 silly reify ]
+173 silly reify mark retired [
+173 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\code-frame'
+173 silly reify ]
+174 silly reify mark retired [
+174 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\core'
+174 silly reify ]
+175 silly reify mark retired [
+175 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\yargs-parser'
+175 silly reify ]
+176 silly reify mark retired [
+176 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-globals'
+176 silly reify ]
+177 silly reify mark retired [
+177 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-module-imports'
+177 silly reify ]
+178 silly reify mark retired [
+178 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-compilation-targets'
+178 silly reify ]
+179 silly reify mark retired [
+179 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-plugin-utils'
+179 silly reify ]
+180 silly reify mark retired [
+180 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-module-transforms'
+180 silly reify ]
+181 silly reify mark retired [
+181 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-string-parser'
+181 silly reify ]
+182 silly reify mark retired [
+182 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-validator-option'
+182 silly reify ]
+183 silly reify mark retired [
+183 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\parser'
+183 silly reify ]
+184 silly reify mark retired [
+184 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helpers'
+184 silly reify ]
+185 silly reify mark retired [
+185 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-validator-identifier'
+185 silly reify ]
+186 silly reify mark retired [
+186 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\plugin-transform-react-jsx-self'
+186 silly reify ]
+187 silly reify mark retired [
+187 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\template'
+187 silly reify ]
+188 silly reify mark retired [
+188 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\traverse'
+188 silly reify ]
+189 silly reify mark retired [
+189 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\plugin-transform-react-jsx-source'
+189 silly reify ]
+190 silly reify mark retired [
+190 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\android-arm'
+190 silly reify ]
+191 silly reify mark retired [
+191 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\android-x64'
+191 silly reify ]
+192 silly reify mark retired [
+192 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\darwin-arm64'
+192 silly reify ]
+193 silly reify mark retired [
+193 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\aix-ppc64'
+193 silly reify ]
+194 silly reify mark retired [
+194 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\types'
+194 silly reify ]
+195 silly reify mark retired [
+195 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\android-arm64'
+195 silly reify ]
+196 silly reify mark retired [
+196 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\freebsd-arm64'
+196 silly reify ]
+197 silly reify mark retired [
+197 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\darwin-x64'
+197 silly reify ]
+198 silly reify mark retired [
+198 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\freebsd-x64'
+198 silly reify ]
+199 silly reify mark retired [
+199 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-arm64'
+199 silly reify ]
+200 silly reify mark retired [
+200 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-ia32'
+200 silly reify ]
+201 silly reify mark retired [
+201 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-ppc64'
+201 silly reify ]
+202 silly reify mark retired [
+202 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-arm'
+202 silly reify ]
+203 silly reify mark retired [
+203 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-loong64'
+203 silly reify ]
+204 silly reify mark retired [
+204 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-mips64el'
+204 silly reify ]
+205 silly reify mark retired [
+205 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-s390x'
+205 silly reify ]
+206 silly reify mark retired [
+206 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-riscv64'
+206 silly reify ]
+207 silly reify mark retired [
+207 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\openbsd-x64'
+207 silly reify ]
+208 silly reify mark retired [
+208 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\sunos-x64'
+208 silly reify ]
+209 silly reify mark retired [
+209 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-x64'
+209 silly reify ]
+210 silly reify mark retired [
+210 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\win32-ia32'
+210 silly reify ]
+211 silly reify mark retired [
+211 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\win32-x64'
+211 silly reify ]
+212 silly reify mark retired [
+212 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\netbsd-x64'
+212 silly reify ]
+213 silly reify mark retired [
+213 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\remapping'
+213 silly reify ]
+214 silly reify mark retired [
+214 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\resolve-uri'
+214 silly reify ]
+215 silly reify mark retired [
+215 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\win32-arm64'
+215 silly reify ]
+216 silly reify mark retired [
+216 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\trace-mapping'
+216 silly reify ]
+217 silly reify mark retired [
+217 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rolldown\\pluginutils'
+217 silly reify ]
+218 silly reify mark retired [
+218 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\gen-mapping'
+218 silly reify ]
+219 silly reify mark retired [
+219 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-android-arm64'
+219 silly reify ]
+220 silly reify mark retired [
+220 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\sourcemap-codec'
+220 silly reify ]
+221 silly reify mark retired [
+221 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-android-arm-eabi'
+221 silly reify ]
+222 silly reify mark retired [
+222 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-darwin-arm64'
+222 silly reify ]
+223 silly reify mark retired [
+223 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-darwin-x64'
+223 silly reify ]
+224 silly reify mark retired [
+224 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-freebsd-x64'
+224 silly reify ]
+225 silly reify mark retired [
+225 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm-gnueabihf'
+225 silly reify ]
+226 silly reify mark retired [
+226 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-freebsd-arm64'
+226 silly reify ]
+227 silly reify mark retired [
+227 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm64-gnu'
+227 silly reify ]
+228 silly reify mark retired [
+228 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm64-musl'
+228 silly reify ]
+229 silly reify mark retired [
+229 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm-musleabihf'
+229 silly reify ]
+230 silly reify mark retired [
+230 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-ppc64-gnu'
+230 silly reify ]
+231 silly reify mark retired [
+231 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-loong64-gnu'
+231 silly reify ]
+232 silly reify mark retired [
+232 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-riscv64-musl'
+232 silly reify ]
+233 silly reify mark retired [
+233 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-riscv64-gnu'
+233 silly reify ]
+234 silly reify mark retired [
+234 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-s390x-gnu'
+234 silly reify ]
+235 silly reify mark retired [
+235 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-loong64-musl'
+235 silly reify ]
+236 silly reify mark retired [
+236 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-ppc64-musl'
+236 silly reify ]
+237 silly reify mark retired [
+237 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-openbsd-x64'
+237 silly reify ]
+238 silly reify mark retired [
+238 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-arm64-msvc'
+238 silly reify ]
+239 silly reify mark retired [
+239 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-x64-musl'
+239 silly reify ]
+240 silly reify mark retired [
+240 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-x64-gnu'
+240 silly reify ]
+241 silly reify mark retired [
+241 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-ia32-msvc'
+241 silly reify ]
+242 silly reify mark retired [
+242 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\babel__core'
+242 silly reify ]
+243 silly reify mark retired [
+243 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-x64-gnu'
+243 silly reify ]
+244 silly reify mark retired [
+244 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-openharmony-arm64'
+244 silly reify ]
+245 silly reify mark retired [
+245 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-x64-msvc'
+245 silly reify ]
+246 silly reify mark retired [
+246 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\babel__generator'
+246 silly reify ]
+247 silly reify mark retired [
+247 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\babel__traverse'
+247 silly reify ]
+248 silly reify mark retired [
+248 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@vitejs\\plugin-react'
+248 silly reify ]
+249 silly reify mark retired [
+249 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\babel__template'
+249 silly reify ]
+250 silly reify mark retired [
+250 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\estree'
+250 silly reify ]
+251 silly reify moves {
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\accepts': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.accepts-L4IqKTzj',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\array-flatten': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.array-flatten-Pb6UcjE7',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\async-function': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.async-function-Ssv301g4',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ansi-styles': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.ansi-styles-2ZzmOMZ9',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ansi-regex': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.ansi-regex-h61BuKcH',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\async-generator-function': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.async-generator-function-6UYikcWF',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\base64-js': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.base64-js-RpNqQpmb',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\bl': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.bl-5FHhA2Vg',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\bindings': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.bindings-QXP1xgqy',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\baseline-browser-mapping': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.baseline-browser-mapping-cCRhzszp',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\body-parser': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.body-parser-HnR3e6j8',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\better-sqlite3': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.better-sqlite3-j4pGn61q',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\browserslist': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.browserslist-i5uztCDz',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\bytes': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.bytes-ViiBfNbY',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\caniuse-lite': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.caniuse-lite-61KTHSjE',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\call-bound': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.call-bound-loqg50k5',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\chalk': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.chalk-KMZEwFuJ',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\call-bind-apply-helpers': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.call-bind-apply-helpers-RHaLmbFt',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\buffer': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.buffer-DjdN097D',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\cliui': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.cliui-SC7aB9JH',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\color-convert': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.color-convert-qPsPOEmM',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\chownr': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.chownr-CCVWCFcU',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\concurrently': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.concurrently-WWZ20utY',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\content-type': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.content-type-aEqRNzAM',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\content-disposition': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.content-disposition-U0MehCn2',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\color-name': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.color-name-tu6795YW',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\cookie': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.cookie-zz0gNtf2',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\decompress-response': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.decompress-response-JI4OBjEC',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\cookie-signature': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.cookie-signature-YYhfSoTI',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\convert-source-map': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.convert-source-map-oZKLXJzF',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\debug': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.debug-81Y2rBSN',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\deep-extend': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.deep-extend-tyMkK0GQ',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\depd': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.depd-OPAkDiIk',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\destroy': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.destroy-Am35Maf3',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\detect-libc': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.detect-libc-rBIY7pw8',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\dunder-proto': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.dunder-proto-nGOuA9eP',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\emoji-regex': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.emoji-regex-kcLgF5f1',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ee-first': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.ee-first-Sk2EyH5V',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\es-define-property': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.es-define-property-Jp86BeEQ',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\end-of-stream': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.end-of-stream-jIMNOau3',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\encodeurl': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.encodeurl-hHOqhUeA',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\electron-to-chromium': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.electron-to-chromium-hVoZ15Oe',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\es-object-atoms': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.es-object-atoms-PRxy8akS',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\esbuild': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.esbuild-wpRrvvqB',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\es-errors': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.es-errors-boCp25yr',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\escape-html': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.escape-html-DLeFZUw7',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\etag': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.etag-CpvHQsBI',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\escalade': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.escalade-CLFkrrz1',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\finalhandler': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.finalhandler-TMAOhIoD',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\expand-template': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.expand-template-OpdlrTB2',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\file-uri-to-path': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.file-uri-to-path-Hg1gTtlr',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\express': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.express-b2ByC2eT',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\fresh': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.fresh-bslZOKSZ',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\forwarded': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.forwarded-VIegNOFG',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\fs-constants': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.fs-constants-Mhmxzf21',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\fsevents': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.fsevents-IBS3bN7f',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\generator-function': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.generator-function-nbuFSroA',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\gensync': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.gensync-kTyHewlx',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\get-caller-file': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.get-caller-file-80pp4z9s',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\get-proto': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.get-proto-DwGQ1sSm',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\github-from-package': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.github-from-package-iZj5YLuW',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\function-bind': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.function-bind-kyqAjWkT',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\gopd': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.gopd-mIiJjYAa',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\get-intrinsic': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.get-intrinsic-nSOVUmoW',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\has-symbols': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.has-symbols-pBmCylqx',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\hasown': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.hasown-y954fHA0',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\iconv-lite': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.iconv-lite-SmpIT0Mt',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\has-flag': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.has-flag-wrjeVLmn',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\http-errors': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.http-errors-9CRIkxUX',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ieee754': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.ieee754-mgB1Iujh',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\inherits': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.inherits-LjanpZGt',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ipaddr.js': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.ipaddr.js-mBP6GRCz',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ini': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.ini-JhJFK9P7',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\js-tokens': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.js-tokens-9xEfoUjU',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\jsesc': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.jsesc-dpMtM5AE',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\loose-envify': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.loose-envify-xXIdynRU',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\is-fullwidth-code-point': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.is-fullwidth-code-point-E42eKI4D',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\lru-cache': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.lru-cache-zYuhF7n2',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\math-intrinsics': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.math-intrinsics-kgJ0oS3Q',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\json5': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.json5-6yg5Qz64',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\merge-descriptors': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.merge-descriptors-CAjZTlHJ',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mime': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.mime-llSk91fx',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\media-typer': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.media-typer-mkIhvSqY',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mime-db': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.mime-db-20OkSJiV',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\lucide-react': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.lucide-react-3CJL8Tp4',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\methods': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.methods-QLQu25A4',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mime-types': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.mime-types-H5AUxgCv',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mimic-response': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.mimic-response-csjbyyyv',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\minimist': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.minimist-pZoWVp0w',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ms': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.ms-sW2DibmH',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\mkdirp-classic': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.mkdirp-classic-uLp2LFrL',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\napi-build-utils': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.napi-build-utils-otMO9t0D',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\nanoid': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.nanoid-cBcgxhll',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\node-abi': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.node-abi-KnGffYnV',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\negotiator': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.negotiator-ql8uCzzX',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\once': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.once-mVEZsEd2',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\node-releases': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.node-releases-gVU0wZ8y',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\object-inspect': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.object-inspect-p85dwE0f',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\on-finished': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.on-finished-OcsZgnw1',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\parseurl': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.parseurl-VIEAtqJG',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\picocolors': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.picocolors-mM2xE0Q0',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\path-to-regexp': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.path-to-regexp-it82SYwN',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\prebuild-install': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.prebuild-install-MKtkziAF',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\proxy-addr': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.proxy-addr-kQtGavoH',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\qs': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.qs-JL89Cdhx',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\postcss': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.postcss-fRwpF82B',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\pump': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.pump-Oj2WRXlw',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\rc': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.rc-YyIxuZuv',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\raw-body': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.raw-body-tSChzFMk',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\react': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.react-NPQSGuKU',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\range-parser': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.range-parser-UfipJC7S',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\react-dom': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.react-dom-X1cxcPJX',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\require-directory': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.require-directory-dmXg6SzP',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\react-refresh': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.react-refresh-WdqK3gnF',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\safer-buffer': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.safer-buffer-0eyjepdL',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\rxjs': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.rxjs-5bUOxJ4R',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\rollup': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.rollup-cVUBUVRX',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\readable-stream': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.readable-stream-1OSsKgxr',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\safe-buffer': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.safe-buffer-tl8GapOX',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\scheduler': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.scheduler-N0q9LPT8',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\send': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.send-qEODfooW',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\side-channel': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.side-channel-9RZiKIwq',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\semver': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.semver-D01FNwPd',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\setprototypeof': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.setprototypeof-aibPDQxe',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\shell-quote': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.shell-quote-LLm4B2OJ',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\serve-static': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.serve-static-CP5vPKYw',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\side-channel-list': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.side-channel-list-BlezNx1q',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\side-channel-map': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.side-channel-map-Hpza8GEs',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\simple-get': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.simple-get-LN9vIGQ5',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\source-map-js': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.source-map-js-a6IHU6rD',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\side-channel-weakmap': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.side-channel-weakmap-WyZlPzRF',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\string-width': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.string-width-YH0xWJZl',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\string_decoder': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.string_decoder-LBiKdfkW',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\simple-concat': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.simple-concat-AsGXzHM5',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\statuses': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.statuses-g4OTI4xX',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\strip-json-comments': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.strip-json-comments-nnz4nVLx',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\supports-color': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.supports-color-jKBQesU1',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tar-stream': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.tar-stream-m9GTSNfN',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\strip-ansi': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.strip-ansi-U98fafEv',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\toidentifier': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.toidentifier-ZtinEwij',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tunnel-agent': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.tunnel-agent-CEyNa9to',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tar-fs': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.tar-fs-Mul35ji9',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tree-kill': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.tree-kill-O3eAjZEU',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\tslib': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.tslib-XQylYz34',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\unpipe': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.unpipe-eEJUFyYw',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\update-browserslist-db': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.update-browserslist-db-rGEXAMQN',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\utils-merge': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.utils-merge-a2YiM5L3',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\type-is': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.type-is-trCqRwpr',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\util-deprecate': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.util-deprecate-fDWeZ9zS',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\ws': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.ws-BmpilKTa',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\vary': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.vary-RtaC1HM6',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\vite': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.vite-nFZeioMG',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\wrappy': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.wrappy-HRfishXk',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\wrap-ansi': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.wrap-ansi-Arznnadq',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\y18n': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.y18n-3yojtSgP',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\yallist': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.yallist-PN2dMCZX',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\compat-data': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.compat-data-1MpOfZLj',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\yargs': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.yargs-TJpUl2Xc',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\generator': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.generator-79cd1wZP',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\code-frame': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.code-frame-R9DOjyaS',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\core': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.core-x3arTcX3',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\yargs-parser': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\.yargs-parser-YeqAmW0E',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-globals': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.helper-globals-BCeGYISX',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-module-imports': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.helper-module-imports-TtAclFSH',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-compilation-targets': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.helper-compilation-targets-6kh7ixdy',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-plugin-utils': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.helper-plugin-utils-mu6GloyS',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-module-transforms': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.helper-module-transforms-rfgwBZFc',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-string-parser': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.helper-string-parser-GVcxyZgg',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-validator-option': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.helper-validator-option-Nii3FpCj',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\parser': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.parser-6W9Y89XG',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helpers': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.helpers-ESX0gjpt',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\helper-validator-identifier': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.helper-validator-identifier-4rS8c2lc',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\plugin-transform-react-jsx-self': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.plugin-transform-react-jsx-self-B4cRpXHp',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\template': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.template-kkKro7ia',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\traverse': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.traverse-ucU1xNjb',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\plugin-transform-react-jsx-source': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.plugin-transform-react-jsx-source-xiPdYpRv',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\android-arm': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.android-arm-KP33ELgc',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\android-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.android-x64-mWephMVj',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\darwin-arm64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.darwin-arm64-ySBHREW0',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\aix-ppc64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.aix-ppc64-mddipZ4g',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\types': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@babel\\.types-fznWwIeA',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\android-arm64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.android-arm64-r7w1Ooz1',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\freebsd-arm64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.freebsd-arm64-PmTM97q7',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\darwin-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.darwin-x64-ZKHZbIbX',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\freebsd-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.freebsd-x64-8xJHB3Iz',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-arm64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.linux-arm64-1uzraQXQ',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-ia32': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.linux-ia32-fxgS6WCf',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-ppc64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.linux-ppc64-2KzcgNj4',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-arm': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.linux-arm-CldOqG7u',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-loong64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.linux-loong64-97ugDe3M',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-mips64el': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.linux-mips64el-ROhxJtmA',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-s390x': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.linux-s390x-qEnLq5Uo',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-riscv64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.linux-riscv64-Own3xE2W',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\openbsd-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.openbsd-x64-aV4UYE9P',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\sunos-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.sunos-x64-EDkOwvv5',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.linux-x64-3gPkp1RQ',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\win32-ia32': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.win32-ia32-F3vMyVQa',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\win32-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.win32-x64-vupRaLLG',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\netbsd-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.netbsd-x64-oJoh1zTa',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\remapping': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\.remapping-rqICEvKy',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\resolve-uri': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\.resolve-uri-CWP3xy8P',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\win32-arm64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\.win32-arm64-UmtxIxGo',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\trace-mapping': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\.trace-mapping-6Pey0X46',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rolldown\\pluginutils': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rolldown\\.pluginutils-XcHDlnrs',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\gen-mapping': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\.gen-mapping-0TBqTpDb',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-android-arm64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-android-arm64-1l39LcOq',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\sourcemap-codec': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@jridgewell\\.sourcemap-codec-xFyjYzoi',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-android-arm-eabi': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-android-arm-eabi-85feveGp',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-darwin-arm64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-darwin-arm64-hhMB7zso',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-darwin-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-darwin-x64-NU6QlzHl',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-freebsd-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-freebsd-x64-mVpwUiAs',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm-gnueabihf': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-arm-gnueabihf-5gR6SS6c',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-freebsd-arm64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-freebsd-arm64-45gJ5i6o',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm64-gnu': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-arm64-gnu-4Kw4Uynj',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm64-musl': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-arm64-musl-VkKy15Dr',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm-musleabihf': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-arm-musleabihf-6K03bG5h',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-ppc64-gnu': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-ppc64-gnu-Kw4PbGPO',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-loong64-gnu': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-loong64-gnu-vSVBqoio',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-riscv64-musl': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-riscv64-musl-P6nDhe0d',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-riscv64-gnu': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-riscv64-gnu-55lVPDhZ',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-s390x-gnu': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-s390x-gnu-vEqGyT0T',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-loong64-musl': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-loong64-musl-xNmqpBCK',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-ppc64-musl': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-ppc64-musl-bkAimJhd',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-openbsd-x64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-openbsd-x64-3twzynBz',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-arm64-msvc': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-win32-arm64-msvc-MsLxkZ8e',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-x64-musl': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-x64-musl-8iiTcm5C',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-x64-gnu': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-linux-x64-gnu-RMoeoP3o',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-ia32-msvc': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-win32-ia32-msvc-7CETl2Qf',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\babel__core': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\.babel__core-OlouJtiN',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-x64-gnu': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-win32-x64-gnu-h17M0pXt',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-openharmony-arm64': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-openharmony-arm64-HX6zfLIn',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-x64-msvc': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\.rollup-win32-x64-msvc-0g0HqSTH',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\babel__generator': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\.babel__generator-AbB4IQv8',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\babel__traverse': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\.babel__traverse-xcxY5AOB',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@vitejs\\plugin-react': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@vitejs\\.plugin-react-7bayn7oH',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\babel__template': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\.babel__template-ltkHnXIc',
+251 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\estree': 'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@types\\.estree-n4pQiUf5'
+251 silly reify }
+252 silly audit bulk request {
+252 silly audit   '@babel/code-frame': [ '7.29.0' ],
+252 silly audit   '@babel/compat-data': [ '7.29.0' ],
+252 silly audit   '@babel/core': [ '7.29.0' ],
+252 silly audit   '@babel/generator': [ '7.29.1' ],
+252 silly audit   '@babel/helper-compilation-targets': [ '7.28.6' ],
+252 silly audit   '@babel/helper-globals': [ '7.28.0' ],
+252 silly audit   '@babel/helper-module-imports': [ '7.28.6' ],
+252 silly audit   '@babel/helper-module-transforms': [ '7.28.6' ],
+252 silly audit   '@babel/helper-plugin-utils': [ '7.28.6' ],
+252 silly audit   '@babel/helper-string-parser': [ '7.27.1' ],
+252 silly audit   '@babel/helper-validator-identifier': [ '7.28.5' ],
+252 silly audit   '@babel/helper-validator-option': [ '7.27.1' ],
+252 silly audit   '@babel/helpers': [ '7.29.2' ],
+252 silly audit   '@babel/parser': [ '7.29.2' ],
+252 silly audit   '@babel/plugin-transform-react-jsx-self': [ '7.27.1' ],
+252 silly audit   '@babel/plugin-transform-react-jsx-source': [ '7.27.1' ],
+252 silly audit   '@babel/template': [ '7.28.6' ],
+252 silly audit   '@babel/traverse': [ '7.29.0' ],
+252 silly audit   '@babel/types': [ '7.29.0' ],
+252 silly audit   '@esbuild/aix-ppc64': [ '0.21.5' ],
+252 silly audit   '@esbuild/android-arm': [ '0.21.5' ],
+252 silly audit   '@esbuild/android-arm64': [ '0.21.5' ],
+252 silly audit   '@esbuild/android-x64': [ '0.21.5' ],
+252 silly audit   '@esbuild/darwin-arm64': [ '0.21.5' ],
+252 silly audit   '@esbuild/darwin-x64': [ '0.21.5' ],
+252 silly audit   '@esbuild/freebsd-arm64': [ '0.21.5' ],
+252 silly audit   '@esbuild/freebsd-x64': [ '0.21.5' ],
+252 silly audit   '@esbuild/linux-arm': [ '0.21.5' ],
+252 silly audit   '@esbuild/linux-arm64': [ '0.21.5' ],
+252 silly audit   '@esbuild/linux-ia32': [ '0.21.5' ],
+252 silly audit   '@esbuild/linux-loong64': [ '0.21.5' ],
+252 silly audit   '@esbuild/linux-mips64el': [ '0.21.5' ],
+252 silly audit   '@esbuild/linux-ppc64': [ '0.21.5' ],
+252 silly audit   '@esbuild/linux-riscv64': [ '0.21.5' ],
+252 silly audit   '@esbuild/linux-s390x': [ '0.21.5' ],
+252 silly audit   '@esbuild/linux-x64': [ '0.21.5' ],
+252 silly audit   '@esbuild/netbsd-x64': [ '0.21.5' ],
+252 silly audit   '@esbuild/openbsd-x64': [ '0.21.5' ],
+252 silly audit   '@esbuild/sunos-x64': [ '0.21.5' ],
+252 silly audit   '@esbuild/win32-arm64': [ '0.21.5' ],
+252 silly audit   '@esbuild/win32-ia32': [ '0.21.5' ],
+252 silly audit   '@esbuild/win32-x64': [ '0.21.5' ],
+252 silly audit   '@jridgewell/gen-mapping': [ '0.3.13' ],
+252 silly audit   '@jridgewell/remapping': [ '2.3.5' ],
+252 silly audit   '@jridgewell/resolve-uri': [ '3.1.2' ],
+252 silly audit   '@jridgewell/sourcemap-codec': [ '1.5.5' ],
+252 silly audit   '@jridgewell/trace-mapping': [ '0.3.31' ],
+252 silly audit   '@rolldown/pluginutils': [ '1.0.0-rc.3' ],
+252 silly audit   '@rollup/rollup-android-arm-eabi': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-android-arm64': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-darwin-arm64': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-darwin-x64': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-freebsd-arm64': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-freebsd-x64': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-arm-gnueabihf': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-arm-musleabihf': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-arm64-gnu': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-arm64-musl': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-loong64-gnu': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-loong64-musl': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-ppc64-gnu': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-ppc64-musl': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-riscv64-gnu': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-riscv64-musl': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-s390x-gnu': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-x64-gnu': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-linux-x64-musl': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-openbsd-x64': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-openharmony-arm64': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-win32-arm64-msvc': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-win32-ia32-msvc': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-win32-x64-gnu': [ '4.60.2' ],
+252 silly audit   '@rollup/rollup-win32-x64-msvc': [ '4.60.2' ],
+252 silly audit   '@types/babel__core': [ '7.20.5' ],
+252 silly audit   '@types/babel__generator': [ '7.27.0' ],
+252 silly audit   '@types/babel__template': [ '7.4.4' ],
+252 silly audit   '@types/babel__traverse': [ '7.28.0' ],
+252 silly audit   '@types/estree': [ '1.0.8' ],
+252 silly audit   '@vitejs/plugin-react': [ '5.2.0' ],
+252 silly audit   accepts: [ '1.3.8' ],
+252 silly audit   'ansi-regex': [ '5.0.1' ],
+252 silly audit   'ansi-styles': [ '4.3.0' ],
+252 silly audit   'array-flatten': [ '1.1.1' ],
+252 silly audit   'async-function': [ '1.0.0' ],
+252 silly audit   'async-generator-function': [ '1.0.0' ],
+252 silly audit   'base64-js': [ '1.5.1' ],
+252 silly audit   'baseline-browser-mapping': [ '2.10.24' ],
+252 silly audit   'better-sqlite3': [ '12.9.0' ],
+252 silly audit   bindings: [ '1.5.0' ],
+252 silly audit   bl: [ '4.1.0' ],
+252 silly audit   'body-parser': [ '1.20.5' ],
+252 silly audit   debug: [ '2.6.9', '4.4.3' ],
+252 silly audit   ms: [ '2.0.0', '2.1.3' ],
+252 silly audit   qs: [ '6.15.1', '6.14.2' ],
+252 silly audit   browserslist: [ '4.28.2' ],
+252 silly audit   buffer: [ '5.7.1' ],
+252 silly audit   bytes: [ '3.1.2' ],
+252 silly audit   'call-bind-apply-helpers': [ '1.0.2' ],
+252 silly audit   'call-bound': [ '1.0.4' ],
+252 silly audit   'caniuse-lite': [ '1.0.30001791' ],
+252 silly audit   chalk: [ '4.1.2' ],
+252 silly audit   'supports-color': [ '7.2.0', '8.1.1' ],
+252 silly audit   chownr: [ '1.1.4' ],
+252 silly audit   cliui: [ '8.0.1' ],
+252 silly audit   'color-convert': [ '2.0.1' ],
+252 silly audit   'color-name': [ '1.1.4' ],
+252 silly audit   concurrently: [ '9.2.1' ],
+252 silly audit   'content-disposition': [ '0.5.4' ],
+252 silly audit   'content-type': [ '1.0.5' ],
+252 silly audit   'convert-source-map': [ '2.0.0' ],
+252 silly audit   cookie: [ '0.7.2' ],
+252 silly audit   'cookie-signature': [ '1.0.7' ],
+252 silly audit   'decompress-response': [ '6.0.0' ],
+252 silly audit   'deep-extend': [ '0.6.0' ],
+252 silly audit   depd: [ '2.0.0' ],
+252 silly audit   destroy: [ '1.2.0' ],
+252 silly audit   'detect-libc': [ '2.1.2' ],
+252 silly audit   'dunder-proto': [ '1.0.1' ],
+252 silly audit   'ee-first': [ '1.1.1' ],
+252 silly audit   'electron-to-chromium': [ '1.5.345' ],
+252 silly audit   'emoji-regex': [ '8.0.0' ],
+252 silly audit   encodeurl: [ '2.0.0' ],
+252 silly audit   'end-of-stream': [ '1.4.5' ],
+252 silly audit   'es-define-property': [ '1.0.1' ],
+252 silly audit   'es-errors': [ '1.3.0' ],
+252 silly audit   'es-object-atoms': [ '1.1.1' ],
+252 silly audit   esbuild: [ '0.21.5' ],
+252 silly audit   escalade: [ '3.2.0' ],
+252 silly audit   'escape-html': [ '1.0.3' ],
+252 silly audit   etag: [ '1.8.1' ],
+252 silly audit   'expand-template': [ '2.0.3' ],
+252 silly audit   express: [ '4.22.1' ],
+252 silly audit   'file-uri-to-path': [ '1.0.0' ],
+252 silly audit   finalhandler: [ '1.3.2' ],
+252 silly audit   forwarded: [ '0.2.0' ],
+252 silly audit   fresh: [ '0.5.2' ],
+252 silly audit   'fs-constants': [ '1.0.0' ],
+252 silly audit   fsevents: [ '2.3.3' ],
+252 silly audit   'function-bind': [ '1.1.2' ],
+252 silly audit   'generator-function': [ '2.0.1' ],
+252 silly audit   gensync: [ '1.0.0-beta.2' ],
+252 silly audit   'get-caller-file': [ '2.0.5' ],
+252 silly audit   'get-intrinsic': [ '1.3.1' ],
+252 silly audit   'get-proto': [ '1.0.1' ],
+252 silly audit   'github-from-package': [ '0.0.0' ],
+252 silly audit   gopd: [ '1.2.0' ],
+252 silly audit   'has-flag': [ '4.0.0' ],
+252 silly audit   'has-symbols': [ '1.1.0' ],
+252 silly audit   hasown: [ '2.0.3' ],
+252 silly audit   'http-errors': [ '2.0.1' ],
+252 silly audit   'iconv-lite': [ '0.4.24' ],
+252 silly audit   ieee754: [ '1.2.1' ],
+252 silly audit   inherits: [ '2.0.4' ],
+252 silly audit   ini: [ '1.3.8' ],
+252 silly audit   'ipaddr.js': [ '1.9.1' ],
+252 silly audit   'is-fullwidth-code-point': [ '3.0.0' ],
+252 silly audit   'js-tokens': [ '4.0.0' ],
+252 silly audit   jsesc: [ '3.1.0' ],
+252 silly audit   json5: [ '2.2.3' ],
+252 silly audit   'loose-envify': [ '1.4.0' ],
+252 silly audit   'lru-cache': [ '5.1.1' ],
+252 silly audit   'lucide-react': [ '0.468.0' ],
+252 silly audit   'math-intrinsics': [ '1.1.0' ],
+252 silly audit   'media-typer': [ '0.3.0' ],
+252 silly audit   'merge-descriptors': [ '1.0.3' ],
+252 silly audit   methods: [ '1.1.2' ],
+252 silly audit   mime: [ '1.6.0' ],
+252 silly audit   'mime-db': [ '1.52.0' ],
+252 silly audit   'mime-types': [ '2.1.35' ],
+252 silly audit   'mimic-response': [ '3.1.0' ],
+252 silly audit   minimist: [ '1.2.8' ],
+252 silly audit   'mkdirp-classic': [ '0.5.3' ],
+252 silly audit   nanoid: [ '3.3.11' ],
+252 silly audit   'napi-build-utils': [ '2.0.0' ],
+252 silly audit   negotiator: [ '0.6.3' ],
+252 silly audit   'node-abi': [ '3.89.0' ],
+252 silly audit   semver: [ '7.7.4', '6.3.1' ],
+252 silly audit   'node-releases': [ '2.0.38' ],
+252 silly audit   'object-inspect': [ '1.13.4' ],
+252 silly audit   'on-finished': [ '2.4.1' ],
+252 silly audit   once: [ '1.4.0' ],
+252 silly audit   parseurl: [ '1.3.3' ],
+252 silly audit   'path-to-regexp': [ '0.1.13' ],
+252 silly audit   picocolors: [ '1.1.1' ],
+252 silly audit   postcss: [ '8.5.12' ],
+252 silly audit   'prebuild-install': [ '7.1.3' ],
+252 silly audit   'proxy-addr': [ '2.0.7' ],
+252 silly audit   pump: [ '3.0.4' ],
+252 silly audit   'range-parser': [ '1.2.1' ],
+252 silly audit   'raw-body': [ '2.5.3' ],
+252 silly audit   rc: [ '1.2.8' ],
+252 silly audit   react: [ '18.3.1' ],
+252 silly audit   'react-dom': [ '18.3.1' ],
+252 silly audit   'react-refresh': [ '0.18.0' ],
+252 silly audit   'readable-stream': [ '3.6.2' ],
+252 silly audit   'require-directory': [ '2.1.1' ],
+252 silly audit   rollup: [ '4.60.2' ],
+252 silly audit   rxjs: [ '7.8.2' ],
+252 silly audit   'safe-buffer': [ '5.2.1' ],
+252 silly audit   'safer-buffer': [ '2.1.2' ],
+252 silly audit   scheduler: [ '0.23.2' ],
+252 silly audit   send: [ '0.19.2' ],
+252 silly audit   'serve-static': [ '1.16.3' ],
+252 silly audit   setprototypeof: [ '1.2.0' ],
+252 silly audit   'shell-quote': [ '1.8.3' ],
+252 silly audit   'side-channel': [ '1.1.0' ],
+252 silly audit   'side-channel-list': [ '1.0.1' ],
+252 silly audit   'side-channel-map': [ '1.0.1' ],
+252 silly audit   'side-channel-weakmap': [ '1.0.2' ],
+252 silly audit   'simple-concat': [ '1.0.1' ],
+252 silly audit   'simple-get': [ '4.0.1' ],
+252 silly audit   'source-map-js': [ '1.2.1' ],
+252 silly audit   statuses: [ '2.0.2' ],
+252 silly audit   string_decoder: [ '1.3.0' ],
+252 silly audit   'string-width': [ '4.2.3' ],
+252 silly audit   'strip-ansi': [ '6.0.1' ],
+252 silly audit   'strip-json-comments': [ '2.0.1' ],
+252 silly audit   'tar-fs': [ '2.1.4' ],
+252 silly audit   'tar-stream': [ '2.2.0' ],
+252 silly audit   toidentifier: [ '1.0.1' ],
+252 silly audit   'tree-kill': [ '1.2.2' ],
+252 silly audit   tslib: [ '2.8.1' ],
+252 silly audit   'tunnel-agent': [ '0.6.0' ],
+252 silly audit   'type-is': [ '1.6.18' ],
+252 silly audit   unpipe: [ '1.0.0' ],
+252 silly audit   'update-browserslist-db': [ '1.2.3' ],
+252 silly audit   'util-deprecate': [ '1.0.2' ],
+252 silly audit   'utils-merge': [ '1.0.1' ],
+252 silly audit   vary: [ '1.1.2' ],
+252 silly audit   vite: [ '5.4.21' ],
+252 silly audit   'wrap-ansi': [ '7.0.0' ],
+252 silly audit   wrappy: [ '1.0.2' ],
+252 silly audit   ws: [ '8.20.0' ],
+252 silly audit   y18n: [ '5.0.8' ],
+252 silly audit   yallist: [ '3.1.1' ],
+252 silly audit   yargs: [ '17.7.2' ],
+252 silly audit   'yargs-parser': [ '21.1.1' ]
+252 silly audit }
+253 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-openharmony-arm64
+254 silly reify mark deleted [
+254 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-openharmony-arm64'
+254 silly reify ]
+255 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-win32-ia32-msvc
+256 silly reify mark deleted [
+256 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-ia32-msvc'
+256 silly reify ]
+257 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-x64-gnu
+258 silly reify mark deleted [
+258 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-x64-gnu'
+258 silly reify ]
+259 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-x64-musl
+260 silly reify mark deleted [
+260 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-x64-musl'
+260 silly reify ]
+261 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-win32-arm64-msvc
+262 silly reify mark deleted [
+262 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-arm64-msvc'
+262 silly reify ]
+263 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-openbsd-x64
+264 silly reify mark deleted [
+264 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-openbsd-x64'
+264 silly reify ]
+265 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-ppc64-musl
+266 silly reify mark deleted [
+266 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-ppc64-musl'
+266 silly reify ]
+267 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-loong64-musl
+268 silly reify mark deleted [
+268 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-loong64-musl'
+268 silly reify ]
+269 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-s390x-gnu
+270 silly reify mark deleted [
+270 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-s390x-gnu'
+270 silly reify ]
+271 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-riscv64-gnu
+272 silly reify mark deleted [
+272 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-riscv64-gnu'
+272 silly reify ]
+273 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-riscv64-musl
+274 silly reify mark deleted [
+274 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-riscv64-musl'
+274 silly reify ]
+275 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-loong64-gnu
+276 silly reify mark deleted [
+276 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-loong64-gnu'
+276 silly reify ]
+277 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-ppc64-gnu
+278 silly reify mark deleted [
+278 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-ppc64-gnu'
+278 silly reify ]
+279 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-arm-musleabihf
+280 silly reify mark deleted [
+280 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm-musleabihf'
+280 silly reify ]
+281 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-arm64-musl
+282 silly reify mark deleted [
+282 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm64-musl'
+282 silly reify ]
+283 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-arm64-gnu
+284 silly reify mark deleted [
+284 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm64-gnu'
+284 silly reify ]
+285 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-freebsd-arm64
+286 silly reify mark deleted [
+286 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-freebsd-arm64'
+286 silly reify ]
+287 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-linux-arm-gnueabihf
+288 silly reify mark deleted [
+288 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-linux-arm-gnueabihf'
+288 silly reify ]
+289 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-freebsd-x64
+290 silly reify mark deleted [
+290 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-freebsd-x64'
+290 silly reify ]
+291 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-darwin-x64
+292 silly reify mark deleted [
+292 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-darwin-x64'
+292 silly reify ]
+293 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-darwin-arm64
+294 silly reify mark deleted [
+294 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-darwin-arm64'
+294 silly reify ]
+295 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-android-arm-eabi
+296 silly reify mark deleted [
+296 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-android-arm-eabi'
+296 silly reify ]
+297 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-android-arm64
+298 silly reify mark deleted [
+298 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-android-arm64'
+298 silly reify ]
+299 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\win32-arm64
+300 silly reify mark deleted [
+300 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\win32-arm64'
+300 silly reify ]
+301 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\netbsd-x64
+302 silly reify mark deleted [
+302 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\netbsd-x64'
+302 silly reify ]
+303 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\win32-ia32
+304 silly reify mark deleted [
+304 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\win32-ia32'
+304 silly reify ]
+305 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\linux-x64
+306 silly reify mark deleted [
+306 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-x64'
+306 silly reify ]
+307 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\sunos-x64
+308 silly reify mark deleted [
+308 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\sunos-x64'
+308 silly reify ]
+309 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\openbsd-x64
+310 silly reify mark deleted [
+310 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\openbsd-x64'
+310 silly reify ]
+311 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\linux-riscv64
+312 silly reify mark deleted [
+312 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-riscv64'
+312 silly reify ]
+313 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\linux-s390x
+314 silly reify mark deleted [
+314 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-s390x'
+314 silly reify ]
+315 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\linux-mips64el
+316 silly reify mark deleted [
+316 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-mips64el'
+316 silly reify ]
+317 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\linux-loong64
+318 silly reify mark deleted [
+318 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-loong64'
+318 silly reify ]
+319 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\linux-arm
+320 silly reify mark deleted [
+320 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-arm'
+320 silly reify ]
+321 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\linux-ppc64
+322 silly reify mark deleted [
+322 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-ppc64'
+322 silly reify ]
+323 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\linux-ia32
+324 silly reify mark deleted [
+324 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-ia32'
+324 silly reify ]
+325 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\linux-arm64
+326 silly reify mark deleted [
+326 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\linux-arm64'
+326 silly reify ]
+327 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\freebsd-x64
+328 silly reify mark deleted [
+328 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\freebsd-x64'
+328 silly reify ]
+329 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\darwin-x64
+330 silly reify mark deleted [
+330 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\darwin-x64'
+330 silly reify ]
+331 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\freebsd-arm64
+332 silly reify mark deleted [
+332 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\freebsd-arm64'
+332 silly reify ]
+333 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\android-arm64
+334 silly reify mark deleted [
+334 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\android-arm64'
+334 silly reify ]
+335 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\aix-ppc64
+336 silly reify mark deleted [
+336 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\aix-ppc64'
+336 silly reify ]
+337 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\darwin-arm64
+338 silly reify mark deleted [
+338 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\darwin-arm64'
+338 silly reify ]
+339 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\android-x64
+340 silly reify mark deleted [
+340 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\android-x64'
+340 silly reify ]
+341 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\android-arm
+342 silly reify mark deleted [
+342 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\android-arm'
+342 silly reify ]
+343 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\fsevents
+344 silly reify mark deleted [
+344 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\fsevents'
+344 silly reify ]
+345 silly audit bulk request failed undefined
+346 http cache @vitejs/plugin-react@http://npm.weimob.com/@vitejs%2fplugin-react/-/plugin-react-5.2.0.tgz 0ms (cache hit)
+347 http cache @types/babel__template@http://npm.weimob.com/@types%2fbabel__template/-/babel__template-7.4.4.tgz 0ms (cache hit)
+348 http cache @types/babel__traverse@http://npm.weimob.com/@types%2fbabel__traverse/-/babel__traverse-7.28.0.tgz 0ms (cache hit)
+349 http cache @types/estree@http://npm.weimob.com/@types%2festree/-/estree-1.0.8.tgz 0ms (cache hit)
+350 http cache @types/babel__core@http://npm.weimob.com/@types%2fbabel__core/-/babel__core-7.20.5.tgz 0ms (cache hit)
+351 http cache @jridgewell/sourcemap-codec@http://npm.weimob.com/@jridgewell%2fsourcemap-codec/-/sourcemap-codec-1.5.5.tgz 0ms (cache hit)
+352 http cache @rollup/rollup-win32-x64-gnu@http://npm.weimob.com/@rollup%2frollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.60.2.tgz 0ms (cache hit)
+353 http cache @types/babel__generator@http://npm.weimob.com/@types%2fbabel__generator/-/babel__generator-7.27.0.tgz 0ms (cache hit)
+354 http cache @rollup/rollup-win32-x64-msvc@http://npm.weimob.com/@rollup%2frollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.60.2.tgz 0ms (cache hit)
+355 http cache @jridgewell/gen-mapping@http://npm.weimob.com/@jridgewell%2fgen-mapping/-/gen-mapping-0.3.13.tgz 0ms (cache hit)
+356 http cache @jridgewell/resolve-uri@http://npm.weimob.com/@jridgewell%2fresolve-uri/-/resolve-uri-3.1.2.tgz 0ms (cache hit)
+357 http cache @rolldown/pluginutils@http://npm.weimob.com/@rolldown%2fpluginutils/-/pluginutils-1.0.0-rc.3.tgz 0ms (cache hit)
+358 http cache @babel/types@http://npm.weimob.com/@babel%2ftypes/-/types-7.29.0.tgz 0ms (cache hit)
+359 http cache @jridgewell/trace-mapping@http://npm.weimob.com/@jridgewell%2ftrace-mapping/-/trace-mapping-0.3.31.tgz 0ms (cache hit)
+360 http cache @esbuild/win32-x64@http://npm.weimob.com/@esbuild%2fwin32-x64/-/win32-x64-0.21.5.tgz 0ms (cache hit)
+361 http cache @babel/traverse@http://npm.weimob.com/@babel%2ftraverse/-/traverse-7.29.0.tgz 0ms (cache hit)
+362 http cache @jridgewell/remapping@http://npm.weimob.com/@jridgewell%2fremapping/-/remapping-2.3.5.tgz 0ms (cache hit)
+363 http cache @babel/plugin-transform-react-jsx-source@http://npm.weimob.com/@babel%2fplugin-transform-react-jsx-source/-/plugin-transform-react-jsx-source-7.27.1.tgz 0ms (cache hit)
+364 http cache @babel/plugin-transform-react-jsx-self@http://npm.weimob.com/@babel%2fplugin-transform-react-jsx-self/-/plugin-transform-react-jsx-self-7.27.1.tgz 0ms (cache hit)
+365 http cache @babel/helpers@http://npm.weimob.com/@babel%2fhelpers/-/helpers-7.29.2.tgz 0ms (cache hit)
+366 http cache @babel/template@http://npm.weimob.com/@babel%2ftemplate/-/template-7.28.6.tgz 0ms (cache hit)
+367 http cache @babel/helper-validator-option@http://npm.weimob.com/@babel%2fhelper-validator-option/-/helper-validator-option-7.27.1.tgz 0ms (cache hit)
+368 http cache @babel/helper-validator-identifier@http://npm.weimob.com/@babel%2fhelper-validator-identifier/-/helper-validator-identifier-7.28.5.tgz 0ms (cache hit)
+369 http cache @babel/parser@http://npm.weimob.com/@babel%2fparser/-/parser-7.29.2.tgz 0ms (cache hit)
+370 http cache @babel/helper-module-transforms@http://npm.weimob.com/@babel%2fhelper-module-transforms/-/helper-module-transforms-7.28.6.tgz 0ms (cache hit)
+371 http cache @babel/helper-compilation-targets@http://npm.weimob.com/@babel%2fhelper-compilation-targets/-/helper-compilation-targets-7.28.6.tgz 0ms (cache hit)
+372 http cache yargs-parser@http://npm.weimob.com/yargs-parser/-/yargs-parser-21.1.1.tgz 0ms (cache hit)
+373 http cache @babel/helper-string-parser@http://npm.weimob.com/@babel%2fhelper-string-parser/-/helper-string-parser-7.27.1.tgz 0ms (cache hit)
+374 http cache @babel/helper-module-imports@http://npm.weimob.com/@babel%2fhelper-module-imports/-/helper-module-imports-7.28.6.tgz 0ms (cache hit)
+375 http cache @babel/helper-globals@http://npm.weimob.com/@babel%2fhelper-globals/-/helper-globals-7.28.0.tgz 0ms (cache hit)
+376 http cache @babel/helper-plugin-utils@http://npm.weimob.com/@babel%2fhelper-plugin-utils/-/helper-plugin-utils-7.28.6.tgz 0ms (cache hit)
+377 http cache yargs@http://npm.weimob.com/yargs/-/yargs-17.7.2.tgz 0ms (cache hit)
+378 http cache @babel/code-frame@http://npm.weimob.com/@babel%2fcode-frame/-/code-frame-7.29.0.tgz 0ms (cache hit)
+379 http cache @babel/core@http://npm.weimob.com/@babel%2fcore/-/core-7.29.0.tgz 0ms (cache hit)
+380 http cache @babel/generator@http://npm.weimob.com/@babel%2fgenerator/-/generator-7.29.1.tgz 0ms (cache hit)
+381 http cache y18n@http://npm.weimob.com/y18n/-/y18n-5.0.8.tgz 0ms (cache hit)
+382 http cache wrappy@http://npm.weimob.com/wrappy/-/wrappy-1.0.2.tgz 0ms (cache hit)
+383 http cache yallist@http://npm.weimob.com/yallist/-/yallist-3.1.1.tgz 0ms (cache hit)
+384 http cache @babel/compat-data@http://npm.weimob.com/@babel%2fcompat-data/-/compat-data-7.29.0.tgz 0ms (cache hit)
+385 http cache wrap-ansi@http://npm.weimob.com/wrap-ansi/-/wrap-ansi-7.0.0.tgz 0ms (cache hit)
+386 http cache vite@http://npm.weimob.com/vite/-/vite-5.4.21.tgz 0ms (cache hit)
+387 http cache vary@http://npm.weimob.com/vary/-/vary-1.1.2.tgz 0ms (cache hit)
+388 http cache type-is@http://npm.weimob.com/type-is/-/type-is-1.6.18.tgz 0ms (cache hit)
+389 http cache util-deprecate@http://npm.weimob.com/util-deprecate/-/util-deprecate-1.0.2.tgz 0ms (cache hit)
+390 http cache ws@http://npm.weimob.com/ws/-/ws-8.20.0.tgz 0ms (cache hit)
+391 http cache update-browserslist-db@http://npm.weimob.com/update-browserslist-db/-/update-browserslist-db-1.2.3.tgz 0ms (cache hit)
+392 http cache utils-merge@http://npm.weimob.com/utils-merge/-/utils-merge-1.0.1.tgz 0ms (cache hit)
+393 http cache unpipe@http://npm.weimob.com/unpipe/-/unpipe-1.0.0.tgz 0ms (cache hit)
+394 http cache tree-kill@http://npm.weimob.com/tree-kill/-/tree-kill-1.2.2.tgz 0ms (cache hit)
+395 http cache tunnel-agent@http://npm.weimob.com/tunnel-agent/-/tunnel-agent-0.6.0.tgz 0ms (cache hit)
+396 http cache tar-stream@http://npm.weimob.com/tar-stream/-/tar-stream-2.2.0.tgz 0ms (cache hit)
+397 http cache tslib@http://npm.weimob.com/tslib/-/tslib-2.8.1.tgz 0ms (cache hit)
+398 http cache tar-fs@http://npm.weimob.com/tar-fs/-/tar-fs-2.1.4.tgz 0ms (cache hit)
+399 http cache strip-json-comments@http://npm.weimob.com/strip-json-comments/-/strip-json-comments-2.0.1.tgz 0ms (cache hit)
+400 http cache statuses@http://npm.weimob.com/statuses/-/statuses-2.0.2.tgz 0ms (cache hit)
+401 http cache simple-concat@http://npm.weimob.com/simple-concat/-/simple-concat-1.0.1.tgz 0ms (cache hit)
+402 http cache string-width@http://npm.weimob.com/string-width/-/string-width-4.2.3.tgz 0ms (cache hit)
+403 http cache side-channel-weakmap@http://npm.weimob.com/side-channel-weakmap/-/side-channel-weakmap-1.0.2.tgz 0ms (cache hit)
+404 http cache source-map-js@http://npm.weimob.com/source-map-js/-/source-map-js-1.2.1.tgz 0ms (cache hit)
+405 http cache string_decoder@http://npm.weimob.com/string_decoder/-/string_decoder-1.3.0.tgz 0ms (cache hit)
+406 http cache side-channel-map@http://npm.weimob.com/side-channel-map/-/side-channel-map-1.0.1.tgz 0ms (cache hit)
+407 http cache side-channel-list@http://npm.weimob.com/side-channel-list/-/side-channel-list-1.0.1.tgz 0ms (cache hit)
+408 http cache simple-get@http://npm.weimob.com/simple-get/-/simple-get-4.0.1.tgz 0ms (cache hit)
+409 http cache shell-quote@http://npm.weimob.com/shell-quote/-/shell-quote-1.8.3.tgz 0ms (cache hit)
+410 http cache setprototypeof@http://npm.weimob.com/setprototypeof/-/setprototypeof-1.2.0.tgz 0ms (cache hit)
+411 http cache serve-static@http://npm.weimob.com/serve-static/-/serve-static-1.16.3.tgz 0ms (cache hit)
+412 http cache strip-ansi@http://npm.weimob.com/strip-ansi/-/strip-ansi-6.0.1.tgz 0ms (cache hit)
+413 http cache toidentifier@http://npm.weimob.com/toidentifier/-/toidentifier-1.0.1.tgz 0ms (cache hit)
+414 http cache side-channel@http://npm.weimob.com/side-channel/-/side-channel-1.1.0.tgz 0ms (cache hit)
+415 http cache scheduler@http://npm.weimob.com/scheduler/-/scheduler-0.23.2.tgz 0ms (cache hit)
+416 http cache semver@http://npm.weimob.com/semver/-/semver-6.3.1.tgz 0ms (cache hit)
+417 http cache supports-color@http://npm.weimob.com/supports-color/-/supports-color-8.1.1.tgz 0ms (cache hit)
+418 http cache send@http://npm.weimob.com/send/-/send-0.19.2.tgz 0ms (cache hit)
+419 http cache safe-buffer@http://npm.weimob.com/safe-buffer/-/safe-buffer-5.2.1.tgz 0ms (cache hit)
+420 http cache rxjs@http://npm.weimob.com/rxjs/-/rxjs-7.8.2.tgz 0ms (cache hit)
+421 http cache safer-buffer@http://npm.weimob.com/safer-buffer/-/safer-buffer-2.1.2.tgz 0ms (cache hit)
+422 http cache readable-stream@http://npm.weimob.com/readable-stream/-/readable-stream-3.6.2.tgz 0ms (cache hit)
+423 http cache rollup@http://npm.weimob.com/rollup/-/rollup-4.60.2.tgz 0ms (cache hit)
+424 http cache react-refresh@http://npm.weimob.com/react-refresh/-/react-refresh-0.18.0.tgz 0ms (cache hit)
+425 http cache require-directory@http://npm.weimob.com/require-directory/-/require-directory-2.1.1.tgz 0ms (cache hit)
+426 http cache react-dom@http://npm.weimob.com/react-dom/-/react-dom-18.3.1.tgz 0ms (cache hit)
+427 http cache range-parser@http://npm.weimob.com/range-parser/-/range-parser-1.2.1.tgz 0ms (cache hit)
+428 http cache react@http://npm.weimob.com/react/-/react-18.3.1.tgz 0ms (cache hit)
+429 http cache raw-body@http://npm.weimob.com/raw-body/-/raw-body-2.5.3.tgz 0ms (cache hit)
+430 http cache postcss@http://npm.weimob.com/postcss/-/postcss-8.5.12.tgz 0ms (cache hit)
+431 http cache qs@http://npm.weimob.com/qs/-/qs-6.14.2.tgz 0ms (cache hit)
+432 http cache rc@http://npm.weimob.com/rc/-/rc-1.2.8.tgz 0ms (cache hit)
+433 http cache pump@http://npm.weimob.com/pump/-/pump-3.0.4.tgz 0ms (cache hit)
+434 http cache proxy-addr@http://npm.weimob.com/proxy-addr/-/proxy-addr-2.0.7.tgz 0ms (cache hit)
+435 http cache prebuild-install@http://npm.weimob.com/prebuild-install/-/prebuild-install-7.1.3.tgz 0ms (cache hit)
+436 http cache path-to-regexp@http://npm.weimob.com/path-to-regexp/-/path-to-regexp-0.1.13.tgz 0ms (cache hit)
+437 http cache parseurl@http://npm.weimob.com/parseurl/-/parseurl-1.3.3.tgz 0ms (cache hit)
+438 http cache object-inspect@http://npm.weimob.com/object-inspect/-/object-inspect-1.13.4.tgz 0ms (cache hit)
+439 http cache picocolors@http://npm.weimob.com/picocolors/-/picocolors-1.1.1.tgz 0ms (cache hit)
+440 http cache node-releases@http://npm.weimob.com/node-releases/-/node-releases-2.0.38.tgz 0ms (cache hit)
+441 http cache once@http://npm.weimob.com/once/-/once-1.4.0.tgz 0ms (cache hit)
+442 http cache on-finished@http://npm.weimob.com/on-finished/-/on-finished-2.4.1.tgz 0ms (cache hit)
+443 http cache nanoid@http://npm.weimob.com/nanoid/-/nanoid-3.3.11.tgz 0ms (cache hit)
+444 http cache node-abi@http://npm.weimob.com/node-abi/-/node-abi-3.89.0.tgz 0ms (cache hit)
+445 http cache negotiator@http://npm.weimob.com/negotiator/-/negotiator-0.6.3.tgz 0ms (cache hit)
+446 http cache ms@http://npm.weimob.com/ms/-/ms-2.1.3.tgz 0ms (cache hit)
+447 http cache mkdirp-classic@http://npm.weimob.com/mkdirp-classic/-/mkdirp-classic-0.5.3.tgz 0ms (cache hit)
+448 http cache mimic-response@http://npm.weimob.com/mimic-response/-/mimic-response-3.1.0.tgz 0ms (cache hit)
+449 http cache mime-types@http://npm.weimob.com/mime-types/-/mime-types-2.1.35.tgz 0ms (cache hit)
+450 http cache minimist@http://npm.weimob.com/minimist/-/minimist-1.2.8.tgz 0ms (cache hit)
+451 http cache napi-build-utils@http://npm.weimob.com/napi-build-utils/-/napi-build-utils-2.0.0.tgz 0ms (cache hit)
+452 http cache methods@http://npm.weimob.com/methods/-/methods-1.1.2.tgz 0ms (cache hit)
+453 http cache lucide-react@http://npm.weimob.com/lucide-react/-/lucide-react-0.468.0.tgz 0ms (cache hit)
+454 http cache media-typer@http://npm.weimob.com/media-typer/-/media-typer-0.3.0.tgz 0ms (cache hit)
+455 http cache mime-db@http://npm.weimob.com/mime-db/-/mime-db-1.52.0.tgz 0ms (cache hit)
+456 http cache merge-descriptors@http://npm.weimob.com/merge-descriptors/-/merge-descriptors-1.0.3.tgz 0ms (cache hit)
+457 http cache is-fullwidth-code-point@http://npm.weimob.com/is-fullwidth-code-point/-/is-fullwidth-code-point-3.0.0.tgz 0ms (cache hit)
+458 http cache mime@http://npm.weimob.com/mime/-/mime-1.6.0.tgz 0ms (cache hit)
+459 http cache json5@http://npm.weimob.com/json5/-/json5-2.2.3.tgz 0ms (cache hit)
+460 http cache math-intrinsics@http://npm.weimob.com/math-intrinsics/-/math-intrinsics-1.1.0.tgz 0ms (cache hit)
+461 http cache lru-cache@http://npm.weimob.com/lru-cache/-/lru-cache-5.1.1.tgz 0ms (cache hit)
+462 http cache ipaddr.js@http://npm.weimob.com/ipaddr.js/-/ipaddr.js-1.9.1.tgz 0ms (cache hit)
+463 http cache js-tokens@http://npm.weimob.com/js-tokens/-/js-tokens-4.0.0.tgz 0ms (cache hit)
+464 http cache jsesc@http://npm.weimob.com/jsesc/-/jsesc-3.1.0.tgz 0ms (cache hit)
+465 http cache ini@http://npm.weimob.com/ini/-/ini-1.3.8.tgz 0ms (cache hit)
+466 http cache inherits@http://npm.weimob.com/inherits/-/inherits-2.0.4.tgz 0ms (cache hit)
+467 http cache loose-envify@http://npm.weimob.com/loose-envify/-/loose-envify-1.4.0.tgz 0ms (cache hit)
+468 http cache http-errors@http://npm.weimob.com/http-errors/-/http-errors-2.0.1.tgz 0ms (cache hit)
+469 http cache iconv-lite@http://npm.weimob.com/iconv-lite/-/iconv-lite-0.4.24.tgz 0ms (cache hit)
+470 http cache ieee754@http://npm.weimob.com/ieee754/-/ieee754-1.2.1.tgz 0ms (cache hit)
+471 http cache hasown@http://npm.weimob.com/hasown/-/hasown-2.0.3.tgz 0ms (cache hit)
+472 http cache function-bind@http://npm.weimob.com/function-bind/-/function-bind-1.1.2.tgz 0ms (cache hit)
+473 http cache gopd@http://npm.weimob.com/gopd/-/gopd-1.2.0.tgz 0ms (cache hit)
+474 http cache has-symbols@http://npm.weimob.com/has-symbols/-/has-symbols-1.1.0.tgz 0ms (cache hit)
+475 http cache has-flag@http://npm.weimob.com/has-flag/-/has-flag-4.0.0.tgz 0ms (cache hit)
+476 http cache get-intrinsic@http://npm.weimob.com/get-intrinsic/-/get-intrinsic-1.3.1.tgz 0ms (cache hit)
+477 http cache github-from-package@http://npm.weimob.com/github-from-package/-/github-from-package-0.0.0.tgz 0ms (cache hit)
+478 http cache get-proto@http://npm.weimob.com/get-proto/-/get-proto-1.0.1.tgz 0ms (cache hit)
+479 http cache gensync@http://npm.weimob.com/gensync/-/gensync-1.0.0-beta.2.tgz 0ms (cache hit)
+480 http cache generator-function@http://npm.weimob.com/generator-function/-/generator-function-2.0.1.tgz 0ms (cache hit)
+481 http cache forwarded@http://npm.weimob.com/forwarded/-/forwarded-0.2.0.tgz 0ms (cache hit)
+482 http cache fresh@http://npm.weimob.com/fresh/-/fresh-0.5.2.tgz 0ms (cache hit)
+483 http cache get-caller-file@http://npm.weimob.com/get-caller-file/-/get-caller-file-2.0.5.tgz 0ms (cache hit)
+484 http cache file-uri-to-path@http://npm.weimob.com/file-uri-to-path/-/file-uri-to-path-1.0.0.tgz 0ms (cache hit)
+485 http cache express@http://npm.weimob.com/express/-/express-4.22.1.tgz 0ms (cache hit)
+486 http cache fs-constants@http://npm.weimob.com/fs-constants/-/fs-constants-1.0.0.tgz 0ms (cache hit)
+487 http cache escalade@http://npm.weimob.com/escalade/-/escalade-3.2.0.tgz 0ms (cache hit)
+488 http cache finalhandler@http://npm.weimob.com/finalhandler/-/finalhandler-1.3.2.tgz 0ms (cache hit)
+489 http cache expand-template@http://npm.weimob.com/expand-template/-/expand-template-2.0.3.tgz 0ms (cache hit)
+490 http cache escape-html@http://npm.weimob.com/escape-html/-/escape-html-1.0.3.tgz 0ms (cache hit)
+491 http cache es-errors@http://npm.weimob.com/es-errors/-/es-errors-1.3.0.tgz 0ms (cache hit)
+492 http cache es-object-atoms@http://npm.weimob.com/es-object-atoms/-/es-object-atoms-1.1.1.tgz 0ms (cache hit)
+493 http cache esbuild@http://npm.weimob.com/esbuild/-/esbuild-0.21.5.tgz 0ms (cache hit)
+494 http cache encodeurl@http://npm.weimob.com/encodeurl/-/encodeurl-2.0.0.tgz 0ms (cache hit)
+495 http cache end-of-stream@http://npm.weimob.com/end-of-stream/-/end-of-stream-1.4.5.tgz 0ms (cache hit)
+496 http cache es-define-property@http://npm.weimob.com/es-define-property/-/es-define-property-1.0.1.tgz 0ms (cache hit)
+497 http cache etag@http://npm.weimob.com/etag/-/etag-1.8.1.tgz 0ms (cache hit)
+498 http cache ee-first@http://npm.weimob.com/ee-first/-/ee-first-1.1.1.tgz 0ms (cache hit)
+499 http cache dunder-proto@http://npm.weimob.com/dunder-proto/-/dunder-proto-1.0.1.tgz 0ms (cache hit)
+500 http cache electron-to-chromium@http://npm.weimob.com/electron-to-chromium/-/electron-to-chromium-1.5.345.tgz 0ms (cache hit)
+501 http cache destroy@http://npm.weimob.com/destroy/-/destroy-1.2.0.tgz 0ms (cache hit)
+502 http cache detect-libc@http://npm.weimob.com/detect-libc/-/detect-libc-2.1.2.tgz 0ms (cache hit)
+503 http cache deep-extend@http://npm.weimob.com/deep-extend/-/deep-extend-0.6.0.tgz 0ms (cache hit)
+504 http cache emoji-regex@http://npm.weimob.com/emoji-regex/-/emoji-regex-8.0.0.tgz 0ms (cache hit)
+505 http cache convert-source-map@http://npm.weimob.com/convert-source-map/-/convert-source-map-2.0.0.tgz 0ms (cache hit)
+506 http cache debug@http://npm.weimob.com/debug/-/debug-4.4.3.tgz 0ms (cache hit)
+507 http cache depd@http://npm.weimob.com/depd/-/depd-2.0.0.tgz 0ms (cache hit)
+508 http cache cookie@http://npm.weimob.com/cookie/-/cookie-0.7.2.tgz 0ms (cache hit)
+509 http cache cookie-signature@http://npm.weimob.com/cookie-signature/-/cookie-signature-1.0.7.tgz 0ms (cache hit)
+510 http cache decompress-response@http://npm.weimob.com/decompress-response/-/decompress-response-6.0.0.tgz 0ms (cache hit)
+511 http cache color-name@http://npm.weimob.com/color-name/-/color-name-1.1.4.tgz 0ms (cache hit)
+512 http cache content-disposition@http://npm.weimob.com/content-disposition/-/content-disposition-0.5.4.tgz 0ms (cache hit)
+513 http cache color-convert@http://npm.weimob.com/color-convert/-/color-convert-2.0.1.tgz 0ms (cache hit)
+514 http cache chownr@http://npm.weimob.com/chownr/-/chownr-1.1.4.tgz 0ms (cache hit)
+515 http cache concurrently@http://npm.weimob.com/concurrently/-/concurrently-9.2.1.tgz 0ms (cache hit)
+516 http cache cliui@http://npm.weimob.com/cliui/-/cliui-8.0.1.tgz 0ms (cache hit)
+517 http cache content-type@http://npm.weimob.com/content-type/-/content-type-1.0.5.tgz 0ms (cache hit)
+518 http cache buffer@http://npm.weimob.com/buffer/-/buffer-5.7.1.tgz 0ms (cache hit)
+519 http cache call-bind-apply-helpers@http://npm.weimob.com/call-bind-apply-helpers/-/call-bind-apply-helpers-1.0.2.tgz 0ms (cache hit)
+520 http cache chalk@http://npm.weimob.com/chalk/-/chalk-4.1.2.tgz 0ms (cache hit)
+521 http cache bytes@http://npm.weimob.com/bytes/-/bytes-3.1.2.tgz 0ms (cache hit)
+522 http cache call-bound@http://npm.weimob.com/call-bound/-/call-bound-1.0.4.tgz 0ms (cache hit)
+523 http cache browserslist@http://npm.weimob.com/browserslist/-/browserslist-4.28.2.tgz 0ms (cache hit)
+524 http cache caniuse-lite@http://npm.weimob.com/caniuse-lite/-/caniuse-lite-1.0.30001791.tgz 0ms (cache hit)
+525 http cache better-sqlite3@http://npm.weimob.com/better-sqlite3/-/better-sqlite3-12.9.0.tgz 0ms (cache hit)
+526 http cache baseline-browser-mapping@http://npm.weimob.com/baseline-browser-mapping/-/baseline-browser-mapping-2.10.24.tgz 0ms (cache hit)
+527 http cache bl@http://npm.weimob.com/bl/-/bl-4.1.0.tgz 0ms (cache hit)
+528 http cache body-parser@http://npm.weimob.com/body-parser/-/body-parser-1.20.5.tgz 0ms (cache hit)
+529 http cache bindings@http://npm.weimob.com/bindings/-/bindings-1.5.0.tgz 0ms (cache hit)
+530 http cache async-generator-function@http://npm.weimob.com/async-generator-function/-/async-generator-function-1.0.0.tgz 0ms (cache hit)
+531 http cache ansi-styles@http://npm.weimob.com/ansi-styles/-/ansi-styles-4.3.0.tgz 0ms (cache hit)
+532 http cache async-function@http://npm.weimob.com/async-function/-/async-function-1.0.0.tgz 0ms (cache hit)
+533 http cache base64-js@http://npm.weimob.com/base64-js/-/base64-js-1.5.1.tgz 0ms (cache hit)
+534 http cache ansi-regex@http://npm.weimob.com/ansi-regex/-/ansi-regex-5.0.1.tgz 0ms (cache hit)
+535 http cache debug@http://npm.weimob.com/debug/-/debug-2.6.9.tgz 0ms (cache hit)
+536 http cache array-flatten@http://npm.weimob.com/array-flatten/-/array-flatten-1.1.1.tgz 0ms (cache hit)
+537 http cache semver@http://npm.weimob.com/semver/-/semver-7.7.4.tgz 0ms (cache hit)
+538 http cache ms@http://npm.weimob.com/ms/-/ms-2.0.0.tgz 0ms (cache hit)
+539 http cache accepts@http://npm.weimob.com/accepts/-/accepts-1.3.8.tgz 0ms (cache hit)
+540 http cache supports-color@http://npm.weimob.com/supports-color/-/supports-color-7.2.0.tgz 0ms (cache hit)
+541 http cache debug@http://npm.weimob.com/debug/-/debug-2.6.9.tgz 0ms (cache hit)
+542 http cache ms@http://npm.weimob.com/ms/-/ms-2.0.0.tgz 0ms (cache hit)
+543 http cache ms@http://npm.weimob.com/ms/-/ms-2.0.0.tgz 0ms (cache hit)
+544 http cache debug@http://npm.weimob.com/debug/-/debug-2.6.9.tgz 0ms (cache hit)
+545 http cache debug@http://npm.weimob.com/debug/-/debug-2.6.9.tgz 0ms (cache hit)
+546 http cache ms@http://npm.weimob.com/ms/-/ms-2.0.0.tgz 0ms (cache hit)
+547 silly tarball no local data for @vitejs/plugin-react@http://npm.weimob.com/@vitejs%2fplugin-react/-/plugin-react-5.2.0.tgz. Extracting by manifest.
+548 silly tarball no local data for @types/babel__template@http://npm.weimob.com/@types%2fbabel__template/-/babel__template-7.4.4.tgz. Extracting by manifest.
+549 http cache qs@http://npm.weimob.com/qs/-/qs-6.15.1.tgz 0ms (cache hit)
+550 silly tarball no local data for @types/babel__traverse@http://npm.weimob.com/@types%2fbabel__traverse/-/babel__traverse-7.28.0.tgz. Extracting by manifest.
+551 silly tarball no local data for @types/estree@http://npm.weimob.com/@types%2festree/-/estree-1.0.8.tgz. Extracting by manifest.
+552 silly tarball no local data for @types/babel__core@http://npm.weimob.com/@types%2fbabel__core/-/babel__core-7.20.5.tgz. Extracting by manifest.
+553 silly tarball no local data for @jridgewell/sourcemap-codec@http://npm.weimob.com/@jridgewell%2fsourcemap-codec/-/sourcemap-codec-1.5.5.tgz. Extracting by manifest.
+554 silly tarball no local data for @rollup/rollup-win32-x64-gnu@http://npm.weimob.com/@rollup%2frollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.60.2.tgz. Extracting by manifest.
+555 silly tarball no local data for @types/babel__generator@http://npm.weimob.com/@types%2fbabel__generator/-/babel__generator-7.27.0.tgz. Extracting by manifest.
+556 silly tarball no local data for @rollup/rollup-win32-x64-msvc@http://npm.weimob.com/@rollup%2frollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.60.2.tgz. Extracting by manifest.
+557 silly tarball no local data for @jridgewell/gen-mapping@http://npm.weimob.com/@jridgewell%2fgen-mapping/-/gen-mapping-0.3.13.tgz. Extracting by manifest.
+558 silly tarball no local data for @jridgewell/resolve-uri@http://npm.weimob.com/@jridgewell%2fresolve-uri/-/resolve-uri-3.1.2.tgz. Extracting by manifest.
+559 silly tarball no local data for @rolldown/pluginutils@http://npm.weimob.com/@rolldown%2fpluginutils/-/pluginutils-1.0.0-rc.3.tgz. Extracting by manifest.
+560 silly tarball no local data for @babel/types@http://npm.weimob.com/@babel%2ftypes/-/types-7.29.0.tgz. Extracting by manifest.
+561 silly tarball no local data for @jridgewell/trace-mapping@http://npm.weimob.com/@jridgewell%2ftrace-mapping/-/trace-mapping-0.3.31.tgz. Extracting by manifest.
+562 silly tarball no local data for @esbuild/win32-x64@http://npm.weimob.com/@esbuild%2fwin32-x64/-/win32-x64-0.21.5.tgz. Extracting by manifest.
+563 silly tarball no local data for @babel/traverse@http://npm.weimob.com/@babel%2ftraverse/-/traverse-7.29.0.tgz. Extracting by manifest.
+564 silly tarball no local data for @jridgewell/remapping@http://npm.weimob.com/@jridgewell%2fremapping/-/remapping-2.3.5.tgz. Extracting by manifest.
+565 silly tarball no local data for @babel/plugin-transform-react-jsx-source@http://npm.weimob.com/@babel%2fplugin-transform-react-jsx-source/-/plugin-transform-react-jsx-source-7.27.1.tgz. Extracting by manifest.
+566 silly tarball no local data for @babel/plugin-transform-react-jsx-self@http://npm.weimob.com/@babel%2fplugin-transform-react-jsx-self/-/plugin-transform-react-jsx-self-7.27.1.tgz. Extracting by manifest.
+567 silly tarball no local data for @babel/helpers@http://npm.weimob.com/@babel%2fhelpers/-/helpers-7.29.2.tgz. Extracting by manifest.
+568 silly tarball no local data for @babel/template@http://npm.weimob.com/@babel%2ftemplate/-/template-7.28.6.tgz. Extracting by manifest.
+569 silly tarball no local data for @babel/helper-validator-option@http://npm.weimob.com/@babel%2fhelper-validator-option/-/helper-validator-option-7.27.1.tgz. Extracting by manifest.
+570 silly tarball no local data for @babel/helper-validator-identifier@http://npm.weimob.com/@babel%2fhelper-validator-identifier/-/helper-validator-identifier-7.28.5.tgz. Extracting by manifest.
+571 silly tarball no local data for @babel/parser@http://npm.weimob.com/@babel%2fparser/-/parser-7.29.2.tgz. Extracting by manifest.
+572 silly tarball no local data for @babel/helper-module-transforms@http://npm.weimob.com/@babel%2fhelper-module-transforms/-/helper-module-transforms-7.28.6.tgz. Extracting by manifest.
+573 silly tarball no local data for @babel/helper-compilation-targets@http://npm.weimob.com/@babel%2fhelper-compilation-targets/-/helper-compilation-targets-7.28.6.tgz. Extracting by manifest.
+574 silly tarball no local data for yargs-parser@http://npm.weimob.com/yargs-parser/-/yargs-parser-21.1.1.tgz. Extracting by manifest.
+575 silly tarball no local data for @babel/helper-string-parser@http://npm.weimob.com/@babel%2fhelper-string-parser/-/helper-string-parser-7.27.1.tgz. Extracting by manifest.
+576 silly tarball no local data for @babel/helper-module-imports@http://npm.weimob.com/@babel%2fhelper-module-imports/-/helper-module-imports-7.28.6.tgz. Extracting by manifest.
+577 silly tarball no local data for @babel/helper-globals@http://npm.weimob.com/@babel%2fhelper-globals/-/helper-globals-7.28.0.tgz. Extracting by manifest.
+578 silly tarball no local data for @babel/helper-plugin-utils@http://npm.weimob.com/@babel%2fhelper-plugin-utils/-/helper-plugin-utils-7.28.6.tgz. Extracting by manifest.
+579 silly tarball no local data for yargs@http://npm.weimob.com/yargs/-/yargs-17.7.2.tgz. Extracting by manifest.
+580 silly tarball no local data for @babel/code-frame@http://npm.weimob.com/@babel%2fcode-frame/-/code-frame-7.29.0.tgz. Extracting by manifest.
+581 silly tarball no local data for @babel/core@http://npm.weimob.com/@babel%2fcore/-/core-7.29.0.tgz. Extracting by manifest.
+582 silly tarball no local data for @babel/generator@http://npm.weimob.com/@babel%2fgenerator/-/generator-7.29.1.tgz. Extracting by manifest.
+583 silly tarball no local data for y18n@http://npm.weimob.com/y18n/-/y18n-5.0.8.tgz. Extracting by manifest.
+584 silly tarball no local data for wrappy@http://npm.weimob.com/wrappy/-/wrappy-1.0.2.tgz. Extracting by manifest.
+585 silly tarball no local data for yallist@http://npm.weimob.com/yallist/-/yallist-3.1.1.tgz. Extracting by manifest.
+586 silly tarball no local data for @babel/compat-data@http://npm.weimob.com/@babel%2fcompat-data/-/compat-data-7.29.0.tgz. Extracting by manifest.
+587 silly tarball no local data for wrap-ansi@http://npm.weimob.com/wrap-ansi/-/wrap-ansi-7.0.0.tgz. Extracting by manifest.
+588 silly tarball no local data for vite@http://npm.weimob.com/vite/-/vite-5.4.21.tgz. Extracting by manifest.
+589 silly tarball no local data for vary@http://npm.weimob.com/vary/-/vary-1.1.2.tgz. Extracting by manifest.
+590 silly tarball no local data for type-is@http://npm.weimob.com/type-is/-/type-is-1.6.18.tgz. Extracting by manifest.
+591 silly tarball no local data for util-deprecate@http://npm.weimob.com/util-deprecate/-/util-deprecate-1.0.2.tgz. Extracting by manifest.
+592 silly tarball no local data for ws@http://npm.weimob.com/ws/-/ws-8.20.0.tgz. Extracting by manifest.
+593 silly tarball no local data for update-browserslist-db@http://npm.weimob.com/update-browserslist-db/-/update-browserslist-db-1.2.3.tgz. Extracting by manifest.
+594 silly tarball no local data for utils-merge@http://npm.weimob.com/utils-merge/-/utils-merge-1.0.1.tgz. Extracting by manifest.
+595 silly tarball no local data for unpipe@http://npm.weimob.com/unpipe/-/unpipe-1.0.0.tgz. Extracting by manifest.
+596 silly tarball no local data for tree-kill@http://npm.weimob.com/tree-kill/-/tree-kill-1.2.2.tgz. Extracting by manifest.
+597 silly tarball no local data for tunnel-agent@http://npm.weimob.com/tunnel-agent/-/tunnel-agent-0.6.0.tgz. Extracting by manifest.
+598 silly tarball no local data for tar-stream@http://npm.weimob.com/tar-stream/-/tar-stream-2.2.0.tgz. Extracting by manifest.
+599 silly tarball no local data for tslib@http://npm.weimob.com/tslib/-/tslib-2.8.1.tgz. Extracting by manifest.
+600 silly tarball no local data for tar-fs@http://npm.weimob.com/tar-fs/-/tar-fs-2.1.4.tgz. Extracting by manifest.
+601 silly tarball no local data for strip-json-comments@http://npm.weimob.com/strip-json-comments/-/strip-json-comments-2.0.1.tgz. Extracting by manifest.
+602 silly tarball no local data for statuses@http://npm.weimob.com/statuses/-/statuses-2.0.2.tgz. Extracting by manifest.
+603 silly tarball no local data for simple-concat@http://npm.weimob.com/simple-concat/-/simple-concat-1.0.1.tgz. Extracting by manifest.
+604 silly tarball no local data for string-width@http://npm.weimob.com/string-width/-/string-width-4.2.3.tgz. Extracting by manifest.
+605 silly tarball no local data for side-channel-weakmap@http://npm.weimob.com/side-channel-weakmap/-/side-channel-weakmap-1.0.2.tgz. Extracting by manifest.
+606 silly tarball no local data for source-map-js@http://npm.weimob.com/source-map-js/-/source-map-js-1.2.1.tgz. Extracting by manifest.
+607 silly tarball no local data for string_decoder@http://npm.weimob.com/string_decoder/-/string_decoder-1.3.0.tgz. Extracting by manifest.
+608 silly tarball no local data for side-channel-map@http://npm.weimob.com/side-channel-map/-/side-channel-map-1.0.1.tgz. Extracting by manifest.
+609 silly tarball no local data for side-channel-list@http://npm.weimob.com/side-channel-list/-/side-channel-list-1.0.1.tgz. Extracting by manifest.
+610 silly tarball no local data for simple-get@http://npm.weimob.com/simple-get/-/simple-get-4.0.1.tgz. Extracting by manifest.
+611 silly tarball no local data for shell-quote@http://npm.weimob.com/shell-quote/-/shell-quote-1.8.3.tgz. Extracting by manifest.
+612 silly tarball no local data for setprototypeof@http://npm.weimob.com/setprototypeof/-/setprototypeof-1.2.0.tgz. Extracting by manifest.
+613 silly tarball no local data for serve-static@http://npm.weimob.com/serve-static/-/serve-static-1.16.3.tgz. Extracting by manifest.
+614 silly tarball no local data for strip-ansi@http://npm.weimob.com/strip-ansi/-/strip-ansi-6.0.1.tgz. Extracting by manifest.
+615 silly tarball no local data for toidentifier@http://npm.weimob.com/toidentifier/-/toidentifier-1.0.1.tgz. Extracting by manifest.
+616 silly tarball no local data for side-channel@http://npm.weimob.com/side-channel/-/side-channel-1.1.0.tgz. Extracting by manifest.
+617 silly tarball no local data for scheduler@http://npm.weimob.com/scheduler/-/scheduler-0.23.2.tgz. Extracting by manifest.
+618 silly tarball no local data for semver@http://npm.weimob.com/semver/-/semver-6.3.1.tgz. Extracting by manifest.
+619 silly tarball no local data for supports-color@http://npm.weimob.com/supports-color/-/supports-color-8.1.1.tgz. Extracting by manifest.
+620 silly tarball no local data for send@http://npm.weimob.com/send/-/send-0.19.2.tgz. Extracting by manifest.
+621 silly tarball no local data for safe-buffer@http://npm.weimob.com/safe-buffer/-/safe-buffer-5.2.1.tgz. Extracting by manifest.
+622 silly tarball no local data for rxjs@http://npm.weimob.com/rxjs/-/rxjs-7.8.2.tgz. Extracting by manifest.
+623 silly tarball no local data for safer-buffer@http://npm.weimob.com/safer-buffer/-/safer-buffer-2.1.2.tgz. Extracting by manifest.
+624 silly tarball no local data for readable-stream@http://npm.weimob.com/readable-stream/-/readable-stream-3.6.2.tgz. Extracting by manifest.
+625 silly tarball no local data for rollup@http://npm.weimob.com/rollup/-/rollup-4.60.2.tgz. Extracting by manifest.
+626 silly tarball no local data for react-refresh@http://npm.weimob.com/react-refresh/-/react-refresh-0.18.0.tgz. Extracting by manifest.
+627 silly tarball no local data for require-directory@http://npm.weimob.com/require-directory/-/require-directory-2.1.1.tgz. Extracting by manifest.
+628 silly tarball no local data for react-dom@http://npm.weimob.com/react-dom/-/react-dom-18.3.1.tgz. Extracting by manifest.
+629 silly tarball no local data for range-parser@http://npm.weimob.com/range-parser/-/range-parser-1.2.1.tgz. Extracting by manifest.
+630 silly tarball no local data for react@http://npm.weimob.com/react/-/react-18.3.1.tgz. Extracting by manifest.
+631 silly tarball no local data for raw-body@http://npm.weimob.com/raw-body/-/raw-body-2.5.3.tgz. Extracting by manifest.
+632 silly tarball no local data for postcss@http://npm.weimob.com/postcss/-/postcss-8.5.12.tgz. Extracting by manifest.
+633 silly tarball no local data for qs@http://npm.weimob.com/qs/-/qs-6.14.2.tgz. Extracting by manifest.
+634 silly tarball no local data for rc@http://npm.weimob.com/rc/-/rc-1.2.8.tgz. Extracting by manifest.
+635 silly tarball no local data for pump@http://npm.weimob.com/pump/-/pump-3.0.4.tgz. Extracting by manifest.
+636 silly tarball no local data for proxy-addr@http://npm.weimob.com/proxy-addr/-/proxy-addr-2.0.7.tgz. Extracting by manifest.
+637 silly tarball no local data for prebuild-install@http://npm.weimob.com/prebuild-install/-/prebuild-install-7.1.3.tgz. Extracting by manifest.
+638 silly tarball no local data for path-to-regexp@http://npm.weimob.com/path-to-regexp/-/path-to-regexp-0.1.13.tgz. Extracting by manifest.
+639 silly tarball no local data for parseurl@http://npm.weimob.com/parseurl/-/parseurl-1.3.3.tgz. Extracting by manifest.
+640 silly tarball no local data for object-inspect@http://npm.weimob.com/object-inspect/-/object-inspect-1.13.4.tgz. Extracting by manifest.
+641 silly tarball no local data for picocolors@http://npm.weimob.com/picocolors/-/picocolors-1.1.1.tgz. Extracting by manifest.
+642 silly tarball no local data for node-releases@http://npm.weimob.com/node-releases/-/node-releases-2.0.38.tgz. Extracting by manifest.
+643 silly tarball no local data for once@http://npm.weimob.com/once/-/once-1.4.0.tgz. Extracting by manifest.
+644 silly tarball no local data for on-finished@http://npm.weimob.com/on-finished/-/on-finished-2.4.1.tgz. Extracting by manifest.
+645 silly tarball no local data for nanoid@http://npm.weimob.com/nanoid/-/nanoid-3.3.11.tgz. Extracting by manifest.
+646 silly tarball no local data for node-abi@http://npm.weimob.com/node-abi/-/node-abi-3.89.0.tgz. Extracting by manifest.
+647 silly tarball no local data for negotiator@http://npm.weimob.com/negotiator/-/negotiator-0.6.3.tgz. Extracting by manifest.
+648 silly tarball no local data for ms@http://npm.weimob.com/ms/-/ms-2.1.3.tgz. Extracting by manifest.
+649 silly tarball no local data for mkdirp-classic@http://npm.weimob.com/mkdirp-classic/-/mkdirp-classic-0.5.3.tgz. Extracting by manifest.
+650 silly tarball no local data for mimic-response@http://npm.weimob.com/mimic-response/-/mimic-response-3.1.0.tgz. Extracting by manifest.
+651 silly tarball no local data for mime-types@http://npm.weimob.com/mime-types/-/mime-types-2.1.35.tgz. Extracting by manifest.
+652 silly tarball no local data for minimist@http://npm.weimob.com/minimist/-/minimist-1.2.8.tgz. Extracting by manifest.
+653 silly tarball no local data for napi-build-utils@http://npm.weimob.com/napi-build-utils/-/napi-build-utils-2.0.0.tgz. Extracting by manifest.
+654 silly tarball no local data for methods@http://npm.weimob.com/methods/-/methods-1.1.2.tgz. Extracting by manifest.
+655 silly tarball no local data for lucide-react@http://npm.weimob.com/lucide-react/-/lucide-react-0.468.0.tgz. Extracting by manifest.
+656 silly tarball no local data for media-typer@http://npm.weimob.com/media-typer/-/media-typer-0.3.0.tgz. Extracting by manifest.
+657 silly tarball no local data for mime-db@http://npm.weimob.com/mime-db/-/mime-db-1.52.0.tgz. Extracting by manifest.
+658 silly tarball no local data for merge-descriptors@http://npm.weimob.com/merge-descriptors/-/merge-descriptors-1.0.3.tgz. Extracting by manifest.
+659 silly tarball no local data for is-fullwidth-code-point@http://npm.weimob.com/is-fullwidth-code-point/-/is-fullwidth-code-point-3.0.0.tgz. Extracting by manifest.
+660 silly tarball no local data for mime@http://npm.weimob.com/mime/-/mime-1.6.0.tgz. Extracting by manifest.
+661 silly tarball no local data for json5@http://npm.weimob.com/json5/-/json5-2.2.3.tgz. Extracting by manifest.
+662 silly tarball no local data for math-intrinsics@http://npm.weimob.com/math-intrinsics/-/math-intrinsics-1.1.0.tgz. Extracting by manifest.
+663 silly tarball no local data for lru-cache@http://npm.weimob.com/lru-cache/-/lru-cache-5.1.1.tgz. Extracting by manifest.
+664 silly tarball no local data for ipaddr.js@http://npm.weimob.com/ipaddr.js/-/ipaddr.js-1.9.1.tgz. Extracting by manifest.
+665 silly tarball no local data for js-tokens@http://npm.weimob.com/js-tokens/-/js-tokens-4.0.0.tgz. Extracting by manifest.
+666 silly tarball no local data for jsesc@http://npm.weimob.com/jsesc/-/jsesc-3.1.0.tgz. Extracting by manifest.
+667 silly tarball no local data for ini@http://npm.weimob.com/ini/-/ini-1.3.8.tgz. Extracting by manifest.
+668 silly tarball no local data for inherits@http://npm.weimob.com/inherits/-/inherits-2.0.4.tgz. Extracting by manifest.
+669 silly tarball no local data for loose-envify@http://npm.weimob.com/loose-envify/-/loose-envify-1.4.0.tgz. Extracting by manifest.
+670 silly tarball no local data for http-errors@http://npm.weimob.com/http-errors/-/http-errors-2.0.1.tgz. Extracting by manifest.
+671 silly tarball no local data for iconv-lite@http://npm.weimob.com/iconv-lite/-/iconv-lite-0.4.24.tgz. Extracting by manifest.
+672 silly tarball no local data for ieee754@http://npm.weimob.com/ieee754/-/ieee754-1.2.1.tgz. Extracting by manifest.
+673 silly tarball no local data for hasown@http://npm.weimob.com/hasown/-/hasown-2.0.3.tgz. Extracting by manifest.
+674 silly tarball no local data for function-bind@http://npm.weimob.com/function-bind/-/function-bind-1.1.2.tgz. Extracting by manifest.
+675 silly tarball no local data for gopd@http://npm.weimob.com/gopd/-/gopd-1.2.0.tgz. Extracting by manifest.
+676 silly tarball no local data for has-symbols@http://npm.weimob.com/has-symbols/-/has-symbols-1.1.0.tgz. Extracting by manifest.
+677 silly tarball no local data for has-flag@http://npm.weimob.com/has-flag/-/has-flag-4.0.0.tgz. Extracting by manifest.
+678 silly tarball no local data for get-intrinsic@http://npm.weimob.com/get-intrinsic/-/get-intrinsic-1.3.1.tgz. Extracting by manifest.
+679 silly tarball no local data for github-from-package@http://npm.weimob.com/github-from-package/-/github-from-package-0.0.0.tgz. Extracting by manifest.
+680 silly tarball no local data for get-proto@http://npm.weimob.com/get-proto/-/get-proto-1.0.1.tgz. Extracting by manifest.
+681 silly tarball no local data for gensync@http://npm.weimob.com/gensync/-/gensync-1.0.0-beta.2.tgz. Extracting by manifest.
+682 silly tarball no local data for generator-function@http://npm.weimob.com/generator-function/-/generator-function-2.0.1.tgz. Extracting by manifest.
+683 silly tarball no local data for forwarded@http://npm.weimob.com/forwarded/-/forwarded-0.2.0.tgz. Extracting by manifest.
+684 silly tarball no local data for fresh@http://npm.weimob.com/fresh/-/fresh-0.5.2.tgz. Extracting by manifest.
+685 silly tarball no local data for get-caller-file@http://npm.weimob.com/get-caller-file/-/get-caller-file-2.0.5.tgz. Extracting by manifest.
+686 silly tarball no local data for file-uri-to-path@http://npm.weimob.com/file-uri-to-path/-/file-uri-to-path-1.0.0.tgz. Extracting by manifest.
+687 silly tarball no local data for express@http://npm.weimob.com/express/-/express-4.22.1.tgz. Extracting by manifest.
+688 silly tarball no local data for fs-constants@http://npm.weimob.com/fs-constants/-/fs-constants-1.0.0.tgz. Extracting by manifest.
+689 silly tarball no local data for escalade@http://npm.weimob.com/escalade/-/escalade-3.2.0.tgz. Extracting by manifest.
+690 silly tarball no local data for finalhandler@http://npm.weimob.com/finalhandler/-/finalhandler-1.3.2.tgz. Extracting by manifest.
+691 silly tarball no local data for expand-template@http://npm.weimob.com/expand-template/-/expand-template-2.0.3.tgz. Extracting by manifest.
+692 silly tarball no local data for escape-html@http://npm.weimob.com/escape-html/-/escape-html-1.0.3.tgz. Extracting by manifest.
+693 silly tarball no local data for es-errors@http://npm.weimob.com/es-errors/-/es-errors-1.3.0.tgz. Extracting by manifest.
+694 silly tarball no local data for es-object-atoms@http://npm.weimob.com/es-object-atoms/-/es-object-atoms-1.1.1.tgz. Extracting by manifest.
+695 silly tarball no local data for esbuild@http://npm.weimob.com/esbuild/-/esbuild-0.21.5.tgz. Extracting by manifest.
+696 silly tarball no local data for encodeurl@http://npm.weimob.com/encodeurl/-/encodeurl-2.0.0.tgz. Extracting by manifest.
+697 silly tarball no local data for end-of-stream@http://npm.weimob.com/end-of-stream/-/end-of-stream-1.4.5.tgz. Extracting by manifest.
+698 silly tarball no local data for es-define-property@http://npm.weimob.com/es-define-property/-/es-define-property-1.0.1.tgz. Extracting by manifest.
+699 silly tarball no local data for etag@http://npm.weimob.com/etag/-/etag-1.8.1.tgz. Extracting by manifest.
+700 silly tarball no local data for ee-first@http://npm.weimob.com/ee-first/-/ee-first-1.1.1.tgz. Extracting by manifest.
+701 silly tarball no local data for dunder-proto@http://npm.weimob.com/dunder-proto/-/dunder-proto-1.0.1.tgz. Extracting by manifest.
+702 silly tarball no local data for electron-to-chromium@http://npm.weimob.com/electron-to-chromium/-/electron-to-chromium-1.5.345.tgz. Extracting by manifest.
+703 silly tarball no local data for destroy@http://npm.weimob.com/destroy/-/destroy-1.2.0.tgz. Extracting by manifest.
+704 silly tarball no local data for detect-libc@http://npm.weimob.com/detect-libc/-/detect-libc-2.1.2.tgz. Extracting by manifest.
+705 silly tarball no local data for deep-extend@http://npm.weimob.com/deep-extend/-/deep-extend-0.6.0.tgz. Extracting by manifest.
+706 silly tarball no local data for emoji-regex@http://npm.weimob.com/emoji-regex/-/emoji-regex-8.0.0.tgz. Extracting by manifest.
+707 silly tarball no local data for convert-source-map@http://npm.weimob.com/convert-source-map/-/convert-source-map-2.0.0.tgz. Extracting by manifest.
+708 silly tarball no local data for debug@http://npm.weimob.com/debug/-/debug-4.4.3.tgz. Extracting by manifest.
+709 silly tarball no local data for depd@http://npm.weimob.com/depd/-/depd-2.0.0.tgz. Extracting by manifest.
+710 silly tarball no local data for cookie@http://npm.weimob.com/cookie/-/cookie-0.7.2.tgz. Extracting by manifest.
+711 silly tarball no local data for cookie-signature@http://npm.weimob.com/cookie-signature/-/cookie-signature-1.0.7.tgz. Extracting by manifest.
+712 silly tarball no local data for decompress-response@http://npm.weimob.com/decompress-response/-/decompress-response-6.0.0.tgz. Extracting by manifest.
+713 silly tarball no local data for color-name@http://npm.weimob.com/color-name/-/color-name-1.1.4.tgz. Extracting by manifest.
+714 silly tarball no local data for content-disposition@http://npm.weimob.com/content-disposition/-/content-disposition-0.5.4.tgz. Extracting by manifest.
+715 silly tarball no local data for color-convert@http://npm.weimob.com/color-convert/-/color-convert-2.0.1.tgz. Extracting by manifest.
+716 silly tarball no local data for chownr@http://npm.weimob.com/chownr/-/chownr-1.1.4.tgz. Extracting by manifest.
+717 silly tarball no local data for concurrently@http://npm.weimob.com/concurrently/-/concurrently-9.2.1.tgz. Extracting by manifest.
+718 silly tarball no local data for cliui@http://npm.weimob.com/cliui/-/cliui-8.0.1.tgz. Extracting by manifest.
+719 silly tarball no local data for content-type@http://npm.weimob.com/content-type/-/content-type-1.0.5.tgz. Extracting by manifest.
+720 silly tarball no local data for buffer@http://npm.weimob.com/buffer/-/buffer-5.7.1.tgz. Extracting by manifest.
+721 silly tarball no local data for call-bind-apply-helpers@http://npm.weimob.com/call-bind-apply-helpers/-/call-bind-apply-helpers-1.0.2.tgz. Extracting by manifest.
+722 silly tarball no local data for chalk@http://npm.weimob.com/chalk/-/chalk-4.1.2.tgz. Extracting by manifest.
+723 silly tarball no local data for bytes@http://npm.weimob.com/bytes/-/bytes-3.1.2.tgz. Extracting by manifest.
+724 silly tarball no local data for call-bound@http://npm.weimob.com/call-bound/-/call-bound-1.0.4.tgz. Extracting by manifest.
+725 silly tarball no local data for browserslist@http://npm.weimob.com/browserslist/-/browserslist-4.28.2.tgz. Extracting by manifest.
+726 silly tarball no local data for caniuse-lite@http://npm.weimob.com/caniuse-lite/-/caniuse-lite-1.0.30001791.tgz. Extracting by manifest.
+727 silly tarball no local data for better-sqlite3@http://npm.weimob.com/better-sqlite3/-/better-sqlite3-12.9.0.tgz. Extracting by manifest.
+728 silly tarball no local data for baseline-browser-mapping@http://npm.weimob.com/baseline-browser-mapping/-/baseline-browser-mapping-2.10.24.tgz. Extracting by manifest.
+729 silly tarball no local data for bl@http://npm.weimob.com/bl/-/bl-4.1.0.tgz. Extracting by manifest.
+730 silly tarball no local data for body-parser@http://npm.weimob.com/body-parser/-/body-parser-1.20.5.tgz. Extracting by manifest.
+731 silly tarball no local data for bindings@http://npm.weimob.com/bindings/-/bindings-1.5.0.tgz. Extracting by manifest.
+732 silly tarball no local data for async-generator-function@http://npm.weimob.com/async-generator-function/-/async-generator-function-1.0.0.tgz. Extracting by manifest.
+733 silly tarball no local data for ansi-styles@http://npm.weimob.com/ansi-styles/-/ansi-styles-4.3.0.tgz. Extracting by manifest.
+734 silly tarball no local data for async-function@http://npm.weimob.com/async-function/-/async-function-1.0.0.tgz. Extracting by manifest.
+735 silly tarball no local data for base64-js@http://npm.weimob.com/base64-js/-/base64-js-1.5.1.tgz. Extracting by manifest.
+736 silly tarball no local data for ansi-regex@http://npm.weimob.com/ansi-regex/-/ansi-regex-5.0.1.tgz. Extracting by manifest.
+737 silly tarball no local data for debug@http://npm.weimob.com/debug/-/debug-2.6.9.tgz. Extracting by manifest.
+738 silly tarball no local data for array-flatten@http://npm.weimob.com/array-flatten/-/array-flatten-1.1.1.tgz. Extracting by manifest.
+739 silly tarball no local data for semver@http://npm.weimob.com/semver/-/semver-7.7.4.tgz. Extracting by manifest.
+740 silly tarball no local data for ms@http://npm.weimob.com/ms/-/ms-2.0.0.tgz. Extracting by manifest.
+741 silly tarball no local data for accepts@http://npm.weimob.com/accepts/-/accepts-1.3.8.tgz. Extracting by manifest.
+742 silly tarball no local data for supports-color@http://npm.weimob.com/supports-color/-/supports-color-7.2.0.tgz. Extracting by manifest.
+743 silly tarball no local data for debug@http://npm.weimob.com/debug/-/debug-2.6.9.tgz. Extracting by manifest.
+744 silly tarball no local data for ms@http://npm.weimob.com/ms/-/ms-2.0.0.tgz. Extracting by manifest.
+745 silly tarball no local data for ms@http://npm.weimob.com/ms/-/ms-2.0.0.tgz. Extracting by manifest.
+746 silly tarball no local data for debug@http://npm.weimob.com/debug/-/debug-2.6.9.tgz. Extracting by manifest.
+747 silly tarball no local data for debug@http://npm.weimob.com/debug/-/debug-2.6.9.tgz. Extracting by manifest.
+748 silly tarball no local data for ms@http://npm.weimob.com/ms/-/ms-2.0.0.tgz. Extracting by manifest.
+749 silly tarball no local data for qs@http://npm.weimob.com/qs/-/qs-6.15.1.tgz. Extracting by manifest.
+750 http fetch GET http://npm.weimob.com/@vitejs%2fplugin-react/-/plugin-react-5.2.0.tgz attempt 1 failed with EACCES
+751 http fetch GET http://npm.weimob.com/@types%2fbabel__template/-/babel__template-7.4.4.tgz attempt 1 failed with EACCES
+752 http fetch GET http://npm.weimob.com/@types%2festree/-/estree-1.0.8.tgz attempt 1 failed with EACCES
+753 http fetch GET http://npm.weimob.com/@types%2fbabel__traverse/-/babel__traverse-7.28.0.tgz attempt 1 failed with EACCES
+754 http fetch GET http://npm.weimob.com/@types%2fbabel__core/-/babel__core-7.20.5.tgz attempt 1 failed with EACCES
+755 http fetch GET http://npm.weimob.com/@jridgewell%2fsourcemap-codec/-/sourcemap-codec-1.5.5.tgz attempt 1 failed with EACCES
+756 http fetch GET http://npm.weimob.com/@rollup%2frollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.60.2.tgz attempt 1 failed with EACCES
+757 http fetch GET http://npm.weimob.com/@types%2fbabel__generator/-/babel__generator-7.27.0.tgz attempt 1 failed with EACCES
+758 http fetch GET http://npm.weimob.com/@rollup%2frollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.60.2.tgz attempt 1 failed with EACCES
+759 http fetch GET http://npm.weimob.com/@jridgewell%2fgen-mapping/-/gen-mapping-0.3.13.tgz attempt 1 failed with EACCES
+760 http fetch GET http://npm.weimob.com/@jridgewell%2fresolve-uri/-/resolve-uri-3.1.2.tgz attempt 1 failed with EACCES
+761 http fetch GET http://npm.weimob.com/@rolldown%2fpluginutils/-/pluginutils-1.0.0-rc.3.tgz attempt 1 failed with EACCES
+762 http fetch GET http://npm.weimob.com/@babel%2ftypes/-/types-7.29.0.tgz attempt 1 failed with EACCES
+763 http fetch GET http://npm.weimob.com/@jridgewell%2ftrace-mapping/-/trace-mapping-0.3.31.tgz attempt 1 failed with EACCES
+764 http fetch GET http://npm.weimob.com/@esbuild%2fwin32-x64/-/win32-x64-0.21.5.tgz attempt 1 failed with EACCES
+765 verbose audit error FetchError: request to https://registry.npmjs.org/-/npm/v1/security/audits/quick failed, reason: 
+765 verbose audit error     at ClientRequest.<anonymous> (C:\Program Files\nodejs\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+765 verbose audit error     at ClientRequest.emit (node:events:518:28)
+765 verbose audit error     at emitErrorEvent (node:_http_client:104:11)
+765 verbose audit error     at _destroy (node:_http_client:898:9)
+765 verbose audit error     at onSocketNT (node:_http_client:918:5)
+765 verbose audit error     at process.processTicksAndRejections (node:internal/process/task_queues:91:21) {
+765 verbose audit error   code: 'EACCES',
+765 verbose audit error   errno: 'EACCES',
+765 verbose audit error   type: 'system'
+765 verbose audit error }
+766 silly audit error undefined
+767 silly audit report null
+768 http fetch GET http://npm.weimob.com/@vitejs%2fplugin-react/-/plugin-react-5.2.0.tgz attempt 2 failed with EACCES
+769 http fetch GET http://npm.weimob.com/@types%2fbabel__template/-/babel__template-7.4.4.tgz attempt 2 failed with EACCES
+770 http fetch GET http://npm.weimob.com/@types%2festree/-/estree-1.0.8.tgz attempt 2 failed with EACCES
+771 http fetch GET http://npm.weimob.com/@types%2fbabel__traverse/-/babel__traverse-7.28.0.tgz attempt 2 failed with EACCES
+772 http fetch GET http://npm.weimob.com/@types%2fbabel__core/-/babel__core-7.20.5.tgz attempt 2 failed with EACCES
+773 http fetch GET http://npm.weimob.com/@jridgewell%2fsourcemap-codec/-/sourcemap-codec-1.5.5.tgz attempt 2 failed with EACCES
+774 http fetch GET http://npm.weimob.com/@rollup%2frollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.60.2.tgz attempt 2 failed with EACCES
+775 http fetch GET http://npm.weimob.com/@types%2fbabel__generator/-/babel__generator-7.27.0.tgz attempt 2 failed with EACCES
+776 http fetch GET http://npm.weimob.com/@rollup%2frollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.60.2.tgz attempt 2 failed with EACCES
+777 http fetch GET http://npm.weimob.com/@jridgewell%2fgen-mapping/-/gen-mapping-0.3.13.tgz attempt 2 failed with EACCES
+778 http fetch GET http://npm.weimob.com/@jridgewell%2fresolve-uri/-/resolve-uri-3.1.2.tgz attempt 2 failed with EACCES
+779 http fetch GET http://npm.weimob.com/@rolldown%2fpluginutils/-/pluginutils-1.0.0-rc.3.tgz attempt 2 failed with EACCES
+780 http fetch GET http://npm.weimob.com/@babel%2ftypes/-/types-7.29.0.tgz attempt 2 failed with EACCES
+781 http fetch GET http://npm.weimob.com/@jridgewell%2ftrace-mapping/-/trace-mapping-0.3.31.tgz attempt 2 failed with EACCES
+782 http fetch GET http://npm.weimob.com/@esbuild%2fwin32-x64/-/win32-x64-0.21.5.tgz attempt 2 failed with EACCES
+783 http fetch GET http://npm.weimob.com/@vitejs%2fplugin-react/-/plugin-react-5.2.0.tgz attempt 3 failed with EACCES
+784 http fetch GET http://npm.weimob.com/@types%2fbabel__template/-/babel__template-7.4.4.tgz attempt 3 failed with EACCES
+785 http fetch GET http://npm.weimob.com/@types%2festree/-/estree-1.0.8.tgz attempt 3 failed with EACCES
+786 http fetch GET http://npm.weimob.com/@types%2fbabel__traverse/-/babel__traverse-7.28.0.tgz attempt 3 failed with EACCES
+787 http fetch GET http://npm.weimob.com/@types%2fbabel__core/-/babel__core-7.20.5.tgz attempt 3 failed with EACCES
+788 http fetch GET http://npm.weimob.com/@jridgewell%2fsourcemap-codec/-/sourcemap-codec-1.5.5.tgz attempt 3 failed with EACCES
+789 http fetch GET http://npm.weimob.com/@rollup%2frollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.60.2.tgz attempt 3 failed with EACCES
+790 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-win32-x64-gnu
+791 silly reify mark deleted [
+791 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-x64-gnu'
+791 silly reify ]
+792 http fetch GET http://npm.weimob.com/@types%2fbabel__generator/-/babel__generator-7.27.0.tgz attempt 3 failed with EACCES
+793 http fetch GET http://npm.weimob.com/@rollup%2frollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.60.2.tgz attempt 3 failed with EACCES
+794 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@rollup\rollup-win32-x64-msvc
+795 silly reify mark deleted [
+795 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@rollup\\rollup-win32-x64-msvc'
+795 silly reify ]
+796 http fetch GET http://npm.weimob.com/@jridgewell%2fgen-mapping/-/gen-mapping-0.3.13.tgz attempt 3 failed with EACCES
+797 http fetch GET http://npm.weimob.com/@jridgewell%2fresolve-uri/-/resolve-uri-3.1.2.tgz attempt 3 failed with EACCES
+798 http fetch GET http://npm.weimob.com/@rolldown%2fpluginutils/-/pluginutils-1.0.0-rc.3.tgz attempt 3 failed with EACCES
+799 http fetch GET http://npm.weimob.com/@babel%2ftypes/-/types-7.29.0.tgz attempt 3 failed with EACCES
+800 http fetch GET http://npm.weimob.com/@jridgewell%2ftrace-mapping/-/trace-mapping-0.3.31.tgz attempt 3 failed with EACCES
+801 http fetch GET http://npm.weimob.com/@esbuild%2fwin32-x64/-/win32-x64-0.21.5.tgz attempt 3 failed with EACCES
+802 verbose reify failed optional dependency C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\node_modules\@esbuild\win32-x64
+803 silly reify mark deleted [
+803 silly reify   'C:\\Users\\CodexSandboxOffline\\.codex\\.sandbox\\cwd\\4a96e5efabd31847\\node_modules\\@esbuild\\win32-x64'
+803 silly reify ]
+804 verbose cwd C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847
+805 verbose os Windows_NT 10.0.19045
+806 verbose node v22.14.0
+807 verbose npm  v10.9.2
+808 error Exit handler never called!
+809 error This is an error with npm itself. Please report this error at:
+810 error   <https://github.com/npm/cli/issues>
+811 verbose exit 1
+812 verbose code 1
+813 error A complete log of this run can be found in: C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\4a96e5efabd31847\.npm-cache\_logs\2026-05-12T13_19_05_169Z-debug-0.log

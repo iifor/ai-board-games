@@ -44,11 +44,11 @@ http://localhost:5173
   },
   "host": {
     "provider": "deepseek",
-    "model": "deepseek-chat"
+    "model": "deepseek-v4-pro"
   },
   "players": [
     { "id": 1, "provider": "openai", "model": "gpt-4o-mini" },
-    { "id": 2, "provider": "deepseek", "model": "deepseek-chat" },
+    { "id": 2, "provider": "deepseek", "model": "deepseek-v4-pro" },
     { "id": 3, "provider": "qwen", "model": "qwen-plus" }
   ]
 }

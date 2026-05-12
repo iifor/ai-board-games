@@ -79,7 +79,8 @@ function getVoiceForItem(item, voices, profile) {
 
   const matchingVoices = voices.filter((voice) => voiceMatchesRole(voice, profile.role));
   const candidates = matchingVoices.length ? matchingVoices : voices;
-  return candidates[(Number(item.playerId) - 1) % candidates.length] || candidates[0] || null;
+  const numericId = getNumericPlayerId(item.playerId);
+  return candidates[(numericId - 1) % candidates.length] || candidates[0] || null;
 }
 
 function voiceMatchesRole(voice, role) {
@@ -91,12 +92,44 @@ function voiceMatchesRole(voice, role) {
 
 function getProfileForItem(item) {
   if (!item.playerId) return HOST_VOICE_PROFILE;
+  const numericId = getNumericPlayerId(item.playerId);
   return PLAYER_VOICE_PROFILES[item.playerId] || {
-    role: Number(item.playerId) % 3 === 0 ? 'child' : Number(item.playerId) % 2 === 0 ? 'male' : 'female',
-    rate: 0.92 + (Number(item.playerId) % 5) * 0.06,
-    pitch: 0.78 + (Number(item.playerId) % 7) * 0.1,
+    role: numericId % 3 === 0 ? 'child' : numericId % 2 === 0 ? 'male' : 'female',
+    rate: 0.92 + (numericId % 5) * 0.06,
+    pitch: 0.78 + (numericId % 7) * 0.1,
     volume: 1
   };
+}
+
+function getNumericPlayerId(playerId) {
+  const numeric = Number(playerId);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const text = String(playerId || '');
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) % 997;
+  }
+  return (hash % 12) + 1;
+}
+
+function clampFinite(value, fallback, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(min, Math.min(max, numeric));
+}
+
+function normalizeVoiceProfile(profile) {
+  return {
+    role: profile?.role || 'host',
+    rate: clampFinite(profile?.rate, 1, 0.1, 10),
+    pitch: clampFinite(profile?.pitch, 1, 0, 2),
+    volume: clampFinite(profile?.volume, 1, 0, 1)
+  };
+}
+
+function getSpeechFallbackDelay(text) {
+  const length = String(text || '').length;
+  return Math.max(120000, Math.min(600000, 30000 + length * 1200));
 }
 
 export function useSpeechQueue() {
@@ -107,9 +140,21 @@ export function useSpeechQueue() {
   const cancellingRef = useRef(false);
   const enabledRef = useRef(true);
   const voicesRef = useRef([]);
+  const endTimerRef = useRef(null);
+  const resumeTimerRef = useRef(null);
+
+  const clearResumeTimer = useCallback(() => {
+    if (!resumeTimerRef.current) return;
+    window.clearInterval(resumeTimerRef.current);
+    resumeTimerRef.current = null;
+  }, []);
 
   const playNext = useCallback(() => {
     if (!enabledRef.current || speakingRef.current || !window.speechSynthesis) return;
+    if (cancellingRef.current) {
+      window.setTimeout(playNext, 80);
+      return;
+    }
     if (voicesRef.current.length === 0) voicesRef.current = getChineseVoices();
     const item = queueRef.current.shift();
     if (!item) return;
@@ -117,7 +162,7 @@ export function useSpeechQueue() {
     currentItemRef.current = item;
     speakingRef.current = true;
     const utterance = new SpeechSynthesisUtterance(item.text);
-    const profile = getProfileForItem(item);
+    const profile = normalizeVoiceProfile(getProfileForItem(item));
     const voice = getVoiceForItem(item, voicesRef.current, profile);
     utterance.lang = 'zh-CN';
     utterance.rate = profile.rate;
@@ -128,21 +173,47 @@ export function useSpeechQueue() {
       utterance.lang = voice.lang || 'zh-CN';
     }
 
+    let finished = false;
     const finish = () => {
+      if (finished) return;
+      finished = true;
       const shouldRunEnd = !cancellingRef.current;
+      clearResumeTimer();
+      if (endTimerRef.current) {
+        window.clearTimeout(endTimerRef.current);
+        endTimerRef.current = null;
+      }
       speakingRef.current = false;
       currentItemRef.current = null;
       if (shouldRunEnd) item.onEnd?.();
       if (shouldRunEnd) playNext();
     };
 
+    utterance.onstart = () => {
+      if (!cancellingRef.current) item.onStart?.();
+    };
     utterance.onend = finish;
     utterance.onerror = finish;
-    window.speechSynthesis.speak(utterance);
-  }, []);
+    try {
+      window.speechSynthesis.resume?.();
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      window.setTimeout(finish, 0);
+      return;
+    }
+    resumeTimerRef.current = window.setInterval(() => {
+      if (window.speechSynthesis?.paused) window.speechSynthesis.resume?.();
+    }, 1000);
+    endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(item.text));
+  }, [clearResumeTimer]);
 
   const cancel = useCallback(() => {
     queueRef.current = [];
+    clearResumeTimer();
+    if (endTimerRef.current) {
+      window.clearTimeout(endTimerRef.current);
+      endTimerRef.current = null;
+    }
     speakingRef.current = false;
     currentItemRef.current = null;
     cancellingRef.current = true;
@@ -150,6 +221,22 @@ export function useSpeechQueue() {
     window.setTimeout(() => {
       cancellingRef.current = false;
     }, 0);
+  }, [clearResumeTimer]);
+
+  const unlock = useCallback(() => {
+    if (!enabledRef.current || !window.speechSynthesis || speakingRef.current) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance('语音准备');
+      utterance.lang = 'zh-CN';
+      utterance.volume = 0;
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      window.speechSynthesis.speak(utterance);
+      window.speechSynthesis.resume?.();
+    } catch {
+      // Browser speech engines can throw before voices are ready; real playback will retry later.
+    }
   }, []);
 
   const setSpeechEnabled = useCallback((value) => {
@@ -157,13 +244,18 @@ export function useSpeechQueue() {
     enabledRef.current = next;
     setSpeechEnabledState(next);
     if (!next) cancel();
-    else playNext();
-  }, [cancel, playNext]);
+    else {
+      unlock();
+      playNext();
+    }
+  }, [cancel, playNext, unlock]);
 
   const speak = useCallback((text, onEnd, options = {}) => {
-    if (!enabledRef.current || !window.speechSynthesis) return;
+    if (!enabledRef.current || !window.speechSynthesis) return false;
     queueRef.current.push({ text, onEnd, ...options });
-    playNext();
+    if (cancellingRef.current) window.setTimeout(playNext, 80);
+    else playNext();
+    return true;
   }, [playNext]);
 
   useEffect(() => {
@@ -190,6 +282,7 @@ export function useSpeechQueue() {
     speechEnabled,
     setSpeechEnabled,
     speak,
+    unlock,
     cancel
   };
 }

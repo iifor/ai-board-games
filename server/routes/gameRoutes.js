@@ -2,7 +2,7 @@ const express = require('express');
 const { getAiConfig } = require('../aiConfig');
 const { createAiGame } = require('../aiGameRunner');
 const { getDb } = require('../db');
-const { saveGameLog } = require('../gameLogStore');
+const { readGameLogs, readRealGameLogs, saveGameLog } = require('../gameLogStore');
 const { testOpenAIConnection } = require('../openaiChat');
 const { listSkins, saveGameRecord } = require('../adminStore');
 
@@ -47,6 +47,36 @@ router.get('/health', (request, response) => {
 router.get('/player-selections', (request, response, next) => {
   try {
     response.json({ selections: getPlayerSelections() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/game-logs/:gameType', (request, response, next) => {
+  try {
+    const gameType = normalizeGameType(request.params.gameType);
+    const logs = (request.query.realOnly === '1' ? readRealGameLogs(gameType) : readGameLogs(gameType))
+      .map((record) => ({
+        id: record.game?.id || record.filename,
+        filename: record.filename,
+        savedAt: record.savedAt,
+        title: record.game?.topic?.title || record.game?.event?.name || record.game?.id || record.filename,
+        mode: record.game?.mode || '',
+        playerCount: record.game?.players?.length || 0,
+        topic: record.game?.topic || null,
+        players: (record.game?.players || []).map((player) => ({
+          id: player.id,
+          name: player.name,
+          nickname: player.nickname,
+          avatar: player.avatar,
+          side: player.side,
+          sideIndex: player.sideIndex,
+          sideLabel: player.sideLabel,
+          debateRole: player.debateRole,
+          debateRoleLabel: player.debateRoleLabel
+        }))
+      }));
+    response.json({ gameType, logs });
   } catch (error) {
     next(error);
   }
@@ -107,8 +137,10 @@ router.get('/games/new', async (request, response, next) => {
 
 async function createGameForMode(config) {
   const game = await createAiGame(config);
-  saveGameRecord(game);
-  if (config.mode === 'real') saveGameLog(game);
+  if (config.mode === 'real') {
+    saveGameRecord(game);
+    saveGameLog(game);
+  }
   return game;
 }
 

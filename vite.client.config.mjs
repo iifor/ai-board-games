@@ -30,6 +30,7 @@ const webPort = Number(process.env.VITE_PORT || 5173);
 
 export default defineConfig({
   root: 'client',
+  cacheDir: '../node_modules/.vite-client',
   plugins: [react(), px2vwPlugin()],
   server: {
     port: webPort,

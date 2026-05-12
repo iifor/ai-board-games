@@ -21,6 +21,8 @@ function attachGameSocket(server) {
         runSession(session, message.mode === 'real' ? 'real' : 'mock', message.playerIds, message.gameType, {
           topic: message.topic,
           debateTeams: message.debateTeams,
+          mockReplayId: message.mockReplayId,
+          mockReplayGame: message.mockReplayGame,
           werewolfMode: message.werewolfMode
         }).catch((error) => {
           if (error.message === 'game-session-cancelled') return;
@@ -54,8 +56,10 @@ async function runSession(session, mode, playerIds, gameType = 'consensus', opti
     onEvent: (event) => session.sendAndWait(withNarration(event))
   });
 
-  saveGameRecord(game);
-  if (mode === 'real') saveGameLog(game);
+  if (mode === 'real') {
+    saveGameRecord(game);
+    saveGameLog(game);
+  }
 
   await session.sendAndWait({
     type: 'done',
@@ -94,7 +98,7 @@ function createSession(socket) {
   const pending = new Map();
   let closed = false;
   let paused = false;
-  const SPEECH_ACK_TIMEOUT_MS = 30000;
+  const SPEECH_ACK_TIMEOUT_MS = 120000;
 
   socket.on('close', () => {
     closed = true;
@@ -193,6 +197,8 @@ function getRequestConfig(mode, playerIds, gameType = 'consensus', options = {})
     gameType,
     topic: options.topic || null,
     debateTeams: options.debateTeams || null,
+    mockReplayId: options.mockReplayId || null,
+    mockReplayGame: options.mockReplayGame || null,
     werewolfMode: options.werewolfMode || null,
     missingProviders,
     realReady: missingProviders.length === 0

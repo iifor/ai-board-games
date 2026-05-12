@@ -12,6 +12,13 @@ export async function fetchPlayerSelections() {
   return data.selections || {};
 }
 
+export async function fetchDebateReplayOptions() {
+  const response = await fetch('/api/toc/game-logs/debate?realOnly=1');
+  if (!response.ok) throw new Error('无法获取辩论赛历史对局');
+  const data = await response.json();
+  return data.logs || [];
+}
+
 export async function savePlayerSelection(gameType, playerIds) {
   const response = await fetch(`/api/toc/player-selections/${gameType}`, {
     method: 'PUT',
@@ -25,12 +32,12 @@ export async function savePlayerSelection(gameType, playerIds) {
   return response.json();
 }
 
-export function openGameSocket({ mode, gameType = 'consensus', playerIds = [], topic, debateTeams, werewolfMode, onEvent, onError, onClose }) {
+export function openGameSocket({ mode, gameType = 'consensus', playerIds = [], topic, debateTeams, mockReplayId, mockReplayGame, werewolfMode, onEvent, onError, onClose }) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(`${protocol}//${window.location.host}/api/toc/ws/game`);
 
   socket.onopen = () => {
-    socket.send(JSON.stringify({ type: 'start', mode, gameType, playerIds, topic, debateTeams, werewolfMode }));
+    socket.send(JSON.stringify({ type: 'start', mode, gameType, playerIds, topic, debateTeams, mockReplayId, mockReplayGame, werewolfMode }));
   };
 
   socket.onmessage = (message) => {
