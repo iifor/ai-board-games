@@ -7,6 +7,11 @@ export async function adminRequest(path, options = {}) {
     }
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(data?.message || '后台请求失败');
+  if (!response.ok) {
+    const error = new Error(data?.message || '后台请求失败');
+    error.template = data?.template || null;
+    error.payload = data;
+    throw error;
+  }
   return data;
 }

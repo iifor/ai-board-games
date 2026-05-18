@@ -3,6 +3,7 @@ const path = require('path');
 const adminRoutes = require('./routes/adminRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const { initAdminData } = require('./adminStore');
+const { getResourceRoot } = require('./uploadStore');
 
 function createApp() {
   const app = express();
@@ -11,10 +12,11 @@ function createApp() {
 
   initAdminData();
 
-  app.use(express.json());
+  app.use(express.json({ limit: '8mb' }));
   app.use('/api/admin', adminRoutes);
   app.use('/api/toc', gameRoutes);
   app.use('/avatars', express.static(path.join(__dirname, '..', 'avatars')));
+  app.use('/resources', express.static(getResourceRoot()));
   app.use('/admin', express.static(adminDistDir));
   app.use(express.static(clientDistDir));
 

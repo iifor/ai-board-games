@@ -46,6 +46,10 @@ export default defineConfig({
       '/avatars': {
         target: `http://127.0.0.1:${apiPort}`,
         changeOrigin: true
+      },
+      '/resources': {
+        target: `http://127.0.0.1:${apiPort}`,
+        changeOrigin: true
       }
     }
   },

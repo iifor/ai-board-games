@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatAvatarUrl } from '../utils/avatar';
 import { classNames, getRoleName } from '../utils/gameState';
 
 export function PlayerList({ players, round, showRoles, visibleRolePlayerId, currentSpeakerId }) {
@@ -111,9 +112,3 @@ function getVisibleConsensusRole(player, canReveal) {
   return roleName === '身份隐藏' || roleName === '玩家视角隐藏' ? '未知身份' : roleName;
 }
 
-function formatAvatarUrl(value) {
-  const url = String(value || '').trim();
-  if (!url) return '';
-  if (/^(https?:|data:|blob:)/i.test(url)) return url.replace(/"/g, '%22');
-  return encodeURI(url.startsWith('/') ? url : `/${url}`).replace(/"/g, '%22');
-}

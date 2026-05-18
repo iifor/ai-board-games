@@ -4,6 +4,7 @@ import { CenterStage, RealStartPanel } from './CenterStage';
 import { ConfirmResetModal, CurrentGameHistory, EventBackground, InfoModal, StageInfo } from './InfoModal';
 import { PlayerList } from './PlayerList';
 import { SpeechSubtitle } from './SpeechSubtitle';
+import { SpeechInsightOverlay } from './SpeechInsightOverlay';
 import { StatusPanel } from './StatusPanel';
 import { ErrorView, LoadingView } from './StateViews';
 import { TopNav } from './TopNav';
@@ -12,8 +13,7 @@ import { openGameSocket } from '../api/gameApi';
 import { buildTimeline, classNames, createEmptyGame, createPendingRound } from '../utils/gameState';
 import { useSpeechQueue } from '../hooks/useSpeechQueue';
 
-export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
-  const [mockMode, setMockMode] = useState(true);
+export function ConsensusGame({ replayGameId = '', onReturnToSelect }) {
   const [game, setGame] = useState(() => createEmptyGame());
   const [step, setStep] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
@@ -24,7 +24,7 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
   const [infoModal, setInfoModal] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
   const [status, setStatus] = useState('idle');
-  const [streamMessage, setStreamMessage] = useState('Mock 模式已就绪，点击开始后由后端逐条推送。');
+  const [streamMessage, setStreamMessage] = useState('真实模式已就绪，点击开始后调用 AI。');
   const [messageLog, setMessageLog] = useState([]);
   const [subtitleSpeech, setSubtitleSpeech] = useState(null);
   const socketRef = useRef(null);
@@ -41,12 +41,17 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
 
   useEffect(() => () => closeSocket(), []);
 
+  useEffect(() => {
+    if (!replayGameId) return;
+    startGame({ replayGameId });
+  }, [replayGameId]);
+
   const timeline = useMemo(() => buildTimeline(game), [game]);
   const historyTimeline = useMemo(() => buildTimeline(game, messageLog), [game, messageLog]);
   const displayGame = game || createEmptyGame();
   const currentEvent = timeline[Math.min(step, Math.max(0, timeline.length - 1))] || {
     type: 'idle',
-    title: mockMode ? '等待 Mock 对局' : '游戏即将开始',
+    title: '游戏即将开始',
     roundData: displayGame.rounds[0] || createPendingRound()
   };
   const currentRound = currentEvent.roundData || displayGame.rounds.at(-1) || createPendingRound();
@@ -71,7 +76,7 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
     if (canShowWinner && status === 'ready') setShowWinnerModal(true);
   }, [canShowWinner, status]);
 
-  function resetToIdle(message, nextMockMode = mockMode) {
+  function resetToIdle(message) {
     closeSocket();
     cancel();
     pendingAckRef.current = null;
@@ -88,22 +93,17 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
     setSubtitleSpeech(null);
     introEventIdRef.current = '';
     setStatus('idle');
-    setStreamMessage(
-      message ||
-        (nextMockMode
-          ? 'Mock 模式已就绪，点击开始后由后端逐条推送。'
-          : '真实模式已就绪，点击开始后才会调用 AI。')
-    );
+    setStreamMessage(message || '真实模式已就绪，点击开始后调用 AI。');
   }
 
-  function startGame() {
+  function startGame(options = {}) {
     resetToIdle('');
     setStatus('streaming');
     setStreamMessage('游戏准备中...');
     socketRef.current = openGameSocket({
-      mode: mockMode ? 'mock' : 'real',
+      mode: 'real',
       gameType: 'consensus',
-      playerIds: selectedPlayerIds,
+      replayGameId: options.replayGameId || '',
       onEvent: handleSocketEvent,
       onError: (error) => {
         setStatus('error');
@@ -126,7 +126,7 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
     pendingAckRef.current = { socket, ackId: event.ackId };
     pendingEventRef.current = event;
 
-    const narration = event.narration || getStreamNarration(event);
+    const narration = event.subtitle?.text || event.narration || getStreamNarration(event);
     if (pausedRef.current) return;
 
     const speechOptions = getSpeechOptions(event);
@@ -151,10 +151,15 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
     }
     if (event.type === 'speech' && event.speech) {
       setStreamMessage(`${event.speech.playerId}号发言中`);
-      setSubtitleSpeech(event.speech);
+      setSubtitleSpeech({
+        ...event.speech,
+        text: event.subtitle?.text || event.speech.text,
+        fullText: event.speech.fullText || event.speech.text,
+        thinking: event.speech.thinking || ''
+      });
       return;
     }
-    const subtitleText = event.narration || getStreamNarration(event) || event.message;
+    const subtitleText = event.subtitle?.text || event.narration || getStreamNarration(event) || event.message;
     if (subtitleText && event.type !== 'game') {
       setSubtitleSpeech({ playerId: null, text: subtitleText });
     }
@@ -179,7 +184,7 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
       return;
     }
 
-    const narration = event.narration || getStreamNarration(event) || event.message;
+    const narration = event.subtitle?.text || event.narration || getStreamNarration(event) || event.message;
     if (!narration) return;
     setMessageLog((items) => [
       ...items,
@@ -222,7 +227,7 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
       sendPlaybackControl(next);
       if (!next && pendingAckRef.current) {
         const event = pendingEventRef.current;
-        const narration = event?.narration || getStreamNarration(event);
+        const narration = event?.subtitle?.text || event?.narration || getStreamNarration(event);
         if (speechEnabled && narration) speak(narration, acknowledgePending, getSpeechOptions(event));
         else acknowledgePending();
       }
@@ -246,24 +251,10 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
     sendPlaybackControl(false);
     if (pendingAckRef.current) {
       const event = pendingEventRef.current;
-      const narration = event?.narration || getStreamNarration(event);
+      const narration = event?.subtitle?.text || event?.narration || getStreamNarration(event);
       if (speechEnabled && narration) speak(narration, acknowledgePending, getSpeechOptions(event));
       else acknowledgePending();
     }
-  }
-
-  function requestModeToggle() {
-    if (controlsLocked) return;
-    const nextMode = !mockMode;
-    if (isRunning && paused) {
-      setConfirmAction(() => () => {
-        setMockMode(nextMode);
-        resetToIdle('本局比赛已结束。', nextMode);
-      });
-      return;
-    }
-    setMockMode(nextMode);
-    resetToIdle(undefined, nextMode);
   }
 
   function requestSpeechToggle() {
@@ -322,18 +313,16 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
   }
 
   return (
-    <main className={classNames('game-shell', !mockMode && 'real-mode')}>
+    <main className="game-shell real-mode">
       <TopNav
         currentRound={currentRound}
         currentEvent={currentEvent}
         autoPlay={autoPlay}
         showRoles={showRoles}
-        mockMode={mockMode}
         speechEnabled={speechEnabled}
         controlsLocked={controlsLocked}
         returnDisabled={isRunning}
         onReturn={returnToSelect}
-        onModeToggle={requestModeToggle}
         onSpeechToggle={requestSpeechToggle}
         setAutoPlay={setTopAutoPlay}
         setShowRoles={setShowRoles}
@@ -359,13 +348,13 @@ export function ConsensusGame({ selectedPlayerIds, onReturnToSelect }) {
             setStep={setStep}
             autoPlay={autoPlay}
             setAutoPlay={setAutoPlay}
-            mockMode={mockMode}
             streamMessage={streamMessage}
           />
         )}
         <StatusPanel game={displayGame} round={currentRound} showRoles={showRoles} visibleRolePlayerId={visibleRolePlayerId} />
       </section>
       <SpeechSubtitle speech={subtitleSpeech} />
+      <SpeechInsightOverlay speech={subtitleSpeech} players={displayGame.players} />
 
       <ActionBar
         paused={paused}
@@ -399,7 +388,9 @@ function getStreamNarration(event) {
 }
 
 function getSpeechOptions(event) {
-  if (event?.type !== 'speech' || !event.speech?.playerId) return {};
-  return { playerId: event.speech.playerId };
+  const base = { audioUrl: event?.audioUrl };
+  if (event?.type !== 'speech' || !event.speech?.playerId) return base;
+  const player = event.game?.players?.find((item) => Number(item.id) === Number(event.speech.playerId));
+  return { ...base, playerId: event.speech.playerId, voicePackageId: player?.voicePackageId };
 }
-
+

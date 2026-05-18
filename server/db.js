@@ -53,7 +53,70 @@ function migrate(db) {
       personality TEXT NOT NULL DEFAULT '',
       provider TEXT NOT NULL DEFAULT 'deepseek',
       model TEXT NOT NULL DEFAULT 'deepseek-v4-pro',
+      model_id INTEGER,
+      voice_package_id INTEGER,
       temperature REAL NOT NULL DEFAULT 0.85,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE SET NULL,
+      FOREIGN KEY (voice_package_id) REFERENCES voice_packages(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS models (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider TEXT NOT NULL,
+      name TEXT NOT NULL,
+      base_url TEXT NOT NULL DEFAULT '',
+      api_format TEXT NOT NULL DEFAULT 'openai-compatible',
+      api_key_cipher TEXT NOT NULL DEFAULT '',
+      api_key_iv TEXT NOT NULL DEFAULT '',
+      api_key_tag TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS voice_packages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'browser',
+      voice_id TEXT NOT NULL DEFAULT '',
+      language TEXT NOT NULL DEFAULT 'zh-CN',
+      gender TEXT NOT NULL DEFAULT '',
+      style TEXT NOT NULL DEFAULT '',
+      rate TEXT NOT NULL DEFAULT '0%',
+      pitch TEXT NOT NULL DEFAULT '0%',
+      sample_text TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS werewolf_modes (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      roles_json TEXT NOT NULL DEFAULT '[]',
+      rules_json TEXT NOT NULL DEFAULT '{}',
+      sheriff_json TEXT NOT NULL DEFAULT '{}',
+      win_condition TEXT NOT NULL DEFAULT 'side',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS werewolf_roles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      faction TEXT NOT NULL DEFAULT 'good',
+      role_type TEXT NOT NULL DEFAULT 'villager',
+      responsibility TEXT NOT NULL DEFAULT '',
+      ability TEXT NOT NULL DEFAULT '',
+      key_info TEXT NOT NULL DEFAULT '',
+      rule_json TEXT NOT NULL DEFAULT '{}',
       enabled INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -68,9 +131,11 @@ function migrate(db) {
       skin_name TEXT NOT NULL DEFAULT '',
       winner TEXT,
       win_reason TEXT NOT NULL DEFAULT '',
+      topic_json TEXT NOT NULL DEFAULT '{}',
       players_json TEXT NOT NULL,
       rounds_json TEXT NOT NULL,
       event_json TEXT NOT NULL,
+      audio_resources_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (skin_id) REFERENCES skins(id) ON DELETE SET NULL
     );
@@ -89,14 +154,34 @@ function migrate(db) {
       player_ids_json TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value_json TEXT NOT NULL DEFAULT 'null',
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   ensureColumn(db, 'games', 'game_type', "TEXT NOT NULL DEFAULT 'consensus'");
+  ensureColumn(db, 'games', 'topic_json', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(db, 'players', 'model_id', 'INTEGER');
+  ensureColumn(db, 'players', 'voice_package_id', 'INTEGER');
+  ensureColumn(db, 'voice_packages', 'gender', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'voice_packages', 'style', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'voice_packages', 'rate', "TEXT NOT NULL DEFAULT '0%'");
+  ensureColumn(db, 'voice_packages', 'pitch', "TEXT NOT NULL DEFAULT '0%'");
+  ensureColumn(db, 'voice_packages', 'sample_text', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'voice_packages', 'temperature', "REAL NOT NULL DEFAULT 0.85");
+  ensureColumn(db, 'games', 'audio_resources_json', "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, 'werewolf_modes', 'roles_json', "TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(db, 'werewolf_modes', 'rules_json', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(db, 'werewolf_modes', 'sheriff_json', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(db, 'werewolf_modes', 'win_condition', "TEXT NOT NULL DEFAULT 'side'");
   db.exec(`
     UPDATE games
     SET game_type = CASE
-      WHEN id LIKE 'debate-%' OR id LIKE 'mock-debate-%' OR event_json LIKE '%ai-debate%' THEN 'debate'
-      WHEN id LIKE 'werewolf-%' OR id LIKE 'mock-werewolf-%' OR event_json LIKE '%ai-werewolf%' THEN 'werewolf'
+      WHEN id LIKE 'debate-%' OR event_json LIKE '%ai-debate%' THEN 'debate'
+      WHEN id LIKE 'werewolf-%' OR event_json LIKE '%ai-werewolf%' THEN 'werewolf'
       ELSE COALESCE(NULLIF(game_type, ''), 'consensus')
     END
     WHERE game_type IS NULL OR game_type = '' OR game_type = 'consensus'
@@ -165,7 +250,18 @@ class JsonStatement {
 }
 
 function readJsonDb(filePath) {
-  const empty = { skins: [], players: [], games: [], game_players: [], game_player_selections: [] };
+  const empty = {
+    skins: [],
+    players: [],
+    models: [],
+    voice_packages: [],
+    werewolf_roles: [],
+    werewolf_modes: [],
+    games: [],
+    game_players: [],
+    game_player_selections: [],
+    app_settings: []
+  };
   try {
     if (!fs.existsSync(filePath)) return empty;
     return { ...empty, ...JSON.parse(fs.readFileSync(filePath, 'utf8')) };
@@ -197,6 +293,13 @@ function runJsonQuery(db, sql, args, mode) {
   }
   if (lower.includes('select count(*) as count from players')) {
     return { count: lower.includes('where enabled = 1') ? data.players.filter((row) => Number(row.enabled) === 1).length : data.players.length };
+  }
+  if (lower === 'select count(*) as count from models') return { count: data.models.length };
+  if (lower === 'select count(*) as count from voice_packages') return { count: data.voice_packages.length };
+  if (lower === 'select count(*) as count from werewolf_roles') return { count: data.werewolf_roles.length };
+  if (lower === 'select count(*) as count from werewolf_modes') return { count: data.werewolf_modes.length };
+  if (lower.includes('select count(*) as count from werewolf_modes where roles_json like ?')) {
+    return { count: data.werewolf_modes.filter((row) => String(row.roles_json || '').includes(String(values[0] || '').replace(/%/g, ''))).length };
   }
   if (lower.includes('select count(*) as count from games where skin_id = ?')) {
     return { count: data.games.filter((row) => row.skin_id === values[0]).length };
@@ -232,9 +335,39 @@ function runJsonQuery(db, sql, args, mode) {
     if (row) Object.assign(row, { sort_order: values[0], updated_at: now() });
     return { changes: row ? 1 : 0 };
   }
+  if (lower.startsWith('update players set model_id = null')) {
+    data.players.forEach((row) => {
+      if (Number(row.model_id) === Number(values[0])) row.model_id = null;
+    });
+    return { changes: 1 };
+  }
+  if (lower.startsWith('update players set voice_package_id = null')) {
+    data.players.forEach((row) => {
+      if (Number(row.voice_package_id) === Number(values[0])) row.voice_package_id = null;
+    });
+    return { changes: 1 };
+  }
   if (lower.startsWith('delete from players')) {
     return deleteWhere(data.players, (row) => Number(row.id) === Number(values[0]));
   }
+
+  if (lower.startsWith('insert into models')) return upsertJsonRow(data.models, withAutoId(data.models, values[0]), 'id');
+  if (lower.startsWith('select * from models')) return selectById(data.models, lower, values, mode);
+  if (lower.startsWith('update models')) return upsertJsonRow(data.models, values[0], 'id');
+  if (lower.startsWith('delete from models')) return deleteWhere(data.models, (row) => Number(row.id) === Number(values[0]));
+
+  if (lower.startsWith('insert into voice_packages')) return upsertJsonRow(data.voice_packages, withAutoId(data.voice_packages, values[0]), 'id');
+  if (lower.startsWith('select * from voice_packages')) return selectById(data.voice_packages, lower, values, mode);
+  if (lower.startsWith('update voice_packages')) return upsertJsonRow(data.voice_packages, values[0], 'id');
+  if (lower.startsWith('delete from voice_packages')) return deleteWhere(data.voice_packages, (row) => Number(row.id) === Number(values[0]));
+
+  if (lower.startsWith('insert into werewolf_roles')) return upsertJsonRow(data.werewolf_roles, values[0], 'id');
+  if (lower.startsWith('select * from werewolf_roles')) return selectById(data.werewolf_roles, lower, values, mode, 'sort_order');
+  if (lower.startsWith('delete from werewolf_roles')) return deleteWhere(data.werewolf_roles, (row) => String(row.id) === String(values[0]));
+
+  if (lower.startsWith('insert into werewolf_modes')) return upsertJsonRow(data.werewolf_modes, values[0], 'id');
+  if (lower.startsWith('select * from werewolf_modes')) return selectById(data.werewolf_modes, lower, values, mode, 'sort_order');
+  if (lower.startsWith('delete from werewolf_modes')) return deleteWhere(data.werewolf_modes, (row) => String(row.id) === String(values[0]));
 
   if (lower.startsWith('insert or replace into games')) {
     const row = { ...values[0], created_at: data.games.find((item) => item.id === values[0].id)?.created_at || now() };
@@ -246,6 +379,11 @@ function runJsonQuery(db, sql, args, mode) {
     return { changes: 1 };
   }
   if (lower.startsWith('select * from games')) return selectGames(data, lower, values, mode);
+  if (lower.startsWith('select audio_resources_json from games where id != ?')) {
+    return data.games
+      .filter((row) => String(row.id) !== String(values[0]))
+      .map((row) => ({ audio_resources_json: row.audio_resources_json || '[]' }));
+  }
   if (lower.startsWith('delete from games')) return deleteWhere(data.games, (row) => row.id === values[0]);
   if (lower.includes('select game_type as gametype, count(*) as count from games group by game_type')) {
     const counts = {};
@@ -271,6 +409,19 @@ function runJsonQuery(db, sql, args, mode) {
     return row ? { playerIdsJson: row.player_ids_json } : undefined;
   }
 
+  if (lower.startsWith('insert into app_settings')) {
+    const key = values[0];
+    const valueJson = values[1];
+    const row = data.app_settings.find((item) => item.key === key);
+    if (row) Object.assign(row, { value_json: valueJson, updated_at: now() });
+    else data.app_settings.push({ key, value_json: valueJson, updated_at: now() });
+    return { changes: 1 };
+  }
+  if (lower.includes('select value_json as valuejson from app_settings where key = ?')) {
+    const row = data.app_settings.find((item) => item.key === values[0]);
+    return row ? { valueJson: row.value_json } : undefined;
+  }
+
   throw new Error(`JSON fallback database does not support SQL: ${sql}`);
 }
 
@@ -282,7 +433,12 @@ function upsertJsonRow(rows, row, key) {
   const index = rows.findIndex((item) => String(item[key]) === String(normalized[key]));
   if (index >= 0) rows[index] = { ...rows[index], ...normalized };
   else rows.push(normalized);
-  return { changes: 1 };
+  return { changes: 1, lastInsertRowid: normalized.id };
+}
+
+function withAutoId(rows, row) {
+  if (row.id) return row;
+  return { ...row, id: Math.max(0, ...rows.map((item) => Number(item.id) || 0)) + 1 };
 }
 
 function deleteWhere(rows, predicate) {
@@ -307,6 +463,16 @@ function selectPlayers(data, lower, values, mode) {
   if (lower.includes('where enabled = 1')) rows = rows.filter((row) => Number(row.enabled) === 1);
   rows.sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0) || (Number(a.id) || 0) - (Number(b.id) || 0));
   return mode === 'get' ? rows[0] : rows;
+}
+
+function selectById(rows, lower, values, mode, sortKey = 'updated_at') {
+  let result = [...rows];
+  if (lower.includes('where id = ?')) result = result.filter((row) => String(row.id) === String(values[0]));
+  result.sort((a, b) => {
+    if (sortKey === 'sort_order') return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0) || String(a.name || '').localeCompare(String(b.name || ''));
+    return String(b.updated_at || '').localeCompare(String(a.updated_at || '')) || (Number(b.id) || 0) - (Number(a.id) || 0);
+  });
+  return mode === 'get' ? result[0] : result;
 }
 
 function selectGames(data, lower, values, mode) {

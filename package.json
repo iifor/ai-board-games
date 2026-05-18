@@ -15,16 +15,19 @@
     "preview": "concurrently \"vite preview --config vite.client.config.mjs --host 0.0.0.0\" \"vite preview --config vite.admin.config.mjs --host 0.0.0.0 --port 5175\"",
     "server": "node server/index.js",
     "start": "node server/index.js",
-    "check": "node -e \"const fs=require('fs'),vm=require('vm'); for (const f of ['server/index.js','server/app.js','server/routes/gameRoutes.js','server/routes/adminRoutes.js','server/db.js','server/adminStore.js','server/mistTemplate.js','server/mockGame.js','server/aiConfig.js','server/aiGameRunner.js','server/aiDebateRunner.js','server/aiWerewolfRunner.js','server/werewolfModes.js','server/openaiChat.js','server/gameLogStore.js','server/gameSocket.js']) { new vm.Script(fs.readFileSync(f,'utf8'), {filename:f}); console.log(f+': ok'); }\""
+    "check": "node -e \"const fs=require('fs'),vm=require('vm'); for (const f of ['server/index.js','server/app.js','server/routes/gameRoutes.js','server/routes/adminRoutes.js','server/db.js','server/adminStore.js','server/mistTemplate.js','server/aiConfig.js','server/aiGameRunner.js','server/aiDebateRunner.js','server/aiWerewolfRunner.js','server/werewolfModes.js','server/openaiChat.js','server/gameSocket.js','server/uploadStore.js','server/voicePreview.js','server/gameAgents/playerAgent.js','server/gameAgents/werewolfGameAgent.js','server/skills/skillRegistry.js','server/skills/werewolf/roleSkills.js','server/services/ai/promptComposer.js','server/services/ai/llmResultCache.js','server/services/audio/audioResourceCache.js','server/services/resources/playableItems.js','server/services/resources/gameResourcePreloader.js']) { new vm.Script(fs.readFileSync(f,'utf8'), {filename:f}); console.log(f+': ok'); }\""
   },
   "dependencies": {
+    "@ant-design/icons": "^5.6.1",
     "@vitejs/plugin-react": "^5.0.0",
+    "antd": "^5.22.7",
     "better-sqlite3": "^12.9.0",
     "concurrently": "^9.2.0",
     "express": "^4.19.2",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.1",
     "vite": "^5.4.0",
     "ws": "^8.18.0"
   },

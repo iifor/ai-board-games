@@ -1,8 +1,12 @@
 export async function fetchAiPlayers() {
+  const data = await fetchAiHealth();
+  return data.players || [];
+}
+
+export async function fetchAiHealth() {
   const response = await fetch('/api/toc/health');
   if (!response.ok) throw new Error('无法获取 AI 玩家配置');
-  const data = await response.json();
-  return data.players || [];
+  return response.json();
 }
 
 export async function fetchPlayerSelections() {
@@ -12,11 +16,23 @@ export async function fetchPlayerSelections() {
   return data.selections || {};
 }
 
-export async function fetchDebateReplayOptions() {
-  const response = await fetch('/api/toc/game-logs/debate?realOnly=1');
-  if (!response.ok) throw new Error('无法获取辩论赛历史对局');
+export async function fetchRecentGames(gameType, limit = 10) {
+  const response = await fetch(`/api/toc/games/recent?gameType=${encodeURIComponent(gameType)}&limit=${encodeURIComponent(limit)}`);
+  if (!response.ok) throw new Error('无法获取历史对局');
   const data = await response.json();
-  return data.logs || [];
+  return data.games || [];
+}
+
+export async function fetchWerewolfModes() {
+  const response = await fetch('/api/toc/werewolf-modes');
+  if (!response.ok) throw new Error('无法获取狼人杀模式');
+  return response.json();
+}
+
+export async function fetchGameDetail(id) {
+  const response = await fetch(`/api/toc/games/${encodeURIComponent(id)}`);
+  if (!response.ok) throw new Error('无法获取对局详情');
+  return response.json();
 }
 
 export async function savePlayerSelection(gameType, playerIds) {
@@ -32,12 +48,12 @@ export async function savePlayerSelection(gameType, playerIds) {
   return response.json();
 }
 
-export function openGameSocket({ mode, gameType = 'consensus', playerIds = [], topic, debateTeams, mockReplayId, mockReplayGame, werewolfMode, onEvent, onError, onClose }) {
+export function openGameSocket({ gameType = 'consensus', playerIds, hostId, topic, debateTeams, werewolfMode, replayGameId, onEvent, onError, onClose }) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(`${protocol}//${window.location.host}/api/toc/ws/game`);
 
   socket.onopen = () => {
-    socket.send(JSON.stringify({ type: 'start', mode, gameType, playerIds, topic, debateTeams, mockReplayId, mockReplayGame, werewolfMode }));
+    socket.send(JSON.stringify({ type: 'start', mode: 'real', gameType, playerIds, hostId, topic, debateTeams, werewolfMode, replayGameId }));
   };
 
   socket.onmessage = (message) => {

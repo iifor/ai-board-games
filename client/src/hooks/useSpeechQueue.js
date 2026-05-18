@@ -132,6 +132,16 @@ function getSpeechFallbackDelay(text) {
   return Math.max(120000, Math.min(600000, 30000 + length * 1200));
 }
 
+async function fetchServerSpeechAudio(text, voicePackageId) {
+  const response = await fetch('/api/toc/voice/synthesize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voicePackageId })
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.blob();
+}
+
 export function useSpeechQueue() {
   const [speechEnabled, setSpeechEnabledState] = useState(true);
   const queueRef = useRef([]);
@@ -140,6 +150,7 @@ export function useSpeechQueue() {
   const cancellingRef = useRef(false);
   const enabledRef = useRef(true);
   const voicesRef = useRef([]);
+  const audioRef = useRef(null);
   const endTimerRef = useRef(null);
   const resumeTimerRef = useRef(null);
 
@@ -150,28 +161,16 @@ export function useSpeechQueue() {
   }, []);
 
   const playNext = useCallback(() => {
-    if (!enabledRef.current || speakingRef.current || !window.speechSynthesis) return;
+    if (!enabledRef.current || speakingRef.current) return;
     if (cancellingRef.current) {
       window.setTimeout(playNext, 80);
       return;
     }
-    if (voicesRef.current.length === 0) voicesRef.current = getChineseVoices();
     const item = queueRef.current.shift();
     if (!item) return;
 
     currentItemRef.current = item;
     speakingRef.current = true;
-    const utterance = new SpeechSynthesisUtterance(item.text);
-    const profile = normalizeVoiceProfile(getProfileForItem(item));
-    const voice = getVoiceForItem(item, voicesRef.current, profile);
-    utterance.lang = 'zh-CN';
-    utterance.rate = profile.rate;
-    utterance.pitch = profile.pitch;
-    utterance.volume = profile.volume;
-    if (voice) {
-      utterance.voice = voice;
-      utterance.lang = voice.lang || 'zh-CN';
-    }
 
     let finished = false;
     const finish = () => {
@@ -189,22 +188,84 @@ export function useSpeechQueue() {
       if (shouldRunEnd) playNext();
     };
 
-    utterance.onstart = () => {
-      if (!cancellingRef.current) item.onStart?.();
+    const playBrowserSpeech = () => {
+      if (cancellingRef.current || !enabledRef.current) {
+        window.setTimeout(finish, 0);
+        return;
+      }
+      if (!window.speechSynthesis) {
+        window.setTimeout(finish, 0);
+        return;
+      }
+      if (voicesRef.current.length === 0) voicesRef.current = getChineseVoices();
+      const utterance = new SpeechSynthesisUtterance(item.text);
+      const profile = normalizeVoiceProfile(getProfileForItem(item));
+      const voice = getVoiceForItem(item, voicesRef.current, profile);
+      utterance.lang = 'zh-CN';
+      utterance.rate = profile.rate;
+      utterance.pitch = profile.pitch;
+      utterance.volume = profile.volume;
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang || 'zh-CN';
+      }
+      utterance.onstart = () => {
+        if (!cancellingRef.current) item.onStart?.();
+      };
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      try {
+        if (cancellingRef.current || !enabledRef.current) {
+          window.setTimeout(finish, 0);
+          return;
+        }
+        window.speechSynthesis.resume?.();
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        window.setTimeout(finish, 0);
+        return;
+      }
+      resumeTimerRef.current = window.setInterval(() => {
+        if (window.speechSynthesis?.paused) window.speechSynthesis.resume?.();
+      }, 1000);
+      endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(item.text));
     };
-    utterance.onend = finish;
-    utterance.onerror = finish;
-    try {
-      window.speechSynthesis.resume?.();
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      window.setTimeout(finish, 0);
-      return;
-    }
-    resumeTimerRef.current = window.setInterval(() => {
-      if (window.speechSynthesis?.paused) window.speechSynthesis.resume?.();
-    }, 1000);
-    endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(item.text));
+
+    const playServerSpeech = async () => {
+      try {
+        item.onStart?.();
+        const ownsUrl = !item.audioUrl;
+        const url = item.audioUrl || URL.createObjectURL(await fetchServerSpeechAudio(item.text, item.voicePackageId));
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => {
+          if (ownsUrl) URL.revokeObjectURL(url);
+          audioRef.current = null;
+          finish();
+        };
+        audio.onerror = () => {
+          if (ownsUrl) URL.revokeObjectURL(url);
+          audioRef.current = null;
+          if (cancellingRef.current || !enabledRef.current) {
+            finish();
+            return;
+          }
+          playBrowserSpeech();
+        };
+        audio.volume = clampFinite(item.volume, 1, 0, 1);
+        await audio.play();
+        endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(item.text));
+      } catch {
+        if (cancellingRef.current || !enabledRef.current) {
+          finish();
+          return;
+        }
+        playBrowserSpeech();
+      }
+    };
+
+    if (item.audioUrl || item.voicePackageId) playServerSpeech();
+    else playBrowserSpeech();
   }, [clearResumeTimer]);
 
   const cancel = useCallback(() => {
@@ -217,6 +278,14 @@ export function useSpeechQueue() {
     speakingRef.current = false;
     currentItemRef.current = null;
     cancellingRef.current = true;
+    if (audioRef.current) {
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current.load?.();
+      audioRef.current = null;
+    }
     window.speechSynthesis?.cancel();
     window.setTimeout(() => {
       cancellingRef.current = false;
@@ -251,7 +320,7 @@ export function useSpeechQueue() {
   }, [cancel, playNext, unlock]);
 
   const speak = useCallback((text, onEnd, options = {}) => {
-    if (!enabledRef.current || !window.speechSynthesis) return false;
+    if (!enabledRef.current) return false;
     queueRef.current.push({ text, onEnd, ...options });
     if (cancellingRef.current) window.setTimeout(playNext, 80);
     else playNext();

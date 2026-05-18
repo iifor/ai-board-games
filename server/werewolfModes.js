@@ -1,91 +1,95 @@
-const WEREWOLF_MODES = {
-  'standard-12': {
-    id: 'standard-12',
-    name: '标准12人局',
-    version: '预女猎白',
-    background: '12人标准局（预女猎白）：4狼人、预言家、女巫、猎人、白痴、4平民。',
-    roles: [
-      'werewolf',
-      'werewolf',
-      'werewolf',
-      'werewolf',
-      'seer',
-      'witch',
-      'hunter',
-      'idiot',
-      'villager',
-      'villager',
-      'villager',
-      'villager'
-    ],
+const { getWerewolfMode, listWerewolfModes, listWerewolfRoles } = require('./adminStore');
+
+const FALLBACK_ROLE = {
+  id: 'villager',
+  name: '村民',
+  faction: 'good',
+  roleType: 'villager',
+  responsibility: '依靠发言、票型和死亡信息找出狼人。',
+  ability: '白天发言和投票。',
+  keyInfo: '没有夜晚技能。',
+  rule: { actions: [{ trigger: 'day', action: 'speakOnly' }, { trigger: 'vote', action: 'voteOnly' }] }
+};
+
+function getWerewolfModeConfig(mode) {
+  const requested = typeof mode === 'string' ? { id: mode } : (mode || {});
+  const modeId = requested.id || requested.modeId;
+  const modeRow = modeId ? getWerewolfMode(modeId) : listWerewolfModes().find((item) => item.enabled);
+  if (!modeRow || !modeRow.enabled) throw new Error('狼人杀模式不存在或未启用，请先在 B 端配置启用模式。');
+
+  const roleMap = new Map(listWerewolfRoles().map((role) => [role.id, role]));
+  const roleSlots = [];
+  for (const item of modeRow.roles || []) {
+    const role = roleMap.get(item.roleId);
+    if (!role || !role.enabled) throw new Error(`狼人杀模式引用了不可用角色：${item.roleId}`);
+    for (let index = 0; index < Number(item.count || 0); index += 1) roleSlots.push(role.id);
+  }
+  if (!roleSlots.length) throw new Error('狼人杀模式未配置角色阵容。');
+
+  const runtimeRoles = Object.fromEntries(
+    [...roleMap.values()].map((role) => [role.id, normalizeRole(role)])
+  );
+  if (!runtimeRoles.villager) runtimeRoles.villager = FALLBACK_ROLE;
+
+  return {
+    id: modeRow.id,
+    name: modeRow.name,
+    version: modeRow.version || 'v1.0',
+    background: modeRow.description || buildModeBackground(modeRow, runtimeRoles),
+    description: modeRow.description || '',
+    roles: roleSlots,
+    roleMap: runtimeRoles,
     sheriff: {
-      enabled: true,
-      voteWeight: 1.5
+      enabled: Boolean(modeRow.sheriff?.enabled),
+      firstDayElection: modeRow.sheriff?.firstDayElection !== false,
+      voteWeight: Number(modeRow.sheriff?.voteWeight || 1.5)
     },
-    lastWordsLimit: 3,
+    winCondition: modeRow.winCondition || 'side',
+    lastWordsLimit: Number(modeRow.rules?.lastWordsLimit ?? 3),
     witch: {
       canSelfSaveNightOne: true,
       onePotionPerNight: true,
       hideWolfTargetAfterAntidoteUsed: true
     },
     hunter: {
-      disabledDeathReasons: ['女巫毒药']
+      disabledDeathReasons: getDisabledDeathReasons(runtimeRoles)
     },
     idiot: {
-      surviveExileOnce: true,
+      surviveExileOnce: hasAction(runtimeRoles.idiot, 'surviveExileOnce'),
       losesVoteAfterReveal: true
     }
-  },
-  'mirror-mist': {
-    id: 'mirror-mist',
-    name: '镜隐迷踪',
-    version: '扩展模式',
-    background: '镜隐迷踪局：保留标准12人底层规则，额外强调身份误导、镜像叙事和迷踪式发言博弈。'
-  },
-  'white-wolf-king-knight': {
-    id: 'white-wolf-king-knight',
-    name: '白狼王騎士',
-    version: '扩展模式',
-    background: '白狼王騎士局：以标准12人局为基础，主持记录白狼王与骑士主题的强对抗节奏。'
-  },
-  'wolf-beauty-knight': {
-    id: 'wolf-beauty-knight',
-    name: '狼美人騎士',
-    version: '扩展模式',
-    background: '狼美人騎士局：以标准12人局为基础，突出狼美人连接威胁与骑士决斗压力。'
-  },
-  'gargoyle-gravekeeper': {
-    id: 'gargoyle-gravekeeper',
-    name: '石像鬼守墓人',
-    version: '扩展模式',
-    background: '石像鬼守墓人局：以标准12人局为基础，突出夜间查验和放逐信息追踪。'
-  },
-  'thief-cupid': {
-    id: 'thief-cupid',
-    name: '盗贼丘比特',
-    version: '扩展模式',
-    background: '盗贼丘比特局：以标准12人局为基础，突出换牌、情侣线与阵营判断扰动。'
-  }
-};
-
-function getWerewolfModeConfig(mode) {
-  const requested = typeof mode === 'string' ? { id: mode } : (mode || {});
-  const base = WEREWOLF_MODES[requested.id] || WEREWOLF_MODES['standard-12'];
-  const standard = WEREWOLF_MODES['standard-12'];
-  return {
-    ...standard,
-    ...base,
-    name: requested.name || base.name,
-    background: requested.description || base.background,
-    roles: base.roles || standard.roles,
-    sheriff: { ...standard.sheriff, ...(base.sheriff || {}) },
-    witch: { ...standard.witch, ...(base.witch || {}) },
-    hunter: { ...standard.hunter, ...(base.hunter || {}) },
-    idiot: { ...standard.idiot, ...(base.idiot || {}) }
   };
 }
 
+function normalizeRole(role) {
+  return {
+    id: role.id,
+    name: role.name,
+    faction: role.faction === 'wolves' ? 'wolves' : 'good',
+    roleType: role.roleType || 'villager',
+    responsibility: role.responsibility || '',
+    ability: role.ability || '',
+    keyInfo: role.keyInfo || '',
+    rule: role.rule || {}
+  };
+}
+
+function hasAction(role, action) {
+  return Array.isArray(role?.rule?.actions) && role.rule.actions.some((item) => item.action === action);
+}
+
+function getDisabledDeathReasons(roleMap) {
+  const hunterAction = roleMap.hunter?.rule?.actions?.find((item) => item.action === 'shootOnDeath');
+  return Array.isArray(hunterAction?.disabledDeathReasons) ? hunterAction.disabledDeathReasons : ['女巫毒药'];
+}
+
+function buildModeBackground(mode, roleMap) {
+  const roles = (mode.roles || [])
+    .map((item) => `${item.count}${roleMap[item.roleId]?.name || item.roleId}`)
+    .join('、');
+  return `${mode.name}：${roles}`;
+}
+
 module.exports = {
-  WEREWOLF_MODES,
   getWerewolfModeConfig
 };

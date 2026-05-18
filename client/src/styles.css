@@ -21,6 +21,10 @@
   user-select: none;
 }
 
+*::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   margin: 0;
   color: var(--text);
@@ -272,7 +276,7 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 884px;
+  height: 100vh;
   padding: 60px;
   overflow: hidden;
 }
@@ -2941,43 +2945,51 @@ p {
 }
 
 .werewolf-table {
-  position: absolute;
-  z-index: 6;
-  inset: 0;
+  --size: 700px;
+  --seat-size: 72px;
+  --seat-count: 12;
+  --radius: 270px;
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
 }
 
 .werewolf-table .werewolf-seat {
   position: absolute;
-  left: var(--x);
-  top: var(--y);
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  width: 345.6px;
-  padding: 0;
-  transform: translate(-50%, -50%);
-  border: 0;
-  background: transparent;
+  left: 50%;
+  top: 50%;
+  width: var(--seat-size);
+  height: var(--seat-size);
+  /*
+    -90deg 表示第 1 个从正上方开始
+    顺时针排列
+  */
+  --angle: calc(-90deg + 360deg / var(--seat-count) * var(--i));
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translate(var(--radius))
+    rotate(calc(-1 * var(--angle)));
 }
 
-.werewolf-table .werewolf-seat:nth-child(1) { --x: 13%; --y: 15%; }
-.werewolf-table .werewolf-seat:nth-child(2) { --x: 13%; --y: 28.5%; }
-.werewolf-table .werewolf-seat:nth-child(3) { --x: 13%; --y: 42%; }
-.werewolf-table .werewolf-seat:nth-child(4) { --x: 13%; --y: 55.5%; }
-.werewolf-table .werewolf-seat:nth-child(5) { --x: 13%; --y: 69%; }
-.werewolf-table .werewolf-seat:nth-child(6) { --x: 13%; --y: 82.5%; }
-.werewolf-table .werewolf-seat:nth-child(7) { --x: 87%; --y: 15%; }
-.werewolf-table .werewolf-seat:nth-child(8) { --x: 87%; --y: 28.5%; }
-.werewolf-table .werewolf-seat:nth-child(9) { --x: 87%; --y: 42%; }
-.werewolf-table .werewolf-seat:nth-child(10) { --x: 87%; --y: 55.5%; }
-.werewolf-table .werewolf-seat:nth-child(11) { --x: 87%; --y: 69%; }
-.werewolf-table .werewolf-seat:nth-child(12) { --x: 87%; --y: 82.5%; }
+.werewolf-table .werewolf-seat:nth-child(1)  { --i: 0; }
+.werewolf-table .werewolf-seat:nth-child(2)  { --i: 1; }
+.werewolf-table .werewolf-seat:nth-child(3)  { --i: 2; }
+.werewolf-table .werewolf-seat:nth-child(4)  { --i: 3; }
+.werewolf-table .werewolf-seat:nth-child(5)  { --i: 4; }
+.werewolf-table .werewolf-seat:nth-child(6)  { --i: 5; }
+.werewolf-table .werewolf-seat:nth-child(7)  { --i: 6; }
+.werewolf-table .werewolf-seat:nth-child(8)  { --i: 7; }
+.werewolf-table .werewolf-seat:nth-child(9)  { --i: 8; }
+.werewolf-table .werewolf-seat:nth-child(10) { --i: 9; }
+.werewolf-table .werewolf-seat:nth-child(11) { --i: 10; }
+.werewolf-table .werewolf-seat:nth-child(12) { --i: 11; }
+.werewolf-table .werewolf-seat:nth-child(13) { --i: 12; }
+.werewolf-table .werewolf-seat:nth-child(14) { --i: 13; }
+.werewolf-table .werewolf-seat:nth-child(15) { --i: 14; }
+.werewolf-table .werewolf-seat:nth-child(16) { --i: 15; }
 
-.werewolf-table .werewolf-seat:nth-child(n + 7) {
-  flex-direction: row-reverse;
-  justify-content: flex-start;
-}
 
 .werewolf-table .werewolf-avatar {
   display: flex;
@@ -3233,7 +3245,6 @@ p {
 }
 
 .player-detail-modal dl {
-  display: flex;
   gap: 10px;
   margin: 0;
 }
@@ -3246,6 +3257,7 @@ p {
 }
 
 .player-detail-modal dt {
+  min-width: 80px;
   color: rgba(160, 210, 255, 0.9);
   font-weight: 800;
 }
@@ -3496,6 +3508,79 @@ p {
   text-decoration: none;
 }
 
+.game-recent-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  max-height: 300px;
+  overflow: auto;
+  
+}
+
+.game-recent-list > strong {
+  color: rgba(237, 245, 255, 0.82);
+  font-size: 13px;
+}
+
+.game-recent-list button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid rgba(130, 166, 204, 0.24);
+  border-radius: 8px;
+  background: rgba(5, 13, 24, 0.42);
+  color: #edf5ff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-recent-list button span,
+.game-recent-list button em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-recent-list button em,
+.game-recent-list p {
+  margin: 0;
+  color: rgba(203, 215, 232, 0.68);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.game-recent-list button em {
+  text-align: right;
+}
+
+.history-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.64);
+}
+
+.history-modal header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.history-modal pre {
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(5, 13, 24, 0.72);
+  color: #dce8f8;
+  font-size: 12px;
+}
+
 /* Final player module sizing and idle stages */
 .werewolf-idle-stage {
   position: relative;
@@ -3651,8 +3736,8 @@ body {
 
 .game-shell,
 .game-select-page {
-  width: 1920px;
-  height: 884px;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
 }
 
@@ -3675,8 +3760,8 @@ body {
 }
 
 .werewolf-shell {
-  width: 1920px;
-  height: 884px;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
 }
 
@@ -3698,4 +3783,47 @@ body {
 .werewolf-history-list,
 .werewolf-stage .werewolf-log {
   overflow: hidden;
+}
+.speech-insight-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  padding: 24px;
+}
+
+.speech-insight-card {
+  width: min(680px, 72vw);
+  max-height: min(52vh, 420px);
+  overflow: auto;
+  padding: 18px 22px;
+  border: 1px solid rgba(130, 180, 255, 0.36);
+  border-radius: 8px;
+  background: rgba(5, 12, 28, 0.76);
+  color: #eef6ff;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(12px);
+}
+
+.speech-insight-card strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.speech-insight-card p {
+  margin: 0;
+  line-height: 1.72;
+}
+
+.speech-insight-card details {
+  margin-top: 12px;
+  color: #bdd4ff;
+}
+
+.speech-insight-card summary {
+  cursor: default;
+  font-weight: 700;
 }

@@ -1,6 +1,5 @@
 import React from 'react';
 import { ArrowLeft, Eye, MessageCircle, Pause, Power, RotateCcw, Volume2, VolumeX } from 'lucide-react';
-import { classNames } from '../utils/gameState';
 
 export function TopNav({
   currentRound,
@@ -10,12 +9,10 @@ export function TopNav({
   roundLabel,
   autoPlay,
   showRoles,
-  mockMode,
   speechEnabled,
   controlsLocked,
   returnDisabled,
   onReturn,
-  onModeToggle,
   onSpeechToggle,
   setAutoPlay,
   setShowRoles,
@@ -24,7 +21,7 @@ export function TopNav({
   return (
     <header className="top-nav">
       <div className="brand">
-        <div className="brand-mark">◎</div>
+        <div className="brand-mark">◆</div>
         <div>
           <h1>{title}</h1>
           <span>{subtitle}</span>
@@ -37,7 +34,7 @@ export function TopNav({
         ) : (
           <>
             <span>第</span>
-            <strong>{currentRound.number}</strong>
+            <strong>{currentRound?.number || 0}</strong>
             <span>/ 3 轮</span>
           </>
         )}
@@ -45,7 +42,7 @@ export function TopNav({
 
       <div className="phase-badge">
         <MessageCircle size={18} />
-        <span>阶段：{currentEvent.title}</span>
+        <span>阶段：{currentEvent?.title || '-'}</span>
       </div>
 
       <nav className="nav-actions" aria-label="游戏菜单">
@@ -64,15 +61,11 @@ export function TopNav({
             <span>{showRoles ? '上帝' : '玩家'}</span>
           </button>
         )}
-        <button className="mode-switch" title="Mock 模式开关" onClick={onModeToggle} disabled={controlsLocked}>
-          <span className={classNames('switch-track', mockMode && 'active')}><i /></span>
-          <span>{mockMode ? 'Mock' : '真实'}</span>
-        </button>
         <button title={speechEnabled ? '关闭语音' : '开启语音'} onClick={onSpeechToggle} disabled={controlsLocked}>
           {speechEnabled ? <Volume2 size={23} /> : <VolumeX size={23} />}
           <span>语音</span>
         </button>
-        <button title={autoPlay ? '暂停' : '开始'} onClick={() => mockMode && setAutoPlay(!autoPlay)} disabled={!mockMode}>
+        <button title={autoPlay ? '暂停' : '开始'} onClick={() => setAutoPlay(!autoPlay)}>
           {autoPlay ? <Pause size={23} /> : <Power size={23} />}
           <span>{autoPlay ? '暂停' : '开始'}</span>
         </button>

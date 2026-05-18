@@ -1,8 +1,21 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { ArrowLeft, Award, CircleHelp, Crown, GripVertical, Landmark, MessageSquareText, Pause, Play, RotateCcw, Shield, Star, Swords, Users, X } from 'lucide-react';
-import { fetchAiPlayers, fetchDebateReplayOptions, openGameSocket } from '../api/gameApi';
+import { Award, CircleHelp, Crown, GripVertical, Landmark, MessageSquareText, Shield, Star, Swords, Users, X } from 'lucide-react';
+import { fetchAiHealth, openGameSocket } from '../api/gameApi';
 import { classNames } from '../utils/gameState';
+import { getPlayerAvatar, normalizeHostId } from '../utils/player';
 import { useSpeechQueue } from '../hooks/useSpeechQueue';
+import { DebateControls } from './debate/DebateControls';
+import { PlayerAvatar } from './common/BaseModal';
+import { HostSelector } from './common/HostSelector';
+import { PlayerDetailModal } from './common/PlayerDetailModal';
+import {
+  DEBATE_SUBTITLE_CONFIG,
+  formatDebateSubtitle,
+  getSubtitleChunkDelay,
+  getSubtitlePlaybackDelay,
+  splitDebateSubtitle
+} from './debate/debateSubtitle';
+import { SpeechInsightOverlay } from './SpeechInsightOverlay';
 import '../styles/debate-game.css';
 
 const EMPTY_DEBATE = {
@@ -34,19 +47,14 @@ const DEFAULT_DEBATE_STAGE_STEPS = [
   { ids: ['free'], label: '自由辩论', Icon: Users },
   { ids: ['closing'], label: '总结陈词', Icon: MessageSquareText },
   { ids: ['judges'], label: '评委点评', Icon: CircleHelp },
-  { ids: ['mvp'], label: 'MVP评选', Icon: Star },
+  { ids: ['mvp'], label: '最佳辩手评选', Icon: Star },
   { ids: ['postgame'], label: '赛后发言', Icon: MessageSquareText }
 ];
 
-const DEBATE_SUBTITLE_CONFIG = {
-  maxChars: 50
-};
-
-export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
-  const [mockMode, setMockMode] = useState(true);
+export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   const [game, setGame] = useState(EMPTY_DEBATE);
   const [status, setStatus] = useState('idle');
-  const [streamMessage, setStreamMessage] = useState('Mock 模式已就绪，点击开始后由后端逐条推送辩论赛。');
+  const [streamMessage, setStreamMessage] = useState('真实模式已就绪，点击开始后调用 AI。');
   const [activeSpeech, setActiveSpeech] = useState(null);
   const [subtitleSpeech, setSubtitleSpeech] = useState(null);
   const [isThinking, setIsThinking] = useState(false);
@@ -54,13 +62,12 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [topicDraft, setTopicDraft] = useState(DEFAULT_DEBATE_TOPIC);
   const [availablePlayers, setAvailablePlayers] = useState([]);
-  const [mockReplayOptions, setMockReplayOptions] = useState([]);
-  const [selectedMockReplayId, setSelectedMockReplayId] = useState('');
-  const [importedReplayGame, setImportedReplayGame] = useState(null);
   const [captainEnabled, setCaptainEnabled] = useState(true);
-  const [debateTeamDraft, setDebateTeamDraft] = useState(() => createDefaultDebateTeams(selectedPlayerIds));
+  const [debateTeamDraft, setDebateTeamDraft] = useState(() => createDefaultDebateTeams([]));
+  const [selectedHostId, setSelectedHostId] = useState('default');
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [autoPlay, setAutoPlay] = useState(false);
+  const [isReplayMode, setIsReplayMode] = useState(false);
   const socketRef = useRef(null);
   const pendingAckRef = useRef(null);
   const pendingEventRef = useRef(null);
@@ -72,15 +79,18 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
   useEffect(() => () => closeSocket(), []);
 
   useEffect(() => {
-    setDebateTeamDraft((value) => normalizeDebateTeamDraft(value, selectedPlayerIds));
-  }, [selectedPlayerIds]);
+    if (!replayGameId) return;
+    startGame(topicDraft, debateTeamDraft, selectedHostId, { replayGameId });
+  }, [replayGameId]);
 
   useEffect(() => {
     if (!topicDialogOpen) return;
     let cancelled = false;
-    fetchAiPlayers()
-      .then((players) => {
-        if (!cancelled) setAvailablePlayers(players);
+    fetchAiHealth()
+      .then((data) => {
+        if (cancelled) return;
+        setAvailablePlayers(data.players || []);
+        setSelectedHostId((current) => current === 'default' ? normalizeHostId(data.defaultHostId) : current);
       })
       .catch(() => {
         if (!cancelled) setAvailablePlayers([]);
@@ -89,21 +99,6 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
       cancelled = true;
     };
   }, [topicDialogOpen]);
-
-  useEffect(() => {
-    if (!topicDialogOpen || !mockMode) return;
-    let cancelled = false;
-    fetchDebateReplayOptions()
-      .then((logs) => {
-        if (!cancelled) setMockReplayOptions(logs);
-      })
-      .catch(() => {
-        if (!cancelled) setMockReplayOptions([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [topicDialogOpen, mockMode]);
 
   useEffect(() => {
     autoPlayRef.current = autoPlay;
@@ -116,8 +111,8 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
   const isRunning = status === 'streaming';
   const hasStarted = status !== 'idle' || Boolean(displayGame.phases?.length);
   const controlsLocked = isRunning;
-  const canStartNextGame = !isRunning || (mockMode && !autoPlay);
-  function resetToIdle(message, nextMockMode = mockMode) {
+  const canStartNextGame = !isRunning || !autoPlay;
+  function resetToIdle(message) {
     closeSocket();
     cancel();
     pendingAckRef.current = null;
@@ -131,8 +126,10 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
     setIsThinking(false);
     setStatus('idle');
     setAutoPlay(false);
+    setIsReplayMode(false);
+    setSelectedHostId('default');
     autoPlayRef.current = false;
-    setStreamMessage(message || (nextMockMode ? 'Mock 模式已就绪，点击开始后由后端逐条推送辩论赛。' : '真实模式已就绪，点击开始后才会调用 AI。'));
+    setStreamMessage(message || '真实模式已就绪，点击开始后调用 AI。');
   }
 
   function requestStartGame() {
@@ -140,14 +137,11 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
     setTopicDialogOpen(true);
   }
 
-  function startGame(topic = topicDraft, teams = debateTeamDraft) {
+  function startGame(topic = topicDraft, teams = debateTeamDraft, hostId = selectedHostId, options = {}) {
     resetToIdle('');
     if (speechEnabled) unlock();
-    const importedGameForStart = mockMode && importedReplayGame ? importedReplayGame : null;
     const nextTopic = normalizeTopicDraft(topic);
-    const playerIdsForTeams = mockMode && (selectedMockReplayId || importedGameForStart)
-      ? uniquePlayerIds([...(teams?.proIds || []), ...(teams?.conIds || []), ...(teams?.judgeIds || [])])
-      : selectedPlayerIds;
+    const playerIdsForTeams = availablePlayers.map((player) => player.id);
     const normalizedTeamsForStart = normalizeDebateTeamDraft(teams, playerIdsForTeams);
     const effectiveCaptainEnabled = captainEnabled && Boolean(normalizedTeamsForStart.proCaptainId && normalizedTeamsForStart.conCaptainId);
     const nextTeams = {
@@ -156,23 +150,25 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
       proCaptainId: effectiveCaptainEnabled ? normalizedTeamsForStart.proCaptainId : null,
       conCaptainId: effectiveCaptainEnabled ? normalizedTeamsForStart.conCaptainId : null
     };
-    const orderedPlayerIds = getOrderedDebatePlayerIds(nextTeams, playerIdsForTeams);
+    const assignedPlayerIds = uniquePlayerIds([...(nextTeams.proIds || []), ...(nextTeams.conIds || []), ...(nextTeams.judgeIds || [])]);
+    const shouldSendTeams = assignedPlayerIds.length >= 8;
     setTopicDraft(nextTopic);
     setDebateTeamDraft(nextTeams);
+    setSelectedHostId(normalizeHostId(hostId));
     setTopicDialogOpen(false);
     setStatus('streaming');
+    setIsReplayMode(Boolean(options.replayGameId));
     setAutoPlay(true);
     autoPlayRef.current = true;
-    setIsThinking(!mockMode);
+    setIsThinking(true);
     setStreamMessage('游戏准备中...');
     socketRef.current = openGameSocket({
-      mode: mockMode ? 'mock' : 'real',
+      mode: 'real',
       gameType: 'debate',
-      playerIds: orderedPlayerIds,
+      hostId: normalizeHostId(hostId),
       topic: nextTopic,
-      debateTeams: nextTeams,
-      mockReplayId: mockMode && !importedGameForStart ? selectedMockReplayId : '',
-      mockReplayGame: importedGameForStart,
+      debateTeams: shouldSendTeams ? nextTeams : null,
+      replayGameId: options.replayGameId || '',
       onEvent: handleSocketEvent,
       onError: (error) => {
         setStatus('error');
@@ -184,40 +180,9 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
   }
 
   function replayCurrentGame() {
-    const replayGame = displayGame;
-    const replayPlayers = replayGame.players || [];
-    const replayPlayerIds = uniquePlayerIds(replayPlayers.map((player) => player.id));
-    if (!replayPlayerIds.length) return;
-    const replayTeams = createDebateTeamsFromPlayers(replayPlayers);
-    const replayTopic = normalizeTopicDraft(replayGame.topic);
     setResultModalOpen(false);
-    resetToIdle('');
-    if (speechEnabled) unlock();
-    setMockMode(true);
-    setTopicDraft(replayTopic);
-    setDebateTeamDraft(replayTeams);
-    setSelectedMockReplayId('');
-    setImportedReplayGame(null);
-    setStatus('streaming');
-    setAutoPlay(true);
-    autoPlayRef.current = true;
-    setIsThinking(false);
-    setStreamMessage('正在复盘本局...');
-    socketRef.current = openGameSocket({
-      mode: 'mock',
-      gameType: 'debate',
-      playerIds: replayPlayerIds,
-      topic: replayTopic,
-      debateTeams: replayTeams,
-      mockReplayGame: replayGame,
-      onEvent: handleSocketEvent,
-      onError: (error) => {
-        setStatus('error');
-        setIsThinking(false);
-        setStreamMessage(error.message);
-      },
-      onClose: () => { }
-    });
+    if (!displayGame.id) return;
+    startGame(displayGame.topic, createDebateTeamsFromPlayers(displayGame.players || []), selectedHostId, { replayGameId: displayGame.id });
   }
 
   function openNextGameSettings() {
@@ -248,17 +213,14 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
     if (event.type === 'speech' && event.speech) {
       const label = event.speech.side === 'host' ? '主持人' : getDebateSpeakerLabel(event.game?.players || displayGame.players, event.speech.playerId);
       setStreamMessage(`${label}正在发言`);
-      setActiveSpeech({
-        playerId: event.speech.playerId,
-        text: event.speech.text
-      });
-      if (!speechEnabled) playSubtitleText(event.speech.text, event.speech.playerId, event.ackId);
+      setActiveSpeech(event.speech.side === 'host' ? null : { playerId: event.speech.playerId, text: event.speech.text });
+      if (!speechEnabled) playSubtitleText(event.speech.text, event.speech.playerId, event.ackId, event);
       return;
     }
-    const subtitleText = event.narration || getDebateNarration(event) || event.message;
+    const subtitleText = event.subtitle?.text || event.narration || getDebateNarration(event) || event.message;
     if (subtitleText && event.type !== 'game') {
       setActiveSpeech({ playerId: null, text: subtitleText });
-      if (!speechEnabled) playSubtitleText(subtitleText, null, event.ackId);
+      if (!speechEnabled) playSubtitleText(subtitleText, null, event.ackId, event);
     }
     if (event.type === 'done') {
       setStatus('ready');
@@ -273,7 +235,7 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
     setActiveSpeech(null);
     if (!pending?.ackId || pending.socket.readyState !== WebSocket.OPEN) return;
     pending.socket.send(JSON.stringify({ type: 'ack', ackId: pending.ackId }));
-    if (!mockMode && status === 'streaming') setIsThinking(true);
+    if (status === 'streaming') setIsThinking(true);
     pendingAckRef.current = null;
     pendingEventRef.current = null;
     clearPendingAckTimer();
@@ -284,15 +246,20 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
     if (!event) return;
     cancel();
     clearPendingAckTimer();
-    const narration = event.narration || getDebateNarration(event);
+    const narration = event.subtitle?.text || event.narration || getDebateNarration(event);
     if (speechEnabled && narration) {
-      const queued = speakSubtitleChunks(narration, event?.speech?.playerId || null, event.ackId);
+      const shouldUseSentenceQueue = Boolean(event?.speech?.playerId);
+      const queued = shouldUseSentenceQueue
+        ? speakSubtitleChunks(narration, event?.speech?.playerId || null, event.ackId, event)
+        : event.audioUrl
+        ? speakServerSubtitle(narration, event?.speech?.playerId || null, event.ackId, event)
+        : speakSubtitleChunks(narration, event?.speech?.playerId || null, event.ackId, event);
       if (!queued) {
-        playSubtitleText(narration, event?.speech?.playerId || null, event.ackId);
+        playSubtitleText(narration, event?.speech?.playerId || null, event.ackId, event);
         ackTimerRef.current = window.setTimeout(acknowledgePending, getSubtitlePlaybackDelay(narration));
       }
     } else {
-      playSubtitleText(narration, event?.speech?.playerId || null, event.ackId);
+      playSubtitleText(narration, event?.speech?.playerId || null, event.ackId, event);
       ackTimerRef.current = window.setTimeout(acknowledgePending, getSubtitlePlaybackDelay(narration));
     }
   }
@@ -303,7 +270,7 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
     ackTimerRef.current = null;
   }
 
-  function playSubtitleText(text, playerId, ackId) {
+  function playSubtitleText(text, playerId, ackId, event) {
     clearSubtitleTimer();
     const chunks = splitDebateSubtitle(text, DEBATE_SUBTITLE_CONFIG.maxChars);
     if (!chunks.length) {
@@ -316,7 +283,9 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
       setSubtitleSpeech({
         id: `${baseId}-${index}`,
         playerId,
-        text: chunks[index]
+        text: chunks[index],
+        speakerLabel: event?.subtitle?.speakerLabel || '',
+        speakerRole: event?.subtitle?.speakerRole || ''
       });
       index += 1;
       if (index < chunks.length) {
@@ -326,28 +295,64 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
     showNext();
   }
 
-  function speakSubtitleChunks(text, playerId, ackId) {
+  function speakSubtitleChunks(text, playerId, ackId, event) {
     clearSubtitleTimer();
     const chunks = splitDebateSubtitle(text, DEBATE_SUBTITLE_CONFIG.maxChars);
     if (!chunks.length) return false;
     const baseId = `${ackId || Date.now()}-${playerId || 'system'}`;
+    const voicePackageId = (event?.game?.players || game?.players || []).find((player) => Number(player.id) === Number(playerId))?.voicePackageId;
     let queued = true;
     chunks.forEach((chunk, index) => {
       const isLast = index === chunks.length - 1;
-      const speechText = removeParentheticalText(chunk);
+      const speechText = chunk;
       const itemQueued = speak(speechText, isLast ? acknowledgePending : undefined, {
         playerId,
+        voicePackageId,
+        audioUrl: event?.audioSegments?.[index]?.audioUrl,
         onStart: () => {
           setSubtitleSpeech({
             id: `${baseId}-${index}`,
             playerId,
-            text: chunk
+            text: chunk,
+            speakerLabel: event?.subtitle?.speakerLabel || '',
+            speakerRole: event?.subtitle?.speakerRole || '',
+            fullText: event?.speech?.fullText || text,
+            thinking: event?.speech?.thinking || ''
           });
         }
       });
       if (!itemQueued) queued = false;
     });
     return queued;
+  }
+
+  function getDebateSpeechOptions(event, playerId) {
+    const player = (event?.game?.players || game?.players || []).find((item) => Number(item.id) === Number(playerId));
+    const hostVoicePackageId = event?.game?.host?.voicePackageId || game?.host?.voicePackageId || null;
+    return {
+      playerId,
+      voicePackageId: player?.voicePackageId || (!playerId ? hostVoicePackageId : null),
+      audioUrl: event?.audioUrl
+    };
+  }
+
+  function speakServerSubtitle(text, playerId, ackId, event) {
+    clearSubtitleTimer();
+    const speechText = text;
+    return speak(speechText, acknowledgePending, {
+      ...getDebateSpeechOptions(event, playerId),
+      onStart: () => {
+        setSubtitleSpeech({
+          id: `${ackId || Date.now()}-${playerId || 'system'}`,
+          playerId,
+          text,
+          speakerLabel: event?.subtitle?.speakerLabel || '',
+          speakerRole: event?.subtitle?.speakerRole || '',
+          fullText: event?.speech?.fullText || text,
+          thinking: event?.speech?.thinking || ''
+        });
+      }
+    });
   }
 
   function clearSubtitleTimer() {
@@ -370,7 +375,23 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
     if (!next) {
       cancel();
       clearPendingAckTimer();
+      clearSubtitleTimer();
+      setSubtitleSpeech(null);
+      setActiveSpeech(null);
+      setIsThinking(false);
     }
+  }
+
+  function skipCurrentReplayPhase() {
+    if (!isReplayMode || socketRef.current?.readyState !== WebSocket.OPEN) return;
+    cancel();
+    clearPendingAckTimer();
+    clearSubtitleTimer();
+    setActiveSpeech(null);
+    setSubtitleSpeech(null);
+    setIsThinking(true);
+    setStreamMessage('正在跳过当前阶段...');
+    socketRef.current.send(JSON.stringify({ type: 'control', action: 'skip-phase' }));
   }
 
   function closeSocket() {
@@ -388,7 +409,7 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
   }
 
   return (
-    <main className={classNames('game-shell debate-shell', !mockMode && 'real-mode')}>
+    <main className="game-shell debate-shell real-mode">
       <DebateControls
         autoPlay={autoPlay}
         onReturn={returnToSelect}
@@ -397,7 +418,10 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
         startTitle={isRunning && autoPlay ? '暂停后可以开始下一局' : displayGame.phases?.length ? '开始下一局' : '开始游戏'}
         startDisabled={!canStartNextGame}
         playbackDisabled={!hasStarted}
+        showSkip={isReplayMode}
+        skipDisabled={!isReplayMode || !hasStarted || status !== 'streaming'}
         onStart={requestStartGame}
+        onSkipPhase={skipCurrentReplayPhase}
       />
 
       <DebateArena
@@ -425,8 +449,12 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
       {selectedPlayer && (
         <PlayerDetailModal
           player={selectedPlayer}
-          label={getDebatePlayerLabel(displayGame.players, selectedPlayer.id)}
-          description={getDebateIdentityDescription(selectedPlayer)}
+          subtitle={getDebatePlayerLabel(displayGame.players, selectedPlayer.id)}
+          fields={[
+            { label: '性格', value: selectedPlayer.personality || '暂无' },
+            { label: '本局身份', value: getDebatePlayerLabel(displayGame.players, selectedPlayer.id) },
+            { label: '身份说明', value: getDebateIdentityDescription(selectedPlayer) }
+          ]}
           onClose={() => setSelectedPlayer(null)}
         />
       )}
@@ -434,73 +462,25 @@ export function DebateGame({ selectedPlayerIds, onReturnToSelect }) {
         <DebateTopicDialog
           topic={topicDraft}
           onChange={setTopicDraft}
-          selectedPlayerIds={selectedPlayerIds}
+          selectedPlayerIds={availablePlayers.map((player) => player.id)}
           players={availablePlayers}
           teams={debateTeamDraft}
+          selectedHostId={selectedHostId}
+          onHostChange={setSelectedHostId}
           onTeamsChange={setDebateTeamDraft}
-          mockMode={mockMode}
-          mockReplayOptions={mockReplayOptions}
-          selectedMockReplayId={selectedMockReplayId}
-          onSelectedMockReplayIdChange={setSelectedMockReplayId}
-          importedReplayGame={importedReplayGame}
-          onImportedReplayGameChange={(game) => {
-            setImportedReplayGame(game);
-            if (game) {
-              setMockMode(true);
-              setSelectedMockReplayId('');
-              setCaptainEnabled(hasDebateCaptains(game.players));
-            }
-          }}
           captainEnabled={captainEnabled}
           onCaptainEnabledChange={setCaptainEnabled}
           speechEnabled={speechEnabled}
-          onMockModeChange={(value) => {
-            if (controlsLocked) return;
-            setMockMode(value);
-            resetToIdle(undefined, value);
-          }}
           onSpeechEnabledChange={(value) => {
             setSpeechEnabled(value);
             if (value) unlock();
           }}
           onCancel={() => setTopicDialogOpen(false)}
-          onStart={(topic, teams) => startGame(topic, teams)}
+          onStart={(topic, teams, hostId) => startGame(topic, teams, hostId)}
         />
       )}
+      <SpeechInsightOverlay speech={subtitleSpeech} players={displayGame.players} />
     </main>
-  );
-}
-
-function DebateControls({
-  autoPlay,
-  startLabel,
-  startTitle,
-  startDisabled,
-  playbackDisabled,
-  onReturn,
-  setAutoPlay,
-  onStart
-}) {
-  return (
-    <nav className="debate-controls" aria-label="辩论赛操作">
-      <button type="button" title="返回游戏选择" onClick={onReturn}>
-        <ArrowLeft size={18} />
-        <span>返回</span>
-      </button>
-      <button type="button" title={startTitle} onClick={onStart} disabled={startDisabled}>
-        <RotateCcw size={18} />
-        <span>{startLabel}</span>
-      </button>
-      <button
-        type="button"
-        title={playbackDisabled ? '开局后可推进' : autoPlay ? '暂停自动推进' : '继续自动推进'}
-        onClick={() => setAutoPlay(!autoPlay)}
-        disabled={playbackDisabled}
-      >
-        {autoPlay ? <Pause size={18} /> : <Play size={18} />}
-        <span>{autoPlay ? '暂停' : '推进'}</span>
-      </button>
-    </nav>
   );
 }
 
@@ -508,7 +488,7 @@ function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subt
   const proPlayers = useMemo(() => game.players.filter((player) => player.side === 'pro'), [game.players]);
   const conPlayers = useMemo(() => game.players.filter((player) => player.side === 'con'), [game.players]);
   const judges = useMemo(() => game.players.filter((player) => player.side === 'judge'), [game.players]);
-  const mvpVoteTargets = useMemo(() => getMvpVoteTargetMap(game), [game]);
+  const mvpVoteTargets = useMemo(() => currentPhase?.id === 'mvp' ? getMvpVoteTargetMap(game) : new Map(), [game, currentPhase]);
   const phaseSteps = useMemo(() => getDebatePhaseSteps(game.phases, currentPhase), [game.phases, currentPhase]);
   const activeStepIndex = getActiveStageIndex(currentPhase, phaseSteps);
   const subtitleMaxChars = getDebateSubtitleMaxChars(game);
@@ -520,6 +500,7 @@ function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subt
         position={game.topic?.proPosition}
         players={proPlayers}
         tone="pro"
+        mvpId={game.mvp?.id}
         currentSpeakerId={currentSpeakerId}
         onPlayerSelect={onPlayerSelect}
         mvpVoteTargets={mvpVoteTargets}
@@ -542,20 +523,23 @@ function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subt
           {isThinking && <DebateThinking />}
           <DebatePhaseTimeline steps={phaseSteps} activeStepIndex={activeStepIndex} />
         </section>
-        <section className="judge-row">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <DebateSeat
-              player={judges[index]}
-              slotLabel={`评委`}
-              key={judges[index]?.id || `judge-empty-${index}`}
-              currentSpeakerId={currentSpeakerId}
-              onPlayerSelect={onPlayerSelect}
-              tone="judge"
-              index={index}
-              mvpVoteTarget={mvpVoteTargets.get(Number(judges[index]?.id))}
-            />
-          ))}
-        </section>
+        {judges.length > 0 && (
+          <section className="judge-row">
+            {judges.map((judge, index) => (
+              <DebateSeat
+                player={judge}
+                slotLabel={`评委`}
+                key={judge.id || `judge-${index}`}
+                currentSpeakerId={currentSpeakerId}
+                onPlayerSelect={onPlayerSelect}
+                tone="judge"
+                index={index}
+                mvpVoteTarget={mvpVoteTargets.get(Number(judge.id))}
+                isMvp={Number(game.mvp?.id) === Number(judge.id)}
+              />
+            ))}
+          </section>
+        )}
       </div>
 
       <DebateSide
@@ -563,6 +547,7 @@ function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subt
         position={game.topic?.conPosition}
         players={conPlayers}
         tone="con"
+        mvpId={game.mvp?.id}
         currentSpeakerId={currentSpeakerId}
         onPlayerSelect={onPlayerSelect}
         mvpVoteTargets={mvpVoteTargets}
@@ -584,7 +569,7 @@ function DebateThinking() {
 function DebateSubtitle({ speech, players, maxChars = DEBATE_SUBTITLE_CONFIG.maxChars }) {
   const text = formatDebateSubtitle(speech?.text, maxChars);
   if (!text) return <div className="debate-subtitle empty" aria-hidden="true" />;
-  const speaker = speech.playerId ? getDebateSpeakerLabel(players, speech.playerId) : '系统播报';
+  const speaker = speech.speakerLabel || (speech.playerId ? getDebateSpeakerLabel(players, speech.playerId) : '主持人');
   return (
     <div className="debate-subtitle" key={speech.id || `${speech.playerId || 'host'}-${text}`}>
       <p><span>{speaker}</span> {text}</p>
@@ -592,43 +577,8 @@ function DebateSubtitle({ speech, players, maxChars = DEBATE_SUBTITLE_CONFIG.max
   );
 }
 
-function formatDebateSubtitle(value, maxChars = DEBATE_SUBTITLE_CONFIG.maxChars) {
-  const text = String(value || '').replace(/\s+/g, ' ').trim();
-  const limit = Math.max(1, Math.min(Number(maxChars) || DEBATE_SUBTITLE_CONFIG.maxChars, 50));
-  if (!text) return '';
-  if (text.length <= limit) return trimSubtitleBreakMark(text);
-
-  const breakIndex = findSubtitleBreakIndex(text, limit);
-
-  if (breakIndex >= 0) return trimSubtitleBreakMark(text.slice(0, breakIndex + 1));
-  return trimSubtitleBreakMark(text.slice(0, limit));
-}
-
-function trimSubtitleBreakMark(value) {
-  return String(value || '').trim().replace(/[，,。.!！?？；;、：:]+$/u, '');
-}
-
 function getDebateSubtitleMaxChars(game) {
   return game?.subtitleMaxChars || game?.config?.subtitleMaxChars || DEBATE_SUBTITLE_CONFIG.maxChars;
-}
-
-function splitDebateSubtitle(value, maxChars = DEBATE_SUBTITLE_CONFIG.maxChars) {
-  let rest = String(value || '').replace(/\s+/g, ' ').trim();
-  const limit = Math.max(1, Math.min(Number(maxChars) || DEBATE_SUBTITLE_CONFIG.maxChars, 50));
-  const chunks = [];
-  while (rest) {
-    if (rest.length <= limit) {
-      const chunk = trimSubtitleBreakMark(rest);
-      if (chunk) chunks.push(chunk);
-      break;
-    }
-    const index = findSubtitleBreakIndex(rest, limit);
-    const end = index >= 0 ? index + 1 : limit;
-    const chunk = trimSubtitleBreakMark(rest.slice(0, end));
-    if (chunk) chunks.push(chunk);
-    rest = rest.slice(end).trim();
-  }
-  return chunks;
 }
 
 function removeParentheticalText(value) {
@@ -639,32 +589,7 @@ function removeParentheticalText(value) {
     .trim();
 }
 
-function findSubtitleBreakIndex(text, limit) {
-  const preferredBreakMarks = '。；;';
-  const secondaryBreakMarks = '！？?!，,、：:';
-  for (const breakMarks of [preferredBreakMarks, secondaryBreakMarks]) {
-    let breakIndex = -1;
-    for (let index = 0; index < text.length && index < limit; index += 1) {
-      if (breakMarks.includes(text[index])) breakIndex = index;
-    }
-    if (breakIndex >= 0) return breakIndex;
-  }
-  return -1;
-}
-
-function getSubtitleChunkDelay(text) {
-  const length = String(text || '').length;
-  return Math.max(1400, Math.min(3600, 900 + length * 70));
-}
-
-function getSubtitlePlaybackDelay(text) {
-  const chunks = splitDebateSubtitle(text, DEBATE_SUBTITLE_CONFIG.maxChars);
-  if (!chunks.length) return 300;
-  const total = chunks.reduce((sum, chunk) => sum + getSubtitleChunkDelay(chunk), 0);
-  return Math.max(900, Math.min(16000, total));
-}
-
-function DebateSide({ title, position, players, tone, currentSpeakerId, onPlayerSelect, mvpVoteTargets }) {
+function DebateSide({ title, position, players, tone, mvpId, currentSpeakerId, onPlayerSelect, mvpVoteTargets }) {
   const seats = Array.from({ length: 4 }).map((_, index) => players[index] || null);
   return (
     <aside className={`debate-side ${tone}`}>
@@ -683,6 +608,7 @@ function DebateSide({ title, position, players, tone, currentSpeakerId, onPlayer
             tone={tone}
             index={index}
             mvpVoteTarget={mvpVoteTargets?.get(Number(player?.id))}
+            isMvp={Number(player?.id) === Number(mvpId)}
           />
         ))}
       </div>
@@ -690,28 +616,30 @@ function DebateSide({ title, position, players, tone, currentSpeakerId, onPlayer
   );
 }
 
-function DebateSeat({ player, currentSpeakerId, slotLabel, onPlayerSelect, tone = 'pro', index = 0, mvpVoteTarget = '' }) {
+function DebateSeat({ player, currentSpeakerId, slotLabel, onPlayerSelect, tone = 'pro', index = 0, mvpVoteTarget = '', isMvp = false }) {
   const isSpeaking = player && Number(currentSpeakerId) === Number(player.id);
   const isJudge = tone === 'judge';
   const isCaptain = !isJudge && player?.debateRole === 'captain';
   const name = player?.nickname || player?.name;
   return (
-    <article className={classNames('debate-seat', tone, isSpeaking && 'speaking', !player && 'empty')}>
+    <article className={classNames('debate-seat', tone, isSpeaking && 'speaking', isMvp && 'mvp-seat', !player && 'empty')}>
       <div
         className="debate-avatar player-detail-trigger"
-        style={player?.avatar ? { backgroundImage: `url("${formatAvatarUrl(player.avatar)}")` } : undefined}
+        style={getPlayerAvatar(player) ? { backgroundImage: `url("${formatAvatarUrl(getPlayerAvatar(player))}")` } : undefined}
         onClick={() => player && onPlayerSelect?.(player)}
         aria-label={player ? `查看${name}信息` : `${slotLabel}席位空缺`}
       >
-        {!player?.avatar && <span className="avatar-sprite" />}
-        {isCaptain && <span className="captain-avatar-badge"><Crown size={42} strokeWidth={3} /></span>}
+        {!getPlayerAvatar(player) && <span className="avatar-sprite" />}
+        {isCaptain && <span className="captain-avatar-badge">队长</span>}
+        {isMvp && <span className="mvp-avatar-badge"><Crown size={18} strokeWidth={3} />最佳</span>}
       </div>
       <div className="debate-nameplate">
         <span className="seat-badge">{isJudge ? slotLabel : `${toChineseOrdinal(index + 1)}辩`}</span>
         <strong>
           {name || slotLabel}
         </strong>
-        {mvpVoteTarget && <span className="seat-mvp-vote">{mvpVoteTarget}</span>}
+        {isMvp && <span className="seat-mvp-badge">本场最佳辩手</span>}
+        {mvpVoteTarget && <span className="seat-mvp-vote">投 {mvpVoteTarget}</span>}
       </div>
     </article>
   );
@@ -810,30 +738,20 @@ function DebateTopicDialog({
   selectedPlayerIds,
   players,
   teams,
+  selectedHostId,
+  onHostChange,
   onTeamsChange,
-  mockMode,
-  mockReplayOptions,
-  selectedMockReplayId,
-  onSelectedMockReplayIdChange,
-  importedReplayGame,
-  onImportedReplayGameChange,
   captainEnabled,
   onCaptainEnabledChange,
   speechEnabled,
-  onMockModeChange,
   onSpeechEnabledChange,
   onCancel,
   onStart
 }) {
-  const selectedReplaySetup = useMemo(
-    () => importedReplayGame ? getReplaySetup([createReplayOptionFromGame(importedReplayGame)], importedReplayGame.id) : getReplaySetup(mockReplayOptions, selectedMockReplayId),
-    [importedReplayGame, mockReplayOptions, selectedMockReplayId]
-  );
-  const [importError, setImportError] = useState('');
-  const isReplayLocked = Boolean(mockMode && selectedReplaySetup);
-  const effectiveTopic = isReplayLocked ? selectedReplaySetup.topic : topic;
-  const effectivePlayerIds = isReplayLocked ? selectedReplaySetup.playerIds : selectedPlayerIds;
-  const effectiveTeams = isReplayLocked ? selectedReplaySetup.teams : teams;
+  const isReplayLocked = false;
+  const effectiveTopic = topic;
+  const effectivePlayerIds = selectedPlayerIds;
+  const effectiveTeams = teams;
   const normalizedTeams = normalizeDebateTeamDraft(effectiveTeams, effectivePlayerIds);
   const proIds = normalizedTeams.proIds;
   const conIds = normalizedTeams.conIds;
@@ -841,15 +759,16 @@ function DebateTopicDialog({
   const proCaptainId = captainEnabled ? normalizedTeams.proCaptainId : null;
   const conCaptainId = captainEnabled ? normalizedTeams.conCaptainId : null;
   const judgeSlotCount = Math.max(0, effectivePlayerIds.length - 8);
-  const canStart = Boolean(effectiveTopic.title?.trim() && effectiveTopic.proPosition?.trim() && effectiveTopic.conPosition?.trim() && proIds.length === 4 && conIds.length === 4);
+  const canStart = Boolean(effectiveTopic.title?.trim() && effectiveTopic.proPosition?.trim() && effectiveTopic.conPosition?.trim() && proIds.filter(Boolean).length === 4 && conIds.filter(Boolean).length === 4);
   const update = (key, value) => {
     if (isReplayLocked) return;
     onChange({ ...topic, [key]: value });
   };
   const playerMap = useMemo(() => new Map(players.map((player) => [Number(player.id), player])), [players]);
-  const replayPlayerMap = useMemo(() => new Map((selectedReplaySetup?.players || []).map((player) => [Number(player.id), player])), [selectedReplaySetup]);
-  const selectedPlayers = effectivePlayerIds.map((id) => replayPlayerMap.get(Number(id)) || playerMap.get(Number(id)) || { id, nickname: `${id}号` });
+  const selectedPlayers = effectivePlayerIds.map((id) => playerMap.get(Number(id)) || { id, nickname: `${id}号` });
   const getPlayer = (id) => selectedPlayers.find((player) => Number(player.id) === Number(id));
+  const assignedIds = new Set([...proIds, ...conIds, ...judgeIds].map(Number));
+  const audiencePlayers = selectedPlayers.filter((player) => !assignedIds.has(Number(player.id)));
 
   const assignPlayerToSlot = (playerId, side, index) => {
     if (isReplayLocked) return;
@@ -862,7 +781,7 @@ function DebateTopicDialog({
     const source = findDebateTeamSlot(current, id);
     const targetOccupant = Number(target[index]) || null;
     if (source?.side === side && source.index === index) return;
-    if (!targetOccupant && target.length >= capacity && !source) return;
+    if (index >= capacity) return;
 
     const next = {
       proIds: removeDebatePlayerIds(current.proIds, id, targetOccupant),
@@ -882,6 +801,21 @@ function DebateTopicDialog({
     assignPlayerToSlot(value, side, index);
   };
 
+  const returnPlayerToAudience = (event) => {
+    if (isReplayLocked) return;
+    event.preventDefault();
+    const id = Number(event.dataTransfer.getData('text/plain'));
+    if (!id) return;
+    onTeamsChange(normalizeDebateTeamDraft({
+      ...normalizedTeams,
+      proIds: proIds.filter((item) => Number(item) !== id),
+      conIds: conIds.filter((item) => Number(item) !== id),
+      judgeIds: judgeIds.filter((item) => Number(item) !== id),
+      proCaptainId: Number(proCaptainId) === id ? null : proCaptainId,
+      conCaptainId: Number(conCaptainId) === id ? null : conCaptainId
+    }, effectivePlayerIds));
+  };
+
   const setCaptain = (side, playerId) => {
     if (isReplayLocked || !captainEnabled) return;
     const id = Number(playerId);
@@ -891,21 +825,6 @@ function DebateTopicDialog({
     }
     if (side === 'con' && conIds.includes(id)) {
       onTeamsChange(normalizeDebateTeamDraft({ ...normalizedTeams, conCaptainId: id }, effectivePlayerIds));
-    }
-  };
-
-  const handleImportGame = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const game = normalizeImportedDebateGame(JSON.parse(text), file.name, players);
-      setImportError('');
-      onImportedReplayGameChange?.(game);
-    } catch (error) {
-      setImportError(error.message || '导入失败，请检查 JSON 文件。');
-      onImportedReplayGameChange?.(null);
     }
   };
 
@@ -945,6 +864,15 @@ function DebateTopicDialog({
           <DebateTeamColumn title="反方" tone="con" ids={conIds} slots={4} labelPrefix="反方" getPlayer={getPlayer} captainId={conCaptainId} onCaptainDrop={setCaptain} onDrop={handleDrop} disabled={isReplayLocked} captainEnabled={captainEnabled} />
         </section>
 
+        <HostSelector
+          players={players}
+          selectedHostId={selectedHostId}
+          onChange={onHostChange}
+          className="debate-host-config"
+          listClassName="debate-host-list"
+          description="可将任意 AI 玩家设为本局主持人，不占用正反方或评委席位"
+        />
+
         {/* <section className="debate-player-pool">
           <div className="player-pool-head">
             <strong>选手列表（{selectedPlayers.length}名）</strong>
@@ -957,39 +885,25 @@ function DebateTopicDialog({
           </div>
         </section> */}
 
-        {mockMode && (
-          <section className="debate-import-row">
-            <label className="debate-import-control">
-              <input type="file" accept="application/json,.json" onChange={handleImportGame} />
-              <span>导入对局 JSON</span>
-            </label>
-            <strong>{importedReplayGame ? `已导入：${importedReplayGame.topic?.title || importedReplayGame.id}` : '导入后将按文件对局播放'}</strong>
-            {importedReplayGame && (
-              <button type="button" onClick={() => onImportedReplayGameChange?.(null)}>清除导入</button>
-            )}
-          </section>
-        )}
-        {importError && <p className="debate-import-error">{importError}</p>}
+        <section
+          className="debate-player-pool"
+          onDragOver={(event) => !isReplayLocked && event.preventDefault()}
+          onDrop={returnPlayerToAudience}
+        >
+          <div className="player-pool-head">
+            <strong>观众席（{audiencePlayers.length}名）</strong>
+            <span>拖入正方、反方或评委席才会参与本局；从比赛席拖回这里则移出本局。</span>
+          </div>
+          <div className="player-pool-list">
+            {audiencePlayers.map((player) => (
+              <DraggableDebatePlayer player={player} key={player.id} />
+            ))}
+            {!audiencePlayers.length && <em className="player-pool-empty">观众席为空</em>}
+          </div>
+        </section>
 
         <footer>
           <div className="debate-topic-switches">
-            <button type="button" className={classNames('dialog-switch', mockMode && 'active')} onClick={() => onMockModeChange(!mockMode)}>
-              <span className="switch-track"><i /></span>
-              <strong>{mockMode ? 'Mock 模式' : '真实模式'}</strong>
-            </button>
-            {mockMode && (
-              <label className="mock-replay-select">
-                <span>历史对局</span>
-                <select value={selectedMockReplayId} onChange={(event) => onSelectedMockReplayIdChange(event.target.value)}>
-                  <option value="">自动生成 Mock 对局</option>
-                  {mockReplayOptions.map((item) => (
-                    <option value={item.filename || item.id} key={item.filename || item.id}>
-                      {formatReplayOption(item)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
             <button
               type="button"
               className={classNames('dialog-switch', captainEnabled && 'active')}
@@ -1005,7 +919,7 @@ function DebateTopicDialog({
               <strong>{speechEnabled ? '语音开启' : '语音关闭'}</strong>
             </button>
           </div>
-          <button type="button" className="primary debate-start-submit" onClick={() => onStart(effectiveTopic, normalizedTeams)} disabled={!canStart}>保存并开始</button>
+          <button type="button" className="primary debate-start-submit" onClick={() => onStart(effectiveTopic, normalizedTeams, selectedHostId)} disabled={!canStart}>保存并开始</button>
         </footer>
       </section>
     </div>
@@ -1133,105 +1047,34 @@ function DebateResult({ game }) {
 
 function DebateResultModal({ game, onNextGame, onReplay }) {
   const report = useMemo(() => getShareReport(game), [game]);
-  const [posters, setPosters] = useState({ vertical: '', wide: '' });
-  const mvpName = report.mvp?.nickname || report.mvp?.name || (report.mvp?.id ? `${report.mvp.id}号` : '暂未产生');
+  const [posterUrl, setPosterUrl] = useState('');
 
   useEffect(() => {
-    let active = true;
-    const nextPosters = {
-      vertical: createDebatePoster(report, 'vertical'),
-      wide: createDebatePoster(report, 'wide')
-    };
-    if (active) setPosters(nextPosters);
+    let cancelled = false;
+    setPosterUrl('');
+    createDebateResultPoster(report)
+      .then((url) => {
+        if (!cancelled && url) setPosterUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setPosterUrl('');
+      });
     return () => {
-      active = false;
+      cancelled = true;
     };
   }, [report]);
 
   return (
     <div className="debate-result-modal-backdrop" role="presentation">
-      <section className="debate-result-modal share-report-modal" role="dialog" aria-modal="true" aria-label="战报分享">
-        <header className="share-report-head">
-          <div>
-            <span>战报分享</span>
-            <h2>{report.topic || 'AI 辩论赛'}</h2>
-          </div>
-          <strong>{report.winnerLabel}</strong>
-        </header>
-
-        <div className="share-report-body">
-          <section className="share-report-summary">
-            <div className="result-modal-stats">
-              <article>
-                <span>胜方</span>
-                <strong>{report.winnerLabel}</strong>
-              </article>
-              <article>
-                <span>MVP</span>
-                <strong>{mvpName}</strong>
-              </article>
-            </div>
-
-            <div className="share-report-grid">
-              <article>
-                <span>正方立场</span>
-                <p>{report.proPosition}</p>
-              </article>
-              <article>
-                <span>反方立场</span>
-                <p>{report.conPosition}</p>
-              </article>
-              <article>
-                <span>正方阵容</span>
-                <p>{formatReportNames(report.proLineup)}</p>
-              </article>
-              <article>
-                <span>反方阵容</span>
-                <p>{formatReportNames(report.conLineup)}</p>
-              </article>
-              <article>
-                <span>评委阵容</span>
-                <p>{formatReportNames(report.judges) || '暂无评委'}</p>
-              </article>
-              <article>
-                <span>胜负理由</span>
-                <p>{report.winReason || '评委综合双方论证质量、反驳力度和团队协作给出结果。'}</p>
-              </article>
-            </div>
-
-            <div className="share-report-lists">
-              <article>
-                <span>精彩金句</span>
-                {(report.highlights.length ? report.highlights : [{ text: '双方围绕核心标准持续交锋，完整呈现了一场 AI 辩论。' }]).map((item, index) => (
-                  <p key={`${item.playerId || index}-${item.text}`}>“{item.text}”</p>
-                ))}
-              </article>
-              <article>
-                <span>评委短评</span>
-                {(report.judgeComments.length ? report.judgeComments : [{ text: report.winReason || '双方各有亮点，胜负取决于评判标准。' }]).map((item, index) => (
-                  <p key={`${item.judgeId || index}-${item.text}`}>{item.judgeName ? `${item.judgeName}：` : ''}{item.text}</p>
-                ))}
-              </article>
-            </div>
-          </section>
-
-          <section className="poster-preview-panel">
-            <article>
-              <span>9:16</span>
-              {posters.vertical && <img src={posters.vertical} alt="9:16 战报海报" />}
-              <button type="button" onClick={() => downloadPoster(posters.vertical, report, '9x16')} disabled={!posters.vertical}>下载竖版</button>
-            </article>
-            <article>
-              <span>16:9</span>
-              {posters.wide && <img src={posters.wide} alt="16:9 战报海报" />}
-              <button type="button" onClick={() => downloadPoster(posters.wide, report, '16x9')} disabled={!posters.wide}>下载横版</button>
-            </article>
-          </section>
-        </div>
+      <section className="debate-result-modal share-report-modal" role="dialog" aria-modal="true" aria-label="本局比赛结束">
+        {posterUrl
+          ? <img className="debate-result-poster" src={posterUrl} alt="本局比赛结束战报海报" />
+          : <div className="debate-result-poster debate-result-poster-loading" aria-label="正在生成战报海报" />}
 
         <footer>
           <button type="button" onClick={onReplay}>复盘</button>
-          <button type="button" className="primary" onClick={onNextGame}>开启下一局</button>
+          <button type="button" onClick={() => downloadResultPoster(posterUrl, report)} disabled={!posterUrl}>下载海报</button>
+          <button type="button" className="primary" onClick={onNextGame}>下一局</button>
         </footer>
       </section>
     </div>
@@ -1240,11 +1083,20 @@ function DebateResultModal({ game, onNextGame, onReplay }) {
 
 function getShareReport(game) {
   if (game?.shareReport) {
+    const playerMap = new Map((game.players || []).map((player) => [Number(player.id), player]));
+    const withPlayerAvatar = (players = []) => players.map((player) => {
+      const match = playerMap.get(Number(player.id));
+      return {
+        ...player,
+        avatar: getPlayerAvatar(player) || getPlayerAvatar(match) || '',
+        avatarUrl: getPlayerAvatar(player) || getPlayerAvatar(match) || ''
+      };
+    });
     return {
       ...game.shareReport,
-      proLineup: game.shareReport.proLineup || [],
-      conLineup: game.shareReport.conLineup || [],
-      judges: game.shareReport.judges || [],
+      proLineup: withPlayerAvatar(game.shareReport.proLineup || []),
+      conLineup: withPlayerAvatar(game.shareReport.conLineup || []),
+      judges: withPlayerAvatar(game.shareReport.judges || []),
       highlights: game.shareReport.highlights || [],
       judgeComments: game.shareReport.judgeComments || []
     };
@@ -1313,6 +1165,297 @@ function formatReportNames(players = []) {
   return players.map((player) => player.nickname || player.name || `${player.id}号`).filter(Boolean).join(' / ');
 }
 
+const DEBATE_RESULT_POSTER_DESIGN = { width: 1672, height: 941 };
+const DEBATE_RESULT_DEBATER_SLOTS = {
+  pro: [
+    { x: 98, avatarY: 355, nameY: 552, roleY: 590, radius: 58 },
+    { x: 258, avatarY: 360, nameY: 557, roleY: 595, radius: 58 },
+    { x: 410, avatarY: 365, nameY: 562, roleY: 600, radius: 58 },
+    { x: 555, avatarY: 370, nameY: 567, roleY: 605, radius: 58 }
+  ],
+  con: [
+    { x: 1130, avatarY: 370, nameY: 552, roleY: 590, radius: 58 },
+    { x: 1285, avatarY: 360, nameY: 557, roleY: 595, radius: 58 },
+    { x: 1435, avatarY: 360, nameY: 562, roleY: 600, radius: 58 },
+    { x: 1580, avatarY: 355, nameY: 567, roleY: 605, radius: 58 }
+  ]
+};
+const DEBATE_RESULT_JUDGE_SLOTS = [
+  { x: 702, avatarY: 834, nameY: 910, radius: 42 },
+  { x: 848, avatarY: 834, nameY: 910, radius: 42 },
+  { x: 992, avatarY: 834, nameY: 910, radius: 42 }
+];
+const DEBATE_RESULT_ROLE_LABELS = ['一辩', '二辩', '三辩', '四辩'];
+
+async function createDebateResultPoster(report) {
+  if (typeof document === 'undefined') return '';
+  const canvas = document.createElement('canvas');
+  canvas.width = DEBATE_RESULT_POSTER_DESIGN.width;
+  canvas.height = DEBATE_RESULT_POSTER_DESIGN.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  await drawDebateResultPosterBackground(ctx, canvas.width, canvas.height);
+  drawDebateResultPosterFrames(ctx);
+  await drawDebateResultPosterAvatars(ctx, report);
+  drawDebateResultPosterText(ctx, report);
+
+  try {
+    return canvas.toDataURL('image/png');
+  } catch (error) {
+    return '';
+  }
+}
+
+async function drawDebateResultPosterBackground(ctx, width, height) {
+  try {
+    const image = await loadPosterImage('/resources/debate_result_poster_bg.png');
+    ctx.drawImage(image, 0, 0, width, height);
+  } catch (error) {
+    // Background is optional; keep the poster information layer usable without it.
+  }
+}
+
+function drawDebateResultPosterFrames(ctx) {
+  DEBATE_RESULT_DEBATER_SLOTS.pro.forEach((slot) => drawPosterAvatarPlaceholder(ctx, slot, 'pro'));
+  DEBATE_RESULT_DEBATER_SLOTS.con.forEach((slot) => drawPosterAvatarPlaceholder(ctx, slot, 'con'));
+  DEBATE_RESULT_JUDGE_SLOTS.forEach((slot) => drawPosterAvatarPlaceholder(ctx, slot, 'judge'));
+}
+
+function drawPosterAvatarPlaceholder(ctx, slot, tone) {
+  const color = tone === 'con' ? 'rgba(255, 96, 106, 0.78)' : tone === 'judge' ? 'rgba(240, 226, 255, 0.72)' : 'rgba(86, 168, 255, 0.78)';
+  ctx.save();
+  ctx.fillStyle = tone === 'con' ? 'rgba(55, 8, 12, 0.34)' : tone === 'judge' ? 'rgba(24, 18, 36, 0.34)' : 'rgba(8, 25, 58, 0.34)';
+  ctx.beginPath();
+  ctx.arc(slot.x, slot.avatarY, slot.radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(slot.x, slot.avatarY, slot.radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function loadPosterImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    if (/^https?:/i.test(src)) image.crossOrigin = 'anonymous';
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+function drawDebateResultPosterText(ctx, report) {
+  drawPosterBoxText(ctx, report.topic || 'AI 辩论赛', {
+    x: 436,
+    y: 105,
+    width: 800,
+    height: 155,
+    maxLines: 2,
+    maxSize: 60,
+    minSize: 34,
+    lineHeight: 72,
+    color: '#ffffff',
+    weight: '950',
+    align: 'center',
+    shadow: true
+  });
+
+  drawPosterSingleLine(ctx, '正方', 90, 718, 150, 46, 32, '#ffffff', '950', 'left');
+  drawRotatedPosterBoxText(ctx, report.proPosition || '正方立场', {
+    x: 90,
+    y: 735,
+    width: 520,
+    height: 70,
+    angle: -2.5,
+    maxLines: 2,
+    maxSize: 34,
+    minSize: 22,
+    lineHeight: 42,
+    color: '#ffffff',
+    weight: '800',
+    align: 'left',
+    shadow: true
+  });
+  drawPosterSingleLine(ctx, '反方', 1580, 718, 150, 46, 32, '#ffffff', '950', 'right');
+  drawRotatedPosterBoxText(ctx, report.conPosition || '反方立场', {
+    x: 1060,
+    y: 735,
+    width: 520,
+    height: 70,
+    angle: 2.5,
+    maxLines: 2,
+    maxSize: 34,
+    minSize: 22,
+    lineHeight: 42,
+    color: '#ffffff',
+    weight: '800',
+    align: 'right',
+    shadow: true
+  });
+
+  drawPosterLineup(ctx, 'pro', sortReportPlayers(report.proLineup || []), '#ffffff', '#dbeaff');
+  drawPosterLineup(ctx, 'con', sortReportPlayers(report.conLineup || []), '#ffffff', '#ffb8b8');
+  drawPosterJudges(ctx, sortReportPlayers(report.judges || []));
+}
+
+function drawPosterLineup(ctx, side, players, nameColor, roleColor) {
+  const slots = DEBATE_RESULT_DEBATER_SLOTS[side] || [];
+  slots.forEach((slot, index) => {
+    const player = players[index];
+    const name = getPosterPlayerName(player) || `${index + 1}号`;
+    drawPosterSingleLine(ctx, name, slot.x, slot.nameY, 144, 23, 16, nameColor, '900', 'center');
+    drawPosterSingleLine(ctx, DEBATE_RESULT_ROLE_LABELS[index], slot.x, slot.roleY, 96, 21, 16, roleColor, '850', 'center');
+  });
+}
+
+function drawPosterJudges(ctx, judges) {
+  DEBATE_RESULT_JUDGE_SLOTS.forEach((slot, index) => {
+    const judge = judges[index];
+    const name = judge ? getPosterPlayerName(judge) : '';
+    if (!name) return;
+    drawPosterSingleLine(ctx, name, slot.x, slot.nameY, 112, 19, 14, '#f6f0ff', '850', 'center');
+  });
+}
+
+async function drawDebateResultPosterAvatars(ctx, report) {
+  const proPlayers = sortReportPlayers(report.proLineup || []);
+  const conPlayers = sortReportPlayers(report.conLineup || []);
+  const judgePlayers = sortReportPlayers(report.judges || []).slice(0, 3);
+  const tasks = [
+    ...DEBATE_RESULT_DEBATER_SLOTS.pro.map((slot, index) => drawCircularAvatar(ctx, proPlayers[index], slot, 'pro')),
+    ...DEBATE_RESULT_DEBATER_SLOTS.con.map((slot, index) => drawCircularAvatar(ctx, conPlayers[index], slot, 'con')),
+    ...DEBATE_RESULT_JUDGE_SLOTS.map((slot, index) => drawCircularAvatar(ctx, judgePlayers[index], slot, 'judge'))
+  ];
+  await Promise.all(tasks);
+}
+
+async function drawCircularAvatar(ctx, player, slot, fallbackTone) {
+  const src = formatAvatarUrl(player?.avatar);
+  if (!src) return;
+  try {
+    const image = await loadPosterImage(src);
+    const diameter = slot.radius * 2;
+    const sourceSize = Math.min(image.naturalWidth || image.width, image.naturalHeight || image.height);
+    const sourceX = ((image.naturalWidth || image.width) - sourceSize) / 2;
+    const sourceY = ((image.naturalHeight || image.height) - sourceSize) / 2;
+    const avatarCanvas = document.createElement('canvas');
+    avatarCanvas.width = diameter;
+    avatarCanvas.height = diameter;
+    const avatarCtx = avatarCanvas.getContext('2d');
+    if (!avatarCtx) return;
+    avatarCtx.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, diameter, diameter);
+    avatarCanvas.toDataURL('image/png');
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(slot.x, slot.avatarY, slot.radius, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(avatarCanvas, slot.x - slot.radius, slot.avatarY - slot.radius, diameter, diameter);
+    ctx.restore();
+    drawAvatarRing(ctx, slot, fallbackTone);
+  } catch (error) {
+    // Avatar drawing is best-effort; keep the poster usable if an image cannot load.
+  }
+}
+
+function drawAvatarRing(ctx, slot, tone) {
+  const color = tone === 'con' ? 'rgba(255, 88, 92, 0.82)' : tone === 'judge' ? 'rgba(232, 213, 255, 0.72)' : 'rgba(76, 159, 255, 0.82)';
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(slot.x, slot.avatarY, slot.radius + 2, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRotatedPosterBoxText(ctx, text, options) {
+  const { x, y, width, height, angle = 0 } = options;
+  ctx.save();
+  ctx.translate(x + width / 2, y + height / 2);
+  ctx.rotate((angle * Math.PI) / 180);
+  drawPosterBoxText(ctx, text, {
+    ...options,
+    x: -width / 2,
+    y: -height / 2
+  });
+  ctx.restore();
+}
+
+function drawPosterBoxText(ctx, text, options) {
+  const {
+    x,
+    y,
+    width,
+    height,
+    maxLines,
+    maxSize,
+    minSize,
+    lineHeight,
+    color,
+    weight,
+    align = 'left',
+    shadow = false
+  } = options;
+  const clean = cleanPosterText(text);
+  let size = maxSize;
+  let lines = [];
+  do {
+    ctx.font = `${weight} ${size}px "Microsoft YaHei", "PingFang SC", Arial, sans-serif`;
+    lines = wrapCanvasText(ctx, clean, width, maxLines);
+    if (lines.length <= maxLines && lines.every((line) => ctx.measureText(line).width <= width)) break;
+    size -= 2;
+  } while (size > minSize);
+  const actualLineHeight = Math.min(lineHeight, size + 14);
+  const blockHeight = Math.min(height, lines.length * actualLineHeight);
+  const startY = y + Math.max(0, (height - blockHeight) / 2) + size;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = `${weight} ${size}px "Microsoft YaHei", "PingFang SC", Arial, sans-serif`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'alphabetic';
+  if (shadow) {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+  }
+  const textX = align === 'center' ? x + width / 2 : align === 'right' ? x + width : x;
+  lines.slice(0, maxLines).forEach((line, index) => {
+    ctx.fillText(line, textX, startY + index * actualLineHeight);
+  });
+  ctx.restore();
+}
+
+function drawPosterSingleLine(ctx, text, x, y, width, maxSize, minSize, color, weight, align = 'center') {
+  let size = maxSize;
+  const clean = cleanPosterText(text);
+  ctx.save();
+  ctx.textAlign = align;
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = color;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.82)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
+  do {
+    ctx.font = `${weight} ${size}px "Microsoft YaHei", "PingFang SC", Arial, sans-serif`;
+    if (ctx.measureText(clean).width <= width || size <= minSize) break;
+    size -= 1;
+  } while (size > minSize);
+  const display = truncateCanvasText(ctx, clean, width);
+  ctx.fillText(display, x, y);
+  ctx.restore();
+}
+
+function truncateCanvasText(ctx, text, width) {
+  if (ctx.measureText(text).width <= width) return text;
+  let next = text;
+  while (next.length > 1 && ctx.measureText(`${next}...`).width > width) next = next.slice(0, -1);
+  return `${next}...`;
+}
+
 function createDebatePoster(report, variant) {
   if (typeof document === 'undefined') return '';
   const vertical = variant === 'vertical';
@@ -1351,7 +1494,7 @@ function drawVerticalPoster(ctx, report, width, height) {
   y = drawWrappedPosterText(ctx, report.topic || 'AI 辩论赛', 72, y, width - 144, 64, '#ffffff', 3, 78);
   y += 28;
   drawWinnerPill(ctx, report.winnerLabel, 72, y, report.winner);
-  drawPosterText(ctx, `MVP ${getPosterPlayerName(report.mvp)}`, 420, y + 34, 36, '#f6dc85', '900');
+  drawPosterText(ctx, `最佳辩手 ${getPosterPlayerName(report.mvp)}`, 420, y + 34, 36, '#f6dc85', '900');
   y += 120;
   y = drawPosterPositions(ctx, report, 72, y, width - 144);
   y += 36;
@@ -1371,7 +1514,7 @@ function drawWidePoster(ctx, report, width, height) {
   drawPosterKicker(ctx, 'AI 辩论赛战报', 72, 80);
   drawWrappedPosterText(ctx, report.topic || 'AI 辩论赛', 72, 150, 740, 54, '#ffffff', 3, 64);
   drawWinnerPill(ctx, report.winnerLabel, 72, 365, report.winner);
-  drawPosterText(ctx, `MVP ${getPosterPlayerName(report.mvp)}`, 350, 399, 36, '#f6dc85', '900');
+  drawPosterText(ctx, `最佳辩手 ${getPosterPlayerName(report.mvp)}`, 350, 399, 36, '#f6dc85', '900');
   drawPosterSection(ctx, '胜负理由', report.winReason || '评委综合双方论证质量、反驳力度和团队协作给出结果。', 72, 470, 690, 34, 3);
   drawPosterPositions(ctx, report, 850, 95, 670);
   drawLineupBlock(ctx, '正方阵容', report.proLineup, 850, 300, 670, '#5db8ff');
@@ -1514,6 +1657,14 @@ function downloadPoster(dataUrl, report, ratio) {
   link.click();
 }
 
+function downloadResultPoster(dataUrl, report) {
+  if (!dataUrl) return;
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = `AI辩论赛赛后海报-${safePosterFileName(report.topic)}.png`;
+  link.click();
+}
+
 function safePosterFileName(value) {
   return String(value || '未命名辩题').replace(/[\\/:*?"<>|]/g, '').slice(0, 18);
 }
@@ -1604,11 +1755,16 @@ function hasDebateCaptains(players = []) {
 
 function normalizeImportedDebateGame(raw, filename = 'imported-debate.json', libraryPlayers = []) {
   if (raw?.type === 'debate' && Array.isArray(raw.players) && (Array.isArray(raw.phases) || Array.isArray(raw.rounds))) {
+    const players = raw.players.map((player) => ({
+      ...player,
+      avatar: getImportedAvatar(player) || player.avatar || ''
+    }));
     return {
       ...raw,
       id: raw.id || `imported-debate-${Date.now()}`,
-      mode: 'mock',
+      mode: 'real',
       topic: normalizeTopicDraft(raw.topic),
+      players,
       phases: Array.isArray(raw.phases) ? raw.phases : getPhasesFromImportedRounds(raw.rounds),
       createdAt: raw.createdAt || new Date().toISOString()
     };
@@ -1628,7 +1784,7 @@ function normalizeImportedDebateGame(raw, filename = 'imported-debate.json', lib
   const game = {
     id: `imported-debate-${Date.now()}`,
     type: 'debate',
-    mode: 'mock',
+    mode: 'real',
     importSource: filename,
     topic,
     players,
@@ -1678,6 +1834,7 @@ function createImportedPlayers(raw, libraryPlayers = []) {
       externalId,
       name: speaker?.nickname || speaker?.name || externalId,
       nickname: speaker?.nickname || speaker?.name || externalId,
+      avatar: getImportedAvatar(speaker),
       side,
       sideIndex: side === 'judge' ? null : players.filter((item) => item.side === side).length,
       role: speaker?.role || '',
@@ -1694,6 +1851,7 @@ function createImportedPlayers(raw, libraryPlayers = []) {
       externalId,
       name: item.nickname || item.name || externalId,
       nickname: item.nickname || item.name || externalId,
+      avatar: getImportedAvatar(item),
       side,
       sideIndex: side === 'judge' ? null : players.filter((candidate) => candidate.side === side).length,
       role: '',
@@ -1713,7 +1871,7 @@ function normalizeImportedTeamMembers(members = [], side) {
     externalId: String(member.id || `${side}-${index + 1}`),
     name: member.nickname || member.name || member.id || `${side}-${index + 1}`,
     nickname: member.nickname || member.name || member.id || `${side}-${index + 1}`,
-    avatar: member.avatar || member.avatarUrl || '',
+    avatar: getImportedAvatar(member),
     role: member.role || '',
     persona: member.persona || '',
     side,
@@ -1785,13 +1943,14 @@ function normalizePlayerMatchKey(value) {
 function mergeImportedPlayer(libraryPlayer, entry, id) {
   const sideLabel = entry.side === 'pro' ? '正方' : entry.side === 'con' ? '反方' : '评委席';
   const debateRole = entry.side === 'judge' ? 'judge' : entry.isCaptain ? 'captain' : 'debater';
+
   return {
     ...(libraryPlayer || {}),
     id,
     externalId: entry.externalId,
     name: libraryPlayer?.name || libraryPlayer?.nickname || entry.name,
     nickname: libraryPlayer?.nickname || libraryPlayer?.name || entry.nickname || entry.name,
-    avatar: libraryPlayer?.avatar || '',
+    avatar: libraryPlayer?.avatar || entry.avatar || '',
     provider: libraryPlayer?.provider || 'imported',
     model: libraryPlayer?.model || 'imported-match',
     sex: libraryPlayer?.sex || '未知',
@@ -1841,8 +2000,8 @@ function createImportedPhases(raw, externalToInternalId, players, result) {
   if (mvpVotes.length) {
     const mvpPhase = {
       id: 'mvp',
-      name: 'MVP评选',
-      summary: '导入对局 MVP 评选结果。',
+      name: '最佳辩手评选',
+      summary: '导入对局最佳辩手评选结果。',
       speeches: [],
       votes: mvpVotes
     };
@@ -1929,7 +2088,25 @@ function createImportedShareReport(game) {
 }
 
 function publicImportedPlayer(player) {
-  return player ? { id: player.id, nickname: player.nickname, name: player.name, side: player.side, sideLabel: player.sideLabel } : null;
+  return player ? { id: player.id, nickname: player.nickname, name: player.name, avatar: getPlayerAvatar(player), avatarUrl: getPlayerAvatar(player), side: player.side, sideLabel: player.sideLabel } : null;
+}
+
+function getImportedAvatar(value = {}) {
+  const avatar = String(
+    value.avatar ||
+    value.avatarUrl ||
+    value.avatarURL ||
+    value.avatar_url ||
+    value.image ||
+    value.imageUrl ||
+    value.icon ||
+    ''
+  ).trim();
+  if (!avatar) return '';
+  if (/^(https?:|data:|blob:|\/)/i.test(avatar)) return avatar;
+  if (avatar.includes('/')) return avatar;
+  if (/\.(png|jpe?g|webp|gif|svg)$/i.test(avatar)) return `/avatars/${avatar}`;
+  return avatar;
 }
 
 function getPhasesFromImportedRounds(rounds = []) {
@@ -1963,7 +2140,7 @@ function mapImportedPhaseName(phaseId, fallback = '') {
     free: '自由辩论',
     closing: '总结陈词',
     judges: '评委点评',
-    mvp: 'MVP评选',
+    mvp: '最佳辩手评选',
     postgame: '赛果公布'
   };
   return fallback || names[phaseId] || phaseId;
@@ -1990,15 +2167,12 @@ function sanitizeImportedPhaseId(value) {
 }
 
 function createDefaultDebateTeams(playerIds = []) {
-  const ids = uniquePlayerIds(playerIds).slice(0, 12);
-  const proIds = ids.slice(0, 4);
-  const conIds = ids.slice(4, 8);
   return {
-    proIds,
-    conIds,
-    judgeIds: ids.slice(8),
-    proCaptainId: proIds[0] || null,
-    conCaptainId: conIds[0] || null
+    proIds: [],
+    conIds: [],
+    judgeIds: [],
+    proCaptainId: null,
+    conCaptainId: null
   };
 }
 
@@ -2006,10 +2180,12 @@ function normalizeDebateTeamDraft(value, playerIds = []) {
   const selectedIds = uniquePlayerIds(playerIds).slice(0, 12);
   if (!value) return createDefaultDebateTeams(selectedIds);
   const selectedSet = new Set(selectedIds);
-  const proIds = uniquePlayerIds(value?.proIds).filter((id) => selectedSet.has(id)).slice(0, 4);
-  const proSet = new Set(proIds);
-  const conIds = uniquePlayerIds(value?.conIds).filter((id) => selectedSet.has(id) && !proSet.has(id)).slice(0, 4);
-  const assigned = new Set([...proIds, ...conIds]);
+  const proIds = normalizeDebateSlots(value?.proIds, 4, selectedSet);
+  const proSet = new Set(proIds.filter(Boolean));
+  const conIds = normalizeDebateSlots(value?.conIds, 4, selectedSet, proSet);
+  const assigned = new Set([...proIds, ...conIds].filter(Boolean));
+  const judgeCapacity = Math.max(0, selectedIds.length - 8);
+  const judgeIds = normalizeDebateSlots(value?.judgeIds, judgeCapacity, selectedSet, assigned);
   const hasExplicitProCaptain = Object.prototype.hasOwnProperty.call(value || {}, 'proCaptainId');
   const hasExplicitConCaptain = Object.prototype.hasOwnProperty.call(value || {}, 'conCaptainId');
   const proCaptainId = hasExplicitProCaptain && value?.proCaptainId == null
@@ -2025,10 +2201,20 @@ function normalizeDebateTeamDraft(value, playerIds = []) {
   return {
     proIds,
     conIds,
-    judgeIds: selectedIds.filter((id) => !assigned.has(id)),
+    judgeIds,
     proCaptainId,
     conCaptainId
   };
+}
+
+function normalizeDebateSlots(ids = [], size = 0, selectedSet = new Set(), usedSet = new Set()) {
+  const used = new Set(usedSet);
+  return Array.from({ length: size }).map((_, index) => {
+    const id = Number(ids[index]);
+    if (!id || !selectedSet.has(id) || used.has(id)) return null;
+    used.add(id);
+    return id;
+  });
 }
 
 function getOrderedDebatePlayerIds(teams, playerIds = []) {
@@ -2100,35 +2286,4 @@ function getDebateIdentityDescription(player) {
 
 function toChineseOrdinal(value) {
   return ['零', '一', '二', '三', '四'][value] || String(value);
-}
-
-function PlayerDetailModal({ player, label, description, onClose }) {
-  return (
-    <div className="player-detail-backdrop" role="presentation" onClick={onClose}>
-      <section className="player-detail-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-        <button type="button" className="player-detail-close" onClick={onClose} aria-label="关闭">×</button>
-        <div className="player-detail-head">
-          <div className="player-detail-avatar" style={player.avatar ? { backgroundImage: `url("${formatAvatarUrl(player.avatar)}")` } : undefined}>
-            {!player.avatar && (player.nickname || player.name || `${player.id}`).slice(0, 1)}
-          </div>
-          <div>
-            <h3>{player.nickname || player.name || `${player.id}号`}</h3>
-            <p>{label}</p>
-          </div>
-        </div>
-        <dl>
-          <div><dt>性格</dt><dd>{player.personality || '暂无'}</dd></div>
-          <div><dt>本局身份</dt><dd>{label}</dd></div>
-          <div><dt>身份说明</dt><dd>{description}</dd></div>
-        </dl>
-      </section>
-    </div>
-  );
-}
-
-function formatAvatarUrl(value) {
-  const url = String(value || '').trim();
-  if (!url) return '';
-  if (/^(https?:|data:|blob:)/i.test(url)) return url.replace(/"/g, '%22');
-  return encodeURI(url.startsWith('/') ? url : `/${url}`).replace(/"/g, '%22');
 }

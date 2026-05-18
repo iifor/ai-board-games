@@ -2,9 +2,9 @@ const express = require('express');
 const { getAiConfig } = require('../aiConfig');
 const { createAiGame } = require('../aiGameRunner');
 const { getDb } = require('../db');
-const { readGameLogs, readRealGameLogs, saveGameLog } = require('../gameLogStore');
 const { testOpenAIConnection } = require('../openaiChat');
-const { listSkins, saveGameRecord } = require('../adminStore');
+const { getGame, getVoicePackage, listGames, listSkins, listWerewolfModes, saveGameRecord } = require('../adminStore');
+const { synthesizeVoicePreview } = require('../voicePreview');
 
 const router = express.Router();
 
@@ -24,24 +24,56 @@ router.get('/health', (request, response) => {
       names: skins.map((skin) => skin.name)
     },
     host: {
+      id: config.host.id || 0,
+      name: config.host.name,
+      nickname: config.host.nickname,
       provider: config.host.provider,
       model: config.host.model,
       baseUrl: config.host.baseUrl,
       apiKeyEnv: config.host.apiKeyEnv,
-      hasApiKey: Boolean(config.host.apiKey)
+      hasApiKey: Boolean(config.host.apiKey),
+      avatar: config.host.avatar || '',
+      avatarUrl: config.host.avatarUrl || config.host.avatar || '',
+      voicePackageId: config.host.voicePackageId || null
     },
+    defaultHostId: config.host.defaultHostPlayerId || config.host.id || null,
     players: config.players.map((player) => ({
       id: player.id,
       nickname: player.nickname,
+      avatar: player.avatar,
+      avatarUrl: player.avatarUrl || player.avatar,
       provider: player.provider,
       model: player.model,
       baseUrl: player.baseUrl,
       apiKeyEnv: player.apiKeyEnv,
       hasApiKey: Boolean(player.apiKey),
       sex: player.sex,
-      personality: player.personality
+      personality: player.personality,
+      voicePackageId: player.voicePackageId
     }))
   });
+});
+
+router.post('/voice/synthesize', async (request, response, next) => {
+  try {
+    const text = String(request.body?.text || '').trim();
+    const voicePackageId = request.body?.voicePackageId;
+    if (!text) {
+      response.status(400).json({ error: 'EMPTY_TEXT', message: '语音文本不能为空' });
+      return;
+    }
+    const voice = getVoicePackage(voicePackageId);
+    if (!voice || !voice.enabled) {
+      response.status(404).json({ error: 'VOICE_PACKAGE_NOT_FOUND', message: '语音包不存在或未启用' });
+      return;
+    }
+    const audio = await synthesizeVoicePreview(voice, text);
+    response.setHeader('Content-Type', audio.mimeType || 'audio/mpeg');
+    response.setHeader('Cache-Control', 'no-store');
+    response.send(audio.buffer);
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get('/player-selections', (request, response, next) => {
@@ -52,31 +84,9 @@ router.get('/player-selections', (request, response, next) => {
   }
 });
 
-router.get('/game-logs/:gameType', (request, response, next) => {
+router.get('/werewolf-modes', (request, response, next) => {
   try {
-    const gameType = normalizeGameType(request.params.gameType);
-    const logs = (request.query.realOnly === '1' ? readRealGameLogs(gameType) : readGameLogs(gameType))
-      .map((record) => ({
-        id: record.game?.id || record.filename,
-        filename: record.filename,
-        savedAt: record.savedAt,
-        title: record.game?.topic?.title || record.game?.event?.name || record.game?.id || record.filename,
-        mode: record.game?.mode || '',
-        playerCount: record.game?.players?.length || 0,
-        topic: record.game?.topic || null,
-        players: (record.game?.players || []).map((player) => ({
-          id: player.id,
-          name: player.name,
-          nickname: player.nickname,
-          avatar: player.avatar,
-          side: player.side,
-          sideIndex: player.sideIndex,
-          sideLabel: player.sideLabel,
-          debateRole: player.debateRole,
-          debateRoleLabel: player.debateRoleLabel
-        }))
-      }));
-    response.json({ gameType, logs });
+    response.json(listWerewolfModes().filter((mode) => mode.enabled));
   } catch (error) {
     next(error);
   }
@@ -125,6 +135,16 @@ router.post('/games', async (request, response, next) => {
   }
 });
 
+router.get('/games/recent', (request, response, next) => {
+  try {
+    const gameType = normalizeGameType(request.query.gameType);
+    const limit = Math.min(50, Math.max(1, Number(request.query.limit) || 10));
+    response.json({ gameType, games: listGames({ gameType }).slice(0, limit) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/games/new', async (request, response, next) => {
   try {
     const config = getRequestConfig(request);
@@ -135,12 +155,22 @@ router.get('/games/new', async (request, response, next) => {
   }
 });
 
+router.get('/games/:id', (request, response, next) => {
+  try {
+    const game = getGame(request.params.id);
+    if (!game) {
+      response.status(404).json({ error: 'GAME_NOT_FOUND', message: '历史对局不存在' });
+      return;
+    }
+    response.json(game);
+  } catch (error) {
+    next(error);
+  }
+});
+
 async function createGameForMode(config) {
   const game = await createAiGame(config);
-  if (config.mode === 'real') {
-    saveGameRecord(game);
-    saveGameLog(game);
-  }
+  saveGameRecord(game);
   return game;
 }
 
@@ -163,11 +193,11 @@ function resolveDiagnosticProvider(config, providerName) {
 function getRequestConfig(request) {
   const config = getAiConfig();
   const requestedMode = request.query.mode || request.body?.mode || 'real';
-  if (requestedMode === 'mock') return { ...config, mode: 'mock' };
+  if (requestedMode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
   if (requestedMode === 'real') {
     if (config.missingProviders.length) {
       const missing = config.missingProviders.map((item) => `${item.provider}(${item.apiKeyEnv})`).join('、');
-      throw new Error(`真实模式缺少 API Key：${missing}。请在 .env 中配置，或在页面右上角切换到 Mock。`);
+      throw new Error(`真实模式缺少 API Key：${missing}。请在 .env 或 B 端模型管理中配置。`);
     }
     return { ...config, mode: 'real' };
   }

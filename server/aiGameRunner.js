@@ -1,10 +1,7 @@
 const { callOpenAIChat, parseJsonObject } = require('./openaiChat');
-const { createMockGame } = require('./mockGame');
-const { readRealGameLogs } = require('./gameLogStore');
 const { getRandomEnabledSkin } = require('./adminStore');
 const { buildMemoryCard, getInvestigationQuestions } = require('./mistTemplate');
-
-let lastMockReplayGameId = null;
+const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('./services/ai/promptComposer');
 
 function shuffle(items) {
   const copy = [...items];
@@ -48,7 +45,9 @@ function createAgents(config, template) {
 
   agents.forEach((agent) => {
     agent.memoryCard = buildMemoryCard(agent, agents, keyFigureId, coverId, template);
-    agent.messages = [{ role: 'system', content: buildSystemPrompt(agent, keyFigureId, coverId, template) }];
+    agent.baseSystemPrompt = buildSystemPrompt(agent, keyFigureId, coverId, template);
+    agent.baseSystemPromptHash = hashText(agent.baseSystemPrompt);
+    agent.messages = [{ role: 'system', content: agent.baseSystemPrompt }];
   });
 
   return agents;
@@ -58,7 +57,8 @@ function buildSystemPrompt(agent, keyFigureId, coverId, template) {
   const terms = template.terms;
   const common = [
     '你正在参与《共识迷雾·迷雾调查》v3.2 标准7人局。你是一个独立玩家，不是主持人。',
-    `你的编号是 ${agent.id}，昵称是 ${agent.nickname}，人格倾向是：${agent.personality}。`,
+    `你的编号是 ${agent.id}。`,
+    buildPlayerPersonaModule(agent),
     `本局皮肤：${template.name}`,
     `事件背景：${template.background}`,
     `你的个人记忆卡：\n${agent.memoryCard}`,
@@ -70,29 +70,29 @@ function buildSystemPrompt(agent, keyFigureId, coverId, template) {
   ];
 
   if (agent.role === 'investigator') {
-    return [
+    return compilePromptModules([
       ...common,
       `你的隐藏阵营是${terms.investigators}。目标：找出真正的${terms.keyFigure}。`,
       `第二轮如果${terms.exclusion}${terms.keyFigure}，调查方立即胜利；否则第三轮必须最终指认${terms.keyFigure}。`,
       `你不知道谁是${terms.keyFigure}，也不知道谁是${terms.cover}。你应推动有效共识，警惕过度共识带来的噪音。`
-    ].join('\n');
+    ]).text;
   }
 
   if (agent.role === 'keyFigure') {
-    return [
+    return compilePromptModules([
       ...common,
       `你的隐藏身份是${terms.mist}中的${terms.keyFigure}。目标：避免第二轮被${terms.exclusion}，避免第三轮成为唯一最高票。`,
       `你的同伴${terms.cover}是 ${coverId} 号。`,
       '你可以误导、模糊、选择性表达信息，制造共识失败、诱导过度共识，或伪装成健康异议。'
-    ].join('\n');
+    ]).text;
   }
 
-  return [
+  return compilePromptModules([
     ...common,
     `你的隐藏身份是${terms.mist}中的${terms.cover}。目标：保护${terms.keyFigure}，制造错误判断。`,
     `真正的${terms.keyFigure}是 ${keyFigureId} 号。`,
     `你可以替${terms.keyFigure}吸引怀疑，把怀疑引向调查方，或在最终指认前制造分票。`
-  ].join('\n');
+  ]).text;
 }
 
 async function askAgent(agent, prompt, options = {}) {
@@ -102,6 +102,7 @@ async function askAgent(agent, prompt, options = {}) {
     baseUrl: agent.baseUrl,
     provider: agent.provider,
     model: agent.model,
+    apiFormat: agent.apiFormat,
     temperature: agent.temperature,
     messages: agent.messages,
     maxTokens: options.maxTokens || 260
@@ -127,11 +128,11 @@ async function collectConsensusVote(agent, round, question, publicHistory, templ
     `公开历史：\n${publicHistory || '暂无'}`,
     `你的状态：\n${getPublicPlayerState(agent, template)}`,
     '请选择你的秘密共识投票。只返回 JSON：',
-    '{"vote":"A","reason":"一句话原因"}'
+    '{"vote":"A"}'
   ].join('\n\n');
 
   try {
-    const reply = await askAgent(agent, prompt, { maxTokens: 120 });
+    const reply = await askAgent(agent, prompt, { maxTokens: 60 });
     const parsed = parseJsonObject(reply);
     const vote = parsed?.vote === 'A' || parsed?.vote === 'B' ? parsed.vote : fallbackConsensusVote(agent, round);
     agent.votes.push(vote);
@@ -176,11 +177,11 @@ async function collectTargetVote(agent, phase, validTargetIds, publicLog, speech
     `本轮发言：\n${speeches || '暂无'}`,
     `你的状态：\n${getPublicPlayerState(agent, template)}`,
     '只返回 JSON：',
-    '{"target":2,"reason":"一句话原因"}'
+    '{"target":2}'
   ].join('\n\n');
 
   try {
-    const reply = await askAgent(agent, prompt, { maxTokens: 120 });
+    const reply = await askAgent(agent, prompt, { maxTokens: 60 });
     const parsed = parseJsonObject(reply);
     const target = Number(parsed?.target);
     return validTargetIds.includes(target) ? target : fallbackTarget(agent, validTargetIds, phase);
@@ -315,6 +316,7 @@ function serializeGame({ agents, rounds, template, gameId, winner = null, winRea
       nickname: agent.nickname,
       avatar: agent.avatar,
       provider: agent.provider,
+      voicePackageId: agent.voicePackageId,
       role: agent.role,
       roleLabel: getRoleLabel(agent.role, template),
       sex: agent.sex || '未知',
@@ -338,133 +340,8 @@ function serializeGame({ agents, rounds, template, gameId, winner = null, winRea
 }
 
 async function createAiGame(config, options = {}) {
-  if (config.mode !== 'real') {
-    const game = getMockReplayGame(config);
-    if (options.onEvent) await replayMockGame(game, options.onEvent);
-    return game;
-  }
+  if (config.mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
   return runAiGame(config, options);
-}
-
-function getMockReplayGame(config) {
-  const selected = getRandomMatchingRealGameLog(config.selectedPlayerIds || config.players.map((player) => player.id));
-  if (selected?.game?.rounds?.length && selected.game?.event?.version === 'v3.2') {
-    lastMockReplayGameId = selected.game.id;
-    const game = clone(selected.game);
-    game.players = resetReplayPlayers(game.players || []);
-    return {
-      ...game,
-      id: `mock-replay-${selected.game.id || Date.now()}`,
-      mode: 'mock',
-      replayFrom: {
-        id: selected.game.id,
-        savedAt: selected.savedAt,
-        filename: selected.filename
-      }
-    };
-  }
-  return createMockGame(config);
-}
-
-function resetReplayPlayers(players = []) {
-  return players.map((player) => ({
-    ...player,
-    alive: true,
-    excluded: false,
-    excludedRound: null,
-    marked: false,
-    lastTestimony: ''
-  }));
-}
-
-function getRandomMatchingRealGameLog(playerIds) {
-  const expected = normalizeIdSet(playerIds);
-  const logs = readRealGameLogs().filter((record) => normalizeIdSet(record.game?.players?.map((player) => player.id)).join(',') === expected.join(','));
-  if (!logs.length) return null;
-  const candidates = logs.length > 1 ? logs.filter((record) => record.game?.id !== lastMockReplayGameId) : logs;
-  const pool = candidates.length ? candidates : logs;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function normalizeIdSet(ids = []) {
-  return ids.map(Number).filter(Boolean).sort((a, b) => a - b);
-}
-
-async function replayMockGame(game, onEvent) {
-  const partial = { ...clone(game), rounds: [], winner: null, winReason: '' };
-  if (partial.event) partial.event.truth = '';
-
-  await onEvent({ type: 'players', players: partial.players, game: clone(partial) });
-
-  for (const sourceRound of game.rounds) {
-    const round = {
-      ...clone(sourceRound),
-      votes: {},
-      tally: { A: 0, B: 0 },
-      consensusType: 'failed',
-      consensus: false,
-      clue: null,
-      appraisal: '',
-      noise: '',
-      speeches: [],
-      suspicionVotes: {},
-      markedSuspects: [],
-      exclusionVotes: {},
-      excluded: [],
-      finalAccusationVotes: {},
-      finalTargets: []
-    };
-    partial.rounds.push(round);
-    await onEvent({ type: 'round-start', round: clone(round), game: clone(partial) });
-
-    Object.assign(round.votes, sourceRound.votes);
-    round.tally = clone(sourceRound.tally);
-    round.consensusType = sourceRound.consensusType;
-    round.consensus = sourceRound.consensus;
-    await onEvent({ type: 'vote-result', round: clone(round), game: clone(partial) });
-
-    round.clue = clone(sourceRound.clue || null);
-    round.appraisal = sourceRound.appraisal || '';
-    round.noise = sourceRound.noise || '';
-    await onEvent({ type: 'clue-result', round: clone(round), game: clone(partial) });
-
-    for (const speech of sourceRound.speeches || []) {
-      round.speeches.push(clone(speech));
-      await onEvent({ type: 'speech', round: clone(round), speech: clone(speech), game: clone(partial) });
-    }
-
-    if (sourceRound.suspicionVotes) {
-      round.suspicionVotes = clone(sourceRound.suspicionVotes);
-      round.markedSuspects = clone(sourceRound.markedSuspects || []);
-      await onEvent({ type: 'suspicion-result', round: clone(round), game: clone(partial) });
-    }
-
-    if (sourceRound.exclusionVotes) {
-      round.exclusionVotes = clone(sourceRound.exclusionVotes);
-      round.excluded = clone(sourceRound.excluded || []);
-      for (const item of round.excluded) {
-        const target = partial.players.find((player) => Number(player.id) === Number(item.id));
-        if (target) {
-          target.alive = false;
-          target.excluded = true;
-          target.excludedRound = round.number;
-          target.lastTestimony = item.testimony || '';
-        }
-      }
-      await onEvent({ type: 'exclusion-result', round: clone(round), game: clone(partial) });
-      for (const item of round.excluded) {
-        await onEvent({ type: 'last-testimony', round: clone(round), testimony: clone(item), game: clone(partial) });
-      }
-    }
-
-    if (sourceRound.finalAccusationVotes) {
-      round.finalAccusationVotes = clone(sourceRound.finalAccusationVotes);
-      round.finalTargets = clone(sourceRound.finalTargets || []);
-      await onEvent({ type: 'final-accusation-result', round: clone(round), game: clone(partial) });
-    }
-  }
-
-  await onEvent({ type: 'game', game: clone(game) });
 }
 
 async function runAiGame(config, options = {}) {

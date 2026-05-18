@@ -1,4 +1,7 @@
-const { callOpenAIChat, parseJsonObject } = require('./openaiChat');
+﻿const { callOpenAIChat, parseJsonObject } = require('./openaiChat');
+
+const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('./services/ai/promptComposer');
+const { cachedLlmCall } = require('./services/ai/llmResultCache');
 
 const PHASES = [
   { id: 'strategy', name: '队长战术部署', limit: 300 },
@@ -10,8 +13,6 @@ const PHASES = [
   { id: 'mvp', name: '评选最佳辩手', limit: 100 },
   { id: 'postgame', name: '赛后发言', limit: 180 }
 ];
-const { readRealGameLogs } = require('./gameLogStore');
-
 const TOPICS = [
   {
     title: 'AI 应该拥有参与重大公共决策的投票权吗？',
@@ -85,7 +86,9 @@ function createDebateAgents(config, topic) {
       speeches: [],
       messages: []
     };
-    agent.messages = [{ role: 'system', content: buildSystemPrompt(agent, topic, PHASES[0]) }];
+    agent.baseSystemPrompt = buildSystemPrompt(agent, topic, PHASES[0]);
+    agent.baseSystemPromptHash = hashText(agent.baseSystemPrompt);
+    agent.messages = [{ role: 'system', content: agent.baseSystemPrompt }];
     return agent;
   });
 }
@@ -135,21 +138,24 @@ function uniqueValidIds(value, playerMap) {
 }
 
 function buildSystemPrompt(agent, topic, phase) {
+  const personaModule = buildPlayerPersonaModule(agent);
   if (agent.side === 'judge') {
-    return [
+    return compilePromptModules([
       '你是《AI 辩论赛》的评委。你不是正反方选手。',
-      `你的场上称谓是${getDebateRoleName(agent)}，昵称是 ${agent.nickname}，人格倾向是：${agent.personality}。`,
+      `你的场上称谓是${getDebateRoleName(agent)}。`,
+      personaModule,
       '发言时不要自称几号，也不要用几号称呼自己；请以评委身份发言。',
       '你需要依据论点清晰度、反驳质量、团队协作、表达感染力进行判断。',
       '点评要具体指出双方亮点和问题，不能只说空话。',
-      'MVP 投票必须从正反方 8 位选手中选择 1 位，并给出理由。',
+      'MVP 投票必须从正反方 8 位选手中选择 1 位；投票任务只返回目标，不需要理由。',
       `严格遵守当前环节字数限制：${phase.limit}。`
-    ].join('\n');
+    ]).text;
   }
 
-  return [
+  return compilePromptModules([
     '你正在参加《AI 辩论赛》。你不是主持人。',
-    `你的场上称谓是${getDebateRoleName(agent)}，昵称是 ${agent.nickname}，人格倾向是：${agent.personality}。`,
+    `你的场上称谓是${getDebateRoleName(agent)}。`,
+    personaModule,
     `你的阵营是：${agent.sideLabel}。你的身份是：${agent.debateRoleLabel}。`,
     `辩题：${topic.title}`,
     `你的立场：${agent.side === 'pro' ? topic.proPosition : topic.conPosition}`,
@@ -161,19 +167,20 @@ function buildSystemPrompt(agent, topic, phase) {
     agent.debateRole === 'captain'
       ? '你是本方队长。你需要给队友制定战术：核心论点、攻击重点、防守底线、发言分工。战术部署只面向本方，不要写给对方或评委。'
       : ''
-  ].filter(Boolean).join('\n');
+  ]).text;
 }
 
-function buildHostPrompt(topic, phaseName) {
-  return [
-    '你是《AI 辩论赛》的主持人。你的职责是推进赛程、宣布辩题、介绍阵营、控制发言顺序、总结环节结果、评选或汇总 MVP、保持节奏和公平。',
+function buildHostPrompt(topic, phaseName, options = {}) {
+  const lines = [
+    '你是《AI 辩论赛》的主持人。你的职责是推进赛程、宣布辩题、介绍阵营、控制发言顺序、总结环节结果、汇总 MVP 投票、保持节奏和公平。',
     '你不能代替选手辩论，不能泄露队长私下部署内容，不能偏袒任一方。',
     '输出要像现场主持，简洁、有仪式感、信息明确。每次主持播报不超过 100 字。',
-    `当前辩题：${topic.title}`,
-    `正方观点：${topic.proPosition}`,
-    `反方观点：${topic.conPosition}`,
+    options.includeTopic
+      ? `本场开局首次播报可以介绍辩题和双方立场：辩题「${topic.title}」；正方「${topic.proPosition}」；反方「${topic.conPosition}」。`
+      : '本场辩题和正反方立场已经在开局播报过。之后进入阶段时不要重复介绍辩题、正方观点或反方观点，只宣布当前环节和必要规则。',
     `当前环节：${phaseName}`
-  ].join('\n');
+  ];
+  return lines.join('\n');
 }
 
 async function askAgent(agent, prompt, options = {}) {
@@ -183,6 +190,7 @@ async function askAgent(agent, prompt, options = {}) {
     baseUrl: agent.baseUrl,
     provider: agent.provider,
     model: agent.model,
+    apiFormat: agent.apiFormat,
     temperature: agent.temperature,
     messages: agent.messages,
     maxTokens: options.maxTokens || 260
@@ -191,20 +199,26 @@ async function askAgent(agent, prompt, options = {}) {
   return reply;
 }
 
-async function askHost(config, topic, phaseName, prompt, maxTokens = 160) {
+async function askHost(config, topic, phaseName, prompt, maxTokens = 160, options = {}) {
   const messages = [
-    { role: 'system', content: buildHostPrompt(topic, phaseName) },
+    { role: 'system', content: buildHostPrompt(topic, phaseName, options) },
     { role: 'user', content: prompt }
   ];
-  return callOpenAIChat({
+  const payload = {
     apiKey: config.host.apiKey,
     baseUrl: config.host.baseUrl,
     provider: config.host.provider,
     model: config.host.model,
+    apiFormat: config.host.apiFormat,
     temperature: config.host.temperature,
     messages,
     maxTokens
-  });
+  };
+  if (options.cacheable) {
+    const cached = await cachedLlmCall(['debate-host', config.host.provider, config.host.model, messages, maxTokens], () => callOpenAIChat(payload));
+    return cached.value;
+  }
+  return callOpenAIChat(payload);
 }
 
 function normalizeText(text, limit, fallback) {
@@ -224,7 +238,7 @@ async function collectSpeech(agent, phase, context, instruction, fallback, maxTo
     const reply = await askAgent(agent, [
       `当前环节：${phase.name}`,
       `字数限制：${phase.limit}字以内`,
-      `赛况：\n${context || '比赛刚开始。'}`,
+      `压缩赛况：\n${context || '比赛刚开始。'}`,
       instruction
     ].join('\n\n'), { maxTokens });
     return normalizeSpeechText(reply, fallback);
@@ -236,7 +250,7 @@ async function collectSpeech(agent, phase, context, instruction, fallback, maxTo
 
 function createPhase(id) {
   const source = PHASES.find((item) => item.id === id);
-  return { ...source, speeches: [], votes: [], summary: '' };
+  return { ...source, speeches: [], votes: [], summary: '', stageSummary: '' };
 }
 
 function pushSpeech(phase, agent, text, kind = 'speech', targetId = null) {
@@ -256,19 +270,37 @@ function pushSpeech(phase, agent, text, kind = 'speech', targetId = null) {
 }
 
 function publicDebateLog(phases) {
-  return phases
+  const summaries = phases
+    .filter((phase) => phase.stageSummary)
+    .map((phase) => `${phase.name}摘要：${phase.stageSummary}`);
+  const recent = phases
     .flatMap((phase) => phase.speeches.map((speech) => `${phase.name}｜${speech.speakerLabel || '发言'}：${speech.text}`))
-    .slice(-18)
-    .join('\n');
+    .slice(-6);
+  return [...summaries.slice(-5), ...recent].join('\n');
 }
 
-function serializeGame({ gameId, mode, topic, agents, phases, winner = null, mvp = null, winReason = '' }) {
+function publicDebateHost(host = {}) {
+  return {
+    id: host.id || 0,
+    name: host.name || host.nickname || '主持人',
+    nickname: host.nickname || host.name || '主持人',
+    avatar: host.avatar || '',
+    avatarUrl: host.avatarUrl || host.avatar || '',
+    provider: host.provider || '',
+    model: host.model || '',
+    voicePackageId: host.voicePackageId || null
+  };
+}
+
+function serializeGame({ gameId, mode, topic, agents, phases, host = null, winner = null, mvp = null, winReason = '' }) {
   const players = agents.map((agent) => ({
     id: agent.id,
     name: agent.name,
     nickname: agent.nickname,
     avatar: agent.avatar,
+    avatarUrl: agent.avatarUrl || agent.avatar,
     provider: agent.provider,
+    voicePackageId: agent.voicePackageId,
     model: agent.model,
     sex: agent.sex || '未知',
     personality: agent.personality,
@@ -292,9 +324,10 @@ function serializeGame({ gameId, mode, topic, agents, phases, winner = null, mvp
       name: 'AI 辩论赛',
       version: 'v1.0',
       background: `辩题：${topic.title}\n正方：${topic.proPosition}\n反方：${topic.conPosition}`,
-      terms: { investigators: '正方', mist: '反方', keyFigure: 'MVP', cover: '评委' },
+      terms: { investigators: '正方', mist: '反方', keyFigure: '最佳辩手', cover: '评委' },
       truth: ''
     },
+    host: publicDebateHost(host),
     players,
     phases,
     rounds: phases.map((phase, index) => ({
@@ -317,46 +350,47 @@ function serializeGame({ gameId, mode, topic, agents, phases, winner = null, mvp
 }
 
 async function runAiDebate(config, options = {}) {
-  if (config.mode !== 'real') return runMockDebate(config, options);
+  if (config.mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
 
   const emit = async (event) => options.onEvent ? options.onEvent(event) : undefined;
   const topic = normalizeTopic(config.topic) || choose(TOPICS);
   const agents = createDebateAgents(config, topic);
   const phases = [];
   const gameId = `debate-${Date.now()}`;
+  const state = { gameId, mode: 'real', topic, agents, phases, host: config.host };
   let winner = null;
   let mvp = null;
   let winReason = '';
 
-  await emit({ type: 'players', players: serializeGame({ gameId, mode: 'real', topic, agents, phases }).players, game: serializeGame({ gameId, mode: 'real', topic, agents, phases }) });
+  await emit({ type: 'players', players: serializeGame(state).players, game: serializeGame(state) });
 
-  await runPhase(config, emit, { gameId, mode: 'real', topic, agents, phases }, 'strategy', async (phase) => {
+  await runPhase(config, emit, state, 'strategy', async (phase) => {
     for (const captain of agents.filter((agent) => agent.debateRole === 'captain')) {
       const text = await collectSpeech(captain, phase, publicDebateLog(phases), '请给本方队友做战术部署。', `${captain.sideLabel}先稳住核心论点，抓住对方定义漏洞，队友分工补证据和反问。`);
-      await emitSpeech(emit, { gameId, mode: 'real', topic, agents, phases }, phase, captain, text, 'strategy');
+      await emitSpeech(emit, state, phase, captain, text, 'strategy');
     }
   });
 
-  await runPhase(config, emit, { gameId, mode: 'real', topic, agents, phases }, 'opening', async (phase) => {
+  await runPhase(config, emit, state, 'opening', async (phase) => {
     for (const agent of [debaterAt(agents, 'pro', 0), debaterAt(agents, 'con', 0)].filter(Boolean)) {
       const text = await collectSpeech(agent, phase, publicDebateLog(phases), '请完成本方立论陈词。', `${agent.sideLabel}认为本方立场更能兼顾现实约束与长期价值，核心标准应当先被清晰定义。`);
-      await emitSpeech(emit, { gameId, mode: 'real', topic, agents, phases }, phase, agent, text, 'opening');
+      await emitSpeech(emit, state, phase, agent, text, 'opening');
     }
   });
 
-  await runPhase(config, emit, { gameId, mode: 'real', topic, agents, phases }, 'crossfire', async (phase) => {
+  await runPhase(config, emit, state, 'crossfire', async (phase) => {
     const pro = agents.filter((agent) => agent.side === 'pro').slice(1, 3);
     const con = agents.filter((agent) => agent.side === 'con').slice(1, 3);
     const pairs = [[pro[0], con[0]], [con[0], pro[1]], [pro[1], con[1]], [con[1], pro[0]]].filter(([a, b]) => a && b);
     for (const [questioner, responder] of pairs) {
       const question = await collectSpeech(questioner, { ...phase, limit: 60 }, publicDebateLog(phases), `请向${getDebateRoleName(responder)}提出一个尖锐问题。`, `请问对方如何解释本方标准下的关键风险？`, 160);
-      await emitSpeech(emit, { gameId, mode: 'real', topic, agents, phases }, phase, questioner, question, 'question', responder.id);
+      await emitSpeech(emit, state, phase, questioner, question, 'question', responder.id);
       const answer = await collectSpeech(responder, phase, publicDebateLog(phases), `请回应${getDebateRoleName(questioner)}刚才的问题，并反击一句。`, `这个问题忽略了前提差异，我方标准更能处理边界情况。`, 180);
-      await emitSpeech(emit, { gameId, mode: 'real', topic, agents, phases }, phase, responder, answer, 'answer', questioner.id);
+      await emitSpeech(emit, state, phase, responder, answer, 'answer', questioner.id);
     }
   });
 
-  await runPhase(config, emit, { gameId, mode: 'real', topic, agents, phases }, 'free', async (phase) => {
+  await runPhase(config, emit, state, 'free', async (phase) => {
     let previousId = null;
     for (let i = 0; i < 8; i += 1) {
       const side = i % 2 === 0 ? 'pro' : 'con';
@@ -364,24 +398,24 @@ async function runAiDebate(config, options = {}) {
       const agent = choose(candidates);
       previousId = agent.id;
       const text = await collectSpeech(agent, phase, publicDebateLog(phases), '请进行自由辩论发言，回应最近争点并推进本方论证。', `${agent.sideLabel}补充一点：对方刚才回避了评判标准，我方才是在处理真实场景。`);
-      await emitSpeech(emit, { gameId, mode: 'real', topic, agents, phases }, phase, agent, text, 'free');
+      await emitSpeech(emit, state, phase, agent, text, 'free');
     }
   });
 
-  await runPhase(config, emit, { gameId, mode: 'real', topic, agents, phases }, 'closing', async (phase) => {
+  await runPhase(config, emit, state, 'closing', async (phase) => {
     for (const agent of [debaterAt(agents, 'pro', 3), debaterAt(agents, 'con', 3)].filter(Boolean)) {
       const text = await collectSpeech(agent, phase, publicDebateLog(phases), '请以四辩身份完成本方总结陈词。', `${agent.sideLabel}总结：我方完成了定义、风险和价值三层证明，对方关键反驳没有击穿核心标准。`);
-      await emitSpeech(emit, { gameId, mode: 'real', topic, agents, phases }, phase, agent, text, 'closing');
+      await emitSpeech(emit, state, phase, agent, text, 'closing');
     }
   });
 
-  const result = await runAwardPhases(config, emit, { gameId, mode: 'real', topic, agents, phases });
+  const result = await runAwardPhases(config, emit, state);
   winner = result.winner;
   mvp = result.mvp;
   winReason = result.winReason;
-  await runPostgamePhase(config, emit, { gameId, mode: 'real', topic, agents, phases, winner, mvp, winReason });
+  await runPostgamePhase(config, emit, { ...state, winner, mvp, winReason });
 
-  const game = serializeGame({ gameId, mode: 'real', topic, agents, phases, winner, mvp, winReason });
+  const game = serializeGame({ ...state, winner, mvp, winReason });
   await emit({ type: 'game', game });
   return game;
 }
@@ -389,17 +423,29 @@ async function runAiDebate(config, options = {}) {
 async function runPhase(config, emit, state, phaseId, action) {
   const phase = createPhase(phaseId);
   state.phases.push(phase);
-  const hostText = await safeHost(config, state.topic, phase.name, `请宣布进入「${phase.name}」环节。`, `现在进入${phase.name}。`);
+  const hostText = await safeHost(
+    config,
+    state.topic,
+    phase.name,
+    phaseId === 'strategy'
+      ? `请宣布本场辩论开局，介绍辩题和正反方立场，然后进入「${phase.name}」环节。`
+      : `请宣布进入「${phase.name}」环节。不要重复介绍辩题、正方观点或反方观点。`,
+    phaseId === 'strategy'
+      ? `本场辩题：${state.topic.title}。正方主张${state.topic.proPosition}，反方主张${state.topic.conPosition}。现在进入${phase.name}。`
+      : `现在进入${phase.name}。`,
+    { includeTopic: phaseId === 'strategy', cacheable: true }
+  );
   phase.summary = hostText;
   await emit({ type: 'phase-start', phase, message: hostText, game: serializeGame(state) });
   await action(phase);
+  phase.stageSummary = summarizeDebatePhase(phase);
   await emit({ type: 'phase-end', phase, message: `${phase.name}结束。`, game: serializeGame(state) });
 }
 
-async function safeHost(config, topic, phaseName, prompt, fallback) {
+async function safeHost(config, topic, phaseName, prompt, fallback, options = {}) {
   if (!config.host?.apiKey) return fallback;
   try {
-    const reply = await askHost(config, topic, phaseName, prompt, 140);
+    const reply = await askHost(config, topic, phaseName, prompt, 140, options);
     return normalizeText(reply, 100, fallback);
   } catch (error) {
     console.error(`主持人生成失败，使用兜底：${error.message}`);
@@ -434,6 +480,7 @@ async function runAwardPhases(config, emit, state) {
     await emit({ type: 'speech', phase: judgePhase, speech, game: serializeGame(state) });
     winnerVotes.host = hostText.includes('反方') && !hostText.includes('正方略胜') ? 'con' : 'pro';
   }
+  judgePhase.stageSummary = summarizeDebatePhase(judgePhase);
   const winner = topWinner(winnerVotes);
   const winReason = winner === 'draw' ? '评委意见接近，双方战成平局。' : `${winner === 'pro' ? '正方' : '反方'}获得更多评委倾向。`;
   await emit({ type: 'phase-end', phase: judgePhase, message: '评委点评完成。', game: serializeGame({ ...state, winner, winReason }) });
@@ -443,15 +490,16 @@ async function runAwardPhases(config, emit, state) {
   mvpPhase.summary = '现在进入全员评选最佳辩手。';
   await emit({ type: 'phase-start', phase: mvpPhase, message: mvpPhase.summary, game: serializeGame({ ...state, winner, winReason }) });
 
-  const voters = state.agents;
+  const voters = contestants;
+  const votes = await Promise.all(voters.map((voter) => collectBestDebaterVote(voter, contestants, state.phases)));
   const mvpVotes = {};
-  for (const voter of voters) {
-    const vote = await collectBestDebaterVote(voter, contestants, state.phases);
-    mvpVotes[voter.id] = vote.target;
+  for (const vote of votes) {
+    mvpVotes[vote.voterId] = vote.target;
     mvpPhase.votes.push(vote);
   }
   const mvpId = topVotedId(mvpVotes) || choose(contestants).id;
   const mvp = publicPlayer(contestants.find((agent) => agent.id === mvpId) || contestants[0]);
+  mvpPhase.stageSummary = `MVP投票完成，最高票目标为${mvp?.nickname || mvp?.id || '最佳辩手'}。`;
   await emit({ type: 'phase-end', phase: mvpPhase, message: '最佳辩手评选完成。', game: serializeGame({ ...state, winner, mvp, winReason }) });
   return { winner, mvp, winReason };
 }
@@ -472,6 +520,7 @@ async function runPostgamePhase(config, emit, state) {
     );
     await emitSpeech(emit, state, phase, agent, text, 'postgame');
   }
+  phase.stageSummary = summarizeDebatePhase(phase);
   await emit({ type: 'phase-end', phase, message: '赛后发言结束。', game: serializeGame(state) });
 }
 
@@ -496,15 +545,15 @@ async function collectBestDebaterVote(voter, contestants, phases) {
     const reply = await askAgent(voter, [
       '请从正反方 8 位选手中评选最佳辩手。',
       `可选对象：${contestants.map((agent) => `${agent.id}号${agent.nickname}`).join('、')}`,
-      `赛况：\n${publicDebateLog(phases)}`,
-      '只返回 JSON：{"target":2,"reason":"80字以内理由"}'
-    ].join('\n\n'), { maxTokens: 160 });
+      `压缩赛况：\n${publicDebateLog(phases)}`,
+      '只返回 JSON：{"target":2}，不要返回理由。'
+    ].join('\n\n'), { maxTokens: 80 });
     const parsed = parseJsonObject(reply);
     const target = Number(parsed?.target);
     const valid = contestants.some((agent) => agent.id === target) ? target : fallback.id;
-    return { voterId: voter.id, target: valid, reason: normalizeText(parsed?.reason, 80, `${valid}号在关键争点上表现突出。`) };
+    return { voterId: voter.id, target: valid };
   } catch {
-    return { voterId: voter.id, target: fallback.id, reason: `${fallback.id}号在关键争点上表现突出。` };
+    return { voterId: voter.id, target: fallback.id };
   }
 }
 
@@ -513,160 +562,26 @@ async function collectJudgeReview(judge, phases) {
     const reply = await askAgent(judge, [
       '请点评双方表现，并给出胜负倾向。',
       `赛况：\n${publicDebateLog(phases)}`,
-      '只返回 JSON：{"winner":"pro","text":"120字以内点评"}，winner 只能是 pro/con/draw。'
+      '只返回 JSON：{"winner":"pro","text":"300字以内点评"}，winner 只能是 pro/con/draw。'
     ].join('\n\n'), { maxTokens: 220 });
     const parsed = parseJsonObject(reply);
     const winner = ['pro', 'con', 'draw'].includes(parsed?.winner) ? parsed.winner : 'draw';
-    return { winner, text: normalizeText(parsed?.text, 120, '双方都有亮点，正方结构完整，反方反击积极，胜负取决于评判标准。') };
+    return { winner, text: normalizeSpeechText(parsed?.text, '双方都有亮点，正方结构完整，反方反击积极，胜负取决于评判标准。') };
   } catch {
     return { winner: 'draw', text: '双方都有亮点，正方结构完整，反方反击积极，胜负取决于评判标准。' };
   }
 }
 
-function runMockDebate(config, options = {}) {
-  const emit = async (event) => options.onEvent ? options.onEvent(event) : undefined;
-  if (isDebateReplayGame(config.mockReplayGame)) return replayMockDebate(config.mockReplayGame, emit);
-  const replay = getDebateReplayGame(config.mockReplayId);
-  if (replay) return replayMockDebate(replay, emit);
-  return createMockDebate(config, emit);
+function summarizeDebatePhase(phase) {
+  const texts = (phase.speeches || [])
+    .map((speech) => `${speech.speakerLabel || '发言'}：${cleanSummaryText(speech.text)}`)
+    .filter(Boolean);
+  if (!texts.length) return cleanSummaryText(phase.summary).slice(0, 120);
+  return texts.join('；').slice(0, 260);
 }
 
-function isDebateReplayGame(value) {
-  return value?.type === 'debate' && Array.isArray(value.players) && (Array.isArray(value.phases) || Array.isArray(value.rounds));
-}
-
-function getDebateReplayGame(replayId) {
-  if (!replayId) return null;
-  const logs = readRealGameLogs('debate');
-  const record = logs.find((item) => item.filename === replayId || item.game?.id === replayId);
-  return record?.game || null;
-}
-
-async function replayMockDebate(sourceGame, emit) {
-  const gameId = `mock-replay-${sourceGame.id || Date.now()}`;
-  const players = (sourceGame.players || []).map((player) => ({ ...player }));
-  const topic = sourceGame.topic || choose(TOPICS);
-  const phases = [];
-  const baseState = { gameId, mode: 'mock', topic, agents: players, phases };
-
-  await emit({ type: 'players', players, game: serializeGame(baseState) });
-  for (const sourcePhase of getReplayPhases(sourceGame)) {
-    const phase = { ...sourcePhase, speeches: [] };
-    phases.push(phase);
-    await emit({ type: 'phase-start', phase, message: phase.summary || `现在进入${phase.name}。`, game: serializeGame(baseState) });
-    for (const speech of sourcePhase.speeches || []) {
-      if (phase.id === 'mvp' && speech.kind === 'mvp-vote') continue;
-      const item = { ...speech };
-      phase.speeches.push(item);
-      await emit({ type: 'speech', phase, speech: item, game: serializeGame(baseState) });
-    }
-    await emit({ type: 'phase-end', phase, message: `${phase.name}结束。`, game: serializeGame(baseState) });
-  }
-  const game = {
-    ...sourceGame,
-    id: gameId,
-    mode: 'mock',
-    players,
-    phases,
-    rounds: phases.map((phase, index) => ({ number: index + 1, phase: phase.id, speeches: phase.speeches || [] })),
-    shareReport: sourceGame.shareReport || buildShareReport({
-      topic,
-      players,
-      phases,
-      winner: sourceGame.winner,
-      mvp: sourceGame.mvp,
-      winReason: sourceGame.winReason
-    })
-  };
-  await emit({ type: 'game', game });
-  return game;
-}
-
-function getReplayPhases(sourceGame) {
-  if (Array.isArray(sourceGame?.phases) && sourceGame.phases.length) return sourceGame.phases;
-  if (!Array.isArray(sourceGame?.rounds)) return [];
-  return sourceGame.rounds
-    .map((round, index) => {
-      const id = round.phase || round.id || PHASES[index]?.id || `round-${index + 1}`;
-      const phaseDef = PHASES.find((item) => item.id === id);
-      return {
-        id,
-        name: round.name || phaseDef?.name || `第 ${index + 1} 环节`,
-        summary: round.summary || round.message || '',
-        speeches: Array.isArray(round.speeches) ? round.speeches : [],
-        votes: Array.isArray(round.votes) ? round.votes : []
-      };
-    })
-    .filter((phase) => phase.speeches.length || phase.summary);
-}
-
-async function createMockDebate(config, emit) {
-  const topic = normalizeTopic(config.topic) || choose(TOPICS);
-  const agents = createDebateAgents(config, topic);
-  const phases = [];
-  const gameId = `mock-debate-${Date.now()}`;
-  const contestants = agents.filter((agent) => agent.side !== 'judge');
-  const mvp = publicPlayer(contestants[0]);
-  const winner = Math.random() > 0.5 ? 'pro' : 'con';
-  const winReason = `${winner === 'pro' ? '正方' : '反方'} 比赛获得更多倾向。`;
-  await emit({ type: 'players', players: serializeGame({ gameId, mode: 'mock', topic, agents, phases }).players, game: serializeGame({ gameId, mode: 'mock', topic, agents, phases }) });
-
-  for (const phaseDef of PHASES.filter((phase) => phase.id !== 'postgame')) {
-    const phase = createPhase(phaseDef.id);
-    phases.push(phase);
-    phase.summary = `现在进入${phase.name}。`;
-    const stateForPhase = phase.id === 'mvp'
-      ? { gameId, mode: 'mock', topic, agents, phases, winner, winReason }
-      : { gameId, mode: 'mock', topic, agents, phases };
-    await emit({ type: 'phase-start', phase, message: phase.summary, game: serializeGame(stateForPhase) });
-    if (phase.id === 'mvp') {
-      for (const voter of agents) {
-        phase.votes.push({ voterId: voter.id, target: mvp.id, reason: `${mvp.id}号在关键争点上表现突出。` });
-      }
-    } else {
-      for (const item of mockSpeakersForPhase(phase.id, agents)) {
-        const text = mockLine(item, phase, topic);
-        const speech = pushSpeech(phase, item, text, phase.id);
-        await emit({ type: 'speech', phase, speech, game: serializeGame(stateForPhase) });
-      }
-    }
-    await emit({ type: 'phase-end', phase, message: `${phase.name}结束。`, game: serializeGame({ ...stateForPhase, mvp }) });
-  }
-
-  const postgamePhase = createPhase('postgame');
-  phases.push(postgamePhase);
-  postgamePhase.summary = '比赛结果已经公布，现在进入赛后发言。';
-  await emit({ type: 'phase-start', phase: postgamePhase, message: postgamePhase.summary, game: serializeGame({ gameId, mode: 'mock', topic, agents, phases, winner, mvp, winReason }) });
-  for (const item of getPostgameSpeakers(agents, mvp.id)) {
-    const speech = pushSpeech(postgamePhase, item, mockLine(item, postgamePhase, topic), 'postgame');
-    await emit({ type: 'speech', phase: postgamePhase, speech, game: serializeGame({ gameId, mode: 'mock', topic, agents, phases, winner, mvp, winReason }) });
-  }
-  await emit({ type: 'phase-end', phase: postgamePhase, message: '赛后发言结束。', game: serializeGame({ gameId, mode: 'mock', topic, agents, phases, winner, mvp, winReason }) });
-  const game = serializeGame({ gameId, mode: 'mock', topic, agents, phases, winner, mvp, winReason });
-  await emit({ type: 'game', game });
-  return game;
-}
-
-function mockSpeakersForPhase(phaseId, agents) {
-  const pro = agents.filter((agent) => agent.side === 'pro');
-  const con = agents.filter((agent) => agent.side === 'con');
-  const judges = agents.filter((agent) => agent.side === 'judge');
-  if (phaseId === 'strategy') return [pro.find((a) => a.debateRole === 'captain'), con.find((a) => a.debateRole === 'captain')].filter(Boolean);
-  if (phaseId === 'opening') return [pro[0], con[0]];
-  if (phaseId === 'crossfire') return [pro[1], con[1], pro[2], con[2]].filter(Boolean);
-  if (phaseId === 'free') return [pro[0], con[0], pro[1], con[1], pro[2], con[2], pro[3], con[3]].filter(Boolean);
-  if (phaseId === 'closing') return [pro[3], con[3]].filter(Boolean);
-  if (phaseId === 'judges') return judges.length ? judges : [pro[0]];
-  if (phaseId === 'mvp') return [];
-  if (phaseId === 'postgame') return getPostgameSpeakers(agents, pro[0]?.id);
-  return [];
-}
-
-function mockLine(agent, phase, topic) {
-  if (phase.id === 'postgame') return `${agent.nickname || agent.id + '号'}赛后认为，这场比赛最精彩的是双方都抓住了核心争点，下一场还可以把论证打得更细。`;
-  if (phase.id === 'judges') return '正方结构更完整，反方质询更有压迫感；我会把胜负交给谁更好回应了现实风险。';
-  if (phase.id === 'strategy') return `${agent.sideLabel}要先定义标准，再围绕${topic.title.slice(0, 12)}抓对方漏洞，发言保持短促有力。`;
-  return `${getDebateRoleName(agent)}认为，本方立场更能解释辩题中的关键矛盾，对方需要回答现实边界。`;
+function cleanSummaryText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
 function debaterAt(agents, side, index) {
@@ -674,7 +589,14 @@ function debaterAt(agents, side, index) {
 }
 
 function publicPlayer(agent) {
-  return agent ? { id: agent.id, nickname: agent.nickname, side: agent.side, sideLabel: agent.sideLabel } : null;
+  return agent ? {
+    id: agent.id,
+    nickname: agent.nickname,
+    avatar: agent.avatar,
+    voicePackageId: agent.voicePackageId,
+    side: agent.side,
+    sideLabel: agent.sideLabel
+  } : null;
 }
 
 function buildShareReport({ topic, players = [], phases = [], winner = null, mvp = null, winReason = '' }) {
@@ -683,6 +605,7 @@ function buildShareReport({ topic, players = [], phases = [], winner = null, mvp
     name: player.name,
     nickname: player.nickname || player.name || `${player.id}号`,
     avatar: player.avatar,
+    voicePackageId: player.voicePackageId,
     side: player.side,
     sideIndex: player.sideIndex,
     sideLabel: player.sideLabel,

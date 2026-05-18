@@ -4,8 +4,10 @@ const { getDb } = require('./db');
 const { createAiGame } = require('./aiGameRunner');
 const { runAiDebate } = require('./aiDebateRunner');
 const { runAiWerewolf } = require('./aiWerewolfRunner');
-const { saveGameRecord } = require('./adminStore');
-const { saveGameLog } = require('./gameLogStore');
+const { getWerewolfModeConfig } = require('./werewolfModes');
+const { getGame, getVoicePackage, listPlayers, saveGameRecord } = require('./adminStore');
+const { prepareVoiceAudio } = require('./services/audio/audioResourceCache');
+const { splitPlayableTextSegments } = require('./services/debate/textSegments');
 
 function attachGameSocket(server) {
   const wss = new WebSocketServer({ server, path: '/api/toc/ws/game' });
@@ -18,14 +20,14 @@ function attachGameSocket(server) {
       if (!message) return;
 
       if (message.type === 'start') {
-        runSession(session, message.mode === 'real' ? 'real' : 'mock', message.playerIds, message.gameType, {
+        runSession(session, message.mode || 'real', message.playerIds, message.gameType, {
           topic: message.topic,
           debateTeams: message.debateTeams,
-          mockReplayId: message.mockReplayId,
-          mockReplayGame: message.mockReplayGame,
-          werewolfMode: message.werewolfMode
+          hostId: message.hostId,
+          werewolfMode: message.werewolfMode,
+          replayGameId: message.replayGameId
         }).catch((error) => {
-          if (error.message === 'game-session-cancelled') return;
+          if (isSessionCancelled(error)) return;
           console.error(error);
           session.send({ type: 'error', message: error.message });
         });
@@ -37,6 +39,7 @@ function attachGameSocket(server) {
 
       if (message.type === 'control') {
         session.setPaused(message.action === 'pause');
+        if (message.action === 'skip-phase') session.skipCurrentPhase();
       }
     });
   });
@@ -44,29 +47,347 @@ function attachGameSocket(server) {
 
 async function runSession(session, mode, playerIds, gameType = 'consensus', options = {}) {
   const safeGameType = normalizeGameType(gameType);
+  if (mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
+  if (options.replayGameId) {
+    await replayGameSession(session, safeGameType, options.replayGameId);
+    return;
+  }
   const config = getRequestConfig(mode, playerIds, safeGameType, options);
 
-  await session.sendAndWait({
-    type: 'host',
-    message: getStartMessage(safeGameType)
-  });
+  const sender = createPreparedSender(session, safeGameType === 'debate' ? { phaseLookahead: 1 } : { prefetchCount: 2 });
+
+  if (safeGameType !== 'debate') {
+    await sender.send({
+      type: 'host',
+      message: getStartMessage(safeGameType),
+      game: { type: safeGameType, host: publicSocketHost(config.host) }
+    });
+  }
 
   const runner = getRunner(safeGameType);
   const game = await runner(config, {
-    onEvent: (event) => session.sendAndWait(withNarration(event))
+    onEvent: (event) => sender.enqueue(event)
   });
+  await sender.flush();
 
-  if (mode === 'real') {
-    saveGameRecord(game);
-    saveGameLog(game);
-  }
+  saveGameRecord({ ...game, audioResources: sender.getAudioResources() });
 
-  await session.sendAndWait({
+  await sender.send({
     type: 'done',
     message: getDoneMessage(safeGameType),
     game
   });
   session.close();
+}
+
+async function replayGameSession(session, gameType, replayGameId) {
+  const game = getGame(replayGameId);
+  if (!game) throw new Error('历史对局不存在。');
+  if (normalizeGameType(game.gameType || game.type) !== gameType) throw new Error('历史对局类型与当前游戏不匹配。');
+  const replayGame = enrichReplayPlayers(normalizeReplayGame(game));
+  const sender = createPreparedSender(session, gameType === 'debate' ? { phaseLookahead: 1 } : { prefetchCount: 2 });
+
+  const replayPlayers = gameType === 'werewolf' ? createWerewolfReplayPlayers(replayGame.players || []) : replayGame.players || [];
+  await sender.send({ type: 'players', players: replayPlayers, game: getPlaybackGameSnapshot(replayGame) });
+  for (const event of buildReplayPlaybackEvents(replayGame)) {
+    await sender.enqueue(event);
+  }
+  await sender.flush();
+  await sender.send({ type: 'game', game: replayGame });
+  session.close();
+}
+
+function normalizeReplayGame(game) {
+  if (game.gameType === 'debate') {
+    return {
+      ...game,
+      type: 'debate',
+      phases: Array.isArray(game.phases) ? game.phases : getDebatePhasesFromRounds(game.rounds || [])
+    };
+  }
+  return {
+    ...game,
+    type: game.gameType || game.type || 'consensus'
+  };
+}
+
+function enrichReplayPlayers(game) {
+  const latestPlayers = new Map(listPlayers().map((player) => [Number(player.id), player]));
+  const players = (game.players || []).map((player) => {
+    const latest = latestPlayers.get(Number(player.id));
+    if (!latest) return player;
+    return {
+      ...player,
+      avatar: latest.avatar || player.avatar || '',
+      avatarUrl: latest.avatar || player.avatarUrl || player.avatar || '',
+      voicePackageId: latest.voicePackageId || player.voicePackageId || null,
+      personality: latest.personality || player.personality || '',
+      sex: latest.sex || player.sex || ''
+    };
+  });
+  return { ...game, players };
+}
+
+function getPlaybackGameSnapshot(game, phases = []) {
+  if (!game) return game;
+  return {
+    ...game,
+    phases,
+    rounds: phases.map((phase, index) => ({
+      number: index + 1,
+      phase: phase.id,
+      title: phase.name,
+      speeches: phase.speeches || []
+    })),
+    winner: null,
+    mvp: null,
+    winReason: '',
+    shareReport: null
+  };
+}
+
+function buildReplayEvents(game) {
+  if (game.type === 'debate') return buildDebateReplayEvents(game);
+  if (game.type === 'werewolf') return buildWerewolfReplayEvents(game);
+  return buildConsensusReplayEvents(game);
+}
+
+function buildReplayPlaybackEvents(game) {
+  if (game.type === 'werewolf') return buildWerewolfReplayPlaybackEvents(game);
+  if (game.type !== 'debate') {
+    return buildReplayEvents(game).map((event) => ({ ...event, game }));
+  }
+  const events = [];
+  const playedPhases = [];
+  for (const phase of game.phases || []) {
+    const currentPhase = { ...phase, speeches: [] };
+    events.push({
+      type: 'phase-start',
+      phase: currentPhase,
+      game: getPlaybackGameSnapshot(game, [...playedPhases, currentPhase])
+    });
+    for (const speech of getRoundSpeeches(phase)) {
+      const normalizedSpeech = normalizeDebateSpeech(speech);
+      currentPhase.speeches.push(normalizedSpeech);
+      events.push({
+        type: 'speech',
+        phase: currentPhase,
+        speech: normalizedSpeech,
+        game: getPlaybackGameSnapshot(game, [...playedPhases, currentPhase])
+      });
+    }
+    events.push({
+      type: 'phase-end',
+      phase: currentPhase,
+      game: getPlaybackGameSnapshot(game, [...playedPhases, currentPhase])
+    });
+    playedPhases.push(currentPhase);
+  }
+  return events;
+}
+
+function buildWerewolfReplayPlaybackEvents(game) {
+  const events = [];
+  const replayPlayers = createWerewolfReplayPlayers(game.players || []);
+  const visibleRounds = [];
+  for (const sourceRound of game.rounds || []) {
+    const nightRound = createWerewolfVisibleRound(sourceRound, 'night-start');
+    visibleRounds.push(nightRound);
+    events.push({
+      type: 'phase-start',
+      phase: 'night',
+      round: nightRound,
+      message: sourceRound.title || `第 ${sourceRound.day || sourceRound.number || visibleRounds.length} 轮`,
+      game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+    });
+
+    applyWerewolfNightDeaths(replayPlayers, sourceRound);
+    Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'night-result'));
+    events.push({
+      type: 'night-result',
+      round: nightRound,
+      game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+    });
+
+    for (const testimony of getWerewolfTestimonies(sourceRound)) {
+      events.push({
+        type: 'last-words',
+        round: nightRound,
+        testimony,
+        game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+      });
+    }
+
+    Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'day-start'));
+    events.push({
+      type: 'day-start',
+      round: nightRound,
+      game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+    });
+
+    const speeches = getRoundSpeeches(sourceRound);
+    for (const speech of speeches) {
+      nightRound.speeches = [...(nightRound.speeches || []), speech];
+      events.push({
+        type: 'speech',
+        round: nightRound,
+        speech,
+        game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+      });
+    }
+
+    applyWerewolfDayEliminations(replayPlayers, sourceRound);
+    Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'vote-result'));
+    events.push({
+      type: 'vote-result',
+      round: nightRound,
+      game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+    });
+  }
+  if (game.winner) {
+    events.push({
+      type: 'game',
+      game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds, true)
+    });
+  }
+  return events;
+}
+
+function createWerewolfReplaySnapshot(game, players, rounds, includeResult = false) {
+  return {
+    ...game,
+    players: players.map((player) => ({ ...player })),
+    rounds: rounds.map((round) => ({ ...round, night: { ...(round.night || {}) }, speeches: [...(round.speeches || [])] })),
+    winner: includeResult ? game.winner : null,
+    winReason: includeResult ? game.winReason : ''
+  };
+}
+
+function createWerewolfReplayPlayers(players) {
+  return players.map((player) => ({
+    ...player,
+    alive: true,
+    deathDay: null,
+    deathReason: '',
+    lastWords: []
+  }));
+}
+
+function createWerewolfVisibleRound(round = {}, stage) {
+  const base = {
+    ...round,
+    phase: stage === 'night-start' || stage === 'night-result' ? 'night' : 'day',
+    night: { ...(round.night || {}) },
+    speeches: [],
+    votes: {},
+    voteTally: {},
+    exile: null,
+    idiotReveal: null,
+    hunterShot: null
+  };
+  if (stage === 'night-start') {
+    base.night = { ...(round.night || {}), deaths: [] };
+  }
+  if (stage === 'day-start') {
+    base.speeches = [];
+  }
+  if (stage === 'vote-result') {
+    base.speeches = getRoundSpeeches(round);
+    base.votes = round.votes || {};
+    base.voteTally = round.voteTally || {};
+    base.exile = round.exile || null;
+    base.idiotReveal = round.idiotReveal || null;
+    base.hunterShot = round.hunterShot || null;
+  }
+  return base;
+}
+
+function applyWerewolfNightDeaths(players, round = {}) {
+  for (const item of round.night?.deaths || []) {
+    applyWerewolfReplayDeath(players, item.id ?? item.playerId, round.day, item.reason || item.deathReason || '夜晚死亡');
+  }
+}
+
+function applyWerewolfDayEliminations(players, round = {}) {
+  if (round.exile?.id) applyWerewolfReplayDeath(players, round.exile.id, round.day, round.exile.deathReason || round.exile.reason || '放逐');
+  if (round.hunterShot?.target) applyWerewolfReplayDeath(players, round.hunterShot.target, round.day, '猎人带走');
+}
+
+function applyWerewolfReplayDeath(players, id, day, reason) {
+  const player = players.find((item) => Number(item.id) === Number(id));
+  if (!player) return;
+  player.alive = false;
+  player.deathDay = day || player.deathDay || null;
+  player.deathReason = reason || player.deathReason || '出局';
+}
+
+function buildConsensusReplayEvents(game) {
+  return (game.rounds || []).flatMap((round) => [
+    { type: 'round-start', round },
+    { type: 'vote-result', round },
+    { type: 'clue-result', round },
+    ...getRoundSpeeches(round).map((speech) => ({ type: 'speech', round, speech }))
+  ]);
+}
+
+function buildDebateReplayEvents(game) {
+  return (game.phases || []).flatMap((phase) => [
+    { type: 'phase-start', phase },
+    ...getRoundSpeeches(phase).map((speech) => ({ type: 'speech', phase, speech: normalizeDebateSpeech(speech) })),
+    { type: 'phase-end', phase }
+  ]);
+}
+
+function buildWerewolfReplayEvents(game) {
+  return (game.rounds || []).flatMap((round) => [
+    { type: 'phase-start', round, message: round.title || `第 ${round.day || round.number || 1} 轮` },
+    ...getRoundSpeeches(round).map((speech) => ({ type: 'speech', round, speech })),
+    ...getWerewolfTestimonies(round).map((testimony) => ({ type: 'last-words', round, testimony })),
+    { type: 'day-start', round },
+    { type: 'vote-result', round }
+  ]);
+}
+
+function getDebatePhasesFromRounds(rounds = []) {
+  return rounds.map((round, index) => ({
+    id: round.phase || round.id || `phase-${index + 1}`,
+    name: round.title || round.name || `第 ${index + 1} 阶段`,
+    speeches: getRoundSpeeches(round)
+  }));
+}
+
+function getRoundSpeeches(round = {}) {
+  return []
+    .concat(round.speeches || [])
+    .concat(round.items || [])
+    .concat(round.discussion || [])
+    .filter(Boolean)
+    .map((speech) => ({
+      ...speech,
+      playerId: speech.playerId ?? speech.player_id ?? speech.id,
+      text: speech.text || speech.content || speech.message || ''
+    }))
+    .filter((speech) => speech.text);
+}
+
+function normalizeDebateSpeech(speech) {
+  return {
+    ...speech,
+    side: speech.side || (speech.playerId ? '' : 'host'),
+    text: speech.text || ''
+  };
+}
+
+function getWerewolfTestimonies(round = {}) {
+  return []
+    .concat(round.lastWords || [])
+    .concat(round.testimonies || [])
+    .filter(Boolean)
+    .map((item) => ({
+      playerId: item.playerId ?? item.id,
+      text: item.text || item.testimony || item.content || ''
+    }))
+    .filter((item) => item.text);
 }
 
 function normalizeGameType(gameType) {
@@ -98,13 +419,14 @@ function createSession(socket) {
   const pending = new Map();
   let closed = false;
   let paused = false;
+  let skipPhaseKey = '';
   const SPEECH_ACK_TIMEOUT_MS = 120000;
 
   socket.on('close', () => {
     closed = true;
     for (const { reject, timer } of pending.values()) {
       if (timer) clearTimeout(timer);
-      reject(new Error('game-session-cancelled'));
+      reject(createSessionCancelledError());
     }
     pending.clear();
   });
@@ -115,7 +437,10 @@ function createSession(socket) {
       socket.send(JSON.stringify(payload));
     },
     sendAndWait(payload) {
-      if (closed || socket.readyState !== socket.OPEN) return Promise.reject(new Error('game-session-cancelled'));
+      if (closed || socket.readyState !== socket.OPEN) return Promise.reject(createSessionCancelledError());
+      const payloadPhaseKey = getEventPhaseKey(payload);
+      if (skipPhaseKey && payloadPhaseKey === skipPhaseKey) return Promise.resolve();
+      if (skipPhaseKey && payloadPhaseKey && payloadPhaseKey !== skipPhaseKey) skipPhaseKey = '';
       const ackId = nextId;
       nextId += 1;
       socket.send(JSON.stringify({ ...payload, ackId }));
@@ -149,6 +474,17 @@ function createSession(socket) {
           item.timer = setTimeout(() => handleSpeechAckTimeout(ackId), SPEECH_ACK_TIMEOUT_MS);
         }
       }
+    },
+    skipCurrentPhase() {
+      let targetPhaseKey = '';
+      for (const [ackId, item] of pending.entries()) {
+        const key = getEventPhaseKey(item.payload);
+        if (!targetPhaseKey && key) targetPhaseKey = key;
+        if (item.timer) clearTimeout(item.timer);
+        pending.delete(ackId);
+        item.resolve();
+      }
+      if (targetPhaseKey) skipPhaseKey = targetPhaseKey;
     }
   };
 
@@ -187,29 +523,67 @@ function getRequestConfig(mode, playerIds, gameType = 'consensus', options = {})
   const config = withSelectedPlayers(getAiConfig(), playerIds);
   const selected = gameType === 'debate' && hasDebateTeamConfig(options.debateTeams)
     ? selectDebateTeamPlayers(config, options.debateTeams)
-    : selectPlayersForGame(config, playerIds, gameType);
-  const selectedProviders = new Set([config.host.provider, ...selected.map((player) => player.provider)]);
+    : selectPlayersForGame(config, playerIds, gameType, options);
+  const host = resolveRequestHost(config, options.hostId);
+  const selectedProviders = new Set([host.provider, ...selected.map((player) => player.provider)]);
   const missingProviders = config.missingProviders.filter((item) => selectedProviders.has(item.provider));
   const scopedConfig = {
     ...config,
+    host,
     players: selected,
     selectedPlayerIds: selected.map((player) => player.id),
     gameType,
     topic: options.topic || null,
     debateTeams: options.debateTeams || null,
-    mockReplayId: options.mockReplayId || null,
-    mockReplayGame: options.mockReplayGame || null,
     werewolfMode: options.werewolfMode || null,
     missingProviders,
     realReady: missingProviders.length === 0
   };
-  if (mode === 'mock') return { ...scopedConfig, mode: 'mock' };
+  if (mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
 
   if (scopedConfig.missingProviders.length) {
     const missing = scopedConfig.missingProviders.map((item) => `${item.provider}(${item.apiKeyEnv})`).join('、');
-    throw new Error(`真实模式缺少 API Key：${missing}。请在 .env 中配置，或切换到 Mock。`);
+    throw new Error(`真实模式缺少 API Key：${missing}。请在 .env 或 B 端模型管理中配置。`);
   }
   return { ...scopedConfig, mode: 'real' };
+}
+
+function resolveRequestHost(config, hostId) {
+  const id = Number(hostId);
+  if (!id) return config.host;
+  const player = config.players.find((item) => Number(item.id) === id);
+  if (!player) return config.host;
+  return {
+    ...config.host,
+    id: player.id,
+    name: player.name || player.nickname || config.host.name,
+    nickname: player.nickname || player.name || config.host.nickname,
+    provider: player.provider,
+    providerName: player.providerName || player.provider,
+    baseUrl: player.baseUrl,
+    apiKeyEnv: player.apiKeyEnv,
+    apiKey: player.apiKey,
+    apiFormat: player.apiFormat,
+    model: player.model,
+    modelId: player.modelId,
+    temperature: Number(player.temperature ?? config.host.temperature ?? 0.35),
+    personality: player.personality || '',
+    sex: player.sex || '',
+    avatar: player.avatar || '',
+    avatarUrl: player.avatarUrl || player.avatar || '',
+    voicePackageId: player.voicePackageId || null
+  };
+}
+
+function publicSocketHost(host = {}) {
+  return {
+    id: host.id || 0,
+    name: host.name || host.nickname || '主持人',
+    nickname: host.nickname || host.name || '主持人',
+    avatar: host.avatar || '',
+    avatarUrl: host.avatarUrl || host.avatar || '',
+    voicePackageId: host.voicePackageId || null
+  };
 }
 
 function hasDebateTeamConfig(value) {
@@ -241,12 +615,13 @@ function normalizeIdList(value) {
   return value.map(Number).filter(Boolean);
 }
 
-function selectPlayersForGame(config, playerIds, gameType) {
+function selectPlayersForGame(config, playerIds, gameType, options = {}) {
   const explicitIds = Array.isArray(playerIds) ? playerIds.map(Number).filter(Boolean) : [];
   const ids = explicitIds.length ? explicitIds : getSavedPlayerIds(gameType);
+  const expectedWerewolfCount = gameType === 'werewolf' ? getWerewolfModeConfig(options.werewolfMode).roles.length : 12;
   const selected = ids.length
     ? ids.map((id) => config.players.find((player) => Number(player.id) === id)).filter(Boolean)
-    : config.players.slice(0, gameType === 'debate' || gameType === 'werewolf' ? 12 : 7);
+    : config.players.slice(0, gameType === 'debate' ? 12 : gameType === 'werewolf' ? expectedWerewolfCount : 7);
 
   if (gameType === 'debate') {
     if (selected.length < 8 || selected.length > 12) {
@@ -256,8 +631,8 @@ function selectPlayersForGame(config, playerIds, gameType) {
   }
 
   if (gameType === 'werewolf') {
-    if (selected.length !== 12) {
-      throw new Error('AI 狼人杀 12 人标准局需要选择恰好 12 位 AI 玩家。');
+    if (selected.length !== expectedWerewolfCount) {
+      throw new Error(`AI 狼人杀当前模式需要选择恰好 ${expectedWerewolfCount} 位 AI 玩家。`);
     }
     return selected;
   }
@@ -291,11 +666,245 @@ function parseMessage(raw) {
   }
 }
 
+function createPreparedSender(session, options = {}) {
+  const queue = [];
+  let drainPromise = null;
+  const audioResources = new Set();
+  const prefetchCount = Number(options.prefetchCount) || 2;
+  const phaseLookahead = Number.isInteger(options.phaseLookahead) ? options.phaseLookahead : null;
+
+  async function enqueue(event) {
+    if (phaseLookahead != null) {
+      while (queue.length && exceedsPhaseLookahead([...queue.map((item) => item.event), event], phaseLookahead)) {
+        try {
+          await queue[0].done;
+        } catch (error) {
+          if (isSessionCancelled(error)) return;
+          throw error;
+        }
+      }
+    }
+    const item = {};
+    item.event = event;
+    item.prepared = prepareOutgoingEvent(event);
+    item.done = new Promise((resolve, reject) => {
+      item.resolve = resolve;
+      item.reject = reject;
+    });
+    item.done.catch(() => {});
+    queue.push(item);
+    if (!drainPromise) {
+      drainPromise = drain();
+      drainPromise.catch(() => {});
+    }
+    if (phaseLookahead == null && queue.length > prefetchCount) {
+      try {
+        await queue[0].done;
+      } catch (error) {
+        if (isSessionCancelled(error)) return;
+        throw error;
+      }
+    }
+  }
+
+  async function drain() {
+    try {
+      while (queue.length) {
+        const item = queue[0];
+        try {
+          const prepared = await item.prepared;
+          collectPreparedAudioResources(prepared, audioResources);
+          await session.sendAndWait(prepared);
+          item.resolve();
+        } catch (error) {
+          item.reject(error);
+          throw error;
+        } finally {
+          queue.shift();
+        }
+      }
+    } finally {
+      drainPromise = null;
+    }
+  }
+
+  return {
+    enqueue,
+    getAudioResources() {
+      return [...audioResources];
+    },
+    async flush() {
+      if (!drainPromise) return;
+      try {
+        await drainPromise;
+      } catch (error) {
+        if (isSessionCancelled(error)) return;
+        throw error;
+      }
+    },
+    async send(event) {
+      await enqueue(event);
+      if (!drainPromise) return;
+      try {
+        await drainPromise;
+      } catch (error) {
+        if (isSessionCancelled(error)) return;
+        throw error;
+      }
+    }
+  };
+}
+
+function exceedsPhaseLookahead(events, phaseLookahead) {
+  const phaseKeys = [];
+  for (const event of events) {
+    const key = getEventPhaseKey(event);
+    if (!key || phaseKeys.includes(key)) continue;
+    phaseKeys.push(key);
+  }
+  return phaseKeys.length > phaseLookahead + 1;
+}
+
+function getEventPhaseKey(event) {
+  const phase = event?.phase || event?.round;
+  if (!phase) return '';
+  return String(phase.id || phase.phase || phase.name || phase.title || phase.number || '');
+}
+
+function createSessionCancelledError() {
+  const error = new Error('game-session-cancelled');
+  error.code = 'GAME_SESSION_CANCELLED';
+  return error;
+}
+
+function isSessionCancelled(error) {
+  return error?.code === 'GAME_SESSION_CANCELLED' || error?.message === 'game-session-cancelled';
+}
+
+function prepareOutgoingEvent(event) {
+  return prepareEventMedia(withNarration(cloneEvent(event)));
+}
+
+function collectPreparedAudioResources(event, target) {
+  if (event?.audioUrl) target.add(event.audioUrl);
+  (event?.audioSegments || []).forEach((segment) => {
+    if (segment?.audioUrl) target.add(segment.audioUrl);
+  });
+}
+
+function cloneEvent(event) {
+  return JSON.parse(JSON.stringify(event || {}));
+}
+
 function withNarration(event) {
   return {
     ...event,
     narration: getNarration(event)
   };
+}
+
+async function prepareEventMedia(event) {
+  const text = getPlayableEventText(event);
+  const subtitle = text ? {
+    text,
+    playerId: event.speech?.playerId || event.testimony?.playerId || null,
+    speakerRole: getEventSpeakerRole(event, text),
+    speakerLabel: getEventSpeakerLabel(event, text)
+  } : null;
+  const result = subtitle ? { ...withPlayableDetails(event, text), subtitle } : withPlayableDetails(event, text);
+  if (!text) return result;
+
+  const voice = resolveEventVoice(event);
+  if (!voice || !voice.enabled || String(voice.provider || '').toLowerCase() !== 'azure') return result;
+
+  try {
+    if (event.game?.type === 'debate' && event.speech?.playerId) {
+      const segments = splitPlayableTextSegments(text);
+      const preparedSegments = await Promise.all(segments.map(async (segment, index) => {
+        const saved = await prepareVoiceAudio(voice, segment);
+        return saved ? {
+          index,
+          text: segment,
+          audioUrl: saved.audioUrl,
+          audioMimeType: saved.audioMimeType,
+          audioCached: saved.audioCached
+        } : null;
+      }));
+      return {
+        ...result,
+        audioSegments: preparedSegments.filter(Boolean)
+      };
+    }
+    const saved = await prepareVoiceAudio(voice, text);
+    if (!saved) return result;
+    return {
+      ...result,
+      audioUrl: saved.audioUrl,
+      audioMimeType: saved.audioMimeType,
+      audioCached: saved.audioCached
+    };
+  } catch (error) {
+    return {
+      ...result,
+      mediaError: error.message
+    };
+  }
+}
+
+function getEventSpeakerRole(event, text = '') {
+  if (event.speech?.playerId || event.testimony?.playerId) return 'player';
+  if (event.type === 'done') return 'system';
+  if (/^游戏开始/.test(String(text || event.message || event.narration || '').trim())) return 'system';
+  if (/^游戏结束/.test(String(text || event.message || event.narration || '').trim())) return 'system';
+  return 'host';
+}
+
+function getEventSpeakerLabel(event, text = '') {
+  const role = getEventSpeakerRole(event, text);
+  if (role === 'system') return '系统播报';
+  if (role === 'host') return '主持人';
+  return '';
+}
+
+function getPlayableEventText(event) {
+  if (event.speech?.text) return String(event.speech.text).trim();
+  if (event.testimony?.text) return String(event.testimony.text).trim();
+  if (event.testimony?.testimony) return String(event.testimony.testimony).trim();
+  return String(event.narration || event.message || '').trim();
+}
+
+function withPlayableDetails(event, fullText) {
+  if (event.speech) {
+    return {
+      ...event,
+      speech: {
+        ...event.speech,
+        fullText: event.speech.fullText || fullText || event.speech.text || '',
+        thinking: event.speech.thinking || event.speech.reasoning || event.speech.thought || ''
+      }
+    };
+  }
+  if (event.testimony) {
+    return {
+      ...event,
+      testimony: {
+        ...event.testimony,
+        fullText: event.testimony.fullText || fullText || event.testimony.text || event.testimony.testimony || '',
+        thinking: event.testimony.thinking || event.testimony.reasoning || event.testimony.thought || ''
+      }
+    };
+  }
+  return event;
+}
+
+function resolveEventVoice(event) {
+  const playerId = event.speech?.playerId || event.testimony?.playerId;
+  if (playerId) {
+    const player = event.game?.players?.find((item) => Number(item.id) === Number(playerId));
+    if (player?.voicePackageId) return getVoicePackage(player.voicePackageId);
+  }
+  if (event.game?.host?.voicePackageId) return getVoicePackage(event.game.host.voicePackageId);
+  return null;
 }
 
 function getNarration(event) {
@@ -354,7 +963,12 @@ function getWerewolfNarration(event) {
 }
 
 function getDebateNarration(event) {
-  if (event.type === 'players') return '辩论选手已经入场。正方、反方和评委席已分配完成。';
+  if (event.type === 'players') {
+    const topic = event.game?.topic || {};
+    return '游戏开始';
+  }
+  if (event.type === 'phase-start' || event.type === 'phase-end') return event.message || '';
+  // if (event.type === 'players') return '辩论选手已经入场。正方、反方和评委席已分配完成。';
   if (event.type === 'phase-start') return event.message || `现在进入${event.phase?.name || '下一'}环节。`;
   if (event.type === 'phase-end') return event.message || `${event.phase?.name || '本'}环节结束。`;
   if (event.type === 'speech') {
@@ -365,7 +979,7 @@ function getDebateNarration(event) {
   }
   if (event.type === 'game') {
     const winner = event.game.winner === 'pro' ? '正方' : event.game.winner === 'con' ? '反方' : '双方平局';
-    const mvp = event.game.mvp ? `本场 MVP 是 ${event.game.mvp.nickname || `${event.game.mvp.id}号`}。` : '';
+    const mvp = event.game.mvp ? `本场最佳辩手是 ${event.game.mvp.nickname || `${event.game.mvp.id}号`}。` : '';
     return `辩论赛进入赛果公布。${winner}。${mvp}`;
   }
   return event.message || '';

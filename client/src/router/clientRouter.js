@@ -23,18 +23,15 @@ export function useClientRouter() {
   return { route, navigate };
 }
 
-export function buildGamePath(gameKey, playerIds = []) {
-  const cleanIds = playerIds.map(Number).filter(Boolean);
-  const params = cleanIds.length ? `?players=${cleanIds.join(',')}` : '';
+export function buildGamePath(gameKey, options = {}) {
+  const searchParams = new URLSearchParams();
+  if (options.gameId) searchParams.set('gameId', options.gameId);
+  const params = searchParams.toString() ? `?${searchParams.toString()}` : '';
   return `/games/${gameKey}${params}`;
 }
 
-export function getRoutePlayerIds(route) {
-  const raw = route.searchParams.get('players') || '';
-  return raw
-    .split(',')
-    .map((value) => Number(value.trim()))
-    .filter(Boolean);
+export function getRouteGameId(route) {
+  return route.searchParams.get('gameId') || '';
 }
 
 function readLocation() {

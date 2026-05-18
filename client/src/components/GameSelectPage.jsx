@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, MessagesSquare, Moon, Sparkles, UsersRound } from 'lucide-react';
-import { fetchAiPlayers, fetchPlayerSelections, savePlayerSelection } from '../api/gameApi';
+import { fetchAiPlayers, fetchPlayerSelections, fetchRecentGames, savePlayerSelection } from '../api/gameApi';
 
 const GAME_RULES = {
   consensus: { min: 7, max: 7, recommended: 7, label: '固定 7 人' },
@@ -14,13 +14,14 @@ const games = [
   { key: 'werewolf', title: 'AI 狼人杀', subtitle: '12人标准场与扩展模式', tone: 'wolf', icon: <Moon size={34} /> }
 ];
 
-export function GameSelectPage({ onStartConsensus, onStartDebate, onStartWerewolf }) {
+export function GameSelectPage({ onStartConsensus, onStartDebate, onStartWerewolf, onReplayGame }) {
   const [players, setPlayers] = useState([]);
   const [selections, setSelections] = useState({});
   const [editingGame, setEditingGame] = useState('');
   const [draftIds, setDraftIds] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [recentGames, setRecentGames] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +33,17 @@ export function GameSelectPage({ onStartConsensus, onStartDebate, onStartWerewol
       })
       .catch((error) => {
         if (!cancelled) setLoadError(error.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(games.map((game) => fetchRecentGames(game.key, 10).then((items) => [game.key, items]).catch(() => [game.key, []])))
+      .then((entries) => {
+        if (!cancelled) setRecentGames(Object.fromEntries(entries));
       });
     return () => {
       cancelled = true;
@@ -106,12 +118,43 @@ export function GameSelectPage({ onStartConsensus, onStartDebate, onStartWerewol
                   error={saveError || loadError}
                 />
               )}
+              <RecentGameList
+                gameType={game.key}
+                games={recentGames[game.key] || []}
+                onOpen={(historyGame) => onReplayGame?.(game.key, historyGame.id, selectedIds)}
+              />
             </article>
           );
         })}
       </section>
     </main>
   );
+}
+
+function RecentGameList({ gameType, games, onOpen }) {
+  return (
+    <div className="game-recent-list">
+      <strong>最近对局</strong>
+      {games.length ? games.map((game) => (
+        <button type="button" key={game.id} onClick={() => onOpen(game)}>
+          <span>{getHistoryTitle(gameType, game)}</span>
+          <em>{formatTime(game.createdAt)}</em>
+        </button>
+      )) : <p>暂无历史对局。</p>}
+    </div>
+  );
+}
+
+function getHistoryTitle(gameType, game) {
+  if (game.topicTitle) return game.topicTitle;
+  if (gameType === 'debate') return game.topic?.title || game.id;
+  if (gameType === 'werewolf') return game.modeName || game.event?.werewolfMode?.name || game.mode || '标准局';
+  return game.skinName || game.event?.name || game.id;
+}
+
+function formatTime(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('zh-CN', { hour12: false });
 }
 
 function GamePlayerEditor({ gameKey, players, draftIds, onToggle, onSave, error }) {
