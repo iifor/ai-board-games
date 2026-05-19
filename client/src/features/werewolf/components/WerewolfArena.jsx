@@ -60,7 +60,6 @@ export function WerewolfArena({
         </div>
 
         <section className="werewolf-center-card" aria-live="polite">
-          <div className="werewolf-center-ornament" aria-hidden="true">?</div>
           <span className="werewolf-phase-kicker">{currentRound?.phase === 'night' ? '夜晚行动' : currentRound?.phase === 'day' ? '白天议事' : '实时观战'}</span>
           <h2>{currentRound ? `${currentRound.phase === 'night' ? '夜晚' : '白天'}第 ${currentRound.day || 1} 轮` : '等待开局'}</h2>
           <dl>

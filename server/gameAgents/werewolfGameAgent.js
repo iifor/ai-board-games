@@ -3,6 +3,11 @@ const { getWerewolfModeConfig } = require('../werewolfModes');
 const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('../services/ai/promptComposer');
 const { PlayerAgent, normalizeText } = require('./playerAgent');
 const { createWerewolfSkillRegistry } = require('../skills/werewolf/roleSkills');
+const {
+  buildNightPublicMessage,
+  buildSheriffStartMessage,
+  buildSheriffResultMessage
+} = require('./werewolfAnnouncements');
 
 const MAX_DAYS = 5;
 
@@ -71,6 +76,7 @@ class WerewolfGameAgent {
         truth: winner ? this.agents.map((agent) => `${agent.id}号${getRoleLabel(agent)}`).join('；') : ''
       },
       host: publicHost(this.config.host),
+      werewolfMode: modeDetail,
       players: this.agents.map(publicPlayer).sort((a, b) => Number(a.id) - Number(b.id)),
       rounds: this.rounds,
       winner,
@@ -90,7 +96,7 @@ class WerewolfGameAgent {
     await this.resolveGuard(round, alive);
     await this.resolveWitch(round);
     this.resolveNightDeaths(round);
-    await this.emit({ type: 'night-result', round, message: getNightPublicMessage(round), game: this.serialize() });
+    await this.emit({ type: 'night-result', round, message: buildNightPublicMessage(round), game: this.serialize() });
   }
 
   async resolveWolfKill(round, alive) {
@@ -161,13 +167,16 @@ class WerewolfGameAgent {
 
   async runDay(round) {
     round.phase = 'day';
-    const message = await askHost(this.config, round.day, '白天', `请公布昨夜公开死亡情况：${getNightPublicMessage(round)}`, getNightPublicMessage(round));
+    const nightPublicMessage = buildNightPublicMessage(round);
+    const message = nightPublicMessage;
     round.publicSummary = message;
     await this.emit({ type: 'day-start', round, message, game: this.serialize() });
 
     if (this.modeConfig.sheriff.enabled && this.modeConfig.sheriff.firstDayElection !== false && round.day === 1) {
-      electSheriff(this.agents, round, this.modeConfig);
-      await this.emit({ type: 'sheriff-result', round, message: getSheriffMessage(round), game: this.serialize() });
+      startSheriffElection(this.agents, round);
+      await this.emit({ type: 'sheriff-start', round, message: buildSheriffStartMessage(round), game: this.serialize() });
+      finishSheriffElection(this.agents, round, this.modeConfig);
+      await this.emit({ type: 'sheriff-result', round, message: buildSheriffResultMessage(round, this.modeConfig), game: this.serialize() });
     } else {
       const previousSheriff = this.rounds.slice(0, -1).reverse().find((item) => item.sheriffId)?.sheriffId;
       round.sheriffId = this.agents.some((agent) => agent.alive && agent.id === previousSheriff) ? previousSheriff : null;
@@ -468,9 +477,15 @@ function countTargets(votes, sheriffId = null, sheriffWeight = 1) {
   return counts;
 }
 
-function electSheriff(agents, round, modeConfig) {
+function startSheriffElection(agents, round) {
   const alive = agents.filter((agent) => agent.alive);
   const candidates = alive.slice(0, 3).map((agent) => agent.id);
+  round.sheriffElection = { candidates, votes: {}, tally: {}, sheriffId: null };
+}
+
+function finishSheriffElection(agents, round, modeConfig) {
+  const alive = agents.filter((agent) => agent.alive);
+  const candidates = round.sheriffElection?.candidates || alive.slice(0, 3).map((agent) => agent.id);
   const votes = {};
   for (const agent of alive.filter((item) => item.canVote)) {
     const target = candidates.includes(agent.id) ? candidates.find((id) => id !== agent.id) || candidates[0] : candidates[0];
@@ -480,11 +495,6 @@ function electSheriff(agents, round, modeConfig) {
   const sheriffId = topExile(tally) || candidates[0] || null;
   round.sheriffId = sheriffId;
   round.sheriffElection = { candidates, votes, tally, sheriffId };
-}
-
-function getSheriffMessage(round) {
-  if (!round.sheriffId) return '本局无人当选警长。';
-  return `警长竞选结束，${round.sheriffId}号当选警长，放逐投票计为1.5票。`;
 }
 
 function hasLastWords(agents, modeConfig) {
@@ -503,11 +513,6 @@ function buildWolfStrategySummary(wolfChoices, wolfTarget, agents) {
     : `狼队刀口分散，最终集中到 ${targetLabel}。`;
 }
 
-function getNightPublicMessage(round) {
-  if (!round.night.deaths.length) return `第 ${round.day} 夜是平安夜。`;
-  return `第 ${round.day} 夜死亡：${round.night.deaths.map((item) => `${item.id}号`).join('、')}。`;
-}
-
 function getVoteMessage(round) {
   if (round.idiotReveal) return `白天投票结束，${round.idiotReveal.id}号翻牌为白痴，免除本次放逐并失去投票权。`;
   if (!round.exile) return '白天投票出现平票，本轮无人被放逐。';
@@ -516,7 +521,7 @@ function getVoteMessage(round) {
 
 function buildPublicLog(rounds, agents) {
   return rounds.map((round) => [
-    `第${round.day}天：${round.publicSummary || getNightPublicMessage(round)}`,
+    `第${round.day}天：${round.publicSummary || buildNightPublicMessage(round)}`,
     round.sheriffId ? `警长：${round.sheriffId}号` : '',
     round.exile ? `放逐：${round.exile.id}号` : '',
     round.idiotReveal ? `白痴翻牌：${round.idiotReveal.id}号` : '',

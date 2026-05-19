@@ -8,6 +8,11 @@ const { getWerewolfModeConfig } = require('./werewolfModes');
 const { getGame, getVoicePackage, listPlayers, saveGameRecord } = require('./adminStore');
 const { prepareVoiceAudio } = require('./services/audio/audioResourceCache');
 const { splitPlayableTextSegments } = require('./services/debate/textSegments');
+const {
+  buildNightPublicMessage,
+  buildSheriffStartMessage,
+  buildSheriffResultMessage
+} = require('./gameAgents/werewolfAnnouncements');
 
 function attachGameSocket(server) {
   const wss = new WebSocketServer({ server, path: '/api/toc/ws/game' });
@@ -206,6 +211,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
     events.push({
       type: 'night-result',
       round: nightRound,
+      message: buildNightPublicMessage(nightRound),
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
     });
 
@@ -222,8 +228,37 @@ function buildWerewolfReplayPlaybackEvents(game) {
     events.push({
       type: 'day-start',
       round: nightRound,
+      message: buildNightPublicMessage(nightRound),
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
     });
+
+    if (shouldReplaySheriffElection(sourceRound)) {
+      const sheriffResult = {
+        sheriffId: nightRound.sheriffId,
+        sheriffElection: nightRound.sheriffElection
+      };
+      nightRound.sheriffId = null;
+      nightRound.sheriffElection = {
+        candidates: sheriffResult.sheriffElection?.candidates || [],
+        votes: {},
+        tally: {},
+        sheriffId: null
+      };
+      events.push({
+        type: 'sheriff-start',
+        round: nightRound,
+        message: buildSheriffStartMessage(nightRound),
+        game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+      });
+      nightRound.sheriffId = sheriffResult.sheriffId;
+      nightRound.sheriffElection = sheriffResult.sheriffElection;
+      events.push({
+        type: 'sheriff-result',
+        round: nightRound,
+        message: buildSheriffResultMessage(nightRound, game.werewolfMode || {}),
+        game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+      });
+    }
 
     const speeches = getRoundSpeeches(sourceRound);
     for (const speech of speeches) {
@@ -341,11 +376,22 @@ function buildDebateReplayEvents(game) {
 function buildWerewolfReplayEvents(game) {
   return (game.rounds || []).flatMap((round) => [
     { type: 'phase-start', round, message: round.title || `第 ${round.day || round.number || 1} 轮` },
-    ...getRoundSpeeches(round).map((speech) => ({ type: 'speech', round, speech })),
+    { type: 'night-result', round, message: buildNightPublicMessage(round) },
     ...getWerewolfTestimonies(round).map((testimony) => ({ type: 'last-words', round, testimony })),
-    { type: 'day-start', round },
+    { type: 'day-start', round, message: buildNightPublicMessage(round) },
+    ...(shouldReplaySheriffElection(round)
+      ? [
+        { type: 'sheriff-start', round, message: buildSheriffStartMessage(round) },
+        { type: 'sheriff-result', round, message: buildSheriffResultMessage(round, game.werewolfMode || {}) }
+      ]
+      : []),
+    ...getRoundSpeeches(round).map((speech) => ({ type: 'speech', round, speech })),
     { type: 'vote-result', round }
   ]);
+}
+
+function shouldReplaySheriffElection(round = {}) {
+  return Boolean(round.sheriffElection);
 }
 
 function getDebatePhasesFromRounds(rounds = []) {
@@ -951,6 +997,8 @@ function getWerewolfNarration(event) {
   if (event.type === 'phase-start') return event.message || `第 ${event.round?.day || 1} 夜，天黑请闭眼。`;
   if (event.type === 'night-result') return event.message || '夜晚行动结算完毕。';
   if (event.type === 'day-start') return event.message || `第 ${event.round?.day || 1} 天，天亮了。`;
+  if (event.type === 'sheriff-start') return event.message || buildSheriffStartMessage(event.round);
+  if (event.type === 'sheriff-result') return event.message || buildSheriffResultMessage(event.round, event.game?.werewolfMode || {});
   if (event.type === 'speech') return `${event.speech.playerId}号发言。${event.speech.text}`;
   if (event.type === 'vote-result') return event.message || '白天投票结果公布。';
   if (event.type === 'last-words' || event.type === 'exile-words') return `${event.testimony.playerId}号遗言。${event.testimony.text}`;

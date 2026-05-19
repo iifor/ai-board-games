@@ -1,14 +1,13 @@
 import React from 'react';
-import { Check, Crown, Moon, Users } from 'lucide-react';
+import { Check, Moon, Users } from 'lucide-react';
 import { classNames } from '../../../utils/classNames';
-import { formatWerewolfModeSummary, getWerewolfHostOptions, getWerewolfModePlayerCount } from '../werewolfUtils';
+import { formatWerewolfModeSummary, getWerewolfModePlayerCount } from '../werewolfUtils';
 import { PanelHeader } from './PanelHeader';
 
 export function WerewolfModeDialog({ modes, selectedMode, onSelect, players, selectedPlayerIds, selectedHostId, onHostChange, onPlayerToggle, error, onCancel, onStart }) {
   const requiredCount = getWerewolfModePlayerCount(selectedMode);
   const selectedCount = selectedPlayerIds.length;
   const canStart = Boolean(selectedMode?.id) && selectedCount === requiredCount;
-  const hostOptions = getWerewolfHostOptions(players);
   return (
     <div className="werewolf-mode-backdrop" role="presentation">
       <section className="werewolf-mode-dialog werewolf-setup-dialog" role="dialog" aria-modal="true" aria-label="狼人杀开局配置">
@@ -33,25 +32,6 @@ export function WerewolfModeDialog({ modes, selectedMode, onSelect, players, sel
                 </button>
               )) : <p className="werewolf-mode-empty">暂无可用狼人杀模式，请先在 B 端启用模式。</p>}
             </div>
-          </section>
-          <section>
-            <PanelHeader icon={<Crown size={18} />} title="主持人" />
-            <div className="werewolf-host-grid">
-              {hostOptions.map((host) => (
-                <button
-                  type="button"
-                  className={String(selectedHostId || 'default') === String(host.id) ? 'checked' : ''}
-                  onClick={() => onHostChange(host.id)}
-                  key={host.id}
-                >
-                  <span>{host.badge}</span>
-                  <strong>{host.name}</strong>
-                  <small>{host.description}</small>
-                  {String(selectedHostId || 'default') === String(host.id) && <Check size={15} />}
-                </button>
-              ))}
-            </div>
-            <p className="werewolf-order-note">主持人只负责播报和推进流程，不占用玩家座位序号。</p>
           </section>
           <section>
             <PanelHeader icon={<Users size={18} />} title={`玩家 ${selectedCount}/${requiredCount || '-'}`} />

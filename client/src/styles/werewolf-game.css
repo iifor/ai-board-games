@@ -574,20 +574,6 @@
   text-align: center;
 }
 
-.werewolf-center-ornament {
-  position: absolute;
-  left: 50%;
-  top: -19px;
-  display: grid;
-  width: 42px;
-  height: 42px;
-  transform: translateX(-50%);
-  place-items: center;
-  color: #cfc3ff;
-  background: rgba(14, 13, 43, 0.94);
-  text-shadow: 0 0 12px rgba(155, 117, 255, 0.9);
-}
-
 .werewolf-phase-kicker {
   display: block;
   color: rgba(218, 224, 255, 0.72);
