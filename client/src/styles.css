@@ -2943,7 +2943,7 @@ p {
 
 .werewolf-table {
   --seat-size: 72px;
-  --radius: 450px;
+  --radius: 350px;
   position: relative;
   width: 100%;
   height: 100%;

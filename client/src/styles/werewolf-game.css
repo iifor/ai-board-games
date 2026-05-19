@@ -368,7 +368,7 @@
   min-width: 780px;
   --orbit-x: 50%;
   --orbit-y: 45%;
-  --ring-radius: min(400px, 50vmin);
+  --ring-radius: min(300px, 50vmin);
   --orbit-radius: var(--ring-radius);
   --avatar-size: 86px;
   pointer-events: none;
