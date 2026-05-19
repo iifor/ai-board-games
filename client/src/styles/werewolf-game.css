@@ -76,26 +76,6 @@
   background: #02050f;
 }
 
-.werewolf-stage-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background:
-    linear-gradient(180deg, rgba(0, 3, 16, 0.18), rgba(0, 3, 16, 0.36)),
-    radial-gradient(circle at 50% 23%, rgba(87, 136, 255, 0.18), transparent 27%),
-    url("../asserts/lrs.png") center / cover no-repeat;
-}
-
-.werewolf-arena-vignette {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at center, rgba(38, 68, 150, 0.04) 0%, rgba(2, 5, 20, 0.18) 54%, rgba(0, 0, 5, 0.76) 100%),
-    linear-gradient(90deg, rgba(0, 0, 8, 0.72), transparent 20%, transparent 80%, rgba(0, 0, 8, 0.72));
-}
-
 .werewolf-side {
   position: absolute;
   z-index: 12;
@@ -502,35 +482,39 @@
   position: absolute;
   left: -10px;
   top: -10px;
+  width: 35px;
+  height: 35px;
   z-index: 5;
-  width: 34px;
-  height: 34px;
-  border: 2px solid rgba(255, 215, 100, 0.85);
-  border-radius: 999px;
-  color: #fff;
-  background: rgba(20, 10, 0, 0.92);
-  font-size: 40px;
-  line-height: 34px;
+  color: #ffffff;
+  font-size: 20px;
+  background: rgba(0, 0, 0, 0.68);
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  border-radius: 50%;
+  line-height: 33px;
+  font-weight: 900;
   text-align: center;
   font-weight: 900;
 }
 
 .werewolf-sheriff-badge {
   position: absolute;
-  right: -9px;
-  top: -10px;
+  right: -10px;
+  top: -12px;
   z-index: 5;
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   place-items: center;
-  border: 1px solid rgba(255, 238, 153, 0.9);
+  border: 2px solid rgba(255, 241, 151, 0.95);
   border-radius: 50%;
-  color: #ffe878;
-  background: radial-gradient(circle at 35% 28%, rgba(255, 255, 210, 0.34), rgba(88, 57, 8, 0.94));
+  color: #ffef76;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 216, 0.5), transparent 36%),
+    linear-gradient(180deg, rgba(125, 79, 9, 0.98), rgba(50, 30, 3, 0.98));
   box-shadow:
-    0 0 10px rgba(255, 223, 98, 0.74),
-    0 0 22px rgba(255, 195, 54, 0.34);
+    0 0 0 2px rgba(46, 25, 0, 0.65),
+    0 0 12px rgba(255, 223, 98, 0.78),
+    0 0 24px rgba(255, 195, 54, 0.42);
 }
 
 .werewolf-dead-badge {
@@ -571,33 +555,11 @@
 }
 
 .werewolf-nameplate {
-  display: block;
+  display: inline-block;
+  min-width: 0;
   margin-top: 8px;
   border-radius: 6px;
   text-align: center;
-}
-
-.werewolf-nameplate strong,
-.werewolf-nameplate span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.werewolf-nameplate strong {
-  color: #fff;
-  font-size: clamp(12px, 0.85vw, 16px);
-  font-weight: 900;
-  line-height: 1.2;
-}
-
-.werewolf-nameplate span {
-  margin-top: 2px;
-  color: #9cff9a;
-  font-size: clamp(11px, 0.72vw, 13px);
-  font-weight: 800;
-  line-height: 1.1;
 }
 
 .werewolf-center-card {
@@ -1328,7 +1290,7 @@
   }
 
   .werewolf-nameplate {
-    min-width: 100px;
+    max-width: 130px;
   }
 }
 

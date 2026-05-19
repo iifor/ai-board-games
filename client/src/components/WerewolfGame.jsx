@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { fetchAiPlayers, fetchWerewolfModes } from '../api/gameApi';
 import { useSpeechQueue } from '../hooks/useSpeechQueue';
 import { useGameSocketSession } from '../hooks/useGameSocketSession';
-import { WerewolfArena, WerewolfControls, WerewolfPlayerDetailModal, WerewolfModeDialog } from '../features/werewolf/components/WerewolfGameSections';
+import { WerewolfArena } from '../features/werewolf/components/WerewolfArena';
+import { WerewolfControls } from '../features/werewolf/components/WerewolfControls';
+import { WerewolfPlayerDetailModal } from '../features/werewolf/components/WerewolfPlayerDetailModal';
+import { WerewolfModeDialog } from '../features/werewolf/components/WerewolfModeDialog';
 import {
   buildEventLogEntry,
   getWerewolfModePlayerCount,
@@ -33,7 +36,6 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   const [game, setGame] = useState(EMPTY_WEREWOLF);
   const [status, setStatus] = useState('idle');
   const [streamMessage, setStreamMessage] = useState('等待开局');
-  const [messageLog, setMessageLog] = useState([]);
   const [eventLog, setEventLog] = useState([]);
   const [activeSpeech, setActiveSpeech] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
@@ -145,7 +147,6 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     cancel();
     resetSessionRefs();
     setGame(EMPTY_WEREWOLF);
-    setMessageLog([]);
     setEventLog([]);
     setActiveSpeech(null);
     setSelectedPlayer(null);
@@ -157,6 +158,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
 
   function requestStartGame() {
     if (!canStartNextGame) return;
+    if (status === 'error') setStatus('idle');
     setSetupError('');
     setSelectedPlayerIds((current) => normalizeWerewolfSelectedIds(current, availablePlayers, werewolfMode));
     setModeDialogOpen(true);
@@ -238,28 +240,6 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     if (!event || event.type === 'done') return;
     const entry = buildEventLogEntry(event);
     if (entry) setEventLog((items) => [...items, entry].slice(-80));
-
-    if (event.type === 'speech' && event.speech) {
-      setMessageLog((items) => [...items, {
-        type: 'player',
-        playerId: event.speech.playerId,
-        text: event.speech.text,
-        title: `${event.speech.playerId} 号发言`
-      }].slice(-80));
-      return;
-    }
-    if ((event.type === 'last-words' || event.type === 'exile-words') && event.testimony) {
-      setMessageLog((items) => [...items, {
-        type: 'player',
-        playerId: event.testimony.playerId,
-        text: event.testimony.text,
-        title: `${event.testimony.playerId} 号遗言`
-      }].slice(-80));
-      return;
-    }
-    const narration = event.narration || getWerewolfNarration(event) || event.message;
-    if (!narration) return;
-    setMessageLog((items) => [...items, { type: 'host', playerId: '主持', text: narration, title: '主持人' }].slice(-80));
   }
 
   function handleAutoPlayChange(value) {
@@ -291,7 +271,6 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
         <section className="werewolf-idle-stage" aria-label="狼人杀待开始">
           <div className="werewolf-idle-brand">
             <p>狼人杀</p>
-            <h2>观赛视角</h2>
             <span>{werewolfMode?.name || '标准局'}</span>
           </div>
           <div className="werewolf-idle-card">
@@ -322,7 +301,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
         />
       )}
 
-      {status === 'error' && <p className="werewolf-error">{streamMessage}</p>}
+      {status === 'error' && streamMessage && !modeDialogOpen && <p className="werewolf-error">{streamMessage}</p>}
 
       {modeDialogOpen && (
         <WerewolfModeDialog

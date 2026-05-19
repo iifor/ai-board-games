@@ -1,6 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { getRoleName, getWinnerName } from '../utils/gameState';
+import { getRoleName, getWinnerName } from '../constants';
 
 export function WinnerModal({ game, onClose }) {
   if (!game?.winner || !game.rounds?.length) return null;

@@ -1,7 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { formatAvatarUrl } from '../../utils/avatar';
-import { classNames } from '../../utils/gameState';
 
 export function BaseModal({
   title,
@@ -44,7 +43,7 @@ export function PlayerAvatar({ player, className = '', fallback = '', style, chi
   const avatar = player?.avatar || player?.avatarUrl || player?.avatar_url || '';
   return (
     <div
-      className={classNames(className, avatar && 'has-avatar')}
+      className={className}
       style={avatar ? { ...(style || {}), backgroundImage: `url("${formatAvatarUrl(avatar)}")` } : style}
       aria-label={name ? `${name}头像` : undefined}
       {...props}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { classNames } from '../utils/gameState';
+import { classNames } from '../utils/classNames';
 
 export function PanelTitle({ title, large = false, compact = false }) {
   return (

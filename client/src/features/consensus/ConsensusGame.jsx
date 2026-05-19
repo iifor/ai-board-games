@@ -1,17 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionBar } from './ActionBar';
-import { CenterStage, RealStartPanel } from './CenterStage';
-import { ConfirmResetModal, CurrentGameHistory, EventBackground, InfoModal, StageInfo } from './InfoModal';
-import { PlayerList } from './PlayerList';
-import { SpeechSubtitle } from './SpeechSubtitle';
-import { SpeechInsightOverlay } from './SpeechInsightOverlay';
-import { StatusPanel } from './StatusPanel';
-import { ErrorView, LoadingView } from './StateViews';
-import { TopNav } from './TopNav';
-import { WinnerModal } from './WinnerModal';
-import { openGameSocket } from '../api/gameApi';
-import { buildTimeline, classNames, createEmptyGame, createPendingRound } from '../utils/gameState';
-import { useSpeechQueue } from '../hooks/useSpeechQueue';
+import { ActionBar } from './components/ActionBar';
+import { CenterStage, RealStartPanel } from './components/CenterStage';
+import { ConfirmResetModal, CurrentGameHistory, EventBackground, InfoModal, StageInfo } from './components/InfoModal';
+import { PlayerList } from './components/PlayerList';
+import { SpeechSubtitle } from '../../components/SpeechSubtitle';
+import { SpeechInsightOverlay } from '../../components/SpeechInsightOverlay';
+import { StatusPanel } from './components/StatusPanel';
+import { ErrorView, LoadingView } from '../../components/StateViews';
+import { TopNav } from '../../components/TopNav';
+import { WinnerModal } from './components/WinnerModal';
+import { openGameSocket } from '../../api/gameApi';
+import { classNames } from '../../utils/classNames';
+import { buildTimeline, createEmptyGame, createPendingRound } from './constants';
+import { useSpeechQueue } from '../../hooks/useSpeechQueue';
 
 export function ConsensusGame({ replayGameId = '', onReturnToSelect }) {
   const [game, setGame] = useState(() => createEmptyGame());

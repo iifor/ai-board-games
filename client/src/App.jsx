@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { ConsensusGame } from './components/ConsensusGame';
-import { DebateGame } from './components/DebateGame';
+import { ConsensusGame } from './features/consensus/ConsensusGame';
+import { DebateGame } from './features/debate/DebateGame';
 import { GameSelectPage } from './components/GameSelectPage';
 import { HomePage } from './components/HomePage';
 import { WerewolfGame } from './components/WerewolfGame';

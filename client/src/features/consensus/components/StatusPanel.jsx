@@ -1,7 +1,7 @@
 import React from 'react';
 import { BadgeCheck, BookOpen, FileSearch, Target, TriangleAlert, UserRound, Users } from 'lucide-react';
-import { buildVoteCards, getConsensusTypeName } from '../utils/gameState';
-import { PanelTitle } from './PanelTitle';
+import { buildVoteCards, getConsensusTypeName } from '../constants';
+import { PanelTitle } from '../../../components/PanelTitle';
 
 export function StatusPanel({ game, round, showRoles, visibleRolePlayerId }) {
   const clueCount = game.rounds.filter((item) => item.clue).length;

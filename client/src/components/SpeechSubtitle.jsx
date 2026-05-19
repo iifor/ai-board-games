@@ -22,7 +22,7 @@ export function SpeechSubtitle({ speech }) {
 
   return (
     <aside className="speech-subtitle" aria-live="polite">
-      <p>{chunks[chunkIndex] || speech.text}</p>
+      {chunks[chunkIndex] || speech.text}
     </aside>
   );
 }

@@ -1,7 +1,3 @@
-export function classNames(...items) {
-  return items.filter(Boolean).join(' ');
-}
-
 export function createEmptyGame() {
   const nicknames = ['豆包', 'Grok', '文心一言', 'Gemini', 'Kimi', 'DeepSeek', '千问'];
   const personalities = ['记录者', '怀疑者', '调和者', '原则派', '机会主义者', '观察者', '倾听者'];

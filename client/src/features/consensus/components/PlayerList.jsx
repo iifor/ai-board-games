@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { formatAvatarUrl } from '../utils/avatar';
-import { classNames, getRoleName } from '../utils/gameState';
+import { formatAvatarUrl } from '../../../utils/avatar';
+import { classNames } from '../../../utils/classNames';
+import { getRoleName } from '../constants';
 
 export function PlayerList({ players, round, showRoles, visibleRolePlayerId, currentSpeakerId }) {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
