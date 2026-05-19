@@ -1,9 +1,10 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Award, CircleHelp, Crown, GripVertical, Landmark, MessageSquareText, Shield, Star, Swords, Users, X } from 'lucide-react';
-import { fetchAiHealth, openGameSocket } from '../api/gameApi';
+import { fetchAiHealth } from '../api/gameApi';
 import { classNames } from '../utils/gameState';
 import { getPlayerAvatar, normalizeHostId } from '../utils/player';
 import { useSpeechQueue } from '../hooks/useSpeechQueue';
+import { useGameSocketSession } from '../hooks/useGameSocketSession';
 import { DebateControls } from './debate/DebateControls';
 import { PlayerAvatar } from './common/BaseModal';
 import { HostSelector } from './common/HostSelector';
@@ -66,17 +67,8 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   const [debateTeamDraft, setDebateTeamDraft] = useState(() => createDefaultDebateTeams([]));
   const [selectedHostId, setSelectedHostId] = useState('default');
   const [resultModalOpen, setResultModalOpen] = useState(false);
-  const [autoPlay, setAutoPlay] = useState(false);
-  const [isReplayMode, setIsReplayMode] = useState(false);
-  const socketRef = useRef(null);
-  const pendingAckRef = useRef(null);
-  const pendingEventRef = useRef(null);
-  const autoPlayRef = useRef(false);
-  const ackTimerRef = useRef(null);
   const subtitleTimerRef = useRef(null);
   const { speechEnabled, setSpeechEnabled, speak, unlock, cancel } = useSpeechQueue();
-
-  useEffect(() => () => closeSocket(), []);
 
   useEffect(() => {
     if (!replayGameId) return;
@@ -100,24 +92,57 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     };
   }, [topicDialogOpen]);
 
-  useEffect(() => {
-    autoPlayRef.current = autoPlay;
-    if (autoPlay && pendingAckRef.current) continuePendingEvent();
-  }, [autoPlay]);
-
   const displayGame = game || EMPTY_DEBATE;
   const currentPhase = displayGame.phases?.at(-1) || null;
   const currentSpeakerId = activeSpeech?.playerId || null;
+  const {
+    autoPlay,
+    isReplayMode,
+    startSession,
+    closeSession,
+    resetSessionRefs,
+    acknowledgePending,
+    setAutoPlayEnabled,
+    skipCurrentReplayPhase,
+    clearPendingAckTimer
+  } = useGameSocketSession({
+    gameType: 'debate',
+    speechEnabled,
+    speak,
+    cancel,
+    applyServerEvent,
+    playPendingEvent: playPendingDebateEvent,
+    onError: (error) => {
+      setStatus('error');
+      setIsThinking(false);
+      setStreamMessage(error.message || '辩论赛生成失败');
+    },
+    onAcknowledge: () => {
+      setActiveSpeech(null);
+      if (status === 'streaming') setIsThinking(true);
+    },
+    onAutoPlayStopped: () => {
+      clearSubtitleTimer();
+      setSubtitleSpeech(null);
+      setActiveSpeech(null);
+      setIsThinking(false);
+    },
+    onSkipPhase: () => {
+      clearSubtitleTimer();
+      setActiveSpeech(null);
+      setSubtitleSpeech(null);
+      setIsThinking(true);
+      setStreamMessage('正在跳过当前阶段...');
+    }
+  });
   const isRunning = status === 'streaming';
   const hasStarted = status !== 'idle' || Boolean(displayGame.phases?.length);
   const controlsLocked = isRunning;
   const canStartNextGame = !isRunning || !autoPlay;
   function resetToIdle(message) {
-    closeSocket();
+    closeSession();
     cancel();
-    pendingAckRef.current = null;
-    pendingEventRef.current = null;
-    clearPendingAckTimer();
+    resetSessionRefs();
     clearSubtitleTimer();
     setResultModalOpen(false);
     setGame(EMPTY_DEBATE);
@@ -125,10 +150,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     setSubtitleSpeech(null);
     setIsThinking(false);
     setStatus('idle');
-    setAutoPlay(false);
-    setIsReplayMode(false);
     setSelectedHostId('default');
-    autoPlayRef.current = false;
     setStreamMessage(message || '真实模式已就绪，点击开始后调用 AI。');
   }
 
@@ -157,25 +179,14 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     setSelectedHostId(normalizeHostId(hostId));
     setTopicDialogOpen(false);
     setStatus('streaming');
-    setIsReplayMode(Boolean(options.replayGameId));
-    setAutoPlay(true);
-    autoPlayRef.current = true;
     setIsThinking(true);
     setStreamMessage('游戏准备中...');
-    socketRef.current = openGameSocket({
+    startSession({
       mode: 'real',
-      gameType: 'debate',
       hostId: normalizeHostId(hostId),
       topic: nextTopic,
       debateTeams: shouldSendTeams ? nextTeams : null,
-      replayGameId: options.replayGameId || '',
-      onEvent: handleSocketEvent,
-      onError: (error) => {
-        setStatus('error');
-        setIsThinking(false);
-        setStreamMessage(error.message);
-      },
-      onClose: () => { }
+      replayGameId: options.replayGameId || ''
     });
   }
 
@@ -188,21 +199,6 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   function openNextGameSettings() {
     setResultModalOpen(false);
     requestStartGame();
-  }
-
-  function handleSocketEvent(event, socket) {
-    if (event.type === 'error') {
-      setStatus('error');
-      setStreamMessage(event.message || '辩论赛生成失败');
-      return;
-    }
-
-    applyServerEvent(event);
-
-    if (!event.ackId) return;
-    pendingAckRef.current = { socket, ackId: event.ackId };
-    pendingEventRef.current = event;
-    if (autoPlayRef.current) continuePendingEvent();
   }
 
   function applyServerEvent(event) {
@@ -230,22 +226,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     }
   }
 
-  function acknowledgePending() {
-    const pending = pendingAckRef.current;
-    setActiveSpeech(null);
-    if (!pending?.ackId || pending.socket.readyState !== WebSocket.OPEN) return;
-    pending.socket.send(JSON.stringify({ type: 'ack', ackId: pending.ackId }));
-    if (status === 'streaming') setIsThinking(true);
-    pendingAckRef.current = null;
-    pendingEventRef.current = null;
-    clearPendingAckTimer();
-  }
-
-  function continuePendingEvent() {
-    const event = pendingEventRef.current;
-    if (!event) return;
-    cancel();
-    clearPendingAckTimer();
+  function playPendingDebateEvent(event, { setAckTimer }) {
     const narration = event.subtitle?.text || event.narration || getDebateNarration(event);
     if (speechEnabled && narration) {
       const shouldUseSentenceQueue = Boolean(event?.speech?.playerId);
@@ -256,18 +237,13 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
         : speakSubtitleChunks(narration, event?.speech?.playerId || null, event.ackId, event);
       if (!queued) {
         playSubtitleText(narration, event?.speech?.playerId || null, event.ackId, event);
-        ackTimerRef.current = window.setTimeout(acknowledgePending, getSubtitlePlaybackDelay(narration));
+        setAckTimer(getSubtitlePlaybackDelay(narration));
       }
     } else {
       playSubtitleText(narration, event?.speech?.playerId || null, event.ackId, event);
-      ackTimerRef.current = window.setTimeout(acknowledgePending, getSubtitlePlaybackDelay(narration));
+      setAckTimer(getSubtitlePlaybackDelay(narration));
     }
-  }
-
-  function clearPendingAckTimer() {
-    if (!ackTimerRef.current) return;
-    window.clearTimeout(ackTimerRef.current);
-    ackTimerRef.current = null;
+    return true;
   }
 
   function playSubtitleText(text, playerId, ackId, event) {
@@ -361,50 +337,15 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     subtitleTimerRef.current = null;
   }
 
-  function sendPlaybackControl(paused) {
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type: 'control', action: paused ? 'pause' : 'resume' }));
-    }
-  }
-
   function handleAutoPlayChange(value) {
-    const next = Boolean(value);
-    setAutoPlay(next);
-    autoPlayRef.current = next;
-    sendPlaybackControl(!next);
-    if (!next) {
-      cancel();
-      clearPendingAckTimer();
-      clearSubtitleTimer();
-      setSubtitleSpeech(null);
-      setActiveSpeech(null);
-      setIsThinking(false);
-    }
-  }
-
-  function skipCurrentReplayPhase() {
-    if (!isReplayMode || socketRef.current?.readyState !== WebSocket.OPEN) return;
-    cancel();
-    clearPendingAckTimer();
-    clearSubtitleTimer();
-    setActiveSpeech(null);
-    setSubtitleSpeech(null);
-    setIsThinking(true);
-    setStreamMessage('正在跳过当前阶段...');
-    socketRef.current.send(JSON.stringify({ type: 'control', action: 'skip-phase' }));
-  }
-
-  function closeSocket() {
-    if (socketRef.current) {
-      socketRef.current.close();
-      socketRef.current = null;
-    }
+    setAutoPlayEnabled(value);
   }
 
   function returnToSelect() {
-    closeSocket();
+    closeSession();
     cancel();
     clearPendingAckTimer();
+    resetSessionRefs();
     onReturnToSelect();
   }
 

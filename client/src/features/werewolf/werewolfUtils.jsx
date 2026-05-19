@@ -1,0 +1,317 @@
+import React from 'react';
+import { Crown, Eye, FlaskConical, Moon, Shield, Sparkles, Sun, Swords, Users, Vote, Wand2 } from 'lucide-react';
+
+export const ROLE_NAMES = {
+  werewolf: '狼人',
+  seer: '预言家',
+  witch: '女巫',
+  hunter: '猎人',
+  idiot: '白痴',
+  guard: '守卫',
+  villager: '村民'
+};
+
+const ROLE_ICON = {
+  werewolf: <Swords size={18} />,
+  seer: <Eye size={18} />,
+  witch: <FlaskConical size={18} />,
+  hunter: <Vote size={18} />,
+  idiot: <Sparkles size={18} />,
+  guard: <Shield size={18} />,
+  villager: <Users size={18} />
+};
+
+const EVENT_LABELS = {
+  players: '玩家入场',
+  'phase-start': '阶段开始',
+  'night-result': '夜间结算',
+  'day-start': '天亮播报',
+  'sheriff-result': '警长竞选',
+  speech: '白天发言',
+  'vote-result': '放逐投票',
+  'last-words': '夜晚遗言',
+  'exile-words': '放逐遗言',
+  'hunter-shot': '猎人开枪',
+  game: '胜负结算',
+  host: '主持播报'
+};
+
+export function buildEventLogEntry(event) {
+  const gameRounds = Array.isArray(event.game?.rounds) ? event.game.rounds : [];
+  const round = event.round || gameRounds.at(-1);
+  const day = round?.day ? `? ${round.day} ?` : '';
+  const title = [day, EVENT_LABELS[event.type] || event.type].filter(Boolean).join(' · ');
+  const text = event.message || event.narration || getEventSummary(event) || getWerewolfNarration(event);
+  if (!text && event.type !== 'players') return null;
+  return {
+    id: `${Date.now()}-${event.type}-${Math.random().toString(16).slice(2)}`,
+    kind: event.type,
+    title,
+    text: text || '玩家已经入场，身份牌已秘密分发。',
+    icon: getEventIcon(event.type)
+  };
+}
+
+function getEventSummary(event) {
+  if (event.type === 'night-result') return formatNightSummary(event.round, event.game?.players || [], true);
+  if (event.type === 'vote-result') return getVoteSummary(event.round);
+  if (event.type === 'hunter-shot' && event.shot) return `${event.shot.from} 号猎人开枪，带走 ${event.shot.target} 号。`;
+  if (event.type === 'sheriff-result') return event.message || (event.round?.sheriffId ? `${event.round.sheriffId} 号当选警长。` : '本局无人当选警长。');
+  if (event.type === 'game') return event.game?.winReason || '';
+  return '';
+}
+
+function getEventIcon(type) {
+  if (type === 'night-result' || type === 'phase-start') return <Moon size={18} />;
+  if (type === 'day-start') return <Sun size={18} />;
+  if (type === 'vote-result') return <Vote size={18} />;
+  if (type === 'hunter-shot') return <Swords size={18} />;
+  if (type === 'sheriff-result') return <Crown size={18} />;
+  if (type === 'game') return <Shield size={18} />;
+  if (type === 'players') return <Users size={18} />;
+  return <Wand2 size={18} />;
+}
+
+export function getRoleConfigGroups(players, mode, showRoles) {
+  const sourceRoles = players.length ? players.map((player) => ({
+    id: player.role || 'unknown',
+    name: getVisibleRoleText(player, showRoles, player.id),
+    count: 1,
+    faction: player.faction
+  })) : normalizeModeRoles(mode);
+
+  const groups = {
+    wolves: { id: 'wolves', name: '狼人阵营', count: 0, icon: ROLE_ICON.werewolf, details: [] },
+    gods: { id: 'gods', name: '神职阵营', count: 0, icon: <Sparkles size={18} />, details: [] },
+    villagers: { id: 'villagers', name: '平民阵营', count: 0, icon: ROLE_ICON.villager, details: [] }
+  };
+  const details = { wolves: new Map(), gods: new Map() };
+
+  sourceRoles.forEach((role) => {
+    const faction = resolveRoleFaction(role);
+    groups[faction].count += role.count;
+    if (faction === 'wolves' && !isBaseWerewolfRole(role)) addRoleDetail(details.wolves, role);
+    if (faction === 'gods') addRoleDetail(details.gods, role);
+  });
+
+  groups.wolves.details = [...details.wolves.values()];
+  groups.gods.details = [...details.gods.values()];
+  return [groups.wolves, groups.gods, groups.villagers];
+}
+
+function normalizeModeRoles(mode) {
+  if (!Array.isArray(mode?.roles)) return [];
+  return mode.roles.map((item) => ({
+    id: item.roleId || item.id || item.name || 'unknown',
+    name: item.roleName || item.name || ROLE_NAMES[item.roleId] || item.roleId || '未知身份',
+    count: Number(item.count || 1),
+    faction: item.faction
+  }));
+}
+
+function resolveRoleFaction(role) {
+  const id = String(role.id || '').toLowerCase();
+  const name = String(role.name || '');
+  const faction = String(role.faction || '').toLowerCase();
+  if (faction === 'wolves' || faction === 'wolf' || id.includes('wolf') || name.includes('?')) return 'wolves';
+  if (id === 'villager' || id === 'civilian' || name.includes('村民') || name.includes('平民')) return 'villagers';
+  return 'gods';
+}
+
+function isBaseWerewolfRole(role) {
+  const id = String(role.id || '').toLowerCase();
+  const name = String(role.name || '');
+  return id === 'werewolf' || id === 'wolf' || name === '狼人';
+}
+
+function addRoleDetail(map, role) {
+  const id = role.id || role.name;
+  const current = map.get(id) || { id, name: role.name || ROLE_NAMES[role.id] || '未知身份', count: 0 };
+  current.count += role.count;
+  map.set(id, current);
+}
+
+export function buildRoundProgress(rounds, currentRound) {
+  const items = [];
+  rounds.forEach((round) => {
+    const day = Number(round.day || 1);
+    items.push({
+      key: `night-${day}`,
+      phase: 'night',
+      label: `夜晚 ${day}`,
+      active: Number(currentRound?.day) === day && currentRound?.phase === 'night'
+    });
+    const hasDay = round.phase === 'day'
+      || round.exile
+      || round.idiotReveal
+      || round.sheriffId
+      || Object.keys(round.voteTally || {}).length
+      || (round.speeches || []).length;
+    if (hasDay) {
+      items.push({
+        key: `day-${day}`,
+        phase: 'day',
+        label: `白天 ${day}`,
+        active: Number(currentRound?.day) === day && currentRound?.phase === 'day'
+      });
+    }
+  });
+  return items.reverse().slice(0, 8);
+}
+
+export function getGameStats(players) {
+  const alive = players.filter((player) => player.alive).length;
+  return { alive, dead: Math.max(0, players.length - alive) };
+}
+
+export function formatWerewolfModeSummary(mode) {
+  const roles = Array.isArray(mode.roles) ? mode.roles : [];
+  const lineup = roles.map((item) => `${item.count} ${item.roleName || item.name || item.roleId}`).join('?');
+  const sheriff = mode.sheriff?.enabled ? '警徽流' : '无警徽';
+  const winMap = { side: '屠边局', gods: '屠神局', villagers: '屠民局', all: '屠城局' };
+  return [lineup, sheriff, winMap[mode.winCondition] || mode.winCondition].filter(Boolean).join(' · ');
+}
+
+export function getWerewolfModePlayerCount(mode) {
+  const roles = Array.isArray(mode?.roles) ? mode.roles : [];
+  const count = roles.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+  return count || 12;
+}
+
+export function getWerewolfHostOptions(players = []) {
+  return [
+    { id: 'default', badge: '主', name: '默认主持人', description: '使用全局主持人模型与语音' },
+    ...sortPlayersById(players).map((player) => ({
+      id: Number(player.id),
+      badge: player.id,
+      name: player.nickname || player.name || `${player.id}号`,
+      description: [player.model, player.voicePackageId ? `语音包 ${player.voicePackageId}` : '未绑定语音'].filter(Boolean).join(' · ')
+    }))
+  ];
+}
+
+export function normalizeWerewolfHostId(value) {
+  const id = Number(value);
+  return id > 0 ? id : 'default';
+}
+
+export function sortPlayersById(players = []) {
+  return players.slice().sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+export function normalizeWerewolfSelectedIds(ids = [], players = [], mode) {
+  const playerIds = new Set(sortPlayersById(players).map((player) => Number(player.id)).filter(Boolean));
+  const required = getWerewolfModePlayerCount(mode);
+  const selected = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter((id) => playerIds.has(id)))].sort((a, b) => a - b);
+  if (selected.length === required) return selected;
+  if (selected.length > required) return selected.slice(0, required);
+  const missing = sortPlayersById(players)
+    .map((player) => Number(player.id))
+    .filter((id) => id && !selected.includes(id))
+    .slice(0, Math.max(0, required - selected.length));
+  return [...selected, ...missing].sort((a, b) => a - b);
+}
+
+export function sanitizeWerewolfSelectedIds(ids = [], players = []) {
+  const playerIds = new Set(sortPlayersById(players).map((player) => Number(player.id)).filter(Boolean));
+  const selected = [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter(Boolean))]
+    .filter((id) => !playerIds.size || playerIds.has(id));
+  return selected.sort((a, b) => a - b);
+}
+
+export function toggleWerewolfPlayerId(ids = [], id, mode) {
+  const target = Number(id);
+  if (!target) return ids;
+  const required = getWerewolfModePlayerCount(mode);
+  const selected = ids.map(Number).filter(Boolean);
+  if (selected.includes(target)) return selected.filter((item) => item !== target).sort((a, b) => a - b);
+  if (selected.length >= required) return selected;
+  return [...selected, target].sort((a, b) => a - b);
+}
+
+export function getPhaseTitle(round, streamMessage) {
+  if (!round) return streamMessage || '等待开局';
+  if (round.phase === 'night') return '夜晚行动';
+  if (round.phase === 'day') return '白天发言与投票';
+  return streamMessage || '游戏进行中';
+}
+
+export function getRoundResult(round) {
+  if (!round) return '等待主持人发牌。';
+  const night = round.night?.deaths?.length ? `夜晚死亡：${round.night.deaths.map((item) => `${item.id}号`).join('、')}` : '夜晚：平安夜';
+  const exile = round.exile ? `放逐：${round.exile.id}号` : round.idiotReveal ? `白痴翻牌：${round.idiotReveal.id}号` : '放逐：暂无';
+  return `${night} ? ${exile}`;
+}
+
+export function getWerewolfNarration(event) {
+  if (event?.type === 'speech') return event.speech?.text || '';
+  if (event?.type === 'last-words' || event?.type === 'exile-words') return event.testimony?.text || '';
+  if (event?.type === 'hunter-shot') return getEventSummary(event);
+  return event?.message || event?.narration || '';
+}
+
+export function shouldShowWerewolfActionTargets(round) {
+  return Boolean(round?.voteTally && Object.keys(round.voteTally).length);
+}
+
+export function getWerewolfActionTarget(round, player) {
+  if (!round || !player) return null;
+  return round.votes?.[player.id] || null;
+}
+
+function formatNightSummary(round, players, showRoles, visibleRolePlayerId) {
+  const deaths = round?.night?.deaths || [];
+  if (deaths.length) {
+    return `${deaths
+      .map((death) => formatWerewolfRecordPlayer(death.id, players, showRoles, visibleRolePlayerId, death.reason))
+      .join('、')} 死亡`;
+  }
+
+  const wolfTarget = round?.night?.wolfTarget;
+  const witchSaved = round?.night?.witchSave;
+  const guardTarget = round?.night?.guardTarget;
+  const guardSaved = wolfTarget && guardTarget && Number(wolfTarget) === Number(guardTarget);
+
+  if (wolfTarget) {
+    const target = formatWerewolfRecordPlayer(wolfTarget, players, showRoles, visibleRolePlayerId);
+    const result = witchSaved ? '女巫解救' : guardSaved ? '守护成功' : '无人死亡';
+    return `刀口 ${target}：${result}`;
+  }
+
+  return round?.phase === 'night' ? '等待夜晚结算' : '平安夜';
+}
+
+function getVoteSummary(round) {
+  if (!round) return '';
+  if (round.idiotReveal) return `投票结束：${round.idiotReveal.id} 号翻牌免除放逐。`;
+  if (round.exile) return `投票结束：${round.exile.id} 号被放逐。`;
+  return '投票出现平票，本轮无人被放逐。';
+}
+
+function formatWerewolfRecordPlayer(playerId, players, showRoles, visibleRolePlayerId, reason) {
+  const player = players.find((item) => Number(item.id) === Number(playerId));
+  const name = player ? (player.nickname || player.name || `${player.id}号`) : `${playerId}号`;
+  const role = player ? getVisibleRoleText(player, showRoles, visibleRolePlayerId) : '';
+  const detail = [role, reason].filter(Boolean).join(' · ');
+  return `${name}${detail ? `?${detail}?` : ''}`;
+}
+
+export function getVisibleRoleText(player, showRoles, visibleRolePlayerId) {
+  if (showRoles || Number(player.id) === Number(visibleRolePlayerId)) return player.roleLabel || ROLE_NAMES[player.role] || '未知身份';
+  return '身份隐藏';
+}
+
+export function getRoleDescription(player, roleVisible) {
+  if (!roleVisible) return '玩家视角下，本局仅公开一名随机玩家身份；该玩家身份暂时隐藏。';
+  const role = player.roleLabel || ROLE_NAMES[player.role] || '未知身份';
+  const descriptions = {
+    werewolf: '狼人阵营，夜晚参与击杀，白天需要伪装好人、引导票型并保护狼队友。',
+    seer: '好人阵营神职，夜晚可以查验一名玩家阵营，白天需要谨慎传递信息。',
+    witch: '好人阵营神职，拥有一次解药和一次毒药，需要根据夜晚死亡信息判断用药。',
+    hunter: '好人阵营神职，死亡或被放逐时可选择开枪带走一名玩家。',
+    idiot: '好人阵营神职，被白天放逐时可翻牌免死，但之后失去投票权。',
+    guard: '好人阵营神职，夜晚守护一名玩家，不能连续两晚守护同一人。',
+    villager: '好人阵营平民，没有夜晚技能，依靠发言、票型和死亡信息寻找狼人。'
+  };
+  return `${role}：${descriptions[player.role] || '根据公开发言和阶段信息参与判断。'}`;
+}
