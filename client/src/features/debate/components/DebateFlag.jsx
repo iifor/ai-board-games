@@ -1,4 +1,5 @@
 import React from 'react';
+import './DebateFlag.css';
 
 export function DebateFlag({ tone, label }) {
   return (

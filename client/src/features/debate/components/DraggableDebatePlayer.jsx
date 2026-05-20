@@ -1,6 +1,7 @@
 import React from 'react';
 import { Crown, GripVertical } from 'lucide-react';
 import { classNames } from '../../../utils/classNames';
+import './DraggableDebatePlayer.css';
 
 export function DraggableDebatePlayer({ player, compact = false, tone = '', isCaptain = false, onCaptainDrop, disabled = false }) {
   const name = player.nickname || player.name || `${player.id}号`;

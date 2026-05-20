@@ -5,6 +5,7 @@ const {
 } = require('../../adminStore');
 const { isAzureVoice, prepareVoiceAudio } = require('../audio/audioResourceCache');
 const { collectPlayableItems } = require('./playableItems');
+const { stripSpeechParentheses } = require('../text/playableText');
 
 const tasks = new Map();
 
@@ -106,7 +107,9 @@ async function prepareAudioResource(game, item) {
   const voice = resolveItemVoice(game, item);
   if (!voice) return { skipped: true };
 
-  const prepared = await prepareVoiceAudio(voice, item.text);
+  const speechText = stripSpeechParentheses(item.text);
+  if (!speechText) return { skipped: true };
+  const prepared = await prepareVoiceAudio(voice, speechText);
   if (prepared?.audioCached) return { cached: true };
   if (prepared?.audioUrl) return { generated: true };
   return { skipped: true };

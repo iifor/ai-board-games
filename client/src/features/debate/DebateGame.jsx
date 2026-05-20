@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { fetchAiHealth } from '../../api/gameApi';
-import { getPlayerAvatar, normalizeHostId } from '../../utils/player';
 import { useSpeechQueue } from '../../hooks/useSpeechQueue';
 import { useGameSocketSession } from '../../hooks/useGameSocketSession';
 import { PlayerDetailModal } from '../../components/common/PlayerDetailModal';
@@ -9,12 +8,7 @@ import { DebateArena } from './components/DebateArena';
 import { DebateControls } from './components/DebateControls';
 import { DebateTopicDialog } from './components/DebateTopicDialog';
 import { DebateResultModal } from './components/DebateResultModal';
-import {
-  DEBATE_SUBTITLE_CONFIG,
-  getSubtitleChunkDelay,
-  getSubtitlePlaybackDelay,
-  splitDebateSubtitle
-} from './debateSubtitle';
+import { useDebateSpeechPlayback } from './hooks/useDebateSpeechPlayback';
 import {
   normalizeTopicDraft,
   normalizeDebateTeamDraft,
@@ -27,7 +21,7 @@ import {
   getDebateNarration
 } from './debateUtils';
 import { EMPTY_DEBATE, DEFAULT_DEBATE_TOPIC } from './constants';
-import '../../styles/debate-game.css';
+import './DebateGame.css';
 
 export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   const [game, setGame] = useState(EMPTY_DEBATE);
@@ -42,14 +36,13 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [captainEnabled, setCaptainEnabled] = useState(true);
   const [debateTeamDraft, setDebateTeamDraft] = useState(() => createDefaultDebateTeams([]));
-  const [selectedHostId, setSelectedHostId] = useState('default');
   const [resultModalOpen, setResultModalOpen] = useState(false);
-  const subtitleTimerRef = useRef(null);
+  const speechPlaybackRef = useRef(null);
   const { speechEnabled, setSpeechEnabled, speak, unlock, cancel } = useSpeechQueue();
 
   useEffect(() => {
     if (!replayGameId) return;
-    startGame(topicDraft, debateTeamDraft, selectedHostId, { replayGameId });
+    startGame(topicDraft, debateTeamDraft, { replayGameId });
   }, [replayGameId]);
 
   useEffect(() => {
@@ -59,7 +52,6 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
       .then((data) => {
         if (cancelled) return;
         setAvailablePlayers(data.players || []);
-        setSelectedHostId((current) => current === 'default' ? normalizeHostId(data.defaultHostId) : current);
       })
       .catch(() => {
         if (!cancelled) setAvailablePlayers([]);
@@ -88,7 +80,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     speak,
     cancel,
     applyServerEvent,
-    playPendingEvent: playPendingDebateEvent,
+    playPendingEvent: (event, controls) => speechPlaybackRef.current?.playPendingDebateEvent(event, controls) || false,
     onError: (error) => {
       setStatus('error');
       setIsThinking(false);
@@ -112,6 +104,16 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
       setStreamMessage('正在跳过当前阶段...');
     }
   });
+  const speechPlayback = useDebateSpeechPlayback({
+    game: displayGame,
+    speechEnabled,
+    speak,
+    acknowledgePending,
+    setActiveSpeech,
+    setSubtitleSpeech
+  });
+  speechPlaybackRef.current = speechPlayback;
+  const { clearSubtitleTimer, playSubtitleText } = speechPlayback;
   const isRunning = status === 'streaming';
   const hasStarted = status !== 'idle' || Boolean(displayGame.phases?.length);
   const canStartNextGame = !isRunning || !autoPlay;
@@ -127,7 +129,6 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     setSubtitleSpeech(null);
     setIsThinking(false);
     setStatus('idle');
-    setSelectedHostId('default');
     setStreamMessage(message || '真实模式已就绪，点击开始后调用 AI。');
   }
 
@@ -136,7 +137,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     setTopicDialogOpen(true);
   }
 
-  function startGame(topic = topicDraft, teams = debateTeamDraft, hostId = selectedHostId, options = {}) {
+  function startGame(topic = topicDraft, teams = debateTeamDraft, options = {}) {
     resetToIdle('');
     if (speechEnabled) unlock();
     const nextTopic = normalizeTopicDraft(topic);
@@ -153,14 +154,12 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     const shouldSendTeams = assignedPlayerIds.length >= 8;
     setTopicDraft(nextTopic);
     setDebateTeamDraft(nextTeams);
-    setSelectedHostId(normalizeHostId(hostId));
     setTopicDialogOpen(false);
     setStatus('streaming');
     setIsThinking(true);
     setStreamMessage('游戏准备中...');
     startSession({
       mode: 'real',
-      hostId: normalizeHostId(hostId),
       topic: nextTopic,
       debateTeams: shouldSendTeams ? nextTeams : null,
       replayGameId: options.replayGameId || ''
@@ -170,7 +169,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   function replayCurrentGame() {
     setResultModalOpen(false);
     if (!displayGame.id) return;
-    startGame(displayGame.topic, createDebateTeamsFromPlayers(displayGame.players || []), selectedHostId, { replayGameId: displayGame.id });
+    startGame(displayGame.topic, createDebateTeamsFromPlayers(displayGame.players || []), { replayGameId: displayGame.id });
   }
 
   function openNextGameSettings() {
@@ -201,115 +200,6 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
       setStreamMessage(event.message || '辩论赛已完成。');
       if (event.game?.winner || event.game?.mvp) setResultModalOpen(true);
     }
-  }
-
-  function playPendingDebateEvent(event, { setAckTimer }) {
-    const narration = event.subtitle?.text || event.narration || getDebateNarration(event);
-    if (speechEnabled && narration) {
-      const shouldUseSentenceQueue = Boolean(event?.speech?.playerId);
-      const queued = shouldUseSentenceQueue
-        ? speakSubtitleChunks(narration, event?.speech?.playerId || null, event.ackId, event)
-        : event.audioUrl
-        ? speakServerSubtitle(narration, event?.speech?.playerId || null, event.ackId, event)
-        : speakSubtitleChunks(narration, event?.speech?.playerId || null, event.ackId, event);
-      if (!queued) {
-        playSubtitleText(narration, event?.speech?.playerId || null, event.ackId, event);
-        setAckTimer(getSubtitlePlaybackDelay(narration));
-      }
-    } else {
-      playSubtitleText(narration, event?.speech?.playerId || null, event.ackId, event);
-      setAckTimer(getSubtitlePlaybackDelay(narration));
-    }
-    return true;
-  }
-
-  function playSubtitleText(text, playerId, ackId, event) {
-    clearSubtitleTimer();
-    const chunks = splitDebateSubtitle(text, DEBATE_SUBTITLE_CONFIG.maxChars);
-    if (!chunks.length) {
-      setSubtitleSpeech(null);
-      return;
-    }
-    let index = 0;
-    const baseId = `${ackId || Date.now()}-${playerId || 'system'}`;
-    const showNext = () => {
-      setSubtitleSpeech({
-        id: `${baseId}-${index}`,
-        playerId,
-        text: chunks[index],
-        speakerLabel: event?.subtitle?.speakerLabel || '',
-        speakerRole: event?.subtitle?.speakerRole || ''
-      });
-      index += 1;
-      if (index < chunks.length) {
-        subtitleTimerRef.current = window.setTimeout(showNext, getSubtitleChunkDelay(chunks[index - 1]));
-      }
-    };
-    showNext();
-  }
-
-  function speakSubtitleChunks(text, playerId, ackId, event) {
-    clearSubtitleTimer();
-    const chunks = splitDebateSubtitle(text, DEBATE_SUBTITLE_CONFIG.maxChars);
-    if (!chunks.length) return false;
-    const baseId = `${ackId || Date.now()}-${playerId || 'system'}`;
-    const voicePackageId = (event?.game?.players || game?.players || []).find((player) => Number(player.id) === Number(playerId))?.voicePackageId;
-    let queued = true;
-    chunks.forEach((chunk, index) => {
-      const isLast = index === chunks.length - 1;
-      const itemQueued = speak(chunk, isLast ? acknowledgePending : undefined, {
-        playerId,
-        voicePackageId,
-        audioUrl: event?.audioSegments?.[index]?.audioUrl,
-        onStart: () => {
-          setSubtitleSpeech({
-            id: `${baseId}-${index}`,
-            playerId,
-            text: chunk,
-            speakerLabel: event?.subtitle?.speakerLabel || '',
-            speakerRole: event?.subtitle?.speakerRole || '',
-            fullText: event?.speech?.fullText || text,
-            thinking: event?.speech?.thinking || ''
-          });
-        }
-      });
-      if (!itemQueued) queued = false;
-    });
-    return queued;
-  }
-
-  function getDebateSpeechOptions(event, playerId) {
-    const player = (event?.game?.players || game?.players || []).find((item) => Number(item.id) === Number(playerId));
-    const hostVoicePackageId = event?.game?.host?.voicePackageId || game?.host?.voicePackageId || null;
-    return {
-      playerId,
-      voicePackageId: player?.voicePackageId || (!playerId ? hostVoicePackageId : null),
-      audioUrl: event?.audioUrl
-    };
-  }
-
-  function speakServerSubtitle(text, playerId, ackId, event) {
-    clearSubtitleTimer();
-    return speak(text, acknowledgePending, {
-      ...getDebateSpeechOptions(event, playerId),
-      onStart: () => {
-        setSubtitleSpeech({
-          id: `${ackId || Date.now()}-${playerId || 'system'}`,
-          playerId,
-          text,
-          speakerLabel: event?.subtitle?.speakerLabel || '',
-          speakerRole: event?.subtitle?.speakerRole || '',
-          fullText: event?.speech?.fullText || text,
-          thinking: event?.speech?.thinking || ''
-        });
-      }
-    });
-  }
-
-  function clearSubtitleTimer() {
-    if (!subtitleTimerRef.current) return;
-    window.clearTimeout(subtitleTimerRef.current);
-    subtitleTimerRef.current = null;
   }
 
   function handleAutoPlayChange(value) {
@@ -381,8 +271,6 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
           selectedPlayerIds={availablePlayers.map((player) => player.id)}
           players={availablePlayers}
           teams={debateTeamDraft}
-          selectedHostId={selectedHostId}
-          onHostChange={setSelectedHostId}
           onTeamsChange={setDebateTeamDraft}
           captainEnabled={captainEnabled}
           onCaptainEnabledChange={setCaptainEnabled}
@@ -392,7 +280,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
             if (value) unlock();
           }}
           onCancel={() => setTopicDialogOpen(false)}
-          onStart={(topic, teams, hostId) => startGame(topic, teams, hostId)}
+          onStart={(topic, teams) => startGame(topic, teams)}
         />
       )}
       <SpeechInsightOverlay speech={subtitleSpeech} players={displayGame.players} />

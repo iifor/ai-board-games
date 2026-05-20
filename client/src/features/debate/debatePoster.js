@@ -1,5 +1,5 @@
 import { getPlayerAvatar } from '../../utils/player';
-import { sortReportPlayers, formatReportNames, cleanPosterText, compactPosterText } from './debateUtils';
+import { sortReportPlayers, cleanPosterText } from './debateUtils';
 
 const DEBATE_RESULT_POSTER_DESIGN = { width: 1672, height: 941 };
 const DEBATE_RESULT_DEBATER_SLOTS = {
@@ -292,151 +292,6 @@ function truncateCanvasText(ctx, text, width) {
   return `${next}...`;
 }
 
-export function createDebatePoster(report, variant) {
-  if (typeof document === 'undefined') return '';
-  const vertical = variant === 'vertical';
-  const canvas = document.createElement('canvas');
-  canvas.width = vertical ? 1080 : 1600;
-  canvas.height = vertical ? 1920 : 900;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
-  drawPosterBackground(ctx, canvas.width, canvas.height, report.winner);
-  if (vertical) drawVerticalPoster(ctx, report, canvas.width, canvas.height);
-  else drawWidePoster(ctx, report, canvas.width, canvas.height);
-  return canvas.toDataURL('image/png');
-}
-
-function drawPosterBackground(ctx, width, height, winner) {
-  const bg = ctx.createLinearGradient(0, 0, width, height);
-  bg.addColorStop(0, '#071225');
-  bg.addColorStop(0.5, '#132442');
-  bg.addColorStop(1, '#1b1029');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = winner === 'pro' ? 'rgba(37, 128, 255, 0.28)' : 'rgba(255, 77, 128, 0.22)';
-  ctx.beginPath();
-  ctx.arc(width * 0.18, height * 0.12, width * 0.28, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = winner === 'con' ? 'rgba(255, 77, 128, 0.26)' : 'rgba(69, 219, 255, 0.18)';
-  ctx.beginPath();
-  ctx.arc(width * 0.86, height * 0.86, width * 0.34, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawVerticalPoster(ctx, report, width, height) {
-  let y = 110;
-  drawPosterKicker(ctx, 'AI 辩论赛战报', 72, y);
-  y += 92;
-  y = drawWrappedPosterText(ctx, report.topic || 'AI 辩论赛', 72, y, width - 144, 64, '#ffffff', 3, 78);
-  y += 28;
-  drawWinnerPill(ctx, report.winnerLabel, 72, y, report.winner);
-  drawPosterText(ctx, `最佳辩手 ${getPosterPlayerName(report.mvp)}`, 420, y + 34, 36, '#f6dc85', '900');
-  y += 120;
-  y = drawPosterPositions(ctx, report, 72, y, width - 144);
-  y += 36;
-  y = drawLineupBlock(ctx, '正方阵容', report.proLineup, 72, y, width - 144, '#5db8ff');
-  y = drawLineupBlock(ctx, '反方阵容', report.conLineup, 72, y + 20, width - 144, '#ff7aa7');
-  y = drawLineupBlock(ctx, '评委阵容', report.judges, 72, y + 20, width - 144, '#d6b4ff');
-  y += 28;
-  y = drawPosterSection(ctx, '胜负理由', report.winReason || '评委综合双方论证质量、反驳力度和团队协作给出结果。', 72, y, width - 144, 44, 3);
-  y += 22;
-  y = drawPosterList(ctx, '精彩金句', report.highlights.map((item) => item.text), 72, y, width - 144, 2);
-  y += 22;
-  drawPosterList(ctx, '评委短评', report.judgeComments.map((item) => item.text), 72, y, width - 144, 2);
-  drawPosterFooter(ctx, width, height);
-}
-
-function drawWidePoster(ctx, report, width, height) {
-  drawPosterKicker(ctx, 'AI 辩论赛战报', 72, 80);
-  drawWrappedPosterText(ctx, report.topic || 'AI 辩论赛', 72, 150, 740, 54, '#ffffff', 3, 64);
-  drawWinnerPill(ctx, report.winnerLabel, 72, 365, report.winner);
-  drawPosterText(ctx, `最佳辩手 ${getPosterPlayerName(report.mvp)}`, 350, 399, 36, '#f6dc85', '900');
-  drawPosterSection(ctx, '胜负理由', report.winReason || '评委综合双方论证质量、反驳力度和团队协作给出结果。', 72, 470, 690, 34, 3);
-  drawPosterPositions(ctx, report, 850, 95, 670);
-  drawLineupBlock(ctx, '正方阵容', report.proLineup, 850, 300, 670, '#5db8ff');
-  drawLineupBlock(ctx, '反方阵容', report.conLineup, 850, 400, 670, '#ff7aa7');
-  drawLineupBlock(ctx, '评委阵容', report.judges, 850, 500, 670, '#d6b4ff');
-  drawPosterList(ctx, '精彩金句', report.highlights.map((item) => item.text), 850, 610, 670, 2);
-  drawPosterList(ctx, '评委短评', report.judgeComments.map((item) => item.text), 72, 640, 690, 2);
-  drawPosterFooter(ctx, width, height);
-}
-
-function drawPosterPositions(ctx, report, x, y, width) {
-  const gap = 20;
-  const cardWidth = (width - gap) / 2;
-  drawPosterCard(ctx, x, y, cardWidth, 150, '正方立场', report.proPosition, '#5db8ff');
-  drawPosterCard(ctx, x + cardWidth + gap, y, cardWidth, 150, '反方立场', report.conPosition, '#ff7aa7');
-  return y + 150;
-}
-
-function drawLineupBlock(ctx, title, players, x, y, width, color) {
-  drawPosterText(ctx, title, x, y, 28, color, '900');
-  drawWrappedPosterText(ctx, formatReportNames(players) || '暂无', x, y + 38, width, 30, '#edf6ff', 2, 34);
-  return y + 92;
-}
-
-function drawPosterSection(ctx, title, text, x, y, width, fontSize, maxLines) {
-  drawPosterText(ctx, title, x, y, 28, '#9edcff', '900');
-  return drawWrappedPosterText(ctx, text, x, y + 42, width, fontSize, '#edf6ff', maxLines, fontSize + 10);
-}
-
-function drawPosterList(ctx, title, items, x, y, width, maxItems) {
-  drawPosterText(ctx, title, x, y, 28, '#9edcff', '900');
-  let nextY = y + 42;
-  const list = items.length ? items : ['双方围绕核心标准持续交锋，完整呈现了一场 AI 辩论。'];
-  list.slice(0, maxItems).forEach((item) => {
-    nextY = drawWrappedPosterText(ctx, `"${item}"`, x, nextY, width, 32, '#ffffff', 2, 40) + 10;
-  });
-  return nextY;
-}
-
-function drawPosterCard(ctx, x, y, width, height, title, text, color) {
-  ctx.fillStyle = 'rgba(8, 20, 42, 0.72)';
-  roundRect(ctx, x, y, width, height, 18);
-  ctx.fill();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  drawPosterText(ctx, title, x + 24, y + 40, 26, color, '900');
-  drawWrappedPosterText(ctx, text, x + 24, y + 82, width - 48, 30, '#ffffff', 2, 38);
-}
-
-function drawWinnerPill(ctx, text, x, y, winner) {
-  const color = winner === 'con' ? '#ff5f97' : winner === 'pro' ? '#3fa2ff' : '#d6b4ff';
-  ctx.fillStyle = color;
-  roundRect(ctx, x, y, 260, 68, 34);
-  ctx.fill();
-  drawPosterText(ctx, text || '待公布', x + 34, y + 45, 34, '#ffffff', '950');
-}
-
-function drawPosterKicker(ctx, text, x, y) {
-  drawPosterText(ctx, text, x, y, 30, '#9edcff', '900');
-}
-
-function drawPosterFooter(ctx, width, height) {
-  ctx.globalAlpha = 0.72;
-  drawPosterText(ctx, 'CONSENSUS · AI Debate Arena', 72, height - 70, 26, '#b8d9ff', '800');
-  ctx.textAlign = 'right';
-  drawPosterText(ctx, new Date().toLocaleDateString('zh-CN'), width - 72, height - 70, 26, '#b8d9ff', '800');
-  ctx.textAlign = 'left';
-  ctx.globalAlpha = 1;
-}
-
-function drawPosterText(ctx, text, x, y, size, color, weight = '700') {
-  ctx.fillStyle = color;
-  ctx.font = `${weight} ${size}px "Microsoft YaHei", "PingFang SC", Arial, sans-serif`;
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(String(text || ''), x, y);
-}
-
-function drawWrappedPosterText(ctx, text, x, y, width, size, color, maxLines = 2, lineHeight = size + 8) {
-  ctx.fillStyle = color;
-  ctx.font = `800 ${size}px "Microsoft YaHei", "PingFang SC", Arial, sans-serif`;
-  const lines = wrapCanvasText(ctx, cleanPosterText(text), width, maxLines);
-  lines.forEach((line, index) => ctx.fillText(line, x, y + index * lineHeight));
-  return y + lines.length * lineHeight;
-}
-
 function wrapCanvasText(ctx, text, width, maxLines) {
   const chars = String(text || '').split('');
   const lines = [];
@@ -461,26 +316,8 @@ function wrapCanvasText(ctx, text, width, maxLines) {
   return lines;
 }
 
-function roundRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.arcTo(x + width, y, x + width, y + height, radius);
-  ctx.arcTo(x + width, y + height, x, y + height, radius);
-  ctx.arcTo(x, y + height, x, y, radius);
-  ctx.arcTo(x, y, x + width, y, radius);
-  ctx.closePath();
-}
-
 function getPosterPlayerName(player) {
   return player?.nickname || player?.name || (player?.id ? `${player.id}号` : '暂未产生');
-}
-
-export function downloadPoster(dataUrl, report, ratio) {
-  if (!dataUrl) return;
-  const link = document.createElement('a');
-  link.href = dataUrl;
-  link.download = `AI辩论赛战报-${safePosterFileName(report.topic)}-${ratio}.png`;
-  link.click();
 }
 
 export function downloadResultPoster(dataUrl, report) {

@@ -13,6 +13,7 @@ import { openGameSocket } from '../../api/gameApi';
 import { classNames } from '../../utils/classNames';
 import { buildTimeline, createEmptyGame, createPendingRound } from './constants';
 import { useSpeechQueue } from '../../hooks/useSpeechQueue';
+import './ConsensusGame.css';
 
 export function ConsensusGame({ replayGameId = '', onReturnToSelect }) {
   const [game, setGame] = useState(() => createEmptyGame());

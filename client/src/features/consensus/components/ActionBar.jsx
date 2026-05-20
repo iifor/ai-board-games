@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileText, History, Pause, Play, RotateCcw } from 'lucide-react';
+import './ActionBar.css';
 
 export function ActionBar({ paused, onHistory, onTogglePause, onBackground, onNextSentence }) {
   return (

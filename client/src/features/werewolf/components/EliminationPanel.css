@@ -1,0 +1,52 @@
+.werewolf-right-board .werewolf-elimination-panel {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.werewolf-elimination-list p,
+.werewolf-progress-list p {
+  margin: 0;
+  color: rgba(226, 235, 255, 0.78);
+  font-size: 13px;
+  line-height: 1.36;
+  overflow-wrap: anywhere;
+}
+
+.werewolf-elimination-panel {
+  flex: 0 1 auto;
+  max-height: 360px;
+  overflow: hidden;
+}
+
+.werewolf-elimination-list article {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+}
+
+.werewolf-right-board .werewolf-elimination-panel,
+.werewolf-progress-panel {
+  height: auto;
+  min-height: 0;
+}
+
+.werewolf-progress-list,
+.werewolf-elimination-list {
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.werewolf-elimination-list article svg {
+  color: rgba(235, 235, 255, 0.64);
+}
+
+.werewolf-elimination-list article span,
+.werewolf-elimination-list article em {
+  color: rgba(226, 235, 255, 0.72);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.werewolf-elimination-list article em {
+  grid-column: 2 / 4;
+}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { formatAvatarUrl } from '../../../utils/avatar';
 import { classNames } from '../../../utils/classNames';
 import { getRoleName } from '../constants';
+import './PlayerList.css';
 
 export function PlayerList({ players, round, showRoles, visibleRolePlayerId, currentSpeakerId }) {
   const [selectedPlayer, setSelectedPlayer] = useState(null);

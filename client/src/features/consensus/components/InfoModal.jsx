@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { getConsensusTypeName, getMistPlayers, getWinnerName } from '../constants';
+import './InfoModal.css';
 
 export function InfoModal({ title, eyebrow = 'INFO', children, onClose }) {
   return (

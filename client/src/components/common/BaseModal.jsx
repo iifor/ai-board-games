@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { formatAvatarUrl } from '../../utils/avatar';
+import './BaseModal.css';
 
 export function BaseModal({
   title,

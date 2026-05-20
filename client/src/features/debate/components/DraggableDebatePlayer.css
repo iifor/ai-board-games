@@ -1,0 +1,86 @@
+.drag-player-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 198px;
+  height: 62px;
+  padding: 0 10px;
+  border: 1px solid rgba(139, 164, 205, 0.46);
+  border-radius: 8px;
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(39, 50, 74, 0.88), rgba(22, 31, 50, 0.88));
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.04);
+  cursor: grab;
+}
+
+.drag-player-card.compact {
+  flex: 1 1 auto;
+  width: 0;
+  height: 46px;
+}
+
+.drag-player-card.captain {
+  border-color: rgba(255, 224, 124, 0.78);
+  box-shadow: 0 0 16px rgba(255, 196, 66, 0.22), inset 0 0 12px rgba(255, 232, 150, 0.1);
+}
+
+.drag-player-card:active {
+  cursor: grabbing;
+}
+
+.drag-player-card.locked {
+  cursor: not-allowed;
+  filter: grayscale(0.42);
+  opacity: 0.72;
+}
+
+.drag-player-avatar {
+  display: flex;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0bbf9a, #1978ff);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.drag-player-card strong {
+  overflow: hidden;
+  flex: 1 1 auto;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drag-captain-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 54px;
+  height: 22px;
+  border: 1px solid rgba(255, 226, 138, 0.76);
+  border-radius: 22px;
+  color: #ffe59a;
+  background: rgba(58, 38, 9, 0.86);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 18px;
+}
+
+.drag-captain-badge svg {
+  color: #ffdb73;
+}
+
+.drag-player-card svg {
+  flex: 0 0 auto;
+  color: rgba(218, 229, 247, 0.7);
+}

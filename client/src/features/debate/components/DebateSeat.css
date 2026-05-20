@@ -1,0 +1,313 @@
+.debate-seat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  width: 312px;
+  min-height: 132px;
+  padding: 12px 30px;
+  border: 1px solid rgba(40, 136, 255, 0.4);
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(4, 28, 78, 0.76), rgba(4, 17, 43, 0.5));
+  box-shadow: inset 0 0 16px rgba(47, 152, 255, 0.09);
+}
+
+.debate-seat::before {
+  content: "";
+  position: absolute;
+  inset: 8px 12px;
+  border-top: 1px solid rgba(74, 158, 255, 0.26);
+  border-bottom: 1px solid rgba(74, 158, 255, 0.12);
+  pointer-events: none;
+}
+
+.debate-seat.con {
+  flex-direction: row-reverse;
+  border-color: rgba(255, 76, 76, 0.36);
+  background: linear-gradient(270deg, rgba(82, 14, 26, 0.76), rgba(32, 8, 27, 0.5));
+}
+
+.debate-seat.con::before {
+  border-top-color: rgba(255, 89, 89, 0.24);
+  border-bottom-color: rgba(255, 89, 89, 0.12);
+}
+
+.debate-seat.judge {
+  gap: 20px;
+  width: 248px;
+  min-height: 120px;
+  padding: 12px 20px;
+  border-color: rgba(178, 122, 255, 0.5);
+  background: linear-gradient(90deg, rgba(32, 24, 64, 0.74), rgba(12, 17, 43, 0.56));
+}
+
+@keyframes breathing {
+  0%, 100% { box-shadow: 0 0 5px rgba(255,193,7,0.5); }
+  50% { box-shadow: 0 0 20px rgba(255,193,7,0.9); }
+}
+
+.debate-seat.speaking {
+  border: 2px solid #ff9800;
+  box-shadow: 0 0 10px rgba(255,152,0,0.6);
+  border-radius: 6px;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  animation: breathing 1.5s infinite;
+  background-color: rgb(255, 241, 118, 0.3);
+  color: #000;
+  border-radius: 4px;
+}
+
+.debate-seat.speaking .debate-avatar {
+  box-shadow:
+    0 0 10px rgba(255, 255, 255, 0.9),
+    0 0 30px rgba(255, 227, 117, 0.92),
+    inset 0 0 18px rgba(255, 236, 160, 0.25);
+}
+
+.debate-seat.empty {
+  opacity: 1;
+}
+
+.debate-avatar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 82px;
+  align-items: center;
+  justify-content: center;
+  width: 82px;
+  height: 82px;
+  border: 2px solid rgba(50, 205, 255, 0.92);
+  border-radius: 82px;
+  background-color: rgba(2, 8, 22, 0.84);
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 0 16px rgba(0, 178, 255, 0.58), inset 0 0 13px rgba(0, 0, 0, 0.84);
+  cursor: pointer;
+}
+
+.debate-seat.con .debate-avatar {
+  flex: 0 0 82px;
+  border-color: rgba(255, 82, 82, 0.92);
+  box-shadow: 0 0 16px rgba(255, 55, 66, 0.52), inset 0 0 13px rgba(0, 0, 0, 0.84);
+}
+
+.debate-seat.judge .debate-avatar {
+  flex-basis: 68px;
+  width: 68px;
+  height: 68px;
+  border-color: rgba(179, 106, 255, 0.96);
+  border-radius: 68px;
+  box-shadow: 0 0 18px rgba(160, 77, 255, 0.48), inset 0 0 13px rgba(0, 0, 0, 0.84);
+}
+
+.avatar-sprite {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 58px;
+  opacity: 0.96;
+}
+
+.avatar-sprite::before,
+.avatar-sprite::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  background: linear-gradient(180deg, #fbfcff, #c6d0ee);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.48);
+}
+
+.avatar-sprite::before {
+  top: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 24px;
+}
+
+.avatar-sprite::after {
+  left: 0;
+  bottom: 0;
+  width: 48px;
+  height: 34px;
+  border-radius: 28px 28px 10px 10px;
+}
+
+.debate-nameplate {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: 150px;
+  gap: 8px;
+}
+
+.debate-seat.con .debate-nameplate {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.seat-badge {
+  align-items: center;
+  width: 82px;
+  height: 32px;
+  border: 1px solid rgba(70, 165, 255, 0.62);
+  color: #ffffff;
+  background: linear-gradient(90deg, rgba(20, 72, 167, 0.88), rgba(10, 37, 105, 0.68));
+  box-shadow: 0 0 12px rgba(34, 151, 255, 0.34), inset 0 0 12px rgba(70, 159, 255, 0.16);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 32px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.72);
+  clip-path: polygon(0 0, 82% 0, 100% 50%, 82% 100%, 0 100%);
+  letter-spacing: 0.25em;
+  padding: 0 5px;
+}
+
+.con .seat-badge {
+  border-color: rgba(255, 76, 77, 0.66);
+  background: linear-gradient(90deg, rgba(139, 22, 29, 0.86), rgba(74, 8, 18, 0.68));
+  box-shadow: 0 0 12px rgba(255, 56, 61, 0.32), inset 0 0 12px rgba(255, 76, 76, 0.14);
+  clip-path: polygon(100% 0, 18% 0, 0 50%, 18% 100%, 100% 100%);
+}
+
+.judge .seat-badge {
+  width: 120px;
+  height: 28px;
+  justify-content: flex-start;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  clip-path: none;
+  font-size: 22px;
+}
+
+.debate-nameplate strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  width: 150px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 950;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debate-seat.con .debate-nameplate strong {
+  justify-content: flex-end;
+}
+
+.debate-nameplate > span:last-child:not(.seat-badge) {
+  overflow: hidden;
+  width: 150px;
+  color: rgba(239, 247, 255, 0.9);
+  font-size: 18px;
+  font-weight: 780;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-mvp-vote {
+  overflow: hidden;
+  width: 180px;
+  height: 24px;
+  border-radius: 6px;
+  color: #f2e7ff;
+  box-shadow: inset 0 0 10px rgba(202, 157, 255, 0.1);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debate-seat.con .seat-mvp-vote {
+  text-align: right;
+}
+
+.debate-seat.mvp-seat {
+  border-color: rgba(255, 214, 102, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 102, 0.55),
+    0 0 24px rgba(255, 193, 7, 0.42);
+}
+
+.seat-mvp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 88px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 224, 130, 0.72);
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255, 193, 7, 0.28), rgba(255, 87, 34, 0.18));
+  color: #ffe7a3;
+  box-shadow: 0 0 14px rgba(255, 193, 7, 0.24);
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+.mvp-avatar-badge {
+  position: absolute;
+  left: 50%;
+  top: -16px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 70px;
+  height: 30px;
+  padding: 0 10px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 238, 170, 0.9);
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ffcf57, #ff7a45);
+  color: #291403;
+  box-shadow: 0 8px 22px rgba(255, 137, 39, 0.48);
+  font-size: 13px;
+  font-weight: 1000;
+  letter-spacing: 0;
+}
+
+.captain-avatar-badge {
+  position: absolute;
+  right: -8px;
+  left: -8px;
+  bottom: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 42px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid rgba(154, 190, 255, 0.62);
+  border-radius: 6px;
+  background: rgba(13, 35, 84, 0.88);
+  color: #cfe0ff;
+  box-shadow: 0 4px 12px rgba(39, 102, 214, 0.28);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.con .captain-avatar-badge {
+  border-color: rgb(255, 73, 73, 0.62);
+  background: rgb(255, 73, 73, 0.88);
+  color: #cfe0ff;
+  box-shadow: 0 4px 12px rgba(255, 73, 73, 0.28);
+}
+
+.captain-avatar-badge svg {
+  display: none;
+}

@@ -7,7 +7,7 @@ const { runAiWerewolf } = require('./aiWerewolfRunner');
 const { getWerewolfModeConfig } = require('./werewolfModes');
 const { getGame, getVoicePackage, listPlayers, saveGameRecord } = require('./adminStore');
 const { prepareVoiceAudio } = require('./services/audio/audioResourceCache');
-const { splitPlayableTextSegments } = require('./services/debate/textSegments');
+const { splitPlayableTextSegments, stripSpeechParentheses } = require('./services/text/playableText');
 const {
   buildNightPublicMessage,
   buildSheriffStartMessage,
@@ -864,13 +864,16 @@ async function prepareEventMedia(event) {
   if (!voice || !voice.enabled || String(voice.provider || '').toLowerCase() !== 'azure') return result;
 
   try {
-    if (event.game?.type === 'debate' && event.speech?.playerId) {
+    if (shouldPrepareSegmentedAudio(event)) {
       const segments = splitPlayableTextSegments(text);
       const preparedSegments = await Promise.all(segments.map(async (segment, index) => {
-        const saved = await prepareVoiceAudio(voice, segment);
+        const speechText = segment.speechText || stripSpeechParentheses(segment.displayText);
+        if (!speechText) return null;
+        const saved = await prepareVoiceAudio(voice, speechText);
         return saved ? {
           index,
-          text: segment,
+          text: segment.displayText,
+          speechText,
           audioUrl: saved.audioUrl,
           audioMimeType: saved.audioMimeType,
           audioCached: saved.audioCached
@@ -881,7 +884,9 @@ async function prepareEventMedia(event) {
         audioSegments: preparedSegments.filter(Boolean)
       };
     }
-    const saved = await prepareVoiceAudio(voice, text);
+    const speechText = stripSpeechParentheses(text);
+    if (!speechText) return result;
+    const saved = await prepareVoiceAudio(voice, speechText);
     if (!saved) return result;
     return {
       ...result,
@@ -895,6 +900,11 @@ async function prepareEventMedia(event) {
       mediaError: error.message
     };
   }
+}
+
+function shouldPrepareSegmentedAudio(event) {
+  if (!event.game || !['debate', 'werewolf'].includes(event.game.type)) return false;
+  return Boolean(event.speech?.playerId || event.testimony?.playerId);
 }
 
 function getEventSpeakerRole(event, text = '') {

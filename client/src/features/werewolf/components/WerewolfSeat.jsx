@@ -3,6 +3,7 @@ import { Star } from 'lucide-react';
 import { formatAvatarUrl } from '../../../utils/avatar';
 import { classNames } from '../../../utils/classNames';
 import { ROLE_NAMES } from '../constants';
+import './WerewolfSeat.css';
 
 export function WerewolfSeat({ player, seatIndex, actionTarget, isSheriff, showRoles, visibleRolePlayerId, currentSpeakerId, onPlayerSelect }) {
   const isSpeaking = Number(currentSpeakerId) === Number(player.id);

@@ -1,0 +1,60 @@
+:root {
+  --bg: #050a10;
+  --panel: rgba(8, 15, 23, 0.88);
+  --panel-soft: rgba(13, 23, 34, 0.78);
+  --panel-bright: rgba(20, 35, 52, 0.88);
+  --line: rgba(222, 188, 116, 0.32);
+  --line-blue: rgba(70, 151, 232, 0.46);
+  --gold: #e2c27a;
+  --gold-soft: #b8893f;
+  --blue: #4aa3ff;
+  --blue-soft: #12345a;
+  --green: #6ff0a0;
+  --red: #ff5d5d;
+  --text: #f7ead2;
+  --muted: #98a5b6;
+  --shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: "Microsoft YaHei", "Noto Serif SC", "Songti SC", Arial, sans-serif;
+  background:
+    radial-gradient(circle at 50% 26%, rgba(36, 74, 103, 0.32), transparent 30%),
+    linear-gradient(90deg, rgba(4, 9, 13, 0.96), rgba(8, 15, 22, 0.74), rgba(4, 9, 13, 0.96)),
+    url("data:image/svg+xml,%3Csvg width='1600' height='900' viewBox='0 0 1600 900' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1600' height='900' fill='%2303080d'/%3E%3Cpath d='M0 690 C260 560 360 640 520 520 C700 386 890 410 1040 545 C1190 680 1330 560 1600 650 L1600 900 L0 900 Z' fill='%230b1118'/%3E%3Cpath d='M210 120 h80 v650 h-80zM1290 120 h80 v650h-80zM430 90 h740 v660 h-740z' fill='%23080d13' opacity='.68'/%3E%3Cpath d='M430 90 h740 M430 750 h740 M210 120 h80 M1290 120 h80' stroke='%232c2416' stroke-width='3'/%3E%3Ccircle cx='800' cy='610' r='245' fill='none' stroke='%231b2633' stroke-width='2' opacity='.7'/%3E%3C/svg%3E");
+  background-size: cover;
+}
+
+button {
+  font: inherit;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+html,
+body,
+#root {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body {
+  overflow: hidden;
+}

@@ -1,0 +1,90 @@
+.werewolf-role-panel,
+.werewolf-progress-panel,
+.werewolf-elimination-panel {
+  flex: 0 1 auto;
+}
+
+.werewolf-role-list,
+.werewolf-progress-list,
+.werewolf-elimination-list {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.werewolf-role-list article,
+.werewolf-progress-list article,
+.werewolf-elimination-list article {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(149, 143, 224, 0.22);
+  border-radius: 6px;
+  background: rgba(8, 14, 42, 0.56);
+  box-shadow: inset 0 0 14px rgba(111, 104, 255, 0.08);
+}
+
+.werewolf-role-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: #adf5ff;
+  background: rgba(18, 55, 75, 0.58);
+  box-shadow: 0 0 12px rgba(93, 210, 255, 0.18);
+}
+
+.werewolf-role-icon.wolf {
+  color: #c4a3ff;
+  background: rgba(54, 24, 92, 0.7);
+  box-shadow: 0 0 13px rgba(157, 92, 255, 0.28);
+}
+
+.werewolf-role-list strong,
+.werewolf-elimination-list strong {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: rgba(246, 248, 255, 0.94);
+  font-size: 16px;
+  font-weight: 850;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.werewolf-role-group > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.werewolf-role-group strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.werewolf-role-group p {
+  margin: 4px 0 0;
+  color: rgba(215, 224, 255, 0.68);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.werewolf-role-list em {
+  flex: 0 0 auto;
+  color: #f8f2ff;
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 900;
+}

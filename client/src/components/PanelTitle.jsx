@@ -1,5 +1,6 @@
 import React from 'react';
 import { classNames } from '../utils/classNames';
+import './PanelTitle.css';
 
 export function PanelTitle({ title, large = false, compact = false }) {
   return (

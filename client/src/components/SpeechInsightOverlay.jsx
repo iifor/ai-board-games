@@ -1,4 +1,5 @@
 import React from 'react';
+import './SpeechInsightOverlay.css';
 
 export function SpeechInsightOverlay({ speech, players = [] }) {
   const playerId = speech?.playerId;

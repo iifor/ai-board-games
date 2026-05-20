@@ -1,0 +1,64 @@
+.werewolf-progress-panel {
+  flex: 0 1 auto;
+  max-height: 360px;
+}
+
+.werewolf-progress-list {
+  position: relative;
+  padding-left: 14px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.werewolf-progress-list::before {
+  content: "";
+  position: absolute;
+  left: 28px;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(175, 164, 255, 0.42), transparent);
+}
+
+.werewolf-progress-list article {
+  position: relative;
+  gap: 16px;
+  border-color: transparent;
+  color: rgba(226, 232, 255, 0.72);
+  background: transparent;
+  box-shadow: none;
+}
+
+.werewolf-progress-list article.active {
+  border-color: rgba(147, 102, 255, 0.58);
+  color: #ffffff;
+  background: linear-gradient(90deg, rgba(91, 44, 191, 0.86), rgba(42, 26, 101, 0.34));
+  box-shadow: 0 0 18px rgba(132, 71, 255, 0.28);
+}
+
+.werewolf-progress-list svg {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  color: #b6a9ff;
+  background: #090b25;
+}
+
+.werewolf-progress-list span {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.werewolf-elimination-list p,
+.werewolf-progress-list p {
+  margin: 0;
+  color: rgba(226, 235, 255, 0.78);
+  font-size: 13px;
+  line-height: 1.36;
+  overflow-wrap: anywhere;
+}
+
+.werewolf-right-board .werewolf-progress-panel {
+  height: auto;
+  min-height: 0;
+}

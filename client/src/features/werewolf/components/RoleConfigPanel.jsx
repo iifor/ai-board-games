@@ -3,6 +3,7 @@ import { Users } from 'lucide-react';
 import { classNames } from '../../../utils/classNames';
 import { getRoleConfigGroups } from '../werewolfUtils';
 import { PanelHeader } from './PanelHeader';
+import './RoleConfigPanel.css';
 
 export function RoleConfigPanel({ players, mode, showRoles }) {
   const groups = getRoleConfigGroups(players, mode, showRoles);

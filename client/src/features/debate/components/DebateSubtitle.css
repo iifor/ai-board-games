@@ -1,0 +1,55 @@
+.debate-subtitle {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80vw;
+  border-radius: 10px;
+  gap: 5px;
+  color: #f8fbff;
+  animation: debateSubtitleIn 180ms ease-out;
+  transition: all 180ms ease-out;
+}
+
+.debate-subtitle.empty {
+  opacity: 0;
+}
+
+.debate-subtitle span {
+  border: 1px solid rgba(120, 204, 255, 0.58);
+  color: #8beeff;
+  background: rgba(4, 24, 70, 0.72);
+  padding: 5px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 10px rgba(69, 171, 255, 0.14);
+  font-size: 16px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.debate-subtitle p {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  flex: 1 1 auto;
+  margin: 0;
+  color: rgba(247, 251, 255, 0.96);
+  font-size: 22px;
+  font-weight: 850;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 8px 12px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+@keyframes debateSubtitleIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

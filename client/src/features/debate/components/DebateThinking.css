@@ -1,0 +1,35 @@
+.debate-thinking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 240px;
+  height: 38px;
+  margin: 0 auto 8px;
+  border: 1px solid rgba(92, 188, 255, 0.46);
+  border-radius: 38px;
+  color: #bdeeff;
+  background: rgba(5, 22, 54, 0.78);
+  box-shadow: 0 0 18px rgba(52, 163, 255, 0.2), inset 0 0 12px rgba(70, 176, 255, 0.1);
+}
+
+.debate-thinking span {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(130, 218, 255, 0.28);
+  border-top-color: #82daff;
+  border-radius: 12px;
+  animation: debateSpin 820ms linear infinite;
+}
+
+.debate-thinking strong {
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 22px;
+}
+
+@keyframes debateSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Award, Star } from 'lucide-react';
+import './DebateResult.css';
 
 export function DebateResult({ game }) {
   if (!game.winner && !game.mvp) return null;

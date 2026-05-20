@@ -1,0 +1,50 @@
+.werewolf-controls {
+  position: absolute;
+  z-index: 60;
+  top: 30px;
+  right: 54px;
+  display: flex;
+  gap: 24px;
+}
+
+.werewolf-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  height: 58px;
+  padding: 0 28px;
+  border: 1px solid rgba(197, 180, 255, 0.42);
+  border-radius: 999px;
+  color: #ded5ff;
+  background: rgba(9, 8, 30, 0.5);
+  box-shadow: inset 0 0 18px rgba(145, 111, 255, 0.08), 0 0 16px rgba(73, 47, 160, 0.12);
+  cursor: pointer;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.werewolf-controls span {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.werewolf-controls button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.werewolf-controls button:hover:not(:disabled) {
+  border-color: rgba(218, 205, 255, 0.7);
+  color: #fff;
+  background: rgba(34, 25, 82, 0.72);
+}
+
+.werewolf-controls button.skip-active:not(:disabled) {
+  border-color: rgba(255, 224, 128, 0.86);
+  color: #fff7d0;
+  background: rgba(92, 65, 20, 0.72);
+  box-shadow: 0 0 18px rgba(255, 199, 83, 0.3), inset 0 0 18px rgba(255, 210, 92, 0.14);
+}

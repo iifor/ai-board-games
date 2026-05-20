@@ -1,0 +1,197 @@
+.werewolf-table {
+  --seat-size: 86px;
+  --radius: 350px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.werewolf-table .werewolf-seat {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--seat-size);
+  height: var(--seat-size);
+  --angle: calc(-90deg + 360deg / var(--seat-count) * var(--i));
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--angle))
+    translate(var(--radius))
+    rotate(calc(-1 * var(--angle)));
+}
+
+.werewolf-table .werewolf-seat:nth-child(1)  { --i: 0; }
+.werewolf-table .werewolf-seat:nth-child(2)  { --i: 1; }
+.werewolf-table .werewolf-seat:nth-child(3)  { --i: 2; }
+.werewolf-table .werewolf-seat:nth-child(4)  { --i: 3; }
+.werewolf-table .werewolf-seat:nth-child(5)  { --i: 4; }
+.werewolf-table .werewolf-seat:nth-child(6)  { --i: 5; }
+.werewolf-table .werewolf-seat:nth-child(7)  { --i: 6; }
+.werewolf-table .werewolf-seat:nth-child(8)  { --i: 7; }
+.werewolf-table .werewolf-seat:nth-child(9)  { --i: 8; }
+.werewolf-table .werewolf-seat:nth-child(10) { --i: 9; }
+.werewolf-table .werewolf-seat:nth-child(11) { --i: 10; }
+.werewolf-table .werewolf-seat:nth-child(12) { --i: 11; }
+.werewolf-table .werewolf-seat:nth-child(13) { --i: 12; }
+.werewolf-table .werewolf-seat:nth-child(14) { --i: 13; }
+.werewolf-table .werewolf-seat:nth-child(15) { --i: 14; }
+.werewolf-table .werewolf-seat:nth-child(16) { --i: 15; }
+
+.werewolf-table .werewolf-seat:nth-child(n + 7) {
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.werewolf-table .werewolf-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  min-width: var(--avatar-size);
+  min-height: var(--avatar-size);
+  box-sizing: border-box;
+  flex: 0 0 var(--avatar-size);
+  aspect-ratio: 1 / 1;
+  appearance: none;
+  -webkit-appearance: none;
+  overflow: visible;
+  padding: 0;
+  border: 2px solid rgba(224, 216, 255, 0.82);
+  border-radius: 50%;
+  background-color: rgba(9, 14, 43, 0.88);
+  background-position: center;
+  background-size: cover;
+  color: #fff;
+  box-shadow:
+    0 0 8px rgba(255, 255, 255, 0.68),
+    0 0 24px rgba(90, 120, 255, 0.78),
+    inset 0 0 28px rgba(65, 91, 255, 0.28);
+  cursor: pointer;
+  font-size: 32px;
+  font-weight: 900;
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.86);
+}
+
+.werewolf-table .werewolf-seat.werewolf .werewolf-avatar {
+  box-shadow:
+    0 0 8px rgba(255, 255, 255, 0.68),
+    0 0 25px rgba(166, 72, 255, 0.86),
+    inset 0 0 28px rgba(149, 60, 255, 0.32);
+}
+
+.werewolf-table .werewolf-seat:nth-child(n + 7):not(.werewolf) .werewolf-avatar {
+  box-shadow:
+    0 0 8px rgba(255, 255, 255, 0.68),
+    0 0 24px rgba(90, 120, 255, 0.78),
+    inset 0 0 28px rgba(65, 91, 255, 0.28);
+}
+
+.werewolf-table .werewolf-seat.speaking .werewolf-avatar {
+  transform: scale(1.08);
+  border-color: rgba(255, 240, 166, 0.94);
+  box-shadow:
+    0 0 10px rgba(255, 255, 255, 0.94),
+    0 0 34px rgba(255, 227, 117, 0.98),
+    0 0 58px rgba(255, 227, 117, 0.42),
+    inset 0 0 28px rgba(255, 236, 160, 0.28);
+}
+
+.werewolf-table .werewolf-seat.dead {
+  opacity: 0.52;
+  filter: grayscale(0.78);
+}
+
+.werewolf-table .werewolf-seat.dead .werewolf-avatar {
+  opacity: 0.58;
+  filter: grayscale(0.82);
+}
+
+.werewolf-table .werewolf-seat.dead::after {
+  content: none;
+}
+
+.werewolf-seat-number {
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  width: 35px;
+  height: 35px;
+  z-index: 5;
+  color: #ffffff;
+  font-size: 20px;
+  background: rgba(0, 0, 0, 0.68);
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  border-radius: 50%;
+  line-height: 33px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.werewolf-sheriff-badge {
+  position: absolute;
+  right: -10px;
+  top: -12px;
+  z-index: 5;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 2px solid rgba(255, 241, 151, 0.95);
+  border-radius: 50%;
+  color: #ffef76;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 216, 0.5), transparent 36%),
+    linear-gradient(180deg, rgba(125, 79, 9, 0.98), rgba(50, 30, 3, 0.98));
+  box-shadow:
+    0 0 0 2px rgba(46, 25, 0, 0.65),
+    0 0 12px rgba(255, 223, 98, 0.78),
+    0 0 24px rgba(255, 195, 54, 0.42);
+}
+
+.werewolf-dead-badge {
+  position: absolute;
+  right: -8px;
+  bottom: 0;
+  z-index: 3;
+  padding: 3px 9px;
+  border: 1px solid rgba(255, 135, 135, 0.72);
+  border-radius: 999px;
+  color: #ffe1e1;
+  background: rgba(76, 8, 24, 0.9);
+  box-shadow: 0 0 12px rgba(255, 88, 88, 0.26);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.werewolf-action-badge {
+  position: absolute;
+  right: 10px;
+  top: 34px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(167, 226, 255, 0.85);
+  border-radius: 50%;
+  color: #ecfbff;
+  background: rgba(9, 42, 76, 0.92);
+  box-shadow: 0 0 12px rgba(98, 195, 255, 0.48);
+  font-size: 14px;
+  font-weight: 1000;
+  line-height: 1;
+}
+
+.werewolf-nameplate {
+  display: inline-block;
+  width: 100px;
+  margin-top: 8px;
+  border-radius: 6px;
+  text-align: center;
+}

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, MessagesSquare, Moon, Sparkles, UsersRound } from 'lucide-react';
 import { fetchAiPlayers, fetchPlayerSelections, fetchRecentGames, savePlayerSelection } from '../api/gameApi';
+import './GameSelectPage.css';
 
 const GAME_RULES = {
   consensus: { min: 7, max: 7, recommended: 7, label: '固定 7 人' },

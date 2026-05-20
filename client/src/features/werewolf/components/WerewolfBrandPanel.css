@@ -1,0 +1,59 @@
+.werewolf-title-panel {
+  position: absolute;
+  left: 0;
+  top: -188px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.werewolf-title-panel p,
+.werewolf-title-panel h2,
+.werewolf-title-panel span {
+  margin: 0;
+}
+
+.werewolf-title-panel p {
+  color: #cbbdff;
+  font-size: 80px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.95;
+  text-shadow: 0 0 22px rgba(130, 105, 255, 0.68);
+}
+
+.werewolf-title-panel h2 {
+  display: inline-block;
+  margin-top: 16px;
+  color: #e8e2ff;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.werewolf-title-panel h2::before,
+.werewolf-title-panel h2::after {
+  content: "◆";
+  color: rgba(208, 196, 255, 0.78);
+  font-size: 15px;
+  margin: 0 10px;
+}
+
+.werewolf-title-panel h2::before {
+  margin-left: 0;
+}
+
+.werewolf-title-panel > span {
+  display: block;
+  margin-top: 7px;
+  color: rgba(224, 233, 255, 0.72);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.werewolf-title-panel button {
+  display: none;
+}

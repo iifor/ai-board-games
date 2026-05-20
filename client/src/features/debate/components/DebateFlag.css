@@ -1,0 +1,53 @@
+.debate-flag {
+  position: relative;
+  display: flex;
+  flex: 0 0 58px;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 78px;
+  color: #21bcff;
+  filter: drop-shadow(0 0 12px rgba(0, 174, 255, 0.8));
+}
+
+.debate-flag.con {
+  color: #ff4f4f;
+  filter: drop-shadow(0 0 12px rgba(255, 62, 70, 0.76));
+}
+
+.debate-flag svg {
+  position: absolute;
+  inset: 0;
+  width: 58px;
+  height: 78px;
+}
+
+.debate-flag .flag-back {
+  fill: rgba(0, 52, 132, 0.48);
+  stroke: currentColor;
+  stroke-width: 3;
+}
+
+.debate-flag.con .flag-back {
+  fill: rgba(128, 0, 22, 0.48);
+}
+
+.debate-flag .flag-line,
+.debate-flag .flag-top {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.debate-flag b {
+  position: relative;
+  z-index: 1;
+  color: currentColor;
+  font-size: 28px;
+  font-weight: 1000;
+  line-height: 1;
+  text-shadow: 0 0 10px currentColor;
+  top: -7px;
+}

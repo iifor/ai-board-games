@@ -1,7 +1,9 @@
 import React from 'react';
 import { ArrowLeft, FastForward, Pause, Play, RotateCcw } from 'lucide-react';
+import { classNames } from '../../../utils/classNames';
+import './WerewolfControls.css';
 
-export function WerewolfControls({ autoPlay, startDisabled, playbackDisabled, showSkip, skipDisabled, onReturn, setAutoPlay, onStart, onSkipPhase }) {
+export function WerewolfControls({ autoPlay, startDisabled, playbackDisabled, showSkip, skipDisabled, skipActive, onReturn, setAutoPlay, onStart, onSkipPhase }) {
   return (
     <nav className="werewolf-controls" aria-label="狼人杀控制">
       <button type="button" title="返回游戏选择" onClick={onReturn}>
@@ -24,6 +26,7 @@ export function WerewolfControls({ autoPlay, startDisabled, playbackDisabled, sh
       {showSkip && (
         <button
           type="button"
+          className={classNames(skipActive && 'skip-active')}
           title={skipDisabled ? '复盘播放中可跳过当前阶段' : '跳过当前阶段'}
           disabled={skipDisabled}
           onClick={onSkipPhase}

@@ -1,6 +1,20 @@
 import React from 'react';
 import { Crown, Eye, FlaskConical, Moon, Shield, Sparkles, Sun, Swords, Users, Vote, Wand2 } from 'lucide-react';
 
+export const EMPTY_WEREWOLF = {
+  id: 'pending-werewolf',
+  type: 'werewolf',
+  mode: 'real',
+  event: {
+    name: 'AI 狼人杀',
+    background: '12 人标准局：狼人阵营与神职、平民阵营在昼夜轮转中对抗。'
+  },
+  players: [],
+  rounds: [],
+  winner: null,
+  winReason: ''
+};
+
 export const ROLE_NAMES = {
   werewolf: '狼人',
   seer: '预言家',

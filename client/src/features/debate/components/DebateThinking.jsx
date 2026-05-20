@@ -1,4 +1,5 @@
 import React from 'react';
+import './DebateThinking.css';
 
 export function DebateThinking() {
   return (

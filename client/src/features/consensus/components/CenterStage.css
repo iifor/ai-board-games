@@ -1,0 +1,331 @@
+.center-stage {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px;
+  scrollbar-color: rgba(226, 194, 122, 0.36) transparent;
+  scrollbar-width: thin;
+}
+
+.center-stage > *:nth-child(3) {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.center-stage::-webkit-scrollbar {
+  width: 8px;
+}
+
+.center-stage::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(226, 194, 122, 0.35);
+}
+
+.start-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 72px 20px 20px;
+}
+
+.start-content {
+  width: 620px;
+  text-align: center;
+}
+
+.start-content h2 {
+  margin-bottom: 16px;
+  color: var(--gold);
+  font-size: 40px;
+}
+
+.start-content p {
+  color: #d8d1c2;
+  line-height: 1.7;
+}
+
+.start-game-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+  border: 1px solid rgba(90, 168, 255, 0.78);
+  background: linear-gradient(180deg, rgba(30, 83, 141, 0.96), rgba(10, 30, 58, 0.98));
+  color: #fff;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.start-game-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.round-compact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.round-compact > *:first-child {
+  flex: 1 1 auto;
+}
+
+.round-compact > *:last-child {
+  flex: 0 0 210px;
+}
+
+.round-question p {
+  margin: 0 0 6px;
+  color: #dcecff;
+  line-height: 1.45;
+}
+
+.round-question div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.round-question span {
+  border: 1px solid rgba(226, 194, 122, 0.2);
+  padding: 4px 8px;
+  color: #fff8df;
+  background: rgba(2, 6, 10, 0.36);
+  font-size: 13px;
+}
+
+.round-vote-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.round-vote-mini strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 18px;
+}
+
+.round-vote-mini em {
+  color: #d8d2c2;
+  font-style: normal;
+}
+
+.round-vote-mini .success {
+  color: #7df0a2;
+}
+
+.round-vote-mini .failed {
+  color: #ff7777;
+}
+
+.result-bars {
+  display: flex;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.result-bars i,
+.result-bars b {
+  display: block;
+  height: 100%;
+}
+
+.result-bars i {
+  background: var(--blue);
+}
+
+.result-bars b {
+  background: var(--gold);
+}
+
+.discussion {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin-top: 20px;
+  padding: 10px 14px;
+}
+
+.discussion > *:first-child {
+  flex: 0 0 32px;
+}
+
+.discussion > *:last-child {
+  flex: 1 1 auto;
+  overflow-y: hidden;
+}
+
+.discussion-scroll {
+  overflow-y: hidden;
+  padding: 2px 4px 6px;
+  scrollbar-color: rgba(226, 194, 122, 0.42) rgba(255, 255, 255, 0.05);
+  scrollbar-width: thin;
+}
+
+.discussion-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.discussion-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(226, 194, 122, 0.35);
+}
+
+.chat-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.chat-line > .chat-id {
+  flex: 0 0 26px;
+}
+
+.chat-line > strong {
+  flex: 0 0 auto;
+}
+
+.chat-line > p {
+  flex: 1 1 auto;
+}
+
+.chat-line > * {
+  order: 0;
+}
+
+.chat-line > *:last-child {
+  flex: 0 0 46px;
+  text-align: right;
+}
+
+.chat-line.host-line {
+  border-color: rgba(226, 194, 122, 0.16);
+  background: rgba(92, 69, 22, 0.16);
+}
+
+.host-line .chat-id {
+  background: #8a6322;
+}
+
+.host-line strong {
+  color: #f0d28b;
+}
+
+.chat-id {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  clip-path: polygon(50% 0, 100% 22%, 100% 78%, 50% 100%, 0 78%, 0 22%);
+  background: #225b9d;
+  color: #fff;
+  font-weight: 900;
+}
+
+.chat-line strong {
+  color: #93d0ff;
+  white-space: nowrap;
+}
+
+.chat-line p {
+  margin: 0;
+  color: #f0eadf;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.chat-line time {
+  color: #c8c9cc;
+  text-align: right;
+}
+
+.empty-discussion {
+  color: var(--muted);
+}
+
+.stream-message {
+  margin: 0 0 8px;
+  border: 1px solid rgba(90, 168, 255, 0.28);
+  padding: 8px 10px;
+  color: #b9dcff;
+  background: rgba(12, 39, 68, 0.42);
+}
+
+.chat-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.chat-input > *:nth-child(1) {
+  flex: 0 0 28px;
+}
+
+.chat-input > *:nth-child(2) {
+  flex: 1 1 auto;
+}
+
+.chat-input > *:nth-child(3) {
+  flex: 0 0 48px;
+}
+
+.chat-input > *:nth-child(4) {
+  flex: 0 0 110px;
+}
+
+.chat-input span {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 12px 14px;
+  color: #8793a2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(2, 6, 10, 0.7);
+}
+
+.chat-input em {
+  color: #c8c8c8;
+  font-style: normal;
+  text-align: right;
+}
+
+.chat-input button {
+  border: 1px solid rgba(91, 166, 255, 0.7);
+  background: linear-gradient(180deg, #1d5ca2, #0a2a51);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 900;
+  height: 42px;
+  font-size: 20px;
+}
+
+.inline-stepper {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.inline-stepper button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(226, 194, 122, 0.26);
+  background: rgba(9, 16, 24, 0.78);
+  color: #e6d5ad;
+  cursor: pointer;
+}

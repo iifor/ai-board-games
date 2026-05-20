@@ -2,6 +2,7 @@ import React from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { buildRoundProgress } from '../werewolfUtils';
 import { PanelHeader } from './PanelHeader';
+import './RoundProgressPanel.css';
 
 export function RoundProgressPanel({ rounds, currentRound }) {
   const items = buildRoundProgress(rounds, currentRound);

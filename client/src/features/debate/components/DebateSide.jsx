@@ -2,6 +2,7 @@ import React from 'react';
 import { DebateFlag } from './DebateFlag';
 import { DebateSeat } from './DebateSeat';
 import { toChineseOrdinal } from '../debateUtils';
+import './DebateSide.css';
 
 export function DebateSide({ title, position, players, tone, mvpId, currentSpeakerId, onPlayerSelect, mvpVoteTargets }) {
   const seats = Array.from({ length: 4 }).map((_, index) => players[index] || null);

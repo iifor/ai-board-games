@@ -1,5 +1,6 @@
 import React from 'react';
 import { getDebateSpeakerLabel } from '../debateUtils';
+import './DebateSubtitle.css';
 
 export function DebateSubtitle({ speech, players, maxChars = 50 }) {
   const text = formatDebateSubtitle(speech?.text, maxChars);

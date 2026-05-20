@@ -1,0 +1,94 @@
+.debate-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 690px;
+  min-height: 64px;
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+  color: #ffeab2;
+  background: transparent;
+}
+
+.debate-result-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.result-winner,
+.result-mvp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 58px;
+  border: 1px solid rgba(255, 226, 138, 0.68);
+  color: #fff3c8;
+  background: linear-gradient(90deg, rgba(54, 35, 8, 0.88), rgba(16, 20, 48, 0.68));
+  box-shadow: 0 0 18px rgba(255, 199, 72, 0.24), inset 0 0 18px rgba(255, 229, 150, 0.12);
+  clip-path: polygon(14px 0, 100% 0, 100% 44px, 86% 58px, 0 58px, 0 14px);
+}
+
+.result-winner {
+  flex: 0 0 362px;
+}
+
+.result-mvp {
+  flex: 0 0 268px;
+  border-color: rgba(180, 115, 255, 0.72);
+  color: #efe0ff;
+  background: linear-gradient(90deg, rgba(50, 24, 80, 0.88), rgba(16, 20, 48, 0.68));
+  box-shadow: 0 0 18px rgba(168, 93, 255, 0.26), inset 0 0 18px rgba(202, 157, 255, 0.12);
+}
+
+.debate-result.pro .result-winner {
+  border-color: rgba(57, 203, 255, 0.72);
+  color: #aef5ff;
+  background: linear-gradient(90deg, rgba(5, 73, 142, 0.92), rgba(9, 26, 68, 0.72));
+  box-shadow: 0 0 22px rgba(40, 176, 255, 0.32), inset 0 0 20px rgba(91, 204, 255, 0.14);
+}
+
+.debate-result.con .result-winner {
+  border-color: rgba(255, 86, 86, 0.76);
+  color: #ffd0d0;
+  background: linear-gradient(90deg, rgba(132, 18, 30, 0.92), rgba(50, 11, 32, 0.72));
+  box-shadow: 0 0 22px rgba(255, 69, 72, 0.3), inset 0 0 20px rgba(255, 93, 93, 0.13);
+}
+
+.debate-result svg {
+  flex: 0 0 auto;
+  margin: 0 10px 0 0;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+.debate-result span {
+  flex: 0 0 auto;
+  margin: 0 10px 0 0;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 20px;
+  opacity: 0.86;
+}
+
+.debate-result strong {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  max-width: 188px;
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 34px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.42);
+}
+
+.result-mvp strong {
+  max-width: 116px;
+  color: #ffffff;
+}

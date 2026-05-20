@@ -7,7 +7,8 @@ import {
   clampFinite,
   normalizeVoiceProfile,
   getSpeechFallbackDelay,
-  fetchServerSpeechAudio
+  fetchServerSpeechAudio,
+  getSpeechPlaybackText
 } from '../utils/speech';
 
 export function useSpeechQueue() {
@@ -66,7 +67,13 @@ export function useSpeechQueue() {
         return;
       }
       if (voicesRef.current.length === 0) voicesRef.current = getChineseVoices();
-      const utterance = new SpeechSynthesisUtterance(item.text);
+      const spokenText = getSpeechPlaybackText(item.text);
+      if (!spokenText) {
+        item.onStart?.();
+        window.setTimeout(finish, 0);
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(spokenText);
       const profile = normalizeVoiceProfile(getProfileForItem(item));
       const voice = getVoiceForItem(item, voicesRef.current, profile);
       utterance.lang = 'zh-CN';
@@ -96,14 +103,19 @@ export function useSpeechQueue() {
       resumeTimerRef.current = window.setInterval(() => {
         if (window.speechSynthesis?.paused) window.speechSynthesis.resume?.();
       }, 1000);
-      endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(item.text));
+      endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(spokenText));
     };
 
     const playServerSpeech = async () => {
       try {
         item.onStart?.();
+        const spokenText = getSpeechPlaybackText(item.text);
+        if (!spokenText) {
+          window.setTimeout(finish, 0);
+          return;
+        }
         const ownsUrl = !item.audioUrl;
-        const url = item.audioUrl || URL.createObjectURL(await fetchServerSpeechAudio(item.text, item.voicePackageId));
+        const url = item.audioUrl || URL.createObjectURL(await fetchServerSpeechAudio(spokenText, item.voicePackageId));
         const audio = new Audio(url);
         audioRef.current = audio;
         audio.onended = () => {
@@ -122,7 +134,7 @@ export function useSpeechQueue() {
         };
         audio.volume = clampFinite(item.volume, 1, 0, 1);
         await audio.play();
-        endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(item.text));
+        endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(spokenText));
       } catch {
         if (cancellingRef.current || !enabledRef.current) {
           finish();

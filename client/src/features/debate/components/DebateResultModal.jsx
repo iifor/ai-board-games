@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createDebateResultPoster, downloadResultPoster } from '../debatePoster';
 import { getShareReport } from '../debateUtils';
+import './DebateResultModal.css';
 
 export function DebateResultModal({ game, onNextGame, onReplay }) {
   const report = useMemo(() => getShareReport(game), [game]);

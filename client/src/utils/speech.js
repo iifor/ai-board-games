@@ -1,4 +1,5 @@
 import { HOST_VOICE_PROFILE, PLAYER_VOICE_PROFILES, VOICE_KEYWORDS } from '../constants/speech';
+import { stripSpeechParentheses } from './playableText';
 
 export function getChineseVoices() {
   if (!window.speechSynthesis) return [];
@@ -64,6 +65,10 @@ export function normalizeVoiceProfile(profile) {
 export function getSpeechFallbackDelay(text) {
   const length = String(text || '').length;
   return Math.max(120000, Math.min(600000, 30000 + length * 1200));
+}
+
+export function getSpeechPlaybackText(text) {
+  return stripSpeechParentheses(text);
 }
 
 export async function fetchServerSpeechAudio(text, voicePackageId) {

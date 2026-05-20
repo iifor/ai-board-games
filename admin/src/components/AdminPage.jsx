@@ -27,6 +27,7 @@ import {
   CloudUploadOutlined,
   DashboardOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   ExperimentOutlined,
   MessageOutlined,
@@ -41,6 +42,7 @@ import {
 } from '@ant-design/icons';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { adminRequest } from '../api/adminApi';
+import { exportJsonFile, safeFilenamePart } from '../utils/fileExport';
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
@@ -1492,7 +1494,18 @@ function GameDetailDrawer({ game, modes, onClose, onDelete }) {
     _rowKey: String(player.id || player.playerId || player.nickname || player.name || `player-${index}`)
   })), [game]);
   return (
-    <Drawer width={720} title="对局详情" open={Boolean(game)} onClose={onClose} extra={game && <Button danger icon={<DeleteOutlined />} onClick={() => onDelete(game.id)}>删除</Button>}>
+    <Drawer
+      width={720}
+      title="对局详情"
+      open={Boolean(game)}
+      onClose={onClose}
+      extra={game && (
+        <Space>
+          <Button icon={<DownloadOutlined />} onClick={() => exportGameJson(game)}>导出 JSON</Button>
+          <Button danger icon={<DeleteOutlined />} onClick={() => onDelete(game.id)}>删除</Button>
+        </Space>
+      )}
+    >
       {game && (
         <Space direction="vertical" size={16} className="admin-full">
           <Descriptions bordered size="small" column={1}>
@@ -1522,6 +1535,10 @@ function GameDetailDrawer({ game, modes, onClose, onDelete }) {
       )}
     </Drawer>
   );
+}
+
+function exportGameJson(game) {
+  exportJsonFile(game, `game-${safeFilenamePart(game?.gameType || game?.type || 'unknown')}-${safeFilenamePart(game?.id || Date.now())}.json`);
 }
 
 function TableActions({ onEdit, editText = '编辑', onDelete, deleteText = '删除' }) {

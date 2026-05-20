@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft, Eye, MessageCircle, Pause, Power, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import './TopNav.css';
 
 export function TopNav({
   currentRound,

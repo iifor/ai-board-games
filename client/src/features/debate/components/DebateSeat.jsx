@@ -3,6 +3,7 @@ import { Crown } from 'lucide-react';
 import { classNames } from '../../../utils/classNames';
 import { getPlayerAvatar } from '../../../utils/player';
 import { toChineseOrdinal } from '../debateUtils';
+import './DebateSeat.css';
 
 function formatAvatarUrl(value) {
   const src = String(value || '').trim();

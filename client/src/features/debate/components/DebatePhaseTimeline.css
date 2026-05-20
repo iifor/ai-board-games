@@ -1,0 +1,102 @@
+.debate-phase-timeline {
+  display: flex;
+  flex: 0 0 176px;
+  justify-content: flex-start;
+  gap: 15px;
+  margin: 0;
+  padding: 0 6px 8px;
+}
+
+.debate-phase-timeline li {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  width: 84px;
+  height: 176px;
+  color: rgba(205, 219, 242, 0.72);
+}
+
+.phase-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(116, 160, 230, 0.46);
+  border-radius: 30px;
+  color: #ffffff;
+  background: radial-gradient(circle, #12204b, #071026);
+  box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.08);
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.phase-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 78px;
+  height: 78px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(154, 175, 218, 0.5);
+  border-radius: 78px;
+  background: rgba(17, 24, 52, 0.86);
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.08);
+  filter: grayscale(1) brightness(0.88);
+}
+
+.phase-icon svg {
+  width: 38px;
+  height: 38px;
+  color: currentColor;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.32));
+}
+
+.debate-phase-timeline strong {
+  overflow: hidden;
+  width: 104px;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debate-phase-timeline li.active {
+  color: #8beeff;
+}
+
+.debate-phase-timeline li.active .phase-number {
+  border-color: rgba(56, 213, 255, 0.95);
+  background: linear-gradient(180deg, #166dff, #06358d);
+  box-shadow: 0 0 18px rgba(29, 183, 255, 0.82);
+}
+
+.debate-phase-timeline li.active .phase-icon {
+  border-color: rgba(60, 213, 255, 0.96);
+  filter: none;
+  box-shadow: 0 0 24px rgba(20, 180, 255, 0.7), inset 0 0 18px rgba(57, 199, 255, 0.18);
+}
+
+.debate-phase-timeline li.past {
+  color: rgba(230, 241, 255, 0.9);
+}
+
+.debate-phase-timeline li.past .phase-icon {
+  filter: none;
+}
+
+.phase-arrow {
+  position: absolute;
+  top: 74px;
+  right: -18px;
+  width: 22px;
+  height: 14px;
+  opacity: 0.78;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0), rgba(145, 177, 255, 0.84));
+  clip-path: polygon(0 35%, 70% 35%, 70% 0, 100% 50%, 70% 100%, 70% 65%, 0 65%);
+  filter: drop-shadow(0 0 8px rgba(117, 169, 255, 0.74));
+}

@@ -1,0 +1,36 @@
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #ead7a8;
+}
+
+.panel-title.large {
+  margin-bottom: 12px;
+}
+
+.panel-title.compact {
+  margin-bottom: 8px;
+}
+
+.panel-title h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.panel-title.large h2 {
+  font-size: 30px;
+}
+
+.panel-title.compact h2 {
+  font-size: 18px;
+}
+
+.panel-title i {
+  width: 78px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(226, 194, 122, 0.82), transparent);
+}

@@ -3,6 +3,7 @@ import { Shield, Users } from 'lucide-react';
 import { classNames } from '../../../utils/classNames';
 import { CaptainDragToken } from './CaptainDragToken';
 import { DraggableDebatePlayer } from './DraggableDebatePlayer';
+import './DebateTeamColumn.css';
 
 export function DebateTeamColumn({ title, tone, ids, slots, labelPrefix, getPlayer, captainId, onCaptainDrop, onDrop, disabled = false, captainEnabled = true }) {
   const Icon = tone === 'judge' ? Users : Shield;

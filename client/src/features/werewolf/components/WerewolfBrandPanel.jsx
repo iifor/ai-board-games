@@ -1,5 +1,6 @@
 import React from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import './WerewolfBrandPanel.css';
 
 export function WerewolfBrandPanel({ game, mode, showRoles, onShowRolesChange }) {
   return (

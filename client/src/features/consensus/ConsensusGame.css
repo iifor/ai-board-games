@@ -1,0 +1,185 @@
+/* Consensus Mist immersive stage */
+.game-shell:not(.debate-shell):not(.werewolf-shell) {
+  position: relative;
+  overflow: hidden;
+  color: #edf7ff;
+  background:
+    linear-gradient(180deg, rgba(0, 8, 16, 0.04), rgba(0, 8, 16, 0.16)),
+    url("../../asserts/gsmw.png") center / cover no-repeat;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 52%, rgba(94, 176, 220, 0.08), transparent 576px),
+    linear-gradient(90deg, rgba(0, 5, 12, 0.48), rgba(0, 9, 18, 0.06) 42%, rgba(0, 5, 12, 0.48));
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) > .top-nav,
+.game-shell:not(.debate-shell):not(.werewolf-shell) > .game-grid,
+.game-shell:not(.debate-shell):not(.werewolf-shell) > .action-bar {
+  position: relative;
+  z-index: 1;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .top-nav {
+  border-bottom-color: rgba(151, 207, 255, 0.2);
+  background: linear-gradient(180deg, rgba(1, 8, 18, 0.92), rgba(1, 8, 18, 0.2));
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(8px);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .brand-mark,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .rank-badge,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .chat-id,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .status-icon {
+  border-color: rgba(150, 213, 255, 0.52);
+  color: #eaf8ff;
+  background: rgba(9, 30, 58, 0.76);
+  box-shadow: 0 0 18px rgba(84, 168, 255, 0.28), inset 0 0 14px rgba(88, 168, 255, 0.16);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .game-grid {
+  display: flex;
+  gap: 23.04px;
+  height: 884px;
+  padding: 15.12px 26.88px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .left-panel {
+  flex: 0 1 364.8px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .center-stage {
+  flex: 1 1 921.6px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .right-panel {
+  flex: 0 1 518.4px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .framed-panel,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .center-stage,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .round-compact,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .discussion,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .status-card,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .exile-panel,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .rules-card {
+  border: 1px solid rgba(143, 202, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(2, 10, 24, 0.5);
+  box-shadow: 0 0 26px rgba(61, 139, 218, 0.14), inset 0 0 22px rgba(77, 149, 222, 0.08);
+  backdrop-filter: blur(9px);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .framed-panel::before,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .framed-panel::after {
+  content: none;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .player-card {
+  border-color: rgba(138, 199, 255, 0.22);
+  background: rgba(4, 17, 36, 0.58);
+  box-shadow: inset 0 0 18px rgba(77, 149, 222, 0.06);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .player-card.speaking {
+  border-color: rgba(255, 226, 142, 0.78);
+  box-shadow: 0 0 24px rgba(255, 215, 99, 0.22), inset 0 0 18px rgba(255, 225, 120, 0.08);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .portrait {
+  border-color: rgba(197, 226, 255, 0.5);
+  background-color: rgba(11, 30, 56, 0.82);
+  box-shadow: 0 0 18px rgba(93, 172, 255, 0.24);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .center-stage {
+  padding: 12.96px 21.12px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .round-compact {
+  flex: 0 0 auto;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .discussion {
+  flex: 1 1 auto;
+  margin-top: 11.88px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .chat-line {
+  border-bottom-color: rgba(150, 213, 255, 0.1);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .chat-line.host-line {
+  background: rgba(36, 64, 98, 0.26);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .status-row,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .side-clue-list article,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .exile-card {
+  border-color: rgba(143, 202, 255, 0.18);
+  background: rgba(3, 15, 32, 0.46);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .action-bar {
+  border-top: 1px solid rgba(151, 207, 255, 0.18);
+  background: rgba(1, 7, 16, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .action-bar button {
+  border-color: rgba(143, 202, 255, 0.3);
+  background: rgba(5, 20, 42, 0.66);
+  box-shadow: inset 0 0 18px rgba(77, 149, 222, 0.08);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .action-bar button:hover:not(:disabled) {
+  border-color: rgba(196, 228, 255, 0.64);
+  box-shadow: 0 0 22px rgba(88, 168, 255, 0.2), inset 0 0 18px rgba(95, 178, 255, 0.12);
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .left-panel {
+  flex: 0 0 345.6px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .player-card {
+  gap: 8.64px;
+  padding: 5.94px 9.6px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .rank-badge {
+  flex-basis: 34.56px;
+  width: 34.56px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .portrait-button,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .portrait {
+  flex-basis: 57.6px;
+  width: 57.6px;
+  height: 57.6px;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .player-name-row strong,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .player-info p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .game-grid {
+  height: 706px;
+  overflow: hidden;
+}
+
+.game-shell:not(.debate-shell):not(.werewolf-shell) .left-panel,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .center-stage,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .right-panel,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .framed-panel,
+.game-shell:not(.debate-shell):not(.werewolf-shell) .discussion {
+  overflow: hidden;
+}

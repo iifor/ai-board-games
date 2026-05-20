@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft, FastForward, Pause, Play, RotateCcw } from 'lucide-react';
+import './DebateControls.css';
 
 export function DebateControls({
   autoPlay,

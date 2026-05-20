@@ -2,6 +2,7 @@ import React from 'react';
 import { Skull } from 'lucide-react';
 import { ROLE_NAMES } from '../constants';
 import { PanelHeader } from './PanelHeader';
+import './EliminationPanel.css';
 
 export function EliminationPanel({ players, showRoles, visibleRolePlayerId }) {
   const eliminated = players

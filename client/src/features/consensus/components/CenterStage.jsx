@@ -2,6 +2,7 @@ import React from 'react';
 import { BadgeCheck, Pause, Play } from 'lucide-react';
 import { PanelTitle } from '../../../components/PanelTitle';
 import { getConsensusTypeName } from '../constants';
+import './CenterStage.css';
 
 export function RealStartPanel({ status, message, onStart }) {
   return (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Bot, Boxes, UsersRound, WandSparkles } from 'lucide-react';
+import './HomePage.css';
 
 const features = [
   { icon: UsersRound, title: '多人对局', subtitle: '随时匹配' },

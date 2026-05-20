@@ -1,0 +1,92 @@
+.game-shell {
+  display: flex;
+  height: 100vh;
+  overflow-x: hidden;
+  border: 1px solid rgba(226, 194, 122, 0.16);
+  background: linear-gradient(180deg, rgba(1, 5, 9, 0.42), rgba(1, 5, 9, 0.2));
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 50px;
+}
+
+.game-shell > .top-nav {
+  flex: 0 0 72px;
+}
+
+.game-shell > .game-grid {
+  flex: 1 1 auto;
+}
+
+.game-shell > .action-bar {
+  flex: 0 0 106px;
+}
+
+.game-grid {
+  display: flex;
+  gap: 22px;
+  height: 884px;
+  overflow: hidden;
+  padding: 12px 28px 12px 24px;
+}
+
+.game-grid > * {
+  overflow: hidden;
+}
+
+.game-grid > *:nth-child(1) {
+  flex: 0 1 360px;
+}
+
+.game-grid > *:nth-child(2) {
+  flex: 1 1 520px;
+}
+
+.game-grid > *:nth-child(3) {
+  flex: 0 1 410px;
+}
+
+.framed-panel {
+  position: relative;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(21, 31, 43, 0.88), rgba(7, 13, 20, 0.9)),
+    rgba(7, 13, 20, 0.84);
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.framed-panel::before,
+.framed-panel::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(226, 194, 122, 0.48);
+  pointer-events: none;
+}
+
+.framed-panel::before {
+  left: 5px;
+  top: 5px;
+  border-left: 1px solid;
+  border-top: 1px solid;
+}
+
+.framed-panel::after {
+  right: 5px;
+  bottom: 5px;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+}
+
+.game-shell,
+.game-select-page {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.game-shell > .game-grid {
+  height: 706px;
+  overflow: hidden;
+}

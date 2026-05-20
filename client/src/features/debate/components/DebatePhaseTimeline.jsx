@@ -1,6 +1,7 @@
 import React from 'react';
 import { MessageSquareText } from 'lucide-react';
 import { classNames } from '../../../utils/classNames';
+import './DebatePhaseTimeline.css';
 
 export function DebatePhaseTimeline({ steps, activeStepIndex }) {
   const displaySteps = steps.length ? steps : [{ id: 'pending', label: '等待开局', Icon: MessageSquareText }];

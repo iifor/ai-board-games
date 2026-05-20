@@ -1,6 +1,7 @@
 import React from 'react';
 import { Crown } from 'lucide-react';
 import { classNames } from '../../../utils/classNames';
+import './CaptainDragToken.css';
 
 export function CaptainDragToken({ tone, disabled = false }) {
   return (

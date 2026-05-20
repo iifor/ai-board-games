@@ -5,6 +5,7 @@ import { DebateThinking } from './DebateThinking';
 import { DebatePhaseTimeline } from './DebatePhaseTimeline';
 import { DebateSubtitle } from './DebateSubtitle';
 import { getDebatePhaseSteps, getActiveStageIndex, getStageTitle, getDebateSubtitleMaxChars, getMvpVoteTargetMap } from '../debateUtils';
+import './DebateArena.css';
 
 export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subtitleSpeech, isThinking, onPlayerSelect, isIdle }) {
   const proPlayers = useMemo(() => game.players.filter((player) => player.side === 'pro'), [game.players]);

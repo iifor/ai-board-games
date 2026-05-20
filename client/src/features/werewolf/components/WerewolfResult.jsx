@@ -1,5 +1,6 @@
 import React from 'react';
 import { Shield } from 'lucide-react';
+import './WerewolfResult.css';
 
 export function WerewolfResult({ game }) {
   if (!game.winner) return null;

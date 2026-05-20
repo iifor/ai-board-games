@@ -1,0 +1,25 @@
+.state-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.ornate-card {
+  width: 620px;
+  padding: 34px;
+}
+
+.eyebrow {
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.gold-button {
+  border: 1px solid rgba(91, 166, 255, 0.7);
+  background: linear-gradient(180deg, #1d5ca2, #0a2a51);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 900;
+}

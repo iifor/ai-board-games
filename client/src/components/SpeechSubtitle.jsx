@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import '../styles/speech-subtitle.css';
+import './SpeechSubtitle.css';
 
 export function SpeechSubtitle({ speech }) {
   const chunks = useMemo(() => splitSubtitleText(speech?.text || ''), [speech?.text]);

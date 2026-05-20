@@ -3,8 +3,9 @@ import { Check, Moon, Users } from 'lucide-react';
 import { classNames } from '../../../utils/classNames';
 import { formatWerewolfModeSummary, getWerewolfModePlayerCount } from '../werewolfUtils';
 import { PanelHeader } from './PanelHeader';
+import './WerewolfModeDialog.css';
 
-export function WerewolfModeDialog({ modes, selectedMode, onSelect, players, selectedPlayerIds, selectedHostId, onHostChange, onPlayerToggle, error, onCancel, onStart }) {
+export function WerewolfModeDialog({ modes, selectedMode, onSelect, players, selectedPlayerIds, onPlayerToggle, error, onCancel, onStart }) {
   const requiredCount = getWerewolfModePlayerCount(selectedMode);
   const selectedCount = selectedPlayerIds.length;
   const canStart = Boolean(selectedMode?.id) && selectedCount === requiredCount;
@@ -58,7 +59,7 @@ export function WerewolfModeDialog({ modes, selectedMode, onSelect, players, sel
         {error && <p className="werewolf-setup-error">{error}</p>}
         <footer>
           <span>{selectedMode?.name || '请选择 B 端启用的模式'}</span>
-          <button type="button" className="primary" disabled={!canStart} onClick={() => onStart(selectedMode, selectedPlayerIds, selectedHostId)}>开始游戏</button>
+          <button type="button" className="primary" disabled={!canStart} onClick={() => onStart(selectedMode, selectedPlayerIds)}>开始游戏</button>
         </footer>
       </section>
     </div>

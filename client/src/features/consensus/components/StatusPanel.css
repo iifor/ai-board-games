@@ -1,0 +1,222 @@
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: hidden;
+  padding-right: 0;
+  scrollbar-color: rgba(226, 194, 122, 0.36) transparent;
+  scrollbar-width: thin;
+}
+
+.right-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.right-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(226, 194, 122, 0.35);
+}
+
+.status-card,
+.exile-panel,
+.rules-card {
+  padding: 14px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(6, 14, 23, 0.76);
+}
+
+.status-row > *:first-child {
+  flex: 0 0 46px;
+}
+
+.status-row > *:nth-child(2) {
+  flex: 0 1 100px;
+}
+
+.status-row > *:last-child {
+  flex: 1 1 auto;
+}
+
+.status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(226, 194, 122, 0.44);
+  color: var(--gold);
+}
+
+.status-row > span {
+  color: #ddd5c6;
+  font-weight: 900;
+}
+
+.status-row div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.status-row div:last-child span {
+  overflow-wrap: anywhere;
+}
+
+.status-row strong {
+  color: #fff0be;
+  font-size: 24px;
+}
+
+.green {
+  color: var(--green);
+}
+
+.red {
+  color: var(--red);
+}
+
+.exile-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.exile-cards > * {
+  flex: 1 1 100%;
+}
+
+.exile-card {
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(17, 29, 43, 0.92), rgba(7, 12, 19, 0.94));
+  text-align: center;
+}
+
+.exile-card.lead {
+  border-color: rgba(226, 194, 122, 0.72);
+  box-shadow: 0 0 22px rgba(226, 194, 122, 0.14);
+}
+
+.exile-card strong {
+  display: block;
+  color: #e5f3ff;
+  font-size: 23px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exile-card span,
+.exile-card em,
+.exile-card p {
+  color: #b7c1ce;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
+.exile-card b {
+  display: inline-block;
+  margin: 4px 5px;
+  color: #f0c76f;
+  font-size: 42px;
+  line-height: 1;
+}
+
+.exile-card p {
+  margin: 4px 0 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exile-note {
+  margin: 12px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+  color: #d9d1c0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.rules-card {
+  overflow-y: hidden;
+  scrollbar-color: rgba(226, 194, 122, 0.36) transparent;
+  scrollbar-width: thin;
+}
+
+.rules-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--gold);
+  font-size: 19px;
+}
+
+.rules-card p {
+  margin: 7px 0;
+  color: #efe4cd;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.side-clue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.side-clue-list article {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px;
+  background: rgba(2, 6, 10, 0.34);
+}
+
+.side-clue-list svg {
+  flex: 0 0 18px;
+  color: #93d0ff;
+}
+
+.side-clue-list > article > *:nth-child(2) {
+  flex: 0 0 76px;
+}
+
+.side-clue-list > article > *:nth-child(3) {
+  flex: 1 1 auto;
+}
+
+.side-clue-list strong {
+  margin: 0;
+  color: #fff8df;
+  font-size: 12px;
+}
+
+.side-clue-list p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.side-clue-list .noise-active {
+  border-color: rgba(232, 195, 103, 0.48);
+  background: rgba(77, 54, 13, 0.28);
+}

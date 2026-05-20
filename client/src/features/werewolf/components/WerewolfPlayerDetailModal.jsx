@@ -2,6 +2,7 @@ import React from 'react';
 import { formatAvatarUrl } from '../../../utils/avatar';
 import { ROLE_NAMES } from '../constants';
 import { getRoleDescription } from '../werewolfUtils';
+import '../WerewolfGame.css';
 
 export function WerewolfPlayerDetailModal({ player, roleVisible, onClose }) {
   const roleText = roleVisible ? player.roleLabel || ROLE_NAMES[player.role] || '未知身份' : '身份隐藏';

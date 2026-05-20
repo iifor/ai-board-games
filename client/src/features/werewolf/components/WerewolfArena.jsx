@@ -7,6 +7,7 @@ import { RoundProgressPanel } from './RoundProgressPanel';
 import { EliminationPanel } from './EliminationPanel';
 import { WerewolfSeat } from './WerewolfSeat';
 import { WerewolfResult } from './WerewolfResult';
+import './WerewolfArena.css';
 
 export function WerewolfArena({
   game,

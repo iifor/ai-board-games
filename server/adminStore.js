@@ -704,7 +704,7 @@ function updateVoicePackage(id, input) {
 
 function pinVoicePackage(id) {
   const voice = getVoicePackage(id);
-  if (!voice) throw new Error('璇煶鍖呬笉瀛樺湪');
+  if (!voice) throw new Error('语音包不存在');
   const minSortOrder = listVoicePackages().reduce((min, item) => Math.min(min, Number(item.sortOrder || 0)), 0);
   return updateVoicePackage(id, { ...voice, sortOrder: minSortOrder - 1 });
 }
@@ -1005,7 +1005,7 @@ function deleteGame(id) {
   const game = getGame(id);
   const retainedAudio = getAudioResourcesUsedByOtherGames(id);
   getDb().prepare('DELETE FROM games WHERE id = ?').run(id);
-  cleanupGameAudioResources(game?.audioResources || [], retainedAudio);
+  cleanupGameAudioResources(collectGameAudioResources(game), retainedAudio);
   return { ok: true };
 }
 
@@ -1054,11 +1054,35 @@ function normalizeAudioResources(value) {
 
 function getAudioResourcesUsedByOtherGames(gameId) {
   try {
-    const rows = getDb().prepare('SELECT audio_resources_json FROM games WHERE id != ?').all(String(gameId));
-    return new Set(rows.flatMap((row) => normalizeAudioResources(parseJson(row.audio_resources_json, []))));
+    const rows = getDb().prepare('SELECT * FROM games WHERE id != ?').all(String(gameId));
+    return new Set(rows.flatMap((row) => collectGameAudioResources(rowToGame(row))));
   } catch {
     return new Set();
   }
+}
+
+function collectGameAudioResources(game) {
+  const values = new Set(normalizeAudioResources(game?.audioResources || []));
+  collectNestedAudioResources(game, values);
+  return [...values];
+}
+
+function collectNestedAudioResources(value, target) {
+  if (!value) return;
+  if (typeof value === 'string') {
+    normalizeAudioResources([value]).forEach((url) => target.add(url));
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectNestedAudioResources(item, target));
+    return;
+  }
+  if (typeof value !== 'object') return;
+  Object.entries(value).forEach(([key, nested]) => {
+    if (key === 'audioUrl') normalizeAudioResources([nested]).forEach((url) => target.add(url));
+    else if (key === 'audioSegments' || key === 'rounds' || key === 'phases' || key === 'event') collectNestedAudioResources(nested, target);
+    else if (nested && typeof nested === 'object') collectNestedAudioResources(nested, target);
+  });
 }
 
 function cleanupGameAudioResources(audioResources, retainedAudio = new Set()) {
