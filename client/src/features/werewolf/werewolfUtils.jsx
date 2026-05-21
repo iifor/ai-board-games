@@ -10,12 +10,12 @@ export function buildEventLogEntry(event) {
   const day = round?.day ? `? ${round.day} ?` : '';
   const title = [day, EVENT_LABELS[event.type] || event.type].filter(Boolean).join(' · ');
   const text = event.message || event.narration || getEventSummary(event) || getWerewolfNarration(event);
-  if (!text && event.type !== 'players') return null;
+  if (!text) return null;
   return {
     id: `${Date.now()}-${event.type}-${Math.random().toString(16).slice(2)}`,
     kind: event.type,
     title,
-    text: text || '玩家已经入场，身份牌已秘密分发。',
+    text,
     icon: getEventIcon(event.type)
   };
 }

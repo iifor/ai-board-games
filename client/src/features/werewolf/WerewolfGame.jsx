@@ -278,14 +278,6 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
             <p>狼人杀</p>
             <span>{werewolfMode?.name || '标准局'}</span>
           </div>
-          <div className="werewolf-idle-card">
-            <span>月夜圆桌</span>
-            <h2>等待开局</h2>
-            <p>{werewolfMode?.description || '身份牌已准备，等待主持人开启本局。'}</p>
-            <button type="button" disabled={!werewolfMode?.id} onClick={requestStartGame}>
-              开始游戏
-            </button>
-          </div>
           <div className="game-idle-loading" aria-live="polite">
             <span aria-hidden="true" />
             <strong>{streamMessage || '等待开局'}</strong>

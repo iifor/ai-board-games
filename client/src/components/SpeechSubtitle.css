@@ -9,6 +9,7 @@
   max-width: 80vw;
   z-index: 160;
   overflow: hidden;
+  padding: 5px 10px;
   transform: translateX(-50%);
   border: 0;
   border-radius: 8px;

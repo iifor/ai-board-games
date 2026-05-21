@@ -197,12 +197,15 @@ function buildWerewolfReplayPlaybackEvents(game) {
   const visibleRounds = [];
   for (const sourceRound of game.rounds || []) {
     const nightRound = createWerewolfVisibleRound(sourceRound, 'night-start');
+    const nightPhaseKey = getWerewolfReplayPhaseKey(sourceRound, visibleRounds.length + 1, 'night');
+    const dayPhaseKey = getWerewolfReplayPhaseKey(sourceRound, visibleRounds.length + 1, 'day');
     visibleRounds.push(nightRound);
     events.push({
       type: 'phase-start',
       phase: 'night',
+      phaseKey: nightPhaseKey,
       round: nightRound,
-      message: sourceRound.title || `第 ${sourceRound.day || sourceRound.number || visibleRounds.length} 轮`,
+      message: '天黑请闭眼',
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
     });
 
@@ -210,6 +213,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
     Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'night-result'));
     events.push({
       type: 'night-result',
+      phaseKey: nightPhaseKey,
       round: nightRound,
       message: buildNightPublicMessage(nightRound),
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
@@ -218,6 +222,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
     for (const testimony of getWerewolfTestimonies(sourceRound)) {
       events.push({
         type: 'last-words',
+        phaseKey: nightPhaseKey,
         round: nightRound,
         testimony,
         game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
@@ -227,6 +232,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
     Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'day-start'));
     events.push({
       type: 'day-start',
+      phaseKey: dayPhaseKey,
       round: nightRound,
       message: buildNightPublicMessage(nightRound),
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
@@ -246,6 +252,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
       };
       events.push({
         type: 'sheriff-start',
+        phaseKey: dayPhaseKey,
         round: nightRound,
         message: buildSheriffStartMessage(nightRound),
         game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
@@ -254,6 +261,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
       nightRound.sheriffElection = sheriffResult.sheriffElection;
       events.push({
         type: 'sheriff-result',
+        phaseKey: dayPhaseKey,
         round: nightRound,
         message: buildSheriffResultMessage(nightRound, game.werewolfMode || {}),
         game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
@@ -265,6 +273,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
       nightRound.speeches = [...(nightRound.speeches || []), speech];
       events.push({
         type: 'speech',
+        phaseKey: dayPhaseKey,
         round: nightRound,
         speech,
         game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
@@ -275,6 +284,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
     Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'vote-result'));
     events.push({
       type: 'vote-result',
+      phaseKey: dayPhaseKey,
       round: nightRound,
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
     });
@@ -286,6 +296,10 @@ function buildWerewolfReplayPlaybackEvents(game) {
     });
   }
   return events;
+}
+
+function getWerewolfReplayPhaseKey(round = {}, roundIndex, phase) {
+  return `werewolf-${round.day || round.number || roundIndex}-${phase}`;
 }
 
 function createWerewolfReplaySnapshot(game, players, rounds, includeResult = false) {
@@ -375,7 +389,7 @@ function buildDebateReplayEvents(game) {
 
 function buildWerewolfReplayEvents(game) {
   return (game.rounds || []).flatMap((round) => [
-    { type: 'phase-start', round, message: round.title || `第 ${round.day || round.number || 1} 轮` },
+    { type: 'phase-start', round, message: '天黑请闭眼' },
     { type: 'night-result', round, message: buildNightPublicMessage(round) },
     ...getWerewolfTestimonies(round).map((testimony) => ({ type: 'last-words', round, testimony })),
     { type: 'day-start', round, message: buildNightPublicMessage(round) },
@@ -450,7 +464,7 @@ function getRunner(gameType) {
 
 function getStartMessage(gameType) {
   if (gameType === 'debate') return 'AI 辩论赛开始';
-  if (gameType === 'werewolf') return 'AI 狼人杀开始';
+  if (gameType === 'werewolf') return '游戏开始，天黑请闭眼，狼人行动中';
   return '游戏开始';
 }
 
@@ -812,6 +826,7 @@ function exceedsPhaseLookahead(events, phaseLookahead) {
 }
 
 function getEventPhaseKey(event) {
+  if (event?.phaseKey) return String(event.phaseKey);
   const phase = event?.phase || event?.round;
   if (!phase) return '';
   return String(phase.id || phase.phase || phase.name || phase.title || phase.number || '');
@@ -1003,8 +1018,8 @@ function getNarration(event) {
 }
 
 function getWerewolfNarration(event) {
-  if (event.type === 'players') return '十二名玩家已经入场，身份牌已秘密分发。';
-  if (event.type === 'phase-start') return event.message || `第 ${event.round?.day || 1} 夜，天黑请闭眼。`;
+  if (event.type === 'players') return '';
+  if (event.type === 'phase-start') return event.message || '天黑请闭眼';
   if (event.type === 'night-result') return event.message || '夜晚行动结算完毕。';
   if (event.type === 'day-start') return event.message || `第 ${event.round?.day || 1} 天，天亮了。`;
   if (event.type === 'sheriff-start') return event.message || buildSheriffStartMessage(event.round);

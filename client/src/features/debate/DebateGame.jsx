@@ -6,6 +6,7 @@ import { PlayerDetailModal } from '../../components/common/PlayerDetailModal';
 import { SpeechInsightOverlay } from '../../components/SpeechInsightOverlay';
 import { DebateArena } from './components/DebateArena';
 import { DebateControls } from './components/DebateControls';
+import { DebateThinking } from './components/DebateThinking';
 import { DebateTopicDialog } from './components/DebateTopicDialog';
 import { DebateResultModal } from './components/DebateResultModal';
 import { useDebateSpeechPlayback } from './hooks/useDebateSpeechPlayback';
@@ -237,11 +238,11 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
         streamMessage={streamMessage}
         activeSpeech={activeSpeech}
         subtitleSpeech={subtitleSpeech}
-        isThinking={isThinking}
         onPlayerSelect={setSelectedPlayer}
         isIdle={status === 'idle' || !displayGame.phases?.length}
       />
 
+      {isThinking && <DebateThinking />}
       {status === 'error' && <p className="debate-error">{streamMessage}</p>}
 
       {resultModalOpen && (

@@ -1,13 +1,12 @@
 import React, { useMemo } from 'react';
 import { DebateSide } from './DebateSide';
 import { DebateSeat } from './DebateSeat';
-import { DebateThinking } from './DebateThinking';
 import { DebatePhaseTimeline } from './DebatePhaseTimeline';
 import { DebateSubtitle } from './DebateSubtitle';
 import { getDebatePhaseSteps, getActiveStageIndex, getStageTitle, getDebateSubtitleMaxChars, getMvpVoteTargetMap } from '../debateUtils';
 import './DebateArena.css';
 
-export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subtitleSpeech, isThinking, onPlayerSelect, isIdle }) {
+export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subtitleSpeech, onPlayerSelect, isIdle }) {
   const proPlayers = useMemo(() => game.players.filter((player) => player.side === 'pro'), [game.players]);
   const conPlayers = useMemo(() => game.players.filter((player) => player.side === 'con'), [game.players]);
   const judges = useMemo(() => game.players.filter((player) => player.side === 'judge'), [game.players]);
@@ -43,7 +42,6 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
             <h2>{currentTitle}</h2>
             <strong>{streamMessage}</strong>
           </div>
-          {isThinking && <DebateThinking />}
           <DebatePhaseTimeline steps={phaseSteps} activeStepIndex={activeStepIndex} />
         </section>
         {judges.length > 0 && (

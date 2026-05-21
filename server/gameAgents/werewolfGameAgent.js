@@ -87,7 +87,7 @@ class WerewolfGameAgent {
 
   async runNight(round) {
     round.phase = 'night';
-    const message = await askHost(this.config, round.day, '夜晚', '请宣布天黑请闭眼，进入夜晚行动。', `第 ${round.day} 夜，天黑请闭眼。`);
+    const message = '天黑请闭眼';
     await this.emit({ type: 'phase-start', phase: 'night', round, message, game: this.serialize() });
 
     const alive = this.agents.filter((agent) => agent.alive);

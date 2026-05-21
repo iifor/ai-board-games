@@ -42,21 +42,6 @@
     linear-gradient(90deg, rgba(0, 0, 8, 0.72), transparent 22%, transparent 78%, rgba(0, 0, 8, 0.72));
 }
 
-.werewolf-idle-stage::before {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  left: 50%;
-  top: 50%;
-  width: 176px;
-  height: 382px;
-  transform: translate(-50%, -50%);
-  border: 1px solid rgba(134, 164, 255, 0.28);
-  border-radius: 8px;
-  background: linear-gradient(180deg, rgba(12, 37, 77, 0.72), rgba(18, 18, 65, 0.72));
-  box-shadow: inset 0 0 42px rgba(53, 98, 190, 0.22);
-}
-
 .werewolf-idle-brand {
   position: absolute;
   z-index: 3;
@@ -103,62 +88,6 @@
   color: rgba(230, 235, 255, 0.74);
   font-size: 16px;
   font-weight: 800;
-}
-
-.werewolf-idle-card {
-  position: absolute;
-  z-index: 3;
-  left: 50%;
-  top: 53.5%;
-  width: 420px;
-  min-width: 420px;
-  padding: 28px 34px 26px;
-  transform: translate(-50%, -50%);
-  border: 1px solid rgba(187, 171, 255, 0.5);
-  border-radius: 8px;
-  color: #eef1ff;
-  background: linear-gradient(180deg, rgba(18, 21, 55, 0.82), rgba(5, 8, 28, 0.78));
-  box-shadow: 0 0 28px rgba(89, 58, 206, 0.22), inset 0 0 28px rgba(110, 92, 255, 0.12);
-  text-align: center;
-  backdrop-filter: blur(8px);
-}
-
-.werewolf-idle-card span {
-  color: rgba(218, 224, 255, 0.72);
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.werewolf-idle-card h2 {
-  margin: 10px 0 12px;
-  color: #cfc3ff;
-  font-size: 46px;
-  line-height: 1.1;
-  text-shadow: 0 0 18px rgba(140, 92, 255, 0.62);
-}
-
-.werewolf-idle-card p {
-  margin: 0;
-  color: rgba(230, 235, 255, 0.76);
-  font-size: 15px;
-  line-height: 1.45;
-}
-
-.werewolf-idle-card button {
-  margin-top: 18px;
-  padding: 10px 24px;
-  border: 1px solid rgba(111, 240, 160, 0.54);
-  border-radius: 999px;
-  color: #d8ffe2;
-  background: rgba(8, 43, 26, 0.64);
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 900;
-}
-
-.werewolf-idle-card button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .werewolf-idle-stage .game-idle-loading {
