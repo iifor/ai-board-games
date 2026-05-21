@@ -4,7 +4,8 @@
       "Bash(npx vite *)",
       "Bash(python3 check_garbled.py)",
       "Bash(grep -rn -P '[\\\\x{0080}-\\\\x{00FF}]{2,}' admin/src client/src server --include='*.css')",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(npm run *)"
     ]
   }
 }

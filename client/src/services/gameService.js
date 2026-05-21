@@ -48,7 +48,7 @@ export async function savePlayerSelection(gameType, playerIds) {
   return response.json();
 }
 
-export function openGameSocket({ gameType = 'consensus', playerIds, hostId, topic, debateTeams, werewolfMode, replayGameId, onEvent, onError, onClose }) {
+export function openGameSocket({ gameType = 'debate', playerIds, hostId, topic, debateTeams, werewolfMode, replayGameId, onEvent, onError, onClose }) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(`${protocol}//${window.location.host}/api/toc/ws/game`);
 

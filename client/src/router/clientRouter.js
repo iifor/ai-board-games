@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-const GAME_PATHS = new Set(['consensus', 'debate', 'werewolf']);
+const GAME_PATHS = new Set(['debate', 'werewolf']);
 
 export function useClientRouter() {
   const [locationState, setLocationState] = useState(() => readLocation());

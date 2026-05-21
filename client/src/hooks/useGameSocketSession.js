@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { openGameSocket } from '../api/gameApi';
+import { openGameSocket } from '../services/gameService';
 
 export function useGameSocketSession({
   gameType,
