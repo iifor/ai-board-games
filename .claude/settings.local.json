@@ -5,7 +5,9 @@
       "Bash(python3 check_garbled.py)",
       "Bash(grep -rn -P '[\\\\x{0080}-\\\\x{00FF}]{2,}' admin/src client/src server --include='*.css')",
       "Bash(python3 -c ' *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(mkdir -p pages)",
+      "Bash(mv components/__TRACKED_VAR__ pages/__TRACKED_VAR__)"
     ]
   }
 }

@@ -161,3 +161,17 @@ body {
   margin: 0;
   white-space: pre-wrap;
 }
+
+.admin-spacer {
+  margin-top: 8px;
+}
+
+.admin-werewolf-role-tag {
+  display: inline-block;
+  margin: 2px 6px 2px 0;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: #f0f5ff;
+  color: #1d4ed8;
+  font-size: 12px;
+}
