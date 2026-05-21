@@ -5,11 +5,12 @@ import { ROLE_NAMES, ROLE_ICON, EVENT_LABELS } from './constants';
 export { ROLE_NAMES };
 
 export function buildEventLogEntry(event) {
+  if (event.type === 'sheriff-withdraw') return null;
   const gameRounds = Array.isArray(event.game?.rounds) ? event.game.rounds : [];
   const round = event.round || gameRounds.at(-1);
   const day = round?.day ? `? ${round.day} ?` : '';
   const title = [day, EVENT_LABELS[event.type] || event.type].filter(Boolean).join(' · ');
-  const text = event.message || event.narration || getEventSummary(event) || getWerewolfNarration(event);
+  const text = getWerewolfFlowLabel(event) || event.message || event.narration || getEventSummary(event) || getWerewolfNarration(event);
   if (!text) return null;
   return {
     id: `${Date.now()}-${event.type}-${Math.random().toString(16).slice(2)}`,
@@ -30,11 +31,11 @@ function getEventSummary(event) {
 }
 
 function getEventIcon(type) {
-  if (type === 'night-result' || type === 'phase-start') return <Moon size={18} />;
+  if (type === 'night-result' || type === 'phase-start' || type.endsWith('-wake') || type.startsWith('witch-')) return <Moon size={18} />;
   if (type === 'day-start') return <Sun size={18} />;
-  if (type === 'vote-result') return <Vote size={18} />;
+  if (type === 'vote-result' || type === 'sheriff-vote' || type === 'sheriff-runoff-vote') return <Vote size={18} />;
   if (type === 'hunter-shot') return <Swords size={18} />;
-  if (type === 'sheriff-result') return <Crown size={18} />;
+  if (type.startsWith('sheriff-') || type === 'speech-order') return <Crown size={18} />;
   if (type === 'game') return <Shield size={18} />;
   if (type === 'players') return <Users size={18} />;
   return <Wand2 size={18} />;
@@ -205,17 +206,29 @@ export function getPhaseTitle(round, streamMessage) {
 }
 
 export function getRoundResult(round) {
-  if (!round) return '等待主持人发牌。';
+  if (!round) return '等待主持人发牌';
   const night = round.night?.deaths?.length ? `夜晚死亡：${round.night.deaths.map((item) => `${item.id}号`).join('、')}` : '夜晚：平安夜';
   const exile = round.exile ? `放逐：${round.exile.id}号` : round.idiotReveal ? `白痴翻牌：${round.idiotReveal.id}号` : '放逐：暂无';
   return `${night} ? ${exile}`;
 }
 
 export function getWerewolfNarration(event) {
-  if (event?.type === 'speech') return event.speech?.text || '';
+  if (event?.type === 'speech' || event?.type === 'wolf-speech' || event?.type === 'sheriff-speech' || event?.type === 'sheriff-runoff-speech') return event.speech?.text || '';
   if (event?.type === 'last-words' || event?.type === 'exile-words') return event.testimony?.text || '';
   if (event?.type === 'hunter-shot') return getEventSummary(event);
   return event?.message || event?.narration || '';
+}
+
+export function getWerewolfFlowLabel(event) {
+  const labels = {
+    'wolf-wake': '狼人行动',
+    'wolf-leader': '狼队领袖指定',
+    'seer-wake': '预言家查验',
+    'guard-wake': '守卫守护',
+    'witch-antidote': '女巫解药',
+    'witch-poison': '女巫毒药'
+  };
+  return labels[event?.type] || '';
 }
 
 export function shouldShowWerewolfActionTargets(round) {

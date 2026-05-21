@@ -19,21 +19,6 @@ const TOPICS = [
     proPosition: 'AI 应该在限定范围内拥有公共决策投票权',
     conPosition: 'AI 不应该拥有公共决策投票权'
   },
-  {
-    title: '未来学校是否应该把 AI 导师作为主教师？',
-    proPosition: 'AI 导师可以成为主教师',
-    conPosition: 'AI 导师不能取代人类主教师'
-  },
-  {
-    title: '开放强 AI 模型能力是否利大于弊？',
-    proPosition: '开放强 AI 模型能力利大于弊',
-    conPosition: '开放强 AI 模型能力弊大于利'
-  },
-  {
-    title: '人类是否应该允许 AI 创作作品独立署名？',
-    proPosition: '应该允许 AI 独立署名',
-    conPosition: '不应该允许 AI 独立署名'
-  }
 ];
 
 function shuffle(items) {

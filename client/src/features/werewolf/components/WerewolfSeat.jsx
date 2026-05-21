@@ -1,11 +1,11 @@
 import React from 'react';
-import { Star } from 'lucide-react';
+import { Hand, Star } from 'lucide-react';
 import { formatAvatarUrl } from '../../../utils/avatar';
 import { classNames } from '../../../utils/classNames';
 import { ROLE_NAMES } from '../constants';
 import './WerewolfSeat.css';
 
-export function WerewolfSeat({ player, seatIndex, actionTarget, isSheriff, showRoles, visibleRolePlayerId, currentSpeakerId, onPlayerSelect }) {
+export function WerewolfSeat({ player, seatIndex, actionTarget, isSheriff, isSheriffCandidate, showRoles, visibleRolePlayerId, currentSpeakerId, onPlayerSelect }) {
   const isSpeaking = Number(currentSpeakerId) === Number(player.id);
   const roleText = player.roleLabel || ROLE_NAMES[player.role] || '';
   return (
@@ -21,6 +21,11 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, isSheriff, showR
       >
         {!player.avatar && (player.nickname || player.name || `${player.id}`).slice(0, 1)}
         <span className="werewolf-seat-number">{player.id}</span>
+        {isSheriffCandidate && (
+          <span className="werewolf-sheriff-candidate-badge" title="警长竞选" aria-label="举手">
+            <Hand size={18} />
+          </span>
+        )}
         {isSheriff && (
           <span className="werewolf-sheriff-badge" title="警长" aria-label="警长">
             <Star size={19} fill="currentColor" />

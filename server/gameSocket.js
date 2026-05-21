@@ -9,7 +9,9 @@ const { getGame, getVoicePackage, listPlayers, saveGameRecord } = require('./adm
 const { prepareVoiceAudio } = require('./services/audio/audioResourceCache');
 const { splitPlayableTextSegments, stripSpeechParentheses } = require('./services/text/playableText');
 const {
+  getWerewolfNightPrompt,
   buildNightPublicMessage,
+  buildDayStartMessage,
   buildSheriffStartMessage,
   buildSheriffResultMessage
 } = require('./gameAgents/werewolfAnnouncements');
@@ -80,7 +82,7 @@ async function runSession(session, mode, playerIds, gameType = 'consensus', opti
   await sender.send({
     type: 'done',
     message: getDoneMessage(safeGameType),
-    game
+    game: safeGameType === 'werewolf' ? createWerewolfPublicGame(game) : game
   });
   session.close();
 }
@@ -98,7 +100,7 @@ async function replayGameSession(session, gameType, replayGameId) {
     await sender.enqueue(event);
   }
   await sender.flush();
-  await sender.send({ type: 'game', game: replayGame });
+  await sender.send({ type: 'game', game: gameType === 'werewolf' ? createWerewolfPublicGame(replayGame) : replayGame });
   session.close();
 }
 
@@ -153,7 +155,6 @@ function getPlaybackGameSnapshot(game, phases = []) {
 
 function buildReplayEvents(game) {
   if (game.type === 'debate') return buildDebateReplayEvents(game);
-  if (game.type === 'werewolf') return buildWerewolfReplayEvents(game);
   return buildConsensusReplayEvents(game);
 }
 
@@ -209,6 +210,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
     });
 
+    appendWerewolfNightPlaybackEvents(events, sourceRound, nightRound, nightPhaseKey, game, replayPlayers, visibleRounds);
     applyWerewolfNightDeaths(replayPlayers, sourceRound);
     Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'night-result'));
     events.push({
@@ -218,52 +220,35 @@ function buildWerewolfReplayPlaybackEvents(game) {
       message: buildNightPublicMessage(nightRound),
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
     });
-
-    for (const testimony of getWerewolfTestimonies(sourceRound)) {
-      events.push({
-        type: 'last-words',
-        phaseKey: nightPhaseKey,
-        round: nightRound,
-        testimony,
-        game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
-      });
-    }
+    appendWerewolfBadgePlaybackEvents(events, sourceRound, nightRound, nightPhaseKey, game, replayPlayers, visibleRounds, 'night');
 
     Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'day-start'));
     events.push({
       type: 'day-start',
       phaseKey: dayPhaseKey,
       round: nightRound,
-      message: buildNightPublicMessage(nightRound),
+      message: buildDayStartMessage(),
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
     });
 
-    if (shouldReplaySheriffElection(sourceRound)) {
-      const sheriffResult = {
-        sheriffId: nightRound.sheriffId,
-        sheriffElection: nightRound.sheriffElection
-      };
-      nightRound.sheriffId = null;
-      nightRound.sheriffElection = {
-        candidates: sheriffResult.sheriffElection?.candidates || [],
-        votes: {},
-        tally: {},
-        sheriffId: null
-      };
+    appendWerewolfSheriffPlaybackEvents(events, sourceRound, nightRound, dayPhaseKey, game, replayPlayers, visibleRounds);
+
+    for (const testimony of getWerewolfTestimonies(sourceRound)) {
       events.push({
-        type: 'sheriff-start',
+        type: 'last-words',
         phaseKey: dayPhaseKey,
         round: nightRound,
-        message: buildSheriffStartMessage(nightRound),
+        testimony,
         game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
       });
-      nightRound.sheriffId = sheriffResult.sheriffId;
-      nightRound.sheriffElection = sheriffResult.sheriffElection;
+    }
+
+    if (sourceRound.daySpeech) {
+      nightRound.daySpeech = sourceRound.daySpeech;
       events.push({
-        type: 'sheriff-result',
+        type: 'speech-order',
         phaseKey: dayPhaseKey,
         round: nightRound,
-        message: buildSheriffResultMessage(nightRound, game.werewolfMode || {}),
         game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
       });
     }
@@ -288,6 +273,7 @@ function buildWerewolfReplayPlaybackEvents(game) {
       round: nightRound,
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
     });
+    appendWerewolfBadgePlaybackEvents(events, sourceRound, nightRound, dayPhaseKey, game, replayPlayers, visibleRounds, 'day');
   }
   if (game.winner) {
     events.push({
@@ -302,6 +288,122 @@ function getWerewolfReplayPhaseKey(round = {}, roundIndex, phase) {
   return `werewolf-${round.day || round.number || roundIndex}-${phase}`;
 }
 
+function appendWerewolfSheriffPlaybackEvents(events, sourceRound, visibleRound, phaseKey, game, replayPlayers, visibleRounds) {
+  if (!shouldReplaySheriffElection(sourceRound)) return;
+  const election = sourceRound.sheriffElection || {};
+  visibleRound.sheriffId = null;
+  visibleRound.sheriffBadge = { ...(visibleRound.sheriffBadge || {}), status: 'none' };
+  visibleRound.sheriffElection = {
+    ...election,
+    speeches: [],
+    withdrawnIds: [],
+    candidates: election.signedUpIds || election.candidates || [],
+    votes: {},
+    tally: {},
+    runoffSpeeches: [],
+    runoffVotes: {},
+    runoffTally: {},
+    sheriffId: null,
+    result: 'pending'
+  };
+  pushWerewolfPlaybackEvent(events, 'sheriff-start', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+    message: buildSheriffStartMessage(visibleRound)
+  });
+
+  for (const speech of election.speeches || []) {
+    visibleRound.sheriffElection.speeches = [...visibleRound.sheriffElection.speeches, speech];
+    pushWerewolfPlaybackEvent(events, 'sheriff-speech', phaseKey, visibleRound, game, replayPlayers, visibleRounds, { speech });
+  }
+
+  visibleRound.sheriffElection.withdrawnIds = election.withdrawnIds || [];
+  visibleRound.sheriffElection.candidates = election.candidates || [];
+  pushWerewolfPlaybackEvent(events, 'sheriff-candidates', phaseKey, visibleRound, game, replayPlayers, visibleRounds);
+
+  visibleRound.sheriffElection.voters = election.voters || [];
+  visibleRound.sheriffElection.votes = election.votes || {};
+  visibleRound.sheriffElection.tally = election.tally || {};
+  pushWerewolfPlaybackEvent(events, 'sheriff-vote', phaseKey, visibleRound, game, replayPlayers, visibleRounds);
+
+  visibleRound.sheriffElection.runoffCandidateIds = election.runoffCandidateIds || [];
+  visibleRound.sheriffElection.runoffSpeechOrder = election.runoffSpeechOrder || [];
+  for (const speech of election.runoffSpeeches || []) {
+    visibleRound.sheriffElection.runoffSpeeches = [...visibleRound.sheriffElection.runoffSpeeches, speech];
+    pushWerewolfPlaybackEvent(events, 'sheriff-runoff-speech', phaseKey, visibleRound, game, replayPlayers, visibleRounds, { speech });
+  }
+  if (Object.keys(election.runoffVotes || {}).length || Object.keys(election.runoffTally || {}).length) {
+    visibleRound.sheriffElection.runoffVotes = election.runoffVotes || {};
+    visibleRound.sheriffElection.runoffTally = election.runoffTally || {};
+    pushWerewolfPlaybackEvent(events, 'sheriff-runoff-vote', phaseKey, visibleRound, game, replayPlayers, visibleRounds);
+  }
+
+  visibleRound.sheriffId = sourceRound.sheriffId || election.sheriffId || null;
+  visibleRound.sheriffBadge = sourceRound.sheriffBadge || { status: visibleRound.sheriffId ? 'held' : 'none' };
+  visibleRound.sheriffElection.sheriffId = visibleRound.sheriffId;
+  visibleRound.sheriffElection.result = election.result;
+  pushWerewolfPlaybackEvent(events, 'sheriff-result', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+    message: buildSheriffResultMessage(visibleRound, game.werewolfMode || {})
+  });
+}
+
+function appendWerewolfNightPlaybackEvents(events, sourceRound, visibleRound, phaseKey, game, replayPlayers, visibleRounds) {
+  const night = sourceRound.night || {};
+  pushWerewolfPlaybackEvent(events, 'wolf-wake', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+    message: getWerewolfNightPrompt('wolf-wake')
+  });
+  if (night.wolfLeaderId) {
+    visibleRound.night.wolfLeaderId = night.wolfLeaderId;
+    pushWerewolfPlaybackEvent(events, 'wolf-leader', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+      message: `主持人指定 ${night.wolfLeaderId} 号狼人担任本夜狼队领袖。`
+    });
+  }
+  visibleRound.night.wolfSpeechOrder = night.wolfSpeechOrder || [];
+  visibleRound.night.wolfSpeeches = [];
+  for (const speech of night.wolfSpeeches || []) {
+    visibleRound.night.wolfSpeeches = [...visibleRound.night.wolfSpeeches, speech];
+    pushWerewolfPlaybackEvent(events, 'wolf-speech', phaseKey, visibleRound, game, replayPlayers, visibleRounds, { speech });
+  }
+  pushWerewolfPlaybackEvent(events, 'seer-wake', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+    message: getWerewolfNightPrompt('seer-wake')
+  });
+  pushWerewolfPlaybackEvent(events, 'guard-wake', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+    message: getWerewolfNightPrompt('guard-wake')
+  });
+  pushWerewolfPlaybackEvent(events, 'witch-antidote', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+    message: getWerewolfNightPrompt('witch-antidote')
+  });
+  pushWerewolfPlaybackEvent(events, 'witch-poison', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+    message: getWerewolfNightPrompt('witch-poison')
+  });
+}
+
+function appendWerewolfBadgePlaybackEvents(events, sourceRound, visibleRound, phaseKey, game, replayPlayers, visibleRounds, phase) {
+  for (const sheriffTransfer of (sourceRound.sheriffTransfers || []).filter((item) => item.phase === phase)) {
+    visibleRound.sheriffTransfers = [...(visibleRound.sheriffTransfers || []), sheriffTransfer];
+    visibleRound.sheriffId = sheriffTransfer.action === 'transfer' ? sheriffTransfer.to : null;
+    visibleRound.sheriffBadge = { status: sheriffTransfer.action === 'transfer' ? 'held' : 'torn' };
+    pushWerewolfPlaybackEvent(
+      events,
+      sheriffTransfer.action === 'transfer' ? 'sheriff-badge-transfer' : 'sheriff-badge-tear',
+      phaseKey,
+      visibleRound,
+      game,
+      replayPlayers,
+      visibleRounds,
+      { sheriffTransfer }
+    );
+  }
+}
+
+function pushWerewolfPlaybackEvent(events, type, phaseKey, round, game, replayPlayers, visibleRounds, extra = {}) {
+  events.push({
+    type,
+    phaseKey,
+    round,
+    ...extra,
+    game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+  });
+}
+
 function createWerewolfReplaySnapshot(game, players, rounds, includeResult = false) {
   return {
     ...game,
@@ -312,9 +414,20 @@ function createWerewolfReplaySnapshot(game, players, rounds, includeResult = fal
   };
 }
 
+function createWerewolfPublicGame(game = {}) {
+  return {
+    ...game,
+    players: (game.players || []).map(publicWerewolfReplayPlayer),
+    rounds: (game.rounds || []).map((round) => ({
+      ...round,
+      night: createWerewolfVisibleNight(round.night)
+    }))
+  };
+}
+
 function createWerewolfReplayPlayers(players) {
   return players.map((player) => ({
-    ...player,
+    ...publicWerewolfReplayPlayer(player),
     alive: true,
     deathDay: null,
     deathReason: '',
@@ -322,11 +435,17 @@ function createWerewolfReplayPlayers(players) {
   }));
 }
 
+function publicWerewolfReplayPlayer({ seerChecks, ...player } = {}) {
+  return player;
+}
+
 function createWerewolfVisibleRound(round = {}, stage) {
   const base = {
     ...round,
     phase: stage === 'night-start' || stage === 'night-result' ? 'night' : 'day',
-    night: { ...(round.night || {}) },
+    night: createWerewolfVisibleNight(round.night),
+    sheriffTransfers: [],
+    daySpeech: null,
     speeches: [],
     votes: {},
     voteTally: {},
@@ -335,7 +454,7 @@ function createWerewolfVisibleRound(round = {}, stage) {
     hunterShot: null
   };
   if (stage === 'night-start') {
-    base.night = { ...(round.night || {}), deaths: [] };
+    base.night = { ...createWerewolfVisibleNight(round.night), deaths: [] };
   }
   if (stage === 'day-start') {
     base.speeches = [];
@@ -349,6 +468,15 @@ function createWerewolfVisibleRound(round = {}, stage) {
     base.hunterShot = round.hunterShot || null;
   }
   return base;
+}
+
+function createWerewolfVisibleNight(night = {}) {
+  return {
+    wolfLeaderId: night.wolfLeaderId || null,
+    wolfSpeechOrder: night.wolfSpeechOrder || [],
+    wolfSpeeches: night.wolfSpeeches || [],
+    deaths: night.deaths || []
+  };
 }
 
 function applyWerewolfNightDeaths(players, round = {}) {
@@ -387,25 +515,31 @@ function buildDebateReplayEvents(game) {
   ]);
 }
 
-function buildWerewolfReplayEvents(game) {
-  return (game.rounds || []).flatMap((round) => [
-    { type: 'phase-start', round, message: '天黑请闭眼' },
-    { type: 'night-result', round, message: buildNightPublicMessage(round) },
-    ...getWerewolfTestimonies(round).map((testimony) => ({ type: 'last-words', round, testimony })),
-    { type: 'day-start', round, message: buildNightPublicMessage(round) },
-    ...(shouldReplaySheriffElection(round)
-      ? [
-        { type: 'sheriff-start', round, message: buildSheriffStartMessage(round) },
-        { type: 'sheriff-result', round, message: buildSheriffResultMessage(round, game.werewolfMode || {}) }
-      ]
-      : []),
-    ...getRoundSpeeches(round).map((speech) => ({ type: 'speech', round, speech })),
-    { type: 'vote-result', round }
-  ]);
-}
-
 function shouldReplaySheriffElection(round = {}) {
   return Boolean(round.sheriffElection);
+}
+
+function getWerewolfSheriffReplayEvents(round = {}, modeConfig = {}) {
+  if (!shouldReplaySheriffElection(round)) return [];
+  const election = round.sheriffElection || {};
+  return [
+    { type: 'sheriff-start', round, message: buildSheriffStartMessage(round) },
+    ...(election.speeches || []).map((speech) => ({ type: 'sheriff-speech', round, speech })),
+    { type: 'sheriff-vote', round },
+    ...(election.runoffSpeeches || []).map((speech) => ({ type: 'sheriff-runoff-speech', round, speech })),
+    ...(Object.keys(election.runoffVotes || {}).length || Object.keys(election.runoffTally || {}).length ? [{ type: 'sheriff-runoff-vote', round }] : []),
+    { type: 'sheriff-result', round, message: buildSheriffResultMessage(round, modeConfig) }
+  ];
+}
+
+function getWerewolfBadgeReplayEvents(round = {}, phase) {
+  return (round.sheriffTransfers || [])
+    .filter((item) => item.phase === phase)
+    .map((sheriffTransfer) => ({
+      type: sheriffTransfer.action === 'transfer' ? 'sheriff-badge-transfer' : 'sheriff-badge-tear',
+      round,
+      sheriffTransfer
+    }));
 }
 
 function getDebatePhasesFromRounds(rounds = []) {
@@ -576,7 +710,10 @@ function createSession(socket) {
 }
 
 function isSpeechWaitPayload(payload) {
-  return payload?.type === 'speech' || payload?.type === 'last-words' || payload?.type === 'exile-words';
+  return payload?.type === 'speech'
+    || payload?.type === 'wolf-speech'
+    || payload?.type === 'last-words'
+    || payload?.type === 'exile-words';
 }
 
 function getRequestConfig(mode, playerIds, gameType = 'consensus', options = {}) {
@@ -1020,19 +1157,57 @@ function getNarration(event) {
 function getWerewolfNarration(event) {
   if (event.type === 'players') return '';
   if (event.type === 'phase-start') return event.message || '天黑请闭眼';
-  if (event.type === 'night-result') return event.message || '夜晚行动结算完毕。';
-  if (event.type === 'day-start') return event.message || `第 ${event.round?.day || 1} 天，天亮了。`;
+  if (event.type === 'wolf-wake') return event.message || getWerewolfNightPrompt('wolf-wake');
+  if (event.type === 'wolf-leader') return event.message || '';
+  if (event.type === 'wolf-speech') return `${event.speech.playerId}号狼人夜聊。${event.speech.text}`;
+  if (event.type === 'seer-wake') return event.message || getWerewolfNightPrompt('seer-wake');
+  if (event.type === 'guard-wake') return event.message || getWerewolfNightPrompt('guard-wake');
+  if (event.type === 'witch-antidote') return event.message || getWerewolfNightPrompt('witch-antidote');
+  if (event.type === 'witch-poison') return event.message || getWerewolfNightPrompt('witch-poison');
+  if (event.type === 'night-result') return event.message || '夜晚行动结算完毕';
+  if (event.type === 'day-start') return event.message || `天亮了`;
   if (event.type === 'sheriff-start') return event.message || buildSheriffStartMessage(event.round);
+  if (event.type === 'sheriff-speech' || event.type === 'sheriff-runoff-speech') return `${event.speech.playerId}号警上发言。${event.speech.text}`;
+  if (event.type === 'sheriff-vote') return event.message || getSheriffVoteNarration(event.round, false);
+  if (event.type === 'sheriff-runoff-vote') return event.message || getSheriffVoteNarration(event.round, true);
   if (event.type === 'sheriff-result') return event.message || buildSheriffResultMessage(event.round, event.game?.werewolfMode || {});
+  if (event.type === 'speech-order') return event.message || getWerewolfSpeechOrderNarration(event.round);
+  if (event.type === 'sheriff-badge-transfer' || event.type === 'sheriff-badge-tear') return event.message || getSheriffBadgeNarration(event.sheriffTransfer);
   if (event.type === 'speech') return `${event.speech.playerId}号发言。${event.speech.text}`;
-  if (event.type === 'vote-result') return event.message || '白天投票结果公布。';
+  if (event.type === 'vote-result') return event.message || '白天投票结果公布';
   if (event.type === 'last-words' || event.type === 'exile-words') return `${event.testimony.playerId}号遗言。${event.testimony.text}`;
   if (event.type === 'hunter-shot') return `猎人发动技能，${event.shot.from}号带走${event.shot.target}号。`;
   if (event.type === 'game') {
     const winner = event.game.winner === 'wolves' ? '狼人阵营胜利' : '好人阵营胜利';
-    return `狼人杀进入胜负结算。${winner}。${event.game.winReason || ''}`;
+    return `游戏结束。${winner}。${event.game.winReason || ''}`;
   }
   return event.message || '';
+}
+
+function getSheriffVoteNarration(round = {}, runoff) {
+  const election = round.sheriffElection || {};
+  const tally = runoff ? election.runoffTally : election.tally;
+  const entries = Object.entries(tally || {}).sort((a, b) => Number(b[1]) - Number(a[1]));
+  if (!entries.length) return runoff ? '警长复投未产生有效票型。' : '警长竞选投票未产生有效票型。';
+  const topCount = Number(entries[0][1]);
+  const topIds = entries.filter(([, count]) => Number(count) === topCount).map(([id]) => Number(id));
+  if (topIds.length > 1) return `${runoff ? '警长复投' : '警长竞选投票'}平票：${topIds.map((id) => `${id}号`).join('、')}。`;
+  return `${runoff ? '警长复投' : '警长竞选投票'}最高票为${topIds[0]}号。`;
+}
+
+function getWerewolfSpeechOrderNarration(round = {}) {
+  if (round.daySpeech?.source === 'sheriff') {
+    return `警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，${round.daySpeech.startPlayerId}号发言`;
+  }
+  if (round.daySpeech?.source === 'night-death') {
+    return `从${round.daySpeech.startPlayerId}号开始发言。`;
+  }
+  return round.daySpeech?.startPlayerId ? `从${round.daySpeech.startPlayerId}号开始发言` : '';
+}
+
+function getSheriffBadgeNarration(transfer = {}) {
+  if (transfer.action === 'transfer') return `警长将警徽移交给${transfer.to}号`;
+  return `警长选择撕掉警徽。`;
 }
 
 function getDebateNarration(event) {

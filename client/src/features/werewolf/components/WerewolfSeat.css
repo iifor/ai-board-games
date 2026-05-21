@@ -151,6 +151,24 @@
     0 0 24px rgba(255, 195, 54, 0.42);
 }
 
+.werewolf-sheriff-candidate-badge {
+  position: absolute;
+  left: -14px;
+  top: 26px;
+  z-index: 5;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 2px solid rgba(255, 245, 191, 0.94);
+  border-radius: 50%;
+  color: #fff1a1;
+  background: linear-gradient(180deg, rgba(208, 110, 25, 0.98), rgba(92, 40, 8, 0.98));
+  box-shadow:
+    0 0 0 2px rgba(40, 18, 0, 0.62),
+    0 0 18px rgba(255, 182, 73, 0.62);
+}
+
 .werewolf-dead-badge {
   position: absolute;
   right: -8px;
@@ -194,4 +212,10 @@
   margin-top: 8px;
   border-radius: 6px;
   text-align: center;
+}
+
+.werewolf-nameplate span {
+  color: var(--green);
+  font-size: 14px;
+  font-weight: bold;
 }

@@ -27,6 +27,7 @@ export function WerewolfArena({
   );
   const stats = getGameStats(orderedPlayers);
   const phaseTitle = getPhaseTitle(currentRound, streamMessage);
+  const sheriffCandidates = getVisibleSheriffCandidates(currentRound);
 
   return (
     <section className="werewolf-arena">
@@ -50,6 +51,7 @@ export function WerewolfArena({
                 seatIndex={index}
                 actionTarget={shouldShowWerewolfActionTargets(currentRound) ? getWerewolfActionTarget(currentRound, player) : null}
                 isSheriff={Number(currentRound?.sheriffId) === Number(player.id)}
+                isSheriffCandidate={sheriffCandidates.has(Number(player.id))}
                 showRoles={showRoles}
                 visibleRolePlayerId={visibleRolePlayerId}
                 currentSpeakerId={currentSpeakerId}
@@ -80,4 +82,12 @@ export function WerewolfArena({
       <SpeechSubtitle speech={activeSpeech} />
     </section>
   );
+}
+
+function getVisibleSheriffCandidates(round) {
+  const election = round?.sheriffElection;
+  if (!election || election.sheriffId || election.result !== 'pending') return new Set();
+  return new Set((election.candidates || election.signedUpIds || [])
+    .map(Number)
+    .filter((id) => id && !(election.withdrawnIds || []).map(Number).includes(id)));
 }

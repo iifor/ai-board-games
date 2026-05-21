@@ -11,6 +11,7 @@ import { useWerewolfSpeechPlayback } from './hooks/useWerewolfSpeechPlayback';
 import {
   buildEventLogEntry,
   getWerewolfModePlayerCount,
+  getWerewolfFlowLabel,
   getWerewolfNarration,
   normalizeWerewolfSelectedIds,
   sanitizeWerewolfSelectedIds,
@@ -107,7 +108,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
         ? { playerId: speakerId, voicePackageId: speechPlayer?.voicePackageId, audioUrl: event.audioUrl }
         : { voicePackageId: event.game?.host?.voicePackageId, audioUrl: event.audioUrl };
     },
-    getAckDelay: (event) => event.type === 'speech' ? 280 : 120,
+    getAckDelay: (event) => event.type === 'speech' || event.type === 'wolf-speech' ? 280 : 120,
     onError: (error) => {
       setStatus('error');
       setStreamMessage(error.message || '狼人杀生成失败');
@@ -195,7 +196,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
 
   function applyServerEvent(event) {
     if (status === 'error') setStatus('streaming');
-    if (event.message) setStreamMessage(event.message);
+    const flowLabel = getWerewolfFlowLabel(event);
+    if (flowLabel || event.message) setStreamMessage(flowLabel || event.message);
     if (event.game) setGame(event.game);
     if (event.players) {
       setGame((value) => ({
@@ -205,8 +207,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     }
     archiveServerEvent(event);
 
-    if (event.type === 'speech' && event.speech) {
-      setStreamMessage(`${event.speech.playerId} 号正在发言`);
+    if ((event.type === 'speech' || event.type === 'wolf-speech' || event.type === 'sheriff-speech' || event.type === 'sheriff-runoff-speech') && event.speech) {
+      setStreamMessage(event.type === 'wolf-speech' ? `${event.speech.playerId} 号狼人夜聊` : `${event.speech.playerId} 号正在发言`);
       setActiveSpeech({
         playerId: event.speech.playerId,
         text: event.subtitle?.text || event.speech.text,
