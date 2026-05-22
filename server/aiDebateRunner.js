@@ -323,8 +323,6 @@ function serializeGame({ gameId, mode, topic, agents, phases, host = null, winne
       aliveIds: agents.map((agent) => agent.id),
       votes: {},
       tally: { A: 0, B: 0 },
-      consensusType: 'effective',
-      consensus: true
     })),
     mvp,
     winner,

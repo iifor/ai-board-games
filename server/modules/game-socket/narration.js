@@ -14,24 +14,25 @@ function getWerewolfNarration(event) {
   if (event.type === 'players') return '';
   if (event.type === 'phase-start') return event.message || '天黑请闭眼';
   if (event.type === 'wolf-wake') return event.message || getWerewolfNightPrompt('wolf-wake');
-  if (event.type === 'wolf-leader') return event.message || '';
-  if (event.type === 'wolf-speech') return `${event.speech.playerId}号狼人夜聊。${event.speech.text}`;
+  if (event.type === 'wolf-leader') return '';
+  if (event.type === 'wolf-speech') return event.speech.text;
   if (event.type === 'seer-wake') return event.message || getWerewolfNightPrompt('seer-wake');
+  if (event.type === 'seer-check') return getSeerCheckNarration(event.seerCheck);
   if (event.type === 'guard-wake') return event.message || getWerewolfNightPrompt('guard-wake');
   if (event.type === 'witch-antidote') return event.message || getWerewolfNightPrompt('witch-antidote');
   if (event.type === 'witch-poison') return event.message || getWerewolfNightPrompt('witch-poison');
   if (event.type === 'night-result') return event.message || '夜晚行动结算完毕';
   if (event.type === 'day-start') return event.message || '天亮了';
   if (event.type === 'sheriff-start') return event.message || buildSheriffStartMessage(event.round);
-  if (event.type === 'sheriff-speech' || event.type === 'sheriff-runoff-speech') return `${event.speech.playerId}号警上发言。${event.speech.text}`;
+  if (event.type === 'sheriff-speech' || event.type === 'sheriff-runoff-speech') return event.speech.text;
   if (event.type === 'sheriff-vote') return event.message || getSheriffVoteNarration(event.round, false);
   if (event.type === 'sheriff-runoff-vote') return event.message || getSheriffVoteNarration(event.round, true);
   if (event.type === 'sheriff-result') return event.message || buildSheriffResultMessage(event.round, event.game?.werewolfMode || {});
   if (event.type === 'speech-order') return event.message || getWerewolfSpeechOrderNarration(event.round);
   if (event.type === 'sheriff-badge-transfer' || event.type === 'sheriff-badge-tear') return event.message || getSheriffBadgeNarration(event.sheriffTransfer);
-  if (event.type === 'speech') return `${event.speech.playerId}号发言。${event.speech.text}`;
+  if (event.type === 'speech') return event.speech.text;
   if (event.type === 'vote-result') return event.message || '白天投票结果公布';
-  if (event.type === 'last-words' || event.type === 'exile-words') return `${event.testimony.playerId}号遗言。${event.testimony.text}`;
+  if (event.type === 'last-words' || event.type === 'exile-words') return event.testimony.text;
   if (event.type === 'hunter-shot') return `猎人发动技能，${event.shot.from}号带走${event.shot.target}号。`;
   if (event.type === 'game') {
     const winner = event.game.winner === 'wolves' ? '狼人阵营胜利' : '好人阵营胜利';
@@ -49,6 +50,11 @@ function getSheriffVoteNarration(round = {}, runoff) {
   const topIds = entries.filter(([, count]) => Number(count) === topCount).map(([id]) => Number(id));
   if (topIds.length > 1) return `${runoff ? '警长复投' : '警长竞选投票'}平票：${topIds.map((id) => `${id}号`).join('、')}。`;
   return `${runoff ? '警长复投' : '警长竞选投票'}最高票为${topIds[0]}号。`;
+}
+
+function getSeerCheckNarration(check = {}) {
+  if (!check?.target) return '';
+  return `他的身份是${check.result || '未知'}。预言家请闭眼。`;
 }
 
 function getWerewolfSpeechOrderNarration(round = {}) {
@@ -70,7 +76,7 @@ function getSheriffBadgeNarration(transfer = {}) {
 }
 
 function getDebateNarration(event) {
-  if (event.type === 'players') return '游戏开始';
+  if (event.type === 'players') return '比赛开始';
   if (event.type === 'phase-start') return event.message || `现在进入${event.phase?.name || '下一'}环节。`;
   if (event.type === 'phase-end') return event.message || `${event.phase?.name || '本'}环节结束。`;
   if (event.type === 'speech') {

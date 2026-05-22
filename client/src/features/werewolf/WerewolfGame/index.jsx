@@ -237,7 +237,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
         playerId: event.speech.playerId,
         text: event.subtitle?.text || event.speech.text,
         fullText: event.speech.fullText || event.speech.text,
-        thinking: event.speech.thinking || ''
+        thinking: event.speech.thinking || '',
+        wordBoundaries: event.wordBoundaries || null
       });
       return;
     }
@@ -248,14 +249,15 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
         playerId: event.testimony.playerId,
         text: event.subtitle?.text || event.testimony.text,
         fullText: event.testimony.fullText || event.testimony.text,
-        thinking: event.testimony.thinking || ''
+        thinking: event.testimony.thinking || '',
+        wordBoundaries: event.wordBoundaries || null
       });
       return;
     }
 
     const subtitleText = event.subtitle?.text || event.narration || getWerewolfNarration(event) || event.message;
     if (subtitleText && event.type !== 'game') {
-      setActiveSpeech({ playerId: null, text: subtitleText });
+      setActiveSpeech({ playerId: null, text: subtitleText, wordBoundaries: event.wordBoundaries || null });
     }
     if (event.type === 'done') {
       setStatus('ready');

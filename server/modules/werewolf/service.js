@@ -58,7 +58,7 @@ class WerewolfGameAgent {
         await runSheriffElection(ctx, round);
       }
 
-      await revealNightResult(ctx);
+      await revealNightResult(ctx, round);
 
       for (const death of round.night.deaths) {
         await maybeTransferSheriffBadge(ctx, round, death.id, death.reason, 'night');

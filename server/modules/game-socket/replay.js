@@ -217,7 +217,7 @@ function appendWerewolfNightPlaybackEvents(events, sourceRound, visibleRound, ph
   pushWerewolfPlaybackEvent(events, 'wolf-wake', phaseKey, visibleRound, game, replayPlayers, visibleRounds, { message: getWerewolfNightPrompt('wolf-wake') });
   if (night.wolfLeaderId) {
     visibleRound.night.wolfLeaderId = night.wolfLeaderId;
-    pushWerewolfPlaybackEvent(events, 'wolf-leader', phaseKey, visibleRound, game, replayPlayers, visibleRounds, { message: `主持人指定 ${night.wolfLeaderId} 号狼人担任本夜狼队领袖。` });
+    pushWerewolfPlaybackEvent(events, 'wolf-leader', phaseKey, visibleRound, game, replayPlayers, visibleRounds);
   }
   visibleRound.night.wolfSpeechOrder = night.wolfSpeechOrder || [];
   visibleRound.night.wolfSpeeches = [];

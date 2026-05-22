@@ -76,7 +76,8 @@ async function decideDaySpeechOrder(ctx, round) {
 }
 
 async function resolveDayVote(ctx, round) {
-  const votes = {};
+  const votes = round.votes || {};
+  round.votes = votes;
   const valid = ctx.agents.filter((agent) => agent.alive).map((agent) => agent.id);
   for (const agent of ctx.agents.filter((item) => item.alive && item.canVote)) {
     const target = await agent.playerAgent.askVoteTarget(
@@ -86,8 +87,13 @@ async function resolveDayVote(ctx, round) {
     );
     votes[agent.id] = target;
     agent.votes.push({ day: round.day, target });
+    await ctx.emit({
+      type: 'day-vote',
+      round,
+      vote: { playerId: agent.id, target },
+      game: ctx.serialize()
+    });
   }
-  round.votes = votes;
   round.voteTally = countTargets(votes, round.sheriffId, ctx.modeConfig.sheriff.voteWeight);
   const exileId = topExile(round.voteTally);
 
@@ -126,7 +132,7 @@ async function maybeHunterShot(ctx, round, playerId, reason) {
     agent.id === playerId && hasRoleAction(agent.roleConfig, 'shootOnDeath') && !agent.hunterShotUsed
   );
   if (!hunter) return;
-  if (ctx.modeConfig.hunter.disabledDeathReasons.includes(hunter.deathReason)) return;
+  if ((ctx.modeConfig.hunter?.disabledDeathReasons || []).includes(hunter.deathReason)) return;
   const result = await ctx.skillRegistry.execute('shootOnDeath', {
     actor: hunter, agents: ctx.agents, fallback: fallbackVote(hunter, ctx.agents)
   });

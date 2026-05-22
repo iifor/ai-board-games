@@ -34,7 +34,7 @@ function createWerewolfSkillRegistry() {
       action: 'save',
       prompt: '女巫解药，可救今晚被狼人袭击的玩家。',
       async execute({ actor, victim, round, modeConfig }) {
-        const canSelfSave = round.day === 1 && modeConfig.witch.canSelfSaveNightOne;
+        const canSelfSave = round.day === 1 && modeConfig.witch?.canSelfSaveNightOne !== false;
         const canSaveVictim = victim && !actor.usedAntidote && (victim.id !== actor.id || canSelfSave);
         if (!canSaveVictim) return { use: false };
         const parsed = await actor.playerAgent.askJson([
@@ -73,9 +73,9 @@ function createWerewolfSkillRegistry() {
       action: 'surviveExileOnce',
       prompt: '首次被白天放逐时翻牌免死并失去投票权。',
       execute({ actor, modeConfig }) {
-        if (!modeConfig.idiot.surviveExileOnce || actor.revealedIdiot) return { survives: false };
+        if (modeConfig.idiot?.surviveExileOnce === false || actor.revealedIdiot) return { survives: false };
         actor.revealedIdiot = true;
-        if (modeConfig.idiot.losesVoteAfterReveal) actor.canVote = false;
+        if (modeConfig.idiot?.losesVoteAfterReveal !== false) actor.canVote = false;
         return { survives: true };
       }
     },

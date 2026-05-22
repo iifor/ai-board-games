@@ -21,6 +21,7 @@ export function useGameSocketSession({
   const socketRef = useRef(null);
   const pendingAckRef = useRef(null);
   const pendingEventRef = useRef(null);
+  const startedAckIdsRef = useRef(new Set());
   const autoPlayRef = useRef(false);
   const ackTimerRef = useRef(null);
   const latestRef = useRef({});
@@ -56,6 +57,7 @@ export function useGameSocketSession({
   function resetSessionRefs() {
     pendingAckRef.current = null;
     pendingEventRef.current = null;
+    startedAckIdsRef.current.clear();
     autoPlayRef.current = false;
     clearPendingAckTimer();
     setAutoPlay(false);
@@ -105,12 +107,16 @@ export function useGameSocketSession({
     pending.socket.send(JSON.stringify({ type: 'ack', ackId: pending.ackId }));
     pendingAckRef.current = null;
     pendingEventRef.current = null;
+    startedAckIdsRef.current.delete(pending.ackId);
     clearPendingAckTimer();
   }
 
   function continuePendingEvent() {
     const event = pendingEventRef.current;
     if (!event) return;
+    const ackId = event.ackId;
+    if (ackId && startedAckIdsRef.current.has(ackId)) return;
+    if (ackId) startedAckIdsRef.current.add(ackId);
     latestRef.current.cancel?.();
     clearPendingAckTimer();
 

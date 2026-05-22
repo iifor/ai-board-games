@@ -233,6 +233,7 @@ export function getWerewolfFlowLabel(event) {
 }
 
 export function shouldShowWerewolfActionTargets(round) {
+  if (round?.votes && Object.keys(round.votes).length) return true;
   if (round?.voteTally && Object.keys(round.voteTally).length) return true;
   const election = round?.sheriffElection;
   if (election && !election.sheriffId && election.result === 'pending') {

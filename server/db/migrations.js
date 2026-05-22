@@ -36,9 +36,8 @@ function migrate(db) {
       FOREIGN KEY (voice_package_id) REFERENCES voice_packages(id) ON DELETE SET NULL
     );
 
-    CREATE TABLE IF NOT EXISTS models (
+    CREATE TABLE IF NOT EXISTS model_providers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      provider TEXT NOT NULL,
       name TEXT NOT NULL,
       base_url TEXT NOT NULL DEFAULT '',
       api_format TEXT NOT NULL DEFAULT 'openai-compatible',
@@ -48,6 +47,22 @@ function migrate(db) {
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS models (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider_id INTEGER,
+      provider TEXT NOT NULL,
+      name TEXT NOT NULL,
+      base_url TEXT NOT NULL DEFAULT '',
+      api_format TEXT NOT NULL DEFAULT 'openai-compatible',
+      api_key_cipher TEXT NOT NULL DEFAULT '',
+      api_key_iv TEXT NOT NULL DEFAULT '',
+      api_key_tag TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (provider_id) REFERENCES model_providers(id) ON DELETE RESTRICT
     );
 
     CREATE TABLE IF NOT EXISTS voice_packages (
@@ -139,6 +154,7 @@ function migrate(db) {
   ensureColumn(db, 'games', 'topic_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, 'players', 'model_id', 'INTEGER');
   ensureColumn(db, 'players', 'voice_package_id', 'INTEGER');
+  ensureColumn(db, 'models', 'provider_id', 'INTEGER');
   ensureColumn(db, 'voice_packages', 'gender', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'voice_packages', 'style', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'voice_packages', 'rate', "TEXT NOT NULL DEFAULT '0%'");
@@ -150,6 +166,7 @@ function migrate(db) {
   ensureColumn(db, 'werewolf_modes', 'rules_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, 'werewolf_modes', 'sheriff_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, 'werewolf_modes', 'win_condition', "TEXT NOT NULL DEFAULT 'side'");
+  migrateLegacyModelProviders(db);
 
   // Fix null/empty/consensus game types
   db.exec(`
@@ -168,6 +185,42 @@ function migrate(db) {
       AND (id LIKE 'debate-%' OR event_json LIKE '%ai-debate%')
   `);
   db.exec('CREATE INDEX IF NOT EXISTS idx_games_type_created ON games(game_type, created_at DESC)');
+}
+
+function migrateLegacyModelProviders(db) {
+  const models = db.prepare('SELECT * FROM models WHERE provider_id IS NULL').all();
+  if (!models.length) return;
+  const providers = new Map();
+  const insert = db.prepare(`
+    INSERT INTO model_providers (name, base_url, api_format, api_key_cipher, api_key_iv, api_key_tag, enabled, created_at, updated_at)
+    VALUES (@name, @base_url, @api_format, @api_key_cipher, @api_key_iv, @api_key_tag, @enabled, @created_at, @updated_at)
+  `);
+  const update = db.prepare('UPDATE models SET provider_id = ? WHERE id = ?');
+  const migrateOne = db.transaction(() => {
+    for (const model of models) {
+      const key = [
+        model.provider, model.base_url, model.api_format,
+        model.api_key_cipher, model.api_key_iv, model.api_key_tag, model.enabled
+      ].map((value) => String(value ?? '')).join('\u0001');
+      let providerId = providers.get(key);
+      if (!providerId) {
+        providerId = insert.run({
+          name: model.provider || '未命名供应商',
+          base_url: model.base_url || '',
+          api_format: model.api_format || 'openai-compatible',
+          api_key_cipher: model.api_key_cipher || '',
+          api_key_iv: model.api_key_iv || '',
+          api_key_tag: model.api_key_tag || '',
+          enabled: Number(model.enabled !== 0),
+          created_at: model.created_at || new Date().toISOString(),
+          updated_at: model.updated_at || new Date().toISOString()
+        }).lastInsertRowid;
+        providers.set(key, providerId);
+      }
+      update.run(providerId, model.id);
+    }
+  });
+  migrateOne();
 }
 
 function ensureColumn(db, tableName, columnName, definition) {

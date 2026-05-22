@@ -82,12 +82,13 @@ function buildWolfStrategySummary(wolfChoices, wolfTarget, agents) {
 }
 
 function getVoteMessage(round) {
-  if (round.idiotReveal) return `白天投票结束，${round.idiotReveal.id}号翻牌为白痴，免除本次放逐并失去投票权。`;
-  if (!round.exile) return '白天投票出现平票，本轮无人被放逐。';
-  return `白天投票结束，${round.exile.id}号被放逐。`;
+  if (round.idiotReveal) return `发言结束，开始放逐投票。请所有玩家投票。${round.idiotReveal.id}号翻牌为白痴，免除本次放逐并失去投票权。`;
+  if (!round.exile) return '发言结束，开始放逐投票。请所有玩家投票。本轮无人被放逐。';
+  return `发言结束，开始放逐投票。请所有玩家投票。${round.exile.id}号玩家被放逐出局。`;
 }
 
 function buildSheriffVoteMessage(round, runoff) {
+  if (!runoff) return '退水结束，开始投票。';
   const tally = runoff ? round.sheriffElection?.runoffTally : round.sheriffElection?.tally;
   const topIds = getTopCandidateIds(tally);
   if (!topIds.length) return runoff ? '警长复投无人形成有效票型。' : '警长竞选无人形成有效票型。';
@@ -97,15 +98,12 @@ function buildSheriffVoteMessage(round, runoff) {
 
 function buildSpeechOrderMessage(round) {
   if (round.daySpeech?.source === 'sheriff') {
-    if (round.daySpeech.anchorPlayerId) {
-      return `${round.sheriffId}号警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，从${round.daySpeech.anchorPlayerId}号死亡玩家的后置位${round.daySpeech.startPlayerId}号开始。`;
-    }
-    return `${round.sheriffId}号警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，从${round.daySpeech.startPlayerId}号开始。`;
+    return `警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，从${round.daySpeech.startPlayerId}号开始。`;
   }
   if (round.daySpeech?.source === 'night-death') {
-    return `场上无警徽，从${round.daySpeech.anchorPlayerId}号死亡玩家的后置位${round.daySpeech.startPlayerId}号开始发言。`;
+    return `现在${round.daySpeech.startPlayerId}号开始发言。`;
   }
-  return `场上无警徽，从${round.daySpeech?.startPlayerId || ''}号开始发言。`;
+  return `从${round.daySpeech?.startPlayerId || ''}号开始发言。`;
 }
 
 function buildSheriffBadgeMessage(transfer) {

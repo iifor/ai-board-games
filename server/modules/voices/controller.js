@@ -6,6 +6,14 @@ function getVoice(req, res) { res.json(formatSuccess(service.getVoicePackage(req
 function createVoice(req, res) { res.status(201).json(formatSuccess(service.createVoicePackage(req.body))); }
 function updateVoice(req, res) { res.json(formatSuccess(service.updateVoicePackage(req.params.id, req.body))); }
 function deleteVoice(req, res) { res.json(formatSuccess(service.deleteVoicePackage(req.params.id))); }
-async function previewVoice(req, res) { res.json(formatSuccess(await service.previewVoice(req.params.id, req.body?.text))); }
+async function previewVoice(req, res, next) {
+  try {
+    const result = await service.previewVoice(req.params.id, req.body?.text);
+    res.set('Content-Type', result.mimeType || 'audio/mpeg');
+    res.send(result.buffer);
+  } catch (error) {
+    next(error);
+  }
+}
 
 module.exports = { getVoices, getVoice, createVoice, updateVoice, deleteVoice, previewVoice };

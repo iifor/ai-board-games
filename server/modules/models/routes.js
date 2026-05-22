@@ -5,6 +5,8 @@ const { createModelSchema, updateModelSchema } = require('./validator');
 
 const router = Router();
 router.get('/models', ctrl.getModels);
+router.get('/model-providers/:providerId/models', ctrl.getProviderModels);
+router.post('/model-providers/:providerId/models', validate(createModelSchema), ctrl.createProviderModel);
 router.get('/models/:id', ctrl.getModel);
 router.post('/models', validate(createModelSchema), ctrl.createModel);
 router.put('/models/:id', validate(updateModelSchema), ctrl.updateModel);

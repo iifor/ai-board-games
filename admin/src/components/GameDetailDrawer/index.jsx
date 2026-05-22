@@ -72,13 +72,6 @@ export function GameDetailDrawer({ game, onClose, onDelete }) {
             </Card>
           )}
 
-          {game.gameType === 'consensus' && game.event && (
-            <Card size="small" title="皮肤信息">
-              {game.skinName && <p><Text strong>皮肤：</Text><Text>{game.skinName}</Text></p>}
-              {game.event.background && <p><Text strong>背景：</Text><Text>{game.event.background}</Text></p>}
-              {game.event.truth && <p><Text strong>真相：</Text><Text>{game.event.truth}</Text></p>}
-            </Card>
-          )}
           <Card title={game.gameType === 'debate' ? '辩手阵容' : '玩家'}>
             <Table
               size="small"

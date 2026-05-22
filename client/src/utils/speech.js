@@ -80,3 +80,15 @@ export async function fetchServerSpeechAudio(text, voicePackageId) {
   if (!response.ok) throw new Error(await response.text());
   return response.blob();
 }
+
+export async function fetchServerSpeechMedia(text, voicePackageId) {
+  const response = await fetch('/api/toc/voice/synthesize-media', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voicePackageId })
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.message || '语音媒体生成失败');
+  if (!payload?.data?.audioUrl) throw new Error(payload?.message || '语音媒体地址缺失');
+  return payload.data;
+}

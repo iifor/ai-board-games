@@ -7,7 +7,7 @@ import {
   clampFinite,
   normalizeVoiceProfile,
   getSpeechFallbackDelay,
-  fetchServerSpeechAudio,
+  fetchServerSpeechMedia,
   getSpeechPlaybackText
 } from '../utils/speech';
 
@@ -107,40 +107,48 @@ export function useSpeechQueue() {
     };
 
     const playServerSpeech = async () => {
-      try {
-        item.onStart?.();
-        const spokenText = getSpeechPlaybackText(item.text);
-        if (!spokenText) {
-          window.setTimeout(finish, 0);
-          return;
-        }
-        const ownsUrl = !item.audioUrl;
-        const url = item.audioUrl || URL.createObjectURL(await fetchServerSpeechAudio(spokenText, item.voicePackageId));
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onended = () => {
-          if (ownsUrl) URL.revokeObjectURL(url);
-          audioRef.current = null;
-          finish();
-        };
-        audio.onerror = () => {
-          if (ownsUrl) URL.revokeObjectURL(url);
-          audioRef.current = null;
-          if (cancellingRef.current || !enabledRef.current) {
-            finish();
-            return;
-          }
-          playBrowserSpeech();
-        };
-        audio.volume = clampFinite(item.volume, 1, 0, 1);
-        await audio.play();
-        endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(spokenText));
-      } catch {
+      let fallbackStarted = false;
+      const fallbackToBrowserSpeech = () => {
+        if (fallbackStarted) return;
+        fallbackStarted = true;
         if (cancellingRef.current || !enabledRef.current) {
           finish();
           return;
         }
         playBrowserSpeech();
+      };
+
+      try {
+        const spokenText = getSpeechPlaybackText(item.text);
+        if (!spokenText) {
+          item.onStart?.();
+          window.setTimeout(finish, 0);
+          return;
+        }
+        const media = item.audioUrl
+          ? {
+            audioUrl: item.audioUrl,
+            audioMimeType: item.audioMimeType || 'audio/mpeg',
+            wordBoundaries: item.wordBoundaries || null
+          }
+          : await fetchServerSpeechMedia(spokenText, item.voicePackageId);
+        const url = media.audioUrl;
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => {
+          audioRef.current = null;
+          finish();
+        };
+        audio.onerror = () => {
+          audioRef.current = null;
+          fallbackToBrowserSpeech();
+        };
+        audio.volume = clampFinite(item.volume, 1, 0, 1);
+        await audio.play();
+        if (!cancellingRef.current) item.onStart?.(media);
+        endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(spokenText));
+      } catch {
+        fallbackToBrowserSpeech();
       }
     };
 

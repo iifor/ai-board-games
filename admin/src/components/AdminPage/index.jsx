@@ -21,6 +21,7 @@ import { Dashboard } from '../../pages/Dashboard';
 import { GameHistory } from '../../pages/GameHistory';
 import { PlayerManager } from '../../pages/PlayerManager';
 import { ModelManager } from '../../pages/ModelManager';
+import { ModelProviderManager } from '../../pages/ModelProviderManager';
 import { VoiceManager } from '../../pages/VoiceManager';
 import { WerewolfRoleManager } from '../../pages/WerewolfRoleManager';
 import { WerewolfModeManager } from '../../pages/WerewolfModeManager';
@@ -57,7 +58,12 @@ const MENU_ITEMS = [
     ]
   },
   { key: '/players', icon: <TeamOutlined />, label: '玩家管理' },
-  { key: '/models', icon: <RobotOutlined />, label: '模型管理' },
+  {
+    key: '/models',
+    icon: <RobotOutlined />,
+    label: '模型管理',
+    children: [{ key: '/models/providers', label: '供应商列表' }]
+  },
   { key: '/voices', icon: <SoundOutlined />, label: '语音管理' }
 ];
 
@@ -75,6 +81,8 @@ function AdminShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const activePath = normalizePath(location.pathname);
+  const modelMenuPath = activePath.startsWith('/models/providers/') ? '/models/providers' : activePath;
+  const titlePath = activePath.startsWith('/models/providers/') ? '/models/providers/:id' : activePath;
 
   return (
     <Layout className="admin-layout">
@@ -85,15 +93,15 @@ function AdminShell() {
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[activePath]}
-          defaultOpenKeys={['/debate', '/werewolf', '/consensus']}
+          selectedKeys={[modelMenuPath]}
+          defaultOpenKeys={['/debate', '/werewolf', '/consensus', '/models']}
           items={MENU_ITEMS}
           onClick={({ key }) => navigate(key)}
         />
       </Sider>
       <Layout>
         <Header className="admin-header">
-          <Title level={3}>{TITLES[activePath] || '仪表盘'}</Title>
+          <Title level={3}>{TITLES[titlePath] || '仪表盘'}</Title>
         </Header>
         <Content className="admin-content">
           <Routes>
@@ -106,7 +114,9 @@ function AdminShell() {
             <Route path="/consensus/history" element={<GameHistory gameType="consensus" />} />
             <Route path="/consensus/skins" element={<SkinManager />} />
             <Route path="/players" element={<PlayerManager />} />
-            <Route path="/models" element={<ModelManager />} />
+            <Route path="/models" element={<Navigate to="/models/providers" replace />} />
+            <Route path="/models/providers" element={<ModelProviderManager />} />
+            <Route path="/models/providers/:providerId" element={<ModelManager />} />
             <Route path="/voices" element={<VoiceManager />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

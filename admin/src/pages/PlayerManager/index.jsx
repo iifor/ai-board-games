@@ -35,7 +35,11 @@ export function PlayerManager() {
     }).catch(() => {});
   }, []);
 
-  const modelOptions = models.map((model) => ({ value: model.id, label: `${model.provider}/${model.name}` }));
+  const modelOptions = models.map((model) => ({
+    value: model.id,
+    label: `${model.provider}/${model.name}`,
+    disabled: !model.enabled
+  }));
   const voiceOptions = voices.map((voice) => ({ value: voice.id, label: voice.name }));
   const hostOptions = [
     { value: 0, label: '系统默认主持人' },
@@ -68,10 +72,14 @@ export function PlayerManager() {
     const payload = { ...values, provider: '', model: '' };
     const path = editing?.id ? `/players/${editing.id}` : '/players';
     const method = editing?.id ? 'PUT' : 'POST';
-    await adminRequest(path, { method, body: JSON.stringify(payload) });
-    message.success('玩家已保存');
-    setEditing(null);
-    await refresh();
+    try {
+      await adminRequest(path, { method, body: JSON.stringify(payload) });
+      message.success('玩家已保存');
+      setEditing(null);
+      await refresh();
+    } catch (error) {
+      message.error(error.message);
+    }
   }
 
   async function toggle(player) {
@@ -158,12 +166,13 @@ export function PlayerManager() {
 }
 
 function PlayerModal({ open, initialValues, modelOptions, voiceOptions, onCancel, onSave }) {
+  const selectableModelOptions = modelOptions.filter((option) => !option.disabled || option.value === initialValues?.modelId);
   return (
     <EntityModal open={open} title={initialValues?.id ? '编辑玩家' : '新增玩家'} initialValues={{ ...emptyPlayer, ...(initialValues || {}) }} onCancel={onCancel} onSave={onSave}>
       <Form.Item name="nickname" label="昵称" rules={[{ required: true, message: '请输入昵称' }]}><Input /></Form.Item>
       <Form.Item name="avatar" label="头像"><AvatarUpload /></Form.Item>
       <Form.Item name="sex" label="性别"><Select options={['未知', '男', '女'].map((value) => ({ value, label: value }))} /></Form.Item>
-      <Form.Item name="modelId" label="模型"><Select allowClear options={modelOptions} /></Form.Item>
+      <Form.Item name="modelId" label="模型"><Select allowClear options={selectableModelOptions} /></Form.Item>
       <Form.Item name="personality" label="人格"><Input.TextArea rows={4} /></Form.Item>
       <Form.Item name="voicePackageId" label="语音包"><Select allowClear options={voiceOptions} /></Form.Item>
       <Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item>

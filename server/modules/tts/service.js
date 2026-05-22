@@ -15,6 +15,19 @@ async function synthesizeVoicePreview(voicePackage, text, options = {}) {
   throw new AppError('UNSUPPORTED_VOICE', '该语音包使用浏览器本地语音，请在前端直接试听。', 422);
 }
 
+async function synthesizeVoiceMedia(voicePackage, text, gameId = null) {
+  const { prepareVoiceAudio } = require('./cache');
+  const content = String(text || '').trim();
+  const saved = await prepareVoiceAudio(voicePackage, content, gameId);
+  if (!saved) throw new AppError('UNSUPPORTED_VOICE', '该语音包无法生成服务端语音媒体。', 422);
+  return {
+    text: content,
+    audioUrl: saved.audioUrl,
+    audioMimeType: saved.audioMimeType,
+    wordBoundaries: saved.wordBoundaries || null
+  };
+}
+
 async function synthesizeAzureVoice(voicePackage, text, options = {}) {
   const key = getAzureSpeechKey();
   const endpoint = normalizeEndpoint(process.env.AZURE_SPEECH_ENDPOINT);
@@ -74,4 +87,4 @@ async function synthesizeAzureVoice(voicePackage, text, options = {}) {
   });
 }
 
-module.exports = { synthesizeVoicePreview };
+module.exports = { synthesizeVoicePreview, synthesizeVoiceMedia };

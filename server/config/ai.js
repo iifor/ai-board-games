@@ -74,7 +74,7 @@ function normalizeHost(defaultModel, players = [], defaultHostPlayerId = null) {
 function resolvePlayerModel(player, models, defaultModel) {
   if (player.modelId) {
     const linked = models.find((m) => Number(m.id) === Number(player.modelId));
-    if (linked) return linked;
+    return linked || null;
   }
   return models.find((m) => m.provider === player.provider && m.name === player.model) || defaultModel || null;
 }

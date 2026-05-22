@@ -11,6 +11,8 @@ export const TITLES = {
   '/consensus/skins': '共识迷雾 / 皮肤管理',
   '/players': '玩家管理',
   '/models': '模型管理',
+  '/models/providers': '模型管理 / 供应商列表',
+  '/models/providers/:id': '模型管理 / 供应商模型',
   '/voices': '语音管理'
 };
 

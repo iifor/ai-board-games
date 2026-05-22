@@ -13,6 +13,7 @@ function readJsonDb(filePath) {
   const empty = {
     skins: [],
     players: [],
+    model_providers: [],
     models: [],
     voice_packages: [],
     werewolf_roles: [],
@@ -24,7 +25,7 @@ function readJsonDb(filePath) {
   };
   try {
     if (!fs.existsSync(filePath)) return empty;
-    return { ...empty, ...JSON.parse(fs.readFileSync(filePath, 'utf8')) };
+    return migrateLegacyModelProviders({ ...empty, ...JSON.parse(fs.readFileSync(filePath, 'utf8')) });
   } catch {
     return empty;
   }
@@ -77,11 +78,62 @@ function selectPlayers(data, lower, values, mode) {
 function selectById(rows, lower, values, mode, sortKey = 'updated_at') {
   let result = [...rows];
   if (lower.includes('where id = ?')) result = result.filter((row) => String(row.id) === String(values[0]));
+  if (lower.includes('where provider_id = ?')) result = result.filter((row) => Number(row.provider_id) === Number(values[0]));
   result.sort((a, b) => {
     if (sortKey === 'sort_order') return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0) || String(a.name || '').localeCompare(String(b.name || ''));
     return String(b.updated_at || '').localeCompare(String(a.updated_at || '')) || (Number(b.id) || 0) - (Number(a.id) || 0);
   });
   return mode === 'get' ? result[0] : result;
+}
+
+function migrateLegacyModelProviders(data) {
+  const providers = Array.isArray(data.model_providers) ? data.model_providers : [];
+  const models = Array.isArray(data.models) ? data.models : [];
+  const bySignature = new Map(providers.map((provider) => [getProviderSignature(provider), provider.id]));
+  models.forEach((model) => {
+    if (model.provider_id) return;
+    const signature = getProviderSignature({
+      name: model.provider,
+      base_url: model.base_url,
+      api_format: model.api_format,
+      api_key_cipher: model.api_key_cipher,
+      api_key_iv: model.api_key_iv,
+      api_key_tag: model.api_key_tag,
+      enabled: model.enabled
+    });
+    let providerId = bySignature.get(signature);
+    if (!providerId) {
+      providerId = Math.max(0, ...providers.map((provider) => Number(provider.id) || 0)) + 1;
+      providers.push({
+        id: providerId,
+        name: model.provider || '未命名供应商',
+        base_url: model.base_url || '',
+        api_format: model.api_format || 'openai-compatible',
+        api_key_cipher: model.api_key_cipher || '',
+        api_key_iv: model.api_key_iv || '',
+        api_key_tag: model.api_key_tag || '',
+        enabled: Number(model.enabled !== 0),
+        created_at: model.created_at || now(),
+        updated_at: model.updated_at || now()
+      });
+      bySignature.set(signature, providerId);
+    }
+    model.provider_id = providerId;
+  });
+  data.model_providers = providers;
+  return data;
+}
+
+function getProviderSignature(provider = {}) {
+  return [
+    provider.name || provider.provider,
+    provider.base_url,
+    provider.api_format,
+    provider.api_key_cipher,
+    provider.api_key_iv,
+    provider.api_key_tag,
+    provider.enabled
+  ].map((value) => String(value ?? '')).join('\u0001');
 }
 
 function selectGames(data, lower, values, mode) {
@@ -124,6 +176,9 @@ function runJsonQuery(db, sql, args, mode) {
     return { count: lower.includes('where enabled = 1') ? data.players.filter((row) => Number(row.enabled) === 1).length : data.players.length };
   }
   if (lower === 'select count(*) as count from models') return { count: data.models.length };
+  if (lower.includes('select count(*) as count from models where provider_id = ?')) {
+    return { count: data.models.filter((row) => Number(row.provider_id) === Number(values[0])).length };
+  }
   if (lower === 'select count(*) as count from voice_packages') return { count: data.voice_packages.length };
   if (lower === 'select count(*) as count from werewolf_roles') return { count: data.werewolf_roles.length };
   if (lower === 'select count(*) as count from werewolf_modes') return { count: data.werewolf_modes.length };
@@ -176,6 +231,11 @@ function runJsonQuery(db, sql, args, mode) {
   if (lower.startsWith('select * from models')) return selectById(data.models, lower, values, mode);
   if (lower.startsWith('update models')) return upsertJsonRow(data.models, values[0], 'id');
   if (lower.startsWith('delete from models')) return deleteWhere(data.models, (row) => Number(row.id) === Number(values[0]));
+
+  if (lower.startsWith('insert into model_providers')) return upsertJsonRow(data.model_providers, withAutoId(data.model_providers, values[0]), 'id');
+  if (lower.startsWith('select * from model_providers')) return selectById(data.model_providers, lower, values, mode);
+  if (lower.startsWith('update model_providers')) return upsertJsonRow(data.model_providers, values[0], 'id');
+  if (lower.startsWith('delete from model_providers')) return deleteWhere(data.model_providers, (row) => Number(row.id) === Number(values[0]));
 
   if (lower.startsWith('insert into voice_packages')) return upsertJsonRow(data.voice_packages, withAutoId(data.voice_packages, values[0]), 'id');
   if (lower.startsWith('select * from voice_packages')) return selectById(data.voice_packages, lower, values, mode);

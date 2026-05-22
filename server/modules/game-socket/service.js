@@ -95,8 +95,8 @@ function getRunner(gameType) {
 }
 
 function getStartMessage(gameType) {
-  if (gameType === 'debate') return 'AI 辩论赛开始';
-  return '游戏开始，天黑请闭眼，狼人行动中';
+  if (gameType === 'debate') return '辩论赛开始';
+  return '游戏开始';
 }
 
 function getDoneMessage(gameType) {

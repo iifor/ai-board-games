@@ -1,4 +1,4 @@
-const { hasRoleAction, getRoleLabel, sortBySeat, rotateFromSeat, getTopCandidateIds, buildWolfStrategySummary } = require('./utils');
+const { hasRoleAction, sortBySeat, rotateFromSeat, getTopCandidateIds, buildWolfStrategySummary } = require('./utils');
 const { topTarget, countTargets } = require('./winCheck');
 const { askWolfNightSpeech } = require('./agents');
 const { getWerewolfNightPrompt, buildNightPublicMessage, buildDayStartMessage } = require('./announcements');
@@ -61,7 +61,6 @@ async function resolveWolfKill(ctx, round, alive) {
   if (leader) {
     await ctx.emit({
       type: 'wolf-leader', round,
-      message: `主持人指定 ${leader.id} 号狼人担任本夜狼队领袖`,
       game: ctx.serialize()
     });
   }
@@ -69,6 +68,7 @@ async function resolveWolfKill(ctx, round, alive) {
   for (const wolf of speechOrder) {
     const isLeader = Number(wolf.id) === Number(leader?.id);
     const text = await askWolfNightSpeech(wolf, round.day, round.night.wolfSpeeches, isLeader);
+    if (!String(text || '').trim()) continue;
     const speech = { playerId: wolf.id, text, phase: 'night-wolf', day: round.day, kind: isLeader ? 'deployment' : 'chat' };
     round.night.wolfSpeeches.push(speech);
     await ctx.emit({ type: 'wolf-speech', round, speech, game: ctx.serialize() });
@@ -128,7 +128,7 @@ async function resolveWitchPoison(ctx, round, usedAntidote) {
   const alive = ctx.agents.filter((agent) => agent.alive);
   const witch = alive.find((agent) => hasRoleAction(agent.roleConfig, 'save') || hasRoleAction(agent.roleConfig, 'poison'));
   if (!witch) return;
-  if (!witch.usedPoison && !(ctx.modeConfig.witch.onePotionPerNight && usedAntidote)) {
+  if (!witch.usedPoison && !(ctx.modeConfig.witch?.onePotionPerNight && usedAntidote)) {
     const poison = await ctx.skillRegistry.execute('poison', { actor: witch, alive });
     if (poison.use && poison.target) {
       witch.usedPoison = true;

@@ -8,6 +8,7 @@ const upload = require('./modules/upload');
 // Admin modules
 const skins = require('./modules/skins');
 const players = require('./modules/players');
+const modelProviders = require('./modules/model-providers');
 const models = require('./modules/models');
 const voices = require('./modules/voices');
 const werewolfConfig = require('./modules/werewolf-config');
@@ -51,8 +52,10 @@ function createApp() {
   app.use(responseFormatter);
 
   // Admin API routes
+  app.use('/api/admin', upload.router);
   app.use('/api/admin', skins.router);
   app.use('/api/admin', players.router);
+  app.use('/api/admin', modelProviders.router);
   app.use('/api/admin', models.router);
   app.use('/api/admin', voices.router);
   app.use('/api/admin', werewolfConfig.router);

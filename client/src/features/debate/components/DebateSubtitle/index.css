@@ -33,6 +33,30 @@
   white-space: nowrap;
 }
 
+.debate-subtitle p strong {
+  flex-shrink: 0;
+  color: #f8fbff;
+  font-size: 18px;
+  padding-right: 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.debate-subtitle__word {
+  display: inline;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color 0.28s ease, text-shadow 0.28s ease;
+}
+
+.debate-subtitle__word.is-active {
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.6), 0 0 24px rgba(255, 255, 255, 0.25);
+}
+
+.debate-subtitle__word.is-next {
+  color: rgba(255, 255, 255, 0.55);
+}
+
 @keyframes debateSubtitleIn {
   from {
     opacity: 0;

@@ -111,7 +111,6 @@ export function formatWinner(value) {
     pro: '正方', con: '反方',
     good: '好人阵营', villager: '好人阵营', villagers: '好人阵营',
     werewolf: '狼人阵营', wolves: '狼人阵营',
-    consensus: '共识达成', mist: '迷雾胜利'
   };
   return map[String(value || '').toLowerCase()] || value || '-';
 }
@@ -165,13 +164,6 @@ export function getImportPromptRule(gameType) {
       '- 发言、投票和死亡结果要能解释最终 winner。'
     ].join('\n');
   }
-  return [
-    '- type 固定为 "consensus"。',
-    '- 必须包含 event 或 skin 信息、players、rounds。',
-    '- rounds 要包含问题、投票、线索/噪音、玩家发言和最终结算。',
-    '- 玩家发言要围绕皮肤真相、线索和迷雾噪音推进。',
-    '- winner/winReason 要与投票和线索结果一致。'
-  ].join('\n');
 }
 
 export function getImportPromptFlowRequirements(gameType) {

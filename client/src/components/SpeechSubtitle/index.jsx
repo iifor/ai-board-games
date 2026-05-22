@@ -1,76 +1,70 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './index.css';
 
+const LOOKAHEAD = 4;
+
 export function SpeechSubtitle({ speech }) {
-  const chunks = useMemo(() => splitSubtitleText(speech?.text || ''), [speech?.text]);
-  const [chunkIndex, setChunkIndex] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const startTimeRef = useRef(null);
+  const rafRef = useRef(null);
 
   useEffect(() => {
-    setChunkIndex(0);
-  }, [speech?.text]);
+    if (!speech?.wordBoundaries?.length) return;
 
-  useEffect(() => {
-    if (chunks.length <= 1) return undefined;
-    const current = chunks[chunkIndex] || '';
-    const timer = window.setTimeout(() => {
-      setChunkIndex((index) => Math.min(index + 1, chunks.length - 1));
-    }, getSubtitleDuration(current));
-    return () => window.clearTimeout(timer);
-  }, [chunks, chunkIndex]);
+    startTimeRef.current = performance.now();
+    setElapsed(0);
+
+    const tick = () => {
+      setElapsed(performance.now() - startTimeRef.current);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [speech?.id, speech?.wordBoundaries]);
 
   if (!speech?.text) return null;
 
+  const boundaries = speech.wordBoundaries;
+
+  if (boundaries?.length) {
+    const currentIndex = findCurrentBoundaryIndex(boundaries, elapsed);
+    const start = currentIndex;
+    const end = Math.min(boundaries.length, start + LOOKAHEAD + 1);
+    const visible = boundaries.slice(start, end);
+
+    return (
+      <aside className="speech-subtitle" aria-live="polite">
+        {visible.map((wb, i) => {
+          const globalIndex = start + i;
+          const isActive = globalIndex === currentIndex;
+          return (
+            <span
+              key={globalIndex}
+              className={`speech-subtitle__word${isActive ? ' is-active' : ' is-next'}`}
+            >
+              {wb.text}
+            </span>
+          );
+        })}
+      </aside>
+    );
+  }
+
   return (
-    <aside className="speech-subtitle" aria-live="polite">
-      {chunks[chunkIndex] || speech.text}
+    <aside className="speech-subtitle speech-subtitle--fallback" aria-live="polite">
+      {speech.text}
     </aside>
   );
 }
 
-function splitSubtitleText(text) {
-  const clean = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!clean) return [];
-
-  const sentenceParts = clean
-    .split(/(?<=[。！？!?；;，,])/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  const chunks = [];
-  let current = '';
-  for (const part of sentenceParts.length ? sentenceParts : [clean]) {
-    if (countSubtitleUnits(current + part) <= 34) {
-      current += part;
-      continue;
-    }
-    if (current) chunks.push(current);
-    if (countSubtitleUnits(part) > 34) chunks.push(...hardSplitSubtitle(part, 34));
-    else current = part;
+function findCurrentBoundaryIndex(boundaries, elapsedMs) {
+  let latest = 0;
+  for (let i = 0; i < boundaries.length; i++) {
+    if (boundaries[i].offset <= elapsedMs) latest = i;
+    else break;
   }
-  if (current) chunks.push(current);
-  return chunks;
-}
-
-function hardSplitSubtitle(text, maxUnits) {
-  const chunks = [];
-  let current = '';
-  for (const char of text) {
-    if (countSubtitleUnits(current + char) > maxUnits && current) {
-      chunks.push(current);
-      current = char;
-    } else {
-      current += char;
-    }
-  }
-  if (current) chunks.push(current);
-  return chunks;
-}
-
-function countSubtitleUnits(text) {
-  return Array.from(text).reduce((sum, char) => sum + (/[\x00-\xff]/.test(char) ? 0.55 : 1), 0);
-}
-
-function getSubtitleDuration(text) {
-  const units = countSubtitleUnits(text);
-  return Math.max(3200, Math.min(9000, units * 280 + 900));
+  return latest;
 }

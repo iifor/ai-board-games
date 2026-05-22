@@ -1,24 +1,31 @@
 const repo = require('./repository');
 const { rowToModel, rowToRuntimeModel, modelToRow } = require('./utils');
 const { AppError, ErrorCodes } = require('../../utils/errors');
-const { getDb } = require('../../db');
 const { callModelChat } = require('../llm');
 
 function listModels() {
-  return repo.findAllModels().map(rowToModel);
+  return repo.findAllModels().map(toModel);
+}
+
+function listModelsByProvider(providerId) {
+  getProvider(providerId);
+  return repo.findModelsByProviderId(providerId).map(toModel);
 }
 
 function getModel(id) {
-  return rowToModel(repo.findModelById(id));
+  return toModel(repo.findModelById(id));
 }
 
 function getRuntimeModel(id) {
-  return rowToRuntimeModel(repo.findModelById(id));
+  const row = repo.findModelById(id);
+  if (!row) return null;
+  return rowToRuntimeModel(row, getProvider(row.provider_id, true));
 }
 
 function createModel(input) {
-  const row = modelToRow(input);
-  if (!row.provider || !row.name) throw new AppError(ErrorCodes.VALIDATION_ERROR, '供应商和模型名称必填', 400);
+  const provider = resolveProvider(input);
+  const row = modelToRow(input, provider);
+  if (!row.provider_id || !row.name) throw new AppError(ErrorCodes.VALIDATION_ERROR, '供应商和模型名称必填', 400);
   const id = repo.insertModel(row);
   return getModel(id);
 }
@@ -26,7 +33,9 @@ function createModel(input) {
 function updateModel(id, input) {
   const existing = repo.findModelById(id);
   if (!existing) throw new AppError(ErrorCodes.NOT_FOUND, '模型不存在', 404);
-  const row = { ...modelToRow(input, existing), id: Number(id) };
+  const provider = resolveProvider({ ...input, providerId: input.providerId || existing.provider_id });
+  const row = { ...modelToRow(input, provider, existing), id: Number(id) };
+  if (!row.name) throw new AppError(ErrorCodes.VALIDATION_ERROR, '模型名称必填', 400);
   repo.updateModel(row);
   return getModel(id);
 }
@@ -50,4 +59,24 @@ async function testModelConnection(id) {
     .catch(err => ({ ok: false, message: err.message }));
 }
 
-module.exports = { listModels, getModel, getRuntimeModel, createModel, updateModel, deleteModel, testModelConnection };
+function toModel(row) {
+  if (!row) return null;
+  return rowToModel(row, getProvider(row.provider_id, true));
+}
+
+function resolveProvider(input) {
+  if (input.providerId || input.provider_id) return getProvider(input.providerId || input.provider_id);
+  if (input.provider) return require('../model-providers').createLegacyModelProvider(input);
+  throw new AppError(ErrorCodes.VALIDATION_ERROR, '请选择供应商', 400);
+}
+
+function getProvider(id, nullable = false) {
+  const provider = id ? require('../model-providers').getRuntimeModelProvider(id) : null;
+  if (provider || nullable) return provider;
+  throw new AppError(ErrorCodes.NOT_FOUND, '供应商不存在', 404);
+}
+
+module.exports = {
+  listModels, listModelsByProvider, getModel, getRuntimeModel,
+  createModel, updateModel, deleteModel, testModelConnection
+};

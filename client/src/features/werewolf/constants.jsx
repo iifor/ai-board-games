@@ -58,6 +58,7 @@ export const EVENT_LABELS = {
   'sheriff-badge-transfer': '警徽移交',
   'sheriff-badge-tear': '撕警徽',
   speech: '白天发言',
+  'day-vote': '玩家投票',
   'vote-result': '放逐投票',
   'last-words': '夜晚遗言',
   'exile-words': '放逐遗言',

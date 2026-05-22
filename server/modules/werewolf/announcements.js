@@ -1,9 +1,9 @@
 const WEREWOLF_NIGHT_PROMPTS = {
-  wolfWake: '狼人请睁眼，请选择今晚的目标',
-  seerWake: '预言家请睁眼，请选择今晚查验的目标',
-  guardWake: '守卫请睁眼，请选择守护的目标',
-  witchAntidote: '女巫请睁眼。你有一瓶解药，今晚它死了，你要救吗？',
-  witchPoison: '你有一瓶毒药，你要用吗？'
+  wolfWake: '狼人请睁眼。请选择今晚要击杀的玩家',
+  seerWake: '预言家请睁眼。请选择你要查验的玩家',
+  guardWake: '守卫请睁眼。请选择要守护的玩家。守卫请闭眼',
+  witchAntidote: '女巫请睁眼。今晚它死了。你要使用解药吗？',
+  witchPoison: '你要使用毒药吗？女巫请闭眼'
 };
 
 const WEREWOLF_NIGHT_PROMPT_KEYS = {
@@ -30,8 +30,8 @@ function buildDayStartMessage() {
 
 function buildSheriffStartMessage(round = {}) {
   const candidates = round.sheriffElection?.candidates || [];
-  if (!candidates.length) return '本局暂无玩家上警';
-  return `${candidates.map((id) => `${id}号`).join('、')}竞选警长`;
+  if (!candidates.length) return '现在进入警长竞选。想上警的玩家请举手。';
+  return '现在进入警长竞选。想上警的玩家请举手。上警玩家依次发言。';
 }
 
 function buildSheriffResultMessage(round = {}, modeConfig = {}) {

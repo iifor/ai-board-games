@@ -7,7 +7,7 @@ function playerToRow(input) {
     sex: input.sex || '未知',
     personality: input.personality || '',
     provider: input.provider || 'deepseek',
-    model: input.model || 'deepseek-v4-pro',
+    model: input.model || 'deepseek-v4-flash',
     model_id: input.modelId != null ? Number(input.modelId) : input.model_id != null ? Number(input.model_id) : null,
     voice_package_id: input.voicePackageId != null ? Number(input.voicePackageId) : input.voice_package_id != null ? Number(input.voice_package_id) : null,
     temperature: Number(input.temperature ?? 0.85),

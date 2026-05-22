@@ -6,7 +6,8 @@ const { getGame, listGames } = require('../modules/games');
 const { getVoicePackage } = require('../modules/voices');
 const { listSkins } = require('../modules/skins');
 const { listWerewolfModes } = require('../modules/werewolf-config');
-const { synthesizeVoicePreview } = require('../modules/tts');
+const { isAzureVoice, synthesizeVoiceMedia, synthesizeVoicePreview } = require('../modules/tts');
+const { AppError, ErrorCodes } = require('../utils/errors');
 
 const router = express.Router();
 
@@ -75,6 +76,24 @@ router.post('/voice/synthesize', async (request, response, next) => {
     response.send(audio.buffer);
   } catch (error) {
     next(error);
+  }
+});
+
+router.post('/voice/synthesize-media', async (request, response, next) => {
+  try {
+    const text = String(request.body?.text || '').trim();
+    const voicePackageId = request.body?.voicePackageId;
+    if (!text) throw new AppError(ErrorCodes.VALIDATION_ERROR, '语音文本不能为空', 400);
+
+    const voice = getVoicePackage(voicePackageId);
+    if (!voice || !voice.enabled) throw new AppError(ErrorCodes.NOT_FOUND, '语音包不存在或未启用', 404);
+    if (!isAzureVoice(voice)) throw new AppError('UNSUPPORTED_VOICE', '该语音包不支持服务端语音媒体。', 422);
+
+    response.json(await synthesizeVoiceMedia(voice, text));
+  } catch (error) {
+    next(error?.code === ErrorCodes.UPSTREAM_ERROR
+      ? new AppError(ErrorCodes.UPSTREAM_ERROR, 'Azure 语音媒体生成失败', 502)
+      : error);
   }
 });
 

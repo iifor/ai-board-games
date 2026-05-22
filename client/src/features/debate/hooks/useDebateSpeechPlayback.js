@@ -41,12 +41,7 @@ export function useDebateSpeechPlayback({
     const narration = event.subtitle?.text || event.narration || getDebateNarration(event);
 
     if (speechEnabled && narration) {
-      const shouldUseChunks = Boolean(event?.speech?.playerId);
-      const queued = shouldUseChunks
-        ? shared.speakChunks(narration, event?.speech?.playerId || null, event.ackId, event)
-        : event.audioUrl
-          ? shared.speakSingle(narration, event?.speech?.playerId || null, event.ackId, event)
-          : shared.speakChunks(narration, event?.speech?.playerId || null, event.ackId, event);
+      const queued = shared.speakSingle(narration, event?.speech?.playerId || null, event.ackId, event);
 
       if (!queued) {
         shared.playSubtitleText(narration, event?.speech?.playerId || null, event.ackId, event);

@@ -1,18 +1,24 @@
-const { encryptApiKey, decryptApiKey } = require('../../utils/crypto');
-
-function rowToModel(row) {
+function rowToModel(row, provider) {
   if (!row) return null;
-  const hasApiKey = Boolean(row.api_key_cipher);
   return {
-    id: row.id, provider: row.provider, name: row.name, baseUrl: row.base_url,
-    apiFormat: row.api_format, hasApiKey,
-    enabled: Boolean(row.enabled), createdAt: row.created_at, updatedAt: row.updated_at
+    id: row.id,
+    providerId: Number(row.provider_id) || null,
+    provider: provider?.name || row.provider,
+    providerName: provider?.name || row.provider,
+    name: row.name,
+    baseUrl: provider?.baseUrl || row.base_url,
+    apiFormat: provider?.apiFormat || row.api_format,
+    hasApiKey: provider ? provider.hasApiKey : Boolean(row.api_key_cipher),
+    providerEnabled: provider ? Boolean(provider.enabled) : Boolean(row.enabled),
+    enabled: Boolean(row.enabled) && (provider ? Boolean(provider.enabled) : true),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
-function rowToRuntimeModel(row) {
+function rowToRuntimeModel(row, provider) {
   if (!row) return null;
-  return { ...rowToModel(row), apiKey: decryptApiKey(row) };
+  return { ...rowToModel(row, provider), apiKey: provider?.apiKey || '' };
 }
 
 function normalizeApiFormat(value) {
@@ -20,18 +26,17 @@ function normalizeApiFormat(value) {
   return text === 'anthropic-compatible' ? text : 'openai-compatible';
 }
 
-function modelToRow(input, existing = null) {
-  const encrypted = Object.prototype.hasOwnProperty.call(input, 'apiKey') && String(input.apiKey || '').trim()
-    ? encryptApiKey(input.apiKey) : {};
+function modelToRow(input, provider, existing = null) {
   return {
-    provider: String(input.provider || existing?.provider || '').trim(),
+    provider_id: Number(input.providerId || input.provider_id || existing?.provider_id || provider?.id || 0) || null,
+    provider: String(provider?.name || input.provider || existing?.provider || '').trim(),
     name: String(input.name || input.modelName || existing?.name || '').trim(),
-    base_url: String(input.baseUrl || input.base_url || existing?.base_url || '').trim(),
-    api_format: normalizeApiFormat(input.apiFormat || input.api_format || existing?.api_format || 'openai-compatible'),
-    api_key_cipher: encrypted.api_key_cipher ?? existing?.api_key_cipher ?? '',
-    api_key_iv: encrypted.api_key_iv ?? existing?.api_key_iv ?? '',
-    api_key_tag: encrypted.api_key_tag ?? existing?.api_key_tag ?? '',
-    enabled: Number(input.enabled !== false)
+    base_url: String(provider?.baseUrl || input.baseUrl || input.base_url || existing?.base_url || '').trim(),
+    api_format: normalizeApiFormat(provider?.apiFormat || input.apiFormat || input.api_format || existing?.api_format),
+    api_key_cipher: existing?.api_key_cipher || '',
+    api_key_iv: existing?.api_key_iv || '',
+    api_key_tag: existing?.api_key_tag || '',
+    enabled: Number(input.enabled !== false && existing?.enabled !== 0)
   };
 }
 

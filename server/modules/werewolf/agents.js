@@ -3,8 +3,9 @@ const { PlayerAgent } = require('./playerAgent');
 const { getRoleConfig, getRoleLabel, getRoleActions, shuffle } = require('./utils');
 
 function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit) {
-  const selected = config.players.slice(0, modeConfig.roles.length);
-  const roles = shuffle(modeConfig.roles);
+  const roleSlots = expandModeRoleSlots(modeConfig.roles);
+  const selected = config.players.slice(0, roleSlots.length);
+  const roles = shuffle(roleSlots);
   const resolveRoleId = (entry) => typeof entry === 'string' ? entry : (entry?.roleId || entry?.id || '');
   const wolves = selected.filter((_, index) => getRoleConfig(modeConfig, resolveRoleId(roles[index])).faction === 'wolves').map((player) => player.id);
 
@@ -36,6 +37,14 @@ function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit) 
       onFallback: (entry) => fallbackAudit.record(entry)
     });
     return agent;
+  });
+}
+
+function expandModeRoleSlots(roles = []) {
+  return (Array.isArray(roles) ? roles : []).flatMap((entry) => {
+    const configuredCount = Number(entry?.count);
+    const count = Number.isFinite(configuredCount) ? Math.max(0, Math.floor(configuredCount)) : 1;
+    return Array.from({ length: count }, () => entry);
   });
 }
 
@@ -151,8 +160,8 @@ async function askWolfNightSpeech(agent, day, wolfSpeeches, isLeader) {
   return agent.playerAgent.askText([
     `第 ${day} 夜狼人行动。${title}`,
     `已知狼队夜聊：\n${history || '你是本夜第一位发言的狼人。'}`,
-    '请只输出狼队战术发言，不超过 100 字。'
-  ].join('\n\n'), { maxTokens: 180, limit: 100 });
+    '可以选择不发言；发言时请只输出狼队战术发言，不超过 100 字。'
+  ].join('\n\n'), { maxTokens: 180, limit: 100, fallback: '' });
 }
 
 async function askSheriffSpeech(agent, day, context, isRunoff) {
@@ -168,7 +177,7 @@ async function askSheriffSpeech(agent, day, context, isRunoff) {
 }
 
 module.exports = {
-  createWerewolfAgents, buildSystemPrompt, createRound,
+  createWerewolfAgents, expandModeRoleSlots, buildSystemPrompt, createRound,
   publicPlayer, publicHost, publicRound, publicNight, createPublicWerewolfEvent,
   askSpeech, askWolfNightSpeech, askSheriffSpeech
 };
