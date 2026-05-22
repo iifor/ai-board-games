@@ -1,5 +1,9 @@
 import { useSpeechPlayback } from '../../../hooks/useSpeechPlayback';
+import { getPlayablePlaybackDelay } from '../../../utils/playableText';
 import { getWerewolfNarration } from '../werewolfUtils';
+
+const WEREWOLF_NIGHT_ACTION_HOLD_MS = 1000;
+const WEREWOLF_NIGHT_ACTION_EVENT_TYPES = new Set(['wolf-vote', 'seer-check', 'guard-action', 'witch-action']);
 
 function getWerewolfExtraFields(event, text) {
   return {
@@ -31,11 +35,19 @@ export function useWerewolfSpeechPlayback({
     setSpeechState: setActiveSpeech,
     extractNarration: getWerewolfNarration,
     getExtraFields: getWerewolfExtraFields,
-    getVoicePackageId: getWerewolfVoicePackageId
+    getVoicePackageId: getWerewolfVoicePackageId,
+    getPlaybackDelay: getWerewolfPlaybackDelay
   });
 
   return {
     clearSubtitleTimer,
     playPendingWerewolfEvent: playPendingEvent
   };
+}
+
+function getWerewolfPlaybackDelay(event, narration, splitConfig) {
+  const delay = getPlayablePlaybackDelay(narration, splitConfig);
+  return WEREWOLF_NIGHT_ACTION_EVENT_TYPES.has(event?.type)
+    ? Math.max(delay, WEREWOLF_NIGHT_ACTION_HOLD_MS)
+    : delay;
 }

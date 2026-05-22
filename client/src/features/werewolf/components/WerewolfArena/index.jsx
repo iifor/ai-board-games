@@ -18,6 +18,7 @@ export function WerewolfArena({
   nightActionPlayerIds,
   nightActionType,
   seerCheckTarget,
+  sheriffCandidateIds,
   activeSpeech,
   showRoles,
   visibleRolePlayerId,
@@ -31,7 +32,7 @@ export function WerewolfArena({
   );
   const stats = getGameStats(orderedPlayers);
   const phaseTitle = getPhaseTitle(currentRound, streamMessage);
-  const sheriffCandidates = getVisibleSheriffCandidates(currentRound);
+  const sheriffCandidates = getVisibleSheriffCandidates(currentRound, sheriffCandidateIds);
   const nightActors = new Set((nightActionPlayerIds || []).map(Number));
   const nightActive = currentRound?.phase === 'night';
 
@@ -94,10 +95,15 @@ export function WerewolfArena({
   );
 }
 
-function getVisibleSheriffCandidates(round) {
+function getVisibleSheriffCandidates(round, eventCandidateIds = []) {
   const election = round?.sheriffElection;
-  if (!election || election.sheriffId || election.result !== 'pending') return new Set();
-  return new Set((election.candidates || election.signedUpIds || [])
+  if (!election || election.sheriffId || isSheriffElectionClosed(election.result)) return new Set();
+  const candidateIds = eventCandidateIds.length ? eventCandidateIds : (election.candidates || election.signedUpIds || []);
+  return new Set(candidateIds
     .map(Number)
     .filter((id) => id && !(election.withdrawnIds || []).map(Number).includes(id)));
+}
+
+function isSheriffElectionClosed(result) {
+  return Boolean(result && result !== 'pending');
 }

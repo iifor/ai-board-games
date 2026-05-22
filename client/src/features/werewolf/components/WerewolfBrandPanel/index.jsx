@@ -5,7 +5,7 @@ import './index.css';
 export function WerewolfBrandPanel({ game, mode, showRoles, onShowRolesChange }) {
   return (
     <section className="werewolf-title-panel">
-      <p>AI 狼人杀</p>
+      <p>AI 狼人杀 {game?.event?.version}</p>
       <span>{mode?.name || game.event?.name}</span>
       <button type="button" onClick={() => onShowRolesChange((value) => !value)}>
         {showRoles ? <Eye size={18} /> : <EyeOff size={18} />}

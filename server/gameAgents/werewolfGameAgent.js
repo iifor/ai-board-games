@@ -46,6 +46,10 @@ class WerewolfGameAgent {
       this.rounds.push(round);
       await this.runNight(round);
       await this.announceDaybreak(round);
+      if (shouldRunFirstDaySheriffElection(round, this.modeConfig)) {
+        await this.runSheriffElection(round);
+      }
+      await this.revealNightResult(round);
       this.applyWinCheck(day);
       if (this.winner) break;
       await this.runDay(round);
@@ -252,16 +256,20 @@ class WerewolfGameAgent {
     const poisoned = this.agents.find((agent) => agent.id === round.night.witchPoisonTarget);
     if (poisoned && !deaths.some((item) => item.id === poisoned.id)) deaths.push({ id: poisoned.id, reason: '女巫毒药' });
 
-    deaths.forEach((death) => eliminate(this.agents, death.id, round.day, death.reason));
     round.night.deaths = deaths;
   }
 
   async announceDaybreak(round) {
     round.phase = 'day';
-    const nightPublicMessage = buildNightPublicMessage(round);
     const message = buildDayStartMessage();
-    round.publicSummary = nightPublicMessage;
     await this.emit({ type: 'day-start', round, message, game: this.serialize() });
+  }
+
+  async revealNightResult(round) {
+    applyNightDeaths(this.agents, round);
+    round.nightRevealed = true;
+    const nightPublicMessage = buildNightPublicMessage(round);
+    round.publicSummary = nightPublicMessage;
     await this.emit({ type: 'night-result', round, message: nightPublicMessage, game: this.serialize() });
     for (const death of round.night.deaths) {
       await this.maybeTransferSheriffBadge(round, death.id, death.reason, 'night');
@@ -271,19 +279,16 @@ class WerewolfGameAgent {
   async runDay(round) {
     round.phase = 'day';
 
-    if (this.modeConfig.sheriff.enabled && this.modeConfig.sheriff.firstDayElection !== false && round.day === 1) {
-      await this.runSheriffElection(round);
-    }
-
     for (const death of round.night.deaths) {
-      if (hasLastWords(this.agents, this.modeConfig)) await this.collectLastWords(round, death.id, 'last-words');
+      if (round.day === 1 && hasLastWords(this.agents, this.modeConfig)) await this.collectLastWords(round, death.id, 'last-words');
       await this.maybeHunterShot(round, death.id, 'night');
     }
 
     const context = buildPublicLog(this.rounds, this.agents);
     const daySpeechOrder = await this.decideDaySpeechOrder(round);
-    for (const agent of daySpeechOrder) {
-      const text = await askSpeech(agent, round.day, context, fallbackSpeech(agent, round.day));
+    for await (const { agent, text } of prefetchOrderedSpeechTexts(daySpeechOrder, (item) => (
+      askSpeech(item, round.day, context, fallbackSpeech(item, round.day))
+    ))) {
       const speech = { playerId: agent.id, text, phase: 'day', day: round.day };
       round.speeches.push(speech);
       await this.emit({ type: 'speech', round, speech, game: this.serialize() });
@@ -335,6 +340,7 @@ class WerewolfGameAgent {
     await this.emit({
       type: 'sheriff-start',
       round,
+      sheriffCandidateIds: signedUpIds,
       message: buildSheriffStartMessage(round),
       game: this.serialize()
     });
@@ -355,7 +361,7 @@ class WerewolfGameAgent {
       else candidates.push(agent);
     }
     round.sheriffElection.candidates = candidates.map((agent) => agent.id);
-    await this.emit({ type: 'sheriff-candidates', round, game: this.serialize() });
+    await this.emit({ type: 'sheriff-candidates', round, sheriffCandidateIds: round.sheriffElection.candidates, game: this.serialize() });
     if (!candidates.length) {
       await this.finishSheriffElection(round, null, 'withdrawn');
       return;
@@ -369,6 +375,7 @@ class WerewolfGameAgent {
     await this.emit({
       type: 'sheriff-vote',
       round,
+      sheriffCandidateIds: round.sheriffElection.candidates,
       message: buildSheriffVoteMessage(round, false),
       game: this.serialize()
     });
@@ -392,6 +399,7 @@ class WerewolfGameAgent {
     await this.emit({
       type: 'sheriff-runoff-vote',
       round,
+      sheriffCandidateIds: round.sheriffElection.runoffCandidateIds,
       message: buildSheriffVoteMessage(round, true),
       game: this.serialize()
     });
@@ -407,11 +415,19 @@ class WerewolfGameAgent {
     const orderKey = isRunoff ? 'runoffSpeechOrder' : 'speechOrder';
     const speechesKey = isRunoff ? 'runoffSpeeches' : 'speeches';
     round.sheriffElection[orderKey] = ordered.map((agent) => agent.id);
-    for (const agent of ordered) {
-      const text = await askSheriffSpeech(agent, round.day, buildPublicLog(this.rounds, this.agents), isRunoff);
+    const context = buildPublicLog(this.rounds, this.agents);
+    for await (const { agent, text } of prefetchOrderedSpeechTexts(ordered, (item) => (
+      askSheriffSpeech(item, round.day, context, isRunoff)
+    ))) {
       const speech = { playerId: agent.id, text, phase: 'sheriff', day: round.day, runoff: isRunoff };
       round.sheriffElection[speechesKey].push(speech);
-      await this.emit({ type: eventType, round, speech, game: this.serialize() });
+      await this.emit({
+        type: eventType,
+        round,
+        speech,
+        sheriffCandidateIds: isRunoff ? round.sheriffElection.runoffCandidateIds : round.sheriffElection.signedUpIds,
+        game: this.serialize()
+      });
     }
   }
 
@@ -433,16 +449,20 @@ class WerewolfGameAgent {
     if (!alive.length) return alive;
 
     const sheriff = alive.find((agent) => Number(agent.id) === Number(round.sheriffId));
+    const nightDeathAnchor = Math.max(0, ...(round.night?.deaths || []).map((death) => Number(death.id) || 0));
     if (sheriff) {
       const parsed = await sheriff.playerAgent.askJson([
         '你是警长。请选择本轮白天发言方向。',
         '只返回 JSON：{"direction":"clockwise"} 或 {"direction":"counterclockwise"}。'
       ].join('\n\n'), { maxTokens: 40, fallback: { direction: 'clockwise' } });
       const direction = parsed?.direction === 'counterclockwise' ? 'counterclockwise' : 'clockwise';
-      const order = getSheriffSpeechOrder(alive, sheriff.id, direction);
+      const order = nightDeathAnchor
+        ? getSheriffNightDeathSpeechOrder(alive, sheriff.id, nightDeathAnchor, direction)
+        : getSheriffSpeechOrder(alive, sheriff.id, direction);
       round.daySpeech = {
         source: 'sheriff',
         direction,
+        anchorPlayerId: nightDeathAnchor || null,
         startPlayerId: order[0]?.id || sheriff.id,
         playerIds: order.map((agent) => agent.id)
       };
@@ -450,7 +470,6 @@ class WerewolfGameAgent {
       return order;
     }
 
-    const nightDeathAnchor = Math.max(0, ...(round.night?.deaths || []).map((death) => Number(death.id) || 0));
     const startId = nightDeathAnchor ? getNextAliveId(alive, nightDeathAnchor, 'clockwise') : getClockStartId(alive);
     const order = rotateFromSeat(alive, startId, 'clockwise');
     round.daySpeech = {
@@ -557,6 +576,33 @@ class WerewolfGameAgent {
     const result = checkWin(this.agents, day, this.modeConfig);
     this.winner = result.winner;
     this.winReason = result.winReason;
+  }
+}
+
+function getSheriffNightDeathSpeechOrder(alive, sheriffId, deathId, direction) {
+  const speakers = alive.filter((agent) => Number(agent.id) !== Number(sheriffId));
+  const startId = getNextAliveId(speakers, deathId, direction);
+  return [...rotateFromSeat(speakers, startId, direction), alive.find((agent) => Number(agent.id) === Number(sheriffId))].filter(Boolean);
+}
+
+async function* prefetchOrderedSpeechTexts(agents, loadText, lookahead = 2) {
+  const pending = new Map();
+  const preload = (index) => {
+    if (index >= agents.length || pending.has(index)) return;
+    const agent = agents[index];
+    pending.set(index, Promise.resolve()
+      .then(() => loadText(agent))
+      .then((text) => ({ agent, text }))
+      .catch((error) => ({ agent, error })));
+  };
+
+  for (let index = 0; index < Math.min(lookahead, agents.length); index += 1) preload(index);
+  for (let index = 0; index < agents.length; index += 1) {
+    const prepared = await pending.get(index);
+    pending.delete(index);
+    if (prepared.error) throw prepared.error;
+    preload(index + lookahead);
+    yield prepared;
   }
 }
 
@@ -721,7 +767,8 @@ function createRound(day) {
     idiotReveal: null,
     lastWords: [],
     hunterShot: null,
-    publicSummary: ''
+    publicSummary: '',
+    nightRevealed: false
   };
 }
 
@@ -768,11 +815,11 @@ function createPublicWerewolfEvent(event = {}) {
 function publicRound(round = {}) {
   return {
     ...round,
-    night: publicNight(round.night)
+    night: publicNight(round.night, !round.nightRevealed)
   };
 }
 
-function publicNight(night = {}) {
+function publicNight(night = {}, hideDeaths = false) {
   return {
     wolfTarget: night.wolfTarget || null,
     wolfLeaderId: night.wolfLeaderId || null,
@@ -786,7 +833,7 @@ function publicNight(night = {}) {
     witchSaveTarget: night.witchSaveTarget || (night.witchSave ? night.wolfTarget : null),
     witchPoisonTarget: night.witchPoisonTarget || null,
     guardTarget: night.guardTarget || null,
-    deaths: night.deaths || []
+    deaths: hideDeaths ? [] : night.deaths || []
   };
 }
 
@@ -809,6 +856,16 @@ function eliminate(agents, id, day, reason) {
   target.alive = false;
   target.deathDay = day;
   target.deathReason = reason;
+}
+
+function applyNightDeaths(agents, round) {
+  for (const death of round.night?.deaths || []) {
+    eliminate(agents, death.id, round.day, death.reason);
+  }
+}
+
+function shouldRunFirstDaySheriffElection(round, modeConfig) {
+  return round.day === 1 && modeConfig.sheriff.enabled && modeConfig.sheriff.firstDayElection !== false;
 }
 
 function checkWin(agents, day, modeConfig = {}) {
@@ -890,6 +947,9 @@ function buildSheriffVoteMessage(round, runoff) {
 
 function buildSpeechOrderMessage(round) {
   if (round.daySpeech?.source === 'sheriff') {
+    if (round.daySpeech.anchorPlayerId) {
+      return `${round.sheriffId}号警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，从${round.daySpeech.anchorPlayerId}号死亡玩家的后置位${round.daySpeech.startPlayerId}号开始。`;
+    }
     return `${round.sheriffId}号警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，从${round.daySpeech.startPlayerId}号开始。`;
   }
   if (round.daySpeech?.source === 'night-death') {

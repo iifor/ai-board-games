@@ -31,6 +31,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   const [activeSpeech, setActiveSpeech] = useState(null);
   const [nightActionType, setNightActionType] = useState('');
   const [seerCheckTarget, setSeerCheckTarget] = useState(null);
+  const [sheriffCandidateIds, setSheriffCandidateIds] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [modeDialogOpen, setModeDialogOpen] = useState(false);
   const [werewolfModes, setWerewolfModes] = useState([]);
@@ -160,6 +161,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     setActiveSpeech(null);
     setNightActionType('');
     setSeerCheckTarget(null);
+    setSheriffCandidateIds([]);
     setSelectedPlayer(null);
     setVisibleRolePlayerId(null);
     setStatus('idle');
@@ -204,6 +206,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   function applyServerEvent(event) {
     if (status === 'error') setStatus('streaming');
     updateNightActionType(event);
+    updateSheriffCandidateIds(event);
     const flowLabel = getWerewolfFlowLabel(event);
     if (flowLabel || event.message) setStreamMessage(flowLabel || event.message);
     if (event.game) setGame(event.game);
@@ -249,6 +252,11 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   }
 
   function updateNightActionType(event) {
+    if (event.type === 'phase-start' && event.phase === 'night') {
+      setNightActionType('');
+      setSeerCheckTarget(null);
+      return;
+    }
     if (event.type === 'seer-check') {
       setNightActionType(event.type);
       setSeerCheckTarget(event.seerCheck?.target || null);
@@ -264,10 +272,23 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
       setSeerCheckTarget(null);
       return;
     }
-    if (event.type === 'day-start' || event.type === 'night-result' || event.type === 'done' || event.type === 'game') {
+    if (event.type === 'done' || event.type === 'game') {
       setNightActionType('');
       setSeerCheckTarget(null);
     }
+  }
+
+  function updateSheriffCandidateIds(event) {
+    if (event.type === 'sheriff-result' || event.type === 'night-result' || event.type === 'done' || event.type === 'game') {
+      setSheriffCandidateIds([]);
+      return;
+    }
+    if (!['sheriff-start', 'sheriff-speech', 'sheriff-candidates', 'sheriff-vote', 'sheriff-runoff-speech', 'sheriff-runoff-vote'].includes(event.type)) return;
+    const election = event.round?.sheriffElection;
+    const ids = event.sheriffCandidateIds?.length
+      ? event.sheriffCandidateIds
+      : election?.signedUpIds?.length ? election.signedUpIds : election?.candidates || [];
+    setSheriffCandidateIds(ids.map(Number).filter(Boolean));
   }
 
   function archiveServerEvent(event) {
@@ -324,6 +345,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
           nightActionPlayerIds={nightActionPlayerIds}
           nightActionType={nightActionType}
           seerCheckTarget={seerCheckTarget}
+          sheriffCandidateIds={sheriffCandidateIds}
           activeSpeech={activeSpeech}
           showRoles={showRoles}
           visibleRolePlayerId={visibleRolePlayerId}
@@ -363,4 +385,3 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     </main>
   );
 }
-

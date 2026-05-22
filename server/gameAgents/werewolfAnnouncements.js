@@ -1,6 +1,6 @@
 const WEREWOLF_NIGHT_PROMPTS = {
-  wolfWake: '狼人请睁眼。',
-  seerWake: '预言家请睁眼，请选择今晚要查验的目标',
+  wolfWake: '狼人请睁眼，请选择今晚的目标',
+  seerWake: '预言家请睁眼，请选择今晚查验的目标',
   guardWake: '守卫请睁眼，请选择守护的目标',
   witchAntidote: '女巫请睁眼。你有一瓶解药，今晚它死了，你要救吗？',
   witchPoison: '你有一瓶毒药，你要用吗？'

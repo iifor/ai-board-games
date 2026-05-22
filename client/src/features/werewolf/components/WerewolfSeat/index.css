@@ -93,6 +93,10 @@
   z-index: 28;
 }
 
+.werewolf-table .werewolf-seat.sheriff-candidate {
+  z-index: 24;
+}
+
 .werewolf-table .werewolf-seat.speaking .werewolf-avatar {
   transform: scale(1.08);
   border-color: rgba(255, 240, 166, 0.94);
@@ -114,6 +118,17 @@
     0 0 78px rgba(186, 30, 56, 0.52),
     inset 0 0 28px rgba(255, 95, 95, 0.22);
   animation-name: werewolf-danger-speaking-glow;
+}
+
+.werewolf-table .werewolf-seat.safe-faction.speaking .werewolf-avatar {
+  border-color: rgba(157, 255, 186, 0.96);
+  box-shadow:
+    0 0 0 5px rgba(35, 155, 83, 0.24),
+    0 0 10px rgba(241, 255, 245, 0.92),
+    0 0 38px rgba(105, 245, 152, 0.94),
+    0 0 78px rgba(30, 150, 82, 0.5),
+    inset 0 0 28px rgba(102, 239, 148, 0.22);
+  animation-name: werewolf-safe-speaking-glow;
 }
 
 .werewolf-table .werewolf-seat.speaking .werewolf-nameplate {
@@ -150,6 +165,18 @@
   }
 }
 
+@keyframes werewolf-safe-speaking-glow {
+  50% {
+    transform: scale(1.14);
+    box-shadow:
+      0 0 0 6px rgba(35, 155, 83, 0.28),
+      0 0 15px rgba(247, 255, 249, 0.96),
+      0 0 52px rgba(111, 250, 160, 0.98),
+      0 0 96px rgba(20, 140, 71, 0.76),
+      inset 0 0 34px rgba(123, 248, 171, 0.3);
+  }
+}
+
 .werewolf-table .werewolf-seat.night-actor {
   z-index: 26;
 }
@@ -175,6 +202,28 @@
   animation: werewolf-night-actor-glow 1.8s ease-in-out infinite;
 }
 
+.werewolf-table .werewolf-seat.danger-faction.night-actor .werewolf-avatar {
+  border-color: rgba(255, 153, 153, 0.96);
+  box-shadow:
+    0 0 0 5px rgba(187, 31, 53, 0.28),
+    0 0 10px rgba(255, 243, 243, 0.92),
+    0 0 38px rgba(255, 112, 112, 0.94),
+    0 0 78px rgba(186, 30, 56, 0.52),
+    inset 0 0 28px rgba(255, 95, 95, 0.22);
+  animation-name: werewolf-danger-night-actor-glow;
+}
+
+.werewolf-table .werewolf-seat.safe-faction.night-actor .werewolf-avatar {
+  border-color: rgba(157, 255, 186, 0.96);
+  box-shadow:
+    0 0 0 5px rgba(35, 155, 83, 0.24),
+    0 0 10px rgba(241, 255, 245, 0.92),
+    0 0 38px rgba(105, 245, 152, 0.94),
+    0 0 78px rgba(30, 150, 82, 0.5),
+    inset 0 0 28px rgba(102, 239, 148, 0.22);
+  animation-name: werewolf-safe-night-actor-glow;
+}
+
 .werewolf-table .werewolf-seat.night-actor .werewolf-nameplate {
   color: #fff;
   text-shadow: 0 0 12px rgba(141, 197, 255, 0.92);
@@ -189,6 +238,30 @@
       0 0 58px rgba(132, 190, 255, 1),
       0 0 92px rgba(74, 130, 255, 0.66),
       inset 0 0 34px rgba(182, 229, 255, 0.42);
+  }
+}
+
+@keyframes werewolf-danger-night-actor-glow {
+  50% {
+    transform: scale(1.18);
+    box-shadow:
+      0 0 0 5px rgba(187, 31, 53, 0.3),
+      0 0 20px rgba(255, 248, 248, 0.96),
+      0 0 58px rgba(255, 115, 115, 0.98),
+      0 0 92px rgba(163, 18, 48, 0.76),
+      inset 0 0 34px rgba(255, 111, 111, 0.32);
+  }
+}
+
+@keyframes werewolf-safe-night-actor-glow {
+  50% {
+    transform: scale(1.18);
+    box-shadow:
+      0 0 0 5px rgba(35, 155, 83, 0.28),
+      0 0 20px rgba(247, 255, 249, 0.96),
+      0 0 58px rgba(111, 250, 160, 0.98),
+      0 0 92px rgba(20, 140, 71, 0.76),
+      inset 0 0 34px rgba(123, 248, 171, 0.3);
   }
 }
 
@@ -246,12 +319,12 @@
 
 .werewolf-sheriff-candidate-badge {
   position: absolute;
-  left: -14px;
+  right: -30px;
   top: 26px;
   z-index: 5;
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 50px;
+  height: 50px;
   place-items: center;
   border: 2px solid rgba(255, 245, 191, 0.94);
   border-radius: 50%;

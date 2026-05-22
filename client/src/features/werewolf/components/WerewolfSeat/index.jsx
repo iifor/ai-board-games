@@ -9,15 +9,18 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadge
   const isSpeaking = Number(currentSpeakerId) === Number(player.id);
   const roleText = player.roleLabel || ROLE_NAMES[player.role] || '';
   const isWerewolfPlayer = player.role === 'werewolf' || player.faction === 'wolves';
+  const hasVisibleSafeFaction = showRoles && !isWerewolfPlayer && Boolean(player.faction || player.role);
   return (
     <article
       className={classNames(
         'werewolf-seat',
         isSpeaking && 'speaking',
         isNightActor && 'night-actor',
+        isSheriffCandidate && 'sheriff-candidate',
         !player.alive && 'dead',
         showRoles && player.role,
-        showRoles && isWerewolfPlayer && 'danger-faction'
+        showRoles && isWerewolfPlayer && 'danger-faction',
+        hasVisibleSafeFaction && 'safe-faction'
       )}
       style={{}}
     >
@@ -31,7 +34,7 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadge
         <span className="werewolf-seat-number">{player.id}</span>
         {isSheriffCandidate && (
           <span className="werewolf-sheriff-candidate-badge" title="警长竞选" aria-label="举手">
-            <Hand size={18} />
+            <Hand size={30} />
           </span>
         )}
         {isSheriff && (
@@ -49,6 +52,7 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadge
                 key={`${badge.kind}-${badge.target || badge.label || badgeIndex}`}
               >
                 {getNightBadgeIcon(badge.kind, 30, '#fff1a1')}
+                {badge.prefix && <b>{badge.prefix}</b>}
                 {badge.target && <b>{badge.target}号</b>}
                 {!badge.target && badge.label && <b>{badge.label}</b>}
                 {badge.result && <em>{badge.result}</em>}

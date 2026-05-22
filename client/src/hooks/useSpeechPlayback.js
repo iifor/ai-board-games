@@ -15,6 +15,7 @@ export function useSpeechPlayback({
   extractNarration,
   getExtraFields,
   getVoicePackageId,
+  getPlaybackDelay = getDefaultPlaybackDelay,
   splitConfig = PLAYABLE_TEXT_CONFIG
 }) {
   const subtitleTimerRef = useRef(null);
@@ -37,11 +38,11 @@ export function useSpeechPlayback({
 
       if (!queued) {
         playSubtitleText(narration, playerId, event.ackId, event);
-        setAckTimer(getPlayablePlaybackDelay(narration, splitConfig));
+        setAckTimer(getPlaybackDelay(event, narration, splitConfig));
       }
     } else {
       playSubtitleText(narration, playerId, event.ackId, event);
-      setAckTimer(getPlayablePlaybackDelay(narration, splitConfig));
+      setAckTimer(getPlaybackDelay(event, narration, splitConfig));
     }
     return true;
   }
@@ -120,4 +121,8 @@ export function useSpeechPlayback({
   }
 
   return { clearSubtitleTimer, playPendingEvent, playSubtitleText, speakChunks, speakSingle };
+}
+
+function getDefaultPlaybackDelay(event, narration, splitConfig) {
+  return getPlayablePlaybackDelay(narration, splitConfig);
 }

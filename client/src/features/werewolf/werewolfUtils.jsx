@@ -233,37 +233,64 @@ export function getWerewolfFlowLabel(event) {
 }
 
 export function shouldShowWerewolfActionTargets(round) {
-  return Boolean(round?.voteTally && Object.keys(round.voteTally).length);
+  if (round?.voteTally && Object.keys(round.voteTally).length) return true;
+  const election = round?.sheriffElection;
+  if (election && !election.sheriffId && election.result === 'pending') {
+    if (hasSheriffVoteData(election)) return true;
+  }
+  return false;
 }
 
 export function getWerewolfActionTarget(round, player) {
   if (!round || !player) return null;
-  return round.votes?.[player.id] || null;
+  if (round.votes?.[player.id]) return round.votes[player.id];
+  const election = round?.sheriffElection;
+  if (election) {
+    if (election.runoffVotes?.[player.id]) return election.runoffVotes[player.id];
+    if (election.votes?.[player.id]) return election.votes[player.id];
+  }
+  return null;
+}
+
+function hasSheriffVoteData(election) {
+  return Boolean(
+    (election.votes && Object.keys(election.votes).length) ||
+    (election.runoffVotes && Object.keys(election.runoffVotes).length)
+  );
 }
 
 export function getWerewolfNightActionBadges(round, player, nightActionType = '') {
   if (!round?.night || !player || round.phase !== 'night') return [];
   const night = round.night;
   const badges = [];
+
   const wolfVoteTarget = night.wolfChoices?.[player.id];
   if (wolfVoteTarget && (player.faction === 'wolves' || player.role === 'werewolf')) {
-    badges.push({ kind: 'wolf', target: wolfVoteTarget, title: `夜投 ${wolfVoteTarget} 号` });
+    if (nightActionType === 'wolf-wake' || nightActionType === 'wolf-leader') {
+      badges.push({ kind: 'wolf', target: wolfVoteTarget, title: `夜投 ${wolfVoteTarget} 号` });
+    }
   }
   if (player.role === 'seer' && night.seerCheck?.target) {
-    const theme = getSeerCheckTheme(night.seerCheck.result);
-    badges.push({
-      kind: 'seer',
-      target: night.seerCheck.target,
-      result: night.seerCheck.result || '',
-      theme,
-      title: `查验 ${night.seerCheck.target} 号：${night.seerCheck.result || '未知'}`
-    });
+    if (nightActionType === 'seer-wake' || nightActionType === 'seer-check') {
+      const theme = getSeerCheckTheme(night.seerCheck.result);
+      badges.push({
+        kind: 'seer',
+        target: night.seerCheck.target,
+        result: night.seerCheck.result || '',
+        theme,
+        title: `查验 ${night.seerCheck.target} 号：${night.seerCheck.result || '未知'}`
+      });
+    }
   }
   if (player.role === 'guard' && night.guardTarget) {
-    badges.push({ kind: 'guard', target: night.guardTarget, title: `守护 ${night.guardTarget} 号` });
+    if (nightActionType === 'guard-wake') {
+      badges.push({ kind: 'guard', target: night.guardTarget, title: `守护 ${night.guardTarget} 号` });
+    }
   }
   if (player.role === 'witch') {
-    appendWitchNightActionBadges(badges, night, nightActionType);
+    if (['witch-antidote', 'witch-antidote-action', 'witch-poison', 'witch-poison-action'].includes(nightActionType)) {
+      appendWitchNightActionBadges(badges, night, nightActionType);
+    }
   }
   return badges;
 }
@@ -296,29 +323,20 @@ export function getNightActionPlayerIds(eventType, players = []) {
 
 function appendWitchNightActionBadges(badges, night, nightActionType) {
   if (night.witchSaveTarget) {
-    badges.push({ kind: 'antidote', target: night.witchSaveTarget, title: `解救 ${night.witchSaveTarget} 号` });
+    badges.push({ kind: 'antidote', target: night.witchSaveTarget, prefix: '救', title: `解救 ${night.witchSaveTarget} 号` });
   } else if (hasCompletedWitchAntidoteAction(nightActionType)) {
-    badges.push(createUnusedWitchBadge('antidote', '解药不用'));
+    badges.push({ kind: 'antidote', label: '不救', title: '解药不用', theme: WEREWOLF_NIGHT_BADGE_THEME.muted });
   }
 
   if (night.witchPoisonTarget) {
-    badges.push({ kind: 'poison', target: night.witchPoisonTarget, title: `毒药 ${night.witchPoisonTarget} 号` });
+    badges.push({ kind: 'poison', target: night.witchPoisonTarget, prefix: '毒', title: `毒药 ${night.witchPoisonTarget} 号` });
   } else if (nightActionType === 'witch-poison-action') {
-    badges.push(createUnusedWitchBadge('poison', '毒药不用'));
+    badges.push({ kind: 'poison', label: '不毒', title: '毒药不用', theme: WEREWOLF_NIGHT_BADGE_THEME.muted });
   }
 }
 
 function hasCompletedWitchAntidoteAction(nightActionType) {
   return ['witch-antidote-action', 'witch-poison', 'witch-poison-action'].includes(nightActionType);
-}
-
-function createUnusedWitchBadge(kind, title) {
-  return {
-    kind,
-    label: '不用',
-    title,
-    theme: WEREWOLF_NIGHT_BADGE_THEME.muted
-  };
 }
 
 function getSeerCheckTheme(result) {
