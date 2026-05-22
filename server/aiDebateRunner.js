@@ -1,7 +1,6 @@
-﻿const { callOpenAIChat, parseJsonObject } = require('./openaiChat');
+﻿const { callOpenAIChat, parseJsonObject, cachedLlmCall } = require('./modules/llm');
 
 const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('./services/ai/promptComposer');
-const { cachedLlmCall } = require('./services/ai/llmResultCache');
 
 const PHASES = [
   { id: 'strategy', name: '队长战术部署', limit: 300 },

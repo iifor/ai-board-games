@@ -1,7 +1,7 @@
 const http = require('http');
-const { getAiConfig } = require('./aiConfig');
 const { createApp } = require('./app');
-const { attachGameSocket } = require('./gameSocket');
+const { attachGameSocket } = require('./modules/game-socket');
+const { getAiConfig } = require('./config');
 
 const port = Number(process.env.API_PORT || (process.env.NODE_ENV === 'production' ? process.env.PORT : undefined) || 3001);
 const app = createApp();

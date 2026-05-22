@@ -1,4 +1,4 @@
-const { callOpenAIChat, parseJsonObject } = require('../openaiChat');
+const { callOpenAIChat, parseJsonObject } = require('../modules/llm');
 
 class PlayerAgent {
   constructor(player, systemPrompt) {

@@ -1,5 +1,5 @@
-const { callOpenAIChat } = require('../openaiChat');
-const { getWerewolfModeConfig } = require('../werewolfModes');
+const { callOpenAIChat } = require('../modules/llm');
+const { getWerewolfModeConfig } = require('../modules/werewolf-config');
 const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('../services/ai/promptComposer');
 const { PlayerAgent, normalizeText } = require('./playerAgent');
 const { createWerewolfSkillRegistry } = require('../skills/werewolf/roleSkills');

@@ -1,12 +1,14 @@
 const { WebSocketServer } = require('ws');
-const { getAiConfig } = require('./aiConfig');
+const { getAiConfig } = require('./config');
 const { getDb } = require('./db');
 const { createAiGame } = require('./aiGameRunner');
 const { runAiDebate } = require('./aiDebateRunner');
 const { runAiWerewolf } = require('./aiWerewolfRunner');
-const { getWerewolfModeConfig } = require('./werewolfModes');
-const { getGame, getVoicePackage, listPlayers, saveGameRecord } = require('./adminStore');
-const { prepareVoiceAudio } = require('./services/audio/audioResourceCache');
+const { getWerewolfModeConfig } = require('./modules/werewolf-config');
+const { getGame, saveGameRecord } = require('./modules/games');
+const { getVoicePackage } = require('./modules/voices');
+const { listPlayers } = require('./modules/players');
+const { prepareVoiceAudio } = require('./modules/tts');
 const { splitPlayableTextSegments, stripSpeechParentheses } = require('./services/text/playableText');
 const {
   getWerewolfNightPrompt,

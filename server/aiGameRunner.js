@@ -1,6 +1,6 @@
-const { callOpenAIChat, parseJsonObject } = require('./openaiChat');
-const { getRandomEnabledSkin } = require('./adminStore');
-const { buildMemoryCard, getInvestigationQuestions } = require('./mistTemplate');
+const { callOpenAIChat, parseJsonObject } = require('./modules/llm');
+const { getRandomEnabledSkin } = require('./modules/skins');
+const { buildMemoryCard, getInvestigationQuestions } = require('./modules/skin-engine');
 const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('./services/ai/promptComposer');
 
 function shuffle(items) {

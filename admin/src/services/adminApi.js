@@ -13,5 +13,7 @@ export async function adminRequest(path, options = {}) {
     error.payload = data;
     throw error;
   }
-  return data;
+  return data?.code === 0 && Object.prototype.hasOwnProperty.call(data, 'data')
+    ? data.data
+    : data;
 }

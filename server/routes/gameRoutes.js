@@ -1,10 +1,13 @@
 const express = require('express');
-const { getAiConfig } = require('../aiConfig');
+const { getAiConfig } = require('../config');
 const { createAiGame } = require('../aiGameRunner');
 const { getDb } = require('../db');
-const { testOpenAIConnection } = require('../openaiChat');
-const { getGame, getVoicePackage, listGames, listSkins, listWerewolfModes, saveGameRecord } = require('../adminStore');
-const { synthesizeVoicePreview } = require('../voicePreview');
+const { testOpenAIConnection } = require('../modules/llm');
+const { getGame, listGames, saveGameRecord } = require('../modules/games');
+const { getVoicePackage } = require('../modules/voices');
+const { listSkins } = require('../modules/skins');
+const { listWerewolfModes } = require('../modules/werewolf-config');
+const { synthesizeVoicePreview } = require('../modules/tts');
 
 const router = express.Router();
 

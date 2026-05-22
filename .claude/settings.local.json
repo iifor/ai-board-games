@@ -7,7 +7,27 @@
       "Bash(python3 -c ' *)",
       "Bash(npm run *)",
       "Bash(mkdir -p pages)",
-      "Bash(mv components/__TRACKED_VAR__ pages/__TRACKED_VAR__)"
+      "Bash(mv components/__TRACKED_VAR__ pages/__TRACKED_VAR__)",
+      "Bash(npm install *)",
+      "Bash(pnpm add *)",
+      "Bash(node -e \"require\\('./server/app'\\)\")",
+      "Bash(timeout 8 node server/index.js)",
+      "Bash(node server/index.js)",
+      "Bash(curl -s http://localhost:3001/api/admin/skins)",
+      "Bash(curl -s http://localhost:3001/api/admin/players)",
+      "Bash(curl -s http://localhost:3001/api/admin/models)",
+      "Bash(curl -s http://localhost:3001/api/toc/health)",
+      "Bash(kill %1)",
+      "Bash(curl -s http://localhost:3001/api/admin/skins/nonexistent)",
+      "Bash(curl -s -X POST http://localhost:3001/api/admin/skins -H \"Content-Type: application/json\" -d '{\"name\":\"\"}')",
+      "Bash(curl -s http://localhost:3001/api/nonexistent)",
+      "Bash(pkill -f \"node server/index.js\")",
+      "Bash(curl -s http://localhost:3001/api/admin/skins/ai-lab-anomaly)",
+      "Bash(fuser -k 3001/tcp)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 15336 //F)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash([ -f \"c:/Users/Administrator/Desktop/AI项目/CONSENSUS/$f\" ])"
     ]
   }
 }

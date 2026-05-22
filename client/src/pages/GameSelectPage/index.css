@@ -195,7 +195,11 @@
   flex-wrap: wrap;
   align-content: flex-start;
   gap: 8px;
-  overflow: hidden;
+  overflow: auto;
+}
+
+.game-player-options::-webkit-scrollbar {
+  display: none;
 }
 
 .game-player-options button {

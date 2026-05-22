@@ -6,33 +6,35 @@ export async function fetchAiPlayers() {
 export async function fetchAiHealth() {
   const response = await fetch('/api/toc/health');
   if (!response.ok) throw new Error('无法获取 AI 玩家配置');
-  return response.json();
+  return parseApiData(response);
 }
 
 export async function fetchPlayerSelections() {
   const response = await fetch('/api/toc/player-selections');
   if (!response.ok) throw new Error('无法获取玩家选择配置');
-  const data = await response.json();
+  const data = await parseApiData(response);
   return data.selections || {};
 }
 
 export async function fetchRecentGames(gameType, limit = 10) {
   const response = await fetch(`/api/toc/games/recent?gameType=${encodeURIComponent(gameType)}&limit=${encodeURIComponent(limit)}`);
   if (!response.ok) throw new Error('无法获取历史对局');
-  const data = await response.json();
-  return data.games || [];
+  const data = await parseApiData(response);
+  return Array.isArray(data.games)
+    ? data.games.filter((game) => game.gameType === gameType)
+    : [];
 }
 
 export async function fetchWerewolfModes() {
   const response = await fetch('/api/toc/werewolf-modes');
   if (!response.ok) throw new Error('无法获取狼人杀模式');
-  return response.json();
+  return parseApiData(response);
 }
 
 export async function fetchGameDetail(id) {
   const response = await fetch(`/api/toc/games/${encodeURIComponent(id)}`);
   if (!response.ok) throw new Error('无法获取对局详情');
-  return response.json();
+  return parseApiData(response);
 }
 
 export async function savePlayerSelection(gameType, playerIds) {
@@ -45,7 +47,14 @@ export async function savePlayerSelection(gameType, playerIds) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.error || data.message || '保存玩家选择失败');
   }
-  return response.json();
+  return parseApiData(response);
+}
+
+async function parseApiData(response) {
+  const payload = await response.json();
+  return payload?.code === 0 && Object.prototype.hasOwnProperty.call(payload, 'data')
+    ? payload.data
+    : payload;
 }
 
 export function openGameSocket({ gameType = 'debate', playerIds, hostId, topic, debateTeams, werewolfMode, replayGameId, onEvent, onError, onClose }) {
