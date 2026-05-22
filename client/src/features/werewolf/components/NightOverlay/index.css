@@ -1,0 +1,75 @@
+.werewolf-night-overlay {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(8, 16, 34, 0.74), rgba(0, 0, 0, 0.92) 56%, rgba(0, 0, 0, 0.98)),
+    rgba(0, 0, 0, 0.84);
+  backdrop-filter: blur(2px) saturate(0.68);
+}
+
+.werewolf-night-overlay::before,
+.werewolf-night-overlay::after,
+.werewolf-night-overlay span {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  opacity: 0.82;
+  background-repeat: repeat;
+  pointer-events: none;
+}
+
+.werewolf-night-overlay::before {
+  background-image:
+    radial-gradient(circle, rgba(142, 172, 255, 0.34) 0 1px, transparent 2px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.18) 0 1px, transparent 2px);
+  background-position: 0 0, 37px 61px;
+  background-size: 88px 88px, 132px 132px;
+  filter: blur(0.3px);
+  animation: werewolf-night-drift 18s linear infinite;
+}
+
+.werewolf-night-overlay::after {
+  background:
+    radial-gradient(ellipse at 24% 32%, rgba(38, 55, 126, 0.36), transparent 28%),
+    radial-gradient(ellipse at 78% 62%, rgba(17, 35, 86, 0.42), transparent 34%);
+  filter: blur(30px);
+  animation: werewolf-night-wave 8s ease-in-out infinite;
+}
+
+.werewolf-night-overlay span:first-child {
+  background-image: radial-gradient(circle, rgba(120, 149, 244, 0.22) 0 1px, transparent 2px);
+  background-size: 54px 54px;
+  filter: blur(1px);
+  animation: werewolf-night-drift 11s linear infinite reverse;
+}
+
+.werewolf-night-overlay span:last-child {
+  background:
+    repeating-radial-gradient(circle at 50% 50%, transparent 0 68px, rgba(10, 23, 64, 0.2) 70px 72px, transparent 74px 120px);
+  mix-blend-mode: screen;
+  opacity: 0.52;
+  animation: werewolf-night-pulse 6s ease-in-out infinite;
+}
+
+@keyframes werewolf-night-drift {
+  to {
+    transform: translate3d(84px, -72px, 0);
+  }
+}
+
+@keyframes werewolf-night-wave {
+  50% {
+    transform: scale(1.12) translate3d(2%, -1%, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes werewolf-night-pulse {
+  50% {
+    transform: scale(1.08);
+    opacity: 0.76;
+  }
+}

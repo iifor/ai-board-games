@@ -6,7 +6,6 @@ function rowToModel(row) {
   return {
     id: row.id, provider: row.provider, name: row.name, baseUrl: row.base_url,
     apiFormat: row.api_format, hasApiKey,
-    apiKey: hasApiKey ? decryptApiKey(row) : '',
     enabled: Boolean(row.enabled), createdAt: row.created_at, updatedAt: row.updated_at
   };
 }

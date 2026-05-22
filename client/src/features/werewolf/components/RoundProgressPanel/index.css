@@ -1,6 +1,7 @@
 .werewolf-progress-panel {
   flex: 0 1 auto;
-  max-height: 360px;
+  max-height: 500px;
+  padding-bottom: 20px;
 }
 
 .werewolf-progress-list {

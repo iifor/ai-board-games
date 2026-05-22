@@ -214,16 +214,6 @@ function buildWerewolfReplayPlaybackEvents(game) {
 
     appendWerewolfNightPlaybackEvents(events, sourceRound, nightRound, nightPhaseKey, game, replayPlayers, visibleRounds);
     applyWerewolfNightDeaths(replayPlayers, sourceRound);
-    Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'night-result'));
-    events.push({
-      type: 'night-result',
-      phaseKey: nightPhaseKey,
-      round: nightRound,
-      message: buildNightPublicMessage(nightRound),
-      game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
-    });
-    appendWerewolfBadgePlaybackEvents(events, sourceRound, nightRound, nightPhaseKey, game, replayPlayers, visibleRounds, 'night');
-
     Object.assign(nightRound, createWerewolfVisibleRound(sourceRound, 'day-start'));
     events.push({
       type: 'day-start',
@@ -232,6 +222,14 @@ function buildWerewolfReplayPlaybackEvents(game) {
       message: buildDayStartMessage(),
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
     });
+    events.push({
+      type: 'night-result',
+      phaseKey: dayPhaseKey,
+      round: nightRound,
+      message: buildNightPublicMessage(nightRound),
+      game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds)
+    });
+    appendWerewolfBadgePlaybackEvents(events, sourceRound, nightRound, dayPhaseKey, game, replayPlayers, visibleRounds, 'night');
 
     appendWerewolfSheriffPlaybackEvents(events, sourceRound, nightRound, dayPhaseKey, game, replayPlayers, visibleRounds);
 
@@ -349,6 +347,7 @@ function appendWerewolfSheriffPlaybackEvents(events, sourceRound, visibleRound, 
 
 function appendWerewolfNightPlaybackEvents(events, sourceRound, visibleRound, phaseKey, game, replayPlayers, visibleRounds) {
   const night = sourceRound.night || {};
+  const configuredActions = getWerewolfReplayNightActions(game);
   pushWerewolfPlaybackEvent(events, 'wolf-wake', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
     message: getWerewolfNightPrompt('wolf-wake')
   });
@@ -364,18 +363,63 @@ function appendWerewolfNightPlaybackEvents(events, sourceRound, visibleRound, ph
     visibleRound.night.wolfSpeeches = [...visibleRound.night.wolfSpeeches, speech];
     pushWerewolfPlaybackEvent(events, 'wolf-speech', phaseKey, visibleRound, game, replayPlayers, visibleRounds, { speech });
   }
-  pushWerewolfPlaybackEvent(events, 'seer-wake', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
-    message: getWerewolfNightPrompt('seer-wake')
-  });
-  pushWerewolfPlaybackEvent(events, 'guard-wake', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
-    message: getWerewolfNightPrompt('guard-wake')
-  });
-  pushWerewolfPlaybackEvent(events, 'witch-antidote', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
-    message: getWerewolfNightPrompt('witch-antidote')
-  });
-  pushWerewolfPlaybackEvent(events, 'witch-poison', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
-    message: getWerewolfNightPrompt('witch-poison')
-  });
+  visibleRound.night.wolfTarget = night.wolfTarget || null;
+  visibleRound.night.wolfChoices = night.wolfChoices || {};
+  visibleRound.night.wolfVoteTally = night.wolfVoteTally || {};
+  visibleRound.night.wolfTieBreak = night.wolfTieBreak || null;
+  pushWerewolfPlaybackEvent(events, 'wolf-vote', phaseKey, visibleRound, game, replayPlayers, visibleRounds);
+  if (configuredActions.has('inspectFaction')) {
+    pushWerewolfPlaybackEvent(events, 'seer-wake', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+      message: getWerewolfNightPrompt('seer-wake')
+    });
+    if (night.seerCheck?.target) {
+      visibleRound.night.seerCheck = night.seerCheck;
+      pushWerewolfPlaybackEvent(events, 'seer-check', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+        seerCheck: night.seerCheck
+      });
+    }
+  }
+  if (configuredActions.has('guard')) {
+    pushWerewolfPlaybackEvent(events, 'guard-wake', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+      message: getWerewolfNightPrompt('guard-wake')
+    });
+    visibleRound.night.guardTarget = night.guardTarget || null;
+    pushWerewolfPlaybackEvent(events, 'guard-action', phaseKey, visibleRound, game, replayPlayers, visibleRounds);
+  }
+  if (configuredActions.has('save')) {
+    pushWerewolfPlaybackEvent(events, 'witch-antidote', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+      message: getWerewolfNightPrompt('witch-antidote')
+    });
+    visibleRound.night.witchSave = Boolean(night.witchSave);
+    visibleRound.night.witchSaveTarget = night.witchSaveTarget || (night.witchSave ? night.wolfTarget : null);
+    pushWerewolfPlaybackEvent(events, 'witch-action', phaseKey, visibleRound, game, replayPlayers, visibleRounds);
+  }
+  if (configuredActions.has('poison')) {
+    pushWerewolfPlaybackEvent(events, 'witch-poison', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
+      message: getWerewolfNightPrompt('witch-poison')
+    });
+    visibleRound.night.witchPoisonTarget = night.witchPoisonTarget || null;
+    pushWerewolfPlaybackEvent(events, 'witch-action', phaseKey, visibleRound, game, replayPlayers, visibleRounds);
+  }
+}
+
+function getWerewolfReplayNightActions(game = {}) {
+  const actions = new Set();
+  for (const role of game.werewolfMode?.resolvedRoles || []) {
+    for (const item of role?.rule?.actions || []) {
+      if (item?.action) actions.add(item.action);
+    }
+  }
+  if (actions.size) return actions;
+
+  const replayRoles = new Set((game.players || []).map((player) => player.role).filter(Boolean));
+  if (replayRoles.has('seer')) actions.add('inspectFaction');
+  if (replayRoles.has('guard')) actions.add('guard');
+  if (replayRoles.has('witch')) {
+    actions.add('save');
+    actions.add('poison');
+  }
+  return actions;
 }
 
 function appendWerewolfBadgePlaybackEvents(events, sourceRound, visibleRound, phaseKey, game, replayPlayers, visibleRounds, phase) {
@@ -456,7 +500,19 @@ function createWerewolfVisibleRound(round = {}, stage) {
     hunterShot: null
   };
   if (stage === 'night-start') {
-    base.night = { ...createWerewolfVisibleNight(round.night), deaths: [] };
+    base.night = {
+      ...createWerewolfVisibleNight(round.night),
+      wolfTarget: null,
+      wolfChoices: {},
+      wolfVoteTally: {},
+      wolfTieBreak: null,
+      seerCheck: null,
+      witchSave: false,
+      witchSaveTarget: null,
+      witchPoisonTarget: null,
+      guardTarget: null,
+      deaths: []
+    };
   }
   if (stage === 'day-start') {
     base.speeches = [];
@@ -474,9 +530,18 @@ function createWerewolfVisibleRound(round = {}, stage) {
 
 function createWerewolfVisibleNight(night = {}) {
   return {
+    wolfTarget: night.wolfTarget || null,
     wolfLeaderId: night.wolfLeaderId || null,
     wolfSpeechOrder: night.wolfSpeechOrder || [],
     wolfSpeeches: night.wolfSpeeches || [],
+    wolfChoices: night.wolfChoices || {},
+    wolfVoteTally: night.wolfVoteTally || {},
+    wolfTieBreak: night.wolfTieBreak || null,
+    seerCheck: night.seerCheck || null,
+    witchSave: Boolean(night.witchSave),
+    witchSaveTarget: night.witchSaveTarget || (night.witchSave ? night.wolfTarget : null),
+    witchPoisonTarget: night.witchPoisonTarget || null,
+    guardTarget: night.guardTarget || null,
     deaths: night.deaths || []
   };
 }

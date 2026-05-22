@@ -45,6 +45,7 @@ class WerewolfGameAgent {
       round.sheriffBadge.status = round.sheriffId ? 'held' : 'none';
       this.rounds.push(round);
       await this.runNight(round);
+      await this.announceDaybreak(round);
       this.applyWinCheck(day);
       if (this.winner) break;
       await this.runDay(round);
@@ -105,23 +106,41 @@ class WerewolfGameAgent {
     const alive = this.agents.filter((agent) => agent.alive);
     await this.emitNightPrompt('wolf-wake', round);
     await this.resolveWolfKill(round, alive);
-    await this.emitNightPrompt('seer-wake', round);
-    await this.resolveInspect(round, alive);
-    await this.emitNightPrompt('guard-wake', round);
-    await this.resolveGuard(round, alive);
-    await this.emitNightPrompt('witch-antidote', round);
-    const witchUsedAntidote = await this.resolveWitchAntidote(round);
-    await this.emitNightPrompt('witch-poison', round);
-    await this.resolveWitchPoison(round, witchUsedAntidote);
-    await this.resolveNightDeaths(round);
-    await this.emit({ type: 'night-result', round, message: buildNightPublicMessage(round), game: this.serialize() });
-    for (const death of round.night.deaths) {
-      await this.maybeTransferSheriffBadge(round, death.id, death.reason, 'night');
+    await this.emitNightAction('wolf-vote', round);
+    if (this.hasConfiguredRoleAction('inspectFaction')) {
+      await this.emitNightPrompt('seer-wake', round);
+      await this.resolveInspect(round, alive);
+      await this.emitNightAction('seer-check', round, { seerCheck: round.night.seerCheck });
     }
+    if (this.hasConfiguredRoleAction('guard')) {
+      await this.emitNightPrompt('guard-wake', round);
+      await this.resolveGuard(round, alive);
+      await this.emitNightAction('guard-action', round);
+    }
+    let witchUsedAntidote = false;
+    if (this.hasConfiguredRoleAction('save')) {
+      await this.emitNightPrompt('witch-antidote', round);
+      witchUsedAntidote = await this.resolveWitchAntidote(round);
+      await this.emitNightAction('witch-action', round);
+    }
+    if (this.hasConfiguredRoleAction('poison')) {
+      await this.emitNightPrompt('witch-poison', round);
+      await this.resolveWitchPoison(round, witchUsedAntidote);
+      await this.emitNightAction('witch-action', round);
+    }
+    await this.resolveNightDeaths(round);
   }
 
   async emitNightPrompt(type, round) {
     await this.emit({ type, round, message: getWerewolfNightPrompt(type), game: this.serialize() });
+  }
+
+  async emitNightAction(type, round, patch = {}) {
+    await this.emit({ type, round, game: this.serialize(), ...patch });
+  }
+
+  hasConfiguredRoleAction(action) {
+    return this.agents.some((agent) => hasRoleAction(agent.roleConfig, action));
   }
 
   async resolveWolfKill(round, alive) {
@@ -204,6 +223,7 @@ class WerewolfGameAgent {
     if (save.use) {
       witch.usedAntidote = true;
       round.night.witchSave = true;
+      round.night.witchSaveTarget = victim.id;
       return true;
     }
     return false;
@@ -236,12 +256,20 @@ class WerewolfGameAgent {
     round.night.deaths = deaths;
   }
 
-  async runDay(round) {
+  async announceDaybreak(round) {
     round.phase = 'day';
     const nightPublicMessage = buildNightPublicMessage(round);
     const message = buildDayStartMessage();
     round.publicSummary = nightPublicMessage;
     await this.emit({ type: 'day-start', round, message, game: this.serialize() });
+    await this.emit({ type: 'night-result', round, message: nightPublicMessage, game: this.serialize() });
+    for (const death of round.night.deaths) {
+      await this.maybeTransferSheriffBadge(round, death.id, death.reason, 'night');
+    }
+  }
+
+  async runDay(round) {
+    round.phase = 'day';
 
     if (this.modeConfig.sheriff.enabled && this.modeConfig.sheriff.firstDayElection !== false && round.day === 1) {
       await this.runSheriffElection(round);
@@ -675,6 +703,7 @@ function createRound(day) {
       wolfTieBreak: null,
       seerCheck: null,
       witchSave: false,
+      witchSaveTarget: null,
       witchPoisonTarget: null,
       guardTarget: null,
       wolfStrategy: '',
@@ -745,9 +774,18 @@ function publicRound(round = {}) {
 
 function publicNight(night = {}) {
   return {
+    wolfTarget: night.wolfTarget || null,
     wolfLeaderId: night.wolfLeaderId || null,
     wolfSpeechOrder: night.wolfSpeechOrder || [],
     wolfSpeeches: night.wolfSpeeches || [],
+    wolfChoices: night.wolfChoices || {},
+    wolfVoteTally: night.wolfVoteTally || {},
+    wolfTieBreak: night.wolfTieBreak || null,
+    seerCheck: night.seerCheck || null,
+    witchSave: Boolean(night.witchSave),
+    witchSaveTarget: night.witchSaveTarget || (night.witchSave ? night.wolfTarget : null),
+    witchPoisonTarget: night.witchPoisonTarget || null,
+    guardTarget: night.guardTarget || null,
     deaths: night.deaths || []
   };
 }

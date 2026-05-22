@@ -14,7 +14,7 @@
 
 .werewolf-elimination-panel {
   flex: 0 1 auto;
-  max-height: 360px;
+  max-height: 800px;
   overflow: hidden;
 }
 

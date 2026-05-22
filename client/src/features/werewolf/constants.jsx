@@ -42,6 +42,7 @@ export const EVENT_LABELS = {
   'wolf-leader': '狼队领袖',
   'wolf-speech': '狼队夜聊',
   'seer-wake': '预言家查验',
+  'seer-check': '预言家查验结果',
   'guard-wake': '守卫守护',
   'witch-antidote': '女巫解药',
   'witch-poison': '女巫毒药',
@@ -63,4 +64,35 @@ export const EVENT_LABELS = {
   'hunter-shot': '猎人开枪',
   game: '胜负结算',
   host: '主持播报'
+};
+
+export const WEREWOLF_NIGHT_BADGE_THEME = {
+  default: {
+    className: 'default',
+    style: {
+      '--werewolf-night-badge-accent': '#fff1a1',
+      '--werewolf-night-badge-result': '#d8efff'
+    }
+  },
+  safe: {
+    className: 'safe',
+    style: {
+      '--werewolf-night-badge-accent': '#b9ffd0',
+      '--werewolf-night-badge-result': '#7ff0a7'
+    }
+  },
+  danger: {
+    className: 'danger',
+    style: {
+      '--werewolf-night-badge-accent': '#ffd0d0',
+      '--werewolf-night-badge-result': '#ff7777'
+    }
+  },
+  muted: {
+    className: 'muted',
+    style: {
+      '--werewolf-night-badge-accent': '#dde5f5',
+      '--werewolf-night-badge-result': '#dde5f5'
+    }
+  }
 };

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Crown, Moon, Shield, Sparkles, Sun, Swords, Users, Vote, Wand2 } from 'lucide-react';
-import { ROLE_NAMES, ROLE_ICON, EVENT_LABELS } from './constants';
+import { ROLE_NAMES, ROLE_ICON, EVENT_LABELS, WEREWOLF_NIGHT_BADGE_THEME } from './constants';
 
 export { ROLE_NAMES };
 
@@ -220,6 +220,7 @@ export function getWerewolfNarration(event) {
 }
 
 export function getWerewolfFlowLabel(event) {
+  if (event?.type === 'seer-check') return event.message || '预言家查验结果';
   const labels = {
     'wolf-wake': '狼人行动',
     'wolf-leader': '狼队领袖指定',
@@ -238,6 +239,93 @@ export function shouldShowWerewolfActionTargets(round) {
 export function getWerewolfActionTarget(round, player) {
   if (!round || !player) return null;
   return round.votes?.[player.id] || null;
+}
+
+export function getWerewolfNightActionBadges(round, player, nightActionType = '') {
+  if (!round?.night || !player || round.phase !== 'night') return [];
+  const night = round.night;
+  const badges = [];
+  const wolfVoteTarget = night.wolfChoices?.[player.id];
+  if (wolfVoteTarget && (player.faction === 'wolves' || player.role === 'werewolf')) {
+    badges.push({ kind: 'wolf', target: wolfVoteTarget, title: `夜投 ${wolfVoteTarget} 号` });
+  }
+  if (player.role === 'seer' && night.seerCheck?.target) {
+    const theme = getSeerCheckTheme(night.seerCheck.result);
+    badges.push({
+      kind: 'seer',
+      target: night.seerCheck.target,
+      result: night.seerCheck.result || '',
+      theme,
+      title: `查验 ${night.seerCheck.target} 号：${night.seerCheck.result || '未知'}`
+    });
+  }
+  if (player.role === 'guard' && night.guardTarget) {
+    badges.push({ kind: 'guard', target: night.guardTarget, title: `守护 ${night.guardTarget} 号` });
+  }
+  if (player.role === 'witch') {
+    appendWitchNightActionBadges(badges, night, nightActionType);
+  }
+  return badges;
+}
+
+export function getNightActionPlayerIds(eventType, players = []) {
+  const roleByNightEvent = {
+    'seer-wake': 'seer',
+    'seer-check': 'seer',
+    'guard-wake': 'guard',
+    'witch-antidote': 'witch',
+    'witch-antidote-action': 'witch',
+    'witch-poison': 'witch',
+    'witch-poison-action': 'witch'
+  };
+
+  if (eventType === 'wolf-wake' || eventType === 'wolf-leader') {
+    return players
+      .filter((player) => player.alive && (player.faction === 'wolves' || player.role === 'werewolf'))
+      .map((player) => Number(player.id))
+      .filter(Boolean);
+  }
+
+  const role = roleByNightEvent[eventType];
+  if (!role) return [];
+  return players
+    .filter((player) => player.alive && player.role === role)
+    .map((player) => Number(player.id))
+    .filter(Boolean);
+}
+
+function appendWitchNightActionBadges(badges, night, nightActionType) {
+  if (night.witchSaveTarget) {
+    badges.push({ kind: 'antidote', target: night.witchSaveTarget, title: `解救 ${night.witchSaveTarget} 号` });
+  } else if (hasCompletedWitchAntidoteAction(nightActionType)) {
+    badges.push(createUnusedWitchBadge('antidote', '解药不用'));
+  }
+
+  if (night.witchPoisonTarget) {
+    badges.push({ kind: 'poison', target: night.witchPoisonTarget, title: `毒药 ${night.witchPoisonTarget} 号` });
+  } else if (nightActionType === 'witch-poison-action') {
+    badges.push(createUnusedWitchBadge('poison', '毒药不用'));
+  }
+}
+
+function hasCompletedWitchAntidoteAction(nightActionType) {
+  return ['witch-antidote-action', 'witch-poison', 'witch-poison-action'].includes(nightActionType);
+}
+
+function createUnusedWitchBadge(kind, title) {
+  return {
+    kind,
+    label: '不用',
+    title,
+    theme: WEREWOLF_NIGHT_BADGE_THEME.muted
+  };
+}
+
+function getSeerCheckTheme(result) {
+  const text = String(result || '');
+  if (text.includes('狼人') || text.toLowerCase().includes('wolf')) return WEREWOLF_NIGHT_BADGE_THEME.danger;
+  if (text.includes('好人') || text.includes('善') || text.toLowerCase().includes('good')) return WEREWOLF_NIGHT_BADGE_THEME.safe;
+  return WEREWOLF_NIGHT_BADGE_THEME.default;
 }
 
 function formatNightSummary(round, players, showRoles, visibleRolePlayerId) {

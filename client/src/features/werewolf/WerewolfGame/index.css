@@ -233,6 +233,12 @@
   font-weight: 900;
 }
 
+.player-detail-head p.danger,
+.player-detail-modal dd.danger {
+  color: #ff7777;
+  text-shadow: 0 0 12px rgba(255, 82, 82, 0.34);
+}
+
 .player-detail-modal dl {
   gap: 10px;
   margin: 0;

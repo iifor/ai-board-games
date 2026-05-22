@@ -1,12 +1,13 @@
 import React, { useMemo } from 'react';
 import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
-import { getGameStats, getPhaseTitle, getRoundResult, getWerewolfActionTarget, shouldShowWerewolfActionTargets } from '../../werewolfUtils';
+import { getGameStats, getPhaseTitle, getRoundResult, getWerewolfActionTarget, getWerewolfNightActionBadges, shouldShowWerewolfActionTargets } from '../../werewolfUtils';
 import { WerewolfBrandPanel } from '../WerewolfBrandPanel';
 import { RoleConfigPanel } from '../RoleConfigPanel';
 import { RoundProgressPanel } from '../RoundProgressPanel';
 import { EliminationPanel } from '../EliminationPanel';
 import { WerewolfSeat } from '../WerewolfSeat';
 import { WerewolfResult } from '../WerewolfResult';
+import { NightOverlay } from '../NightOverlay';
 import './index.css';
 
 export function WerewolfArena({
@@ -14,6 +15,9 @@ export function WerewolfArena({
   mode,
   currentRound,
   currentSpeakerId,
+  nightActionPlayerIds,
+  nightActionType,
+  seerCheckTarget,
   activeSpeech,
   showRoles,
   visibleRolePlayerId,
@@ -28,9 +32,11 @@ export function WerewolfArena({
   const stats = getGameStats(orderedPlayers);
   const phaseTitle = getPhaseTitle(currentRound, streamMessage);
   const sheriffCandidates = getVisibleSheriffCandidates(currentRound);
+  const nightActors = new Set((nightActionPlayerIds || []).map(Number));
+  const nightActive = currentRound?.phase === 'night';
 
   return (
-    <section className="werewolf-arena">
+    <section className={nightActive ? 'werewolf-arena night-active' : 'werewolf-arena'}>
       <aside className="werewolf-side werewolf-left-board" aria-label="狼人杀左侧信息">
         <WerewolfBrandPanel game={game} mode={mode} showRoles={showRoles} onShowRolesChange={onShowRolesChange} />
         <RoleConfigPanel players={orderedPlayers} mode={mode} showRoles={showRoles} />
@@ -50,6 +56,9 @@ export function WerewolfArena({
                 player={player}
                 seatIndex={index}
                 actionTarget={shouldShowWerewolfActionTargets(currentRound) ? getWerewolfActionTarget(currentRound, player) : null}
+                nightActionBadges={getWerewolfNightActionBadges(currentRound, player, nightActionType)}
+                isNightActor={nightActive && nightActors.has(Number(player.id))}
+                seerInspectionTarget={nightActive && player.role === 'seer' ? seerCheckTarget : null}
                 isSheriff={Number(currentRound?.sheriffId) === Number(player.id)}
                 isSheriffCandidate={sheriffCandidates.has(Number(player.id))}
                 showRoles={showRoles}
@@ -79,6 +88,7 @@ export function WerewolfArena({
       </aside>
 
       <WerewolfResult game={game} />
+      <NightOverlay active={nightActive} />
       <SpeechSubtitle speech={activeSpeech} />
     </section>
   );

@@ -12,7 +12,7 @@ export function RoleConfigPanel({ players, mode, showRoles }) {
       <PanelHeader icon={<Users size={18} />} title="角色配置" />
       <div className="werewolf-role-list">
         {groups.map((group) => (
-          <article className="werewolf-role-group" key={group.id}>
+          <article className={classNames('werewolf-role-group', group.id === 'wolves' && 'danger')} key={group.id}>
             <span className={classNames('werewolf-role-icon', group.id === 'wolves' && 'wolf')}>
               {group.icon}
             </span>

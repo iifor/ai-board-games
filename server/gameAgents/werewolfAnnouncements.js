@@ -37,7 +37,7 @@ function buildDayStartMessage() {
 function buildSheriffStartMessage(round = {}) {
   const candidates = round.sheriffElection?.candidates || [];
   if (!candidates.length) return '本局暂无玩家上警';
-  return `要上警的玩家请举手，${candidates.map((id) => `${id}号`).join('、')}竞选警长`;
+  return `${candidates.map((id) => `${id}号`).join('、')}竞选警长`;
 }
 
 function buildSheriffResultMessage(round = {}, modeConfig = {}) {

@@ -42,9 +42,13 @@
 }
 
 .werewolf-role-icon.wolf {
-  color: #c4a3ff;
-  background: rgba(54, 24, 92, 0.7);
-  box-shadow: 0 0 13px rgba(157, 92, 255, 0.28);
+  color: #ffd0d0;
+  background: rgba(89, 18, 34, 0.72);
+  box-shadow: 0 0 13px rgba(255, 92, 92, 0.32);
+}
+
+.werewolf-role-group.danger strong {
+  color: #ff9d9d;
 }
 
 .werewolf-role-list strong,

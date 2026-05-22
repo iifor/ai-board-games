@@ -6,6 +6,7 @@ function getFetchFailureHint(error, endpoint) {
   if (code === 'ENOTFOUND') return `DNS 解析失败，无法找到接口域名。endpoint=${endpoint}`;
   if (code === 'ECONNREFUSED') return `连接被拒绝，请检查 baseUrl 是否正确。endpoint=${endpoint}`;
   if (code === 'ETIMEDOUT') return `连接超时，当前网络可能无法访问该 API。endpoint=${endpoint}`;
+  if (code === 'UND_ERR_CONNECT_TIMEOUT') return `连接超时，后端无法在限时内连接到供应商 API。endpoint=${endpoint}`;
   if (code === 'ECONNRESET') return `连接被重置，可能是代理、中转或网络链路中断。endpoint=${endpoint}`;
   return `网络请求失败：${detail}。endpoint=${endpoint}`;
 }

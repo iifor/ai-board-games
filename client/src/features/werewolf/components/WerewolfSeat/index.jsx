@@ -1,16 +1,24 @@
 import React from 'react';
-import { Hand, Star } from 'lucide-react';
+import { Eye, FlaskConical, Hand, Shield, Star, Swords } from 'lucide-react';
 import { formatAvatarUrl } from '../../../../utils/avatar';
 import { classNames } from '../../../../utils/classNames';
 import { ROLE_NAMES } from '../../constants';
 import './index.css';
 
-export function WerewolfSeat({ player, seatIndex, actionTarget, isSheriff, isSheriffCandidate, showRoles, visibleRolePlayerId, currentSpeakerId, onPlayerSelect }) {
+export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadges = [], isNightActor, seerInspectionTarget, isSheriff, isSheriffCandidate, showRoles, visibleRolePlayerId, currentSpeakerId, onPlayerSelect }) {
   const isSpeaking = Number(currentSpeakerId) === Number(player.id);
   const roleText = player.roleLabel || ROLE_NAMES[player.role] || '';
+  const isWerewolfPlayer = player.role === 'werewolf' || player.faction === 'wolves';
   return (
     <article
-      className={classNames('werewolf-seat', isSpeaking && 'speaking', !player.alive && 'dead', showRoles && player.role)}
+      className={classNames(
+        'werewolf-seat',
+        isSpeaking && 'speaking',
+        isNightActor && 'night-actor',
+        !player.alive && 'dead',
+        showRoles && player.role,
+        showRoles && isWerewolfPlayer && 'danger-faction'
+      )}
       style={{}}
     >
       <div
@@ -31,14 +39,38 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, isSheriff, isShe
             <Star size={19} fill="currentColor" />
           </span>
         )}
+        {nightActionBadges.length > 0 && (
+          <div className="werewolf-night-action-badges">
+            {nightActionBadges.map((badge, badgeIndex) => (
+              <span
+                className={classNames('werewolf-night-action-badge', badge.kind, badge.theme?.className)}
+                style={badge.theme?.style}
+                title={badge.title}
+                key={`${badge.kind}-${badge.target || badge.label || badgeIndex}`}
+              >
+                {getNightBadgeIcon(badge.kind, 30, '#fff1a1')}
+                {badge.target && <b>{badge.target}号</b>}
+                {!badge.target && badge.label && <b>{badge.label}</b>}
+                {badge.result && <em>{badge.result}</em>}
+              </span>
+            ))}
+          </div>
+        )}
         {!player.alive && <span className="werewolf-dead-badge">出局</span>}
       </div>
       {actionTarget && <span className="werewolf-action-badge" title={`投给 ${actionTarget} 号`}>{actionTarget}</span>}
       <div className="werewolf-nameplate">
         <strong>{player.nickname || player.name || `${player.id}号`}</strong>
         <br />
-        <span>{roleText}</span>
+        <span className={classNames(showRoles && isWerewolfPlayer && 'danger')}>{roleText}</span>
       </div>
     </article>
   );
+}
+
+function getNightBadgeIcon(kind, size = 13, color = '#fff') {
+  if (kind === 'wolf') return <Swords size={size} color={color} />;
+  if (kind === 'guard') return <Shield size={size} color={color} />;
+  if (kind === 'seer') return <Eye size={size} color={color} />;
+  return <FlaskConical size={size} color={color} />;
 }

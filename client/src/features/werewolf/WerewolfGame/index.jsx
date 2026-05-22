@@ -11,6 +11,7 @@ import { EMPTY_WEREWOLF } from '../constants';
 import { useWerewolfSpeechPlayback } from '../hooks/useWerewolfSpeechPlayback';
 import {
   buildEventLogEntry,
+  getNightActionPlayerIds,
   getWerewolfModePlayerCount,
   getWerewolfFlowLabel,
   getWerewolfNarration,
@@ -28,6 +29,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   const [streamMessage, setStreamMessage] = useState('等待开局');
   const [eventLog, setEventLog] = useState([]);
   const [activeSpeech, setActiveSpeech] = useState(null);
+  const [nightActionType, setNightActionType] = useState('');
+  const [seerCheckTarget, setSeerCheckTarget] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [modeDialogOpen, setModeDialogOpen] = useState(false);
   const [werewolfModes, setWerewolfModes] = useState([]);
@@ -82,6 +85,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   const displayGame = game || EMPTY_WEREWOLF;
   const currentRound = displayGame.rounds?.at(-1) || null;
   const currentSpeakerId = activeSpeech?.playerId || null;
+  const nightActionPlayerIds = getNightActionPlayerIds(nightActionType, displayGame.players || []);
   const {
     autoPlay,
     isReplayMode,
@@ -154,6 +158,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     setGame(EMPTY_WEREWOLF);
     setEventLog([]);
     setActiveSpeech(null);
+    setNightActionType('');
+    setSeerCheckTarget(null);
     setSelectedPlayer(null);
     setVisibleRolePlayerId(null);
     setStatus('idle');
@@ -197,6 +203,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
 
   function applyServerEvent(event) {
     if (status === 'error') setStatus('streaming');
+    updateNightActionType(event);
     const flowLabel = getWerewolfFlowLabel(event);
     if (flowLabel || event.message) setStreamMessage(flowLabel || event.message);
     if (event.game) setGame(event.game);
@@ -238,6 +245,28 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
       setStatus('ready');
       setActiveSpeech(null);
       setStreamMessage(event.message || '狼人杀已完成。');
+    }
+  }
+
+  function updateNightActionType(event) {
+    if (event.type === 'seer-check') {
+      setNightActionType(event.type);
+      setSeerCheckTarget(event.seerCheck?.target || null);
+      return;
+    }
+    if (event.type === 'witch-action') {
+      setNightActionType((current) => current.includes('poison') ? 'witch-poison-action' : 'witch-antidote-action');
+      setSeerCheckTarget(null);
+      return;
+    }
+    if (['wolf-wake', 'wolf-leader', 'seer-wake', 'guard-wake', 'witch-antidote', 'witch-poison'].includes(event.type)) {
+      setNightActionType(event.type);
+      setSeerCheckTarget(null);
+      return;
+    }
+    if (event.type === 'day-start' || event.type === 'night-result' || event.type === 'done' || event.type === 'game') {
+      setNightActionType('');
+      setSeerCheckTarget(null);
     }
   }
 
@@ -292,6 +321,9 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
           mode={werewolfMode}
           currentRound={currentRound}
           currentSpeakerId={currentSpeakerId}
+          nightActionPlayerIds={nightActionPlayerIds}
+          nightActionType={nightActionType}
+          seerCheckTarget={seerCheckTarget}
           activeSpeech={activeSpeech}
           showRoles={showRoles}
           visibleRolePlayerId={visibleRolePlayerId}
@@ -331,7 +363,4 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     </main>
   );
 }
-
-
-
 

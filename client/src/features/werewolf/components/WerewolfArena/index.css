@@ -12,7 +12,7 @@
 .werewolf-side {
   position: absolute;
   z-index: 12;
-  top: 232px;
+  top: 150px;
   bottom: 46px;
   display: flex;
   flex-direction: column;
@@ -41,6 +41,24 @@
   --orbit-radius: var(--ring-radius);
   --avatar-size: 86px;
   pointer-events: none;
+}
+
+.werewolf-arena.night-active {
+  z-index: 60;
+}
+
+.werewolf-arena.night-active .werewolf-orbit-stage {
+  z-index: 64;
+}
+
+.werewolf-arena.night-active .werewolf-center-card {
+  border-color: rgba(122, 145, 205, 0.34);
+  background:
+    linear-gradient(180deg, rgba(2, 5, 18, 0.86), rgba(0, 0, 0, 0.84)),
+    rgba(0, 0, 0, 0.72);
+  box-shadow:
+    0 0 28px rgba(8, 14, 36, 0.64),
+    inset 0 0 28px rgba(82, 122, 220, 0.1);
 }
 
 .werewolf-scoreboard {
