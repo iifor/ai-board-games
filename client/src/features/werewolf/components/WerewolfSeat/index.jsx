@@ -7,7 +7,7 @@ import './index.css';
 
 export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadges = [], isNightActor, seerInspectionTarget, isSheriff, isSheriffCandidate, showRoles, visibleRolePlayerId, currentSpeakerId, onPlayerSelect }) {
   const isSpeaking = Number(currentSpeakerId) === Number(player.id);
-  const roleText = player.roleLabel || ROLE_NAMES[player.role] || '';
+  const roleText = ROLE_NAMES[player.roleLabel] || player.roleLabel || ROLE_NAMES[player.role] || '';
   const isWerewolfPlayer = player.role === 'werewolf' || player.faction === 'wolves';
   const hasVisibleSafeFaction = showRoles && !isWerewolfPlayer && Boolean(player.faction || player.role);
   return (

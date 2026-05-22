@@ -32,13 +32,13 @@ function normalizeGameType(value) {
   const text = String(value || '').toLowerCase();
   if (text.includes('debate')) return 'debate';
   if (text.includes('werewolf')) return 'werewolf';
-  return 'consensus';
+  return 'werewolf';
 }
 
 function getGameTypeName(gameType) {
   if (gameType === 'debate') return 'AI 辩论赛';
   if (gameType === 'werewolf') return 'AI 狼人杀';
-  return '共识迷雾';
+  return 'AI 狼人杀';
 }
 
 module.exports = { parseJson, toJson, rowToGame, rowToGameSummary, normalizeGameType, getGameTypeName };

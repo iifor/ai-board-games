@@ -17,7 +17,7 @@ export function EliminationPanel({ players, showRoles, visibleRolePlayerId }) {
           <article key={player.id}>
             <Skull size={18} />
             <strong>玩家 {player.id}</strong>
-            <span>{player.roleLabel || ROLE_NAMES[player.role] || ''}</span>
+            <span>{ROLE_NAMES[player.roleLabel] || player.roleLabel || ROLE_NAMES[player.role] || ''}</span>
             <em>{player.deathReason || '出局'} · 第 {player.deathDay || '?'} 天</em>
           </article>
         )) : <p>暂无玩家出局。</p>}

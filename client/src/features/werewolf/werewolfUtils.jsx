@@ -135,7 +135,7 @@ export function getGameStats(players) {
 
 export function formatWerewolfModeSummary(mode) {
   const roles = Array.isArray(mode.roles) ? mode.roles : [];
-  const lineup = roles.map((item) => `${item.count} ${item.roleName || item.name || item.roleId}`).join('?');
+  const lineup = roles.map((item) => `${item.roleName || item.name || ROLE_NAMES[item.roleId] || item.roleId}x${item.count}`).join('、');
   const sheriff = mode.sheriff?.enabled ? '警徽流' : '无警徽';
   const winMap = { side: '屠边局', gods: '屠神局', villagers: '屠民局', all: '屠城局' };
   return [lineup, sheriff, winMap[mode.winCondition] || mode.winCondition].filter(Boolean).join(' · ');
@@ -384,13 +384,13 @@ function formatWerewolfRecordPlayer(playerId, players, showRoles, visibleRolePla
 }
 
 export function getVisibleRoleText(player, showRoles, visibleRolePlayerId) {
-  if (showRoles || Number(player.id) === Number(visibleRolePlayerId)) return player.roleLabel || ROLE_NAMES[player.role] || '未知身份';
+  if (showRoles || Number(player.id) === Number(visibleRolePlayerId)) return ROLE_NAMES[player.roleLabel] || player.roleLabel || ROLE_NAMES[player.role] || '未知身份';
   return '身份隐藏';
 }
 
 export function getRoleDescription(player, roleVisible) {
   if (!roleVisible) return '玩家视角下，本局仅公开一名随机玩家身份；该玩家身份暂时隐藏。';
-  const role = player.roleLabel || ROLE_NAMES[player.role] || '未知身份';
+  const role = ROLE_NAMES[player.roleLabel] || player.roleLabel || ROLE_NAMES[player.role] || '未知身份';
   const descriptions = {
     werewolf: '狼人阵营，夜晚参与击杀，白天需要伪装好人、引导票型并保护狼队友。',
     seer: '好人阵营神职，夜晚可以查验一名玩家阵营，白天需要谨慎传递信息。',

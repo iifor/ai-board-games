@@ -1,5 +1,5 @@
 const { callOpenAIChat } = require('../../llm');
-const { normalizeText } = require('../../../gameAgents/playerAgent');
+const { normalizeText } = require('../playerAgent');
 
 class HostAgent {
   constructor(host = {}, options = {}) {

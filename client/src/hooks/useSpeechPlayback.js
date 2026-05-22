@@ -49,6 +49,11 @@ export function useSpeechPlayback({
 
   function playSubtitleText(text, playerId, ackId, event) {
     clearSubtitleTimer();
+    const boundaries = collectWordBoundaries(event);
+    if (boundaries.length) {
+      playTimedSubtitles(boundaries, playerId, ackId, event);
+      return;
+    }
     const chunks = splitPlayableDisplaySegments(text, splitConfig);
     if (!chunks.length) return;
     let index = 0;
@@ -65,6 +70,43 @@ export function useSpeechPlayback({
       index += 1;
       if (index < chunks.length) {
         subtitleTimerRef.current = window.setTimeout(showNext, getPlayableChunkDelay(chunks[index - 1]));
+      }
+    };
+    showNext();
+  }
+
+  function playTimedSubtitles(boundaries, playerId, ackId, event) {
+    clearSubtitleTimer();
+    if (!boundaries.length) return;
+    const baseId = `${ackId || Date.now()}-${playerId || 'system'}`;
+    const extra = getExtraFields(event, '');
+    // group words into phrases by pauses > 400ms
+    const phrases = [];
+    let current = { offset: boundaries[0].offset, words: [] };
+    for (const b of boundaries) {
+      const gap = current.words.length ? b.offset - (current.offset + boundaries[boundaries.indexOf(b) - 1].offset + boundaries[boundaries.indexOf(b) - 1].duration) : 0;
+      if (gap > 400 && current.words.length) {
+        phrases.push({ ...current, text: current.words.map((w) => w.text).join('') });
+        current = { offset: b.offset, words: [] };
+      }
+      current.words.push(b);
+    }
+    if (current.words.length) {
+      phrases.push({ ...current, text: current.words.map((w) => w.text).join('') });
+    }
+
+    let index = 0;
+    const showNext = () => {
+      setSpeechState({
+        id: `${baseId}-${index}`,
+        playerId,
+        text: phrases[index].text,
+        ...extra
+      });
+      index += 1;
+      if (index < phrases.length) {
+        const delay = phrases[index].offset - phrases[index - 1].offset;
+        subtitleTimerRef.current = window.setTimeout(showNext, Math.max(200, delay));
       }
     };
     showNext();
@@ -87,10 +129,12 @@ export function useSpeechPlayback({
         voicePackageId: voicePkgId,
         audioUrl: event?.audioSegments?.find((seg) => Number(seg.index) === index)?.audioUrl,
         onStart: () => {
+          const seg = event?.audioSegments?.find((s) => Number(s.index) === index);
           setSpeechState({
             id: `${baseId}-${index}`,
             playerId,
             text: chunk,
+            wordBoundaries: seg?.wordBoundaries || null,
             ...extra
           });
         }
@@ -114,6 +158,7 @@ export function useSpeechPlayback({
           id: `${ackId || Date.now()}-${playerId || 'system'}`,
           playerId,
           text,
+          wordBoundaries: event?.wordBoundaries || event?.audioSegments?.[0]?.wordBoundaries || null,
           ...extra
         });
       }
@@ -121,6 +166,24 @@ export function useSpeechPlayback({
   }
 
   return { clearSubtitleTimer, playPendingEvent, playSubtitleText, speakChunks, speakSingle };
+}
+
+function collectWordBoundaries(event) {
+  if (Array.isArray(event?.audioSegments) && event.audioSegments.length > 0) {
+    let cumulativeOffset = 0;
+    const all = [];
+    for (const seg of event.audioSegments) {
+      if (!Array.isArray(seg?.wordBoundaries)) continue;
+      for (const b of seg.wordBoundaries) {
+        all.push({ ...b, offset: (b.offset || 0) + cumulativeOffset });
+      }
+      const last = seg.wordBoundaries[seg.wordBoundaries.length - 1];
+      if (last) cumulativeOffset += (last.offset || 0) + (last.duration || 0);
+    }
+    return all;
+  }
+  if (Array.isArray(event?.wordBoundaries)) return event.wordBoundaries;
+  return [];
 }
 
 function getDefaultPlaybackDelay(event, narration, splitConfig) {

@@ -98,7 +98,7 @@ function migrate(db) {
 
     CREATE TABLE IF NOT EXISTS games (
       id TEXT PRIMARY KEY,
-      game_type TEXT NOT NULL DEFAULT 'consensus',
+      game_type TEXT NOT NULL DEFAULT 'werewolf',
       mode TEXT NOT NULL,
       skin_id TEXT,
       skin_name TEXT NOT NULL DEFAULT '',
@@ -135,7 +135,7 @@ function migrate(db) {
     );
   `);
 
-  ensureColumn(db, 'games', 'game_type', "TEXT NOT NULL DEFAULT 'consensus'");
+  ensureColumn(db, 'games', 'game_type', "TEXT NOT NULL DEFAULT 'werewolf'");
   ensureColumn(db, 'games', 'topic_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, 'players', 'model_id', 'INTEGER');
   ensureColumn(db, 'players', 'voice_package_id', 'INTEGER');
@@ -151,14 +151,21 @@ function migrate(db) {
   ensureColumn(db, 'werewolf_modes', 'sheriff_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, 'werewolf_modes', 'win_condition', "TEXT NOT NULL DEFAULT 'side'");
 
+  // Fix null/empty/consensus game types
   db.exec(`
     UPDATE games
     SET game_type = CASE
       WHEN id LIKE 'debate-%' OR event_json LIKE '%ai-debate%' THEN 'debate'
       WHEN id LIKE 'werewolf-%' OR event_json LIKE '%ai-werewolf%' THEN 'werewolf'
-      ELSE COALESCE(NULLIF(game_type, ''), 'consensus')
+      ELSE COALESCE(NULLIF(game_type, ''), 'werewolf')
     END
     WHERE game_type IS NULL OR game_type = '' OR game_type = 'consensus'
+  `);
+  // Fix debate games that were incorrectly saved as werewolf (missing gameType in serialize)
+  db.exec(`
+    UPDATE games SET game_type = 'debate'
+    WHERE game_type = 'werewolf'
+      AND (id LIKE 'debate-%' OR event_json LIKE '%ai-debate%')
   `);
   db.exec('CREATE INDEX IF NOT EXISTS idx_games_type_created ON games(game_type, created_at DESC)');
 }

@@ -8,7 +8,7 @@ export function DebateSubtitle({ speech, players, maxChars = 50 }) {
   const speaker = speech.speakerLabel || (speech.playerId ? getDebateSpeakerLabel(players, speech.playerId) : '主持人');
   return (
     <div className="debate-subtitle" key={speech.id || `${speech.playerId || 'host'}-${text}`}>
-      <p><span>{speaker}</span> {text}</p>
+      <p>{text}</p>
     </div>
   );
 }

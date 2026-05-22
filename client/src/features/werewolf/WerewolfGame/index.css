@@ -103,10 +103,6 @@
   font-weight: 800;
 }
 
-.werewolf-idle-stage .game-idle-loading {
-  display: none;
-}
-
 .game-idle-loading {
   position: absolute;
   left: 50%;

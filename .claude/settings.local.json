@@ -27,7 +27,20 @@
       "Bash(netstat -ano)",
       "Bash(taskkill //PID 15336 //F)",
       "Bash(taskkill //F //IM node.exe)",
-      "Bash([ -f \"c:/Users/Administrator/Desktop/AI项目/CONSENSUS/$f\" ])"
+      "Bash([ -f \"c:/Users/Administrator/Desktop/AI项目/CONSENSUS/$f\" ])",
+      "Bash(node -e \"require\\('./server/modules/game-socket'\\); console.log\\('game-socket OK'\\)\")",
+      "Bash(node -e \"require\\('./server/modules/werewolf'\\); console.log\\('werewolf OK'\\)\")",
+      "Bash(node -e \"require\\('./shared/types/gameTypes'\\); require\\('./shared/schemas/skillRegistry'\\); console.log\\('shared OK'\\)\")",
+      "Bash(node -e \"const m = require\\('./server/modules/werewolf'\\); console.log\\('werewolf index keys:', Object.keys\\(m\\)\\);\")",
+      "Bash(node -e \"const m = require\\('./server/modules/werewolf/agents'\\); console.log\\('agents keys:', Object.keys\\(m\\)\\);\")",
+      "Bash(node -e \"const m = require\\('./server/modules/werewolf/day'\\); console.log\\('day keys:', Object.keys\\(m\\)\\);\")",
+      "Bash(node -e \"const m = require\\('./server/modules/werewolf/night'\\); console.log\\('night keys:', Object.keys\\(m\\)\\);\")",
+      "Bash(node -e \"const m = require\\('./server/modules/werewolf/service'\\); console.log\\('service keys:', Object.keys\\(m\\)\\);\")",
+      "Bash(node -e \"const m = require\\('./server/modules/game-socket'\\); console.log\\('game-socket keys:', Object.keys\\(m\\)\\);\")",
+      "Bash(node -e \"const { HostAgent } = require\\('./server/modules/werewolf/agents/hostAgent'\\); console.log\\('HostAgent loaded:', typeof HostAgent\\);\")",
+      "Bash(node -e \"const sdk = require\\('microsoft-cognitiveservices-speech-sdk'\\); console.log\\('SDK loaded:', Object.keys\\(sdk\\).slice\\(0, 10\\)\\);\")",
+      "Bash(node -e \"require\\('./server/app'\\); console.log\\('App OK'\\);\")",
+      "Bash(node -e ' *)"
     ]
   }
 }

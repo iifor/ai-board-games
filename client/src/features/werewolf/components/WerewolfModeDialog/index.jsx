@@ -67,7 +67,6 @@ export function WerewolfModeDialog({
                 );
               }) : <p className="werewolf-mode-empty">正在读取 AI 玩家配置。</p>}
             </div>
-            <p className="werewolf-order-note">座位序号固定按玩家 ID 升序排列，不能手动拖拽调整。</p>
           </section>
           <section className="werewolf-view-mode">
             <PanelHeader icon={<Eye size={18} />} title="C 端视角" />
@@ -87,7 +86,7 @@ export function WerewolfModeDialog({
         </div>
         {error && <p className="werewolf-setup-error">{error}</p>}
         <footer>
-          <span>{selectedMode?.name || '请选择 B 端启用的模式'}</span>
+          <span></span>
           <button type="button" className="primary" disabled={!canStart} onClick={() => onStart(selectedMode, selectedPlayerIds, selectedViewMode)}>开始游戏</button>
         </footer>
       </section>

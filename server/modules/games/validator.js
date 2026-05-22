@@ -1,7 +1,7 @@
 const { z } = require('zod');
 
 const listGamesSchema = z.object({
-  gameType: z.enum(['consensus', 'debate', 'werewolf']).optional(),
+  gameType: z.enum(['debate', 'werewolf']).optional(),
   mode: z.string().optional(),
   skinId: z.string().optional(),
   winner: z.string().optional(),

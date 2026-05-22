@@ -83,15 +83,15 @@
 }
 
 .werewolf-setup-grid {
-  display: grid;
-  grid-template-columns: 0.9fr 0.85fr 1.1fr;
+  display: flex;
+  flex-direction: row;
   gap: 18px;
   min-height: 0;
   overflow: hidden;
 }
 
 .werewolf-setup-grid > section {
-  min-height: 0;
+  flex: 1 1 0;
   padding: 14px;
   overflow: hidden;
   border: 1px solid rgba(187, 171, 255, 0.2);
@@ -237,32 +237,29 @@
   color: #8dffae;
 }
 
-.werewolf-order-note,
-.werewolf-setup-error {
-  margin: 10px 0 0;
-  color: rgba(226, 240, 255, 0.62);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
 .werewolf-setup-error {
   margin: -8px 0 0;
   color: #ffd0d0;
 }
 
 .werewolf-view-mode {
-  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  width: 200px;
 }
 
 .werewolf-view-mode-switch {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
 .werewolf-view-mode-switch button {
-  display: grid;
-  grid-template-columns: 24px 1fr;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 2px 10px;
   min-height: 76px;
   padding: 12px;

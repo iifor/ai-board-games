@@ -300,6 +300,7 @@ function serializeGame({ gameId, mode, topic, agents, phases, host = null, winne
   }));
   return {
     id: gameId,
+    gameType: 'debate',
     type: 'debate',
     mode,
     topic,

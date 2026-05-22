@@ -1,9 +1,16 @@
 const service = require('./service');
-const routes = require('./routes');
+const routes = require('../../routes/gameRoutes');
 const constants = require('./constants');
+const session = require('./session');
+const { createPreparedSender } = require('./sender');
+const { replayGameSession } = require('./replay');
 
 module.exports = {
   router: routes,
-  ...service,
+  attachGameSocket: service.attachGameSocket,
+  runSession: service.runSession,
+  createSession: session.createSession,
+  createPreparedSender,
+  replayGameSession,
   ...constants
 };

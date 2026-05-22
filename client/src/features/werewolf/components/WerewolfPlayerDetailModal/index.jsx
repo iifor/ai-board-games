@@ -6,7 +6,7 @@ import { getRoleDescription } from '../../werewolfUtils';
 import '../../WerewolfGame/index.css';
 
 export function WerewolfPlayerDetailModal({ player, roleVisible, onClose }) {
-  const roleText = roleVisible ? player.roleLabel || ROLE_NAMES[player.role] || '未知身份' : '身份隐藏';
+  const roleText = roleVisible ? (ROLE_NAMES[player.roleLabel] || player.roleLabel || ROLE_NAMES[player.role] || '未知身份') : '身份隐藏';
   const dangerRole = roleVisible && (player.role === 'werewolf' || player.faction === 'wolves');
   return (
     <div className="player-detail-backdrop" role="presentation" onClick={onClose}>

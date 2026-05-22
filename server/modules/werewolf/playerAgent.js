@@ -1,4 +1,4 @@
-const { callOpenAIChat, parseJsonObject } = require('../modules/llm');
+const { callOpenAIChat, parseJsonObject } = require('../llm');
 
 class PlayerAgent {
   constructor(player, systemPrompt, options = {}) {
@@ -32,10 +32,8 @@ class PlayerAgent {
     try {
       const parsed = parseJsonObject(await this.call(prompt, options.maxTokens || 120));
       if (parsed) return parsed;
-
       const retryParsed = parseJsonObject(await this.call(`${prompt}\n\nReturn one valid JSON object only.`, options.maxTokens || 120));
       if (retryParsed) return retryParsed;
-
       this.recordFallback(options.skillId || 'player-json', 'invalid-json', options.fallback);
       return options.fallback;
     } catch (error) {
@@ -50,11 +48,7 @@ class PlayerAgent {
       prompt,
       `Valid targets: ${validIds.join(', ')}`,
       'Return JSON only, for example {"target":2}.'
-    ].join('\n\n'), {
-      maxTokens: 60,
-      fallback: { target: fallback },
-      skillId: options.skillId || 'player-vote'
-    });
+    ].join('\n\n'), { maxTokens: 60, fallback: { target: fallback }, skillId: options.skillId || 'player-vote' });
     const target = Number(parsed?.target);
     if (validIds.includes(target)) return target;
     this.recordFallback(options.skillId || 'player-vote', 'invalid-target', fallback);
@@ -78,12 +72,7 @@ class PlayerAgent {
   }
 
   recordFallback(skillId, reason, fallbackValue) {
-    this.onFallback?.({
-      skillId,
-      actorId: this.player.id,
-      reason,
-      fallbackValue
-    });
+    this.onFallback?.({ skillId, actorId: this.player.id, reason, fallbackValue });
   }
 }
 
@@ -93,7 +82,4 @@ function normalizeText(text, limit, fallback) {
   return clean.slice(0, limit);
 }
 
-module.exports = {
-  PlayerAgent,
-  normalizeText
-};
+module.exports = { PlayerAgent, normalizeText };

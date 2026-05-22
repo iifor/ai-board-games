@@ -25,6 +25,4 @@ class SkillRegistry {
   }
 }
 
-module.exports = {
-  SkillRegistry
-};
+module.exports = { SkillRegistry };

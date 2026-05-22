@@ -47,7 +47,8 @@ function deleteWerewolfMode(id) {
 
 // Mode config builder
 function getWerewolfModeConfig(modeId) {
-  const mode = getWerewolfMode(modeId);
+  const id = typeof modeId === 'string' ? modeId : (modeId?.id || modeId?.modeId || 'standard');
+  const mode = getWerewolfMode(id);
   if (!mode) throw new AppError(ErrorCodes.NOT_FOUND, '狼人杀模式不存在', 404);
 
   const roles = listWerewolfRoles();
@@ -64,6 +65,7 @@ function getWerewolfModeConfig(modeId) {
   return {
     ...mode,
     resolvedRoles,
+    roleMap,
     totalPlayers,
     sheriff: mode.sheriff || {}
   };

@@ -211,7 +211,7 @@ function runJsonQuery(db, sql, args, mode) {
   if (lower.startsWith('delete from games')) return deleteWhere(data.games, (row) => row.id === values[0]);
   if (lower.includes('select game_type as gametype, count(*) as count from games group by game_type')) {
     const counts = {};
-    data.games.forEach((row) => { counts[row.game_type || 'consensus'] = (counts[row.game_type || 'consensus'] || 0) + 1; });
+    data.games.forEach((row) => { counts[row.game_type || 'werewolf'] = (counts[row.game_type || 'werewolf'] || 0) + 1; });
     return Object.entries(counts).map(([gameType, count]) => ({ gameType, count }));
   }
 

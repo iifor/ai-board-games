@@ -6,7 +6,7 @@ const upload = require('../upload');
 function saveGameRecord(game) {
   const row = {
     id: game.id,
-    game_type: game.gameType || 'consensus',
+    game_type: game.gameType || game.type || 'werewolf',
     mode: game.mode || '',
     skin_id: game.skinId || null,
     skin_name: game.skinName || '',
@@ -54,9 +54,11 @@ function deleteGame(id) {
   const game = getGame(id);
   if (!game) throw new AppError(ErrorCodes.NOT_FOUND, '游戏记录不存在', 404);
 
+  upload.deleteGameAudioDirectory(game.id);
+
   if (Array.isArray(game.audioResources)) {
     game.audioResources.forEach((url) => {
-      if (typeof url === 'string' && shouldCleanAudioUrl(url)) {
+      if (typeof url === 'string' && shouldCleanAudioUrl(url, id)) {
         upload.deleteGeneratedAudioByUrl(url);
       }
     });
@@ -65,8 +67,8 @@ function deleteGame(id) {
   return { ok: true };
 }
 
-function shouldCleanAudioUrl(url) {
-  const otherGames = repo.findAudioResourcesExceptGame(getGame.id || '');
+function shouldCleanAudioUrl(url, excludeGameId) {
+  const otherGames = repo.findAudioResourcesExceptGame(excludeGameId || '');
   const otherUrls = new Set();
   otherGames.forEach((json) => {
     const resources = parseJson(json, []);

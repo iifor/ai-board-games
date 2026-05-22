@@ -1,20 +1,21 @@
+const sdk = require('microsoft-cognitiveservices-speech-sdk');
 const { DEFAULT_SAMPLE_TEXT } = require('./constants');
 const {
   getAzureSpeechKey, normalizeEndpoint, parseRegionFromEndpoint,
-  buildAzureSsml, escapeXml
+  buildAzureSsml
 } = require('./utils');
 const { AppError, ErrorCodes } = require('../../utils/errors');
 
-async function synthesizeVoicePreview(voicePackage, text) {
+async function synthesizeVoicePreview(voicePackage, text, options = {}) {
   if (!voicePackage) throw new AppError(ErrorCodes.NOT_FOUND, '语音包不存在', 404);
   const provider = String(voicePackage.provider || 'browser').trim().toLowerCase();
   const content = String(text || voicePackage.sampleText || DEFAULT_SAMPLE_TEXT).trim() || DEFAULT_SAMPLE_TEXT;
 
-  if (provider === 'azure') return synthesizeAzureVoice(voicePackage, content);
+  if (provider === 'azure') return synthesizeAzureVoice(voicePackage, content, options);
   throw new AppError('UNSUPPORTED_VOICE', '该语音包使用浏览器本地语音，请在前端直接试听。', 422);
 }
 
-async function synthesizeAzureVoice(voicePackage, text) {
+async function synthesizeAzureVoice(voicePackage, text, options = {}) {
   const key = getAzureSpeechKey();
   const endpoint = normalizeEndpoint(process.env.AZURE_SPEECH_ENDPOINT);
   const region = process.env.AZURE_SPEECH_REGION || parseRegionFromEndpoint(endpoint);
@@ -22,40 +23,55 @@ async function synthesizeAzureVoice(voicePackage, text) {
     throw new AppError(ErrorCodes.UPSTREAM_ERROR, '缺少 AZURE_SPEECH_KEY 或 AZURE_SPEECH_REGION/AZURE_SPEECH_ENDPOINT，无法合成 Azure 语音。', 503);
   }
 
-  const tokenEndpoint = endpoint
-    ? `${endpoint}/sts/v1.0/issuetoken`
-    : `https://${region}.api.cognitive.microsoft.com/sts/v1.0/issuetoken`;
-  const tokenResponse = await fetch(tokenEndpoint, {
-    method: 'POST',
-    headers: {
-      'Ocp-Apim-Subscription-Key': key,
-      'Content-Length': '0'
+  const collectBoundaries = options.collectWordBoundaries !== false;
+
+  return new Promise((resolve, reject) => {
+    try {
+      const speechConfig = sdk.SpeechConfig.fromSubscription(key, region);
+      speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
+      if (voicePackage.language) speechConfig.speechSynthesisLanguage = voicePackage.language;
+
+      const pullStream = sdk.AudioOutputStream.createPullStream();
+      const audioConfig = sdk.AudioConfig.fromStreamOutput(pullStream);
+      const synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
+
+      const wordBoundaries = [];
+      if (collectBoundaries) {
+        synthesizer.wordBoundary = (sender, event) => {
+          wordBoundaries.push({
+            offset: Math.round(event.audioOffset / 10000),
+            duration: Math.round(event.duration / 10000),
+            text: event.text
+          });
+        };
+      }
+
+      const ssml = buildAzureSsml(voicePackage, text);
+
+      synthesizer.speakSsmlAsync(
+        ssml,
+        (result) => {
+          synthesizer.close();
+          if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
+            resolve({
+              buffer: Buffer.from(result.audioData),
+              mimeType: 'audio/mpeg',
+              wordBoundaries
+            });
+          } else {
+            const detail = sdk.CancellationDetails.fromResult(result);
+            reject(new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure 语音合成失败：${detail.errorDetails || result.reason}`, 502));
+          }
+        },
+        (error) => {
+          synthesizer.close();
+          reject(new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure 语音合成失败：${error}`, 502));
+        }
+      );
+    } catch (error) {
+      reject(new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure SDK 初始化失败：${error.message}`, 503));
     }
   });
-  if (!tokenResponse.ok) {
-    throw new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure 语音鉴权失败：${tokenResponse.status} ${await tokenResponse.text()}`, 502);
-  }
-  const token = await tokenResponse.text();
-
-  const synthesisEndpoint = `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`;
-  const ssml = buildAzureSsml(voicePackage, text);
-  const synthesisResponse = await fetch(synthesisEndpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/ssml+xml',
-      'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
-      'User-Agent': 'consensus-ai-game'
-    },
-    body: ssml
-  });
-  if (!synthesisResponse.ok) {
-    throw new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure 语音合成失败：${synthesisResponse.status} ${await synthesisResponse.text()}`, 502);
-  }
-  return {
-    buffer: Buffer.from(await synthesisResponse.arrayBuffer()),
-    mimeType: 'audio/mpeg'
-  };
 }
 
 module.exports = { synthesizeVoicePreview };
