@@ -249,3 +249,56 @@
   margin: -8px 0 0;
   color: #ffd0d0;
 }
+
+.werewolf-view-mode {
+  grid-column: 1 / -1;
+}
+
+.werewolf-view-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.werewolf-view-mode-switch button {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 2px 10px;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid rgba(202, 221, 255, 0.18);
+  color: rgba(236, 243, 255, 0.92);
+  background: rgba(8, 16, 34, 0.72);
+  text-align: left;
+}
+
+.werewolf-view-mode-switch button.active {
+  border-color: rgba(139, 255, 170, 0.52);
+  background: rgba(16, 58, 38, 0.62);
+}
+
+.werewolf-view-mode-switch button svg {
+  grid-row: span 2;
+  align-self: center;
+}
+
+.werewolf-view-mode-switch button span,
+.werewolf-view-mode-switch button small {
+  min-width: 0;
+}
+
+.werewolf-view-mode-switch button span {
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.werewolf-view-mode-switch button small {
+  color: rgba(226, 240, 255, 0.62);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .werewolf-view-mode-switch {
+    grid-template-columns: 1fr;
+  }
+}

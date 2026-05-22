@@ -1,43 +1,64 @@
 const { callOpenAIChat, parseJsonObject } = require('../modules/llm');
 
 class PlayerAgent {
-  constructor(player, systemPrompt) {
+  constructor(player, systemPrompt, options = {}) {
     this.player = player;
     this.messages = [{ role: 'system', content: systemPrompt }];
+    this.onFallback = options.onFallback;
   }
 
   async askText(prompt, options = {}) {
     const fallback = options.fallback || '';
     const limit = options.limit || 260;
-    if (!this.player.apiKey) return normalizeText(fallback, limit, fallback);
+    if (!this.player.apiKey) {
+      this.recordFallback(options.skillId || 'player-text', 'missing-api-key', fallback);
+      return normalizeText(fallback, limit, fallback);
+    }
     try {
       const reply = await this.call(prompt, options.maxTokens || 260);
       return normalizeText(reply, limit, fallback);
     } catch (error) {
-      console.error(`${this.player.nickname || this.player.id} 文本生成失败，使用兜底：${error.message}`);
+      console.error(`${this.player.nickname || this.player.id} text decision failed, using fallback: ${error.message}`);
+      this.recordFallback(options.skillId || 'player-text', error.message, fallback);
       return normalizeText(fallback, limit, fallback);
     }
   }
 
   async askJson(prompt, options = {}) {
-    if (!this.player.apiKey) return options.fallback;
+    if (!this.player.apiKey) {
+      this.recordFallback(options.skillId || 'player-json', 'missing-api-key', options.fallback);
+      return options.fallback;
+    }
     try {
-      const reply = await this.call(prompt, options.maxTokens || 120);
-      return parseJsonObject(reply);
+      const parsed = parseJsonObject(await this.call(prompt, options.maxTokens || 120));
+      if (parsed) return parsed;
+
+      const retryParsed = parseJsonObject(await this.call(`${prompt}\n\nReturn one valid JSON object only.`, options.maxTokens || 120));
+      if (retryParsed) return retryParsed;
+
+      this.recordFallback(options.skillId || 'player-json', 'invalid-json', options.fallback);
+      return options.fallback;
     } catch (error) {
-      console.error(`${this.player.nickname || this.player.id} JSON 生成失败，使用兜底：${error.message}`);
+      console.error(`${this.player.nickname || this.player.id} JSON decision failed, using fallback: ${error.message}`);
+      this.recordFallback(options.skillId || 'player-json', error.message, options.fallback);
       return options.fallback;
     }
   }
 
-  async askVoteTarget(prompt, validIds, fallback) {
+  async askVoteTarget(prompt, validIds, fallback, options = {}) {
     const parsed = await this.askJson([
       prompt,
-      `可选目标：${validIds.join('、')}`,
-      '只返回 JSON：{"target":2}，不要返回理由。'
-    ].join('\n\n'), { maxTokens: 60, fallback: { target: fallback } });
+      `Valid targets: ${validIds.join(', ')}`,
+      'Return JSON only, for example {"target":2}.'
+    ].join('\n\n'), {
+      maxTokens: 60,
+      fallback: { target: fallback },
+      skillId: options.skillId || 'player-vote'
+    });
     const target = Number(parsed?.target);
-    return validIds.includes(target) ? target : fallback;
+    if (validIds.includes(target)) return target;
+    this.recordFallback(options.skillId || 'player-vote', 'invalid-target', fallback);
+    return fallback;
   }
 
   async call(prompt, maxTokens) {
@@ -54,6 +75,15 @@ class PlayerAgent {
     });
     this.messages.push({ role: 'assistant', content: reply });
     return reply;
+  }
+
+  recordFallback(skillId, reason, fallbackValue) {
+    this.onFallback?.({
+      skillId,
+      actorId: this.player.id,
+      reason,
+      fallbackValue
+    });
   }
 }
 

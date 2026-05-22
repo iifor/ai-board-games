@@ -15,7 +15,12 @@ function saveGameRecord(game) {
     topic_json: toJson(game.topic || {}),
     players_json: toJson(game.players || []),
     rounds_json: toJson(game.rounds || []),
-    event_json: toJson(game.event || {}),
+    event_json: toJson({
+      ...(game.event || {}),
+      ...(game.clientViewMode ? { clientViewMode: game.clientViewMode } : {}),
+      ...(game.audienceSession ? { audienceSession: game.audienceSession } : {}),
+      ...(Array.isArray(game.fallbackAudit) ? { fallbackAudit: game.fallbackAudit } : {})
+    }),
     audio_resources_json: toJson(game.audioResources || []),
     created_at: game.createdAt || new Date().toISOString()
   };

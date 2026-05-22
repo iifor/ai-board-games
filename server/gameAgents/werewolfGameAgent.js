@@ -3,6 +3,9 @@ const { getWerewolfModeConfig } = require('../modules/werewolf-config');
 const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('../services/ai/promptComposer');
 const { PlayerAgent, normalizeText } = require('./playerAgent');
 const { createWerewolfSkillRegistry } = require('../skills/werewolf/roleSkills');
+const { HostAgent } = require('../modules/werewolf/agents/hostAgent');
+const { createFallbackAudit } = require('../modules/werewolf/failures/fallbackAudit');
+const { createAudienceSession, projectWerewolfEvent } = require('../modules/werewolf/views/viewPolicy');
 const {
   getClockStartId,
   getNextAliveId,
@@ -29,9 +32,12 @@ class WerewolfGameAgent {
     this.mode = 'real';
     this.modeConfig = getWerewolfModeConfig(config.werewolfMode);
     this.skillRegistry = createWerewolfSkillRegistry();
-    this.agents = createWerewolfAgents(config, this.modeConfig, this.skillRegistry);
-    this.rounds = [];
     this.gameId = `werewolf-${Date.now()}`;
+    this.fallbackAudit = createFallbackAudit(this.gameId);
+    this.agents = createWerewolfAgents(config, this.modeConfig, this.skillRegistry, this.fallbackAudit);
+    this.audienceSession = createAudienceSession(this.agents, config.clientViewMode, config.viewerPlayerId);
+    this.hostAgent = new HostAgent(config.host, { onFallback: (entry) => this.fallbackAudit.record(entry) });
+    this.rounds = [];
     this.werewolfMode = config.werewolfMode;
     this.winner = null;
     this.winReason = '';
@@ -50,7 +56,10 @@ class WerewolfGameAgent {
         await this.runSheriffElection(round);
       }
       await this.revealNightResult(round);
-      this.applyWinCheck(day);
+      this.applyWinCheck(day, {
+        checkWolfVoteLock: true,
+        sheriffId: round.sheriffId
+      });
       if (this.winner) break;
       await this.runDay(round);
       this.applyWinCheck(day);
@@ -68,7 +77,9 @@ class WerewolfGameAgent {
   }
 
   async emit(event) {
-    return this.options.onEvent ? this.options.onEvent(createPublicWerewolfEvent(event)) : undefined;
+    if (!this.options.onEvent) return undefined;
+    const projected = projectWerewolfEvent(event, this.audienceSession);
+    return projected ? this.options.onEvent(projected) : undefined;
   }
 
   serialize(patch = {}) {
@@ -92,6 +103,9 @@ class WerewolfGameAgent {
         },
         truth: winner ? this.agents.map((agent) => `${agent.id}号${getRoleLabel(agent)}`).join('；') : ''
       },
+      clientViewMode: this.audienceSession.mode,
+      audienceSession: this.audienceSession,
+      fallbackAudit: this.fallbackAudit.list(),
       host: publicHost(this.config.host),
       werewolfMode: modeDetail,
       players: this.agents.map(publicPlayer).sort((a, b) => Number(a.id) - Number(b.id)),
@@ -572,8 +586,8 @@ class WerewolfGameAgent {
     await this.maybeTransferSheriffBadge(round, result.target, '猎人开枪', reason);
   }
 
-  applyWinCheck(day) {
-    const result = checkWin(this.agents, day, this.modeConfig);
+  applyWinCheck(day, options = {}) {
+    const result = checkWin(this.agents, day, this.modeConfig, options);
     this.winner = result.winner;
     this.winReason = result.winReason;
   }
@@ -615,7 +629,7 @@ function shuffle(items) {
   return copy;
 }
 
-function createWerewolfAgents(config, modeConfig, skillRegistry) {
+function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit) {
   const selected = config.players.slice(0, modeConfig.roles.length);
   const roles = shuffle(modeConfig.roles);
   const wolves = selected.filter((_, index) => getRoleConfig(modeConfig, roles[index]).faction === 'wolves').map((player) => player.id);
@@ -644,7 +658,9 @@ function createWerewolfAgents(config, modeConfig, skillRegistry) {
     };
     agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry);
     agent.baseSystemPromptHash = hashText(agent.baseSystemPrompt);
-    agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt);
+    agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt, {
+      onFallback: (entry) => fallbackAudit.record(entry)
+    });
     return agent;
   });
 }
@@ -868,9 +884,18 @@ function shouldRunFirstDaySheriffElection(round, modeConfig) {
   return round.day === 1 && modeConfig.sheriff.enabled && modeConfig.sheriff.firstDayElection !== false;
 }
 
-function checkWin(agents, day, modeConfig = {}) {
+function checkWin(agents, day, modeConfig = {}, options = {}) {
   const aliveWolves = agents.filter((agent) => agent.alive && agent.faction === 'wolves').length;
   if (aliveWolves === 0) return { winner: 'good', winReason: `第 ${day} 天，狼人全部出局，好人阵营胜利。` };
+  if (options.checkWolfVoteLock) {
+    const votePower = getAliveVotePower(agents, options.sheriffId, modeConfig.sheriff?.voteWeight);
+    if (votePower.wolves >= votePower.good) {
+      return {
+        winner: 'wolves',
+        winReason: `狼人通过绑票获胜。`
+      };
+    }
+  }
   const aliveGood = agents.filter((agent) => agent.alive && agent.faction !== 'wolves');
   const aliveVillagers = aliveGood.filter((agent) => getRoleType(agent) === 'villager').length;
   const aliveGods = aliveGood.filter((agent) => getRoleType(agent) === 'god').length;
@@ -879,6 +904,17 @@ function checkWin(agents, day, modeConfig = {}) {
   if ((winCondition === 'side' || winCondition === 'villagers') && aliveVillagers === 0) return { winner: 'wolves', winReason: `第 ${day} 天，所有平民出局，狼人阵营胜利。` };
   if ((winCondition === 'side' || winCondition === 'gods') && aliveGods === 0) return { winner: 'wolves', winReason: `第 ${day} 天，所有神职出局，狼人阵营胜利。` };
   return { winner: null, winReason: '' };
+}
+
+function getAliveVotePower(agents, sheriffId = null, sheriffWeight = 1) {
+  return agents
+    .filter((agent) => agent.alive && agent.canVote)
+    .reduce((totals, agent) => {
+      const weight = Number(agent.id) === Number(sheriffId) ? Number(sheriffWeight) || 1 : 1;
+      if (agent.faction === 'wolves') totals.wolves += weight;
+      else totals.good += weight;
+      return totals;
+    }, { wolves: 0, good: 0 });
 }
 
 function topTarget(votes) {

@@ -38,10 +38,12 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   const [werewolfMode, setWerewolfMode] = useState(null);
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState([]);
+  const [clientViewMode, setClientViewMode] = useState('god');
   const [setupError, setSetupError] = useState('');
   const [visibleRolePlayerId, setVisibleRolePlayerId] = useState(null);
   const [showRoles, setShowRoles] = useState(true);
   const speechPlaybackRef = useRef(null);
+  const replayStartedRef = useRef('');
   const { speechEnabled, speak, cancel } = useSpeechQueue();
 
   useEffect(() => {
@@ -79,9 +81,10 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   }, [modeDialogOpen, werewolfMode?.id]);
 
   useEffect(() => {
-    if (!replayGameId || (!werewolfMode && !replayGameId)) return;
+    if (!replayGameId || replayStartedRef.current === replayGameId) return;
+    replayStartedRef.current = replayGameId;
     startGame(werewolfMode, [], { replayGameId });
-  }, [replayGameId, werewolfMode?.id]);
+  }, [replayGameId]);
 
   const displayGame = game || EMPTY_WEREWOLF;
   const currentRound = displayGame.rounds?.at(-1) || null;
@@ -176,7 +179,11 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     setModeDialogOpen(true);
   }
 
-  function startGame(modeConfig = werewolfMode, playerIds = selectedPlayerIds, options = {}) {
+  function startGame(modeConfig = werewolfMode, playerIds = selectedPlayerIds, viewMode = clientViewMode, options = {}) {
+    if (viewMode && typeof viewMode === 'object') {
+      options = viewMode;
+      viewMode = clientViewMode;
+    }
     if (!modeConfig?.id && !options.replayGameId) {
       setStatus('error');
       setStreamMessage('暂无可用狼人杀模式，请先在 B 端启用模式。');
@@ -192,6 +199,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     resetToIdle('');
     setWerewolfMode(modeConfig);
     setSelectedPlayerIds(sortedPlayerIds);
+    setClientViewMode(viewMode === 'player' ? 'player' : 'god');
     setModeDialogOpen(false);
     setStatus('streaming');
     setStreamMessage('游戏准备中...');
@@ -199,6 +207,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
       mode: 'real',
       playerIds: sortedPlayerIds,
       werewolfMode: modeConfig,
+      clientViewMode: viewMode === 'player' ? 'player' : 'god',
       replayGameId: options.replayGameId || ''
     });
   }
@@ -209,7 +218,11 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     updateSheriffCandidateIds(event);
     const flowLabel = getWerewolfFlowLabel(event);
     if (flowLabel || event.message) setStreamMessage(flowLabel || event.message);
-    if (event.game) setGame(event.game);
+    if (event.game) {
+      setGame(event.game);
+      if (event.game.clientViewMode) setClientViewMode(event.game.clientViewMode);
+      if (event.game.audienceSession?.viewerPlayerId) setVisibleRolePlayerId(event.game.audienceSession.viewerPlayerId);
+    }
     if (event.players) {
       setGame((value) => ({
         ...(event.game || value || EMPTY_WEREWOLF),
@@ -369,9 +382,11 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
           onCancel={() => setModeDialogOpen(false)}
           players={availablePlayers}
           selectedPlayerIds={selectedPlayerIds}
+          viewMode={clientViewMode}
+          onViewModeChange={setClientViewMode}
           onPlayerToggle={(id) => setSelectedPlayerIds((value) => toggleWerewolfPlayerId(value, id, werewolfMode))}
           error={setupError}
-          onStart={(mode, playerIds) => startGame(mode, playerIds)}
+          onStart={(mode, playerIds, viewMode) => startGame(mode, playerIds, viewMode)}
         />
       )}
 

@@ -5,6 +5,12 @@ const { createAiGame } = require('./aiGameRunner');
 const { runAiDebate } = require('./aiDebateRunner');
 const { runAiWerewolf } = require('./aiWerewolfRunner');
 const { getWerewolfModeConfig } = require('./modules/werewolf-config');
+const {
+  createProjectionContext,
+  projectWerewolfEvent,
+  projectWerewolfGame,
+  projectPlayers
+} = require('./modules/werewolf/views/viewPolicy');
 const { getGame, saveGameRecord } = require('./modules/games');
 const { getVoicePackage } = require('./modules/voices');
 const { listPlayers } = require('./modules/players');
@@ -34,7 +40,9 @@ function attachGameSocket(server) {
           debateTeams: message.debateTeams,
           hostId: message.hostId,
           werewolfMode: message.werewolfMode,
-          replayGameId: message.replayGameId
+          replayGameId: message.replayGameId,
+          clientViewMode: message.clientViewMode,
+          replayView: message.replayView
         }).catch((error) => {
           if (isSessionCancelled(error)) return;
           console.error(error);
@@ -58,7 +66,7 @@ async function runSession(session, mode, playerIds, gameType = 'consensus', opti
   const safeGameType = normalizeGameType(gameType);
   if (mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
   if (options.replayGameId) {
-    await replayGameSession(session, safeGameType, options.replayGameId);
+    await replayGameSession(session, safeGameType, options.replayGameId, options);
     return;
   }
   const config = getRequestConfig(mode, playerIds, safeGameType, options);
@@ -89,20 +97,28 @@ async function runSession(session, mode, playerIds, gameType = 'consensus', opti
   session.close();
 }
 
-async function replayGameSession(session, gameType, replayGameId) {
+async function replayGameSession(session, gameType, replayGameId, options = {}) {
   const game = getGame(replayGameId);
   if (!game) throw new Error('历史对局不存在。');
   if (normalizeGameType(game.gameType || game.type) !== gameType) throw new Error('历史对局类型与当前游戏不匹配。');
   const replayGame = enrichReplayPlayers(normalizeReplayGame(game));
   const sender = createPreparedSender(session, gameType === 'debate' ? { phaseLookahead: 1 } : { prefetchCount: 2 });
 
+  const replayProjection = gameType === 'werewolf'
+    ? createProjectionContext(replayGame, options.replayView || {})
+    : null;
   const replayPlayers = gameType === 'werewolf' ? createWerewolfReplayPlayers(replayGame.players || []) : replayGame.players || [];
-  await sender.send({ type: 'players', players: replayPlayers, game: getPlaybackGameSnapshot(replayGame) });
+  await sender.send({
+    type: 'players',
+    players: replayProjection ? projectPlayers(replayPlayers, replayProjection) : replayPlayers,
+    game: replayProjection ? projectWerewolfGame(getPlaybackGameSnapshot(replayGame), replayProjection) : getPlaybackGameSnapshot(replayGame)
+  });
   for (const event of buildReplayPlaybackEvents(replayGame)) {
-    await sender.enqueue(event);
+    const projected = replayProjection ? projectWerewolfEvent(event, replayProjection) : event;
+    if (projected) await sender.enqueue(projected);
   }
   await sender.flush();
-  await sender.send({ type: 'game', game: gameType === 'werewolf' ? createWerewolfPublicGame(replayGame) : replayGame });
+  await sender.send({ type: 'game', game: replayProjection ? projectWerewolfGame(replayGame, replayProjection) : replayGame });
   session.close();
 }
 
@@ -492,14 +508,7 @@ function createWerewolfReplaySnapshot(game, players, rounds, includeResult = fal
 }
 
 function createWerewolfPublicGame(game = {}) {
-  return {
-    ...game,
-    players: (game.players || []).map(publicWerewolfReplayPlayer),
-    rounds: (game.rounds || []).map((round) => ({
-      ...round,
-      night: createWerewolfVisibleNight(round.night)
-    }))
-  };
+  return projectWerewolfGame(game, createProjectionContext(game));
 }
 
 function createWerewolfReplayPlayers(players) {
@@ -530,6 +539,11 @@ function createWerewolfVisibleRound(round = {}, stage) {
     idiotReveal: null,
     hunterShot: null
   };
+  if ((stage === 'night-start' || stage === 'day-start') && shouldReplayFirstDaySheriffBeforeNightResult(round)) {
+    base.sheriffId = null;
+    base.sheriffBadge = { status: 'none' };
+    base.sheriffElection = null;
+  }
   if (stage === 'night-start') {
     base.night = {
       ...createWerewolfVisibleNight(round.night),
@@ -848,6 +862,7 @@ function getRequestConfig(mode, playerIds, gameType = 'consensus', options = {})
     topic: options.topic || null,
     debateTeams: options.debateTeams || null,
     werewolfMode: options.werewolfMode || null,
+    clientViewMode: options.clientViewMode || 'god',
     missingProviders,
     realReady: missingProviders.length === 0
   };

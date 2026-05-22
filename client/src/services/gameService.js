@@ -57,12 +57,12 @@ async function parseApiData(response) {
     : payload;
 }
 
-export function openGameSocket({ gameType = 'debate', playerIds, hostId, topic, debateTeams, werewolfMode, replayGameId, onEvent, onError, onClose }) {
+export function openGameSocket({ gameType = 'debate', playerIds, hostId, topic, debateTeams, werewolfMode, clientViewMode, replayView, replayGameId, onEvent, onError, onClose }) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(`${protocol}//${window.location.host}/api/toc/ws/game`);
 
   socket.onopen = () => {
-    socket.send(JSON.stringify({ type: 'start', mode: 'real', gameType, playerIds, hostId, topic, debateTeams, werewolfMode, replayGameId }));
+    socket.send(JSON.stringify({ type: 'start', mode: 'real', gameType, playerIds, hostId, topic, debateTeams, werewolfMode, clientViewMode, replayView, replayGameId }));
   };
 
   socket.onmessage = (message) => {
