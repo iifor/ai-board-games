@@ -4,7 +4,7 @@
   min-height: 100%;
   overflow: auto;
   color: #f6fbff;
-  background: var(--bg-debate) center / cover no-repeat, #02040c;
+  background: var(--bg-debate) center / cover no-repeat, #02040c !important;
 }
 
 .debate-shell * {

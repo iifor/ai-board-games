@@ -261,6 +261,9 @@ function runJsonQuery(db, sql, args, mode) {
   }
   if (lower.startsWith('delete from game_players')) return deleteWhere(data.game_players, (row) => row.game_id === values[0]);
   if (lower.startsWith('insert into game_players')) {
+    if (!data.games.some((row) => row.id === values[0])) {
+      throw new Error('FOREIGN KEY constraint failed');
+    }
     data.game_players.push({ game_id: values[0], player_id: values[1], player_snapshot_json: values[2] });
     return { changes: 1 };
   }

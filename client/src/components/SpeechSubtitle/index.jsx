@@ -30,7 +30,7 @@ export function SpeechSubtitle({ speech, players = [], getSpeakerLabel, classNam
 
     return (
       <aside className={rootClassName} aria-live="polite">
-        <span className="speech-subtitle__speaker">{speaker}</span>
+        <p className="speech-subtitle__speaker">{speaker}发言：</p>
         {activeCue?.words.map((word) => {
           const state = getWordPlaybackState(word, activeWord);
           return (
@@ -44,7 +44,7 @@ export function SpeechSubtitle({ speech, players = [], getSpeakerLabel, classNam
   if (!speech?.playerId) {
     return (
       <aside className={rootClassName} aria-live="polite">
-        <span className="speech-subtitle__speaker">{speaker}</span>
+        <p className="speech-subtitle__speaker">{speaker}发言：</p>
         <span>{timeline.fullText || text}</span>
       </aside>
     );
@@ -52,7 +52,7 @@ export function SpeechSubtitle({ speech, players = [], getSpeakerLabel, classNam
 
   return (
     <aside className={fallbackClassName} aria-live="polite">
-      <span className="speech-subtitle__speaker">{speaker}</span>
+      <p className="speech-subtitle__speaker">{speaker}发言：</p>
       <p>{timeline.fullText || text}</p>
     </aside>
   );

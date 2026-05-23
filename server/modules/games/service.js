@@ -25,13 +25,17 @@ function saveGameRecord(game) {
     created_at: game.createdAt || new Date().toISOString()
   };
 
-  repo.deleteGamePlayers(row.id);
-  if (Array.isArray(game.players)) {
-    game.players.forEach((p) => {
-      repo.insertGamePlayer(row.id, p.id || p.playerId, toJson(p));
-    });
-  }
-  repo.insertOrReplaceGame(row);
+  const db = require('../../db').getDb();
+  const tx = db.transaction(() => {
+    repo.insertOrReplaceGame(row);
+    repo.deleteGamePlayers(row.id);
+    if (Array.isArray(game.players)) {
+      game.players.forEach((p) => {
+        repo.insertGamePlayer(row.id, p.id || p.playerId, toJson(p));
+      });
+    }
+  });
+  tx();
   return listGames();
 }
 
