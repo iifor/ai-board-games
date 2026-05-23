@@ -73,7 +73,7 @@ const PLAYER_COLS = ['id', 'nickname', 'name', 'avatar', 'sex', 'personality', '
 const PROVIDER_COLS = ['id', 'name', 'base_url', 'api_format', 'api_key_cipher', 'api_key_iv', 'api_key_tag', 'enabled', 'created_at', 'updated_at'];
 const MODEL_COLS = ['id', 'provider_id', 'provider', 'name', 'base_url', 'api_format', 'api_key_cipher', 'api_key_iv', 'api_key_tag', 'enabled', 'created_at', 'updated_at'];
 const VOICE_COLS = ['id', 'name', 'provider', 'voice_id', 'language', 'gender', 'style', 'rate', 'pitch', 'sample_text', 'description', 'enabled', 'created_at', 'updated_at'];
-const ROLE_COLS = ['id', 'name', 'faction', 'role_type', 'responsibility', 'ability', 'key_info', 'rule_json', 'enabled', 'sort_order', 'created_at', 'updated_at'];
+const ROLE_COLS = ['id', 'name', 'faction', 'role_type', 'responsibility', 'ability', 'play_style_advice', 'key_info', 'rule_json', 'enabled', 'sort_order', 'created_at', 'updated_at'];
 const MODE_COLS = ['id', 'name', 'description', 'roles_json', 'rules_json', 'sheriff_json', 'win_condition', 'enabled', 'sort_order', 'created_at', 'updated_at'];
 const GAME_COLS = ['id', 'game_type', 'mode', 'skin_id', 'skin_name', 'winner', 'win_reason', 'topic_json', 'players_json', 'rounds_json', 'event_json', 'audio_resources_json', 'created_at'];
 const GP_COLS = ['game_id', 'player_id', 'player_snapshot_json'];
@@ -85,7 +85,7 @@ function upsert(db, table, columns, rows) {
   const placeholders = columns.map(() => '?').join(', ');
   const stmt = db.prepare(`INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`);
   for (const row of rows) {
-    stmt.run(columns.map((col) => row[col]));
+    stmt.run(columns.map((col) => col === 'play_style_advice' ? String(row[col] || '') : row[col]));
   }
 }
 

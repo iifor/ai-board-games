@@ -103,6 +103,7 @@ function migrate(db) {
       role_type TEXT NOT NULL DEFAULT 'villager',
       responsibility TEXT NOT NULL DEFAULT '',
       ability TEXT NOT NULL DEFAULT '',
+      play_style_advice TEXT NOT NULL DEFAULT '',
       key_info TEXT NOT NULL DEFAULT '',
       rule_json TEXT NOT NULL DEFAULT '{}',
       enabled INTEGER NOT NULL DEFAULT 1,
@@ -166,6 +167,7 @@ function migrate(db) {
   ensureColumn(db, 'werewolf_modes', 'rules_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, 'werewolf_modes', 'sheriff_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, 'werewolf_modes', 'win_condition', "TEXT NOT NULL DEFAULT 'side'");
+  ensureColumn(db, 'werewolf_roles', 'play_style_advice', "TEXT NOT NULL DEFAULT ''");
   migrateLegacyModelProviders(db);
 
   // Fix null/empty/consensus game types

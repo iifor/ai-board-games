@@ -1,6 +1,7 @@
 ﻿const { callOpenAIChat, parseJsonObject, cachedLlmCall } = require('./modules/llm');
 
 const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('./services/ai/promptComposer');
+const { syncMissingPublicMemory } = require('./modules/game-memory');
 
 const PHASES = [
   { id: 'strategy', name: '队长战术部署', limit: 300 },
@@ -222,7 +223,7 @@ async function collectSpeech(agent, phase, context, instruction, fallback, maxTo
     const reply = await askAgent(agent, [
       `当前环节：${phase.name}`,
       `字数限制：${phase.limit}字以内`,
-      `压缩赛况：\n${context || '比赛刚开始。'}`,
+      `公开赛况：${context || '已通过上文增量同步；如果没有同步内容，则比赛刚开始。'}`,
       instruction
     ].join('\n\n'), { maxTokens });
     return normalizeSpeechText(reply, fallback);
@@ -261,6 +262,72 @@ function publicDebateLog(phases) {
     .flatMap((phase) => phase.speeches.map((speech) => `${phase.name}｜${speech.speakerLabel || '发言'}：${speech.text}`))
     .slice(-6);
   return [...summaries.slice(-5), ...recent].join('\n');
+}
+
+function collectDebateMemoryEntries(state) {
+  const phases = state.phases || [];
+  const currentPhase = phases.at(-1);
+  const entries = [];
+  phases.forEach((phase, phaseIndex) => {
+    const baseOrder = (phaseIndex + 1) * 100000;
+    const current = phase === currentPhase;
+
+    if (!current) {
+      if (phase.id === 'strategy') {
+        (phase.speeches || []).forEach((speech, index) => {
+          entries.push(createDebateMemoryEntry({
+            id: `debate:${phase.id}:team-strategy:${index}:${speech.playerId}`,
+            scope: 'team',
+            targetSide: speech.side,
+            type: 'summary',
+            text: `${phase.name}本方战术，${speech.speakerLabel || '队长'}：${speech.text}`,
+            order: baseOrder + index
+          }));
+        });
+      } else if (phase.stageSummary) {
+        entries.push(createDebateMemoryEntry({
+          id: `debate:${phase.id}:summary`,
+          type: 'summary',
+          text: `${phase.name}摘要：${phase.stageSummary}`,
+          order: baseOrder + 1
+        }));
+      }
+      return;
+    }
+
+    (phase.speeches || []).forEach((speech, index) => {
+      const teamOnly = phase.id === 'strategy' || speech.kind === 'strategy';
+      entries.push(createDebateMemoryEntry({
+        id: `debate:${phase.id}:speech:${index}:${speech.playerId}:${speech.kind || 'speech'}`,
+        scope: teamOnly ? 'team' : 'public',
+        targetSide: teamOnly ? speech.side : undefined,
+        type: 'speech',
+        text: `${phase.name}｜${speech.speakerLabel || '发言'}：${speech.text}`,
+        order: baseOrder + 100 + index
+      }));
+    });
+
+    if ((phase.votes || []).length) {
+      entries.push(createDebateMemoryEntry({
+        id: `debate:${phase.id}:votes`,
+        type: 'vote',
+        text: `${phase.name}投票：${phase.votes.map((vote) => `${vote.voterId}投${vote.target}`).join('、')}。`,
+        order: baseOrder + 900
+      }));
+    }
+  });
+  return entries;
+}
+
+function createDebateMemoryEntry(entry) {
+  return {
+    scope: 'public',
+    ...entry
+  };
+}
+
+function syncDebateMemory(agent, state) {
+  return syncMissingPublicMemory(agent, collectDebateMemoryEntries(state));
 }
 
 function publicDebateHost(host = {}) {
@@ -349,14 +416,16 @@ async function runAiDebate(config, options = {}) {
 
   await runPhase(config, emit, state, 'strategy', async (phase) => {
     for (const captain of agents.filter((agent) => agent.debateRole === 'captain')) {
-      const text = await collectSpeech(captain, phase, publicDebateLog(phases), '请给本方队友做战术部署。', `${captain.sideLabel}先稳住核心论点，抓住对方定义漏洞，队友分工补证据和反问。`);
+      syncDebateMemory(captain, state);
+      const text = await collectSpeech(captain, phase, '', '请给本方队友做战术部署。', `${captain.sideLabel}先稳住核心论点，抓住对方定义漏洞，队友分工补证据和反问。`);
       await emitSpeech(emit, state, phase, captain, text, 'strategy');
     }
   });
 
   await runPhase(config, emit, state, 'opening', async (phase) => {
     for (const agent of [debaterAt(agents, 'pro', 0), debaterAt(agents, 'con', 0)].filter(Boolean)) {
-      const text = await collectSpeech(agent, phase, publicDebateLog(phases), '请完成本方立论陈词。', `${agent.sideLabel}认为本方立场更能兼顾现实约束与长期价值，核心标准应当先被清晰定义。`);
+      syncDebateMemory(agent, state);
+      const text = await collectSpeech(agent, phase, '', '请完成本方立论陈词。', `${agent.sideLabel}认为本方立场更能兼顾现实约束与长期价值，核心标准应当先被清晰定义。`);
       await emitSpeech(emit, state, phase, agent, text, 'opening');
     }
   });
@@ -366,9 +435,11 @@ async function runAiDebate(config, options = {}) {
     const con = agents.filter((agent) => agent.side === 'con').slice(1, 3);
     const pairs = [[pro[0], con[0]], [con[0], pro[1]], [pro[1], con[1]], [con[1], pro[0]]].filter(([a, b]) => a && b);
     for (const [questioner, responder] of pairs) {
-      const question = await collectSpeech(questioner, { ...phase, limit: 60 }, publicDebateLog(phases), `请向${getDebateRoleName(responder)}提出一个尖锐问题。`, `请问对方如何解释本方标准下的关键风险？`, 160);
+      syncDebateMemory(questioner, state);
+      const question = await collectSpeech(questioner, { ...phase, limit: 60 }, '', `请向${getDebateRoleName(responder)}提出一个尖锐问题。`, `请问对方如何解释本方标准下的关键风险？`, 160);
       await emitSpeech(emit, state, phase, questioner, question, 'question', responder.id);
-      const answer = await collectSpeech(responder, phase, publicDebateLog(phases), `请回应${getDebateRoleName(questioner)}刚才的问题，并反击一句。`, `这个问题忽略了前提差异，我方标准更能处理边界情况。`, 180);
+      syncDebateMemory(responder, state);
+      const answer = await collectSpeech(responder, phase, '', `请回应${getDebateRoleName(questioner)}刚才的问题，并反击一句。`, `这个问题忽略了前提差异，我方标准更能处理边界情况。`, 180);
       await emitSpeech(emit, state, phase, responder, answer, 'answer', questioner.id);
     }
   });
@@ -380,14 +451,16 @@ async function runAiDebate(config, options = {}) {
       const candidates = agents.filter((agent) => agent.side === side && agent.id !== previousId);
       const agent = choose(candidates);
       previousId = agent.id;
-      const text = await collectSpeech(agent, phase, publicDebateLog(phases), '请进行自由辩论发言，回应最近争点并推进本方论证。', `${agent.sideLabel}补充一点：对方刚才回避了评判标准，我方才是在处理真实场景。`);
+      syncDebateMemory(agent, state);
+      const text = await collectSpeech(agent, phase, '', '请进行自由辩论发言，回应最近争点并推进本方论证。', `${agent.sideLabel}补充一点：对方刚才回避了评判标准，我方才是在处理真实场景。`);
       await emitSpeech(emit, state, phase, agent, text, 'free');
     }
   });
 
   await runPhase(config, emit, state, 'closing', async (phase) => {
     for (const agent of [debaterAt(agents, 'pro', 3), debaterAt(agents, 'con', 3)].filter(Boolean)) {
-      const text = await collectSpeech(agent, phase, publicDebateLog(phases), '请以四辩身份完成本方总结陈词。', `${agent.sideLabel}总结：我方完成了定义、风险和价值三层证明，对方关键反驳没有击穿核心标准。`);
+      syncDebateMemory(agent, state);
+      const text = await collectSpeech(agent, phase, '', '请以四辩身份完成本方总结陈词。', `${agent.sideLabel}总结：我方完成了定义、风险和价值三层证明，对方关键反驳没有击穿核心标准。`);
       await emitSpeech(emit, state, phase, agent, text, 'closing');
     }
   });
@@ -451,7 +524,7 @@ async function runAwardPhases(config, emit, state) {
   const winnerVotes = {};
   if (judges.length) {
     for (const judge of judges) {
-      const review = await collectJudgeReview(judge, state.phases);
+      const review = await collectJudgeReview(judge, state);
       winnerVotes[judge.id] = review.winner;
       const speech = pushSpeech(judgePhase, judge, review.text, 'judge-review');
       await emit({ type: 'speech', phase: judgePhase, speech, game: serializeGame(state) });
@@ -474,7 +547,7 @@ async function runAwardPhases(config, emit, state) {
   await emit({ type: 'phase-start', phase: mvpPhase, message: mvpPhase.summary, game: serializeGame({ ...state, winner, winReason }) });
 
   const voters = contestants;
-  const votes = await Promise.all(voters.map((voter) => collectBestDebaterVote(voter, contestants, state.phases)));
+  const votes = await Promise.all(voters.map((voter) => collectBestDebaterVote(voter, contestants, state)));
   const mvpVotes = {};
   for (const vote of votes) {
     mvpVotes[vote.voterId] = vote.target;
@@ -493,10 +566,11 @@ async function runPostgamePhase(config, emit, state) {
   phase.summary = '比赛结果已经公布，现在进入赛后发言。';
   await emit({ type: 'phase-start', phase, message: phase.summary, game: serializeGame(state) });
   for (const agent of getPostgameSpeakers(state.agents, state.mvp?.id)) {
+    syncDebateMemory(agent, state);
     const text = await collectSpeech(
       agent,
       phase,
-      publicDebateLog(state.phases),
+      '',
       '请发表赛后感言：可以回应本场胜负、点评关键争点、感谢队友或回应对手。不要再投票。',
       `${agent.sideLabel}赛后想说，本场最关键的是双方都把核心标准讲清楚了；无论结果如何，这场交锋很过瘾。`,
       220
@@ -522,13 +596,14 @@ function getPostgameSpeakers(agents, mvpId) {
   return [...contestants.slice(startIndex), ...contestants.slice(0, startIndex)];
 }
 
-async function collectBestDebaterVote(voter, contestants, phases) {
+async function collectBestDebaterVote(voter, contestants, state) {
   const fallback = contestants[Math.floor(Math.random() * contestants.length)];
   try {
+    syncDebateMemory(voter, state);
     const reply = await askAgent(voter, [
       '请从正反方 8 位选手中评选最佳辩手。',
       `可选对象：${contestants.map((agent) => `${agent.id}号${agent.nickname}`).join('、')}`,
-      `压缩赛况：\n${publicDebateLog(phases)}`,
+      '公开赛况已通过上文增量同步。',
       '只返回 JSON：{"target":2}，不要返回理由。'
     ].join('\n\n'), { maxTokens: 80 });
     const parsed = parseJsonObject(reply);
@@ -540,11 +615,12 @@ async function collectBestDebaterVote(voter, contestants, phases) {
   }
 }
 
-async function collectJudgeReview(judge, phases) {
+async function collectJudgeReview(judge, state) {
   try {
+    syncDebateMemory(judge, state);
     const reply = await askAgent(judge, [
       '请点评双方表现，并给出胜负倾向。',
-      `赛况：\n${publicDebateLog(phases)}`,
+      '公开赛况已通过上文增量同步。',
       '只返回 JSON：{"winner":"pro","text":"300字以内点评"}，winner 只能是 pro/con/draw。'
     ].join('\n\n'), { maxTokens: 220 });
     const parsed = parseJsonObject(reply);

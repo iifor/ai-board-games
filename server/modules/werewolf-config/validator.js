@@ -7,6 +7,7 @@ const upsertRoleSchema = z.object({
   roleType: z.enum(['god', 'wolf', 'villager']).optional(),
   responsibility: z.string().optional(),
   ability: z.string().optional(),
+  playStyleAdvice: z.string().optional(),
   keyInfo: z.string().optional(),
   rule: z.object({ actions: z.array(z.any()).optional() }).optional(),
   enabled: z.boolean().optional(),

@@ -1,12 +1,13 @@
 const {
   sortBySeat, getSheriffSpeechOrder, getSheriffNightDeathSpeechOrder,
-  getNextAliveId, getClockStartId, rotateFromSeat, prefetchOrderedSpeechTexts,
-  buildSpeechOrderMessage, buildSheriffBadgeMessage, buildPublicLog,
+  getNextAliveId, getClockStartId, rotateFromSeat,
+  buildSpeechOrderMessage, buildSheriffBadgeMessage, collectWerewolfPublicMemoryEntries,
   fallbackSpeech, fallbackLastWords, fallbackVote, getRoleLabel, hasRoleAction
 } = require('./utils');
 const { askSpeech } = require('./agents');
 const { eliminate, countTargets, topExile, hasLastWords } = require('./winCheck');
 const { getVoteMessage } = require('./utils');
+const { syncMissingPublicMemory } = require('../game-memory');
 
 async function runDay(ctx, round) {
   round.phase = 'day';
@@ -18,11 +19,10 @@ async function runDay(ctx, round) {
     await maybeHunterShot(ctx, round, death.id, 'night');
   }
 
-  const context = buildPublicLog(ctx.rounds, ctx.agents);
   const daySpeechOrder = await decideDaySpeechOrder(ctx, round);
-  for await (const { agent, text } of prefetchOrderedSpeechTexts(daySpeechOrder, (item) => (
-    askSpeech(item, round.day, context, fallbackSpeech(item, round.day))
-  ))) {
+  for (const agent of daySpeechOrder) {
+    syncWerewolfMemory(agent, ctx);
+    const text = await askSpeech(agent, round.day, '公开信息已通过上文增量同步。', fallbackSpeech(agent, round.day));
     const speech = { playerId: agent.id, text, phase: 'day', day: round.day };
     round.speeches.push(speech);
     await ctx.emit({ type: 'speech', round, speech, game: ctx.serialize() });
@@ -80,6 +80,7 @@ async function resolveDayVote(ctx, round) {
   round.votes = votes;
   const valid = ctx.agents.filter((agent) => agent.alive).map((agent) => agent.id);
   for (const agent of ctx.agents.filter((item) => item.alive && item.canVote)) {
+    syncWerewolfMemory(agent, ctx);
     const target = await agent.playerAgent.askVoteTarget(
       '白天投票：请选择你认为最像狼人的玩家。',
       valid.filter((id) => id !== agent.id),
@@ -120,7 +121,8 @@ async function resolveDayVote(ctx, round) {
 async function collectLastWords(ctx, round, playerId, eventType) {
   const agent = ctx.agents.find((item) => item.id === playerId);
   if (!agent) return;
-  const text = await askSpeech(agent, round.day, buildPublicLog(ctx.rounds, ctx.agents), fallbackLastWords(agent), 80);
+  syncWerewolfMemory(agent, ctx);
+  const text = await askSpeech(agent, round.day, '公开信息已通过上文增量同步。', fallbackLastWords(agent), 80);
   agent.lastWords = text;
   const words = { playerId: agent.id, text, day: round.day };
   round.lastWords.push(words);
@@ -150,6 +152,7 @@ async function maybeTransferSheriffBadge(ctx, round, playerId, reason, phase) {
   const alive = sortBySeat(ctx.agents.filter((agent) => agent.alive));
   const validIds = alive.map((agent) => agent.id);
   const fallbackTarget = validIds[0] || null;
+  if (sheriff) syncWerewolfMemory(sheriff, ctx);
   const parsed = sheriff && validIds.length
     ? await sheriff.playerAgent.askJson([
       `你是已出局警长。当前仍存活玩家：${validIds.join('、')}。`,
@@ -172,6 +175,10 @@ async function maybeTransferSheriffBadge(ctx, round, playerId, reason, phase) {
     round, sheriffTransfer: transfer,
     message: buildSheriffBadgeMessage(transfer), game: ctx.serialize()
   });
+}
+
+function syncWerewolfMemory(agent, ctx) {
+  return syncMissingPublicMemory(agent, collectWerewolfPublicMemoryEntries(ctx.rounds, ctx.agents));
 }
 
 module.exports = {

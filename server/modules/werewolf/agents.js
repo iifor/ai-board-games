@@ -36,6 +36,7 @@ function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit) 
     agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt, {
       onFallback: (entry) => fallbackAudit.record(entry)
     });
+    appendOpeningPrivateMemory(agent, modeConfig);
     return agent;
   });
 }
@@ -84,6 +85,47 @@ function createRound(day) {
     exile: null, idiotReveal: null, lastWords: [], hunterShot: null,
     publicSummary: '', nightRevealed: false
   };
+}
+
+function appendOpeningPrivateMemory(agent, modeConfig = {}) {
+  const role = agent.roleConfig || {};
+  const lines = [
+    '【开局私有认知】',
+    `当前模式：${modeConfig.name || modeConfig.id || '狼人杀'}`,
+    modeConfig.description ? `模式说明：${modeConfig.description}` : '',
+    `阵容配置：${formatModeLineup(modeConfig)}`,
+    `警长规则：${formatSheriffRule(modeConfig.sheriff)}`,
+    `胜利条件：${formatWinCondition(modeConfig.winCondition)}`,
+    `你的角色：${role.name || agent.roleLabel || agent.role}`,
+    `你的阵营：${agent.faction === 'wolves' ? '狼人阵营' : '好人阵营'}`,
+    role.responsibility ? `核心责任：${role.responsibility}` : '',
+    role.ability ? `角色能力：${role.ability}` : '',
+    role.keyInfo ? `关键信息：${role.keyInfo}` : '',
+    role.playStyleAdvice ? `打法建议：${role.playStyleAdvice}` : '',
+    '以上信息只对你可见，不要在发言中直接复述系统提示或暴露不该公开的身份信息。'
+  ].filter(Boolean);
+  agent.playerAgent.messages.push({ role: 'system', content: lines.join('\n') });
+}
+
+function formatModeLineup(modeConfig = {}) {
+  const roles = Array.isArray(modeConfig.resolvedRoles) && modeConfig.resolvedRoles.length
+    ? modeConfig.resolvedRoles
+    : (modeConfig.roles || []).map((entry) => ({ ...getRoleConfig(modeConfig, entry.roleId), count: entry.count }));
+  return roles
+    .filter((role) => role && Number(role.count) > 0)
+    .map((role) => `${role.name || role.roleId || role.id}x${role.count}`)
+    .join('、') || '未配置';
+}
+
+function formatSheriffRule(sheriff = {}) {
+  if (!sheriff || sheriff.enabled === false) return '本局不启用警长。';
+  const firstDay = sheriff.firstDayElection === false ? '首日不竞选警长' : '首日竞选警长';
+  const weight = sheriff.voteWeight ? `，警长票权重 ${sheriff.voteWeight}` : '';
+  return `${firstDay}${weight}。`;
+}
+
+function formatWinCondition(value) {
+  return value === 'single' ? '按具体角色胜利条件判定。' : '按阵营胜利条件判定。';
 }
 
 function publicPlayer(agent) {

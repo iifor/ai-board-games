@@ -1,12 +1,17 @@
 const { buildSheriffStartMessage, buildSheriffResultMessage } = require('./announcements');
-const { shuffle, rotateFromSeat, getTopCandidateIds, prefetchOrderedSpeechTexts, buildSheriffVoteMessage, buildSheriffBadgeMessage, buildPublicLog } = require('./utils');
+const {
+  shuffle, rotateFromSeat, getTopCandidateIds,
+  buildSheriffVoteMessage, collectWerewolfPublicMemoryEntries
+} = require('./utils');
 const { countTargets } = require('./winCheck');
+const { syncMissingPublicMemory } = require('../game-memory');
 
 async function runSheriffElection(ctx, round) {
   const { agents, emit, serialize } = ctx;
   const alive = agents.filter((agent) => agent.alive).sort((a, b) => Number(a.id) - Number(b.id));
   const signedUpAgents = [];
   for (const [index, agent] of alive.entries()) {
+    syncWerewolfMemory(agent, ctx);
     const parsed = await agent.playerAgent.askJson([
       '第一天警长竞选开始。你是否上警竞选警长？',
       '只返回 JSON：{"run":true} 或 {"run":false}。'
@@ -32,6 +37,7 @@ async function runSheriffElection(ctx, round) {
   await playSheriffSpeeches(ctx, round, signedUpAgents, 'sheriff-speech');
   const candidates = [];
   for (const agent of signedUpAgents) {
+    syncWerewolfMemory(agent, ctx);
     const parsed = await agent.playerAgent.askJson([
       '你的警上竞选发言已经结束。你是否退水退出警长竞选？',
       '只返回 JSON：{"withdraw":true} 或 {"withdraw":false}。'
@@ -48,7 +54,7 @@ async function runSheriffElection(ctx, round) {
 
   const voters = alive.filter((agent) => agent.canVote && !signedUpIds.includes(agent.id));
   round.sheriffElection.voters = voters.map((agent) => agent.id);
-  const firstVote = await collectSheriffVotes(voters, candidates, '警长竞选投票，请从候选人中选择警长。');
+  const firstVote = await collectSheriffVotes(ctx, voters, candidates, '警长竞选投票，请从候选人中选择警长。');
   round.sheriffElection.votes = firstVote.votes;
   round.sheriffElection.tally = firstVote.tally;
   await emit({ type: 'sheriff-vote', round, sheriffCandidateIds: round.sheriffElection.candidates, message: buildSheriffVoteMessage(round, false), game: serialize() });
@@ -66,7 +72,7 @@ async function runSheriffElection(ctx, round) {
   const runoffCandidates = candidates.filter((agent) => firstTopIds.includes(agent.id));
   round.sheriffElection.runoffCandidateIds = runoffCandidates.map((agent) => agent.id);
   await playSheriffSpeeches(ctx, round, runoffCandidates, 'sheriff-runoff-speech');
-  const runoffVote = await collectSheriffVotes(voters, runoffCandidates, '警长复投，请在平票候选人中选择警长。');
+  const runoffVote = await collectSheriffVotes(ctx, voters, runoffCandidates, '警长复投，请在平票候选人中选择警长。');
   round.sheriffElection.runoffVotes = runoffVote.votes;
   round.sheriffElection.runoffTally = runoffVote.tally;
   await emit({ type: 'sheriff-runoff-vote', round, sheriffCandidateIds: round.sheriffElection.runoffCandidateIds, message: buildSheriffVoteMessage(round, true), game: serialize() });
@@ -82,11 +88,10 @@ async function playSheriffSpeeches(ctx, round, candidates, eventType) {
   const orderKey = isRunoff ? 'runoffSpeechOrder' : 'speechOrder';
   const speechesKey = isRunoff ? 'runoffSpeeches' : 'speeches';
   round.sheriffElection[orderKey] = ordered.map((agent) => agent.id);
-  const context = buildPublicLog(ctx.rounds, ctx.agents);
   const { askSheriffSpeech } = require('./agents');
-  for await (const { agent, text } of prefetchOrderedSpeechTexts(ordered, (item) => (
-    askSheriffSpeech(item, round.day, context, isRunoff)
-  ))) {
+  for (const agent of ordered) {
+    syncWerewolfMemory(agent, ctx);
+    const text = await askSheriffSpeech(agent, round.day, '公开信息已通过上文增量同步。', isRunoff);
     const speech = { playerId: agent.id, text, phase: 'sheriff', day: round.day, runoff: isRunoff };
     round.sheriffElection[speechesKey].push(speech);
     await ctx.emit({
@@ -105,14 +110,19 @@ async function finishSheriffElection(ctx, round, sheriffId, result) {
   await ctx.emit({ type: 'sheriff-result', round, message: buildSheriffResultMessage(round, ctx.modeConfig), game: ctx.serialize() });
 }
 
-async function collectSheriffVotes(voters, candidates, prompt) {
+async function collectSheriffVotes(ctx, voters, candidates, prompt) {
   const candidateIds = candidates.map((agent) => agent.id);
   const votes = {};
   for (const agent of voters) {
+    syncWerewolfMemory(agent, ctx);
     const target = await agent.playerAgent.askVoteTarget(prompt, candidateIds, candidateIds[0]);
     votes[agent.id] = target;
   }
   return { votes, tally: countTargets(votes) };
+}
+
+function syncWerewolfMemory(agent, ctx) {
+  return syncMissingPublicMemory(agent, collectWerewolfPublicMemoryEntries(ctx.rounds, ctx.agents));
 }
 
 module.exports = { runSheriffElection, playSheriffSpeeches, finishSheriffElection, collectSheriffVotes };

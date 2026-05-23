@@ -38,7 +38,8 @@ function rowToWerewolfRole(row) {
   if (!row) return null;
   return {
     id: row.id, name: row.name, faction: row.faction, roleType: row.role_type,
-    responsibility: row.responsibility, ability: row.ability, keyInfo: row.key_info,
+    responsibility: row.responsibility, ability: row.ability,
+    playStyleAdvice: row.play_style_advice || '', keyInfo: row.key_info,
     rule: parseJson(row.rule_json, {}), enabled: Boolean(row.enabled),
     sortOrder: row.sort_order, createdAt: row.created_at, updatedAt: row.updated_at
   };
@@ -54,6 +55,7 @@ function werewolfRoleToRow(input) {
     role_type: normalizeWerewolfRoleType(input.roleType || input.role_type),
     responsibility: String(input.responsibility || '').trim(),
     ability: String(input.ability || '').trim(),
+    play_style_advice: String(input.playStyleAdvice || input.play_style_advice || '').trim(),
     key_info: String(input.keyInfo || input.key_info || '').trim(),
     rule_json: toJson(rule),
     enabled: Number(input.enabled !== false),

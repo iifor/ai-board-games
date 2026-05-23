@@ -10,11 +10,12 @@ function findAllRoles() {
 
 function insertRole(row) {
   getDb().prepare(`
-    INSERT INTO werewolf_roles (id, name, faction, role_type, responsibility, ability, key_info, rule_json, enabled, sort_order, created_at, updated_at)
-    VALUES (@id, @name, @faction, @role_type, @responsibility, @ability, @key_info, @rule_json, @enabled, @sort_order, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    INSERT INTO werewolf_roles (id, name, faction, role_type, responsibility, ability, play_style_advice, key_info, rule_json, enabled, sort_order, created_at, updated_at)
+    VALUES (@id, @name, @faction, @role_type, @responsibility, @ability, @play_style_advice, @key_info, @rule_json, @enabled, @sort_order, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name, faction = excluded.faction, role_type = excluded.role_type,
-      responsibility = excluded.responsibility, ability = excluded.ability, key_info = excluded.key_info,
+      responsibility = excluded.responsibility, ability = excluded.ability,
+      play_style_advice = excluded.play_style_advice, key_info = excluded.key_info,
       rule_json = excluded.rule_json, enabled = excluded.enabled, sort_order = excluded.sort_order,
       updated_at = CURRENT_TIMESTAMP
   `).run(row);

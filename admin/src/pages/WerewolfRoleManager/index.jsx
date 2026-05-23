@@ -23,7 +23,7 @@ export function WerewolfRoleManager() {
   const filteredRoles = filterByQuery(
     roles.filter((role) => filters.enabled === undefined || role.enabled === filters.enabled),
     filters.q,
-    ['id', 'name', 'responsibility', 'ability', 'keyInfo']
+    ['id', 'name', 'responsibility', 'ability', 'keyInfo', 'playStyleAdvice']
   );
 
   async function refresh() {
@@ -54,7 +54,7 @@ export function WerewolfRoleManager() {
         <ListFilterBar
           value={filters}
           onChange={setFilters}
-          searchPlaceholder="搜索角色、职责、能力"
+          searchPlaceholder="搜索角色、职责、能力、打法建议"
           selects={[{ key: 'enabled', placeholder: '状态', options: booleanOptions() }]}
         />
         <Table rowKey="id" dataSource={filteredRoles} columns={[
@@ -62,6 +62,7 @@ export function WerewolfRoleManager() {
           { title: '阵营', dataIndex: 'faction', render: (value) => value === 'wolves' ? <Tag color="red">狼人</Tag> : <Tag color="blue">好人</Tag> },
           { title: '类型', dataIndex: 'roleType', render: (value) => WEREWOLF_ROLE_TYPE_OPTIONS.find((item) => item.value === value)?.label || value },
           { title: '能力', dataIndex: 'ability', ellipsis: true },
+          { title: '打法建议', dataIndex: 'playStyleAdvice', ellipsis: true },
           { title: '启用', dataIndex: 'enabled', render: enabledTag },
           { title: '操作', width: 150, render: (_, record) => <TableActions onEdit={() => setEditing(record)} onDelete={() => remove(record.id)} /> }
         ]} />
@@ -73,7 +74,10 @@ export function WerewolfRoleManager() {
 
 function WerewolfRoleModal({ open, initialValues, onCancel, onSave }) {
   const values = {
-    faction: 'good', roleType: 'villager', enabled: true,
+    faction: 'good',
+    roleType: 'villager',
+    enabled: true,
+    playStyleAdvice: '',
     rule: JSON.stringify({ actions: [] }, null, 2),
     ...(initialValues || {})
   };
@@ -87,6 +91,7 @@ function WerewolfRoleModal({ open, initialValues, onCancel, onSave }) {
       <Form.Item name="responsibility" label="责任"><Input.TextArea rows={2} /></Form.Item>
       <Form.Item name="ability" label="能力"><Input.TextArea rows={2} /></Form.Item>
       <Form.Item name="keyInfo" label="关键信息"><Input.TextArea rows={2} /></Form.Item>
+      <Form.Item name="playStyleAdvice" label="打法建议"><Input.TextArea rows={3} /></Form.Item>
       <Form.Item name="rule" label="规则 DSL JSON" extra="启用角色只允许 kill、inspectFaction、save、poison、guard、shootOnDeath、surviveExileOnce、voteOnly、speakOnly。"><Input.TextArea rows={8} /></Form.Item>
       <Form.Item name="sortOrder" label="排序"><InputNumber min={0} /></Form.Item>
       <Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item>

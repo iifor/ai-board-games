@@ -121,6 +121,148 @@ function buildPublicLog(rounds, agents) {
   ].filter(Boolean).join('；')).join('\n') || `存活玩家：${agents.filter((agent) => agent.alive).map((agent) => `${agent.id}号`).join('、')}`;
 }
 
+function collectWerewolfPublicMemoryEntries(rounds = [], agents = []) {
+  const currentRound = rounds.at(-1);
+  const entries = [];
+  for (const round of rounds) {
+    const day = Number(round.day || 0);
+    const baseOrder = day * 100000;
+    const current = round === currentRound;
+    const summary = buildWerewolfRoundSummary(round, agents);
+    if (summary) {
+      entries.push(createMemoryEntry(`werewolf:day:${day}:summary:${hashMemoryText(summary)}`, 'summary', summary, baseOrder + 1));
+    }
+
+    if (!current) continue;
+
+    if (round.daySpeech?.playerIds?.length) {
+      entries.push(createMemoryEntry(
+        `werewolf:day:${day}:speech-order`,
+        'result',
+        `第${day}天白天发言顺序：${formatIds(round.daySpeech.playerIds)}。方向：${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}。`,
+        baseOrder + 50
+      ));
+    }
+
+    const election = round.sheriffElection;
+    if (election) {
+      if (Array.isArray(election.signedUpIds) && election.signedUpIds.length) {
+        entries.push(createMemoryEntry(
+          `werewolf:day:${day}:sheriff-candidates`,
+          'result',
+          `第${day}天警长竞选上警玩家：${formatIds(election.signedUpIds)}。`,
+          baseOrder + 100
+        ));
+      }
+      (election.speeches || []).forEach((speech, index) => {
+        entries.push(createMemoryEntry(
+          `werewolf:day:${day}:sheriff-speech:${index}:${speech.playerId}`,
+          'speech',
+          `第${day}天警长竞选发言，${speech.playerId}号：${speech.text}`,
+          baseOrder + 110 + index
+        ));
+      });
+      if (Array.isArray(election.withdrawnIds) && election.withdrawnIds.length) {
+        entries.push(createMemoryEntry(
+          `werewolf:day:${day}:sheriff-withdrawn`,
+          'result',
+          `第${day}天警长竞选退水玩家：${formatIds(election.withdrawnIds)}。`,
+          baseOrder + 180
+        ));
+      }
+      if (election.votes && Object.keys(election.votes).length) {
+        entries.push(createMemoryEntry(
+          `werewolf:day:${day}:sheriff-votes`,
+          'vote',
+          `第${day}天警长竞选投票：${formatVotes(election.votes)}。`,
+          baseOrder + 190
+        ));
+      }
+      (election.runoffSpeeches || []).forEach((speech, index) => {
+        entries.push(createMemoryEntry(
+          `werewolf:day:${day}:sheriff-runoff-speech:${index}:${speech.playerId}`,
+          'speech',
+          `第${day}天警长竞选复投发言，${speech.playerId}号：${speech.text}`,
+          baseOrder + 210 + index
+        ));
+      });
+      if (election.runoffVotes && Object.keys(election.runoffVotes).length) {
+        entries.push(createMemoryEntry(
+          `werewolf:day:${day}:sheriff-runoff-votes`,
+          'vote',
+          `第${day}天警长竞选复投：${formatVotes(election.runoffVotes)}。`,
+          baseOrder + 280
+        ));
+      }
+    }
+
+    (round.lastWords || []).forEach((words, index) => {
+      entries.push(createMemoryEntry(
+        `werewolf:day:${day}:last-words:${index}:${words.playerId}`,
+        'speech',
+        `第${day}天遗言，${words.playerId}号：${words.text}`,
+        baseOrder + 300 + index
+      ));
+    });
+
+    (round.speeches || []).forEach((speech, index) => {
+      entries.push(createMemoryEntry(
+        `werewolf:day:${day}:day-speech:${index}:${speech.playerId}`,
+        'speech',
+        `第${day}天白天发言，${speech.playerId}号：${speech.text}`,
+        baseOrder + 400 + index
+      ));
+    });
+
+    if (round.votes && Object.keys(round.votes).length) {
+      entries.push(createMemoryEntry(
+        `werewolf:day:${day}:day-votes`,
+        'vote',
+        `第${day}天放逐投票：${formatVotes(round.votes)}。`,
+        baseOrder + 900
+      ));
+    }
+  }
+  return entries;
+}
+
+function buildWerewolfRoundSummary(round = {}, agents = []) {
+  const day = Number(round.day || 0);
+  const parts = [];
+  if (round.publicSummary) parts.push(round.publicSummary);
+  if (round.sheriffId) parts.push(`警长是${round.sheriffId}号`);
+  if (round.exile) parts.push(`${round.exile.id}号被放逐`);
+  if (round.idiotReveal) parts.push(`${round.idiotReveal.id}号白痴翻牌`);
+  if (round.hunterShot) parts.push(`${round.hunterShot.from}号猎人带走${round.hunterShot.target}号`);
+  if (!parts.length && day === 1) {
+    parts.push(`存活玩家：${agents.filter((agent) => agent.alive).map((agent) => `${agent.id}号`).join('、')}`);
+  }
+  return parts.length ? `第${day}天摘要：${parts.join('；')}。` : '';
+}
+
+function createMemoryEntry(id, type, text, order) {
+  return { id, scope: 'public', type, text, order };
+}
+
+function formatIds(ids = []) {
+  return ids.map((id) => `${id}号`).join('、') || '无';
+}
+
+function formatVotes(votes = {}) {
+  return Object.entries(votes)
+    .map(([playerId, target]) => `${playerId}号投${target}号`)
+    .join('、') || '无';
+}
+
+function hashMemoryText(value) {
+  const text = String(value || '');
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
 const ROLE_NAME_FALLBACK = {
   werewolf: '狼人', seer: '预言家', witch: '女巫', hunter: '猎人',
   idiot: '白痴', guard: '守卫', villager: '村民'
@@ -175,6 +317,7 @@ module.exports = {
   getSheriffSpeechOrder, getSheriffNightDeathSpeechOrder, getTopCandidateIds,
   prefetchOrderedSpeechTexts, buildWolfStrategySummary, getVoteMessage,
   buildSheriffVoteMessage, buildSpeechOrderMessage, buildSheriffBadgeMessage,
-  buildPublicLog, getRoleConfig, getRoleLabel, getRoleActions, hasRoleAction,
+  buildPublicLog, collectWerewolfPublicMemoryEntries,
+  getRoleConfig, getRoleLabel, getRoleActions, hasRoleAction,
   fallbackSpeech, fallbackLastWords, fallbackVote
 };
