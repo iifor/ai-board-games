@@ -1,6 +1,6 @@
 const { hasRoleAction, sortBySeat, rotateFromSeat, getTopCandidateIds, buildWolfStrategySummary } = require('./utils');
 const { topTarget, countTargets } = require('./winCheck');
-const { askWolfNightSpeech } = require('./agents');
+const { askWolfNightSpeech, askWolfNightSpeechWithThinking } = require('./agents');
 const { getWerewolfNightPrompt, buildNightPublicMessage, buildDayStartMessage } = require('./announcements');
 const { applyNightDeaths } = require('./winCheck');
 
@@ -67,11 +67,20 @@ async function resolveWolfKill(ctx, round, alive) {
 
   for (const wolf of speechOrder) {
     const isLeader = Number(wolf.id) === Number(leader?.id);
-    const text = await askWolfNightSpeech(wolf, round.day, round.night.wolfSpeeches, isLeader);
-    if (!String(text || '').trim()) continue;
-    const speech = { playerId: wolf.id, text, phase: 'night-wolf', day: round.day, kind: isLeader ? 'deployment' : 'chat' };
-    round.night.wolfSpeeches.push(speech);
-    await ctx.emit({ type: 'wolf-speech', round, speech, game: ctx.serialize() });
+    if (wolf.thinkingEnabled && wolf.playerAgent.thinkingEnabled) {
+      const { content, thinking } = await askWolfNightSpeechWithThinking(wolf, round.day, round.night.wolfSpeeches, isLeader);
+      if (!String(content || '').trim()) continue;
+      if (thinking) await ctx.emit({ type: 'thinking', playerId: wolf.id, thinking });
+      const speech = { playerId: wolf.id, text: content, phase: 'night-wolf', day: round.day, kind: isLeader ? 'deployment' : 'chat', thinking };
+      round.night.wolfSpeeches.push(speech);
+      await ctx.emit({ type: 'wolf-speech', round, speech, game: ctx.serialize() });
+    } else {
+      const text = await askWolfNightSpeech(wolf, round.day, round.night.wolfSpeeches, isLeader);
+      if (!String(text || '').trim()) continue;
+      const speech = { playerId: wolf.id, text, phase: 'night-wolf', day: round.day, kind: isLeader ? 'deployment' : 'chat' };
+      round.night.wolfSpeeches.push(speech);
+      await ctx.emit({ type: 'wolf-speech', round, speech, game: ctx.serialize() });
+    }
   }
 
   const wolfChoices = {};

@@ -4,6 +4,7 @@ import { DebateDialogFooter } from '../DebateDialogFooter';
 import { DebatePlayerPool } from '../DebatePlayerPool';
 import { DebateTeamBoard } from '../DebateTeamBoard';
 import { DebateTopicFields } from '../DebateTopicFields';
+import { HostSeat } from '../../../../components/common/HostSeat';
 import {
   normalizeDebateTeamDraft,
   getDebateTeamKey,
@@ -23,6 +24,8 @@ export function DebateTopicDialog({
   onCaptainEnabledChange,
   speechEnabled,
   onSpeechEnabledChange,
+  hostId,
+  onHostChange,
   onCancel,
   onStart
 }) {
@@ -46,6 +49,7 @@ export function DebateTopicDialog({
   const playerMap = useMemo(() => new Map(players.map((player) => [Number(player.id), player])), [players]);
   const selectedPlayers = effectivePlayerIds.map((id) => playerMap.get(Number(id)) || { id, nickname: `${id}号` });
   const getPlayer = (id) => selectedPlayers.find((player) => Number(player.id) === Number(id));
+  const hostPlayer = players.find((p) => Number(p.id) === Number(hostId)) || null;
   const assignedIds = new Set([...proIds, ...conIds, ...judgeIds].map(Number));
   const audiencePlayers = selectedPlayers.filter((player) => !assignedIds.has(Number(player.id)));
 
@@ -139,6 +143,12 @@ export function DebateTopicDialog({
           onCaptainDrop={setCaptain}
           onDrop={handleDrop}
         />
+        <HostSeat
+          hostPlayer={hostPlayer}
+          players={players}
+          onSelect={(id) => onHostChange?.(id)}
+          onRemove={() => onHostChange?.(null)}
+        />
         <DebatePlayerPool players={audiencePlayers} disabled={isReplayLocked} onDrop={returnPlayerToAudience} />
         <DebateDialogFooter
           captainEnabled={captainEnabled}
@@ -147,7 +157,7 @@ export function DebateTopicDialog({
           canStart={canStart}
           onCaptainEnabledChange={onCaptainEnabledChange}
           onSpeechEnabledChange={onSpeechEnabledChange}
-          onStart={() => onStart(effectiveTopic, normalizedTeams)}
+          onStart={() => onStart(effectiveTopic, normalizedTeams, { hostId })}
         />
       </section>
     </div>

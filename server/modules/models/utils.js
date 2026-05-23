@@ -10,6 +10,7 @@ function rowToModel(row, provider) {
     apiFormat: provider?.apiFormat || row.api_format,
     hasApiKey: provider ? provider.hasApiKey : Boolean(row.api_key_cipher),
     providerEnabled: provider ? Boolean(provider.enabled) : Boolean(row.enabled),
+    thinkingEnabled: Boolean(Number(row.thinking_enabled)),
     enabled: Boolean(row.enabled) && (provider ? Boolean(provider.enabled) : true),
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -36,6 +37,7 @@ function modelToRow(input, provider, existing = null) {
     api_key_cipher: existing?.api_key_cipher || '',
     api_key_iv: existing?.api_key_iv || '',
     api_key_tag: existing?.api_key_tag || '',
+    thinking_enabled: input.thinkingEnabled === true ? 1 : (input.thinkingEnabled === false ? 0 : (existing?.thinking_enabled === 1 ? 1 : 0)),
     enabled: Number(input.enabled !== false && existing?.enabled !== 0)
   };
 }

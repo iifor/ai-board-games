@@ -1,17 +1,17 @@
 const { getFetchFailureHint, normalizeBaseUrl } = require('./utils');
 
-async function callOpenAIChat({
+async function callOpenAIChatRaw({
   apiKey,
   baseUrl = 'https://api.openai.com/v1',
   provider = 'openai',
   model,
   messages,
   temperature = 0.8,
-  maxTokens = 260,
+  maxTokens = 800,
   apiFormat = 'openai-compatible'
 }) {
   if (apiFormat === 'anthropic-compatible') {
-    return callAnthropicChat({ apiKey, baseUrl, provider, model, messages, temperature, maxTokens });
+    return callAnthropicChatRaw({ apiKey, baseUrl, provider, model, messages, temperature, maxTokens });
   }
   const endpoint = `${normalizeBaseUrl(baseUrl, 'https://api.openai.com/v1', 'Base URL').replace(/\/$/, '')}/chat/completions`;
   let response;
@@ -40,17 +40,25 @@ async function callOpenAIChat({
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content?.trim() || '';
+  const message = data.choices?.[0]?.message || {};
+  const content = String(message.content || '').trim();
+  const thinking = String(message.reasoning_content || '').trim();
+  return { content, thinking };
 }
 
-async function callAnthropicChat({
+async function callOpenAIChat(options) {
+  const { content } = await callOpenAIChatRaw(options);
+  return content;
+}
+
+async function callAnthropicChatRaw({
   apiKey,
   baseUrl = 'https://api.anthropic.com/v1',
   provider = 'anthropic',
   model,
   messages,
   temperature = 0.8,
-  maxTokens = 260
+  maxTokens = 800
 }) {
   const normalizedBaseUrl = normalizeBaseUrl(baseUrl, 'https://api.anthropic.com/v1', 'Base URL').replace(/\/$/, '');
   const endpoint = `${normalizedBaseUrl.endsWith('/v1') ? normalizedBaseUrl : `${normalizedBaseUrl}/v1`}/messages`;
@@ -89,15 +97,32 @@ async function callAnthropicChat({
   }
 
   const data = await response.json();
-  return (data.content || [])
-    .map((item) => item.type === 'text' ? item.text : '')
+  const content = (data.content || [])
+    .filter((item) => item.type === 'text')
+    .map((item) => item.text || '')
     .join('')
     .trim();
+  const thinking = (data.content || [])
+    .filter((item) => item.type === 'thinking')
+    .map((item) => item.thinking || '')
+    .join('')
+    .trim();
+  return { content, thinking };
+}
+
+async function callAnthropicChat(options) {
+  const { content } = await callAnthropicChatRaw(options);
+  return content;
 }
 
 async function callModelChat(target) {
   if (target.apiFormat === 'anthropic-compatible') return callAnthropicChat(target);
   return callOpenAIChat(target);
+}
+
+async function callModelChatWithThinking(target) {
+  if (target.apiFormat === 'anthropic-compatible') return callAnthropicChatRaw(target);
+  return callOpenAIChatRaw(target);
 }
 
 async function testModelConnection(target) {
@@ -182,8 +207,11 @@ async function testOpenAIConnection(target) {
 
 module.exports = {
   callAnthropicChat,
+  callAnthropicChatRaw,
   callModelChat,
+  callModelChatWithThinking,
   callOpenAIChat,
+  callOpenAIChatRaw,
   testModelConnection,
   testOpenAIConnection
 };

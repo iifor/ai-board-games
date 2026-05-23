@@ -4,6 +4,7 @@ import { useSpeechQueue } from '../../../hooks/useSpeechQueue';
 import { useGameSocketSession } from '../../../hooks/useGameSocketSession';
 import { WerewolfArena } from '../components/WerewolfArena';
 import { WerewolfControls } from '../components/WerewolfControls';
+import { ThinkingModal } from '../../../components/common/ThinkingModal';
 import { WerewolfPlayerDetailModal } from '../components/WerewolfPlayerDetailModal';
 import { WerewolfModeDialog } from '../components/WerewolfModeDialog';
 import bgWerewolf from '../../../asserts/werewolf.png';
@@ -30,6 +31,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   const [streamMessage, setStreamMessage] = useState('等待开局');
   const [eventLog, setEventLog] = useState([]);
   const [activeSpeech, setActiveSpeech] = useState(null);
+  const [activeThinking, setActiveThinking] = useState(null);
   const [nightActionType, setNightActionType] = useState('');
   const [seerCheckTarget, setSeerCheckTarget] = useState(null);
   const [sheriffCandidateIds, setSheriffCandidateIds] = useState([]);
@@ -41,6 +43,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   const [selectedPlayerIds, setSelectedPlayerIds] = useState([]);
   const [clientViewMode, setClientViewMode] = useState('god');
   const [setupError, setSetupError] = useState('');
+  const [selectedHostId, setSelectedHostId] = useState(null);
   const [visibleRolePlayerId, setVisibleRolePlayerId] = useState(null);
   const [showRoles, setShowRoles] = useState(true);
   const speechPlaybackRef = useRef(null);
@@ -163,6 +166,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     setGame(EMPTY_WEREWOLF);
     setEventLog([]);
     setActiveSpeech(null);
+    setActiveThinking(null);
     setNightActionType('');
     setSeerCheckTarget(null);
     setSheriffCandidateIds([]);
@@ -185,6 +189,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
       options = viewMode;
       viewMode = clientViewMode;
     }
+    const hostId = options.hostId ?? selectedHostId;
     if (!modeConfig?.id && !options.replayGameId) {
       setStatus('error');
       setStreamMessage('暂无可用狼人杀模式，请先在 B 端启用模式。');
@@ -207,6 +212,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     startSession({
       mode: 'real',
       playerIds: sortedPlayerIds,
+      hostId: hostId || undefined,
       werewolfMode: modeConfig,
       clientViewMode: viewMode === 'player' ? 'player' : 'god',
       replayGameId: options.replayGameId || ''
@@ -232,7 +238,14 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     }
     archiveServerEvent(event);
 
+    if (event.type === 'thinking') {
+      const thinkingPlayer = event.game?.players?.find((p) => Number(p.id) === Number(event.playerId)) || null;
+      setActiveThinking({ player: thinkingPlayer, thinking: event.thinking || '' });
+      return;
+    }
+
     if ((event.type === 'speech' || event.type === 'wolf-speech' || event.type === 'sheriff-speech' || event.type === 'sheriff-runoff-speech') && event.speech) {
+      setActiveThinking(null);
       const speakerLabel = formatWerewolfSeatLabel(event.speech.playerId, event.game?.players || displayGame.players || []);
       setStreamMessage(event.type === 'wolf-speech' ? `${speakerLabel}狼人夜聊` : `${speakerLabel}正在发言`);
       setActiveSpeech({
@@ -246,6 +259,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     }
 
     if ((event.type === 'last-words' || event.type === 'exile-words') && event.testimony) {
+      setActiveThinking(null);
       const speakerLabel = formatWerewolfSeatLabel(event.testimony.playerId, event.game?.players || displayGame.players || []);
       setStreamMessage(`${speakerLabel}遗言`);
       setActiveSpeech({
@@ -390,8 +404,10 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
           viewMode={clientViewMode}
           onViewModeChange={setClientViewMode}
           onPlayerToggle={(id) => setSelectedPlayerIds((value) => toggleWerewolfPlayerId(value, id, werewolfMode))}
+          hostId={selectedHostId}
+          onHostChange={(id) => setSelectedHostId(id ?? null)}
           error={setupError}
-          onStart={(mode, playerIds, viewMode) => startGame(mode, playerIds, viewMode)}
+          onStart={(mode, playerIds, viewMode, opts) => startGame(mode, playerIds, viewMode, opts)}
         />
       )}
 
@@ -402,6 +418,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
           onClose={() => setSelectedPlayer(null)}
         />
       )}
+
+      <ThinkingModal visible={Boolean(activeThinking)} player={activeThinking?.player} thinking={activeThinking?.thinking || ''} />
     </main>
   );
 }

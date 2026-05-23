@@ -1,0 +1,80 @@
+.thinking-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 6, 24, 0.46);
+  backdrop-filter: blur(3px);
+}
+
+.thinking-dialog {
+  width: min(520px, 90vw);
+  max-height: 62vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(92, 188, 255, 0.46);
+  border-radius: 10px;
+  background: rgba(5, 22, 54, 0.82);
+  box-shadow: 0 0 22px rgba(52, 163, 255, 0.22), inset 0 0 12px rgba(70, 176, 255, 0.08);
+  color: #bdeeff;
+  overflow: hidden;
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(92, 188, 255, 0.18);
+  flex-shrink: 0;
+}
+
+.thinking-header span {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(130, 218, 255, 0.28);
+  border-top-color: #82daff;
+  border-radius: 12px;
+  animation: thinkingSpin 820ms linear infinite;
+}
+
+.thinking-header strong {
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 22px;
+}
+
+.thinking-waiting {
+  padding: 18px 18px 22px;
+  margin: 0;
+  font-size: 14px;
+  color: rgba(189, 238, 255, 0.62);
+  text-align: center;
+}
+
+.thinking-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+
+.thinking-text {
+  margin: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #bdeeff;
+  background: none;
+  border: none;
+}
+
+@keyframes thinkingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

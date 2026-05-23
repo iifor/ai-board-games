@@ -3,6 +3,7 @@ import { Check, Eye, Moon, UserRound, Users } from 'lucide-react';
 import { classNames } from '../../../../utils/classNames';
 import { formatWerewolfModeSummary, getWerewolfModePlayerCount } from '../../werewolfUtils';
 import { PanelHeader } from '../PanelHeader';
+import { HostSeat } from '../../../../components/common/HostSeat';
 import './index.css';
 
 export function WerewolfModeDialog({
@@ -14,6 +15,8 @@ export function WerewolfModeDialog({
   viewMode,
   onViewModeChange,
   onPlayerToggle,
+  hostId,
+  onHostChange,
   error,
   onCancel,
   onStart
@@ -22,6 +25,7 @@ export function WerewolfModeDialog({
   const selectedCount = selectedPlayerIds.length;
   const canStart = Boolean(selectedMode?.id) && selectedCount === requiredCount;
   const selectedViewMode = viewMode === 'player' ? 'player' : 'god';
+  const hostPlayer = players.find((p) => Number(p.id) === Number(hostId)) || null;
 
   return (
     <div className="werewolf-mode-backdrop" role="presentation">
@@ -50,6 +54,12 @@ export function WerewolfModeDialog({
           </section>
           <section>
             <PanelHeader icon={<Users size={18} />} title={`玩家 ${selectedCount}/${requiredCount || '-'}`} />
+            <HostSeat
+              hostPlayer={hostPlayer}
+              players={players}
+              onSelect={(id) => onHostChange?.(id)}
+              onRemove={() => onHostChange?.(null)}
+            />
             <div className="werewolf-player-grid">
               {players.length ? players.map((player) => {
                 const checked = selectedPlayerIds.includes(Number(player.id));
@@ -57,6 +67,11 @@ export function WerewolfModeDialog({
                   <button
                     type="button"
                     className={checked ? 'checked' : ''}
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData('text/plain', String(player.id));
+                      event.dataTransfer.effectAllowed = 'move';
+                    }}
                     onClick={() => onPlayerToggle(player.id)}
                     key={player.id}
                   >
@@ -87,7 +102,7 @@ export function WerewolfModeDialog({
         {error && <p className="werewolf-setup-error">{error}</p>}
         <footer>
           <span></span>
-          <button type="button" className="primary" disabled={!canStart} onClick={() => onStart(selectedMode, selectedPlayerIds, selectedViewMode)}>开始游戏</button>
+          <button type="button" className="primary" disabled={!canStart} onClick={() => onStart(selectedMode, selectedPlayerIds, selectedViewMode, { hostId })}>开始游戏</button>
         </footer>
       </section>
     </div>

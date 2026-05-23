@@ -28,7 +28,6 @@
 }
 
 .speech-subtitle__word.is-active {
-  color: aquamarine;
   text-shadow: 0 0 14px rgba(255, 255, 255, 0.7), 0 0 28px rgba(255, 255, 255, 0.3);
 }
 

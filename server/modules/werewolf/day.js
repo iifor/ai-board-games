@@ -4,8 +4,9 @@ const {
   buildSpeechOrderMessage, buildSheriffBadgeMessage, collectWerewolfPublicMemoryEntries,
   fallbackSpeech, fallbackLastWords, fallbackVote, getRoleLabel, hasRoleAction
 } = require('./utils');
-const { askSpeech } = require('./agents');
+const { askSpeech, askSpeechWithThinking } = require('./agents');
 const { eliminate, countTargets, topExile, hasLastWords } = require('./winCheck');
+const { WEREWOLF } = require('../../../shared/constants/gameLimits');
 const { getVoteMessage } = require('./utils');
 const { syncMissingPublicMemory } = require('../game-memory');
 
@@ -22,10 +23,18 @@ async function runDay(ctx, round) {
   const daySpeechOrder = await decideDaySpeechOrder(ctx, round);
   for (const agent of daySpeechOrder) {
     syncWerewolfMemory(agent, ctx);
-    const text = await askSpeech(agent, round.day, '公开信息已通过上文增量同步。', fallbackSpeech(agent, round.day));
-    const speech = { playerId: agent.id, text, phase: 'day', day: round.day };
-    round.speeches.push(speech);
-    await ctx.emit({ type: 'speech', round, speech, game: ctx.serialize() });
+    if (agent.thinkingEnabled && agent.playerAgent.thinkingEnabled) {
+      const { content, thinking } = await askSpeechWithThinking(agent, round.day, '公开信息已通过上文增量同步。', fallbackSpeech(agent, round.day));
+      if (thinking) await ctx.emit({ type: 'thinking', playerId: agent.id, thinking });
+      const speech = { playerId: agent.id, text: content, phase: 'day', day: round.day, thinking };
+      round.speeches.push(speech);
+      await ctx.emit({ type: 'speech', round, speech, game: ctx.serialize() });
+    } else {
+      const text = await askSpeech(agent, round.day, '公开信息已通过上文增量同步。', fallbackSpeech(agent, round.day));
+      const speech = { playerId: agent.id, text, phase: 'day', day: round.day };
+      round.speeches.push(speech);
+      await ctx.emit({ type: 'speech', round, speech, game: ctx.serialize() });
+    }
   }
 
   await resolveDayVote(ctx, round);
@@ -122,11 +131,20 @@ async function collectLastWords(ctx, round, playerId, eventType) {
   const agent = ctx.agents.find((item) => item.id === playerId);
   if (!agent) return;
   syncWerewolfMemory(agent, ctx);
-  const text = await askSpeech(agent, round.day, '公开信息已通过上文增量同步。', fallbackLastWords(agent), 80);
-  agent.lastWords = text;
-  const words = { playerId: agent.id, text, day: round.day };
-  round.lastWords.push(words);
-  await ctx.emit({ type: eventType, round, testimony: words, game: ctx.serialize() });
+  if (agent.thinkingEnabled && agent.playerAgent.thinkingEnabled) {
+    const { content, thinking } = await askSpeechWithThinking(agent, round.day, '公开信息已通过上文增量同步。', fallbackLastWords(agent), WEREWOLF.LAST_WORDS_CHAR_LIMIT);
+    agent.lastWords = content;
+    if (thinking) await ctx.emit({ type: 'thinking', playerId: agent.id, thinking });
+    const words = { playerId: agent.id, text: content, day: round.day, thinking };
+    round.lastWords.push(words);
+    await ctx.emit({ type: eventType, round, testimony: words, game: ctx.serialize() });
+  } else {
+    const text = await askSpeech(agent, round.day, '公开信息已通过上文增量同步。', fallbackLastWords(agent), WEREWOLF.LAST_WORDS_CHAR_LIMIT);
+    agent.lastWords = text;
+    const words = { playerId: agent.id, text, day: round.day };
+    round.lastWords.push(words);
+    await ctx.emit({ type: eventType, round, testimony: words, game: ctx.serialize() });
+  }
 }
 
 async function maybeHunterShot(ctx, round, playerId, reason) {

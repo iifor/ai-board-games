@@ -1,6 +1,8 @@
 const { isSessionCancelled, isSpeechWaitPayload, getEventPhaseKey } = require('./session');
 const { prepareOutgoingEvent, collectPreparedAudioResources } = require('./media');
 
+const IMMEDIATE_EVENT_TYPES = new Set(['thinking']);
+
 function createPreparedSender(session, options = {}) {
   const queue = [];
   let drainPromise = null;
@@ -49,7 +51,11 @@ function createPreparedSender(session, options = {}) {
         try {
           const prepared = await item.prepared;
           collectPreparedAudioResources(prepared, audioResources);
-          await session.sendAndWait(prepared);
+          if (IMMEDIATE_EVENT_TYPES.has(prepared.type)) {
+            await session.send(prepared);
+          } else {
+            await session.sendAndWait(prepared);
+          }
           item.resolve();
         } catch (error) {
           item.reject(error);

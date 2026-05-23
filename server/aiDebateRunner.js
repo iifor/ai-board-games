@@ -1,17 +1,20 @@
-﻿const { callOpenAIChat, parseJsonObject, cachedLlmCall } = require('./modules/llm');
+﻿const { callOpenAIChat, callModelChatWithThinking, parseJsonObject, cachedLlmCall } = require('./modules/llm');
 
 const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('./services/ai/promptComposer');
 const { syncMissingPublicMemory } = require('./modules/game-memory');
+const { DEBATE } = require('../shared/constants/gameLimits');
+
+const PHASE_LIMITS = DEBATE.PHASE_LIMITS;
 
 const PHASES = [
-  { id: 'strategy', name: '队长战术部署', limit: 300 },
-  { id: 'opening', name: '立论陈词', limit: 350 },
-  { id: 'crossfire', name: '正反攻辩', limit: 200 },
-  { id: 'free', name: '自由辩论', limit: 150 },
-  { id: 'closing', name: '总结陈词', limit: 350 },
-  { id: 'judges', name: '评委点评', limit: 300 },
-  { id: 'mvp', name: '评选最佳辩手', limit: 100 },
-  { id: 'postgame', name: '赛后发言', limit: 180 }
+  { id: 'strategy', name: '队长战术部署', limit: PHASE_LIMITS.strategy },
+  { id: 'opening', name: '立论陈词', limit: PHASE_LIMITS.opening },
+  { id: 'crossfire', name: '正反攻辩', limit: PHASE_LIMITS.crossfire },
+  { id: 'free', name: '自由辩论', limit: PHASE_LIMITS.free },
+  { id: 'closing', name: '总结陈词', limit: PHASE_LIMITS.closing },
+  { id: 'judges', name: '评委点评', limit: PHASE_LIMITS.judges },
+  { id: 'mvp', name: '评选最佳辩手', limit: PHASE_LIMITS.mvp },
+  { id: 'postgame', name: '赛后发言', limit: PHASE_LIMITS.postgame }
 ];
 const TOPICS = [
   {
@@ -159,7 +162,7 @@ function buildHostPrompt(topic, phaseName, options = {}) {
   const lines = [
     '你是《AI 辩论赛》的主持人。你的职责是推进赛程、宣布辩题、介绍阵营、控制发言顺序、总结环节结果、汇总 MVP 投票、保持节奏和公平。',
     '你不能代替选手辩论，不能泄露队长私下部署内容，不能偏袒任一方。',
-    '输出要像现场主持，简洁、有仪式感、信息明确。每次主持播报不超过 100 字。',
+    `输出要像现场主持，简洁、有仪式感、信息明确。每次主持播报建议不超过 ${DEBATE.HOST_ANNOUNCE_CHAR_LIMIT} 字（弱约束，超出也正常输出）。`,
     options.includeTopic
       ? `本场开局首次播报可以介绍辩题和双方立场：辩题「${topic.title}」；正方「${topic.proPosition}」；反方「${topic.conPosition}」。`
       : '本场辩题和正反方立场已经在开局播报过。之后进入阶段时不要重复介绍辩题、正方观点或反方观点，只宣布当前环节和必要规则。',
@@ -178,13 +181,30 @@ async function askAgent(agent, prompt, options = {}) {
     apiFormat: agent.apiFormat,
     temperature: agent.temperature,
     messages: agent.messages,
-    maxTokens: options.maxTokens || 260
+    maxTokens: options.maxTokens || 800
   });
   agent.messages.push({ role: 'assistant', content: reply });
   return reply;
 }
 
-async function askHost(config, topic, phaseName, prompt, maxTokens = 160, options = {}) {
+async function askAgentWithThinking(agent, prompt, options = {}) {
+  agent.messages.push({ role: 'user', content: prompt });
+  const { content, thinking } = await callModelChatWithThinking({
+    apiKey: agent.apiKey,
+    baseUrl: agent.baseUrl,
+    provider: agent.provider,
+    model: agent.model,
+    apiFormat: agent.apiFormat,
+    temperature: agent.temperature,
+    messages: agent.messages,
+    maxTokens: options.maxTokens || 800
+  });
+  agent.messages.push({ role: 'assistant', content });
+  return { content, thinking };
+}
+
+async function askHost(config, topic, phaseName, prompt, maxTokens, options = {}) {
+  const effectiveMaxTokens = maxTokens || Math.ceil(DEBATE.HOST_ANNOUNCE_CHAR_LIMIT * 2.5);
   const messages = [
     { role: 'system', content: buildHostPrompt(topic, phaseName, options) },
     { role: 'user', content: prompt }
@@ -197,19 +217,20 @@ async function askHost(config, topic, phaseName, prompt, maxTokens = 160, option
     apiFormat: config.host.apiFormat,
     temperature: config.host.temperature,
     messages,
-    maxTokens
+    maxTokens: effectiveMaxTokens
   };
   if (options.cacheable) {
-    const cached = await cachedLlmCall(['debate-host', config.host.provider, config.host.model, messages, maxTokens], () => callOpenAIChat(payload));
+    const cached = await cachedLlmCall(['debate-host', config.host.provider, config.host.model, messages, effectiveMaxTokens], () => callOpenAIChat(payload));
     return cached.value;
   }
   return callOpenAIChat(payload);
 }
 
+// limit 仅作为提示词弱约束，不做实际截断处理
 function normalizeText(text, limit, fallback) {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!clean) return fallback.slice(0, limit);
-  return clean.slice(0, limit);
+  if (!clean) return String(fallback || '');
+  return clean;
 }
 
 function normalizeSpeechText(text, fallback) {
@@ -217,15 +238,28 @@ function normalizeSpeechText(text, fallback) {
   return clean || fallback;
 }
 
-async function collectSpeech(agent, phase, context, instruction, fallback, maxTokens = 260) {
+async function collectSpeech(agent, phase, context, instruction, fallback, maxTokens) {
+  const effectiveMaxTokens = maxTokens || Math.ceil((phase.limit || 200) * 2.5);
   if (!agent.apiKey) return normalizeSpeechText(fallback, fallback);
+  const prompt = [
+    `当前环节：${phase.name}`,
+    `建议字数：${phase.limit}字以内（弱约束，超出也正常输出）`,
+    `公开赛况：${context || '已通过上文增量同步；如果没有同步内容，则比赛刚开始。'}`,
+    instruction
+  ].join('\n\n');
+
+  if (agent.thinkingEnabled) {
+    try {
+      const { content, thinking } = await askAgentWithThinking(agent, prompt, { maxTokens: effectiveMaxTokens });
+      return { content: normalizeSpeechText(content, fallback), thinking };
+    } catch (error) {
+      console.error(`辩论赛 ${agent.nickname || agent.id} 发言+thinking失败，使用兜底：${error.message}`);
+      return { content: normalizeSpeechText(fallback, fallback), thinking: '' };
+    }
+  }
+
   try {
-    const reply = await askAgent(agent, [
-      `当前环节：${phase.name}`,
-      `字数限制：${phase.limit}字以内`,
-      `公开赛况：${context || '已通过上文增量同步；如果没有同步内容，则比赛刚开始。'}`,
-      instruction
-    ].join('\n\n'), { maxTokens });
+    const reply = await askAgent(agent, prompt, { maxTokens: effectiveMaxTokens });
     return normalizeSpeechText(reply, fallback);
   } catch (error) {
     console.error(`辩论赛 ${agent.nickname || agent.id} 发言失败，使用兜底：${error.message}`);
@@ -436,10 +470,10 @@ async function runAiDebate(config, options = {}) {
     const pairs = [[pro[0], con[0]], [con[0], pro[1]], [pro[1], con[1]], [con[1], pro[0]]].filter(([a, b]) => a && b);
     for (const [questioner, responder] of pairs) {
       syncDebateMemory(questioner, state);
-      const question = await collectSpeech(questioner, { ...phase, limit: 60 }, '', `请向${getDebateRoleName(responder)}提出一个尖锐问题。`, `请问对方如何解释本方标准下的关键风险？`, 160);
+      const question = await collectSpeech(questioner, { ...phase, limit: PHASE_LIMITS.crossfire_question }, '', `请向${getDebateRoleName(responder)}提出一个尖锐问题。`, `请问对方如何解释本方标准下的关键风险？`);
       await emitSpeech(emit, state, phase, questioner, question, 'question', responder.id);
       syncDebateMemory(responder, state);
-      const answer = await collectSpeech(responder, phase, '', `请回应${getDebateRoleName(questioner)}刚才的问题，并反击一句。`, `这个问题忽略了前提差异，我方标准更能处理边界情况。`, 180);
+      const answer = await collectSpeech(responder, phase, '', `请回应${getDebateRoleName(questioner)}刚才的问题，并反击一句。`, `这个问题忽略了前提差异，我方标准更能处理边界情况。`);
       await emitSpeech(emit, state, phase, responder, answer, 'answer', questioner.id);
     }
   });
@@ -501,16 +535,20 @@ async function runPhase(config, emit, state, phaseId, action) {
 async function safeHost(config, topic, phaseName, prompt, fallback, options = {}) {
   if (!config.host?.apiKey) return fallback;
   try {
-    const reply = await askHost(config, topic, phaseName, prompt, 140, options);
-    return normalizeText(reply, 100, fallback);
+    const reply = await askHost(config, topic, phaseName, prompt, undefined, options);
+    return normalizeText(reply, DEBATE.HOST_ANNOUNCE_CHAR_LIMIT, fallback);
   } catch (error) {
     console.error(`主持人生成失败，使用兜底：${error.message}`);
     return fallback;
   }
 }
 
-async function emitSpeech(emit, state, phase, agent, text, kind, targetId = null) {
+async function emitSpeech(emit, state, phase, agent, result, kind, targetId = null) {
+  const text = typeof result === 'string' ? result : result.content;
+  const thinking = typeof result === 'string' ? '' : (result.thinking || '');
+  if (thinking) await emit({ type: 'thinking', playerId: agent.id, thinking });
   const speech = pushSpeech(phase, agent, text, kind, targetId);
+  if (thinking) speech.thinking = thinking;
   await emit({ type: 'speech', phase, speech, game: serializeGame(state) });
 }
 
@@ -572,8 +610,7 @@ async function runPostgamePhase(config, emit, state) {
       phase,
       '',
       '请发表赛后感言：可以回应本场胜负、点评关键争点、感谢队友或回应对手。不要再投票。',
-      `${agent.sideLabel}赛后想说，本场最关键的是双方都把核心标准讲清楚了；无论结果如何，这场交锋很过瘾。`,
-      220
+      `${agent.sideLabel}赛后想说，本场最关键的是双方都把核心标准讲清楚了；无论结果如何，这场交锋很过瘾。`
     );
     await emitSpeech(emit, state, phase, agent, text, 'postgame');
   }
@@ -621,8 +658,8 @@ async function collectJudgeReview(judge, state) {
     const reply = await askAgent(judge, [
       '请点评双方表现，并给出胜负倾向。',
       '公开赛况已通过上文增量同步。',
-      '只返回 JSON：{"winner":"pro","text":"300字以内点评"}，winner 只能是 pro/con/draw。'
-    ].join('\n\n'), { maxTokens: 220 });
+      `只返回 JSON：{"winner":"pro","text":"建议${PHASE_LIMITS.judges}字以内点评（弱约束，超出也正常输出）"}，winner 只能是 pro/con/draw。`
+    ].join('\n\n'), { maxTokens: Math.ceil(PHASE_LIMITS.judges * 2.5) });
     const parsed = parseJsonObject(reply);
     const winner = ['pro', 'con', 'draw'].includes(parsed?.winner) ? parsed.winner : 'draw';
     return { winner, text: normalizeSpeechText(parsed?.text, '双方都有亮点，正方结构完整，反方反击积极，胜负取决于评判标准。') };
@@ -806,5 +843,6 @@ function topWinner(votes) {
 
 module.exports = {
   runAiDebate,
-  PHASES
+  PHASES,
+  PHASE_LIMITS
 };

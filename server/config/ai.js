@@ -51,7 +51,8 @@ function normalizePlayer(player, models, defaultModel, index) {
     apiFormat: model?.apiFormat || 'openai-compatible',
     model: model?.name || player.model || '', modelId: model?.id || player.modelId || null,
     temperature: 0.85, personality: player.personality || '记录者',
-    sex: player.sex || '未知', voicePackageId: player.voicePackageId || null
+    sex: player.sex || '未知', voicePackageId: player.voicePackageId || null,
+    thinkingEnabled: model?.thinkingEnabled || false
   };
 }
 
@@ -62,12 +63,14 @@ function normalizeHost(defaultModel, players = [], defaultHostPlayerId = null) {
       name: defaultPlayer.name || defaultPlayer.nickname || DEFAULT_CONFIG.host.name,
       nickname: defaultPlayer.nickname || defaultPlayer.name || DEFAULT_CONFIG.host.nickname,
       temperature: Number(defaultPlayer.temperature ?? DEFAULT_CONFIG.host.temperature),
+      thinkingEnabled: defaultPlayer.thinkingEnabled || false,
       defaultHostPlayerId: defaultPlayer.id };
   }
   const provider = defaultModel ? modelToProvider(defaultModel) : null;
   return { ...DEFAULT_CONFIG.host, provider: provider?.name || '', providerName: provider?.name || '',
     baseUrl: provider?.baseUrl || '', apiKeyEnv: 'DATABASE_MODEL_API_KEY', apiKey: provider?.apiKey || '',
     apiFormat: defaultModel?.apiFormat || 'openai-compatible', model: defaultModel?.name || '',
+    thinkingEnabled: defaultModel?.thinkingEnabled || false,
     defaultHostPlayerId: null };
 }
 

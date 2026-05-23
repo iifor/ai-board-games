@@ -7,6 +7,7 @@ const createModelSchema = z.object({
   baseUrl: z.string().optional(),
   apiFormat: z.enum(['openai-compatible', 'anthropic-compatible']).optional(),
   apiKey: z.string().optional(),
+  thinkingEnabled: z.boolean().optional(),
   enabled: z.boolean().optional()
 });
 

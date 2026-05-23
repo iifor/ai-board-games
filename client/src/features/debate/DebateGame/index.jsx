@@ -5,7 +5,7 @@ import { useGameSocketSession } from '../../../hooks/useGameSocketSession';
 import { PlayerDetailModal } from '../../../components/common/PlayerDetailModal';
 import { DebateArena } from '../components/DebateArena';
 import { DebateControls } from '../components/DebateControls';
-import { DebateThinking } from '../components/DebateThinking';
+import { ThinkingModal } from '../../../components/common/ThinkingModal';
 import { DebateTopicDialog } from '../components/DebateTopicDialog';
 import { DebateResultModal } from '../components/DebateResultModal';
 import bgDebate from '../../../asserts/debate.png';
@@ -30,13 +30,14 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   const [streamMessage, setStreamMessage] = useState('真实模式已就绪，点击开始后调用 AI。');
   const [activeSpeech, setActiveSpeech] = useState(null);
   const [subtitleSpeech, setSubtitleSpeech] = useState(null);
-  const [isThinking, setIsThinking] = useState(false);
+  const [activeThinking, setActiveThinking] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [topicDraft, setTopicDraft] = useState(DEFAULT_DEBATE_TOPIC);
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [captainEnabled, setCaptainEnabled] = useState(true);
   const [debateTeamDraft, setDebateTeamDraft] = useState(() => createDefaultDebateTeams([]));
+  const [selectedHostId, setSelectedHostId] = useState(null);
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const speechPlaybackRef = useRef(null);
   const { speechEnabled, setSpeechEnabled, speak, unlock, cancel } = useSpeechQueue();
@@ -84,24 +85,24 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     playPendingEvent: (event, controls) => speechPlaybackRef.current?.playPendingDebateEvent(event, controls) || false,
     onError: (error) => {
       setStatus('error');
-      setIsThinking(false);
+      setActiveThinking(null);
       setStreamMessage(error.message || '辩论赛生成失败');
     },
     onAcknowledge: () => {
       setActiveSpeech(null);
-      if (status === 'streaming') setIsThinking(true);
+      if (status === 'streaming') setActiveThinking({ player: null, thinking: '' });
     },
     onAutoPlayStopped: () => {
       clearSubtitleTimer();
       setSubtitleSpeech(null);
       setActiveSpeech(null);
-      setIsThinking(false);
+      setActiveThinking(null);
     },
     onSkipPhase: () => {
       clearSubtitleTimer();
       setActiveSpeech(null);
       setSubtitleSpeech(null);
-      setIsThinking(true);
+      setActiveThinking({ player: null, thinking: '' });
       setStreamMessage('正在跳过当前阶段...');
     }
   });
@@ -128,7 +129,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     setGame(EMPTY_DEBATE);
     setActiveSpeech(null);
     setSubtitleSpeech(null);
-    setIsThinking(false);
+    setActiveThinking(null);
     setStatus('idle');
     setStreamMessage(message || '真实模式已就绪，点击开始后调用 AI。');
   }
@@ -141,6 +142,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   function startGame(topic = topicDraft, teams = debateTeamDraft, options = {}) {
     resetToIdle('');
     if (speechEnabled) unlock();
+    const hostId = options.hostId ?? selectedHostId;
     const nextTopic = normalizeTopicDraft(topic);
     const playerIdsForTeams = availablePlayers.map((player) => player.id);
     const normalizedTeamsForStart = normalizeDebateTeamDraft(teams, playerIdsForTeams);
@@ -157,11 +159,12 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     setDebateTeamDraft(nextTeams);
     setTopicDialogOpen(false);
     setStatus('streaming');
-    setIsThinking(true);
+    setActiveThinking({ player: null, thinking: '' });
     setStreamMessage('游戏准备中...');
     startSession({
       mode: 'real',
       topic: nextTopic,
+      hostId: hostId || undefined,
       debateTeams: shouldSendTeams ? nextTeams : null,
       replayGameId: options.replayGameId || ''
     });
@@ -179,7 +182,12 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   }
 
   function applyServerEvent(event) {
-    setIsThinking(false);
+    if (event.type === 'thinking') {
+      const thinkingPlayer = event.game?.players?.find((p) => Number(p.id) === Number(event.playerId)) || null;
+      setActiveThinking({ player: thinkingPlayer, thinking: event.thinking || '' });
+      return;
+    }
+    setActiveThinking(null);
     if (event.message) setStreamMessage(event.message);
     if (event.game) setGame(event.game);
     if (event.players) setGame((value) => ({ ...(value || EMPTY_DEBATE), players: event.players }));
@@ -197,7 +205,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
     }
     if (event.type === 'done') {
       setStatus('ready');
-      setIsThinking(false);
+      setActiveThinking(null);
       setStreamMessage(event.message || '辩论赛已完成。');
       if (event.game?.winner || event.game?.mvp) setResultModalOpen(true);
     }
@@ -242,7 +250,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
         isIdle={status === 'idle' || !displayGame.phases?.length}
       />
 
-      {isThinking && <DebateThinking />}
+      <ThinkingModal visible={Boolean(activeThinking)} player={activeThinking?.player} thinking={activeThinking?.thinking || ''} />
       {status === 'error' && <p className="debate-error">{streamMessage}</p>}
 
       {resultModalOpen && (
@@ -280,8 +288,10 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
             setSpeechEnabled(value);
             if (value) unlock();
           }}
+          hostId={selectedHostId}
+          onHostChange={(id) => setSelectedHostId(id ?? null)}
           onCancel={() => setTopicDialogOpen(false)}
-          onStart={(topic, teams) => startGame(topic, teams)}
+          onStart={(topic, teams, opts) => startGame(topic, teams, opts)}
         />
       )}
     </main>

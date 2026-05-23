@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { App as AntApp, Button, Card, Descriptions, Form, Input, Modal, Space, Table } from 'antd';
 import { ApiOutlined, PlusOutlined } from '@ant-design/icons';
+import { Switch } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import { adminRequest } from '../../services/adminApi';
 import { filterByQuery, formatApiFormat } from '../../utils/adminHelpers';
@@ -112,8 +113,11 @@ export function ModelManager() {
 
 function ModelModal({ open, initialValues, onCancel, onSave }) {
   return (
-    <EntityModal open={open} title={initialValues?.id ? '编辑模型' : '新增模型'} initialValues={initialValues || {}} onCancel={onCancel} onSave={onSave}>
+    <EntityModal open={open} title={initialValues?.id ? '编辑模型' : '新增模型'} initialValues={initialValues?.id ? initialValues : { thinkingEnabled: false }} onCancel={onCancel} onSave={onSave}>
       <Form.Item name="name" label="模型名称" rules={[{ required: true, message: '请输入模型名称' }]}><Input /></Form.Item>
+      <Form.Item name="thinkingEnabled" label="Think 模式" valuePropName="checked">
+        <Switch checkedChildren="开" unCheckedChildren="关" />
+      </Form.Item>
     </EntityModal>
   );
 }

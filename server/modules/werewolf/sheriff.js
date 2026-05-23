@@ -88,17 +88,29 @@ async function playSheriffSpeeches(ctx, round, candidates, eventType) {
   const orderKey = isRunoff ? 'runoffSpeechOrder' : 'speechOrder';
   const speechesKey = isRunoff ? 'runoffSpeeches' : 'speeches';
   round.sheriffElection[orderKey] = ordered.map((agent) => agent.id);
-  const { askSheriffSpeech } = require('./agents');
+  const { askSheriffSpeech, askSheriffSpeechWithThinking } = require('./agents');
   for (const agent of ordered) {
     syncWerewolfMemory(agent, ctx);
-    const text = await askSheriffSpeech(agent, round.day, '公开信息已通过上文增量同步。', isRunoff);
-    const speech = { playerId: agent.id, text, phase: 'sheriff', day: round.day, runoff: isRunoff };
-    round.sheriffElection[speechesKey].push(speech);
-    await ctx.emit({
-      type: eventType, round, speech,
-      sheriffCandidateIds: isRunoff ? round.sheriffElection.runoffCandidateIds : round.sheriffElection.signedUpIds,
-      game: ctx.serialize()
-    });
+    if (agent.thinkingEnabled && agent.playerAgent.thinkingEnabled) {
+      const { content, thinking } = await askSheriffSpeechWithThinking(agent, round.day, '公开信息已通过上文增量同步。', isRunoff);
+      if (thinking) await ctx.emit({ type: 'thinking', playerId: agent.id, thinking });
+      const speech = { playerId: agent.id, text: content, phase: 'sheriff', day: round.day, runoff: isRunoff, thinking };
+      round.sheriffElection[speechesKey].push(speech);
+      await ctx.emit({
+        type: eventType, round, speech,
+        sheriffCandidateIds: isRunoff ? round.sheriffElection.runoffCandidateIds : round.sheriffElection.signedUpIds,
+        game: ctx.serialize()
+      });
+    } else {
+      const text = await askSheriffSpeech(agent, round.day, '公开信息已通过上文增量同步。', isRunoff);
+      const speech = { playerId: agent.id, text, phase: 'sheriff', day: round.day, runoff: isRunoff };
+      round.sheriffElection[speechesKey].push(speech);
+      await ctx.emit({
+        type: eventType, round, speech,
+        sheriffCandidateIds: isRunoff ? round.sheriffElection.runoffCandidateIds : round.sheriffElection.signedUpIds,
+        game: ctx.serialize()
+      });
+    }
   }
 }
 
