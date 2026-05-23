@@ -22,11 +22,18 @@ export function useSpeechQueue() {
   const audioRef = useRef(null);
   const endTimerRef = useRef(null);
   const resumeTimerRef = useRef(null);
+  const audioTimeRafRef = useRef(null);
 
   const clearResumeTimer = useCallback(() => {
     if (!resumeTimerRef.current) return;
     window.clearInterval(resumeTimerRef.current);
     resumeTimerRef.current = null;
+  }, []);
+
+  const clearAudioTimeRaf = useCallback(() => {
+    if (!audioTimeRafRef.current) return;
+    window.cancelAnimationFrame(audioTimeRafRef.current);
+    audioTimeRafRef.current = null;
   }, []);
 
   const playNext = useCallback(() => {
@@ -47,6 +54,7 @@ export function useSpeechQueue() {
       finished = true;
       const shouldRunEnd = !cancellingRef.current;
       clearResumeTimer();
+      clearAudioTimeRaf();
       if (endTimerRef.current) {
         window.clearTimeout(endTimerRef.current);
         endTimerRef.current = null;
@@ -68,6 +76,7 @@ export function useSpeechQueue() {
       }
       if (voicesRef.current.length === 0) voicesRef.current = getChineseVoices();
       const spokenText = getSpeechPlaybackText(item.text);
+      item.onTimeChange?.(null);
       if (!spokenText) {
         item.onStart?.();
         window.setTimeout(finish, 0);
@@ -111,6 +120,8 @@ export function useSpeechQueue() {
       const fallbackToBrowserSpeech = () => {
         if (fallbackStarted) return;
         fallbackStarted = true;
+        clearAudioTimeRaf();
+        item.onTimeChange?.(null);
         if (cancellingRef.current || !enabledRef.current) {
           finish();
           return;
@@ -136,16 +147,21 @@ export function useSpeechQueue() {
         const audio = new Audio(url);
         audioRef.current = audio;
         audio.onended = () => {
+          clearAudioTimeRaf();
           audioRef.current = null;
           finish();
         };
         audio.onerror = () => {
+          clearAudioTimeRaf();
           audioRef.current = null;
           fallbackToBrowserSpeech();
         };
         audio.volume = clampFinite(item.volume, 1, 0, 1);
         await audio.play();
-        if (!cancellingRef.current) item.onStart?.(media);
+        if (!cancellingRef.current) {
+          item.onStart?.(media);
+          startAudioTimeUpdates(audio, item);
+        }
         endTimerRef.current = window.setTimeout(finish, getSpeechFallbackDelay(spokenText));
       } catch {
         fallbackToBrowserSpeech();
@@ -154,11 +170,25 @@ export function useSpeechQueue() {
 
     if (item.audioUrl || item.voicePackageId) playServerSpeech();
     else playBrowserSpeech();
-  }, [clearResumeTimer]);
+    function startAudioTimeUpdates(audio, item) {
+      clearAudioTimeRaf();
+      const tick = () => {
+        if (audioRef.current !== audio || cancellingRef.current || !enabledRef.current) {
+          clearAudioTimeRaf();
+          return;
+        }
+        item.onTimeChange?.(audio.currentTime * 1000);
+        audioTimeRafRef.current = window.requestAnimationFrame(tick);
+      };
+      item.onTimeChange?.(audio.currentTime * 1000);
+      audioTimeRafRef.current = window.requestAnimationFrame(tick);
+    }
+  }, [clearAudioTimeRaf, clearResumeTimer]);
 
   const cancel = useCallback(() => {
     queueRef.current = [];
     clearResumeTimer();
+    clearAudioTimeRaf();
     if (endTimerRef.current) {
       window.clearTimeout(endTimerRef.current);
       endTimerRef.current = null;
@@ -178,7 +208,7 @@ export function useSpeechQueue() {
     window.setTimeout(() => {
       cancellingRef.current = false;
     }, 0);
-  }, [clearResumeTimer]);
+  }, [clearAudioTimeRaf, clearResumeTimer]);
 
   const unlock = useCallback(() => {
     if (!enabledRef.current || !window.speechSynthesis || speakingRef.current) return;

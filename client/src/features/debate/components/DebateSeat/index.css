@@ -200,6 +200,21 @@
   justify-content: flex-end;
 }
 
+.seat-model-name {
+  overflow: hidden;
+  width: 150px;
+  color: rgba(222, 236, 255, 0.7);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debate-seat.con .seat-model-name {
+  text-align: right;
+}
+
 .debate-nameplate > span:last-child:not(.seat-badge) {
   overflow: hidden;
   width: 150px;

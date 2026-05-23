@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
-import { getGameStats, getPhaseTitle, getRoundResult, getWerewolfActionTarget, getWerewolfNightActionBadges, shouldShowWerewolfActionTargets } from '../../werewolfUtils';
+import { formatWerewolfSeatLabel, getGameStats, getPhaseTitle, getRoundResult, getWerewolfActionTarget, getWerewolfNightActionBadges, getWerewolfSeatNumber, shouldShowWerewolfActionTargets } from '../../werewolfUtils';
 import { WerewolfBrandPanel } from '../WerewolfBrandPanel';
 import { RoleConfigPanel } from '../RoleConfigPanel';
 import { RoundProgressPanel } from '../RoundProgressPanel';
@@ -56,8 +56,8 @@ export function WerewolfArena({
               <WerewolfSeat
                 player={player}
                 seatIndex={index}
-                actionTarget={shouldShowWerewolfActionTargets(currentRound) ? getWerewolfActionTarget(currentRound, player) : null}
-                nightActionBadges={getWerewolfNightActionBadges(currentRound, player, nightActionType)}
+                actionTarget={shouldShowWerewolfActionTargets(currentRound) ? getWerewolfSeatNumber(getWerewolfActionTarget(currentRound, player), orderedPlayers) : null}
+                nightActionBadges={getWerewolfNightActionBadges(currentRound, player, nightActionType, orderedPlayers)}
                 isNightActor={nightActive && nightActors.has(Number(player.id))}
                 seerInspectionTarget={nightActive && player.role === 'seer' ? seerCheckTarget : null}
                 isSheriff={Number(currentRound?.sheriffId) === Number(player.id)}
@@ -80,7 +80,7 @@ export function WerewolfArena({
             <div><dt>出局玩家</dt><dd>{stats.dead}</dd></div>
           </dl>
           <p>{streamMessage}</p>
-          <strong>{getRoundResult(currentRound)}</strong>
+          <strong>{getRoundResult(currentRound, orderedPlayers)}</strong>
         </section>
       </section>
 
@@ -90,7 +90,11 @@ export function WerewolfArena({
 
       <WerewolfResult game={game} />
       <NightOverlay active={nightActive} />
-      <SpeechSubtitle speech={activeSpeech} />
+      <SpeechSubtitle
+        speech={activeSpeech}
+        players={orderedPlayers}
+        getSpeakerLabel={(speech, players) => speech?.playerId ? formatWerewolfSeatLabel(speech.playerId, players) : '主持人'}
+      />
     </section>
   );
 }

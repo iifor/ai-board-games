@@ -1,7 +1,7 @@
 import React from 'react';
 import { Crown } from 'lucide-react';
 import { classNames } from '../../../../utils/classNames';
-import { getPlayerAvatar } from '../../../../utils/player';
+import { getPlayerAvatar, getPlayerModelName } from '../../../../utils/player';
 import { toChineseOrdinal } from '../../debateUtils';
 import './index.css';
 
@@ -17,6 +17,7 @@ export function DebateSeat({ player, currentSpeakerId, slotLabel, onPlayerSelect
   const isJudge = tone === 'judge';
   const isCaptain = !isJudge && player?.debateRole === 'captain';
   const name = player?.nickname || player?.name;
+  const modelName = getPlayerModelName(player);
   return (
     <article className={classNames('debate-seat', tone, isSpeaking && 'speaking', isMvp && 'mvp-seat', !player && 'empty')}>
       <div
@@ -34,6 +35,7 @@ export function DebateSeat({ player, currentSpeakerId, slotLabel, onPlayerSelect
         <strong>
           {name || slotLabel}
         </strong>
+        {modelName && <small className="seat-model-name">{modelName}</small>}
         {isMvp && <span className="seat-mvp-badge">本场最佳辩手</span>}
         {mvpVoteTarget && <span className="seat-mvp-vote">投 {mvpVoteTarget}</span>}
       </div>

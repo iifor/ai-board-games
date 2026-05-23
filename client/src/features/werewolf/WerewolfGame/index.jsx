@@ -15,6 +15,7 @@ import {
   getWerewolfModePlayerCount,
   getWerewolfFlowLabel,
   getWerewolfNarration,
+  formatWerewolfSeatLabel,
   normalizeWerewolfSelectedIds,
   sanitizeWerewolfSelectedIds,
   sortPlayersById,
@@ -232,7 +233,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     archiveServerEvent(event);
 
     if ((event.type === 'speech' || event.type === 'wolf-speech' || event.type === 'sheriff-speech' || event.type === 'sheriff-runoff-speech') && event.speech) {
-      setStreamMessage(event.type === 'wolf-speech' ? `${event.speech.playerId} 号狼人夜聊` : `${event.speech.playerId} 号正在发言`);
+      const speakerLabel = formatWerewolfSeatLabel(event.speech.playerId, event.game?.players || displayGame.players || []);
+      setStreamMessage(event.type === 'wolf-speech' ? `${speakerLabel}狼人夜聊` : `${speakerLabel}正在发言`);
       setActiveSpeech({
         playerId: event.speech.playerId,
         text: event.subtitle?.text || event.speech.text,
@@ -244,7 +246,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     }
 
     if ((event.type === 'last-words' || event.type === 'exile-words') && event.testimony) {
-      setStreamMessage(`${event.testimony.playerId} 号遗言`);
+      const speakerLabel = formatWerewolfSeatLabel(event.testimony.playerId, event.game?.players || displayGame.players || []);
+      setStreamMessage(`${speakerLabel}遗言`);
       setActiveSpeech({
         playerId: event.testimony.playerId,
         text: event.subtitle?.text || event.testimony.text,

@@ -408,6 +408,16 @@
   font-weight: bold;
 }
 
+.werewolf-nameplate small {
+  display: block;
+  overflow: hidden;
+  margin-top: 2px;
+  color: rgba(226, 238, 255, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 12px;
+}
+
 .werewolf-nameplate span.danger {
   color: #ff7777;
   text-shadow: 0 0 12px rgba(255, 82, 82, 0.38);

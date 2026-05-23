@@ -23,9 +23,15 @@ export function buildEventLogEntry(event) {
 
 function getEventSummary(event) {
   if (event.type === 'night-result') return formatNightSummary(event.round, event.game?.players || [], true);
-  if (event.type === 'vote-result') return getVoteSummary(event.round);
-  if (event.type === 'hunter-shot' && event.shot) return `${event.shot.from} 号猎人开枪，带走 ${event.shot.target} 号。`;
-  if (event.type === 'sheriff-result') return event.message || (event.round?.sheriffId ? `${event.round.sheriffId} 号当选警长。` : '本局无人当选警长。');
+  if (event.type === 'vote-result') return getVoteSummary(event.round, event.game?.players || []);
+  if (event.type === 'hunter-shot' && event.shot) {
+    const players = event.game?.players || [];
+    return `${formatWerewolfSeatLabel(event.shot.from, players)}猎人开枪，带走 ${formatWerewolfSeatLabel(event.shot.target, players)}。`;
+  }
+  if (event.type === 'sheriff-result') {
+    const players = event.game?.players || [];
+    return event.message || (event.round?.sheriffId ? `${formatWerewolfSeatLabel(event.round.sheriffId, players)}当选警长。` : '本局无人当选警长。');
+  }
   if (event.type === 'game') return event.game?.winReason || '';
   return '';
 }
@@ -168,6 +174,16 @@ export function sortPlayersById(players = []) {
   return players.slice().sort((a, b) => Number(a.id) - Number(b.id));
 }
 
+export function getWerewolfSeatNumber(playerId, players = []) {
+  const index = sortPlayersById(players).findIndex((player) => Number(player.id) === Number(playerId));
+  return index >= 0 ? index + 1 : Number(playerId) || '';
+}
+
+export function formatWerewolfSeatLabel(playerId, players = []) {
+  const seatNumber = getWerewolfSeatNumber(playerId, players);
+  return seatNumber ? `${seatNumber}号玩家` : '玩家';
+}
+
 export function normalizeWerewolfSelectedIds(ids = [], players = [], mode) {
   const playerIds = new Set(sortPlayersById(players).map((player) => Number(player.id)).filter(Boolean));
   const required = getWerewolfModePlayerCount(mode);
@@ -205,10 +221,14 @@ export function getPhaseTitle(round, streamMessage) {
   return streamMessage || '游戏进行中';
 }
 
-export function getRoundResult(round) {
+export function getRoundResult(round, players = []) {
   if (!round) return '等待主持人发牌';
-  const night = round.night?.deaths?.length ? `夜晚死亡：${round.night.deaths.map((item) => `${item.id}号`).join('、')}` : '夜晚：平安夜';
-  const exile = round.exile ? `放逐：${round.exile.id}号` : round.idiotReveal ? `白痴翻牌：${round.idiotReveal.id}号` : '放逐：暂无';
+  const night = round.night?.deaths?.length
+    ? `夜晚死亡：${round.night.deaths.map((item) => formatWerewolfSeatLabel(item.id, players)).join('、')}`
+    : '夜晚：平安夜';
+  const exile = round.exile
+    ? `放逐：${formatWerewolfSeatLabel(round.exile.id, players)}`
+    : round.idiotReveal ? `白痴翻牌：${formatWerewolfSeatLabel(round.idiotReveal.id, players)}` : '放逐：暂无';
   return `${night} ? ${exile}`;
 }
 
@@ -260,7 +280,7 @@ function hasSheriffVoteData(election) {
   );
 }
 
-export function getWerewolfNightActionBadges(round, player, nightActionType = '') {
+export function getWerewolfNightActionBadges(round, player, nightActionType = '', players = []) {
   if (!round?.night || !player || round.phase !== 'night') return [];
   const night = round.night;
   const badges = [];
@@ -268,29 +288,28 @@ export function getWerewolfNightActionBadges(round, player, nightActionType = ''
   const wolfVoteTarget = night.wolfChoices?.[player.id];
   if (wolfVoteTarget && (player.faction === 'wolves' || player.role === 'werewolf')) {
     if (nightActionType === 'wolf-wake' || nightActionType === 'wolf-leader') {
-      badges.push({ kind: 'wolf', target: wolfVoteTarget, title: `夜投 ${wolfVoteTarget} 号` });
+      badges.push(createNightTargetBadge('wolf', wolfVoteTarget, players, { titlePrefix: '夜投' }));
     }
   }
   if (player.role === 'seer' && night.seerCheck?.target) {
     if (nightActionType === 'seer-wake' || nightActionType === 'seer-check') {
       const theme = getSeerCheckTheme(night.seerCheck.result);
-      badges.push({
-        kind: 'seer',
-        target: night.seerCheck.target,
+      badges.push(createNightTargetBadge('seer', night.seerCheck.target, players, {
         result: night.seerCheck.result || '',
         theme,
-        title: `查验 ${night.seerCheck.target} 号：${night.seerCheck.result || '未知'}`
-      });
+        titlePrefix: '查验',
+        titleSuffix: `：${night.seerCheck.result || '未知'}`
+      }));
     }
   }
   if (player.role === 'guard' && night.guardTarget) {
     if (nightActionType === 'guard-wake') {
-      badges.push({ kind: 'guard', target: night.guardTarget, title: `守护 ${night.guardTarget} 号` });
+      badges.push(createNightTargetBadge('guard', night.guardTarget, players, { titlePrefix: '守护' }));
     }
   }
   if (player.role === 'witch') {
     if (['witch-antidote', 'witch-antidote-action', 'witch-poison', 'witch-poison-action'].includes(nightActionType)) {
-      appendWitchNightActionBadges(badges, night, nightActionType);
+      appendWitchNightActionBadges(badges, night, nightActionType, players);
     }
   }
   return badges;
@@ -322,18 +341,32 @@ export function getNightActionPlayerIds(eventType, players = []) {
     .filter(Boolean);
 }
 
-function appendWitchNightActionBadges(badges, night, nightActionType) {
+function appendWitchNightActionBadges(badges, night, nightActionType, players = []) {
   if (night.witchSaveTarget) {
-    badges.push({ kind: 'antidote', target: night.witchSaveTarget, prefix: '救', title: `解救 ${night.witchSaveTarget} 号` });
+    badges.push(createNightTargetBadge('antidote', night.witchSaveTarget, players, { prefix: '救', titlePrefix: '解救' }));
   } else if (hasCompletedWitchAntidoteAction(nightActionType)) {
     badges.push({ kind: 'antidote', label: '不救', title: '解药不用', theme: WEREWOLF_NIGHT_BADGE_THEME.muted });
   }
 
   if (night.witchPoisonTarget) {
-    badges.push({ kind: 'poison', target: night.witchPoisonTarget, prefix: '毒', title: `毒药 ${night.witchPoisonTarget} 号` });
+    badges.push(createNightTargetBadge('poison', night.witchPoisonTarget, players, { prefix: '毒', titlePrefix: '毒药' }));
   } else if (nightActionType === 'witch-poison-action') {
     badges.push({ kind: 'poison', label: '不毒', title: '毒药不用', theme: WEREWOLF_NIGHT_BADGE_THEME.muted });
   }
+}
+
+function createNightTargetBadge(kind, target, players, options = {}) {
+  const seatNumber = getWerewolfSeatNumber(target, players);
+  const targetLabel = seatNumber ? `${seatNumber}号` : `${target}号`;
+  return {
+    kind,
+    target,
+    targetLabel,
+    prefix: options.prefix,
+    result: options.result,
+    theme: options.theme,
+    title: `${options.titlePrefix || ''} ${targetLabel}${options.titleSuffix || ''}`.trim()
+  };
 }
 
 function hasCompletedWitchAntidoteAction(nightActionType) {
@@ -369,16 +402,16 @@ function formatNightSummary(round, players, showRoles, visibleRolePlayerId) {
   return round?.phase === 'night' ? '等待夜晚结算' : '平安夜';
 }
 
-function getVoteSummary(round) {
+function getVoteSummary(round, players = []) {
   if (!round) return '';
-  if (round.idiotReveal) return `投票结束：${round.idiotReveal.id} 号翻牌免除放逐。`;
-  if (round.exile) return `投票结束：${round.exile.id} 号被放逐。`;
+  if (round.idiotReveal) return `投票结束：${formatWerewolfSeatLabel(round.idiotReveal.id, players)}翻牌免除放逐。`;
+  if (round.exile) return `投票结束：${formatWerewolfSeatLabel(round.exile.id, players)}被放逐。`;
   return '投票出现平票，本轮无人被放逐。';
 }
 
 function formatWerewolfRecordPlayer(playerId, players, showRoles, visibleRolePlayerId, reason) {
   const player = players.find((item) => Number(item.id) === Number(playerId));
-  const name = player ? (player.nickname || player.name || `${player.id}号`) : `${playerId}号`;
+  const name = formatWerewolfSeatLabel(playerId, players);
   const role = player ? getVisibleRoleText(player, showRoles, visibleRolePlayerId) : '';
   const detail = [role, reason].filter(Boolean).join(' · ');
   return `${name}${detail ? `?${detail}?` : ''}`;

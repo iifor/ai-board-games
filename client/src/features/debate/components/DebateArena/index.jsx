@@ -2,8 +2,8 @@ import React, { useMemo } from 'react';
 import { DebateSide } from '../DebateSide';
 import { DebateSeat } from '../DebateSeat';
 import { DebatePhaseTimeline } from '../DebatePhaseTimeline';
-import { DebateSubtitle } from '../DebateSubtitle';
-import { getDebatePhaseSteps, getActiveStageIndex, getStageTitle, getDebateSubtitleMaxChars, getMvpVoteTargetMap } from '../../debateUtils';
+import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
+import { getDebatePhaseSteps, getActiveStageIndex, getStageTitle, getDebatePlayerLabel, getMvpVoteTargetMap } from '../../debateUtils';
 import './index.css';
 
 export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subtitleSpeech, onPlayerSelect, isIdle }) {
@@ -13,7 +13,6 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
   const mvpVoteTargets = useMemo(() => currentPhase?.id === 'mvp' ? getMvpVoteTargetMap(game) : new Map(), [game, currentPhase]);
   const phaseSteps = useMemo(() => getDebatePhaseSteps(game.phases, currentPhase), [game.phases, currentPhase]);
   const activeStepIndex = getActiveStageIndex(currentPhase, phaseSteps);
-  const subtitleMaxChars = getDebateSubtitleMaxChars(game);
   const currentTitle = isIdle ? '等待开局' : getStageTitle(currentPhase);
   return (
     <>
@@ -73,7 +72,12 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
         onPlayerSelect={onPlayerSelect}
         mvpVoteTargets={mvpVoteTargets}
       />
-      <DebateSubtitle speech={subtitleSpeech} players={game.players} maxChars={subtitleMaxChars} />
+      <SpeechSubtitle
+        speech={subtitleSpeech}
+        players={game.players}
+        className="speech-subtitle--debate"
+        getSpeakerLabel={(speech, players) => speech?.playerId ? getDebatePlayerLabel(players, speech.playerId) : '主持人'}
+      />
     </>
   );
 }

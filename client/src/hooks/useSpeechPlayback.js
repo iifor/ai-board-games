@@ -51,23 +51,37 @@ export function useSpeechPlayback({
       playerId,
       text,
       wordBoundaries: event?.wordBoundaries || null,
+      currentTimeMs: event?.currentTimeMs ?? null,
       ...extra
     });
+    return baseId;
   }
 
   function speakSingle(text, playerId, ackId, event) {
     clearSubtitleTimer();
-    const voicePkgId = getVoicePackageId(event, game, playerId);
+    const isHostSpeech = !playerId;
+    const voicePkgId = isHostSpeech ? null : getVoicePackageId(event, game, playerId);
+    const audioUrl = isHostSpeech ? null : event?.audioUrl;
+    const wordBoundaries = isHostSpeech ? null : event?.wordBoundaries || null;
+    let speechId = null;
     return speak(text, acknowledgePending, {
       playerId,
       voicePackageId: voicePkgId,
-      audioUrl: event?.audioUrl,
-      audioMimeType: event?.audioMimeType,
-      wordBoundaries: event?.wordBoundaries || null,
+      audioUrl,
+      audioMimeType: isHostSpeech ? null : event?.audioMimeType,
+      wordBoundaries,
       onStart: (media) => {
-        playSubtitleText(text, playerId, ackId, {
+        speechId = playSubtitleText(text, playerId, ackId, {
           ...event,
-          wordBoundaries: media?.wordBoundaries || event?.wordBoundaries || null
+          currentTimeMs: isHostSpeech ? null : 0,
+          wordBoundaries: isHostSpeech ? null : media?.wordBoundaries || wordBoundaries
+        });
+      },
+      onTimeChange: (currentTimeMs) => {
+        if (!speechId) return;
+        setSpeechState((current) => {
+          if (!current || current.id !== speechId) return current;
+          return { ...current, currentTimeMs };
         });
       }
     });

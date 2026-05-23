@@ -1,70 +1,69 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
+import {
+  buildSpeechSubtitleTimeline,
+  findActiveCue,
+  findActiveWord,
+  getWordPlaybackState
+} from '../../utils/wordBoundariesToSubtitle';
 import './index.css';
 
-const LOOKAHEAD = 4;
+export function SpeechSubtitle({ speech, players = [], getSpeakerLabel, className = '' }) {
+  const text = String(speech?.text || '').trim();
+  const hasWordBoundaries = Boolean(speech?.wordBoundaries?.length);
+  const hasCurrentTime = speech?.currentTimeMs !== null && speech?.currentTimeMs !== undefined;
+  const timeline = useMemo(
+    () => buildSpeechSubtitleTimeline(text, speech?.wordBoundaries),
+    [text, speech?.wordBoundaries]
+  );
 
-export function SpeechSubtitle({ speech }) {
-  const [elapsed, setElapsed] = useState(0);
-  const startTimeRef = useRef(null);
-  const rafRef = useRef(null);
+  if (!text) return null;
 
-  useEffect(() => {
-    if (!speech?.wordBoundaries?.length) return;
+  const speaker = resolveSpeakerLabel(speech, players, getSpeakerLabel);
+  const rootClassName = ['speech-subtitle', className].filter(Boolean).join(' ');
+  const fallbackClassName = ['speech-subtitle', 'speech-subtitle--fallback', className].filter(Boolean).join(' ');
 
-    startTimeRef.current = performance.now();
-    setElapsed(0);
+  if (hasWordBoundaries && !hasCurrentTime) return null;
 
-    const tick = () => {
-      setElapsed(performance.now() - startTimeRef.current);
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [speech?.id, speech?.wordBoundaries]);
-
-  if (!speech?.text) return null;
-
-  const boundaries = speech.wordBoundaries;
-
-  if (boundaries?.length) {
-    const currentIndex = findCurrentBoundaryIndex(boundaries, elapsed);
-    const start = currentIndex;
-    const end = Math.min(boundaries.length, start + LOOKAHEAD + 1);
-    const visible = boundaries.slice(start, end);
+  if (hasWordBoundaries && timeline.cues.length > 0) {
+    const activeCue = findActiveCue(timeline.cues, speech.currentTimeMs);
+    const activeWord = findActiveWord(activeCue, speech.currentTimeMs);
 
     return (
-      <aside className="speech-subtitle" aria-live="polite">
-        {visible.map((wb, i) => {
-          const globalIndex = start + i;
-          const isActive = globalIndex === currentIndex;
+      <aside className={rootClassName} aria-live="polite">
+        <span className="speech-subtitle__speaker">{speaker}</span>
+        {activeCue?.words.map((word) => {
+          const state = getWordPlaybackState(word, activeWord);
           return (
-            <span
-              key={globalIndex}
-              className={`speech-subtitle__word${isActive ? ' is-active' : ' is-next'}`}
-            >
-              {wb.text}
-            </span>
+            <span key={word.index} className={`speech-subtitle__word is-${state}`} >{word.text}</span>
           );
         })}
       </aside>
     );
   }
 
+  if (!speech?.playerId) {
+    return (
+      <aside className={rootClassName} aria-live="polite">
+        <span className="speech-subtitle__speaker">{speaker}</span>
+        <span>{timeline.fullText || text}</span>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="speech-subtitle speech-subtitle--fallback" aria-live="polite">
-      {speech.text}
+    <aside className={fallbackClassName} aria-live="polite">
+      <span className="speech-subtitle__speaker">{speaker}</span>
+      <p>{timeline.fullText || text}</p>
     </aside>
   );
 }
 
-function findCurrentBoundaryIndex(boundaries, elapsedMs) {
-  let latest = 0;
-  for (let i = 0; i < boundaries.length; i++) {
-    if (boundaries[i].offset <= elapsedMs) latest = i;
-    else break;
-  }
-  return latest;
+function resolveSpeakerLabel(speech, players, getSpeakerLabel) {
+  const explicit = String(speech?.speakerLabel || '').trim();
+  if (explicit) return explicit;
+  const custom = getSpeakerLabel?.(speech, players);
+  if (custom) return custom;
+  if (!speech?.playerId) return '主持人';
+  const player = players.find((item) => Number(item.id) === Number(speech.playerId));
+  return player?.nickname || player?.name || `${speech.playerId}号`;
 }

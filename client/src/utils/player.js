@@ -18,6 +18,10 @@ export function getPlayerInitial(player, fallback = '') {
   return String(getPlayerDisplayName(player, fallback) || '?').slice(0, 1);
 }
 
+export function getPlayerModelName(player) {
+  return player?.modelName || player?.model || '';
+}
+
 export function sortPlayersById(players = []) {
   return [...players].sort((a, b) => Number(a.id) - Number(b.id));
 }

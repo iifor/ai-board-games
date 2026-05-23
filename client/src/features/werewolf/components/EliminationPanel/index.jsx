@@ -1,6 +1,7 @@
 import React from 'react';
 import { Skull } from 'lucide-react';
 import { ROLE_NAMES } from '../../constants';
+import { formatWerewolfSeatLabel } from '../../werewolfUtils';
 import { PanelHeader } from '../PanelHeader';
 import './index.css';
 
@@ -16,7 +17,7 @@ export function EliminationPanel({ players, showRoles, visibleRolePlayerId }) {
         {eliminated.length ? eliminated.map((player) => (
           <article key={player.id}>
             <Skull size={18} />
-            <strong>玩家 {player.id}</strong>
+            <strong>{formatWerewolfSeatLabel(player.id, players)}</strong>
             <span>{ROLE_NAMES[player.roleLabel] || player.roleLabel || ROLE_NAMES[player.role] || ''}</span>
             <em>{player.deathReason || '出局'} · 第 {player.deathDay || '?'} 天</em>
           </article>

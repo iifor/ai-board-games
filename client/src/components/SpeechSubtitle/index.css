@@ -2,53 +2,110 @@
   position: fixed;
   left: 50%;
   bottom: 50px;
+  right: auto;
   max-width: 80vw;
   z-index: 160;
   overflow: hidden;
-  padding: 16px 28px;
+  padding: 5px 15px;
   transform: translateX(-50%);
   border-radius: 10px;
   color: #fff;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(0, 0, 0, 0.25);
   text-align: center;
   text-shadow: 0 2px 3px rgba(0, 0, 0, 0.86);
   pointer-events: none;
-  font-size: 34px;
   font-weight: 600;
   line-height: 1.5;
+  font-size: 24px;
   min-width: 100px;
-  white-space: nowrap;
+  white-space: normal;
+  transition: all 180ms ease-out;
 }
 
 .speech-subtitle__word {
   display: inline;
-  color: rgba(255, 255, 255, 0.4);
-  transition: color 0.28s ease, text-shadow 0.28s ease, opacity 0.28s ease;
+  color: #fff;
+  transition: all 120ms ease-out;
 }
 
 .speech-subtitle__word.is-active {
-  color: #fff;
-  font-weight: 700;
+  color: aquamarine;
   text-shadow: 0 0 14px rgba(255, 255, 255, 0.7), 0 0 28px rgba(255, 255, 255, 0.3);
 }
 
-.speech-subtitle__word.is-next {
-  color: rgba(255, 255, 255, 0.55);
+
+.speech-subtitle__word.is-punctuation {
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: inherit;
+  text-shadow: none;
 }
 
-/* Fallback: centered floating popup when no wordBoundaries */
+.speech-subtitle__speaker {
+  display: inline-block;
+  margin-right: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.8em;
+  vertical-align: baseline;
+  text-align: center;
+}
+
 .speech-subtitle--fallback {
   top: 50%;
+  left: 50%;
   bottom: auto;
+  right: auto;
   transform: translate(-50%, -50%);
   max-width: 72vw;
   padding: 24px 36px;
   border-radius: 14px;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(255, 255, 255, 0.8);
+  color: #222;
   font-size: 30px;
   line-height: 1.7;
   white-space: normal;
   animation: subtitle-pop-in 0.28s ease-out;
+  text-align: left;
+}
+
+.speech-subtitle--fallback .speech-subtitle__speaker {
+  display: block;
+  font-size: 26px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--accent-color);
+}
+
+.speech-subtitle--debate {
+  bottom: 30px;
+  font-size: 22px;
+  font-weight: 850;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.speech-subtitle--debate .speech-subtitle__speaker {
+  flex-shrink: 0;
+  margin-right: 10px;
+  padding-right: 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 18px;
+}
+
+.speech-subtitle--debate.speech-subtitle--fallback {
+  top: 50%;
+  bottom: auto;
+  max-width: 72vw;
+  padding: 22px 30px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #222;
+  font-size: 26px;
+  line-height: 1.65;
+}
+
+.speech-subtitle--debate.speech-subtitle--fallback .speech-subtitle__speaker {
+  border-right: 0;
+  padding-right: 0;
+  color: var(--accent-color);
 }
 
 @keyframes subtitle-pop-in {
