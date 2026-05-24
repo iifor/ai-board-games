@@ -509,7 +509,7 @@ async function runAiDebate(config, options = {}) {
   });
 
   await runPhase(config, emit, state, 'closing', async (phase) => {
-    for (const agent of [debaterAt(agents, 'pro', 3), debaterAt(agents, 'con', 3)].filter(Boolean)) {
+    for (const agent of [debaterAt(agents, 'con', 3), debaterAt(agents, 'pro', 3)].filter(Boolean)) {
       syncDebateMemory(agent, state);
       const text = await collectSpeech(agent, phase, '', '请以四辩身份完成本方总结陈词。', `${agent.sideLabel}总结：我方完成了定义、风险和价值三层证明，对方关键反驳没有击穿核心标准。`);
       await emitSpeech(emit, state, phase, agent, text, 'closing');
