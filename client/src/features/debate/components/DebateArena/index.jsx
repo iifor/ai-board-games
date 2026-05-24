@@ -31,7 +31,6 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
         <header className="debate-hero">
           <h1>AI 辩论赛</h1>
           <div className="debate-topic-ribbon">
-            <span>辩题：</span>
             <strong>{game.topic?.title || '等待辩题'}</strong>
           </div>
         </header>

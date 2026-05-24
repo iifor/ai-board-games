@@ -1,6 +1,10 @@
 const express = require('express');
 const db = require('./db');
 
+function success(data, message = '操作成功') {
+  return { code: 0, message, data };
+}
+
 function createRouter() {
   const router = express.Router();
 
@@ -14,7 +18,7 @@ function createRouter() {
         limit: Number(limit) || 50,
         offset: Number(offset) || 0
       });
-      res.json({ code: 0, data: rows });
+      res.json(success(rows));
     } catch (err) { next(err); }
   });
 
@@ -25,7 +29,7 @@ function createRouter() {
       if (!trace) return res.status(404).json({ code: 'NOT_FOUND', message: 'Trace not found' });
       const spans = db.findSpansByTrace(req.params.id);
       trace.spans = spans;
-      res.json({ code: 0, data: trace });
+      res.json(success(trace));
     } catch (err) { next(err); }
   });
 
@@ -33,7 +37,7 @@ function createRouter() {
   router.delete('/traces/:id', (req, res, next) => {
     try {
       db.deleteTrace(req.params.id);
-      res.json({ code: 0, message: 'deleted' });
+      res.json(success({ ok: true }, 'deleted'));
     } catch (err) { next(err); }
   });
 
@@ -41,7 +45,7 @@ function createRouter() {
   router.get('/traces/:id/llm', (req, res, next) => {
     try {
       const rows = db.findLlmRecordsByTrace(req.params.id);
-      res.json({ code: 0, data: rows });
+      res.json(success(rows));
     } catch (err) { next(err); }
   });
 
@@ -49,7 +53,7 @@ function createRouter() {
   router.get('/traces/:id/decisions', (req, res, next) => {
     try {
       const rows = db.findDecisionsByTrace(req.params.id);
-      res.json({ code: 0, data: rows });
+      res.json(success(rows));
     } catch (err) { next(err); }
   });
 
@@ -57,7 +61,7 @@ function createRouter() {
   router.get('/traces/:id/snapshots', (req, res, next) => {
     try {
       const rows = db.findSnapshotsByTrace(req.params.id);
-      res.json({ code: 0, data: rows });
+      res.json(success(rows));
     } catch (err) { next(err); }
   });
 
@@ -65,7 +69,7 @@ function createRouter() {
   router.get('/traces/:id/events', (req, res, next) => {
     try {
       const rows = db.findEventsByTrace(req.params.id);
-      res.json({ code: 0, data: rows });
+      res.json(success(rows));
     } catch (err) { next(err); }
   });
 
@@ -78,10 +82,7 @@ function createRouter() {
       const llmCalls = db.findLlmRecordsByPlayer(id, Number(playerId));
       const decisions = db.findDecisionsByPlayer(id, Number(playerId));
       const snapshots = db.findSnapshotsByTrace(id);
-      res.json({
-        code: 0,
-        data: { trace, llmCalls, decisions, snapshots }
-      });
+      res.json(success({ trace, llmCalls, decisions, snapshots }));
     } catch (err) { next(err); }
   });
 
