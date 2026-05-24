@@ -105,9 +105,6 @@ function AdminShell() {
         />
       </Sider>
       <Layout>
-        <Header className="admin-header">
-          <Title level={3}>{TITLES[titlePath] || '仪表盘'}</Title>
-        </Header>
         <Content className="admin-content">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -9,6 +9,7 @@ const { eliminate, countTargets, topExile, hasLastWords } = require('./winCheck'
 const { WEREWOLF } = require('../../../shared/constants/gameLimits');
 const { getVoteMessage } = require('./utils');
 const { syncMissingPublicMemory } = require('../game-memory');
+const { executeSkillWithTrace } = require('../agent-core');
 
 async function runDay(ctx, round) {
   round.phase = 'day';
@@ -110,7 +111,7 @@ async function resolveDayVote(ctx, round) {
   if (exileId) {
     const target = ctx.agents.find((agent) => agent.id === exileId);
     if (hasRoleAction(target?.roleConfig, 'surviveExileOnce')) {
-      const result = await ctx.skillRegistry.execute('surviveExileOnce', { actor: target, modeConfig: ctx.modeConfig });
+      const result = await runRoleSkill(ctx, 'surviveExileOnce', { actor: target, modeConfig: ctx.modeConfig, phase: 'day' });
       if (result.survives) {
         round.idiotReveal = { id: exileId, reason: '白痴翻牌免除放逐，失去投票权' };
       } else {
@@ -153,8 +154,8 @@ async function maybeHunterShot(ctx, round, playerId, reason) {
   );
   if (!hunter) return;
   if ((ctx.modeConfig.hunter?.disabledDeathReasons || []).includes(hunter.deathReason)) return;
-  const result = await ctx.skillRegistry.execute('shootOnDeath', {
-    actor: hunter, agents: ctx.agents, fallback: fallbackVote(hunter, ctx.agents)
+  const result = await runRoleSkill(ctx, 'shootOnDeath', {
+    actor: hunter, agents: ctx.agents, fallback: fallbackVote(hunter, ctx.agents), phase: reason
   });
   if (!result.target) return;
   hunter.hunterShotUsed = true;
@@ -197,6 +198,15 @@ async function maybeTransferSheriffBadge(ctx, round, playerId, reason, phase) {
 
 function syncWerewolfMemory(agent, ctx) {
   return syncMissingPublicMemory(agent, collectWerewolfPublicMemoryEntries(ctx.rounds, ctx.agents));
+}
+
+function runRoleSkill(ctx, action, context) {
+  return executeSkillWithTrace(ctx.skillRegistry, action, {
+    ...context,
+    state: ctx.state,
+    gameType: ctx.gameType || 'werewolf',
+    fallbackAudit: ctx.fallbackAudit
+  });
 }
 
 module.exports = {

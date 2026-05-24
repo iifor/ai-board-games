@@ -3,7 +3,7 @@ const { PlayerAgent } = require('./playerAgent');
 const { getRoleConfig, getRoleLabel, getRoleActions, shuffle } = require('./utils');
 const { WEREWOLF } = require('../../../shared/constants/gameLimits');
 
-function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit, gameId) {
+function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit, gameId, roleSkillRegistry = null) {
   const roleSlots = expandModeRoleSlots(modeConfig.roles);
   const selected = config.players.slice(0, roleSlots.length);
   const roles = shuffle(roleSlots);
@@ -38,6 +38,7 @@ function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit, 
       onFallback: (entry) => fallbackAudit.record(entry),
       gameId
     });
+    roleSkillRegistry?.applyToPlayer(agent.playerAgent, roleId);
     appendOpeningPrivateMemory(agent, modeConfig);
     return agent;
   });

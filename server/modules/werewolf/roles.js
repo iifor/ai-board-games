@@ -1,7 +1,11 @@
-const { SkillRegistry } = require('../../../shared/schemas/skillRegistry');
+const { AgentSkillRegistry } = require('../agent-core');
 
 function createWerewolfSkillRegistry() {
-  return new SkillRegistry([
+  return new AgentSkillRegistry(createWerewolfSkills());
+}
+
+function createWerewolfSkills() {
+  return [
     {
       action: 'kill',
       prompt: '夜晚选择击杀目标。',
@@ -81,7 +85,7 @@ function createWerewolfSkillRegistry() {
     },
     { action: 'voteOnly', prompt: '白天投票。', execute: () => ({ ok: true }) },
     { action: 'speakOnly', prompt: '白天发言。', execute: () => ({ ok: true }) }
-  ]);
+  ];
 }
 
-module.exports = { createWerewolfSkillRegistry };
+module.exports = { createWerewolfSkillRegistry, createWerewolfSkills };

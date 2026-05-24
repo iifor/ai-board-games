@@ -3,6 +3,7 @@ const { topTarget, countTargets } = require('./winCheck');
 const { askWolfNightSpeech, askWolfNightSpeechWithThinking } = require('./agents');
 const { getWerewolfNightPrompt, buildNightPublicMessage, buildDayStartMessage } = require('./announcements');
 const { applyNightDeaths } = require('./winCheck');
+const { executeSkillWithTrace } = require('../agent-core');
 
 async function runNight(ctx, round) {
   const { skillRegistry, agents, modeConfig, emit, serialize } = ctx;
@@ -85,7 +86,7 @@ async function resolveWolfKill(ctx, round, alive) {
 
   const wolfChoices = {};
   for (const wolf of wolves) {
-    const result = await ctx.skillRegistry.execute('kill', { actor: wolf, alive, fallback: wolfFallback, topTarget });
+    const result = await runRoleSkill(ctx, 'kill', { actor: wolf, alive, fallback: wolfFallback, topTarget, phase: 'night' });
     wolfChoices[wolf.id] = result.target;
   }
   round.night.wolfChoices = wolfChoices;
@@ -105,7 +106,7 @@ async function resolveWolfKill(ctx, round, alive) {
 async function resolveInspect(ctx, round, alive) {
   const seer = alive.find((agent) => hasRoleAction(agent.roleConfig, 'inspectFaction'));
   if (!seer) return;
-  const check = await ctx.skillRegistry.execute('inspectFaction', { actor: seer, alive, agents: ctx.agents });
+  const check = await runRoleSkill(ctx, 'inspectFaction', { actor: seer, alive, agents: ctx.agents, phase: 'night' });
   seer.seerChecks.push(check);
   round.night.seerCheck = check;
 }
@@ -113,7 +114,7 @@ async function resolveInspect(ctx, round, alive) {
 async function resolveGuard(ctx, round, alive) {
   const guard = alive.find((agent) => hasRoleAction(agent.roleConfig, 'guard'));
   if (!guard) return;
-  const result = await ctx.skillRegistry.execute('guard', { actor: guard, alive });
+  const result = await runRoleSkill(ctx, 'guard', { actor: guard, alive, phase: 'night' });
   guard.lastGuardTarget = result.target;
   round.night.guardTarget = result.target;
 }
@@ -123,7 +124,7 @@ async function resolveWitchAntidote(ctx, round) {
   const witch = alive.find((agent) => hasRoleAction(agent.roleConfig, 'save') || hasRoleAction(agent.roleConfig, 'poison'));
   if (!witch) return false;
   const victim = ctx.agents.find((agent) => agent.id === round.night.wolfTarget);
-  const save = await ctx.skillRegistry.execute('save', { actor: witch, victim, round, modeConfig: ctx.modeConfig });
+  const save = await runRoleSkill(ctx, 'save', { actor: witch, victim, round, modeConfig: ctx.modeConfig, phase: 'night' });
   if (save.use) {
     witch.usedAntidote = true;
     round.night.witchSave = true;
@@ -138,7 +139,7 @@ async function resolveWitchPoison(ctx, round, usedAntidote) {
   const witch = alive.find((agent) => hasRoleAction(agent.roleConfig, 'save') || hasRoleAction(agent.roleConfig, 'poison'));
   if (!witch) return;
   if (!witch.usedPoison && !(ctx.modeConfig.witch?.onePotionPerNight && usedAntidote)) {
-    const poison = await ctx.skillRegistry.execute('poison', { actor: witch, alive });
+    const poison = await runRoleSkill(ctx, 'poison', { actor: witch, alive, phase: 'night' });
     if (poison.use && poison.target) {
       witch.usedPoison = true;
       round.night.witchPoisonTarget = poison.target;
@@ -168,6 +169,15 @@ async function revealNightResult(ctx, round) {
   const nightPublicMessage = buildNightPublicMessage(round);
   round.publicSummary = nightPublicMessage;
   await ctx.emit({ type: 'night-result', round, message: nightPublicMessage, game: ctx.serialize() });
+}
+
+function runRoleSkill(ctx, action, context) {
+  return executeSkillWithTrace(ctx.skillRegistry, action, {
+    ...context,
+    state: ctx.state,
+    gameType: ctx.gameType || 'werewolf',
+    fallbackAudit: ctx.fallbackAudit
+  });
 }
 
 module.exports = {

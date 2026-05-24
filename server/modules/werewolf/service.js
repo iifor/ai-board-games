@@ -1,5 +1,7 @@
 const { getWerewolfModeConfig } = require('../werewolf-config');
+const { BaseGameAgent } = require('../agent-core');
 const { createWerewolfSkillRegistry } = require('./roles');
+const { createWerewolfRoleSkillRegistry } = require('./roleSkills');
 const { HostAgent } = require('./agents/hostAgent');
 const { createFallbackAudit } = require('./failures/fallbackAudit');
 const { createAudienceSession, projectWerewolfEvent } = require('./views/viewPolicy');
@@ -10,20 +12,28 @@ const { runDay, maybeTransferSheriffBadge } = require('./day');
 const { runSheriffElection } = require('./sheriff');
 const { shouldRunFirstDaySheriffElection, checkWin } = require('./winCheck');
 const { MAX_DAYS } = require('./constants');
-const { createTraceContext, flushTrace, markTraceError, markTraceComplete, recordSnapshot, recordEvent, startPhaseSpan, endSpan } = require('../observability');
+const {
+  createTraceContext, flushTrace, markTraceError, markTraceComplete,
+  recordSnapshot, recordEvent, recordDecision, startPhaseSpan, endSpan
+} = require('../observability');
 
-class WerewolfGameAgent {
+class WerewolfGameAgent extends BaseGameAgent {
   constructor(config, options = {}) {
     if (config.mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
+    const modeConfig = getWerewolfModeConfig(config.werewolfMode);
+    const skillRegistry = createWerewolfSkillRegistry();
+    super({ gameType: 'werewolf', skillRegistry });
     this.config = config;
     this.options = options;
     this.mode = 'real';
-    this.modeConfig = getWerewolfModeConfig(config.werewolfMode);
-    this.skillRegistry = createWerewolfSkillRegistry();
+    this.modeConfig = modeConfig;
+    this.roleSkillRegistry = createWerewolfRoleSkillRegistry(this.modeConfig, this.skillRegistry);
     this.gameId = `werewolf-${Date.now()}`;
-    this.fallbackAudit = createFallbackAudit(this.gameId);
-    this.agents = createWerewolfAgents(config, this.modeConfig, this.skillRegistry, this.fallbackAudit, this.gameId);
     this.trace = createTraceContext(this.gameId, 'werewolf', config.werewolfMode);
+    this.fallbackAudit = createFallbackAudit(this.gameId, {
+      onRecord: (event) => this.recordFallback(event)
+    });
+    this.agents = createWerewolfAgents(config, this.modeConfig, this.skillRegistry, this.fallbackAudit, this.gameId, this.roleSkillRegistry);
     this.audienceSession = createAudienceSession(this.agents, config.clientViewMode, config.viewerPlayerId);
     this.hostAgent = new HostAgent(config.host, { onFallback: (entry) => this.fallbackAudit.record(entry), gameId: this.gameId });
     this.rounds = [];
@@ -38,6 +48,9 @@ class WerewolfGameAgent {
       rounds: this.rounds,
       modeConfig: this.modeConfig,
       skillRegistry: this.skillRegistry,
+      fallbackAudit: this.fallbackAudit,
+      state: this,
+      gameType: 'werewolf',
       emit: (event) => this.emit(event),
       serialize: (patch) => this.serialize(patch)
     };
@@ -126,6 +139,24 @@ class WerewolfGameAgent {
     if (!this.options.onEvent) return undefined;
     const projected = projectWerewolfEvent(event, this.audienceSession);
     return projected ? this.options.onEvent(projected) : undefined;
+  }
+
+  recordFallback(event) {
+    recordEvent(this.trace, event);
+    recordDecision(this.trace, {
+      playerId: event.actorId != null ? Number(event.actorId) || 0 : 0,
+      decisionType: 'fallback',
+      phase: event.phase,
+      promptText: '',
+      responseText: '',
+      chosenTarget: null,
+      fallbackUsed: true,
+      fallbackReason: event.reason,
+      skillId: event.skillId
+    });
+    if (!this.options.onEvent) return;
+    const projected = projectWerewolfEvent(event, this.audienceSession);
+    this.options.onEvent(projected || event);
   }
 
   serialize(patch = {}) {
