@@ -2,8 +2,8 @@ const { WebSocketServer } = require('ws');
 const { getAiConfig } = require('../../config');
 const { getDb } = require('../../db');
 const { runAiDebate } = require('../../aiDebateRunner');
-const { runWerewolfGame } = require('../werewolf');
-const { getWerewolfModeConfig } = require('../werewolf-config');
+const { runWerewolfWorkflow } = require('../werewolf');
+const { getWerewolfModeConfig } = require('../werewolf-config/service');
 const { createProjectionContext, projectWerewolfGame } = require('../werewolf/views/viewPolicy');
 const { getGame, saveGameRecord } = require('../games');
 const { createSession, isSessionCancelled, parseMessage } = require('./session');
@@ -76,7 +76,7 @@ async function runSession(session, mode, playerIds, gameType = 'werewolf', optio
   saveGameRecord({ ...game, audioResources: sender.getAudioResources() });
 
   await sender.send({
-    type: safeGameType === 'debate' ? 'workflow-completed' : 'done',
+    type: safeGameType === 'debate' || safeGameType === 'werewolf' ? 'workflow-completed' : 'done',
     message: getDoneMessage(safeGameType),
     game: safeGameType === 'werewolf' ? projectWerewolfGame(game, createProjectionContext(game)) : game
   });
@@ -91,7 +91,7 @@ function normalizeGameType(gameType) {
 
 function getRunner(gameType) {
   if (gameType === 'debate') return runAiDebate;
-  return runWerewolfGame;
+  return runWerewolfWorkflow;
 }
 
 function getStartMessage(gameType) {

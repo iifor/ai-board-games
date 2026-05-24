@@ -1,10 +1,11 @@
-const { WerewolfGameAgent, runWerewolfGame } = require('./service');
 const { PlayerAgent } = require('./playerAgent');
 const constants = require('./constants');
+const workflow = require('./workflow');
+
+workflow.registerWerewolfWorkflow();
 
 module.exports = {
-  WerewolfGameAgent,
   PlayerAgent,
-  runWerewolfGame,
+  ...workflow,
   ...constants
 };

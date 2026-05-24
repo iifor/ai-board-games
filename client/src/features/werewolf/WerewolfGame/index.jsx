@@ -220,6 +220,12 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
   }
 
   function applyServerEvent(event) {
+    if (event.type === 'workflow-event') {
+      if (event.message) setStreamMessage(event.message);
+      if (event.game) setGame(event.game);
+      archiveServerEvent(event);
+      return;
+    }
     if (status === 'error') setStatus('streaming');
     updateNightActionType(event);
     updateSheriffCandidateIds(event);
@@ -276,7 +282,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }) {
     if (subtitleText && event.type !== 'game') {
       setActiveSpeech({ playerId: null, text: subtitleText, wordBoundaries: event.wordBoundaries || null });
     }
-    if (event.type === 'done') {
+    if (event.type === 'workflow-completed' || event.type === 'done') {
       setStatus('ready');
       setActiveSpeech(null);
       setStreamMessage(event.message || '狼人杀已完成。');
