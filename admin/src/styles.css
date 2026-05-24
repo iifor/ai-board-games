@@ -13,12 +13,27 @@ body {
   background: #f5f7fb;
 }
 
-.admin-layout {
+#root {
   min-height: 100vh;
 }
 
+.admin-layout {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
 .admin-sider {
-  min-height: 100vh;
+  position: sticky !important;
+  top: 0;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: auto;
+}
+
+.admin-main {
+  max-height: 100vh;
+  overflow: hidden;
 }
 
 .admin-brand {
@@ -56,6 +71,9 @@ body {
 }
 
 .admin-content {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: auto;
   padding: 24px;
 }
 
@@ -174,4 +192,187 @@ body {
   background: #f0f5ff;
   color: #1d4ed8;
   font-size: 12px;
+}
+
+.admin-entity-form {
+  max-height: min(72vh, 760px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.admin-trace-detail {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 48px);
+  min-height: 0;
+}
+
+.admin-trace-detail.is-drawer {
+  height: 100%;
+}
+
+.admin-trace-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
+.admin-trace-page > .ant-typography,
+.admin-trace-page > .ant-card {
+  flex: 0 0 auto;
+}
+
+.admin-trace-table {
+  min-height: 0;
+}
+
+.admin-trace-table .ant-table-container,
+.admin-trace-table .ant-table-content,
+.admin-trace-table .ant-table-body {
+  overflow: auto !important;
+}
+
+.admin-trace-detail-card {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-trace-detail:not(.is-drawer) .admin-trace-detail-card {
+  flex: 1 1 auto;
+}
+
+.admin-trace-detail-card .ant-card-body {
+  min-height: 0;
+}
+
+.admin-trace-detail.is-drawer .admin-trace-detail-card {
+  height: 100%;
+}
+
+.admin-trace-detail.is-drawer .admin-trace-detail-card .ant-card-body {
+  height: 100%;
+  overflow: auto;
+}
+
+.admin-trace-row {
+  cursor: pointer;
+}
+
+.admin-trace-timeline-row.is-span > td:first-child {
+  border-left: 4px solid #2f54eb;
+}
+
+.admin-trace-timeline-row.is-llm > td:first-child {
+  border-left: 4px solid #1677ff;
+}
+
+.admin-trace-timeline-row.is-decision > td:first-child {
+  border-left: 4px solid #722ed1;
+}
+
+.admin-trace-timeline-row.is-event > td:first-child {
+  border-left: 4px solid #52c41a;
+}
+
+.admin-trace-click-card {
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.admin-trace-card-list {
+  max-height: calc(100vh - 330px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.admin-trace-detail-drawer .ant-drawer-body {
+  height: calc(100vh - 55px);
+  overflow: auto;
+}
+
+.admin-trace-related-section {
+  margin-top: 18px;
+}
+
+.admin-trace-related-section .ant-typography {
+  margin-bottom: 8px;
+}
+
+.admin-trace-related-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-trace-relation-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-trace-relation-item:hover,
+.admin-trace-relation-item:focus-visible {
+  border-color: #91caff;
+  background: #f8fbff;
+  outline: none;
+}
+
+.admin-trace-relation-title {
+  min-width: 0;
+  overflow: hidden;
+  color: #1f2937;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-trace-json-panel {
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #0f172a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.admin-trace-json {
+  margin: 0;
+  padding: 14px 16px;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  tab-size: 2;
+}
+
+.admin-json-key {
+  color: #7dd3fc;
+}
+
+.admin-json-string {
+  color: #86efac;
+}
+
+.admin-json-number {
+  color: #fbbf24;
+}
+
+.admin-json-boolean {
+  color: #f0abfc;
+}
+
+.admin-json-null {
+  color: #94a3b8;
+}
+
+.admin-json-punctuation {
+  color: #cbd5e1;
 }

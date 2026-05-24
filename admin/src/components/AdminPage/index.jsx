@@ -2,8 +2,7 @@ import React from 'react';
 import {
   App as AntApp,
   Layout,
-  Menu,
-  Typography
+  Menu
 } from 'antd';
 import {
   DashboardOutlined,
@@ -16,7 +15,6 @@ import {
   TrophyOutlined
 } from '@ant-design/icons';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { TITLES } from '../../constants/adminConstants';
 import { normalizePath } from '../../utils/adminHelpers';
 import { Dashboard } from '../../pages/Dashboard';
 import { GameHistory } from '../../pages/GameHistory';
@@ -31,8 +29,7 @@ import { TraceExplorer } from '../../pages/TraceExplorer';
 import { TraceDetail } from '../../pages/TraceExplorer/TraceDetail';
 import { AgentTraceView } from '../../pages/TraceExplorer/AgentTraceView';
 
-const { Header, Content, Sider } = Layout;
-const { Title } = Typography;
+const { Content, Sider } = Layout;
 
 const MENU_ITEMS = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
@@ -87,7 +84,6 @@ function AdminShell() {
   const navigate = useNavigate();
   const activePath = normalizePath(location.pathname);
   const modelMenuPath = activePath.startsWith('/models/providers/') ? '/models/providers' : activePath;
-  const titlePath = activePath.startsWith('/models/providers/') ? '/models/providers/:id' : activePath;
 
   return (
     <Layout className="admin-layout">
@@ -104,7 +100,7 @@ function AdminShell() {
           onClick={({ key }) => navigate(key)}
         />
       </Sider>
-      <Layout>
+      <Layout className="admin-main">
         <Content className="admin-content">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

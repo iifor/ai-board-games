@@ -107,6 +107,16 @@ function safeJson(value) {
   }
 }
 
+function safeAttrValue(value) {
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 function safeStr(value, fallback = '') {
   return typeof value === 'string' ? value : fallback;
 }
@@ -130,7 +140,7 @@ function createTraceContext(gameId, gameType, gameMode) {
     attributes: {
       'game.id': gameId,
       'game.type': gameType,
-      'game.mode': String(gameMode || ''),
+      'game.mode': safeAttrValue(gameMode),
       'span.type': 'game-root'
     }
   });
@@ -143,7 +153,7 @@ function createTraceContext(gameId, gameType, gameMode) {
   db.insertTrace({
     id: traceId,
     game_type: gameType,
-    game_mode: String(gameMode || ''),
+    game_mode: safeAttrValue(gameMode),
     status: 'recording',
     llm_call_count: 0,
     agent_decision_count: 0,

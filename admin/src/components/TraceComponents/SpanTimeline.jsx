@@ -40,7 +40,7 @@ const SPAN_TYPE_LABELS = {
   'skill-execution': '技能执行'
 };
 
-export function SpanTimeline({ spans = [] }) {
+export function SpanTimeline({ spans = [], onSelectSpan }) {
   const tree = buildSpanTree(spans);
   const flat = flattenTree(tree);
 
@@ -48,6 +48,7 @@ export function SpanTimeline({ spans = [] }) {
 
   return (
     <Table
+      className="admin-trace-table"
       dataSource={flat} rowKey="id" size="small"
       columns={[
         {
@@ -81,28 +82,13 @@ export function SpanTimeline({ spans = [] }) {
         }
       ]}
       pagination={false}
-      expandable={{
-        expandedRowRender: (record) => {
-          let attrs = {};
-          let error = null;
-          try { attrs = typeof record.attributes_json === 'string' ? JSON.parse(record.attributes_json) : (record.attributes_json || {}); } catch { /* ignore */ }
-          try { error = record.error_json ? (typeof record.error_json === 'string' ? JSON.parse(record.error_json) : record.error_json) : null; } catch { /* ignore */ }
-          return (
-            <div>
-              {Object.keys(attrs).length > 0 && (
-                <pre style={{ fontSize: 11, background: '#fafafa', padding: 8, borderRadius: 4 }}>
-                  {JSON.stringify(attrs, null, 2)}
-                </pre>
-              )}
-              {error && (
-                <pre style={{ fontSize: 11, color: '#ff4d4f', background: '#fff2f0', padding: 8, borderRadius: 4, marginTop: 8 }}>
-                  {JSON.stringify(error, null, 2)}
-                </pre>
-              )}
-            </div>
-          );
+      scroll={{ x: 760, y: 'calc(100vh - 330px)' }}
+      rowClassName={onSelectSpan ? 'admin-trace-row' : ''}
+      onRow={(record) => ({
+        onClick: () => {
+          if (onSelectSpan) onSelectSpan(record);
         }
-      }}
+      })}
     />
   );
 }

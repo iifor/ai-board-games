@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Select, Space, Table, Tag, Typography } from 'antd';
-import { EyeOutlined, SearchOutlined } from '@ant-design/icons';
+import { App as AntApp, Button, Card, Modal, Select, Space, Table, Tag, Typography } from 'antd';
+import { DeleteOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { adminRequest } from '../../services/adminApi';
 import { GAME_LABELS } from '../../constants/adminConstants';
@@ -11,6 +11,7 @@ const STATUS_MAP = { recording: '进行中', completed: '已完成', error: '错
 const STATUS_COLORS = { recording: 'processing', completed: 'success', error: 'error' };
 
 export function TraceExplorer() {
+  const { message } = AntApp.useApp();
   const navigate = useNavigate();
   const [traces, setTraces] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +32,25 @@ export function TraceExplorer() {
   }, [gameType, status]);
 
   useEffect(() => { fetchTraces(); }, [fetchTraces]);
+
+  function confirmRemove(trace) {
+    Modal.confirm({
+      title: '删除观测数据',
+      content: `确认删除 Trace「${trace.id}」吗？相关 Span、LLM 调用、Agent 决策、快照和事件数据会一并删除。`,
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      async onOk() {
+        try {
+          await adminRequest(`/traces/${trace.id}`, { method: 'DELETE' });
+          message.success('观测数据已删除');
+          await fetchTraces();
+        } catch (error) {
+          message.error(error.message);
+        }
+      }
+    });
+  }
 
   const columns = [
     {
@@ -57,17 +77,37 @@ export function TraceExplorer() {
       render: (t) => t ? new Date(t).toLocaleString() : '-'
     },
     {
-      title: '操作', key: 'actions', width: 120, fixed: 'right',
+      title: '操作', key: 'actions', width: 160, fixed: 'right',
       render: (_, record) => (
-        <Button type="link" icon={<EyeOutlined />} onClick={() => navigate(`/traces/${record.id}`)}>
-          查看
-        </Button>
+        <Space>
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={(event) => {
+              event.stopPropagation();
+              navigate(`/traces/${record.id}`);
+            }}
+          >
+            查看
+          </Button>
+          <Button
+            type="link"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={(event) => {
+              event.stopPropagation();
+              confirmRemove(record);
+            }}
+          >
+            删除
+          </Button>
+        </Space>
       )
     }
   ];
 
   return (
-    <div>
+    <div className="admin-trace-page">
       <Title level={3}>AI 对局观测</Title>
       <Card size="small" style={{ marginBottom: 16 }}>
         <Space>
@@ -91,9 +131,12 @@ export function TraceExplorer() {
         </Space>
       </Card>
       <Table
+        className="admin-trace-table"
         rowKey="id" columns={columns} dataSource={traces}
-        loading={loading} size="small" scroll={{ x: 1100 }}
-        pagination={{ pageSize: 30, showSizeChanger: false }}
+        loading={loading} size="small" scroll={{ x: 1160, y: 'calc(100vh - 260px)' }}
+        pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [15, 20] }}
+        rowClassName="admin-trace-row"
+        onRow={(record) => ({ onClick: () => navigate(`/traces/${record.id}`) })}
       />
     </div>
   );

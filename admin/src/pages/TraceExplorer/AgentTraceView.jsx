@@ -178,7 +178,7 @@ export function AgentTraceView() {
             },
             { title: '回退', dataIndex: 'fallback_used', key: 'fallback', width: 60, render: (v) => v ? <Tag color="orange">是</Tag> : '' },
           ]}
-          pagination={{ pageSize: 30, showSizeChanger: false }}
+          pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [15, 20] }}
         />
 
         {/* Q6: Persona consistency */}

@@ -12,8 +12,24 @@ export function EntityModal({ open, title, initialValues, width = 640, onCancel,
   }, [form, initialValues, open]);
 
   return (
-    <Modal open={open} width={width} title={title} onCancel={onCancel} onOk={() => form.submit()} destroyOnHidden forceRender>
-      <Form form={form} layout="vertical" preserve={false} initialValues={initialValues} onFinish={onSave}>
+    <Modal
+      open={open}
+      width={width}
+      title={title}
+      onCancel={onCancel}
+      onOk={() => form.submit()}
+      destroyOnHidden
+      forceRender
+      styles={{ body: { overflow: 'hidden' } }}
+    >
+      <Form
+        className="admin-entity-form"
+        form={form}
+        layout="vertical"
+        preserve={false}
+        initialValues={initialValues}
+        onFinish={onSave}
+      >
         {children}
       </Form>
     </Modal>
