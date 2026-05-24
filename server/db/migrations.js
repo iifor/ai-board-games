@@ -149,6 +149,122 @@ function migrate(db) {
       value_json TEXT NOT NULL DEFAULT 'null',
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS matches (
+      id TEXT PRIMARY KEY,
+      game_type TEXT NOT NULL,
+      workflow_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'running',
+      current_step_index INTEGER NOT NULL DEFAULT 0,
+      version INTEGER NOT NULL DEFAULT 0,
+      config_json TEXT NOT NULL DEFAULT '{}',
+      state_json TEXT NOT NULL DEFAULT '{}',
+      blockers_json TEXT NOT NULL DEFAULT '[]',
+      error_json TEXT NOT NULL DEFAULT 'null',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS match_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      current_step_index INTEGER NOT NULL,
+      state_json TEXT NOT NULL,
+      blockers_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_match_snapshots_match ON match_snapshots(match_id, version DESC);
+
+    CREATE TABLE IF NOT EXISTS workflow_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_id TEXT NOT NULL,
+      seq INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      step_id TEXT,
+      player_id TEXT,
+      payload_json TEXT NOT NULL DEFAULT '{}',
+      visibility TEXT NOT NULL DEFAULT 'public',
+      visible_to_player_ids_json TEXT NOT NULL DEFAULT '[]',
+      idempotency_key TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+      UNIQUE(match_id, seq),
+      UNIQUE(match_id, idempotency_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_workflow_events_match_seq ON workflow_events(match_id, seq);
+    CREATE INDEX IF NOT EXISTS idx_workflow_events_type ON workflow_events(type);
+
+    CREATE TABLE IF NOT EXISTS pending_actions (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      step_id TEXT NOT NULL,
+      epoch_id TEXT,
+      player_id TEXT,
+      actor_type TEXT NOT NULL,
+      action_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      payload_json TEXT NOT NULL DEFAULT '{}',
+      result_event_seq INTEGER,
+      idempotency_key TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+      UNIQUE(match_id, idempotency_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pending_actions_match ON pending_actions(match_id, status);
+
+    CREATE TABLE IF NOT EXISTS ai_tasks (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      step_id TEXT NOT NULL,
+      task_key TEXT NOT NULL,
+      epoch_id TEXT,
+      player_id TEXT,
+      action TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued',
+      prompt_json TEXT NOT NULL DEFAULT '{}',
+      context_json TEXT NOT NULL DEFAULT '{}',
+      raw_output TEXT NOT NULL DEFAULT '',
+      result_json TEXT NOT NULL DEFAULT 'null',
+      error_json TEXT NOT NULL DEFAULT 'null',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      visible_event_seq_max INTEGER NOT NULL DEFAULT 0,
+      visible_event_ids_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+      UNIQUE(match_id, step_id, task_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_tasks_match_status ON ai_tasks(match_id, status);
+
+    CREATE TABLE IF NOT EXISTS outbox_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_id TEXT NOT NULL,
+      event_seq INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      payload_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+      UNIQUE(match_id, event_seq)
+    );
+    CREATE INDEX IF NOT EXISTS idx_outbox_match_status ON outbox_messages(match_id, status);
+
+    CREATE TABLE IF NOT EXISTS memory_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_id TEXT NOT NULL,
+      scope TEXT NOT NULL DEFAULT 'public',
+      owner_id TEXT,
+      snapshot_json TEXT NOT NULL DEFAULT '{}',
+      source_event_seq INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_memory_snapshots_match ON memory_snapshots(match_id, scope, owner_id);
   `);
 
   ensureColumn(db, 'games', 'game_type', "TEXT NOT NULL DEFAULT 'werewolf'");

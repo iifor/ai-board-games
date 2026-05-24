@@ -182,6 +182,17 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
   }
 
   function applyServerEvent(event) {
+    if (event.type === 'workflow-event') {
+      setActiveThinking(null);
+      if (event.message) setStreamMessage(event.message);
+      if (event.game) setGame(event.game);
+      const phaseSpeech = event.phase?.speeches?.at(-1);
+      if (phaseSpeech) {
+        setActiveSpeech({ playerId: phaseSpeech.playerId, text: phaseSpeech.text });
+        if (!speechEnabled) playSubtitleText(phaseSpeech.text, phaseSpeech.playerId, event.ackId, event);
+      }
+      return;
+    }
     if (event.type === 'thinking') {
       const thinkingPlayer = event.game?.players?.find((p) => Number(p.id) === Number(event.playerId)) || null;
       setActiveThinking({ player: thinkingPlayer, thinking: event.thinking || '' });
@@ -203,7 +214,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }) {
       setActiveSpeech({ playerId: null, text: subtitleText });
       if (!speechEnabled) playSubtitleText(subtitleText, null, event.ackId, event);
     }
-    if (event.type === 'done') {
+    if (event.type === 'workflow-completed') {
       setStatus('ready');
       setActiveThinking(null);
       setStreamMessage(event.message || '辩论赛已完成。');

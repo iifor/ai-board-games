@@ -1,8 +1,8 @@
-const { runDebateGame } = require('./modules/debate');
+const { runDebateWorkflow } = require('./modules/debate');
 const { PHASES, PHASE_LIMITS } = require('./modules/debate/constants');
 
 async function runAiDebate(config, options = {}) {
-  return runDebateGame(config, options);
+  return runDebateWorkflow(config, options);
 }
 
 module.exports = {

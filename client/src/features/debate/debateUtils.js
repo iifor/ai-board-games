@@ -184,6 +184,8 @@ export function getMvpVoteTargetMap(game) {
 }
 
 export function getDebateNarration(event) {
+  if (event?.type === 'workflow-event') return event.message || event.phase?.stageSummary || '';
+  if (event?.type === 'workflow-completed') return event.message || '';
   if (event?.type === 'speech') return event.speech?.text || '';
   return event?.message || event?.narration || '';
 }

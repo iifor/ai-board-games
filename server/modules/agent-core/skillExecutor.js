@@ -1,4 +1,4 @@
-const { startSkillSpan, endSpan } = require('../observability');
+const { startSkillSpan, endSpan } = require('../observability/tracer');
 
 async function executeSkillWithTrace(registry, action, context = {}) {
   const source = resolveSkillSource(registry, action, context);

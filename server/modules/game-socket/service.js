@@ -76,7 +76,7 @@ async function runSession(session, mode, playerIds, gameType = 'werewolf', optio
   saveGameRecord({ ...game, audioResources: sender.getAudioResources() });
 
   await sender.send({
-    type: 'done',
+    type: safeGameType === 'debate' ? 'workflow-completed' : 'done',
     message: getDoneMessage(safeGameType),
     game: safeGameType === 'werewolf' ? projectWerewolfGame(game, createProjectionContext(game)) : game
   });
