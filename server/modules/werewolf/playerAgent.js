@@ -6,6 +6,7 @@ class PlayerAgent {
     this.messages = [{ role: 'system', content: systemPrompt }];
     this.onFallback = options.onFallback;
     this.thinkingEnabled = Boolean(player.thinkingEnabled);
+    this.gameId = options.gameId || null;
   }
 
   async askText(prompt, options = {}) {
@@ -66,7 +67,11 @@ class PlayerAgent {
       apiFormat: this.player.apiFormat,
       temperature: this.player.temperature,
       messages: this.messages,
-      maxTokens
+      maxTokens,
+      _gameId: this.gameId,
+      _playerId: this.player.id,
+      _playerRole: this.player.role || this.player.roleLabel,
+      _playerFaction: this.player.faction
     });
     this.messages.push({ role: 'assistant', content: reply });
     return reply;
@@ -82,7 +87,11 @@ class PlayerAgent {
       apiFormat: this.player.apiFormat,
       temperature: this.player.temperature,
       messages: this.messages,
-      maxTokens
+      maxTokens,
+      _gameId: this.gameId,
+      _playerId: this.player.id,
+      _playerRole: this.player.role || this.player.roleLabel,
+      _playerFaction: this.player.faction
     });
     this.messages.push({ role: 'assistant', content });
     return { content, thinking };

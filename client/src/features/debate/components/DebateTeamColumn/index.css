@@ -81,12 +81,12 @@
   flex: 1 1 auto;
   align-items: center;
   justify-content: center;
-  height: 46px;
+  height: 36px;
   border: 1px dashed rgba(198, 216, 242, 0.58);
   border-radius: 7px;
   color: rgba(224, 235, 250, 0.7);
   background: rgba(13, 21, 38, 0.56);
-  font-size: 16px;
+  font-size: 12px;
   font-style: normal;
-  font-weight: 850;
+  font-weight: 600;
 }

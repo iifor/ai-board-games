@@ -8,6 +8,7 @@ import {
 import {
   DashboardOutlined,
   ExperimentOutlined,
+  EyeOutlined,
   RobotOutlined,
   SkinOutlined,
   SoundOutlined,
@@ -26,6 +27,9 @@ import { VoiceManager } from '../../pages/VoiceManager';
 import { WerewolfRoleManager } from '../../pages/WerewolfRoleManager';
 import { WerewolfModeManager } from '../../pages/WerewolfModeManager';
 import { SkinManager } from '../../pages/SkinManager';
+import { TraceExplorer } from '../../pages/TraceExplorer';
+import { TraceDetail } from '../../pages/TraceExplorer/TraceDetail';
+import { AgentTraceView } from '../../pages/TraceExplorer/AgentTraceView';
 
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
@@ -64,7 +68,8 @@ const MENU_ITEMS = [
     label: '模型管理',
     children: [{ key: '/models/providers', label: '供应商列表' }]
   },
-  { key: '/voices', icon: <SoundOutlined />, label: '语音管理' }
+  { key: '/voices', icon: <SoundOutlined />, label: '语音管理' },
+  { key: '/traces', icon: <EyeOutlined />, label: 'AI 观测' }
 ];
 
 export function AdminPage() {
@@ -118,6 +123,9 @@ function AdminShell() {
             <Route path="/models/providers" element={<ModelProviderManager />} />
             <Route path="/models/providers/:providerId" element={<ModelManager />} />
             <Route path="/voices" element={<VoiceManager />} />
+            <Route path="/traces" element={<TraceExplorer />} />
+            <Route path="/traces/:id" element={<TraceDetail />} />
+            <Route path="/traces/:id/player/:playerId" element={<AgentTraceView />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Content>

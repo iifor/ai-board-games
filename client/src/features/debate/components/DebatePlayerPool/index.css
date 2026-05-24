@@ -9,20 +9,20 @@
 .player-pool-head {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
 .player-pool-head strong {
   color: #ffffff;
   font-size: 20px;
-  font-weight: 950;
+  font-weight: 600;
 }
 
 .player-pool-head span {
   color: rgba(214, 226, 245, 0.72);
   font-size: 14px;
-  font-weight: 820;
+  font-weight: 600;
 }
 
 .player-pool-list {
@@ -34,8 +34,8 @@
 .player-pool-empty {
   display: inline-flex;
   align-items: center;
-  min-height: 42px;
+  min-height: 36px;
   color: rgba(218, 229, 247, 0.68);
   font-style: normal;
-  font-weight: 850;
+  font-weight: 600;
 }

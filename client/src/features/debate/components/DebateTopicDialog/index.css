@@ -15,7 +15,7 @@
 
 .debate-topic-dialog,
 .player-detail-modal {
-  width: 1380px;
+  width: 1500px;
   border: 1px solid rgba(95, 171, 255, 0.62);
   border-radius: 18px;
   background:
@@ -25,8 +25,8 @@
 }
 
 .debate-topic-dialog {
-  padding: 20px 30px 14px;
-  max-height: 920px;
+  padding: 15px 20px 14px;
+  max-height: 950px;
   overflow-y: auto;
 }
 
@@ -35,7 +35,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  height: 56px;
+  height: 50px;
   margin-bottom: 18px;
 }
 
@@ -44,7 +44,7 @@
   flex: 1 1 auto;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .debate-dialog-title > span {
@@ -87,8 +87,8 @@
   align-items: center;
   gap: 8px;
   color: #d9ebff;
-  font-size: 17px;
-  font-weight: 900;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .debate-topic-dialog label b {
@@ -97,14 +97,14 @@
 
 .debate-topic-dialog input {
   flex: 1 1 auto;
-  height: 44px;
+  height: 42px;
   border: 1px solid rgba(132, 162, 204, 0.58);
   border-radius: 7px;
   padding: 0 14px;
   color: #ffffff;
   background: rgba(22, 32, 55, 0.86);
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 600;
   outline: none;
 }
 
@@ -122,7 +122,7 @@
 
 .debate-topic-dialog textarea {
   width: 710px;
-  min-height: 92px;
+  min-height: 90px;
   resize: vertical;
   border: 1px solid rgba(103, 171, 255, 0.38);
   border-radius: 6px;
@@ -146,7 +146,7 @@
 .player-detail-close {
   border: 1px solid rgba(107, 180, 255, 0.48);
   border-radius: 6px;
-  padding: 9px 16px;
+  padding: 6px 12px;
   color: #eaf5ff;
   background: rgba(14, 41, 85, 0.75);
   cursor: pointer;
@@ -176,19 +176,19 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   border: 1px solid rgba(107, 180, 255, 0.28);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: rgba(8, 22, 48, 0.66);
 }
 
 .debate-import-row strong {
   overflow: hidden;
   color: rgba(230, 243, 255, 0.84);
-  font-size: 14px;
-  font-weight: 850;
-  line-height: 22px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -199,7 +199,7 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: 30px;
   border: 1px solid rgba(110, 196, 255, 0.55);
   border-radius: 6px;
   padding: 0 12px;
@@ -207,7 +207,7 @@
   background: rgba(13, 54, 106, 0.82);
   cursor: pointer;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .debate-import-control input {
@@ -218,20 +218,20 @@
   margin: 10px 0 0;
   color: #ffb4c8;
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 600;
 }
 
 .dialog-switch {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  min-height: 42px;
+  min-height: 40px;
 }
 
 .dialog-switch .switch-track {
   position: relative;
-  width: 34px;
-  height: 18px;
+  width: 30px;
+  height: 16px;
   border-radius: 18px;
   background: rgba(255, 82, 82, 0.3);
   box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.55);
@@ -257,10 +257,10 @@
 }
 
 .debate-start-submit {
-  width: 148px;
-  min-height: 48px;
+  width: 120px;
+  min-height: 40px;
   padding: 0 28px;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .player-detail-modal {
@@ -280,7 +280,7 @@
 
 .player-detail-head {
   display: flex;
-  gap: 18px;
+  gap: 12px;
   align-items: center;
   margin-bottom: 20px;
 }
@@ -289,23 +289,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 88px;
-  height: 88px;
+  width: 60px;
+  height: 60px;
   border: 2px solid rgba(72, 198, 255, 0.95);
-  border-radius: 88px;
+  border-radius: 60px;
   background: rgba(1, 10, 28, 0.92);
   background-position: center;
   background-size: cover;
   color: #ffffff;
-  font-size: 34px;
-  font-weight: 950;
+  font-size: 26px;
+  font-weight: 600;
   box-shadow: 0 0 20px rgba(46, 169, 255, 0.56);
 }
 
 .player-detail-head p {
   margin: 8px 0 0;
   color: #9edcff;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .player-detail-modal dl {
@@ -316,26 +316,26 @@
 .player-detail-modal dl div {
   display: flex;
   gap: 14px;
-  padding: 12px 0;
+  padding: 10px 0;
   border-top: 1px solid rgba(112, 172, 255, 0.18);
 }
 
 .player-detail-modal dt {
-  min-width: 80px;
+  min-width: 60px;
   color: #89d7ff;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .player-detail-modal dd {
   margin: 0;
   color: rgba(240, 247, 255, 0.9);
-  line-height: 24px;
+  line-height: 20px;
   user-select: text;
 }
 
 .debate-host-config {
-  margin-top: 16px;
-  padding: 12px 16px 14px;
+  margin-top: 10px;
+  padding: 12px 12px 14px;
   border: 1px solid rgba(88, 188, 255, 0.34);
   border-radius: 8px;
   background: rgba(8, 22, 48, 0.58);
@@ -349,7 +349,6 @@
 
 .debate-host-list button {
   display: grid;
-  grid-template-columns: 32px minmax(96px, 1fr) minmax(112px, auto);
   align-items: center;
   gap: 8px;
   min-width: 238px;
@@ -374,8 +373,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   color: #061827;
   background: linear-gradient(135deg, #c5f7ff, #58d9ff);

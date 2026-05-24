@@ -14,6 +14,7 @@ const voices = require('./modules/voices');
 const werewolfConfig = require('./modules/werewolf-config');
 const games = require('./modules/games');
 const settings = require('./modules/settings');
+const observability = require('./modules/observability');
 
 // Game module
 const gameSocket = require('./modules/game-socket');
@@ -61,6 +62,7 @@ function createApp() {
   app.use('/api/admin', werewolfConfig.router);
   app.use('/api/admin', games.router);
   app.use('/api/admin', settings.router);
+  app.use('/api/admin', observability.router);
 
   // Game API routes
   app.use('/api/toc', gameSocket.router);

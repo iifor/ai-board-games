@@ -3,7 +3,7 @@ const { PlayerAgent } = require('./playerAgent');
 const { getRoleConfig, getRoleLabel, getRoleActions, shuffle } = require('./utils');
 const { WEREWOLF } = require('../../../shared/constants/gameLimits');
 
-function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit) {
+function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit, gameId) {
   const roleSlots = expandModeRoleSlots(modeConfig.roles);
   const selected = config.players.slice(0, roleSlots.length);
   const roles = shuffle(roleSlots);
@@ -35,7 +35,8 @@ function createWerewolfAgents(config, modeConfig, skillRegistry, fallbackAudit) 
     agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry);
     agent.baseSystemPromptHash = hashText(agent.baseSystemPrompt);
     agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt, {
-      onFallback: (entry) => fallbackAudit.record(entry)
+      onFallback: (entry) => fallbackAudit.record(entry),
+      gameId
     });
     appendOpeningPrivateMemory(agent, modeConfig);
     return agent;

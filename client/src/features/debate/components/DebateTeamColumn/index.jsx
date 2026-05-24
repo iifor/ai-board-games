@@ -15,7 +15,7 @@ export function DebateTeamColumn({ title, tone, ids, slots, labelPrefix, getPlay
         {tone !== 'judge' && captainEnabled && <CaptainDragToken tone={tone} disabled={disabled} />}
       </h3>
       <div className="team-slot-list">
-        {Array.from({ length: slots }).map((_, index) => {
+        {Array.from({ length: slots > 4 ? 4 : slots }).map((_, index) => {
           const player = getPlayer(ids[index]);
           return (
             <div

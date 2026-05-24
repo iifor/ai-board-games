@@ -13,7 +13,10 @@ export const TITLES = {
   '/models': '模型管理',
   '/models/providers': '模型管理 / 供应商列表',
   '/models/providers/:id': '模型管理 / 供应商模型',
-  '/voices': '语音管理'
+  '/voices': '语音管理',
+  '/traces': 'AI 对局观测',
+  '/traces/:id': 'AI 对局观测 / Trace 详情',
+  '/traces/:id/player/:playerId': 'AI 对局观测 / 玩家分析'
 };
 
 export const API_FORMAT_OPTIONS = [

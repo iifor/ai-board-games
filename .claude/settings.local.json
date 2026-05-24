@@ -40,7 +40,30 @@
       "Bash(node -e \"const { HostAgent } = require\\('./server/modules/werewolf/agents/hostAgent'\\); console.log\\('HostAgent loaded:', typeof HostAgent\\);\")",
       "Bash(node -e \"const sdk = require\\('microsoft-cognitiveservices-speech-sdk'\\); console.log\\('SDK loaded:', Object.keys\\(sdk\\).slice\\(0, 10\\)\\);\")",
       "Bash(node -e \"require\\('./server/app'\\); console.log\\('App OK'\\);\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:opentelemetry.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:unpkg.com)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:socket.dev)",
+      "WebFetch(domain:repos.ecosyste.ms)",
+      "WebFetch(domain:www.pkgstats.com)",
+      "WebFetch(domain:npmmirror.com)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:dependabot.ecosyste.ms)",
+      "WebFetch(domain:langfuse.com)",
+      "Bash(npm --version)",
+      "Bash(node -e \"require\\('@opentelemetry/api'\\); console.log\\('OTel API OK'\\)\")",
+      "Bash(node -e \"require\\('@opentelemetry/sdk-trace-base'\\); console.log\\('OTel SDK OK'\\)\")",
+      "Bash(node -e \"require\\('express'\\); console.log\\('express OK'\\)\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('express'\\)\\)\")",
+      "Bash(npm cache *)",
+      "Bash(node -e \"require\\('@opentelemetry/api'\\); console.log\\('OK'\\)\")"
     ]
   }
 }

@@ -6,6 +6,7 @@ class HostAgent {
   constructor(host = {}, options = {}) {
     this.host = host;
     this.onFallback = options.onFallback;
+    this.gameId = options.gameId || null;
   }
 
   async announce(day, phase, prompt, fallback) {
@@ -22,7 +23,8 @@ class HostAgent {
           { role: 'system', content: buildHostPrompt(day, phase) },
           { role: 'user', content: prompt }
         ],
-        maxTokens: Math.ceil(WEREWOLF.HOST_ANNOUNCE_CHAR_LIMIT * 2.5)
+        maxTokens: Math.ceil(WEREWOLF.HOST_ANNOUNCE_CHAR_LIMIT * 2.5),
+        _gameId: this.gameId
       });
       return normalizeText(reply, WEREWOLF.HOST_ANNOUNCE_CHAR_LIMIT, fallback);
     } catch (error) {

@@ -3,6 +3,7 @@
 const { buildPlayerPersonaModule, compilePromptModules, hashText } = require('./services/ai/promptComposer');
 const { syncMissingPublicMemory } = require('./modules/game-memory');
 const { DEBATE } = require('../shared/constants/gameLimits');
+const { createTraceContext, flushTrace, markTraceComplete, markTraceError, recordSnapshot, recordEvent, startPhaseSpan, endSpan } = require('./modules/observability');
 
 const PHASE_LIMITS = DEBATE.PHASE_LIMITS;
 
@@ -181,7 +182,11 @@ async function askAgent(agent, prompt, options = {}) {
     apiFormat: agent.apiFormat,
     temperature: agent.temperature,
     messages: agent.messages,
-    maxTokens: options.maxTokens || 800
+    maxTokens: options.maxTokens || 800,
+    _gameId: agent._gameId,
+    _playerId: agent.id,
+    _playerRole: agent.sideLabel || agent.side,
+    _playerFaction: agent.side
   });
   agent.messages.push({ role: 'assistant', content: reply });
   return reply;
@@ -197,7 +202,11 @@ async function askAgentWithThinking(agent, prompt, options = {}) {
     apiFormat: agent.apiFormat,
     temperature: agent.temperature,
     messages: agent.messages,
-    maxTokens: options.maxTokens || 800
+    maxTokens: options.maxTokens || 800,
+    _gameId: agent._gameId,
+    _playerId: agent.id,
+    _playerRole: agent.sideLabel || agent.side,
+    _playerFaction: agent.side
   });
   agent.messages.push({ role: 'assistant', content });
   return { content, thinking };
@@ -217,7 +226,8 @@ async function askHost(config, topic, phaseName, prompt, maxTokens, options = {}
     apiFormat: config.host.apiFormat,
     temperature: config.host.temperature,
     messages,
-    maxTokens: effectiveMaxTokens
+    maxTokens: effectiveMaxTokens,
+    _gameId: config._gameId || null
   };
   if (options.cacheable) {
     const cached = await cachedLlmCall(['debate-host', config.host.provider, config.host.model, messages, effectiveMaxTokens], () => callOpenAIChat(payload));
@@ -436,16 +446,23 @@ function serializeGame({ gameId, mode, topic, agents, phases, host = null, winne
 async function runAiDebate(config, options = {}) {
   if (config.mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
 
-  const emit = async (event) => options.onEvent ? options.onEvent(event) : undefined;
+  const emit = async (event) => {
+    recordEvent(trace, event);
+    return options.onEvent ? options.onEvent(event) : undefined;
+  };
   const topic = normalizeTopic(config.topic) || choose(TOPICS);
   const agents = createDebateAgents(config, topic);
   const phases = [];
   const gameId = `debate-${Date.now()}`;
-  const state = { gameId, mode: 'real', topic, agents, phases, host: config.host };
+  const trace = createTraceContext(gameId, 'debate', '');
+  config._gameId = gameId;
+  agents.forEach((agent) => { agent._gameId = gameId; });
+  const state = { gameId, mode: 'real', topic, agents, phases, host: config.host, trace };
   let winner = null;
   let mvp = null;
   let winReason = '';
 
+  recordSnapshot(trace, 'game-start', serializeGame(state), { phase: 'init' });
   await emit({ type: 'players', players: serializeGame(state).players, game: serializeGame(state) });
 
   await runPhase(config, emit, state, 'strategy', async (phase) => {
@@ -507,12 +524,19 @@ async function runAiDebate(config, options = {}) {
 
   const game = serializeGame({ ...state, winner, mvp, winReason });
   await emit({ type: 'game', game });
+
+  // Finalize trace
+  markTraceComplete(trace);
+  recordSnapshot(trace, 'game-end', game, { phase: 'game-end' });
+  flushTrace(trace);
+
   return game;
 }
 
 async function runPhase(config, emit, state, phaseId, action) {
   const phase = createPhase(phaseId);
   state.phases.push(phase);
+  const phaseSpan = startPhaseSpan(`phase:${phaseId}`, { phase: phaseId, phase_name: phase.name });
   const hostText = await safeHost(
     config,
     state.topic,
@@ -530,6 +554,7 @@ async function runPhase(config, emit, state, phaseId, action) {
   await action(phase);
   phase.stageSummary = summarizeDebatePhase(phase);
   await emit({ type: 'phase-end', phase, message: `${phase.name}结束。`, game: serializeGame(state) });
+  endSpan(phaseSpan);
 }
 
 async function safeHost(config, topic, phaseName, prompt, fallback, options = {}) {

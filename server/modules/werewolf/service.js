@@ -10,6 +10,7 @@ const { runDay, maybeTransferSheriffBadge } = require('./day');
 const { runSheriffElection } = require('./sheriff');
 const { shouldRunFirstDaySheriffElection, checkWin } = require('./winCheck');
 const { MAX_DAYS } = require('./constants');
+const { createTraceContext, flushTrace, markTraceError, markTraceComplete, recordSnapshot, recordEvent, startPhaseSpan, endSpan } = require('../observability');
 
 class WerewolfGameAgent {
   constructor(config, options = {}) {
@@ -21,9 +22,10 @@ class WerewolfGameAgent {
     this.skillRegistry = createWerewolfSkillRegistry();
     this.gameId = `werewolf-${Date.now()}`;
     this.fallbackAudit = createFallbackAudit(this.gameId);
-    this.agents = createWerewolfAgents(config, this.modeConfig, this.skillRegistry, this.fallbackAudit);
+    this.agents = createWerewolfAgents(config, this.modeConfig, this.skillRegistry, this.fallbackAudit, this.gameId);
+    this.trace = createTraceContext(this.gameId, 'werewolf', config.werewolfMode);
     this.audienceSession = createAudienceSession(this.agents, config.clientViewMode, config.viewerPlayerId);
-    this.hostAgent = new HostAgent(config.host, { onFallback: (entry) => this.fallbackAudit.record(entry) });
+    this.hostAgent = new HostAgent(config.host, { onFallback: (entry) => this.fallbackAudit.record(entry), gameId: this.gameId });
     this.rounds = [];
     this.werewolfMode = config.werewolfMode;
     this.winner = null;
@@ -42,47 +44,85 @@ class WerewolfGameAgent {
   }
 
   async run() {
-    await this.emit({ type: 'players', players: this.serialize().players, game: this.serialize() });
+    try {
+      recordSnapshot(this.trace, 'game-start', this.serialize(), { phase: 'init' });
 
-    for (let day = 1; day <= MAX_DAYS && !this.winner; day += 1) {
-      const round = createRound(day);
-      round.sheriffId = this.getActiveSheriffId();
-      round.sheriffBadge.status = round.sheriffId ? 'held' : 'none';
-      this.rounds.push(round);
-      const ctx = this.buildCtx();
+      await this.emit({ type: 'players', players: this.serialize().players, game: this.serialize() });
 
-      await runNight(ctx, round);
-      await announceDaybreak(ctx, round);
+      for (let day = 1; day <= MAX_DAYS && !this.winner; day += 1) {
+        const round = createRound(day);
+        round.sheriffId = this.getActiveSheriffId();
+        round.sheriffBadge.status = round.sheriffId ? 'held' : 'none';
+        this.rounds.push(round);
+        const ctx = this.buildCtx();
 
-      if (shouldRunFirstDaySheriffElection(round, this.modeConfig)) {
-        await runSheriffElection(ctx, round);
+        // Phase: night
+        const nightSpan = startPhaseSpan('phase:night', { day, phase: 'night' });
+        await runNight(ctx, round);
+        endSpan(nightSpan);
+
+        // Phase: daybreak
+        const daybreakSpan = startPhaseSpan('phase:daybreak', { day, phase: 'daybreak' });
+        await announceDaybreak(ctx, round);
+        endSpan(daybreakSpan);
+
+        // Phase: sheriff election
+        if (shouldRunFirstDaySheriffElection(round, this.modeConfig)) {
+          const sheriffSpan = startPhaseSpan('phase:sheriff', { day, phase: 'sheriff' });
+          await runSheriffElection(ctx, round);
+          endSpan(sheriffSpan);
+        }
+
+        // Phase: night-reveal
+        const revealSpan = startPhaseSpan('phase:night-reveal', { day, phase: 'night-reveal' });
+        await revealNightResult(ctx, round);
+        endSpan(revealSpan);
+
+        for (const death of round.night.deaths) {
+          await maybeTransferSheriffBadge(ctx, round, death.id, death.reason, 'night');
+        }
+
+        this.applyWinCheck(day, { checkWolfVoteLock: true, sheriffId: round.sheriffId });
+        if (this.winner) {
+          recordSnapshot(this.trace, `day-${day}-end`, this.serialize(), { day, phase: 'day-end' });
+          break;
+        }
+
+        // Phase: day
+        const daySpan = startPhaseSpan('phase:day', { day, phase: 'day' });
+        await runDay(ctx, round);
+        endSpan(daySpan);
+
+        recordSnapshot(this.trace, `day-${day}-end`, this.serialize(), { day, phase: 'day-end' });
+        this.applyWinCheck(day);
       }
 
-      await revealNightResult(ctx, round);
-
-      for (const death of round.night.deaths) {
-        await maybeTransferSheriffBadge(ctx, round, death.id, death.reason, 'night');
+      if (!this.winner) {
+        const aliveWolves = this.agents.filter((agent) => agent.alive && agent.faction === 'wolves').length;
+        this.winner = aliveWolves ? 'wolves' : 'good';
+        this.winReason = aliveWolves ? '达到最大天数，狼人仍有存活，狼人阵营险胜。' : '达到最大天数，狼人全部出局，好人阵营胜利。';
       }
 
-      this.applyWinCheck(day, { checkWolfVoteLock: true, sheriffId: round.sheriffId });
-      if (this.winner) break;
+      const game = this.serialize();
+      await this.emit({ type: 'game', game });
 
-      await runDay(ctx, round);
-      this.applyWinCheck(day);
+      markTraceComplete(this.trace);
+      recordSnapshot(this.trace, 'game-end', game, { phase: 'game-end' });
+
+      return game;
+    } catch (error) {
+      markTraceError(this.trace, error.message);
+      recordSnapshot(this.trace, 'error', this.serialize(), { phase: 'error' });
+      throw error;
+    } finally {
+      flushTrace(this.trace);
     }
-
-    if (!this.winner) {
-      const aliveWolves = this.agents.filter((agent) => agent.alive && agent.faction === 'wolves').length;
-      this.winner = aliveWolves ? 'wolves' : 'good';
-      this.winReason = aliveWolves ? '达到最大天数，狼人仍有存活，狼人阵营险胜。' : '达到最大天数，狼人全部出局，好人阵营胜利。';
-    }
-
-    const game = this.serialize();
-    await this.emit({ type: 'game', game });
-    return game;
   }
 
   async emit(event) {
+    // Layer 1: record event immediately
+    recordEvent(this.trace, event);
+
     if (!this.options.onEvent) return undefined;
     const projected = projectWerewolfEvent(event, this.audienceSession);
     return projected ? this.options.onEvent(projected) : undefined;

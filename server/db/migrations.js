@@ -188,6 +188,115 @@ function migrate(db) {
       AND (id LIKE 'debate-%' OR event_json LIKE '%ai-debate%')
   `);
   db.exec('CREATE INDEX IF NOT EXISTS idx_games_type_created ON games(game_type, created_at DESC)');
+
+  // Observability tables
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS game_traces (
+      id TEXT PRIMARY KEY,
+      game_type TEXT NOT NULL,
+      game_mode TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'recording',
+      llm_call_count INTEGER NOT NULL DEFAULT 0,
+      agent_decision_count INTEGER NOT NULL DEFAULT 0,
+      event_count INTEGER NOT NULL DEFAULT 0,
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      completed_at TEXT,
+      duration_ms INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS trace_spans (
+      id TEXT PRIMARY KEY,
+      trace_id TEXT NOT NULL REFERENCES game_traces(id) ON DELETE CASCADE,
+      parent_span_id TEXT,
+      span_type TEXT NOT NULL,
+      span_name TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT,
+      status TEXT NOT NULL DEFAULT 'ok',
+      attributes_json TEXT NOT NULL DEFAULT '{}',
+      error_json TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_spans_trace ON trace_spans(trace_id);
+    CREATE INDEX IF NOT EXISTS idx_spans_parent ON trace_spans(parent_span_id);
+
+    CREATE TABLE IF NOT EXISTS llm_records (
+      id TEXT PRIMARY KEY,
+      trace_id TEXT NOT NULL REFERENCES game_traces(id) ON DELETE CASCADE,
+      span_id TEXT,
+      game_type TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      model TEXT NOT NULL,
+      api_format TEXT NOT NULL,
+      player_id INTEGER,
+      player_role TEXT,
+      player_faction TEXT,
+      messages_json TEXT NOT NULL,
+      response_text TEXT NOT NULL DEFAULT '',
+      thinking_text TEXT,
+      temperature REAL,
+      max_tokens INTEGER,
+      prompt_tokens INTEGER,
+      completion_tokens INTEGER,
+      latency_ms INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'success',
+      error_message TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_llm_trace ON llm_records(trace_id);
+    CREATE INDEX IF NOT EXISTS idx_llm_player ON llm_records(trace_id, player_id);
+
+    CREATE TABLE IF NOT EXISTS agent_decisions (
+      id TEXT PRIMARY KEY,
+      trace_id TEXT NOT NULL REFERENCES game_traces(id) ON DELETE CASCADE,
+      span_id TEXT,
+      game_type TEXT NOT NULL,
+      player_id INTEGER NOT NULL,
+      player_role TEXT,
+      player_faction TEXT,
+      decision_type TEXT NOT NULL,
+      phase TEXT,
+      day INTEGER,
+      prompt_text TEXT,
+      response_text TEXT,
+      chosen_target INTEGER,
+      fallback_used INTEGER NOT NULL DEFAULT 0,
+      fallback_reason TEXT,
+      skill_id TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_decisions_trace ON agent_decisions(trace_id);
+    CREATE INDEX IF NOT EXISTS idx_decisions_player ON agent_decisions(trace_id, player_id);
+    CREATE INDEX IF NOT EXISTS idx_decisions_type ON agent_decisions(decision_type);
+
+    CREATE TABLE IF NOT EXISTS game_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trace_id TEXT NOT NULL REFERENCES game_traces(id) ON DELETE CASCADE,
+      span_id TEXT,
+      event_type TEXT NOT NULL,
+      phase TEXT,
+      day INTEGER,
+      event_json TEXT NOT NULL,
+      received_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_events_trace ON game_events(trace_id);
+    CREATE INDEX IF NOT EXISTS idx_events_type ON game_events(event_type);
+
+    CREATE TABLE IF NOT EXISTS state_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trace_id TEXT NOT NULL REFERENCES game_traces(id) ON DELETE CASCADE,
+      checkpoint TEXT NOT NULL,
+      day INTEGER,
+      phase TEXT,
+      player_count INTEGER,
+      alive_count INTEGER,
+      snapshot_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_snapshots_trace ON state_snapshots(trace_id);
+    CREATE INDEX IF NOT EXISTS idx_snapshots_checkpoint ON state_snapshots(trace_id, checkpoint);
+  `);
 }
 
 function migrateLegacyModelProviders(db) {
