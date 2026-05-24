@@ -119,6 +119,23 @@ function rowToSnapshot(row) {
   };
 }
 
+function rowToActionWindowEpoch(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    matchId: row.match_id,
+    stepId: row.step_id,
+    actionType: row.action_type,
+    status: row.status,
+    window: parseJson(row.window_json, {}),
+    createdEventSeq: row.created_event_seq || undefined,
+    resolvedEventSeq: row.resolved_event_seq || undefined,
+    expiresAt: row.expires_at || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 module.exports = {
   nowIso,
   toJson,
@@ -129,5 +146,6 @@ module.exports = {
   rowToEvent,
   rowToTask,
   rowToPendingAction,
-  rowToSnapshot
+  rowToSnapshot,
+  rowToActionWindowEpoch
 };

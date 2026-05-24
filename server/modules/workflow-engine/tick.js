@@ -96,6 +96,15 @@ function tickMatch(matchId, budget = {}) {
         break;
       }
 
+      // Step handlers can explicitly finish the match before the workflow step
+      // list is exhausted, for games where a win condition may occur mid-loop.
+      if (result.matchStatus === MATCH_STATUS.COMPLETED) {
+        status = MATCH_STATUS.COMPLETED;
+        currentStepIndex = workflow.steps.length;
+        blockers = [];
+        break;
+      }
+
       currentStepIndex += 1;
       stepsProcessed += 1;
     }

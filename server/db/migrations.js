@@ -265,6 +265,23 @@ function migrate(db) {
       FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_memory_snapshots_match ON memory_snapshots(match_id, scope, owner_id);
+
+    CREATE TABLE IF NOT EXISTS action_window_epochs (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      step_id TEXT NOT NULL,
+      action_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      window_json TEXT NOT NULL DEFAULT '{}',
+      created_event_seq INTEGER,
+      resolved_event_seq INTEGER,
+      expires_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+      UNIQUE(match_id, step_id, action_type)
+    );
+    CREATE INDEX IF NOT EXISTS idx_action_window_epochs_match ON action_window_epochs(match_id, status);
   `);
 
   ensureColumn(db, 'games', 'game_type', "TEXT NOT NULL DEFAULT 'werewolf'");

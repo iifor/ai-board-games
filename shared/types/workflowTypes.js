@@ -45,11 +45,31 @@ const EVENT_VISIBILITY = Object.freeze({
   SYSTEM: 'system'
 });
 
+const ACTION_WINDOW_STATUS = Object.freeze({
+  OPEN: 'open',
+  RESOLVED: 'resolved',
+  EXPIRED: 'expired',
+  CANCELLED: 'cancelled'
+});
+
+const WEREWOLF_EFFECT_TYPES = Object.freeze({
+  KILL: 'kill',
+  PROTECT: 'protect',
+  INSPECT: 'inspect',
+  SAVE: 'save',
+  POISON: 'poison',
+  EXILE: 'exile',
+  HUNTER_SHOT: 'hunter_shot',
+  IDIOT_SURVIVE: 'idiot_survive'
+});
+
 module.exports = {
   MATCH_STATUS,
   BLOCKER_TYPES,
   BLOCKER_STATUS,
   AI_TASK_STATUS,
   PENDING_ACTION_STATUS,
-  EVENT_VISIBILITY
+  EVENT_VISIBILITY,
+  ACTION_WINDOW_STATUS,
+  WEREWOLF_EFFECT_TYPES
 };

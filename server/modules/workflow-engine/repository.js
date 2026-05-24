@@ -7,7 +7,8 @@ const {
   rowToEvent,
   rowToTask,
   rowToPendingAction,
-  rowToSnapshot
+  rowToSnapshot,
+  rowToActionWindowEpoch
 } = require('./utils');
 
 function createMatch(row) {
@@ -288,6 +289,51 @@ function listSnapshots(matchId, limit = 20) {
     .map(rowToSnapshot);
 }
 
+function upsertActionWindowEpoch(epoch) {
+  getDb().prepare(`
+    INSERT INTO action_window_epochs (
+      id, match_id, step_id, action_type, status, window_json,
+      created_event_seq, resolved_event_seq, expires_at, created_at, updated_at
+    )
+    VALUES (
+      @id, @match_id, @step_id, @action_type, @status, @window_json,
+      @created_event_seq, @resolved_event_seq, @expires_at, @created_at, @updated_at
+    )
+    ON CONFLICT(match_id, step_id, action_type) DO UPDATE SET
+      status = excluded.status,
+      window_json = excluded.window_json,
+      created_event_seq = COALESCE(excluded.created_event_seq, action_window_epochs.created_event_seq),
+      resolved_event_seq = COALESCE(excluded.resolved_event_seq, action_window_epochs.resolved_event_seq),
+      expires_at = excluded.expires_at,
+      updated_at = excluded.updated_at
+  `).run({
+    id: epoch.id,
+    match_id: epoch.matchId,
+    step_id: epoch.stepId,
+    action_type: epoch.actionType,
+    status: epoch.status || 'open',
+    window_json: toJson(epoch.window || {}),
+    created_event_seq: epoch.createdEventSeq || null,
+    resolved_event_seq: epoch.resolvedEventSeq || null,
+    expires_at: epoch.expiresAt || null,
+    created_at: epoch.createdAt || nowIso(),
+    updated_at: nowIso()
+  });
+  return getActionWindowEpoch(epoch.matchId, epoch.stepId, epoch.actionType);
+}
+
+function getActionWindowEpoch(matchId, stepId, actionType) {
+  return rowToActionWindowEpoch(getDb().prepare(
+    'SELECT * FROM action_window_epochs WHERE match_id = ? AND step_id = ? AND action_type = ?'
+  ).get(matchId, stepId, actionType));
+}
+
+function listActionWindowEpochs(matchId) {
+  return getDb().prepare('SELECT * FROM action_window_epochs WHERE match_id = ? ORDER BY created_at ASC')
+    .all(matchId)
+    .map(rowToActionWindowEpoch);
+}
+
 function getDebugState(matchId) {
   const match = getMatch(matchId);
   if (!match) return null;
@@ -296,6 +342,7 @@ function getDebugState(matchId) {
     events: listEvents(matchId),
     aiTasks: listAiTasks(matchId),
     pendingActions: listPendingActions(matchId),
+    actionWindows: listActionWindowEpochs(matchId),
     outbox: listPendingOutbox(matchId),
     snapshots: listSnapshots(matchId)
   };
@@ -327,5 +374,8 @@ module.exports = {
   submitPendingAction,
   expirePendingActions,
   listSnapshots,
+  upsertActionWindowEpoch,
+  getActionWindowEpoch,
+  listActionWindowEpochs,
   getDebugState
 };
