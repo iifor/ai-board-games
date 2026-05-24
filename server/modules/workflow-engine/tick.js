@@ -2,7 +2,7 @@ const { getDb } = require('../../db');
 const repo = require('./repository');
 const { getWorkflow, getStepHandler } = require('./workflowRegistry');
 const { evaluateCondition } = require('./condition');
-const { MATCH_STATUS } = require('../../../shared/types/workflowTypes');
+const { MATCH_STATUS, BLOCKER_TYPES, BLOCKER_STATUS } = require('../../../shared/types/workflowTypes');
 const { toJson } = require('./utils');
 
 const DEFAULT_BUDGET = {
@@ -31,13 +31,14 @@ function tickMatch(matchId, budget = {}) {
       const step = workflow.steps[currentStepIndex];
       if (!step) {
         status = MATCH_STATUS.COMPLETED;
-        const eventRow = repo.appendEvent({
+        repo.commitWorkflowChange({
           matchId,
-          type: 'match_completed',
-          payload: { state },
-          idempotencyKey: `${matchId}:match_completed`
+          events: [{
+            type: 'match_completed',
+            payload: { state },
+            idempotencyKey: `${matchId}:match_completed`
+          }]
         });
-        repo.insertOutbox(matchId, eventRow);
         break;
       }
 
@@ -50,14 +51,15 @@ function tickMatch(matchId, budget = {}) {
         stepId: step.id
       };
       if (step.condition && !evaluateCondition(step.condition, conditionContext)) {
-        const eventRow = repo.appendEvent({
+        repo.commitWorkflowChange({
           matchId,
-          type: 'step_skipped',
-          stepId: step.id,
-          payload: { step },
-          idempotencyKey: `${matchId}:${step.id}:skipped`
+          events: [{
+            type: 'step_skipped',
+            stepId: step.id,
+            payload: { step },
+            idempotencyKey: `${matchId}:${step.id}:skipped`
+          }]
         });
-        repo.insertOutbox(matchId, eventRow);
         currentStepIndex += 1;
         stepsProcessed += 1;
         continue;
@@ -77,12 +79,10 @@ function tickMatch(matchId, budget = {}) {
       }
 
       state = result.state || state;
-      if (result.events?.length) {
-        for (const event of result.events) {
-          const eventRow = repo.appendEvent({ matchId, stepId: step.id, ...event });
-          repo.insertOutbox(matchId, eventRow);
-        }
-      }
+      if (result.events?.length) repo.commitWorkflowChange({
+        matchId,
+        events: result.events.map((event) => ({ stepId: step.id, ...event }))
+      });
       if (result.tasks?.length) {
         for (const task of result.tasks) repo.createAiTask(task);
       }
@@ -91,7 +91,7 @@ function tickMatch(matchId, budget = {}) {
       }
 
       if (result.status === 'WAITING') {
-        blockers = result.blockers || [];
+        blockers = resolveBlockers(matchId, result.blockers || []);
         status = MATCH_STATUS.WAITING;
         break;
       }
@@ -101,18 +101,41 @@ function tickMatch(matchId, budget = {}) {
     }
 
     const version = Number(match.version || 0) + 1;
-    repo.updateMatch(matchId, {
-      status,
-      current_step_index: currentStepIndex,
-      version,
-      state_json: toJson(state),
-      blockers_json: toJson(blockers),
-      completed_at: status === MATCH_STATUS.COMPLETED ? new Date().toISOString() : match.completedAt || null
+    const { match: updated } = repo.commitWorkflowChange({
+      matchId,
+      matchPatch: {
+        status,
+        current_step_index: currentStepIndex,
+        version,
+        state_json: toJson(state),
+        blockers_json: toJson(blockers),
+        completed_at: status === MATCH_STATUS.COMPLETED ? new Date().toISOString() : match.completedAt || null
+      },
+      snapshot: true
     });
-    const updated = repo.getMatch(matchId);
-    repo.upsertSnapshot(updated);
     return updated;
   })();
 }
 
-module.exports = { tickMatch };
+function resolveBlockers(matchId, blockers) {
+  const tasks = new Map(repo.listAiTasks(matchId).map((task) => [task.id, task]));
+  const actions = new Map(repo.listPendingActions(matchId).map((action) => [action.id, action]));
+  return blockers.map((blocker) => {
+    if (blocker.type === BLOCKER_TYPES.AI_TASK && blocker.taskId) {
+      const task = tasks.get(blocker.taskId);
+      if (task?.status === 'succeeded') return { ...blocker, status: BLOCKER_STATUS.COMPLETED };
+      if (task?.status === 'failed') return { ...blocker, status: BLOCKER_STATUS.FAILED };
+      if (task?.status === 'cancelled') return { ...blocker, status: BLOCKER_STATUS.CANCELLED };
+    }
+    if (blocker.type === BLOCKER_TYPES.HUMAN_ACTION && blocker.actionId) {
+      const action = actions.get(blocker.actionId);
+      if (action?.status === 'submitted') return { ...blocker, status: BLOCKER_STATUS.COMPLETED };
+      if (action?.status === 'expired') return { ...blocker, status: BLOCKER_STATUS.EXPIRED };
+      if (action?.status === 'cancelled') return { ...blocker, status: BLOCKER_STATUS.CANCELLED };
+      if (action?.status === 'failed') return { ...blocker, status: BLOCKER_STATUS.FAILED };
+    }
+    return { ...blocker, status: blocker.status || BLOCKER_STATUS.PENDING };
+  });
+}
+
+module.exports = { tickMatch, resolveBlockers };

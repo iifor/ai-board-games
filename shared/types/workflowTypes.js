@@ -27,7 +27,8 @@ const AI_TASK_STATUS = Object.freeze({
   RUNNING: 'running',
   SUCCEEDED: 'succeeded',
   FAILED: 'failed',
-  RETRYING: 'retrying'
+  RETRYING: 'retrying',
+  CANCELLED: 'cancelled'
 });
 
 const PENDING_ACTION_STATUS = Object.freeze({

@@ -1,5 +1,14 @@
 const { getDb } = require('../../db');
-const { nowIso, toJson, parseJson, publicMatch, rowToEvent, rowToTask } = require('./utils');
+const {
+  nowIso,
+  toJson,
+  parseJson,
+  publicMatch,
+  rowToEvent,
+  rowToTask,
+  rowToPendingAction,
+  rowToSnapshot
+} = require('./utils');
 
 function createMatch(row) {
   getDb().prepare(`
@@ -40,8 +49,13 @@ function nextEventSeq(matchId) {
 }
 
 function appendEvent(event) {
+  if (event.idempotencyKey) {
+    const existing = getDb().prepare('SELECT * FROM workflow_events WHERE match_id = ? AND idempotency_key = ?')
+      .get(event.matchId, event.idempotencyKey);
+    if (existing) return existing;
+  }
   const seq = event.seq || nextEventSeq(event.matchId);
-  getDb().prepare(`
+  const result = getDb().prepare(`
     INSERT OR IGNORE INTO workflow_events (
       match_id, seq, type, step_id, player_id, payload_json, visibility,
       visible_to_player_ids_json, idempotency_key, created_at
@@ -62,6 +76,12 @@ function appendEvent(event) {
     idempotency_key: event.idempotencyKey || null,
     created_at: event.createdAt || nowIso()
   });
+  if (result.changes > 0) return getDb().prepare('SELECT * FROM workflow_events WHERE match_id = ? AND seq = ?').get(event.matchId, seq);
+  if (event.idempotencyKey) {
+    const duplicate = getDb().prepare('SELECT * FROM workflow_events WHERE match_id = ? AND idempotency_key = ?')
+      .get(event.matchId, event.idempotencyKey);
+    if (duplicate) return duplicate;
+  }
   return getDb().prepare('SELECT * FROM workflow_events WHERE match_id = ? AND seq = ?').get(event.matchId, seq);
 }
 
@@ -74,10 +94,26 @@ function listEventsAfter(matchId, afterSeq = 0) {
 }
 
 function insertOutbox(matchId, eventRow) {
+  if (!eventRow) return;
   getDb().prepare(`
-    INSERT INTO outbox_messages (match_id, event_seq, status, payload_json, created_at, updated_at)
+    INSERT OR IGNORE INTO outbox_messages (match_id, event_seq, status, payload_json, created_at, updated_at)
     VALUES (?, ?, 'pending', ?, ?, ?)
   `).run(matchId, eventRow.seq, toJson(rowToEvent(eventRow)), nowIso(), nowIso());
+}
+
+function commitWorkflowChange({ matchId, events = [], matchPatch = null, snapshot = false }) {
+  return getDb().transaction(() => {
+    const rows = [];
+    for (const event of events) {
+      const eventRow = appendEvent({ matchId, ...event });
+      insertOutbox(matchId, eventRow);
+      rows.push(rowToEvent(eventRow));
+    }
+    if (matchPatch) updateMatch(matchId, matchPatch);
+    const match = getMatch(matchId);
+    if (snapshot && match) upsertSnapshot(match);
+    return { match, events: rows };
+  })();
 }
 
 function listPendingOutbox(matchId) {
@@ -126,6 +162,31 @@ function createAiTask(task) {
   });
 }
 
+function claimNextAiTask({ matchId = null, workerId = 'worker' } = {}) {
+  const db = getDb();
+  const row = matchId
+    ? db.prepare(`
+      SELECT * FROM ai_tasks
+      WHERE match_id = ? AND status IN ('queued', 'retrying')
+      ORDER BY created_at ASC
+      LIMIT 1
+    `).get(matchId)
+    : db.prepare(`
+      SELECT * FROM ai_tasks
+      WHERE status IN ('queued', 'retrying')
+      ORDER BY created_at ASC
+      LIMIT 1
+    `).get();
+  if (!row) return null;
+  const result = db.prepare(`
+    UPDATE ai_tasks
+    SET status = 'running', attempts = attempts + 1, worker_id = ?, claimed_at = ?, updated_at = ?
+    WHERE id = ? AND status IN ('queued', 'retrying')
+  `).run(workerId, nowIso(), nowIso(), row.id);
+  if (!result.changes) return null;
+  return getAiTask(row.id);
+}
+
 function listAiTasks(matchId, status = null) {
   const rows = status
     ? getDb().prepare('SELECT * FROM ai_tasks WHERE match_id = ? AND status = ? ORDER BY created_at ASC').all(matchId, status)
@@ -149,6 +210,24 @@ function updateAiTask(id, patch) {
   getDb().prepare(`UPDATE ai_tasks SET ${sets.join(', ')} WHERE id = @id`).run(params);
 }
 
+function retryAiTask(id) {
+  updateAiTask(id, {
+    status: 'retrying',
+    error_json: 'null',
+    worker_id: '',
+    claimed_at: null
+  });
+  return getAiTask(id);
+}
+
+function cancelAiTask(id, reason = 'cancelled') {
+  updateAiTask(id, {
+    status: 'cancelled',
+    error_json: toJson({ message: reason })
+  });
+  return getAiTask(id);
+}
+
 function createPendingAction(action) {
   getDb().prepare(`
     INSERT OR IGNORE INTO pending_actions (
@@ -166,7 +245,47 @@ function createPendingAction(action) {
 
 function listPendingActions(matchId) {
   return getDb().prepare('SELECT * FROM pending_actions WHERE match_id = ? ORDER BY created_at ASC').all(matchId)
-    .map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) }));
+    .map(rowToPendingAction);
+}
+
+function getPendingAction(actionId) {
+  return rowToPendingAction(getDb().prepare('SELECT * FROM pending_actions WHERE id = ?').get(actionId));
+}
+
+function updatePendingAction(actionId, patch) {
+  const sets = [];
+  const params = { id: actionId, updated_at: nowIso() };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    sets.push(`${key} = @${key}`);
+    params[key] = value;
+  }
+  sets.push('updated_at = @updated_at');
+  getDb().prepare(`UPDATE pending_actions SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  return getPendingAction(actionId);
+}
+
+function submitPendingAction(actionId, { payload, resultEventSeq, idempotencyKey }) {
+  return updatePendingAction(actionId, {
+    status: 'submitted',
+    payload_json: toJson(payload || {}),
+    result_event_seq: resultEventSeq || null,
+    idempotency_key: idempotencyKey
+  });
+}
+
+function expirePendingActions(matchId, stepId = null) {
+  const sql = stepId
+    ? "UPDATE pending_actions SET status = 'expired', updated_at = ? WHERE match_id = ? AND step_id = ? AND status = 'pending'"
+    : "UPDATE pending_actions SET status = 'expired', updated_at = ? WHERE match_id = ? AND status = 'pending'";
+  const params = stepId ? [nowIso(), matchId, stepId] : [nowIso(), matchId];
+  return getDb().prepare(sql).run(...params).changes;
+}
+
+function listSnapshots(matchId, limit = 20) {
+  return getDb().prepare('SELECT * FROM match_snapshots WHERE match_id = ? ORDER BY version DESC, id DESC LIMIT ?')
+    .all(matchId, Number(limit) || 20)
+    .map(rowToSnapshot);
 }
 
 function getDebugState(matchId) {
@@ -177,7 +296,8 @@ function getDebugState(matchId) {
     events: listEvents(matchId),
     aiTasks: listAiTasks(matchId),
     pendingActions: listPendingActions(matchId),
-    outbox: listPendingOutbox(matchId)
+    outbox: listPendingOutbox(matchId),
+    snapshots: listSnapshots(matchId)
   };
 }
 
@@ -187,6 +307,7 @@ module.exports = {
   getMatch,
   updateMatch,
   appendEvent,
+  commitWorkflowChange,
   listEvents,
   listEventsAfter,
   insertOutbox,
@@ -194,10 +315,17 @@ module.exports = {
   markOutboxSent,
   upsertSnapshot,
   createAiTask,
+  claimNextAiTask,
   listAiTasks,
   getAiTask,
   updateAiTask,
+  retryAiTask,
+  cancelAiTask,
   createPendingAction,
   listPendingActions,
+  getPendingAction,
+  submitPendingAction,
+  expirePendingActions,
+  listSnapshots,
   getDebugState
 };

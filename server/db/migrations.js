@@ -285,6 +285,8 @@ function migrate(db) {
   ensureColumn(db, 'werewolf_modes', 'win_condition', "TEXT NOT NULL DEFAULT 'side'");
   ensureColumn(db, 'werewolf_roles', 'play_style_advice', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'models', 'thinking_enabled', "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, 'ai_tasks', 'worker_id', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'ai_tasks', 'claimed_at', 'TEXT');
   migrateLegacyModelProviders(db);
 
   // Fix null/empty/consensus game types

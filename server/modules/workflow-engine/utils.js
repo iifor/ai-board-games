@@ -78,9 +78,44 @@ function rowToTask(row) {
     result: parseJson(row.result_json, null),
     error: parseJson(row.error_json, null),
     attempts: row.attempts,
+    workerId: row.worker_id || undefined,
+    claimedAt: row.claimed_at || undefined,
     visibleEventSeqMax: row.visible_event_seq_max,
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function rowToPendingAction(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    matchId: row.match_id,
+    stepId: row.step_id,
+    epochId: row.epoch_id || undefined,
+    playerId: row.player_id || undefined,
+    actorType: row.actor_type,
+    actionType: row.action_type,
+    status: row.status,
+    payload: parseJson(row.payload_json, {}),
+    resultEventSeq: row.result_event_seq || undefined,
+    idempotencyKey: row.idempotency_key,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function rowToSnapshot(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    matchId: row.match_id,
+    version: row.version,
+    status: row.status,
+    currentStepIndex: row.current_step_index,
+    state: parseJson(row.state_json, {}),
+    blockers: parseJson(row.blockers_json, []),
+    createdAt: row.created_at
   };
 }
 
@@ -92,5 +127,7 @@ module.exports = {
   stableTaskId,
   publicMatch,
   rowToEvent,
-  rowToTask
+  rowToTask,
+  rowToPendingAction,
+  rowToSnapshot
 };

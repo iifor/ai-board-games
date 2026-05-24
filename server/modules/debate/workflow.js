@@ -145,6 +145,30 @@ const handlers = {
         gameType: 'debate'
       });
       return normalizeTaskResult(spec, result);
+    },
+    validateAiResult({ task, result }) {
+      const payload = result?.payload;
+      if (!payload || typeof payload !== 'object') {
+        throw Object.assign(new Error('Debate AI result payload is required'), { severity: 'high' });
+      }
+      if (!payload.action || payload.action !== task.action) {
+        throw Object.assign(new Error('Debate AI result action does not match task action'), { severity: 'high' });
+      }
+      if (['judge_review'].includes(task.action)) {
+        if (!['pro', 'con', 'draw'].includes(payload.winner) || !String(payload.text || '').trim()) {
+          throw Object.assign(new Error('Judge review result is invalid'), { severity: 'high' });
+        }
+        return;
+      }
+      if (task.action === 'vote_mvp') {
+        if (!payload.voterId || !payload.target) {
+          throw Object.assign(new Error('MVP vote result is invalid'), { severity: 'high' });
+        }
+        return;
+      }
+      if (!String(payload.text || '').trim()) {
+        throw Object.assign(new Error('Debate speech result text is empty'), { severity: 'medium' });
+      }
     }
   },
   'debate.result_announce': {
