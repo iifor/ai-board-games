@@ -1,6 +1,6 @@
 import { Users } from 'lucide-react';
 import { classNames } from '../../../../utils/classNames';
-import { getRoleConfigGroups } from '../../werewolfUtils';
+import { getRoleConfigGroups } from '../../utils';
 import { PanelHeader } from '../PanelHeader';
 import type { Player, WerewolfMode } from '../../../../types';
 import './index.css';

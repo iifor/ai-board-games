@@ -21,7 +21,7 @@ import {
   sanitizeWerewolfSelectedIds,
   sortPlayersById,
   toggleWerewolfPlayerId
-} from '../werewolfUtils';
+} from '../utils';
 import type { GameState, GameEvent, GameStatus, Player, WerewolfMode, EventLogEntry, SpeechState } from '../../../types';
 import './index.css';
 

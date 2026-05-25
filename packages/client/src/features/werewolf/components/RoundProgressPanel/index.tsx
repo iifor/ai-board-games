@@ -1,5 +1,5 @@
 import { Moon, Sun } from 'lucide-react';
-import { buildRoundProgress } from '../../werewolfUtils';
+import { buildRoundProgress } from '../../utils';
 import { PanelHeader } from '../PanelHeader';
 import type { WerewolfRound } from '../../../../types';
 import './index.css';

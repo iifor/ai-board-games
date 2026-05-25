@@ -1,7 +1,7 @@
 import { Crown } from 'lucide-react';
 import { classNames } from '../../../../utils/classNames';
 import { getPlayerAvatar, getPlayerModelName } from '../../../../utils/player';
-import { toChineseOrdinal } from '../../debateUtils';
+import { toChineseOrdinal } from '../../utils';
 import './index.css';
 import type { Player } from '../../../../types';
 

@@ -3,14 +3,13 @@ import type { QueueItem } from '../types';
 import type { SpeechMedia } from '@ai-presenter/shared/types/speechTypes';
 import {
   getChineseVoices,
-  getVoiceForItem,
-  getProfileForItem,
   clampFinite,
-  normalizeVoiceProfile,
   getSpeechFallbackDelay,
   fetchServerSpeechMedia,
   getSpeechPlaybackText
 } from '../utils/speech';
+import { createBrowserSpeechUtterance, createSilentSpeechUnlockUtterance } from './speech/browserSpeech';
+import { clearAnimationFrame, clearWindowInterval, clearWindowTimeout } from './speech/timers';
 
 export function useSpeechQueue() {
   const [speechEnabled, setSpeechEnabledState] = useState<boolean>(true);
@@ -26,15 +25,11 @@ export function useSpeechQueue() {
   const audioTimeRafRef = useRef<number | null>(null);
 
   const clearResumeTimer = useCallback(() => {
-    if (!resumeTimerRef.current) return;
-    window.clearInterval(resumeTimerRef.current);
-    resumeTimerRef.current = null;
+    clearWindowInterval(resumeTimerRef);
   }, []);
 
   const clearAudioTimeRaf = useCallback(() => {
-    if (!audioTimeRafRef.current) return;
-    window.cancelAnimationFrame(audioTimeRafRef.current);
-    audioTimeRafRef.current = null;
+    clearAnimationFrame(audioTimeRafRef);
   }, []);
 
   const playNext = useCallback(() => {
@@ -56,10 +51,7 @@ export function useSpeechQueue() {
       const shouldRunEnd = !cancellingRef.current;
       clearResumeTimer();
       clearAudioTimeRaf();
-      if (endTimerRef.current) {
-        window.clearTimeout(endTimerRef.current);
-        endTimerRef.current = null;
-      }
+      clearWindowTimeout(endTimerRef);
       speakingRef.current = false;
       currentItemRef.current = null;
       if (shouldRunEnd) item.onEnd?.();
@@ -83,16 +75,11 @@ export function useSpeechQueue() {
         window.setTimeout(finish, 0);
         return;
       }
-      const utterance = new SpeechSynthesisUtterance(spokenText);
-      const profile = normalizeVoiceProfile(getProfileForItem(item));
-      const voice = getVoiceForItem(item, voicesRef.current, profile);
-      utterance.lang = 'zh-CN';
-      utterance.rate = profile.rate;
-      utterance.pitch = profile.pitch;
-      utterance.volume = profile.volume;
-      if (voice) {
-        utterance.voice = voice;
-        utterance.lang = voice.lang || 'zh-CN';
+      const utterance = createBrowserSpeechUtterance(item, voicesRef.current);
+      if (!utterance) {
+        item.onStart?.();
+        window.setTimeout(finish, 0);
+        return;
       }
       utterance.onstart = () => {
         if (!cancellingRef.current) item.onStart?.();
@@ -191,10 +178,7 @@ export function useSpeechQueue() {
     queueRef.current = [];
     clearResumeTimer();
     clearAudioTimeRaf();
-    if (endTimerRef.current) {
-      window.clearTimeout(endTimerRef.current);
-      endTimerRef.current = null;
-    }
+    clearWindowTimeout(endTimerRef);
     speakingRef.current = false;
     currentItemRef.current = null;
     cancellingRef.current = true;
@@ -216,12 +200,7 @@ export function useSpeechQueue() {
     if (!enabledRef.current || !window.speechSynthesis || speakingRef.current) return;
     try {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance('语音准备');
-      utterance.lang = 'zh-CN';
-      utterance.volume = 0;
-      utterance.rate = 1;
-      utterance.pitch = 1;
-      window.speechSynthesis.speak(utterance);
+      window.speechSynthesis.speak(createSilentSpeechUnlockUtterance());
       window.speechSynthesis.resume?.();
     } catch {
       // Browser speech engines can throw before voices are ready; real playback will retry later.

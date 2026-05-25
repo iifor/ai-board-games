@@ -1,6 +1,6 @@
 import { useSpeechPlayback } from '../../../hooks/useSpeechPlayback';
 import { PLAYABLE_TEXT_CONFIG, getPlayablePlaybackDelay } from '../../../utils/playableText';
-import { getDebateNarration } from '../debateUtils';
+import { getDebateNarration } from '../utils';
 import type { GameEvent, SpeechState, GameState } from '../../../types';
 
 interface UseDebateSpeechPlaybackParams {

@@ -1,6 +1,6 @@
 import { useSpeechPlayback } from '../../../hooks/useSpeechPlayback';
 import { getPlayablePlaybackDelay } from '../../../utils/playableText';
-import { getWerewolfNarration } from '../werewolfUtils';
+import { getWerewolfNarration } from '../utils';
 import type { GameEvent, GameState, Player, SpeechState, PlayableTextOptions, QueueItem } from '../../../types';
 
 const WEREWOLF_NIGHT_ACTION_HOLD_MS = 1000;

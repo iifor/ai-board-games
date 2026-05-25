@@ -1,6 +1,6 @@
 import { Check, Eye, Moon, UserRound, Users } from 'lucide-react';
 import { classNames } from '../../../../utils/classNames';
-import { formatWerewolfModeSummary, getWerewolfModePlayerCount } from '../../werewolfUtils';
+import { formatWerewolfModeSummary, getWerewolfModePlayerCount } from '../../utils';
 import { PanelHeader } from '../PanelHeader';
 import { HostSeat } from '../../../../components/common/HostSeat';
 import type { Player, WerewolfMode } from '../../../../types';

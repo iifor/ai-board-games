@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
-import { formatWerewolfSeatLabel, getGameStats, getPhaseTitle, getRoundResult, getWerewolfActionTarget, getWerewolfNightActionBadges, getWerewolfSeatNumber, shouldShowWerewolfActionTargets } from '../../werewolfUtils';
+import { formatWerewolfSeatLabel, getGameStats, getPhaseTitle, getRoundResult, getWerewolfActionTarget, getWerewolfNightActionBadges, getWerewolfSeatNumber, shouldShowWerewolfActionTargets } from '../../utils';
 import { WerewolfBrandPanel } from '../WerewolfBrandPanel';
 import { RoleConfigPanel } from '../RoleConfigPanel';
 import { RoundProgressPanel } from '../RoundProgressPanel';

@@ -126,9 +126,10 @@ function resolvePlayerModel(player: Record<string, unknown>, models: Record<stri
 }
 
 function modelToProvider(model: Record<string, unknown>): ProviderInfo {
+  const apiKeyEnv = 'DATABASE_MODEL_API_KEY';
   return { name: model.provider as string, provider: model.provider as string,
     baseUrl: String(model.baseUrl || '').replace(/\/$/, ''),
-    apiKeyEnv: 'DATABASE_MODEL_API_KEY', apiKey: (model.apiKey as string) || '',
+    apiKeyEnv, apiKey: (model.apiKey as string) || process.env[apiKeyEnv] || '',
     apiFormat: (model.apiFormat as string) || 'openai-compatible' };
 }
 

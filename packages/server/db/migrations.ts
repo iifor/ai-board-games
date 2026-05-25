@@ -46,6 +46,7 @@ function migrate(db: Database | JsonDb): void {
       voice_package_id INTEGER,
       temperature REAL NOT NULL DEFAULT 0.85,
       enabled INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE SET NULL,
@@ -304,6 +305,7 @@ function migrate(db: Database | JsonDb): void {
   ensureColumn(db, 'games', 'topic_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, 'players', 'model_id', 'INTEGER');
   ensureColumn(db, 'players', 'voice_package_id', 'INTEGER');
+  ensureColumn(db, 'players', 'sort_order', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'models', 'provider_id', 'INTEGER');
   ensureColumn(db, 'voice_packages', 'gender', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'voice_packages', 'style', "TEXT NOT NULL DEFAULT ''");

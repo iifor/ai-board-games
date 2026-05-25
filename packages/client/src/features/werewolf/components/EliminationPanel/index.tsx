@@ -1,6 +1,6 @@
 import { Skull } from 'lucide-react';
 import { ROLE_NAMES } from '../../constants';
-import { formatWerewolfSeatLabel } from '../../werewolfUtils';
+import { formatWerewolfSeatLabel } from '../../utils';
 import { PanelHeader } from '../PanelHeader';
 import type { Player } from '../../../../types';
 import './index.css';

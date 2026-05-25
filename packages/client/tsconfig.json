@@ -15,7 +15,10 @@
     "isolatedModules": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@ai-presenter/shared/*": ["../shared/*"]
+    }
   },
   "include": ["src/**/*", "vite-env.d.ts"],
   "exclude": ["node_modules"]

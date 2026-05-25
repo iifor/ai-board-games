@@ -1,6 +1,6 @@
 import { DebateFlag } from '../DebateFlag';
 import { DebateSeat } from '../DebateSeat';
-import { toChineseOrdinal } from '../../debateUtils';
+import { toChineseOrdinal } from '../../utils';
 import './index.css';
 import type { Player } from '../../../../types';
 

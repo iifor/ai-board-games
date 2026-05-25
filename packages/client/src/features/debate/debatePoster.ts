@@ -1,4 +1,4 @@
-import { sortReportPlayers, cleanPosterText } from './debateUtils';
+import { sortReportPlayers, cleanPosterText } from './utils';
 import type { Player, DebateShareReport, PosterSlot, PosterBoxTextOptions } from '../../types';
 
 const DEBATE_RESULT_POSTER_DESIGN = { width: 1672, height: 941 };

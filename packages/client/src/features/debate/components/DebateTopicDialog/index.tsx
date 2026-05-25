@@ -10,7 +10,7 @@ import {
   getDebateTeamKey,
   findDebateTeamSlot,
   removeDebatePlayerIds
-} from '../../debateUtils';
+} from '../../utils';
 import './index.css';
 import type { Player, DebateTopic, DebateTeamDraft } from '../../../../types';
 

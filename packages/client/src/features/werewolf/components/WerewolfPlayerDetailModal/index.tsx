@@ -1,7 +1,7 @@
 import { formatAvatarUrl } from '../../../../utils/avatar';
 import { classNames } from '../../../../utils/classNames';
 import { ROLE_NAMES } from '../../constants';
-import { getRoleDescription } from '../../werewolfUtils';
+import { getRoleDescription } from '../../utils';
 import type { Player } from '../../../../types';
 import '../../WerewolfGame/index.css';
 

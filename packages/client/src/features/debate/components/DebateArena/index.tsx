@@ -3,7 +3,7 @@ import { DebateSide } from '../DebateSide';
 import { DebateSeat } from '../DebateSeat';
 import { DebatePhaseTimeline } from '../DebatePhaseTimeline';
 import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
-import { getDebatePhaseSteps, getActiveStageIndex, getStageTitle, getDebatePlayerLabel, getMvpVoteTargetMap } from '../../debateUtils';
+import { getDebatePhaseSteps, getActiveStageIndex, getStageTitle, getDebatePlayerLabel, getMvpVoteTargetMap } from '../../utils';
 import './index.css';
 import type { GameState, SpeechState, Player, DebatePhase } from '../../../../types';
 

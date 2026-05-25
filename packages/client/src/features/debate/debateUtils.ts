@@ -570,8 +570,7 @@ function createPlayerLibraryMatcher(libraryPlayers: Player[] = []): PlayerMatche
 }
 
 function getPlayerMatchKeys(value: Record<string, unknown> | Player = {}): string[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const v = value as any;
+  const v = value as Record<string, unknown>;
   return [
     v.nickname,
     v.name,

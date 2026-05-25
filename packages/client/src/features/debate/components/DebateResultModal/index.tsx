@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createDebateResultPoster, downloadResultPoster } from '../../debatePoster';
-import { getShareReport } from '../../debateUtils';
+import { getShareReport } from '../../utils';
 import './index.css';
 import type { GameState } from '../../../../types';
 

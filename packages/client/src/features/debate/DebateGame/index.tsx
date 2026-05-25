@@ -20,7 +20,7 @@ import {
   getDebatePlayerLabel,
   getDebateIdentityDescription,
   getDebateNarration
-} from '../debateUtils';
+} from '../utils';
 import { EMPTY_DEBATE, DEFAULT_DEBATE_TOPIC } from '../constants';
 import './index.css';
 import type { GameState, GameEvent, GameStatus, SpeechState, Player, DebateTopic, DebateTeamDraft } from '../../../types';
