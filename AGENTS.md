@@ -136,6 +136,7 @@ server/modules/<moduleName>/
 * Props、API 入参、API 返回值必须有明确类型
 * 不允许大量使用 any
 * 不允许用 as any 掩盖类型问题
+* 使用 any 必须加注释
 * 前后端共享类型优先放到 shared/types
 * API 返回结构必须稳定、清晰、可判断
 

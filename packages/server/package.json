@@ -1,0 +1,30 @@
+{
+  "name": "@consensus-mist/server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "dev": "tsx index.js",
+    "build": "tsc",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@consensus-mist/shared": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.7.1",
+    "@opentelemetry/sdk-trace-base": "^2.7.1",
+    "better-sqlite3": "^12.9.0",
+    "express": "^4.19.2",
+    "microsoft-cognitiveservices-speech-sdk": "^1.50.0",
+    "ws": "^8.18.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  }
+}

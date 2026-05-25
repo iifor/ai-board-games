@@ -63,7 +63,16 @@
       "Bash(node -e \"require\\('express'\\); console.log\\('express OK'\\)\")",
       "Bash(node -e \"console.log\\(require.resolve\\('express'\\)\\)\")",
       "Bash(npm cache *)",
-      "Bash(node -e \"require\\('@opentelemetry/api'\\); console.log\\('OK'\\)\")"
+      "Bash(node -e \"require\\('@opentelemetry/api'\\); console.log\\('OK'\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm run *)",
+      "Bash(npx tsx *)",
+      "Bash(tsx --version)",
+      "Bash(pnpm --filter @consensus-mist/server run check)",
+      "Bash(timeout 5 pnpm --filter @consensus-mist/server run dev)",
+      "Bash(pnpm --filter @consensus-mist/shared run check)",
+      "Bash(pnpm --filter @consensus-mist/admin run check)"
     ]
   }
 }

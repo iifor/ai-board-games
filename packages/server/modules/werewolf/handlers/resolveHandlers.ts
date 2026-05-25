@@ -1,0 +1,134 @@
+import {
+  buildActionWindow,
+  createActionBlockers,
+  hasOpenWork,
+  collectActionResults,
+  allActionWorkSucceeded,
+  resolveActionWindow
+} from '../actionWindows';
+import type { ActionWindow } from '../actionWindows';
+const { resolveNightEffects, resolveExileEffects, applyHunterShot } = require('../effects');
+import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
+import type { Runtime } from '../runtime';
+const { findPendingHunter } = require('../reducers');
+import { runHunterAiTask, validateHunterAiResult } from '../aiActions';
+import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
+import type { StepState } from './common';
+
+interface Match {
+  id: string;
+  [key: string]: unknown;
+}
+
+interface Step {
+  id: string;
+  config: {
+    day?: number;
+    phase?: string;
+    actionType?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+interface HandlerResult {
+  status: string;
+  state: StepState;
+  events?: unknown[];
+  blockers?: unknown[];
+  tasks?: unknown[];
+  pendingActions?: unknown[];
+}
+
+function createNightResolveHandler() {
+  return {
+    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+      if (isDone(state, step.id) || state.winner) return completed(state, step.id);
+      const runtime = createRuntime(match, state);
+      const round = ensureRound(runtime.state, step.config.day!);
+      const resolved = resolveNightEffects(runtime.agents, round);
+      const hunter = findPendingHunter(runtime.agents, round, resolved.deaths);
+      if (hunter) return createHunterWindow({ match, step, state, runtime, round, hunter });
+      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id }, step.id);
+      return {
+        status: 'COMPLETED',
+        state: nextState,
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', 'night resolved', { effects: resolved.effects })]
+      };
+    },
+    runAiTask: runHunterAiTask,
+    validateAiResult: validateHunterAiResult
+  };
+}
+
+function createExileResolveHandler() {
+  return {
+    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+      if (isDone(state, step.id) || state.winner) return completed(state, step.id);
+      const runtime = createRuntime(match, state);
+      const round = ensureRound(runtime.state, step.config.day!);
+      const resolved = resolveExileEffects(runtime.agents, round, runtime.modeConfig);
+      const hunter = findPendingHunter(runtime.agents, round, resolved.exile ? [resolved.exile] : []);
+      if (hunter) return createHunterWindow({ match, step, state, runtime, round, hunter });
+      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id }, step.id);
+      return {
+        status: 'COMPLETED',
+        state: nextState,
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', 'exile resolved', { effects: resolved.effects })]
+      };
+    },
+    runAiTask: runHunterAiTask,
+    validateAiResult: validateHunterAiResult
+  };
+}
+
+function createHunterWindow({ match, step, state, runtime, round, hunter }: {
+  match: Match;
+  step: Step;
+  state: StepState;
+  runtime: Runtime;
+  round: Record<string, unknown>;
+  hunter: unknown;
+}): HandlerResult {
+  const actionType = 'hunter_shot';
+  if (!hasOpenWork(match.id, step.id, actionType)) {
+    const window = buildActionWindow({
+      match,
+      step: { ...step, config: { ...step.config, actionType } },
+      state: state as unknown as Record<string, unknown>,
+      actionType,
+      actors: [hunter] as Parameters<typeof buildActionWindow>[0]['actors'],
+      targetIds: (runtime.agents || []).filter((agent) => agent.alive).map((agent) => agent.id),
+      optional: false
+    });
+    const work = createActionBlockers({ match, step, window, actors: [hunter] as Parameters<typeof createActionBlockers>[0]['actors'], promptContext: { day: (round as { day?: number }).day, actionType, round } });
+    return {
+      status: 'WAITING',
+      state: { ...state, currentStep: step.id, currentActionWindow: window },
+      blockers: work.blockers,
+      tasks: work.tasks,
+      pendingActions: work.pendingActions,
+      events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', 'hunter shot requested', { actionWindow: window })]
+    };
+  }
+  if (!allActionWorkSucceeded(match.id, step.id, actionType, 1)) {
+    const window = state.currentActionWindow || { id: `${match.id}:${step.id}:${actionType}` };
+    const work = createActionBlockers({ match, step, window: window as Parameters<typeof createActionBlockers>[0]['window'], actors: [hunter] as Parameters<typeof createActionBlockers>[0]['actors'], promptContext: { day: (round as { day?: number }).day, actionType, round } });
+    return { status: 'WAITING', state: { ...state, currentStep: step.id }, blockers: work.blockers };
+  }
+  const result = collectActionResults(match.id, step.id, actionType)[0];
+  const effect = applyHunterShot(runtime.agents, round, { from: (hunter as { id: number }).id, target: result?.payload?.target, reason: (round as { phase?: string }).phase });
+  const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
+  resolveActionWindow(match.id, step.id, actionType, state.currentActionWindow as unknown as ActionWindow);
+  return {
+    status: 'COMPLETED',
+    state: nextState,
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', 'hunter shot resolved', { effects: effect ? [effect] : [] })]
+  };
+}
+
+export {
+  createNightResolveHandler,
+  createExileResolveHandler,
+  createHunterWindow
+};
