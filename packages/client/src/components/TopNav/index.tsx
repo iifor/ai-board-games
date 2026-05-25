@@ -1,0 +1,102 @@
+import React from 'react';
+import { ArrowLeft, Eye, MessageCircle, Pause, Power, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import './index.css';
+
+interface TopNavViewAction {
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  icon?: React.ReactNode;
+  label: string;
+}
+
+interface TopNavProps {
+  currentRound?: { number?: number };
+  currentEvent?: { title?: string };
+  title?: string;
+  subtitle?: string;
+  roundLabel?: string;
+  autoPlay: boolean;
+  showRoles: boolean;
+  speechEnabled: boolean;
+  controlsLocked?: boolean;
+  returnDisabled?: boolean;
+  onReturn: () => void;
+  onSpeechToggle: () => void;
+  setAutoPlay: (value: boolean) => void;
+  setShowRoles: (value: boolean | ((prev: boolean) => boolean)) => void;
+  viewAction?: TopNavViewAction;
+}
+
+export function TopNav({
+  currentRound,
+  currentEvent,
+  title = '共识迷雾',
+  subtitle = '迷雾调查 v3.2',
+  roundLabel,
+  autoPlay,
+  showRoles,
+  speechEnabled,
+  controlsLocked,
+  returnDisabled,
+  onReturn,
+  onSpeechToggle,
+  setAutoPlay,
+  setShowRoles,
+  viewAction
+}: TopNavProps) {
+  return (
+    <header className="top-nav">
+      <div className="brand">
+        <div className="brand-mark">{'◆'}</div>
+        <div>
+          <h1>{title}</h1>
+          <span>{subtitle}</span>
+        </div>
+      </div>
+
+      <div className="round-title">
+        {roundLabel ? (
+          <span>{roundLabel}</span>
+        ) : (
+          <>
+            <span>第</span>
+            <strong>{currentRound?.number || 0}</strong>
+            <span>/ 3 轮</span>
+          </>
+        )}
+      </div>
+
+      <div className="phase-badge">
+        <MessageCircle size={18} />
+        <span>阶段：{currentEvent?.title || '-'}</span>
+      </div>
+
+      <nav className="nav-actions" aria-label="游戏菜单">
+        <button title="返回游戏选择" onClick={onReturn} disabled={returnDisabled}>
+          <ArrowLeft size={23} />
+          <span>返回</span>
+        </button>
+        {viewAction ? (
+          <button title={viewAction.title} onClick={viewAction.onClick} disabled={viewAction.disabled}>
+            {viewAction.icon || <RotateCcw size={23} />}
+            <span>{viewAction.label}</span>
+          </button>
+        ) : (
+          <button title={showRoles ? '上帝视角：所有信息公开可见' : '玩家视角：点击一位玩家查看信息'} onClick={() => setShowRoles(!showRoles)}>
+            <Eye size={23} />
+            <span>{showRoles ? '上帝' : '玩家'}</span>
+          </button>
+        )}
+        <button title={speechEnabled ? '关闭语音' : '开启语音'} onClick={onSpeechToggle} disabled={controlsLocked}>
+          {speechEnabled ? <Volume2 size={23} /> : <VolumeX size={23} />}
+          <span>语音</span>
+        </button>
+        <button title={autoPlay ? '暂停' : '开始'} onClick={() => setAutoPlay(!autoPlay)}>
+          {autoPlay ? <Pause size={23} /> : <Power size={23} />}
+          <span>{autoPlay ? '暂停' : '开始'}</span>
+        </button>
+      </nav>
+    </header>
+  );
+}

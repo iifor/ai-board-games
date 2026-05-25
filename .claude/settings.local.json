@@ -72,7 +72,9 @@
       "Bash(pnpm --filter @consensus-mist/server run check)",
       "Bash(timeout 5 pnpm --filter @consensus-mist/server run dev)",
       "Bash(pnpm --filter @consensus-mist/shared run check)",
-      "Bash(pnpm --filter @consensus-mist/admin run check)"
+      "Bash(pnpm --filter @consensus-mist/admin run check)",
+      "Bash(pnpm --filter @consensus-mist/client run check)",
+      "Bash(pnpm --filter @consensus-mist/client run build)"
     ]
   }
 }

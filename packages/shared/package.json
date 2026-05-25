@@ -6,9 +6,18 @@
     "check": "tsc --noEmit"
   },
   "exports": {
-    "./types/*": "./types/*",
-    "./schemas/*": "./schemas/*",
-    "./constants/*": "./constants/*",
+    "./types/*": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/types/*.js"
+    },
+    "./schemas/*": {
+      "types": "./dist/schemas/*.d.ts",
+      "default": "./dist/schemas/*.js"
+    },
+    "./constants/*": {
+      "types": "./dist/constants/*.d.ts",
+      "default": "./dist/constants/*.js"
+    },
     "./vite-plugins/*": "./vite-plugins/*"
   },
   "devDependencies": {

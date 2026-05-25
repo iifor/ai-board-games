@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build"
+    "build": "vite build",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -15,7 +16,10 @@
   },
   "devDependencies": {
     "@consensus-mist/shared": "workspace:*",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^6.0.3",
     "vite": "^5.4.0"
   }
 }

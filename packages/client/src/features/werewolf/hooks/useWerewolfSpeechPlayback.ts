@@ -1,0 +1,74 @@
+import { useSpeechPlayback } from '../../../hooks/useSpeechPlayback';
+import { getPlayablePlaybackDelay } from '../../../utils/playableText';
+import { getWerewolfNarration } from '../werewolfUtils';
+import type { GameEvent, GameState, Player, SpeechState, PlayableTextOptions, QueueItem } from '../../../types';
+
+const WEREWOLF_NIGHT_ACTION_HOLD_MS = 1000;
+const WEREWOLF_NIGHT_ACTION_EVENT_TYPES = new Set(['wolf-vote', 'seer-check', 'guard-action', 'witch-action']);
+
+interface SpeechPlaybackControls {
+  setAckTimer: (delay: number) => void;
+}
+
+function getWerewolfExtraFields(event: GameEvent, text: string): Partial<SpeechState> {
+  return {
+    fullText: event?.speech?.fullText || event?.testimony?.fullText || text,
+    thinking: event?.speech?.thinking || event?.testimony?.thinking || ''
+  };
+}
+
+function getWerewolfVoicePackageId(event: GameEvent, game: GameState | null, playerId: string): number | null {
+  if (!playerId) {
+    const hostRecord = (event?.game as Record<string, unknown> | undefined)?.host as Record<string, unknown> | undefined;
+    return (hostRecord?.voicePackageId as number) || null;
+  }
+  const speechPlayer = ((event?.game?.players || game?.players || []) as Player[]).find(
+    (player: Player) => Number(player.id) === Number(playerId)
+  );
+  return speechPlayer?.voicePackageId || null;
+}
+
+interface UseWerewolfSpeechPlaybackParams {
+  game: GameState;
+  speechEnabled: boolean;
+  speak: (text: string, onEnd?: () => void, options?: Partial<QueueItem>) => boolean;
+  acknowledgePending: () => void;
+  setActiveSpeech: (state: SpeechState | ((prev: SpeechState | null) => SpeechState | null)) => void;
+}
+
+interface UseWerewolfSpeechPlaybackResult {
+  clearSubtitleTimer: () => void;
+  playPendingWerewolfEvent: (event: GameEvent, controls: SpeechPlaybackControls) => boolean;
+}
+
+export function useWerewolfSpeechPlayback({
+  game,
+  speechEnabled,
+  speak,
+  acknowledgePending,
+  setActiveSpeech
+}: UseWerewolfSpeechPlaybackParams): UseWerewolfSpeechPlaybackResult {
+  const { clearSubtitleTimer, playPendingEvent } = useSpeechPlayback({
+    game,
+    speechEnabled,
+    speak,
+    acknowledgePending,
+    setSpeechState: setActiveSpeech,
+    extractNarration: getWerewolfNarration,
+    getExtraFields: getWerewolfExtraFields,
+    getVoicePackageId: getWerewolfVoicePackageId,
+    getPlaybackDelay: getWerewolfPlaybackDelay
+  });
+
+  return {
+    clearSubtitleTimer,
+    playPendingWerewolfEvent: playPendingEvent
+  };
+}
+
+function getWerewolfPlaybackDelay(event: GameEvent, narration: string, splitConfig: PlayableTextOptions): number {
+  const delay = getPlayablePlaybackDelay(narration, splitConfig);
+  return WEREWOLF_NIGHT_ACTION_EVENT_TYPES.has(event?.type)
+    ? Math.max(delay, WEREWOLF_NIGHT_ACTION_HOLD_MS)
+    : delay;
+}
