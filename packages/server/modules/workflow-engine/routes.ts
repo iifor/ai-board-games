@@ -9,5 +9,7 @@ router.post('/workflow/matches/:matchId/actions/:actionId/submit', controller.su
 router.post('/workflow/ai-tasks/:taskId/retry', controller.retryAiTask);
 router.post('/workflow/ai-tasks/:taskId/cancel', controller.cancelAiTask);
 router.post('/workflow/ai-tasks/:taskId/manual-complete', controller.manualCompleteAiTask);
+router.post('/workflow/matches/:matchId/interrupts', controller.createInterrupt);
+router.post('/workflow/interrupts/:interruptId/resolve', controller.resolveInterrupt);
 
 export default router;

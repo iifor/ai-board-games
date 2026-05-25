@@ -299,6 +299,40 @@ function migrate(db: Database | JsonDb): void {
       UNIQUE(match_id, step_id, action_type)
     );
     CREATE INDEX IF NOT EXISTS idx_action_window_epochs_match ON action_window_epochs(match_id, status);
+
+    CREATE TABLE IF NOT EXISTS workflow_effects (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      step_id TEXT,
+      source_event_seq INTEGER,
+      effect_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'proposed',
+      priority INTEGER NOT NULL DEFAULT 0,
+      payload_json TEXT NOT NULL DEFAULT '{}',
+      applied_event_seq INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_workflow_effects_match ON workflow_effects(match_id, status);
+    CREATE INDEX IF NOT EXISTS idx_workflow_effects_type ON workflow_effects(effect_type);
+
+    CREATE TABLE IF NOT EXISTS workflow_interrupts (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      step_id TEXT,
+      effect_id TEXT,
+      interrupt_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      priority INTEGER NOT NULL DEFAULT 0,
+      payload_json TEXT NOT NULL DEFAULT '{}',
+      resolution_json TEXT NOT NULL DEFAULT 'null',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+      FOREIGN KEY (effect_id) REFERENCES workflow_effects(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_workflow_interrupts_match ON workflow_interrupts(match_id, status);
   `);
 
   ensureColumn(db, 'games', 'game_type', "TEXT NOT NULL DEFAULT 'werewolf'");

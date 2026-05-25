@@ -6,6 +6,8 @@ import type {
   PendingActionRow,
   AiTaskRow,
   ActionWindowEpochRow,
+  WorkflowEffectRow,
+  WorkflowInterruptRow,
   OutboxMessageRow,
 } from '../../types/database';
 import type {
@@ -15,6 +17,8 @@ import type {
   PendingAction,
   MatchSnapshot,
   ActionWindowEpoch,
+  WorkflowEffect,
+  WorkflowInterrupt,
 } from '../../types/workflow';
 import {
   nowIso,
@@ -26,6 +30,8 @@ import {
   rowToPendingAction,
   rowToSnapshot,
   rowToActionWindowEpoch,
+  rowToWorkflowEffect,
+  rowToWorkflowInterrupt,
 } from './utils';
 
 interface MatchCreateRow {
@@ -108,6 +114,30 @@ interface ActionWindowEpochInput {
   resolvedEventSeq?: number | null;
   expiresAt?: string | null;
   createdAt?: string;
+}
+
+interface WorkflowEffectInput {
+  id: string;
+  matchId: string;
+  stepId?: string | null;
+  sourceEventSeq?: number | null;
+  effectType: string;
+  status?: string;
+  priority?: number;
+  payload?: unknown;
+  appliedEventSeq?: number | null;
+}
+
+interface WorkflowInterruptInput {
+  id: string;
+  matchId: string;
+  stepId?: string | null;
+  effectId?: string | null;
+  interruptType: string;
+  status?: string;
+  priority?: number;
+  payload?: unknown;
+  resolution?: unknown;
 }
 
 interface OutboxRow {
@@ -448,12 +478,110 @@ function listActionWindowEpochs(matchId: string): ActionWindowEpoch[] {
     .map(rowToActionWindowEpoch).filter((e): e is ActionWindowEpoch => e !== null);
 }
 
+function createWorkflowEffect(effect: WorkflowEffectInput): WorkflowEffect | null {
+  getDb().prepare(`
+    INSERT OR REPLACE INTO workflow_effects (
+      id, match_id, step_id, source_event_seq, effect_type, status, priority,
+      payload_json, applied_event_seq, created_at, updated_at
+    )
+    VALUES (
+      @id, @match_id, @step_id, @source_event_seq, @effect_type, @status, @priority,
+      @payload_json, @applied_event_seq, COALESCE((SELECT created_at FROM workflow_effects WHERE id = @id), @created_at), @updated_at
+    )
+  `).run({
+    id: effect.id,
+    match_id: effect.matchId,
+    step_id: effect.stepId || null,
+    source_event_seq: effect.sourceEventSeq || null,
+    effect_type: effect.effectType,
+    status: effect.status || 'proposed',
+    priority: Number(effect.priority || 0),
+    payload_json: toJson(effect.payload || {}),
+    applied_event_seq: effect.appliedEventSeq || null,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  });
+  return getWorkflowEffect(effect.id);
+}
+
+function getWorkflowEffect(id: string): WorkflowEffect | null {
+  return rowToWorkflowEffect(getDb().prepare('SELECT * FROM workflow_effects WHERE id = ?').get(id) as WorkflowEffectRow | undefined);
+}
+
+function listWorkflowEffects(matchId: string): WorkflowEffect[] {
+  return (getDb().prepare('SELECT * FROM workflow_effects WHERE match_id = ? ORDER BY priority DESC, created_at ASC').all(matchId) as WorkflowEffectRow[])
+    .map(rowToWorkflowEffect).filter((e): e is WorkflowEffect => e !== null);
+}
+
+function updateWorkflowEffect(id: string, patch: Record<string, unknown>): WorkflowEffect | null {
+  const sets: string[] = [];
+  const params: Record<string, unknown> = { id, updated_at: nowIso() };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    sets.push(`${key} = @${key}`);
+    params[key] = value;
+  }
+  sets.push('updated_at = @updated_at');
+  getDb().prepare(`UPDATE workflow_effects SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  return getWorkflowEffect(id);
+}
+
+function createWorkflowInterrupt(interrupt: WorkflowInterruptInput): WorkflowInterrupt | null {
+  getDb().prepare(`
+    INSERT OR REPLACE INTO workflow_interrupts (
+      id, match_id, step_id, effect_id, interrupt_type, status, priority,
+      payload_json, resolution_json, created_at, updated_at
+    )
+    VALUES (
+      @id, @match_id, @step_id, @effect_id, @interrupt_type, @status, @priority,
+      @payload_json, @resolution_json, COALESCE((SELECT created_at FROM workflow_interrupts WHERE id = @id), @created_at), @updated_at
+    )
+  `).run({
+    id: interrupt.id,
+    match_id: interrupt.matchId,
+    step_id: interrupt.stepId || null,
+    effect_id: interrupt.effectId || null,
+    interrupt_type: interrupt.interruptType,
+    status: interrupt.status || 'pending',
+    priority: Number(interrupt.priority || 0),
+    payload_json: toJson(interrupt.payload || {}),
+    resolution_json: toJson(interrupt.resolution ?? null),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  });
+  return getWorkflowInterrupt(interrupt.id);
+}
+
+function getWorkflowInterrupt(id: string): WorkflowInterrupt | null {
+  return rowToWorkflowInterrupt(getDb().prepare('SELECT * FROM workflow_interrupts WHERE id = ?').get(id) as WorkflowInterruptRow | undefined);
+}
+
+function listWorkflowInterrupts(matchId: string): WorkflowInterrupt[] {
+  return (getDb().prepare('SELECT * FROM workflow_interrupts WHERE match_id = ? ORDER BY priority DESC, created_at ASC').all(matchId) as WorkflowInterruptRow[])
+    .map(rowToWorkflowInterrupt).filter((i): i is WorkflowInterrupt => i !== null);
+}
+
+function updateWorkflowInterrupt(id: string, patch: Record<string, unknown>): WorkflowInterrupt | null {
+  const sets: string[] = [];
+  const params: Record<string, unknown> = { id, updated_at: nowIso() };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    sets.push(`${key} = @${key}`);
+    params[key] = value;
+  }
+  sets.push('updated_at = @updated_at');
+  getDb().prepare(`UPDATE workflow_interrupts SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  return getWorkflowInterrupt(id);
+}
+
 interface DebugState {
   match: Match;
   events: WorkflowEvent[];
   aiTasks: AiTask[];
   pendingActions: PendingAction[];
   actionWindows: ActionWindowEpoch[];
+  effects: WorkflowEffect[];
+  interrupts: WorkflowInterrupt[];
   outbox: OutboxRow[];
   snapshots: MatchSnapshot[];
 }
@@ -467,6 +595,8 @@ function getDebugState(matchId: string): DebugState | null {
     aiTasks: listAiTasks(matchId),
     pendingActions: listPendingActions(matchId),
     actionWindows: listActionWindowEpochs(matchId),
+    effects: listWorkflowEffects(matchId),
+    interrupts: listWorkflowInterrupts(matchId),
     outbox: listPendingOutbox(matchId),
     snapshots: listSnapshots(matchId),
   };
@@ -501,6 +631,14 @@ export {
   upsertActionWindowEpoch,
   getActionWindowEpoch,
   listActionWindowEpochs,
+  createWorkflowEffect,
+  getWorkflowEffect,
+  listWorkflowEffects,
+  updateWorkflowEffect,
+  createWorkflowInterrupt,
+  getWorkflowInterrupt,
+  listWorkflowInterrupts,
+  updateWorkflowInterrupt,
   getDebugState,
 };
 export type { EventInput, CommitChangeInput, CommitChangeResult };

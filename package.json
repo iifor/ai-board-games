@@ -18,7 +18,7 @@
     "check:admin": "pnpm --filter @ai-presenter/admin run check",
     "check:server": "pnpm --filter @ai-presenter/server run check",
     "check:shared": "pnpm --filter @ai-presenter/shared run check",
-    "test:workflow": "node --preserve-symlinks -e \"for (const f of ['./tests/workflow/werewolfEffects.test.js','./tests/workflow/werewolfReducers.test.js','./tests/workflow/werewolfActionWindow.test.js','./tests/workflow/werewolfFakeWorkflow.test.js','./tests/workflow/tickCompleted.test.js']) require(f)\""
+    "test:workflow": "node --preserve-symlinks ./tests/workflow/runWorkflowTests.cjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

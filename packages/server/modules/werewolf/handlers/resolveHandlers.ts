@@ -14,6 +14,7 @@ const { findPendingHunter } = require('../reducers');
 import { runHunterAiTask, validateHunterAiResult } from '../aiActions';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
+import { recordWorkflowEffects } from '../../workflow-engine/effects';
 
 interface Match {
   id: string;
@@ -50,6 +51,7 @@ function createNightResolveHandler() {
       const hunter = findPendingHunter(runtime.agents, round, resolved.deaths);
       if (hunter) return createHunterWindow({ match, step, state, runtime, round, hunter });
       const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id }, step.id);
+      recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: resolved.effects });
       return {
         status: 'COMPLETED',
         state: nextState,
@@ -71,6 +73,7 @@ function createExileResolveHandler() {
       const hunter = findPendingHunter(runtime.agents, round, resolved.exile ? [resolved.exile] : []);
       if (hunter) return createHunterWindow({ match, step, state, runtime, round, hunter });
       const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id }, step.id);
+      recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: resolved.effects });
       return {
         status: 'COMPLETED',
         state: nextState,
@@ -120,6 +123,7 @@ function createHunterWindow({ match, step, state, runtime, round, hunter }: {
   const effect = applyHunterShot(runtime.agents, round, { from: (hunter as { id: number }).id, target: result?.payload?.target, reason: (round as { phase?: string }).phase });
   const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
   resolveActionWindow(match.id, step.id, actionType, state.currentActionWindow as unknown as ActionWindow);
+  if (effect) recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: [effect] });
   return {
     status: 'COMPLETED',
     state: nextState,

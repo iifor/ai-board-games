@@ -1,31 +1,35 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const repo = require('../../server/modules/workflow-engine/repository');
-const { createActionWindowHandler } = require('../../server/modules/werewolf/handlers/actionWindowHandler');
-const { createNightResolveHandler, createExileResolveHandler } = require('../../server/modules/werewolf/handlers/resolveHandlers');
-const { createRound } = require('../../server/modules/werewolf/agents');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as repo from '../../packages/server/modules/workflow-engine/repository';
+import { createActionWindowHandler } from '../../packages/server/modules/werewolf/handlers/actionWindowHandler';
+import { createNightResolveHandler, createExileResolveHandler } from '../../packages/server/modules/werewolf/handlers/resolveHandlers';
+import { createRound } from '../../packages/server/modules/werewolf/agents';
+
+type RepoPatch = Pick<typeof repo, 'upsertActionWindowEpoch' | 'listEvents' | 'createAiTask' | 'listAiTasks' | 'listPendingActions'>;
 
 test('fake werewolf action window opens, completes, and night resolve emits effects', () => {
   const original = snapshotRepo(repo);
-  const tasks = [];
-  const epochs = [];
+  const tasks: Array<Record<string, unknown>> = [];
+  const epochs: Array<Record<string, unknown>> = [];
   try {
-    repo.upsertActionWindowEpoch = (epoch) => epochs.push(epoch);
-    repo.listEvents = () => [];
-    repo.createAiTask = (task) => tasks.push({ ...task, status: task.status || 'queued', result: null });
-    repo.listPendingActions = () => [];
-    repo.listAiTasks = () => tasks;
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => { epochs.push(epoch); return epoch; },
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never
+    });
 
     const state = createState();
     const match = { id: 'm-fake', config: { players: state.players }, createdAt: 'now' };
     const wolfStep = { id: 'wolf_kill_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'wolf_kill' } };
     const actionHandler = createActionWindowHandler();
 
-    const opened = actionHandler.execute({ match, step: wolfStep, state });
+    const opened = actionHandler.execute({ match, step: wolfStep, state } as never);
     assert.equal(opened.status, 'WAITING');
-    assert.equal(opened.tasks.length, 1);
-    assert.equal(opened.events[0].type, 'werewolf_action_requested');
-    tasks.push(...opened.tasks);
+    assert.equal(opened.tasks?.length, 1);
+    assert.equal(opened.events?.[0].type, 'werewolf_action_requested');
+    tasks.push(...(opened.tasks || []));
 
     tasks[0] = {
       ...tasks[0],
@@ -33,36 +37,36 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
       playerId: 1,
       result: { payload: { target: 2, speech: 'target 2' } }
     };
-    const completed = actionHandler.execute({ match, step: wolfStep, state: opened.state });
+    const completed = actionHandler.execute({ match, step: wolfStep, state: opened.state } as never);
     assert.equal(completed.status, 'COMPLETED');
-    assert.equal(completed.state.rounds[0].night.wolfTarget, 2);
+    assert.equal(completed.state?.rounds[0].night.wolfTarget, 2);
 
     const nightResolved = createNightResolveHandler().execute({
       match,
       step: { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } },
       state: completed.state
-    });
+    } as never);
     assert.equal(nightResolved.status, 'COMPLETED');
-    assert.equal(nightResolved.events[0].type, 'werewolf_effect_resolved');
-    assert.equal(nightResolved.state.players.find((player) => Number(player.id) === 2).alive, false);
+    assert.equal(nightResolved.events?.[0].type, 'werewolf_effect_resolved');
+    assert.equal(nightResolved.state?.players.find((player: Record<string, unknown>) => Number(player.id) === 2).alive, false);
 
     const dayVotedState = {
       ...nightResolved.state,
-      rounds: [{ ...nightResolved.state.rounds[0], votes: { 1: 3, 3: 3 } }]
+      rounds: [{ ...nightResolved.state?.rounds[0], votes: { 1: 3, 3: 3 } }]
     };
     const exileResolved = createExileResolveHandler().execute({
       match,
       step: { id: 'exile_resolve_1', type: 'werewolf.exile_resolve', config: { day: 1, phase: 'day' } },
       state: dayVotedState
-    });
+    } as never);
     assert.equal(exileResolved.status, 'COMPLETED');
-    assert.equal(exileResolved.state.rounds[0].exile.id, 3);
+    assert.equal(exileResolved.state?.rounds[0].exile.id, 3);
   } finally {
-    restoreRepo(repo, original);
+    patchRepo(repo, original);
   }
 });
 
-function createState() {
+function createState(): Record<string, unknown> {
   const round = createRound(1);
   return {
     modeConfig: { sheriff: {}, witch: {}, roleMap: {} },
@@ -80,7 +84,7 @@ function createState() {
   };
 }
 
-function player(id, role, faction, actions) {
+function player(id: number, role: string, faction: string, actions: string[]): Record<string, unknown> {
   return {
     id,
     name: String(id),
@@ -96,7 +100,7 @@ function player(id, role, faction, actions) {
   };
 }
 
-function snapshotRepo(target) {
+function snapshotRepo(target: typeof repo): RepoPatch {
   return {
     upsertActionWindowEpoch: target.upsertActionWindowEpoch,
     listEvents: target.listEvents,
@@ -106,6 +110,6 @@ function snapshotRepo(target) {
   };
 }
 
-function restoreRepo(target, original) {
-  Object.assign(target, original);
+function patchRepo(target: typeof repo, patch: Partial<RepoPatch>): void {
+  Object.assign(target, patch);
 }

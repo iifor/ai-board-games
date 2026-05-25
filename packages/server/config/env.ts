@@ -2,8 +2,12 @@ import fs from 'fs';
 import path from 'path';
 
 function loadEnvFile(): void {
-  const envPath = path.join(__dirname, '..', '..', '.env');
-  if (!fs.existsSync(envPath)) return;
+  const envPaths = [
+    path.join(__dirname, '..', '..', '..', '.env'),
+    path.join(__dirname, '..', '..', '.env')
+  ];
+  const envPath = envPaths.find((item) => fs.existsSync(item));
+  if (!envPath) return;
   const content = fs.readFileSync(envPath, 'utf8');
   for (const line of content.split(/\r?\n/)) {
     const trimmed = line.trim();

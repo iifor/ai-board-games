@@ -1,17 +1,17 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const path = require('node:path');
-const { MATCH_STATUS } = require('../../shared/types/workflowTypes');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 
 test('tick honors step handler matchStatus completed before workflow is exhausted', () => {
   const workspace = path.resolve(__dirname, '../..');
-  const dbPath = path.join(workspace, 'server/db/index.js');
-  const repoPath = path.join(workspace, 'server/modules/workflow-engine/repository.js');
-  const registryPath = path.join(workspace, 'server/modules/workflow-engine/workflowRegistry.js');
-  const tickPath = path.join(workspace, 'server/modules/workflow-engine/tick.js');
+  const dbPath = path.join(workspace, 'packages/server/db/index.ts');
+  const repoPath = path.join(workspace, 'packages/server/modules/workflow-engine/repository.ts');
+  const registryPath = path.join(workspace, 'packages/server/modules/workflow-engine/workflowRegistry.ts');
+  const tickPath = path.join(workspace, 'packages/server/modules/workflow-engine/tick.ts');
   const originals = new Map([dbPath, repoPath, registryPath, tickPath].map((file) => [file, require.cache[file]]));
 
-  let match = {
+  let match: Record<string, unknown> = {
     id: 'match-1',
     workflowId: 'wf',
     status: MATCH_STATUS.RUNNING,
@@ -27,7 +27,7 @@ test('tick honors step handler matchStatus completed before workflow is exhauste
       { id: 'should_not_run', type: 'later' }
     ]
   };
-  const events = [];
+  const events: Array<Record<string, unknown>> = [];
 
   try {
     delete require.cache[tickPath];
@@ -35,15 +35,15 @@ test('tick honors step handler matchStatus completed before workflow is exhauste
       id: dbPath,
       filename: dbPath,
       loaded: true,
-      exports: { getDb: () => ({ transaction: (fn) => fn }) }
-    };
+      exports: { getDb: () => ({ transaction: (fn: () => unknown) => fn }) }
+    } as NodeModule;
     require.cache[repoPath] = {
       id: repoPath,
       filename: repoPath,
       loaded: true,
       exports: {
         getMatch: () => match,
-        commitWorkflowChange: ({ events: nextEvents = [], matchPatch = null }) => {
+        commitWorkflowChange: ({ events: nextEvents = [], matchPatch = null }: { events?: Array<Record<string, unknown>>; matchPatch?: Record<string, unknown> | null }) => {
           events.push(...nextEvents);
           if (matchPatch) {
             match = {
@@ -51,8 +51,8 @@ test('tick honors step handler matchStatus completed before workflow is exhauste
               status: matchPatch.status,
               currentStepIndex: matchPatch.current_step_index,
               version: matchPatch.version,
-              state: JSON.parse(matchPatch.state_json),
-              blockers: JSON.parse(matchPatch.blockers_json),
+              state: JSON.parse(String(matchPatch.state_json)),
+              blockers: JSON.parse(String(matchPatch.blockers_json)),
               completedAt: matchPatch.completed_at
             };
           }
@@ -62,7 +62,7 @@ test('tick honors step handler matchStatus completed before workflow is exhauste
         listAiTasks: () => [],
         listPendingActions: () => []
       }
-    };
+    } as NodeModule;
     require.cache[registryPath] = {
       id: registryPath,
       filename: registryPath,
@@ -78,14 +78,14 @@ test('tick honors step handler matchStatus completed before workflow is exhauste
           })
         })
       }
-    };
+    } as NodeModule;
 
-    const { tickMatch } = require(tickPath);
+    const { tickMatch } = require(tickPath) as { tickMatch: (matchId: string) => Record<string, unknown> };
     const updated = tickMatch('match-1');
 
     assert.equal(updated.status, MATCH_STATUS.COMPLETED);
     assert.equal(updated.currentStepIndex, workflow.steps.length);
-    assert.equal(updated.state.winner, 'good');
+    assert.equal((updated.state as Record<string, unknown>).winner, 'good');
     assert.equal(events.some((event) => event.type === 'winner_decided'), true);
   } finally {
     for (const [file, original] of originals.entries()) {

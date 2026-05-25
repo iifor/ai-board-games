@@ -1,5 +1,6 @@
 import * as repo from './repository';
 import type { CommitChangeInput, CommitChangeResult } from './repository';
+import { requestInterrupt, resolveInterrupt } from './effects';
 import { getDb } from '../../db';
 import { tickMatch } from './tick';
 import { processClaimedAiTask } from './aiTaskWorker';
@@ -247,6 +248,21 @@ function getDebugState(matchId: string) {
   return repo.getDebugState(matchId);
 }
 
+function createInterrupt(input: {
+  matchId: string;
+  stepId?: string | null;
+  effectId?: string | null;
+  interruptType: string;
+  priority?: number;
+  payload?: Record<string, unknown>;
+}) {
+  return requestInterrupt(input);
+}
+
+function resolveWorkflowInterrupt(interruptId: string, status: string, resolution: unknown = {}) {
+  return resolveInterrupt(interruptId, status, resolution);
+}
+
 function listPendingOutbox(matchId: string) {
   return repo.listPendingOutbox(matchId);
 }
@@ -268,6 +284,8 @@ export {
   manualCompleteAiTask,
   submitPendingAction,
   commitWorkflowChange,
+  createInterrupt,
+  resolveWorkflowInterrupt,
   getDebugState,
   listPendingOutbox,
   markOutboxSent,

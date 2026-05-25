@@ -59,6 +59,35 @@ function manualCompleteAiTask(req: Request, res: Response, next: NextFunction): 
   }
 }
 
+function createInterrupt(req: Request, res: Response, next: NextFunction): void {
+  try {
+    const matchId = String(req.params.matchId);
+    res.json(formatSuccess(service.createInterrupt({
+      matchId,
+      stepId: req.body?.stepId || null,
+      effectId: req.body?.effectId || null,
+      interruptType: String(req.body?.interruptType || 'manual_debug'),
+      priority: Number(req.body?.priority || 0),
+      payload: (req.body?.payload || {}) as Record<string, unknown>,
+    })));
+  } catch (error) {
+    next(error);
+  }
+}
+
+function resolveInterrupt(req: Request, res: Response, next: NextFunction): void {
+  try {
+    const interruptId = String(req.params.interruptId);
+    res.json(formatSuccess(service.resolveWorkflowInterrupt(
+      interruptId,
+      String(req.body?.status || 'resolved'),
+      req.body?.resolution || {},
+    )));
+  } catch (error) {
+    next(error);
+  }
+}
+
 export {
   getMatchDebug,
   wakeMatch,
@@ -66,4 +95,6 @@ export {
   retryAiTask,
   cancelAiTask,
   manualCompleteAiTask,
+  createInterrupt,
+  resolveInterrupt,
 };

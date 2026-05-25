@@ -6,6 +6,8 @@ import type {
   PendingActionRow,
   AiTaskRow,
   ActionWindowEpochRow,
+  WorkflowEffectRow,
+  WorkflowInterruptRow,
 } from '../../types/database';
 import type {
   Match,
@@ -14,6 +16,8 @@ import type {
   PendingAction,
   AiTask,
   ActionWindowEpoch,
+  WorkflowEffect,
+  WorkflowInterrupt,
 } from '../../types/workflow';
 
 function nowIso(): string {
@@ -152,6 +156,40 @@ function rowToActionWindowEpoch(row: ActionWindowEpochRow | null | undefined): A
   };
 }
 
+function rowToWorkflowEffect(row: WorkflowEffectRow | null | undefined): WorkflowEffect | null {
+  if (!row) return null;
+  return {
+    id: row.id,
+    matchId: row.match_id,
+    stepId: row.step_id || undefined,
+    sourceEventSeq: row.source_event_seq || undefined,
+    effectType: row.effect_type,
+    status: row.status,
+    priority: row.priority,
+    payload: parseJson(row.payload_json, {}),
+    appliedEventSeq: row.applied_event_seq || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function rowToWorkflowInterrupt(row: WorkflowInterruptRow | null | undefined): WorkflowInterrupt | null {
+  if (!row) return null;
+  return {
+    id: row.id,
+    matchId: row.match_id,
+    stepId: row.step_id || undefined,
+    effectId: row.effect_id || undefined,
+    interruptType: row.interrupt_type,
+    status: row.status,
+    priority: row.priority,
+    payload: parseJson(row.payload_json, {}),
+    resolution: parseJson(row.resolution_json, null),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export {
   nowIso,
   toJson,
@@ -164,4 +202,6 @@ export {
   rowToPendingAction,
   rowToSnapshot,
   rowToActionWindowEpoch,
+  rowToWorkflowEffect,
+  rowToWorkflowInterrupt,
 };

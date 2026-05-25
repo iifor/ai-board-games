@@ -104,6 +104,34 @@ interface ActionWindowEpoch {
   updatedAt: string;
 }
 
+interface WorkflowEffect {
+  id: string;
+  matchId: string;
+  stepId: string | undefined;
+  sourceEventSeq: number | undefined;
+  effectType: string;
+  status: string;
+  priority: number;
+  payload: unknown;
+  appliedEventSeq: number | undefined;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface WorkflowInterrupt {
+  id: string;
+  matchId: string;
+  stepId: string | undefined;
+  effectId: string | undefined;
+  interruptType: string;
+  status: string;
+  priority: number;
+  payload: unknown;
+  resolution: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type {
   Match,
   StepBlocker,
@@ -111,5 +139,7 @@ export type {
   AiTask,
   PendingAction,
   MatchSnapshot,
-  ActionWindowEpoch
+  ActionWindowEpoch,
+  WorkflowEffect,
+  WorkflowInterrupt
 };

@@ -25,3 +25,36 @@ export async function adminRequest<T = unknown>(
     ? data.data
     : data) as T;
 }
+
+export function getWorkflowDebug(matchId: string) {
+  return adminRequest<Record<string, unknown>>(`/workflow/matches/${encodeURIComponent(matchId)}/debug`);
+}
+
+export function tickWorkflowMatch(matchId: string) {
+  return adminRequest<Record<string, unknown>>(`/workflow/matches/${encodeURIComponent(matchId)}/tick`, { method: 'POST' });
+}
+
+export function retryWorkflowAiTask(taskId: string) {
+  return adminRequest<Record<string, unknown>>(`/workflow/ai-tasks/${encodeURIComponent(taskId)}/retry`, { method: 'POST' });
+}
+
+export function cancelWorkflowAiTask(taskId: string, reason = 'debug cancel') {
+  return adminRequest<Record<string, unknown>>(`/workflow/ai-tasks/${encodeURIComponent(taskId)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason })
+  });
+}
+
+export function createWorkflowInterrupt(matchId: string, payload: Record<string, unknown>) {
+  return adminRequest<Record<string, unknown>>(`/workflow/matches/${encodeURIComponent(matchId)}/interrupts`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function resolveWorkflowInterrupt(interruptId: string, payload: Record<string, unknown>) {
+  return adminRequest<Record<string, unknown>>(`/workflow/interrupts/${encodeURIComponent(interruptId)}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}

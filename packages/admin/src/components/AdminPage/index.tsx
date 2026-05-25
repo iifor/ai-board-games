@@ -7,6 +7,7 @@ import {
   DashboardOutlined,
   ExperimentOutlined,
   EyeOutlined,
+  PartitionOutlined,
   RobotOutlined,
   SkinOutlined,
   SoundOutlined,
@@ -27,6 +28,7 @@ import { SkinManager } from '../../pages/SkinManager';
 import { TraceExplorer } from '../../pages/TraceExplorer';
 import { TraceDetail } from '../../pages/TraceExplorer/TraceDetail';
 import { AgentTraceView } from '../../pages/TraceExplorer/AgentTraceView';
+import { WorkflowDebugConsole } from '../../pages/WorkflowDebugConsole';
 import type { ItemType } from 'antd/es/menu/interface';
 
 const { Content, Sider } = Layout;
@@ -67,6 +69,7 @@ const MENU_ITEMS: ItemType[] = [
   },
   { key: '/voices', icon: <SoundOutlined />, label: '语音管理' },
   { key: '/traces', icon: <EyeOutlined />, label: 'AI 观测' }
+, { key: '/workflow-debug', icon: <PartitionOutlined />, label: 'Workflow Debug' }
 ];
 
 export function AdminPage() {
@@ -119,6 +122,7 @@ function AdminShell() {
             <Route path="/traces" element={<TraceExplorer />} />
             <Route path="/traces/:id" element={<TraceDetail />} />
             <Route path="/traces/:id/player/:playerId" element={<AgentTraceView />} />
+            <Route path="/workflow-debug" element={<WorkflowDebugConsole />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Content>

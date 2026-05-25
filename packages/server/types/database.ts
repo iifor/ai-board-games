@@ -259,6 +259,34 @@ interface ActionWindowEpochRow {
   updated_at: string;
 }
 
+interface WorkflowEffectRow {
+  id: string;
+  match_id: string;
+  step_id: string | null;
+  source_event_seq: number | null;
+  effect_type: string;
+  status: string;
+  priority: number;
+  payload_json: string;
+  applied_event_seq: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface WorkflowInterruptRow {
+  id: string;
+  match_id: string;
+  step_id: string | null;
+  effect_id: string | null;
+  interrupt_type: string;
+  status: string;
+  priority: number;
+  payload_json: string;
+  resolution_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface GameTraceRow {
   id: string;
   game_type: string;
@@ -374,6 +402,8 @@ export type {
   OutboxMessageRow,
   MemorySnapshotRow,
   ActionWindowEpochRow,
+  WorkflowEffectRow,
+  WorkflowInterruptRow,
   GameTraceRow,
   TraceSpanRow,
   LlmRecordRow,

@@ -63,6 +63,21 @@ const WEREWOLF_EFFECT_TYPES = Object.freeze({
   IDIOT_SURVIVE: 'idiot_survive'
 });
 
+const WORKFLOW_EFFECT_STATUS = Object.freeze({
+  PROPOSED: 'proposed',
+  APPLIED: 'applied',
+  CANCELLED: 'cancelled',
+  FAILED: 'failed'
+});
+
+const WORKFLOW_INTERRUPT_STATUS = Object.freeze({
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  RESOLVED: 'resolved',
+  CANCELLED: 'cancelled'
+});
+
 export {
   MATCH_STATUS,
   BLOCKER_TYPES,
@@ -71,5 +86,7 @@ export {
   PENDING_ACTION_STATUS,
   EVENT_VISIBILITY,
   ACTION_WINDOW_STATUS,
-  WEREWOLF_EFFECT_TYPES
+  WEREWOLF_EFFECT_TYPES,
+  WORKFLOW_EFFECT_STATUS,
+  WORKFLOW_INTERRUPT_STATUS
 };
