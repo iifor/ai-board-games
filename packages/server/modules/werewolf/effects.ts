@@ -1,4 +1,4 @@
-import { WEREWOLF_EFFECT_TYPES } from '@consensus-mist/shared/types/workflowTypes';
+import { WEREWOLF_EFFECT_TYPES } from '@ai-presenter/shared/types/workflowTypes';
 import { eliminate, countTargets, topExile } from './winCheck';
 import type { WerewolfAgent } from './winCheck';
 import { hasRoleAction } from './utils';

@@ -1,4 +1,4 @@
-import { SkillRegistry, Skill } from '@consensus-mist/shared/schemas/skillRegistry';
+import { SkillRegistry, Skill } from '@ai-presenter/shared/schemas/skillRegistry';
 
 interface AgentSkill extends Skill {
   scope?: string;

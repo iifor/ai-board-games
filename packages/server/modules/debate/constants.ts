@@ -1,4 +1,4 @@
-import { DEBATE } from '@consensus-mist/shared/constants/gameLimits';
+import { DEBATE } from '@ai-presenter/shared/constants/gameLimits';
 
 const PHASE_LIMITS = DEBATE.PHASE_LIMITS;
 

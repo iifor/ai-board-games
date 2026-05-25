@@ -1,6 +1,6 @@
 const repo = require('../workflow-engine/repository');
 const { stableTaskId } = require('../workflow-engine/utils');
-const { BLOCKER_TYPES, BLOCKER_STATUS, ACTION_WINDOW_STATUS } = require('@consensus-mist/shared/types/workflowTypes');
+const { BLOCKER_TYPES, BLOCKER_STATUS, ACTION_WINDOW_STATUS } = require('@ai-presenter/shared/types/workflowTypes');
 const { hasRoleAction, sortBySeat } = require('./utils');
 
 interface Agent {

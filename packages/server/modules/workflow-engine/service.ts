@@ -5,7 +5,7 @@ import { tickMatch } from './tick';
 import { processClaimedAiTask } from './aiTaskWorker';
 import { getWorkflow } from './workflowRegistry';
 import { createId, nowIso, toJson } from './utils';
-import { MATCH_STATUS } from '@consensus-mist/shared/types/workflowTypes';
+import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import type { Match, AiTask } from '../../types/workflow';
 
 const MAX_AI_ATTEMPTS = 2;

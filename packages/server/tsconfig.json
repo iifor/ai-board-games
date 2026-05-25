@@ -17,7 +17,7 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@consensus-mist/shared/*": ["../shared/*"]
+      "@ai-presenter/shared/*": ["../shared/*"]
     }
   },
   "include": ["**/*.ts", "**/*.js"],

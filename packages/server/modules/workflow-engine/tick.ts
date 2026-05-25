@@ -3,7 +3,7 @@ import * as repo from './repository';
 import { getWorkflow, getStepHandler } from './workflowRegistry';
 import { evaluateCondition } from './condition';
 import type { ConditionContext } from './condition';
-import { MATCH_STATUS, BLOCKER_TYPES, BLOCKER_STATUS } from '@consensus-mist/shared/types/workflowTypes';
+import { MATCH_STATUS, BLOCKER_TYPES, BLOCKER_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { toJson } from './utils';
 import type { Match, StepBlocker, AiTask, PendingAction } from '../../types/workflow';
 import type { Workflow, WorkflowStep, StepHandlerExecuteResult } from './workflowRegistry';

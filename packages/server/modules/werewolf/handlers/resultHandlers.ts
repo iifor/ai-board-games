@@ -1,4 +1,4 @@
-const { MATCH_STATUS } = require('@consensus-mist/shared/types/workflowTypes');
+const { MATCH_STATUS } = require('@ai-presenter/shared/types/workflowTypes');
 const { checkWin } = require('../winCheck');
 import { createRuntime, syncRuntimeState } from '../runtime';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';

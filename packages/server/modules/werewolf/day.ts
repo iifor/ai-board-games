@@ -6,7 +6,7 @@ const {
 } = require('./utils');
 const { askSpeech, askSpeechWithThinking } = require('./agents');
 const { eliminate, countTargets, topExile, hasLastWords } = require('./winCheck');
-const { WEREWOLF } = require('@consensus-mist/shared/constants/gameLimits');
+const { WEREWOLF } = require('@ai-presenter/shared/constants/gameLimits');
 const { getVoteMessage } = require('./utils');
 const { syncMissingPublicMemory } = require('../game-memory');
 const { executeSkillWithTrace } = require('../agent-core');

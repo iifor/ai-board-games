@@ -1,7 +1,7 @@
 import { buildPlayerPersonaModule, compilePromptModules, hashText } from '../../services/ai/promptComposer';
 import { PlayerAgent } from './playerAgent';
 import { getRoleConfig, getRoleLabel, getRoleActions, shuffle } from './utils';
-import { WEREWOLF } from '@consensus-mist/shared/constants/gameLimits';
+import { WEREWOLF } from '@ai-presenter/shared/constants/gameLimits';
 import type { FallbackAudit } from '../agent-core/fallbackAudit';
 import type { RoleSkillRegistry } from '../agent-core/roleSkillRegistry';
 

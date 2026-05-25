@@ -7,7 +7,7 @@ interface EncryptedApiKey {
 }
 
 function getSecretKey(): Buffer {
-  const secret = process.env.ADMIN_SECRET || process.env.API_KEY_SECRET || 'consensus-mist-local-admin-secret';
+  const secret = process.env.ADMIN_SECRET || process.env.API_KEY_SECRET || 'ai-presenter-local-admin-secret';
   return crypto.createHash('sha256').update(secret).digest();
 }
 

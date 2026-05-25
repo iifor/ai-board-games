@@ -1,5 +1,5 @@
 import type { VoiceProfile, QueueItem } from '../types';
-import type { SpeechMedia } from '@consensus-mist/shared/types/speechTypes';
+import type { SpeechMedia } from '@ai-presenter/shared/types/speechTypes';
 import { HOST_VOICE_PROFILE, PLAYER_VOICE_PROFILES, VOICE_KEYWORDS } from '../constants/speech';
 import { stripSpeechParentheses } from './playableText';
 

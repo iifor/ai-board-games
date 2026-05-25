@@ -1,5 +1,5 @@
 {
-  "name": "@consensus-mist/server",
+  "name": "@ai-presenter/server",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,7 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@consensus-mist/shared": "workspace:*",
+    "@ai-presenter/shared": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/core": "^2.7.1",
     "@opentelemetry/sdk-trace-base": "^2.7.1",

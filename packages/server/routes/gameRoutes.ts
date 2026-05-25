@@ -21,7 +21,7 @@ router.get('/health', (_request: Request, response: Response) => {
   const skins = listSkins(true);
   response.json({
     ok: true,
-    service: 'consensus-mist-api',
+    service: 'ai-presenter-api',
     modeControl: 'frontend-query',
     realReady: config.realReady,
     missingProviders: config.missingProviders,

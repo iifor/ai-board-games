@@ -4,9 +4,9 @@ import { migrate, Database } from './migrations';
 import { JsonDb } from './fallback';
 
 const projectRoot = path.join(__dirname, '..', '..');
-const DEFAULT_DB_PATH = path.join(projectRoot, 'data', 'consensus-mist.sqlite');
+const DEFAULT_DB_PATH = path.join(projectRoot, 'data', 'ai-presenter.sqlite');
 const databasePath = process.env.DATABASE_PATH || DEFAULT_DB_PATH;
-const fallbackPath = process.env.JSON_DATABASE_PATH || path.join(projectRoot, 'data', 'consensus-mist.fallback.json');
+const fallbackPath = process.env.JSON_DATABASE_PATH || path.join(projectRoot, 'data', 'ai-presenter.fallback.json');
 
 let connection: Database | JsonDb | null = null;
 

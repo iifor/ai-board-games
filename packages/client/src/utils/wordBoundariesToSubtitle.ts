@@ -1,4 +1,4 @@
-import type { SpeechWordBoundary } from '@consensus-mist/shared/types/speechTypes';
+import type { SpeechWordBoundary } from '@ai-presenter/shared/types/speechTypes';
 import type { NormalizedWord, SubtitleCue, SubtitleTimeline } from '../types';
 
 interface SubtitleConfig {

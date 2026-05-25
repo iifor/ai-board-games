@@ -1,7 +1,7 @@
 import { callOpenAIChat } from '../../llm';
 import type { LlmCallOptions, LlmMessage } from '../../llm';
 import { normalizeText } from '../playerAgent';
-import { WEREWOLF } from '@consensus-mist/shared/constants/gameLimits';
+import { WEREWOLF } from '@ai-presenter/shared/constants/gameLimits';
 
 interface HostConfig {
   apiKey?: string;

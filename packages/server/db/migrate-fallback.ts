@@ -3,8 +3,8 @@
  *
  * Usage: node server/db/migrate-fallback.js
  *
- * Reads data/consensus-mist.fallback.json and upserts every row into
- * data/consensus-mist.sqlite.  Existing SQLite rows with matching primary
+ * Reads data/ai-presenter.fallback.json and upserts every row into
+ * data/ai-presenter.sqlite.  Existing SQLite rows with matching primary
  * keys are overwritten; new rows are inserted.
  */
 
@@ -12,8 +12,8 @@ import fs from 'fs';
 import path from 'path';
 
 const projectRoot = path.join(__dirname, '..', '..');
-const JSON_PATH = path.join(projectRoot, 'data', 'consensus-mist.fallback.json');
-const SQLITE_PATH = path.join(projectRoot, 'data', 'consensus-mist.sqlite');
+const JSON_PATH = path.join(projectRoot, 'data', 'ai-presenter.fallback.json');
+const SQLITE_PATH = path.join(projectRoot, 'data', 'ai-presenter.sqlite');
 
 interface JsonDbData {
   skins?: Record<string, unknown>[];

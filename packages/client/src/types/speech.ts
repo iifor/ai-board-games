@@ -1,4 +1,4 @@
-import type { SpeechWordBoundary, SpeechMedia } from '@consensus-mist/shared/types/speechTypes';
+import type { SpeechWordBoundary, SpeechMedia } from '@ai-presenter/shared/types/speechTypes';
 
 export type { SpeechWordBoundary, SpeechMedia };
 

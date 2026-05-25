@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { px2vwPlugin } from '@consensus-mist/shared/vite-plugins/px2vw.mjs';
+import { px2vwPlugin } from '@ai-presenter/shared/vite-plugins/px2vw.mjs';
 
 const apiPort = Number(process.env.API_PORT || 3001);
 const webPort = Number(process.env.VITE_PORT || 5173);

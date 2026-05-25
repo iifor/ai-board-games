@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { QueueItem } from '../types';
-import type { SpeechMedia } from '@consensus-mist/shared/types/speechTypes';
+import type { SpeechMedia } from '@ai-presenter/shared/types/speechTypes';
 import {
   getChineseVoices,
   getVoiceForItem,
