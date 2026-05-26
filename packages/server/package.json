@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "node index.js",
-    "dev": "tsx index.js",
-    "build": "tsc",
-    "check": "tsc --noEmit"
+    "start": "node --preserve-symlinks --preserve-symlinks-main ./dev-runtime.cjs",
+    "dev": "node --preserve-symlinks --preserve-symlinks-main ./dev-runtime.cjs",
+    "build": "node --preserve-symlinks --preserve-symlinks-main ./node_modules/typescript/lib/tsc.js",
+    "check": "node --preserve-symlinks --preserve-symlinks-main ./node_modules/typescript/lib/tsc.js --noEmit"
   },
   "dependencies": {
     "@ai-presenter/shared": "workspace:*",

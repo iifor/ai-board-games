@@ -269,7 +269,10 @@ const handlers: Record<string, {
         return;
       }
       if (task.action === 'vote_mvp') {
-        const spec = (task.promptContextSnapshot || {}) as TaskSpec;
+        const spec = readTaskSpec(task.promptContextSnapshot);
+        if (!spec) {
+          throw Object.assign(new Error('MVP vote task context is invalid'), { severity: 'high' });
+        }
         const contestantIds = Array.isArray(spec.contestantIds) ? spec.contestantIds.map(Number) : [];
         const voterId = Number(payload.voterId);
         const target = Number(payload.target);
@@ -304,6 +307,20 @@ const handlers: Record<string, {
     },
   },
 };
+
+function readTaskSpec(value: unknown): TaskSpec | null {
+  if (!value || typeof value !== 'object') return null;
+  const spec = value as Partial<TaskSpec>;
+  if (!spec.taskKey || !spec.actorId || !spec.action || !spec.phaseId) return null;
+  return {
+    taskKey: String(spec.taskKey),
+    actorId: Number(spec.actorId),
+    targetId: spec.targetId === undefined ? undefined : Number(spec.targetId),
+    action: String(spec.action),
+    phaseId: String(spec.phaseId),
+    contestantIds: Array.isArray(spec.contestantIds) ? spec.contestantIds.map(Number) : undefined,
+  };
+}
 
 // ---- Public functions ----
 

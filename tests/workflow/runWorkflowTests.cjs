@@ -4,6 +4,8 @@ const Module = require('node:module');
 const ts = require('../../packages/server/node_modules/typescript');
 
 const root = path.resolve(__dirname, '../..');
+const serverRoot = path.join(root, 'packages', 'server');
+const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
 const testFiles = [
   'werewolfEffects.test.ts',
   'werewolfReducers.test.ts',
@@ -13,6 +15,18 @@ const testFiles = [
 ].map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];
+
+if (fs.existsSync(pnpmRoot)) {
+  const pnpmModulePaths = fs.readdirSync(pnpmRoot)
+    .map((name) => path.join(pnpmRoot, name, 'node_modules'))
+    .filter((entry) => fs.existsSync(entry));
+  process.env.NODE_PATH = [
+    path.join(serverRoot, 'node_modules'),
+    ...pnpmModulePaths,
+    process.env.NODE_PATH || ''
+  ].filter(Boolean).join(path.delimiter);
+  Module._initPaths();
+}
 
 Module._extensions['.ts'] = function loadTs(module, filename) {
   const source = fs.readFileSync(filename, 'utf8');

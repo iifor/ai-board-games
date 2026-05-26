@@ -5,19 +5,28 @@ import { createActionWindowHandler } from '../../packages/server/modules/werewol
 import { createNightResolveHandler, createExileResolveHandler } from '../../packages/server/modules/werewolf/handlers/resolveHandlers';
 import { createRound } from '../../packages/server/modules/werewolf/agents';
 
-type RepoPatch = Pick<typeof repo, 'upsertActionWindowEpoch' | 'listEvents' | 'createAiTask' | 'listAiTasks' | 'listPendingActions'>;
+type RepoPatch = Pick<typeof repo,
+  'upsertActionWindowEpoch' |
+  'listEvents' |
+  'createAiTask' |
+  'listAiTasks' |
+  'listPendingActions' |
+  'createWorkflowEffect'
+>;
 
 test('fake werewolf action window opens, completes, and night resolve emits effects', () => {
   const original = snapshotRepo(repo);
   const tasks: Array<Record<string, unknown>> = [];
   const epochs: Array<Record<string, unknown>> = [];
+  const effects: Array<Record<string, unknown>> = [];
   try {
     patchRepo(repo, {
       upsertActionWindowEpoch: (epoch: never) => { epochs.push(epoch); return epoch; },
       listEvents: () => [],
       createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
       listPendingActions: () => [],
-      listAiTasks: () => tasks as never
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => { effects.push(effect); return effect; }
     });
 
     const state = createState();
@@ -48,6 +57,7 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
     } as never);
     assert.equal(nightResolved.status, 'COMPLETED');
     assert.equal(nightResolved.events?.[0].type, 'werewolf_effect_resolved');
+    assert.equal(effects.length, 1);
     assert.equal(nightResolved.state?.players.find((player: Record<string, unknown>) => Number(player.id) === 2).alive, false);
 
     const dayVotedState = {
@@ -106,7 +116,8 @@ function snapshotRepo(target: typeof repo): RepoPatch {
     listEvents: target.listEvents,
     createAiTask: target.createAiTask,
     listAiTasks: target.listAiTasks,
-    listPendingActions: target.listPendingActions
+    listPendingActions: target.listPendingActions,
+    createWorkflowEffect: target.createWorkflowEffect
   };
 }
 

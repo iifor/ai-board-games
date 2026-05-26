@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "tsc",
-    "check": "tsc --noEmit"
+    "build": "node --preserve-symlinks --preserve-symlinks-main ./node_modules/typescript/lib/tsc.js",
+    "check": "node --preserve-symlinks --preserve-symlinks-main ./node_modules/typescript/lib/tsc.js --noEmit"
   },
   "exports": {
     "./types/*": {
