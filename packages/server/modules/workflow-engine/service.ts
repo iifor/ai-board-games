@@ -267,6 +267,10 @@ function listPendingOutbox(matchId: string) {
   return repo.listPendingOutbox(matchId);
 }
 
+function listOutboxMessages(matchId: string, limit?: number) {
+  return repo.listOutboxMessages(matchId, limit);
+}
+
 function markOutboxSent(id: number): void {
   return repo.markOutboxSent(id);
 }
@@ -288,5 +292,6 @@ export {
   resolveWorkflowInterrupt,
   getDebugState,
   listPendingOutbox,
+  listOutboxMessages,
   markOutboxSent,
 };

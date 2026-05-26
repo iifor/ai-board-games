@@ -13,6 +13,7 @@ const { applyActionResults, getActorsForStep, getTargetIds } = require('../reduc
 import { runActionWindowAiTask, validateActionWindowAiResult } from '../aiActions';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
+import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage } from '../messages';
 
 interface Match {
   id: string;
@@ -63,7 +64,7 @@ function createActionWindowHandler() {
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', `${step.config.actionType} resolved`)]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day))]
       };
     },
     runAiTask: runActionWindowAiTask,
@@ -76,7 +77,7 @@ function skipAction(match: Match, step: Step, runtime: Runtime): HandlerResult {
   return {
     status: 'COMPLETED',
     state: nextState,
-    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_skipped', `${step.config.actionType} skipped`)]
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_skipped', actionSkippedMessage(step.config.actionType, step.config.day))]
   };
 }
 
@@ -110,7 +111,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     blockers: work.blockers,
     tasks: work.tasks,
     pendingActions: work.pendingActions,
-    events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', `${step.config.actionType} requested`, { actionWindow: window })]
+    events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionWindow: window })]
   };
 }
 

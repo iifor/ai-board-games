@@ -15,6 +15,7 @@ import { runHunterAiTask, validateHunterAiResult } from '../aiActions';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
 import { recordWorkflowEffects } from '../../workflow-engine/effects';
+import { actionRequestedMessage, actionResolvedMessage, effectResolvedMessage } from '../messages';
 
 interface Match {
   id: string;
@@ -55,7 +56,7 @@ function createNightResolveHandler() {
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', 'night resolved', { effects: resolved.effects })]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('night', step.config.day), { effects: resolved.effects })]
       };
     },
     runAiTask: runHunterAiTask,
@@ -77,7 +78,7 @@ function createExileResolveHandler() {
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', 'exile resolved', { effects: resolved.effects })]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('day', step.config.day), { effects: resolved.effects })]
       };
     },
     runAiTask: runHunterAiTask,
@@ -111,7 +112,7 @@ function createHunterWindow({ match, step, state, runtime, round, hunter }: {
       blockers: work.blockers,
       tasks: work.tasks,
       pendingActions: work.pendingActions,
-      events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', 'hunter shot requested', { actionWindow: window })]
+      events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(actionType, (round as { day?: number }).day), { actionWindow: window })]
     };
   }
   if (!allActionWorkSucceeded(match.id, step.id, actionType, 1)) {
@@ -127,7 +128,7 @@ function createHunterWindow({ match, step, state, runtime, round, hunter }: {
   return {
     status: 'COMPLETED',
     state: nextState,
-    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', 'hunter shot resolved', { effects: effect ? [effect] : [] })]
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', actionResolvedMessage(actionType, (round as { day?: number }).day), { effects: effect ? [effect] : [] })]
   };
 }
 

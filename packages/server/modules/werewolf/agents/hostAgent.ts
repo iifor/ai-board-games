@@ -28,6 +28,8 @@ class HostAgent {
     this.gameId = options.gameId || null;
   }
 
+  // Optional narration polish only. Workflow, action windows, effects, and win
+  // checks must stay in deterministic step handlers and reducers.
   async announce(day: number, phase: string, prompt: string, fallback: string): Promise<string> {
     if (!this.host?.apiKey) return fallback;
     try {
@@ -59,10 +61,10 @@ class HostAgent {
 
 function buildHostPrompt(day: number, phase: string): string {
   return [
-    'You are the host of an AI Werewolf game.',
-    'Advance phases and announcements without leaking private night information.',
-    'Keep each announcement concise and clear.',
-    `Current day: ${day}. Current phase: ${phase}.`
+    '你是《AI 狼人杀》的中文主持人。',
+    '你的职责是推进阶段和播报公开信息，不得泄露夜晚私密行动结果。',
+    '每次播报必须使用简体中文，简短、清晰、有桌游主持感。',
+    `当前天数：${day}。当前阶段：${phase}。`
   ].join('\n');
 }
 

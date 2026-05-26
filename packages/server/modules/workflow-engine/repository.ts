@@ -264,6 +264,12 @@ function listPendingOutbox(matchId: string): OutboxRow[] {
     .map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) }));
 }
 
+function listOutboxMessages(matchId: string, limit: number = 200): OutboxRow[] {
+  return (getDb().prepare('SELECT * FROM outbox_messages WHERE match_id = ? ORDER BY id DESC LIMIT ?').all(matchId, Number(limit) || 200) as OutboxRow[])
+    .map((row) => ({ ...row, payload: parseJson(row.payload_json, {}) }))
+    .reverse();
+}
+
 function markOutboxSent(id: number): void {
   getDb().prepare('UPDATE outbox_messages SET status = ?, updated_at = ? WHERE id = ?').run('sent', nowIso(), id);
 }
@@ -597,7 +603,7 @@ function getDebugState(matchId: string): DebugState | null {
     actionWindows: listActionWindowEpochs(matchId),
     effects: listWorkflowEffects(matchId),
     interrupts: listWorkflowInterrupts(matchId),
-    outbox: listPendingOutbox(matchId),
+    outbox: listOutboxMessages(matchId),
     snapshots: listSnapshots(matchId),
   };
 }
@@ -613,6 +619,7 @@ export {
   listEventsAfter,
   insertOutbox,
   listPendingOutbox,
+  listOutboxMessages,
   markOutboxSent,
   upsertSnapshot,
   createAiTask,

@@ -115,6 +115,10 @@ class SqliteSpanExporter implements SpanExporter {
         const errJson = (span.status && span.status.code === SpanStatusCode.ERROR && span.status.message)
           ? JSON.stringify({ message: span.status.message }) : null;
 
+        if (!db.findTraceById(sctx.traceId)) {
+          continue;
+        }
+
         db.insertSpan({
           id: sctx.spanId,
           trace_id: sctx.traceId,

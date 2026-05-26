@@ -6,6 +6,7 @@ interface PlayerAgentLike {
   hasSkill?: (action: string) => boolean;
   onFallback?: (entry: FallbackEntry) => void;
   execute?: (action: string, context: Record<string, unknown>) => Promise<unknown>;
+  executeSkill?: (action: string, context: Record<string, unknown>) => Promise<unknown>;
 }
 
 interface ActorLike {
@@ -55,10 +56,8 @@ async function executeSkillWithTrace(
     if (context.actor?.playerAgent && fallbackAudit) {
       context.actor.playerAgent.onFallback = (entry: FallbackEntry) => fallbackAudit.record(entry);
     }
-    const result = await (source as { execute: (action: string, ctx: Record<string, unknown>) => Promise<unknown> }).execute(
-      action,
-      { ...context, action, fallbackAudit: fallbackAudit || context.fallbackAudit }
-    );
+    const executionContext = { ...context, action, fallbackAudit: fallbackAudit || context.fallbackAudit };
+    const result = await executeResolvedSource(source, action, executionContext);
     const attrs = fallbackEvents.length
       ? { 'fallback.used': true, 'fallback.count': fallbackEvents.length, 'fallback.reason': fallbackEvents[0]?.reason || 'fallback' }
       : {};
@@ -86,6 +85,20 @@ async function executeSkillWithTrace(
       context.actor.playerAgent.onFallback = originalOnFallback;
     }
   }
+}
+
+function executeResolvedSource(
+  source: AgentSkillRegistry | PlayerAgentLike,
+  action: string,
+  context: Record<string, unknown>
+): Promise<unknown> {
+  if ('executeSkill' in source && typeof source.executeSkill === 'function') {
+    return source.executeSkill(action, context);
+  }
+  if ('execute' in source && typeof source.execute === 'function') {
+    return source.execute(action, context);
+  }
+  throw new Error(`Skill source cannot execute action: ${action}`);
 }
 
 function resolveSkillSource(

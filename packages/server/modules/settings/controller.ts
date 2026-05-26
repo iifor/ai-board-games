@@ -7,7 +7,8 @@ function getSettings(_req: Request, res: Response): void {
 }
 
 function setDefaultHost(req: Request, res: Response): void {
-  res.json(formatSuccess(service.setDefaultHostPlayerId((req.body as Record<string, unknown>).defaultHostPlayerId)));
+  const body = req.body as Record<string, unknown>;
+  res.json(formatSuccess(service.setDefaultHostPlayerId(body.defaultHostPlayerId ?? body.playerId)));
 }
 
 export { getSettings, setDefaultHost };

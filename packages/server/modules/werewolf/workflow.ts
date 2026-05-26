@@ -1,6 +1,7 @@
 const workflowService = require('../workflow-engine/service');
 import { registerWorkflow } from '../workflow-engine/workflowRegistry';
 import type { Workflow } from '../workflow-engine/workflowRegistry';
+import { createTraceContext, flushTrace, getActiveTrace, markTraceComplete, markTraceError, recordEvent } from '../observability';
 import { createWerewolfSteps } from './steps';
 import { createWerewolfHandlers } from './handlers';
 import { createInitialWerewolfState, serializeWerewolfState } from './runtime';
@@ -35,32 +36,118 @@ function createWerewolfWorkflowMatch(config: Record<string, unknown>): Record<st
 
 async function runWerewolfWorkflow(config: Record<string, unknown>, options: { onEvent?: (event: Record<string, unknown>) => void } = {}): Promise<Record<string, unknown>> {
   const match = createWerewolfWorkflowMatch(config);
-  await flushOutbox(match.id as string, options.onEvent);
-  while (true) {
-    const { processed, match: current } = await workflowService.drainAiTasks(match.id, { maxTasks: 1 });
+  const trace = createTraceContext(match.id as string, 'werewolf', String(config.werewolfMode || 'workflow'));
+  try {
     await flushOutbox(match.id as string, options.onEvent);
-    if (!processed || ['completed', 'failed', 'paused_debug'].includes(current?.status)) break;
+    while (true) {
+      const { processed, match: current } = await workflowService.drainAiTasks(match.id, { maxTasks: 1 });
+      await flushOutbox(match.id as string, options.onEvent);
+      if (!processed || ['completed', 'failed', 'paused_debug'].includes(current?.status)) break;
+    }
+    const finalMatch = workflowService.getDebugState(match.id)?.match || match;
+    markTraceComplete(trace);
+    flushTrace(trace);
+    return serializeWerewolfState(finalMatch, finalMatch.state);
+  } catch (error) {
+    markTraceError(trace, (error as Error).message || String(error));
+    flushTrace(trace);
+    throw error;
   }
-  const finalMatch = workflowService.getDebugState(match.id)?.match;
-  return serializeWerewolfState(finalMatch, finalMatch.state);
 }
 
 async function flushOutbox(matchId: string, onEvent?: (event: Record<string, unknown>) => void): Promise<void> {
   const messages = workflowService.listPendingOutbox(matchId);
   for (const message of messages) {
-    const payload = (message.payload?.payload || {}) as Record<string, unknown>;
-    await onEvent?.({
-      type: 'workflow-event',
-      matchId,
-      event: message.payload,
-      workflowEvent: payload.workflowEvent,
-      message: payload.message,
-      game: payload.game,
-      actionWindow: payload.actionWindow,
-      effects: payload.effects
-    });
+    const event = projectWorkflowOutboxEvent(matchId, message.payload as WorkflowEventPayload);
+    recordWorkflowOutbox(matchId, event);
+    await onEvent?.(event);
     workflowService.markOutboxSent(message.id);
   }
+}
+
+interface WorkflowEventPayload {
+  type?: string;
+  stepId?: string;
+  playerId?: string | number;
+  payload?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  wolf_kill: '狼人袭击',
+  seer_check: '预言家查验',
+  guard_protect: '守卫守护',
+  witch_save: '女巫解药',
+  witch_poison: '女巫毒药',
+  day_speech: '白天发言',
+  day_vote: '白天投票',
+  hunter_shot: '猎人开枪'
+};
+
+function projectWorkflowOutboxEvent(matchId: string, workflowEvent: WorkflowEventPayload): Record<string, unknown> {
+  const payload = (workflowEvent?.payload || {}) as Record<string, unknown>;
+  const game = payload.game || currentSerializedGame(matchId);
+  const base = {
+    type: 'workflow-event',
+    matchId,
+    event: workflowEvent,
+    workflowEvent: payload.workflowEvent || workflowEvent.type,
+    message: payload.message,
+    game,
+    actionWindow: payload.actionWindow,
+    effects: payload.effects
+  };
+  if (workflowEvent.type === 'werewolf_action_submitted') {
+    return { ...base, ...projectWerewolfAction(payload, game as Record<string, unknown>) };
+  }
+  return base;
+}
+
+function projectWerewolfAction(payload: Record<string, unknown>, game: Record<string, unknown>): Record<string, unknown> {
+  const actionType = String(payload.actionType || '');
+  const actorId = payload.actorId as number | string | undefined;
+  if (actionType === 'day_speech') {
+    return {
+      message: payload.text,
+      speech: {
+        playerId: actorId,
+        text: String(payload.text || ''),
+        thinking: String(payload.thinking || '')
+      },
+      game
+    };
+  }
+  if (actionType === 'wolf_kill' && payload.speech) {
+    return {
+      message: payload.speech,
+      speech: {
+        playerId: actorId,
+        text: String(payload.speech || ''),
+        thinking: String(payload.thinking || '')
+      },
+      game
+    };
+  }
+  return {
+    message: `${actorId || '玩家'}号完成${ACTION_LABELS[actionType] || '行动'}。`,
+    game
+  };
+}
+
+function currentSerializedGame(matchId: string): Record<string, unknown> | null {
+  const match = workflowService.getDebugState(matchId)?.match;
+  if (!match) return null;
+  return serializeWerewolfState(match, match.state);
+}
+
+function recordWorkflowOutbox(matchId: string, event: Record<string, unknown>): void {
+  const trace = getActiveTrace(matchId);
+  if (!trace) return;
+  recordEvent(trace, {
+    type: String(event.workflowEvent || event.type || 'workflow-event'),
+    phase: String((event.actionWindow as Record<string, unknown> | undefined)?.phase || ''),
+    event
+  });
 }
 
 export {

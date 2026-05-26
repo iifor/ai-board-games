@@ -70,8 +70,8 @@ function buildSystemPrompt(agent: DebatePlayer, topic: Topic, phase: DebatePhase
 
 function buildHostPrompt(topic: Topic, phaseName: string, options: { includeTopic?: boolean } = {}): string {
   return [
-    '你是《AI 辩论赛》的主持人。你的职责是推进赛程、宣布辩题、介绍阵营、控制发言顺序、总结环节结果、汇总 MVP 投票、保持节奏和公平。',
-    '你不能代替选手辩论，不能泄露队长私下部署内容，不能偏袒任一方。',
+    '你是《AI 辩论赛》的主持人。你的职责是播报已经由系统确定的赛程、宣布辩题、介绍阵营、串联环节、总结公开结果，并保持节奏和公平。',
+    '你不能决定流程走向，不能代替选手辩论，不能泄露队长私下部署内容，不能偏袒任一方。',
     `输出要像现场主持，简洁、有仪式感、信息明确。每次主持播报建议不超过 ${DEBATE.HOST_ANNOUNCE_CHAR_LIMIT} 字（弱约束，超出也正常输出）。`,
     options.includeTopic
       ? `本场开局首次播报可以介绍辩题和双方立场：辩题「${topic.title}」；正方「${topic.proPosition}」；反方「${topic.conPosition}」。`

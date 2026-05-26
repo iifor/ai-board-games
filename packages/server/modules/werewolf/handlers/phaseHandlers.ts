@@ -1,6 +1,7 @@
 import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
+import { phaseStartedMessage } from '../messages';
 
 interface Match {
   id: string;
@@ -34,7 +35,7 @@ function createNightStartHandler() {
       return {
         status: 'COMPLETED',
         state: markStepComplete({ ...nextState, currentStep: step.id }, step.id) as StepState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_phase_changed', `Night ${step.config.day} started`)]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_phase_changed', phaseStartedMessage('night', step.config.day))]
       };
     }
   };
@@ -51,7 +52,7 @@ function createDayStartHandler() {
       return {
         status: 'COMPLETED',
         state: markStepComplete({ ...nextState, currentStep: step.id }, step.id) as StepState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_phase_changed', `Day ${step.config.day} started`)]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_phase_changed', phaseStartedMessage('day', step.config.day))]
       };
     }
   };

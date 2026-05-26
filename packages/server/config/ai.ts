@@ -49,6 +49,14 @@ interface AiConfig {
   missingProviders: Array<{ provider: string; apiKeyEnv: string }>;
 }
 
+interface AppSettings {
+  defaultHostPlayerId: number | null;
+  hostModelId?: number | null;
+  defaultHostModelId?: number | null;
+}
+
+type HostModelSource = Pick<AgentConfig, 'provider' | 'providerName' | 'baseUrl' | 'apiKeyEnv' | 'apiKey' | 'apiFormat' | 'model' | 'modelId' | 'temperature' | 'thinkingEnabled'>;
+
 function getAiConfig(): AiConfig {
   loadEnvFile();
 
@@ -63,8 +71,15 @@ function getAiConfig(): AiConfig {
   const defaultModel = runtimeModels[0] || null;
   const rawPlayers = players.listPlayers(true);
   const aiPlayers = rawPlayers.map((player: Record<string, unknown>, index: number) => normalizePlayer(player, runtimeModels, defaultModel, index));
-  const appSettings = settings.getAppSettings();
-  const host = normalizeHost(defaultModel, aiPlayers, appSettings.defaultHostPlayerId);
+  const appSettings = settings.getAppSettings() as AppSettings;
+  const host = normalizeHost({
+    players: aiPlayers,
+    defaultHostPlayerId: appSettings.defaultHostPlayerId,
+    configuredModel: resolveConfiguredHostModel(
+      runtimeModels,
+      appSettings.hostModelId ?? appSettings.defaultHostModelId ?? null,
+    )
+  });
   const providers = Object.fromEntries(runtimeModels.map((model: Record<string, unknown>) => [model.provider, modelToProvider(model)]));
   const missingProviders = getMissingProviders({ host, players: aiPlayers });
 
@@ -99,8 +114,13 @@ function normalizePlayer(player: Record<string, unknown>, models: Record<string,
   };
 }
 
-function normalizeHost(defaultModel: Record<string, unknown> | null, players: AgentConfig[] = [], defaultHostPlayerId: number | null = null): AgentConfig {
-  const defaultPlayer = players.find((p) => Number(p.id) === Number(defaultHostPlayerId));
+function normalizeHost(input: {
+  players?: AgentConfig[];
+  defaultHostPlayerId?: number | null;
+  configuredModel?: Record<string, unknown> | null;
+}): AgentConfig {
+  const players = input.players || [];
+  const defaultPlayer = players.find((p) => Number(p.id) === Number(input.defaultHostPlayerId));
   if (defaultPlayer) {
     return { ...DEFAULT_CONFIG.host, ...defaultPlayer, id: defaultPlayer.id,
       name: defaultPlayer.name || defaultPlayer.nickname || DEFAULT_CONFIG.host.name,
@@ -109,12 +129,50 @@ function normalizeHost(defaultModel: Record<string, unknown> | null, players: Ag
       thinkingEnabled: defaultPlayer.thinkingEnabled || false,
       defaultHostPlayerId: defaultPlayer.id };
   }
-  const provider = defaultModel ? modelToProvider(defaultModel) : null;
-  return { ...DEFAULT_CONFIG.host, provider: provider?.name || '', providerName: provider?.name || '',
-    baseUrl: provider?.baseUrl || '', apiKeyEnv: 'DATABASE_MODEL_API_KEY', apiKey: provider?.apiKey || '',
-    apiFormat: (defaultModel?.apiFormat as string) || 'openai-compatible', model: (defaultModel?.name as string) || '',
-    thinkingEnabled: (defaultModel?.thinkingEnabled as boolean) || false,
+  const modelSource = input.configuredModel
+    ? hostModelSourceFromRuntimeModel(input.configuredModel)
+    : hostModelSourceFromPlayer(players[0]);
+  return { ...DEFAULT_CONFIG.host, ...modelSource,
     defaultHostPlayerId: null } as AgentConfig;
+}
+
+function resolveConfiguredHostModel(models: Record<string, unknown>[], hostModelId?: number | null): Record<string, unknown> | null {
+  if (hostModelId) {
+    return models.find((model) => Number(model.id) === Number(hostModelId)) || null;
+  }
+  return null;
+}
+
+function hostModelSourceFromRuntimeModel(model: Record<string, unknown>): HostModelSource {
+  const provider = modelToProvider(model);
+  return {
+    provider: provider.name || '',
+    providerName: provider.name || '',
+    baseUrl: provider.baseUrl || '',
+    apiKeyEnv: 'DATABASE_MODEL_API_KEY',
+    apiKey: provider.apiKey || '',
+    apiFormat: (model.apiFormat as string) || 'openai-compatible',
+    model: (model.name as string) || '',
+    modelId: (model.id as number) || null,
+    temperature: DEFAULT_CONFIG.host.temperature,
+    thinkingEnabled: (model.thinkingEnabled as boolean) || false
+  };
+}
+
+function hostModelSourceFromPlayer(player?: AgentConfig): Partial<HostModelSource> {
+  if (!player) return {};
+  return {
+    provider: player.provider,
+    providerName: player.providerName,
+    baseUrl: player.baseUrl,
+    apiKeyEnv: player.apiKeyEnv,
+    apiKey: player.apiKey,
+    apiFormat: player.apiFormat,
+    model: player.model,
+    modelId: player.modelId,
+    temperature: Number(player.temperature ?? DEFAULT_CONFIG.host.temperature),
+    thinkingEnabled: player.thinkingEnabled || false
+  };
 }
 
 function resolvePlayerModel(player: Record<string, unknown>, models: Record<string, unknown>[], defaultModel: Record<string, unknown> | null): Record<string, unknown> | null {

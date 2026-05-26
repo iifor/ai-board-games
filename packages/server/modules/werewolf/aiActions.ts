@@ -172,7 +172,7 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
 
 async function runDayVoteAction(runtime: Runtime, actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
   const valid = alive.map((agent) => agent.id).filter((id) => Number(id) !== Number(actor.id));
-  const target = await actor.playerAgent.askVoteTarget('Day vote: choose one player to exile.', valid, fallbackVote(actor, runtime.agents));
+  const target = await actor.playerAgent.askVoteTarget('请选择你要放逐的玩家', valid, fallbackVote(actor, runtime.agents));
   return { target };
 }
 

@@ -269,7 +269,11 @@ const handlers: Record<string, {
         return;
       }
       if (task.action === 'vote_mvp') {
-        if (!payload.voterId || !payload.target) {
+        const spec = (task.promptContextSnapshot || {}) as TaskSpec;
+        const contestantIds = Array.isArray(spec.contestantIds) ? spec.contestantIds.map(Number) : [];
+        const voterId = Number(payload.voterId);
+        const target = Number(payload.target);
+        if (!voterId || !target || voterId !== Number(task.playerId) || !contestantIds.includes(target)) {
           throw Object.assign(new Error('MVP vote result is invalid'), { severity: 'high' });
         }
         return;
@@ -613,10 +617,17 @@ function normalizeTaskResult(spec: Record<string, unknown>, result: unknown): Ru
     };
   }
   if (spec.action === 'vote_mvp') {
+    const contestantIds = Array.isArray(spec.contestantIds) ? (spec.contestantIds as number[]).map(Number) : [];
+    const target = Number((result as Record<string, unknown>).target);
     return {
       eventType: 'debate_ai_result',
       rawOutput: result,
-      payload: { action: spec.action as string, actorId: spec.actorId, voterId: (result as Record<string, unknown>).voterId, target: (result as Record<string, unknown>).target },
+      payload: {
+        action: spec.action as string,
+        actorId: spec.actorId,
+        voterId: Number((result as Record<string, unknown>).voterId) || Number(spec.actorId),
+        target: contestantIds.includes(target) ? target : null,
+      },
     };
   }
   const text = typeof result === 'string' ? result : (result as Record<string, unknown>)?.content;
