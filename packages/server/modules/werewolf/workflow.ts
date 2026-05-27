@@ -1,9 +1,10 @@
 const workflowService = require('../workflow-engine/service');
 import { registerWorkflow } from '../workflow-engine/workflowRegistry';
-import type { Workflow } from '../workflow-engine/workflowRegistry';
+import type { StepHandler, Workflow } from '../workflow-engine/workflowRegistry';
 import { createTraceContext, flushTrace, getActiveTrace, markTraceComplete, markTraceError, recordEvent } from '../observability';
 import { createWerewolfSteps } from './steps';
 import { createWerewolfHandlers } from './handlers';
+import { ACTION_LABELS } from './messages';
 import { createInitialWerewolfState, serializeWerewolfState } from './runtime';
 
 const WEREWOLF_WORKFLOW_ID = 'werewolf.workflow.basic.v1';
@@ -15,7 +16,7 @@ const werewolfWorkflow: Workflow = {
 };
 
 function registerWerewolfWorkflow(): void {
-  registerWorkflow(werewolfWorkflow, createWerewolfHandlers() as unknown as Record<string, import('../workflow-engine/workflowRegistry').StepHandler>);
+  registerWorkflow(werewolfWorkflow, createWerewolfHandlers() as unknown as Record<string, StepHandler>);
 }
 
 function createWerewolfWorkflowMatch(config: Record<string, unknown>): Record<string, unknown> {
@@ -73,17 +74,6 @@ interface WorkflowEventPayload {
   [key: string]: unknown;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  wolf_kill: '狼人袭击',
-  seer_check: '预言家查验',
-  guard_protect: '守卫守护',
-  witch_save: '女巫解药',
-  witch_poison: '女巫毒药',
-  day_speech: '白天发言',
-  day_vote: '白天投票',
-  hunter_shot: '猎人开枪'
-};
-
 function projectWorkflowOutboxEvent(matchId: string, workflowEvent: WorkflowEventPayload): Record<string, unknown> {
   const payload = (workflowEvent?.payload || {}) as Record<string, unknown>;
   const game = payload.game || currentSerializedGame(matchId);
@@ -117,7 +107,7 @@ function projectWerewolfAction(payload: Record<string, unknown>, game: Record<st
       game
     };
   }
-  if (actionType === 'wolf_kill' && payload.speech) {
+  if ((actionType === 'wolf_kill' || actionType === 'wolf_speech') && payload.speech) {
     return {
       message: payload.speech,
       speech: {

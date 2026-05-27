@@ -2,6 +2,7 @@ import { getDb } from '../../db';
 import * as repo from './repository';
 import { getWorkflow, getStepHandler } from './workflowRegistry';
 import { evaluateCondition } from './condition';
+import { hydrateMatchFromEventStore, withProjectedState } from './projection';
 import type { ConditionContext } from './condition';
 import { MATCH_STATUS, BLOCKER_TYPES, BLOCKER_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { toJson } from './utils';
@@ -30,6 +31,7 @@ function tickMatch(matchId: string, budget: TickBudget = {}): Match {
   return getDb().transaction(() => {
     let match = repo.getMatch(matchId);
     if (!match) throw new Error(`Match not found: ${matchId}`);
+    match = hydrateMatchFromEventStore(match);
     if (TERMINAL_STATUSES.includes(match.status)) return match;
 
     const workflow = getWorkflow(match.workflowId);
@@ -93,7 +95,7 @@ function tickMatch(matchId: string, budget: TickBudget = {}): Match {
       state = result.state || state;
       if (result.events?.length) repo.commitWorkflowChange({
         matchId,
-        events: result.events.map((event) => ({ stepId: step.id, ...event }) as repo.EventInput),
+        events: result.events.map((event) => ({ stepId: step.id, ...withProjectedState(event, state) }) as repo.EventInput),
       });
       if (result.tasks?.length) {
         for (const task of result.tasks) repo.createAiTask(task as never);

@@ -13,6 +13,11 @@ export interface WerewolfRound {
 
 export interface WerewolfNight {
   deaths?: { id: string; reason?: string }[];
+  wolfIds?: string[] | number[];
+  wolfLeaderId?: string | number | null;
+  wolfSpeechOrder?: (string | number)[];
+  wolfSpeeches?: { playerId?: string | number; text?: string; thinking?: string }[];
+  wolfSharedInfo?: string;
   wolfTarget?: string;
   wolfChoices?: Record<string, string>;
   seerCheck?: { target: string; result?: string };

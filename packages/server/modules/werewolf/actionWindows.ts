@@ -1,7 +1,7 @@
-const repo = require('../workflow-engine/repository');
-const { stableTaskId } = require('../workflow-engine/utils');
-const { BLOCKER_TYPES, BLOCKER_STATUS, ACTION_WINDOW_STATUS } = require('@ai-presenter/shared/types/workflowTypes');
-const { hasRoleAction, sortBySeat } = require('./utils');
+import * as repo from '../workflow-engine/repository';
+import { stableTaskId } from '../workflow-engine/utils';
+import { BLOCKER_TYPES, BLOCKER_STATUS, ACTION_WINDOW_STATUS } from '@ai-presenter/shared/types/workflowTypes';
+import { hasRoleAction, sortBySeat } from './utils';
 
 interface Agent {
   id: number;
@@ -39,6 +39,7 @@ interface ActionWindow {
   targetIds: number[];
   optional: boolean;
   visibility: string;
+  [key: string]: unknown;
 }
 
 interface ActionResult {
@@ -73,7 +74,9 @@ function buildActionWindow({ match, step, state, actionType, actors, targetIds =
     actorIds: actorList.map((actor: Agent) => actor.id),
     targetIds,
     optional,
-    visibility: actionType === 'day_speech' || actionType === 'day_vote' ? 'public' : 'private'
+    visibility: resolveVisibility(actionType),
+    orderMode: step.config.ordered ? 'ordered' : 'parallel',
+    completionPolicy: 'all'
   };
   repo.upsertActionWindowEpoch({
     id: epochId,
@@ -81,7 +84,7 @@ function buildActionWindow({ match, step, state, actionType, actors, targetIds =
     stepId: step.id,
     actionType,
     status: ACTION_WINDOW_STATUS.OPEN,
-    window
+    window: window as Record<string, unknown>
   });
   return window;
 }
@@ -93,10 +96,11 @@ function createActionBlockers({ match, step, window, actors, promptContext = {} 
   actors: Agent[];
   promptContext?: Record<string, unknown>;
 }) {
+  const activeActors = selectActorsForWindow(match.id, step.id, window, actors);
   const blockers: Record<string, unknown>[] = [];
   const tasks: Record<string, unknown>[] = [];
   const pendingActions: Record<string, unknown>[] = [];
-  for (const actor of actors || []) {
+  for (const actor of activeActors || []) {
     const actorType = resolveActorType(actor);
     const taskKey = `${window.actionType}:${actor.id}`;
     const id = stableTaskId(match.id, step.id, taskKey);
@@ -163,10 +167,10 @@ function collectActionResults(matchId: string, stepId: string, actionType: strin
     }));
   const actionResults = repo.listPendingActions(matchId)
     .filter((action: { stepId: string; actionType: string; status: string }) => action.stepId === stepId && action.actionType === actionType && action.status === 'submitted')
-    .map((action: { playerId: string | number; payload?: Record<string, unknown> }) => ({
+    .map((action: { playerId?: string | number; payload?: unknown }) => ({
       source: 'human',
       actorId: Number(action.playerId),
-      payload: action.payload || {}
+      payload: payloadRecord(action.payload)
     }));
   return [...taskResults, ...actionResults];
 }
@@ -183,8 +187,19 @@ function resolveActionWindow(matchId: string, stepId: string, actionType: string
     stepId,
     actionType,
     status: ACTION_WINDOW_STATUS.RESOLVED,
-    window: window || {}
+    window: (window || {}) as Record<string, unknown>
   });
+}
+
+function selectActorsForWindow(matchId: string, stepId: string, window: ActionWindow, actors: Agent[]): Agent[] {
+  if (window.orderMode !== 'ordered') return actors || [];
+  const completed = collectActionResults(matchId, stepId, window.actionType).length;
+  const next = (actors || [])[completed];
+  return next ? [next] : [];
+}
+
+function payloadRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
 }
 
 function getAliveActorsByAction(runtime: Runtime, action: string): Agent[] {
@@ -193,6 +208,12 @@ function getAliveActorsByAction(runtime: Runtime, action: string): Agent[] {
 
 function resolveActorType(actor: Agent): string {
   return actor.actorType === 'human' || actor.isHuman ? 'human' : 'ai';
+}
+
+function resolveVisibility(actionType: string): string {
+  if (actionType === 'day_speech' || actionType === 'day_vote') return 'public';
+  if (actionType?.startsWith('sheriff_')) return 'public';
+  return 'private';
 }
 
 export {
@@ -205,4 +226,4 @@ export {
   getAliveActorsByAction
 };
 
-export type { ActionWindow };
+export type { ActionWindow, ActionResult, Agent, Match, Step, Runtime };

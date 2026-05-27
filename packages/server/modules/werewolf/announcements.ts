@@ -1,8 +1,8 @@
 const WEREWOLF_NIGHT_PROMPTS: Record<string, string> = {
-  wolfWake: '狼人请睁眼。请选择今晚要击杀的玩家',
-  seerWake: '预言家请睁眼。请选择你要查验的玩家',
+  wolfWake: '狼人请睁眼。请选择今晚要击杀的玩家。',
+  seerWake: '预言家请睁眼。请选择你要查验的玩家。',
   guardWake: '守卫请睁眼。请选择要守护的玩家。',
-  witchAntidote: '女巫请睁眼。今晚它死了。你要使用解药吗？',
+  witchAntidote: '女巫请睁眼。今晚有人倒牌，你要使用解药吗？',
   witchPoison: '你要使用毒药吗？'
 } as const;
 
@@ -33,12 +33,12 @@ interface RoundWithNight {
 
 function buildNightPublicMessage(round: RoundWithNight = {}): string {
   const deaths = Array.isArray(round.night?.deaths) ? round.night.deaths : [];
-  if (!deaths.length) return '昨晚是平安夜';
-  return `昨晚${deaths.map((item) => `${item.id}号`).join('、')}死亡`;
+  if (!deaths.length) return '昨晚是平安夜。';
+  return `昨晚${deaths.map((item) => `${item.id}号`).join('、')}死亡。`;
 }
 
 function buildDayStartMessage(): string {
-  return '天亮了';
+  return '天亮了。';
 }
 
 interface SheriffElection {
@@ -53,12 +53,12 @@ interface RoundWithSheriff {
 function buildSheriffStartMessage(round: RoundWithSheriff = {}): string {
   const candidates = round.sheriffElection?.candidates || [];
   if (!candidates.length) return '现在进入警长竞选。想上警的玩家请举手。';
-  return '现在进入警长竞选。想上警的玩家请举手。上警玩家依次发言。';
+  return '现在进入警长竞选。上警玩家依次发言。';
 }
 
 function buildSheriffResultMessage(round: RoundWithSheriff = {}, _modeConfig: Record<string, unknown> = {}): string {
-  if (!round.sheriffId) return '警长竞选结束，本局无警长';
-  return `${round.sheriffId}号当选警长`;
+  if (!round.sheriffId) return '警长竞选结束，本局没有警长。';
+  return `${round.sheriffId}号当选警长。`;
 }
 
 export {

@@ -13,7 +13,7 @@ server/modules/debate/
   constants.js          # PHASES、TOPICS、限制常量
   playerAgent.js        # DebateAgent 类（辩手 AI 包装器）
   skillRegistry.js      # DebateSkillRegistry（技能注册表）
-  prompts.js            # buildSystemPrompt、buildHostPrompt、buildDebateRoleName
+  prompts.js            # buildSystemPrompt、buildDebateRoleName
   speech.js             # collectSpeech、emitSpeech、pushSpeech
   phases.js             # 各阶段执行函数（runStrategyPhase、runOpeningPhase 等）
   utils.js              # shuffle、choose、normalizeTopic、serializeGame、buildShareReport
@@ -198,7 +198,7 @@ async function runDebateGame(config, options = {})
 | `getDebateRoleName` | `prompts.js` | ~20 |
 | `collectSpeech` + `askAgent` | `speech.js` | ~60 |
 | `pushSpeech` + `emitSpeech` | `speech.js` | ~30 |
-| `askHost` + `buildHostPrompt` + `safeHost` | `prompts.js` | ~60 |
+| 流程化主持播报模板 | `workflow.ts` / `phases.ts` | ~20 |
 | `createPhase` | `phases.js` | ~15 |
 | `runPhase` | `phases.js` | ~25 |
 | 各阶段具体逻辑（strategy/opening/crossfire/free/closing） | `phases.js` | ~200 |

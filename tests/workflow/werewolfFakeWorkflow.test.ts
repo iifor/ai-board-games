@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as repo from '../../packages/server/modules/workflow-engine/repository';
 import { createActionWindowHandler } from '../../packages/server/modules/werewolf/handlers/actionWindowHandler';
-import { createNightResolveHandler, createExileResolveHandler } from '../../packages/server/modules/werewolf/handlers/resolveHandlers';
+import { createNightResolveHandler, createExileResolveHandler, createSheriffResolveHandler } from '../../packages/server/modules/werewolf/handlers/resolveHandlers';
 import { createRound } from '../../packages/server/modules/werewolf/agents';
 
 type RepoPatch = Pick<typeof repo,
@@ -30,6 +30,7 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
     });
 
     const state = createState();
+    state.rounds[0].night.wolfLeaderId = 2;
     const match = { id: 'm-fake', config: { players: state.players }, createdAt: 'now' };
     const wolfStep = { id: 'wolf_kill_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'wolf_kill' } };
     const actionHandler = createActionWindowHandler();
@@ -76,6 +77,153 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
   }
 });
 
+test('wolf speech window opens all wolves but queues speakers in leader order before vote', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'white_wolf_king', 'wolves', ['kill'], { roleLabel: '白狼王', wolfLeaderPriority: 100, roleConfig: { id: 'white_wolf_king', name: '白狼王', faction: 'wolves', rule: { actions: [{ action: 'kill' }], wolfLeaderPriority: 100 } } }),
+      player(3, 'werewolf', 'wolves', ['kill']),
+      player(4, 'villager', 'good', [])
+    ];
+    state.rounds[0].night.wolfLeaderId = 2;
+    const match = { id: 'm-wolf-order', config: { players: state.players }, createdAt: 'now' };
+    const handler = createActionWindowHandler();
+    const speechStep = { id: 'wolf_speech_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'wolf_speech', ordered: true } };
+
+    const opened = handler.execute({ match, step: speechStep, state } as never);
+    assert.equal(opened.status, 'WAITING');
+    assert.deepEqual(opened.state?.rounds[0].night.wolfSpeechOrder, [2, 3, 1]);
+    assert.deepEqual(opened.events?.[0].payload.actionWindow.actorIds.sort(), [1, 2, 3]);
+    assert.equal(opened.tasks?.length, 1);
+    assert.equal(opened.tasks?.[0].playerId, 2);
+    tasks.push(...(opened.tasks || []));
+
+    tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 2, result: { payload: { speech: '先打4。' } } };
+    const waiting = handler.execute({ match, step: speechStep, state: opened.state } as never);
+    assert.equal(waiting.status, 'WAITING');
+    assert.equal(waiting.tasks?.[0].playerId, 3);
+    assert.equal(waiting.blockers?.[0].taskId, waiting.tasks?.[0].id);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('human pending action submission lets werewolf action window continue', () => {
+  const original = snapshotRepo(repo);
+  const pendingActions: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: () => undefined,
+      listAiTasks: () => [],
+      listPendingActions: () => pendingActions as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+
+    const state = createState();
+    state.players = [
+      { ...state.players![0], actorType: 'human', faction: 'good', canVote: true },
+      { ...state.players![1], actorType: 'human', alive: true, canVote: true },
+      { ...state.players![2], actorType: 'human', alive: true, canVote: true }
+    ];
+    const match = { id: 'm-human', config: { players: state.players }, createdAt: 'now' };
+    const step = { id: 'day_vote_1', type: 'werewolf.action_window', config: { day: 1, phase: 'day', actionType: 'day_vote' } };
+    const handler = createActionWindowHandler();
+
+    const opened = handler.execute({ match, step, state } as never);
+    assert.equal(opened.status, 'WAITING');
+    assert.equal(opened.pendingActions?.length, 3);
+    pendingActions.push(...(opened.pendingActions || []).map((action: Record<string, unknown>) => ({
+      ...action,
+      status: Number(action.playerId) === 1 ? 'submitted' : 'pending',
+      payload: Number(action.playerId) === 1 ? { target: 2 } : action.payload
+    })));
+
+    let waiting = handler.execute({ match, step, state: opened.state } as never);
+    assert.equal(waiting.status, 'WAITING');
+    pendingActions.forEach((action) => {
+      action.status = 'submitted';
+      action.payload = { target: 2 };
+    });
+
+    const completed = handler.execute({ match, step, state: waiting.state } as never);
+    assert.equal(completed.status, 'COMPLETED');
+    assert.equal(completed.state?.rounds[0].votes[1], 2);
+    assert.equal(completed.events?.[0].type, 'werewolf_action_submitted');
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('first day sheriff election windows resolve a human election', () => {
+  const original = snapshotRepo(repo);
+  const pendingActions: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: () => undefined,
+      listAiTasks: () => [],
+      listPendingActions: () => pendingActions as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+
+    const state = createState();
+    state.players = state.players!.map((player: Record<string, unknown>) => ({ ...player, actorType: 'human', alive: true, canVote: true }));
+    const match = { id: 'm-sheriff', config: { players: state.players }, createdAt: 'now' };
+    const handler = createActionWindowHandler();
+
+    let current = openAndSubmit(handler, match, state, 'sheriff_signup_1', 'sheriff_signup', {
+      1: { run: true },
+      2: { run: true },
+      3: { run: false }
+    }, pendingActions);
+    assert.deepEqual(current.rounds[0].sheriffElection.signedUpIds, [1, 2]);
+
+    current = openAndSubmit(handler, match, current, 'sheriff_speech_1', 'sheriff_speech', {
+      1: { text: '我竞选警长。' },
+      2: { text: '我也竞选。' }
+    }, pendingActions);
+    assert.equal(current.rounds[0].sheriffElection.speeches.length, 2);
+
+    current = openAndSubmit(handler, match, current, 'sheriff_withdraw_1', 'sheriff_withdraw', {
+      1: { withdraw: false },
+      2: { withdraw: true }
+    }, pendingActions);
+    assert.deepEqual(current.rounds[0].sheriffElection.candidates, [1]);
+
+    current = openAndSubmit(handler, match, current, 'sheriff_vote_1', 'sheriff_vote', {
+      2: { target: 1 },
+      3: { target: 1 }
+    }, pendingActions);
+    assert.deepEqual(current.rounds[0].sheriffElection.tally, { 1: 2 });
+
+    const resolved = createSheriffResolveHandler().execute({
+      match,
+      step: { id: 'sheriff_resolve_1', type: 'werewolf.sheriff_resolve', config: { day: 1, phase: 'day', actionType: 'sheriff_resolve' } },
+      state: current
+    } as never);
+    assert.equal(resolved.status, 'COMPLETED');
+    assert.equal(resolved.state?.rounds[0].sheriffId, 1);
+    assert.equal(resolved.state?.rounds[0].sheriffBadge.status, 'held');
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
 function createState(): Record<string, unknown> {
   const round = createRound(1);
   return {
@@ -94,7 +242,7 @@ function createState(): Record<string, unknown> {
   };
 }
 
-function player(id: number, role: string, faction: string, actions: string[]): Record<string, unknown> {
+function player(id: number, role: string, faction: string, actions: string[], patch: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id,
     name: String(id),
@@ -106,8 +254,32 @@ function player(id: number, role: string, faction: string, actions: string[]): R
     canVote: true,
     votes: [],
     seerChecks: [],
-    roleConfig: { id: role, name: role, faction, rule: { actions: actions.map((action) => ({ action })) } }
+    roleConfig: { id: role, name: role, faction, rule: { actions: actions.map((action) => ({ action })) } },
+    ...patch
   };
+}
+
+function openAndSubmit(
+  handler: ReturnType<typeof createActionWindowHandler>,
+  match: Record<string, unknown>,
+  state: Record<string, unknown>,
+  stepId: string,
+  actionType: string,
+  payloads: Record<number, Record<string, unknown>>,
+  pendingActions: Array<Record<string, unknown>>
+): Record<string, unknown> {
+  pendingActions.length = 0;
+  const step = { id: stepId, type: 'werewolf.action_window', config: { day: 1, phase: 'day', actionType } };
+  const opened = handler.execute({ match, step, state } as never);
+  assert.equal(opened.status, 'WAITING');
+  pendingActions.push(...(opened.pendingActions || []).map((action: Record<string, unknown>) => ({
+    ...action,
+    status: 'submitted',
+    payload: payloads[Number(action.playerId)] || {}
+  })));
+  const completed = handler.execute({ match, step, state: opened.state } as never);
+  assert.equal(completed.status, 'COMPLETED');
+  return completed.state as Record<string, unknown>;
 }
 
 function snapshotRepo(target: typeof repo): RepoPatch {

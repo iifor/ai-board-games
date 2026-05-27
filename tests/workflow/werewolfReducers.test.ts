@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRound } from '../../packages/server/modules/werewolf/agents';
 import { applyActionResults, getActorsForStep, getTargetIds, findPendingHunter } from '../../packages/server/modules/werewolf/reducers';
+import { ensureWolfTeamContext, wolfLeaderPriority } from '../../packages/server/modules/werewolf/wolfTeam';
 
 interface TestAgent {
   id: number;
@@ -84,4 +85,22 @@ test('reducers select actors and pending hunter', () => {
 
   const hunter = actor(6, 'good', ['shootOnDeath'], { alive: false, hunterShotUsed: false });
   assert.equal(findPendingHunter([hunter] as never, round as never, [{ id: 6 }] as never)?.id, 6);
+});
+
+test('wolf team context shares wolves and prefers high identity leader', () => {
+  const ctx = runtime();
+  ctx.agents = [
+    actor(1, 'wolves', ['kill']),
+    actor(2, 'wolves', ['kill'], { role: 'white_wolf_king', roleLabel: '白狼王', roleConfig: { id: 'white_wolf_king', name: '白狼王', rule: { actions: [{ action: 'kill' }], wolfLeaderPriority: 100 } } }),
+    actor(3, 'wolves', ['kill']),
+    actor(4, 'good')
+  ];
+
+  const context = ensureWolfTeamContext(ctx as never, ctx.state.rounds[0] as never);
+
+  assert.deepEqual(context.wolfIds, [1, 2, 3]);
+  assert.equal(context.wolfLeaderId, 2);
+  assert.deepEqual(context.wolfSpeechOrder, [2, 3, 1]);
+  assert.match(context.wolfSharedInfo, /狼队成员/);
+  assert.equal(wolfLeaderPriority(ctx.agents[1] as never), 100);
 });

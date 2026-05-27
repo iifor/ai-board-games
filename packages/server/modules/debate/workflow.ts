@@ -131,11 +131,30 @@ const debateWorkflow: WorkflowDefinition = {
   version: 'v1',
   steps: [
     { id: 'topic_reveal', type: 'debate.topic_reveal', name: '辩题公布', config: {} },
-    { id: 'opening_speech', type: 'debate.ai_phase', name: '立论陈词', config: { phaseId: 'opening', tasks: 'opening' } },
-    { id: 'crossfire', type: 'debate.ai_phase', name: '正反攻辩', config: { phaseId: 'crossfire', tasks: 'crossfire' } },
-    { id: 'summary_speech', type: 'debate.ai_phase', name: '总结陈词', config: { phaseId: 'closing', tasks: 'closing' } },
-    { id: 'judge_comment', type: 'debate.ai_phase', name: '评委点评', config: { phaseId: 'judges', tasks: 'judges' } },
-    { id: 'best_speaker_vote', type: 'debate.ai_phase', name: '最佳辩手投票', config: { phaseId: 'mvp', tasks: 'mvp' } },
+    { id: 'opening_pro_1', type: 'debate.ai_turn', name: '正方一辩立论', config: { phaseId: 'opening', turn: 'opening', side: 'pro', sideIndex: 0, action: 'opening_argue' } },
+    { id: 'opening_con_1', type: 'debate.ai_turn', name: '反方一辩立论', config: { phaseId: 'opening', turn: 'opening', side: 'con', sideIndex: 0, action: 'opening_argue' } },
+    { id: 'crossfire_1_question', type: 'debate.ai_turn', name: '攻辩一提问', config: { phaseId: 'crossfire', turn: 'crossfire', actorSide: 'pro', actorIndex: 1, targetSide: 'con', targetIndex: 1, action: 'crossfire_question' } },
+    { id: 'crossfire_1_answer', type: 'debate.ai_turn', name: '攻辩一回答', config: { phaseId: 'crossfire', turn: 'crossfire', actorSide: 'con', actorIndex: 1, targetSide: 'pro', targetIndex: 1, action: 'crossfire_answer' } },
+    { id: 'crossfire_2_question', type: 'debate.ai_turn', name: '攻辩二提问', config: { phaseId: 'crossfire', turn: 'crossfire', actorSide: 'con', actorIndex: 1, targetSide: 'pro', targetIndex: 2, action: 'crossfire_question' } },
+    { id: 'crossfire_2_answer', type: 'debate.ai_turn', name: '攻辩二回答', config: { phaseId: 'crossfire', turn: 'crossfire', actorSide: 'pro', actorIndex: 2, targetSide: 'con', targetIndex: 1, action: 'crossfire_answer' } },
+    { id: 'crossfire_3_question', type: 'debate.ai_turn', name: '攻辩三提问', config: { phaseId: 'crossfire', turn: 'crossfire', actorSide: 'pro', actorIndex: 2, targetSide: 'con', targetIndex: 2, action: 'crossfire_question' } },
+    { id: 'crossfire_3_answer', type: 'debate.ai_turn', name: '攻辩三回答', config: { phaseId: 'crossfire', turn: 'crossfire', actorSide: 'con', actorIndex: 2, targetSide: 'pro', targetIndex: 2, action: 'crossfire_answer' } },
+    { id: 'crossfire_4_question', type: 'debate.ai_turn', name: '攻辩四提问', config: { phaseId: 'crossfire', turn: 'crossfire', actorSide: 'con', actorIndex: 2, targetSide: 'pro', targetIndex: 1, action: 'crossfire_question' } },
+    { id: 'crossfire_4_answer', type: 'debate.ai_turn', name: '攻辩四回答', config: { phaseId: 'crossfire', turn: 'crossfire', actorSide: 'pro', actorIndex: 1, targetSide: 'con', targetIndex: 2, action: 'crossfire_answer' } },
+    { id: 'closing_con_4', type: 'debate.ai_turn', name: '反方四辩总结', config: { phaseId: 'closing', turn: 'closing', side: 'con', sideIndex: 3, action: 'closing_summary' } },
+    { id: 'closing_pro_4', type: 'debate.ai_turn', name: '正方四辩总结', config: { phaseId: 'closing', turn: 'closing', side: 'pro', sideIndex: 3, action: 'closing_summary' } },
+    { id: 'judge_review_1', type: 'debate.ai_turn', name: '评委一点评', config: { phaseId: 'judges', turn: 'judge', judgeIndex: 0, action: 'judge_review' } },
+    { id: 'judge_review_2', type: 'debate.ai_turn', name: '评委二点评', config: { phaseId: 'judges', turn: 'judge', judgeIndex: 1, action: 'judge_review' } },
+    { id: 'judge_review_3', type: 'debate.ai_turn', name: '评委三点评', config: { phaseId: 'judges', turn: 'judge', judgeIndex: 2, action: 'judge_review' } },
+    { id: 'judge_review_4', type: 'debate.ai_turn', name: '评委四点评', config: { phaseId: 'judges', turn: 'judge', judgeIndex: 3, action: 'judge_review' } },
+    { id: 'mvp_vote_1', type: 'debate.ai_turn', name: '最佳辩手投票一', config: { phaseId: 'mvp', turn: 'mvp', contestantIndex: 0, action: 'vote_mvp' } },
+    { id: 'mvp_vote_2', type: 'debate.ai_turn', name: '最佳辩手投票二', config: { phaseId: 'mvp', turn: 'mvp', contestantIndex: 1, action: 'vote_mvp' } },
+    { id: 'mvp_vote_3', type: 'debate.ai_turn', name: '最佳辩手投票三', config: { phaseId: 'mvp', turn: 'mvp', contestantIndex: 2, action: 'vote_mvp' } },
+    { id: 'mvp_vote_4', type: 'debate.ai_turn', name: '最佳辩手投票四', config: { phaseId: 'mvp', turn: 'mvp', contestantIndex: 3, action: 'vote_mvp' } },
+    { id: 'mvp_vote_5', type: 'debate.ai_turn', name: '最佳辩手投票五', config: { phaseId: 'mvp', turn: 'mvp', contestantIndex: 4, action: 'vote_mvp' } },
+    { id: 'mvp_vote_6', type: 'debate.ai_turn', name: '最佳辩手投票六', config: { phaseId: 'mvp', turn: 'mvp', contestantIndex: 5, action: 'vote_mvp' } },
+    { id: 'mvp_vote_7', type: 'debate.ai_turn', name: '最佳辩手投票七', config: { phaseId: 'mvp', turn: 'mvp', contestantIndex: 6, action: 'vote_mvp' } },
+    { id: 'mvp_vote_8', type: 'debate.ai_turn', name: '最佳辩手投票八', config: { phaseId: 'mvp', turn: 'mvp', contestantIndex: 7, action: 'vote_mvp' } },
     { id: 'result_announce', type: 'debate.result_announce', name: '结果公布', config: {} },
   ],
 };
@@ -171,7 +190,7 @@ const handlers: Record<string, {
       };
     },
   },
-  'debate.ai_phase': {
+  'debate.ai_turn': {
     execute({ match, step, state }: HandlerContext): HandlerResult {
       if (state.completedSteps?.[step.id]) return { status: 'COMPLETED', state };
       const phase = createPhaseFromStep(step);
@@ -216,7 +235,7 @@ const handlers: Record<string, {
         return { status: 'WAITING', state: { ...state, currentStep: step.id }, blockers, tasks };
       }
 
-      const nextState = applyAiPhaseResults(match, step, state, phase, taskSpecs, existing);
+      const nextState = applyAiTurnResult(match, step, state, phase, taskSpecs, existing);
       return {
         status: 'COMPLETED',
         state: nextState,
@@ -529,44 +548,31 @@ function createPhaseFromStep(step: WorkflowStep): DebatePhase {
 function createTaskSpecs(step: WorkflowStep, state: WorkflowState): TaskSpec[] {
   const players = state.players || [];
   const phaseId = step.config.phaseId as string;
-  if (step.config.tasks === 'opening') {
-    return [
-      { taskKey: 'pro-opening', actorId: debaterAt(players, 'pro', 0)?.id as number, action: 'opening_argue', phaseId },
-      { taskKey: 'con-opening', actorId: debaterAt(players, 'con', 0)?.id as number, action: 'opening_argue', phaseId },
-    ].filter((item) => item.actorId);
+  const action = step.config.action as string;
+  if (!action) return [];
+  if (step.config.turn === 'opening' || step.config.turn === 'closing') {
+    const actor = debaterAt(players, step.config.side as string, Number(step.config.sideIndex || 0));
+    return actor ? [{ taskKey: step.id, actorId: actor.id, action, phaseId }] : [];
   }
-  if (step.config.tasks === 'crossfire') {
-    const pro = players.filter((agent) => agent.side === 'pro').slice(1, 3);
-    const con = players.filter((agent) => agent.side === 'con').slice(1, 3);
-    return [
-      [pro[0], con[0], 'question'],
-      [con[0], pro[1], 'question'],
-      [pro[1], con[1], 'question'],
-      [con[1], pro[0], 'question'],
-    ].filter(([actor, target]) => actor && target).flatMap(([actor, target], index) => ([
-      { taskKey: `crossfire-${index + 1}-question`, actorId: (actor as DebatePlayer).id, targetId: (target as DebatePlayer).id, action: 'crossfire_question', phaseId },
-      { taskKey: `crossfire-${index + 1}-answer`, actorId: (target as DebatePlayer).id, targetId: (actor as DebatePlayer).id, action: 'crossfire_answer', phaseId },
-    ]));
+  if (step.config.turn === 'crossfire') {
+    const actor = debaterAt(players, step.config.actorSide as string, Number(step.config.actorIndex || 0));
+    const target = debaterAt(players, step.config.targetSide as string, Number(step.config.targetIndex || 0));
+    return actor && target ? [{ taskKey: step.id, actorId: actor.id, targetId: target.id, action, phaseId }] : [];
   }
-  if (step.config.tasks === 'closing') {
-    return [
-      { taskKey: 'con-closing', actorId: debaterAt(players, 'con', 3)?.id as number, action: 'closing_summary', phaseId },
-      { taskKey: 'pro-closing', actorId: debaterAt(players, 'pro', 3)?.id as number, action: 'closing_summary', phaseId },
-    ].filter((item) => item.actorId);
+  if (step.config.turn === 'judge') {
+    const judge = players.filter((agent) => agent.side === 'judge')[Number(step.config.judgeIndex || 0)];
+    return judge ? [{ taskKey: step.id, actorId: judge.id, action, phaseId }] : [];
   }
-  if (step.config.tasks === 'judges') {
-    return players.filter((agent) => agent.side === 'judge')
-      .map((judge) => ({ taskKey: `judge-${judge.id}`, actorId: judge.id, action: 'judge_review', phaseId }));
-  }
-  if (step.config.tasks === 'mvp') {
+  if (step.config.turn === 'mvp') {
     const contestants = players.filter((agent) => agent.side === 'pro' || agent.side === 'con');
-    return contestants.map((actor) => ({
-      taskKey: `mvp-${actor.id}`,
+    const actor = contestants[Number(step.config.contestantIndex || 0)];
+    return actor ? [{
+      taskKey: step.id,
       actorId: actor.id,
-      action: 'vote_mvp',
+      action,
       phaseId,
       contestantIds: contestants.map((item) => item.id),
-    }));
+    }] : [];
   }
   return [];
 }
@@ -618,6 +624,68 @@ function applyAiPhaseResults(
   phase.stageSummary = summarizeDebatePhase(phase);
   nextState.phases.push(phase);
   return markStepComplete(nextState, step.id);
+}
+
+function applyAiTurnResult(
+  _match: WorkflowMatch,
+  step: WorkflowStep,
+  state: WorkflowState,
+  phase: DebatePhase,
+  taskSpecs: TaskSpec[],
+  tasks: AiTask[],
+): WorkflowState {
+  const playerMap = new Map((state.players || []).map((player) => [Number(player.id), player]));
+  const taskMap = new Map(tasks.map((task) => [task.taskKey, task]));
+  const nextState: WorkflowState = { ...state, phases: [...(state.phases || [])] };
+  const phaseIndex = nextState.phases.findIndex((item) => item.id === phase.id);
+  const currentPhase = phaseIndex >= 0 ? { ...nextState.phases[phaseIndex] } : phase;
+
+  if (step.config.turn === 'judge') {
+    const winnerVotes = collectWinnerVotes(currentPhase);
+    for (const spec of taskSpecs) {
+      const result = taskMap.get(spec.taskKey)?.result?.payload;
+      const judge = playerMap.get(Number(spec.actorId));
+      if (!judge || !result) continue;
+      winnerVotes[String(judge.id)] = String(result.winner || 'draw');
+      const speech = pushSpeech(currentPhase, judge, String(result.text || ''), 'judge-review') as unknown as Record<string, unknown>;
+      speech.winner = result.winner || 'draw';
+    }
+    nextState.winner = topWinner(winnerVotes);
+    nextState.winReason = nextState.winner === 'draw' ? '评委意见接近，双方战成平局。' : `${nextState.winner === 'pro' ? '正方' : '反方'}获得更多评委倾向。`;
+  } else if (step.config.turn === 'mvp') {
+    const votes = [...((currentPhase.votes || []) as Array<{ voterId: number; target: number }>)];
+    for (const spec of taskSpecs) {
+      const vote = taskMap.get(spec.taskKey)?.result?.payload;
+      if (vote?.target) votes.push(vote as unknown as { voterId: number; target: number });
+    }
+    currentPhase.votes = votes;
+    const mvpId = topVotedId(Object.fromEntries(votes.map((vote) => [vote.voterId, vote.target])));
+    nextState.mvp = publicPlayer(playerMap.get(Number(mvpId)) || playerMap.get(Number(votes[0]?.target)) as DebatePlayer);
+  } else {
+    for (const spec of taskSpecs) {
+      const result = taskMap.get(spec.taskKey)?.result?.payload;
+      const actor = playerMap.get(Number(spec.actorId));
+      if (!actor || !result) continue;
+      const kind = spec.action === 'crossfire_question' ? 'question'
+        : spec.action === 'crossfire_answer' ? 'answer'
+          : currentPhase.id;
+      pushSpeech(currentPhase, actor as DebatePlayer, String(result.text || result.content || ''), kind, spec.targetId || null);
+    }
+  }
+
+  currentPhase.stageSummary = summarizeDebatePhase(currentPhase);
+  if (phaseIndex >= 0) nextState.phases[phaseIndex] = currentPhase;
+  else nextState.phases.push(currentPhase);
+  return markStepComplete(nextState, step.id);
+}
+
+function collectWinnerVotes(phase: DebatePhase): Record<string, string> {
+  const votes: Record<string, string> = {};
+  for (const speech of phase.speeches || []) {
+    const winner = (speech as unknown as Record<string, unknown>).winner;
+    if (speech.playerId && winner) votes[String(speech.playerId)] = String(winner);
+  }
+  return votes;
 }
 
 function normalizeTaskResult(spec: Record<string, unknown>, result: unknown): RuntimeResult {

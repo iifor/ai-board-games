@@ -43,6 +43,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   const [activeSpeech, setActiveSpeech] = useState<SpeechState | null>(null);
   const [activeThinking, setActiveThinking] = useState<ActiveThinking | null>(null);
   const [nightActionType, setNightActionType] = useState('');
+  const [nightActionActorIds, setNightActionActorIds] = useState<number[]>([]);
   const [seerCheckTarget, setSeerCheckTarget] = useState<string | null>(null);
   const [sheriffCandidateIds, setSheriffCandidateIds] = useState<number[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -103,7 +104,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   const displayGame = game || EMPTY_WEREWOLF;
   const currentRound = displayGame.rounds?.[displayGame.rounds.length - 1] || null;
   const currentSpeakerId = activeSpeech?.playerId || null;
-  const nightActionPlayerIds = getNightActionPlayerIds(nightActionType, (displayGame.players || []) as Player[]);
+  const nightActionPlayerIds = nightActionActorIds.length ? nightActionActorIds : getNightActionPlayerIds(nightActionType, (displayGame.players || []) as Player[]);
   const {
     autoPlay,
     isReplayMode,
@@ -182,6 +183,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     setActiveSpeech(null);
     setActiveThinking(null);
     setNightActionType('');
+    setNightActionActorIds([]);
     setSeerCheckTarget(null);
     setSheriffCandidateIds([]);
     setSelectedPlayer(null);
@@ -236,6 +238,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     if (event.type === 'workflow-event') {
       if (event.message) setStreamMessage(event.message);
       if (event.game) setGame(event.game);
+      updateWorkflowNightAction(event);
+      updateWorkflowSpeech(event);
       archiveServerEvent(event);
       return;
     }
@@ -309,6 +313,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   function updateNightActionType(event: GameEvent): void {
     if (event.type === 'phase-start' && event.phase === 'night') {
       setNightActionType('');
+      setNightActionActorIds([]);
       setSeerCheckTarget(null);
       return;
     }
@@ -324,13 +329,50 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     }
     if (['wolf-wake', 'wolf-leader', 'seer-wake', 'guard-wake', 'witch-antidote', 'witch-poison'].includes(event.type)) {
       setNightActionType(event.type);
+      setNightActionActorIds([]);
       setSeerCheckTarget(null);
       return;
     }
     if (event.type === 'done' || event.type === 'game') {
       setNightActionType('');
+      setNightActionActorIds([]);
       setSeerCheckTarget(null);
     }
+  }
+
+  function updateWorkflowNightAction(event: GameEvent): void {
+    const actionWindow = event.actionWindow as { actionType?: string; actorIds?: Array<number | string> } | undefined;
+    const actionType = String(actionWindow?.actionType || '');
+    const actorIds = (actionWindow?.actorIds || []).map(Number).filter(Boolean);
+    if (actionType === 'wolf_speech' || actionType === 'wolf_vote' || actionType === 'wolf_kill') {
+      setNightActionType('wolf-wake');
+      setNightActionActorIds(actorIds);
+      setSeerCheckTarget(null);
+      return;
+    }
+    if (actionType === 'seer_check') setNightActionType('seer-wake');
+    else if (actionType === 'guard_protect') setNightActionType('guard-wake');
+    else if (actionType === 'witch_save') setNightActionType('witch-antidote');
+    else if (actionType === 'witch_poison') setNightActionType('witch-poison');
+    else if (actionWindow) setNightActionActorIds(actorIds);
+  }
+
+  function updateWorkflowSpeech(event: GameEvent): void {
+    if (!event.speech) return;
+    const workflowActionType = String(((event.event as Record<string, unknown> | undefined)?.payload as Record<string, unknown> | undefined)?.actionType || '');
+    if (workflowActionType !== 'wolf_speech' && workflowActionType !== 'wolf_kill') return;
+    setActiveThinking(null);
+    const speakerLabel = formatWerewolfSeatLabel(event.speech.playerId, (event.game?.players || displayGame.players || []) as Player[]);
+    setStreamMessage(`${speakerLabel}狼人夜聊`);
+    setActiveSpeech({
+      id: '',
+      playerId: event.speech.playerId,
+      text: event.subtitle?.text || event.speech.text,
+      fullText: event.speech.fullText || event.speech.text,
+      thinking: event.speech.thinking || '',
+      wordBoundaries: event.wordBoundaries || null,
+      currentTimeMs: null
+    });
   }
 
   function updateSheriffCandidateIds(event: GameEvent): void {

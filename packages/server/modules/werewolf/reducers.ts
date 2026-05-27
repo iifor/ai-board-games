@@ -6,6 +6,12 @@ import {
   buildWolfStrategySummary
 } from './utils';
 import { getAliveActorsByAction } from './actionWindows';
+import {
+  applySheriffActionResults,
+  getSheriffActorsForAction,
+  getSheriffTargetIds
+} from './sheriffWorkflow';
+import { ensureWolfTeamContext } from './wolfTeam';
 
 interface Agent {
   id: number;
@@ -24,11 +30,15 @@ interface Agent {
 }
 
 interface Night {
+  wolfIds?: number[];
   wolfChoices?: Record<string, number>;
   wolfSpeeches?: Array<Record<string, unknown>>;
   wolfVoteTally?: Record<string, number>;
   wolfTarget?: number | null;
   wolfStrategy?: string;
+  wolfSharedInfo?: string;
+  wolfLeaderId?: number | null;
+  wolfSpeechOrder?: number[];
   seerCheck?: { target: number; result: string } | null;
   guardTarget?: number | null;
   witchSave?: boolean;
@@ -43,6 +53,8 @@ interface Round {
   phase?: string;
   night: Night;
   sheriffId?: number | null;
+  sheriffElection?: Record<string, unknown> | null;
+  sheriffBadge?: { status: string };
   speeches?: Array<Record<string, unknown>>;
   votes?: Record<string, number>;
   voteTally?: Record<string, number>;
@@ -92,12 +104,42 @@ function applyActionResults(runtime: Runtime, step: Step, results: ActionResult[
   const round = ensureRound(runtime.state, step.config.day);
   const actionType = step.config.actionType;
   if (actionType === 'wolf_kill') applyWolfKill(runtime, round, results);
+  if (actionType === 'wolf_speech') applyWolfSpeech(runtime, round, results);
+  if (actionType === 'wolf_vote') applyWolfVote(runtime, round, results);
   if (actionType === 'seer_check') applySeerCheck(runtime, round, results);
   if (actionType === 'guard_protect') applyGuardProtect(runtime, round, results);
   if (actionType === 'witch_save') applyWitchSave(runtime, round, results);
   if (actionType === 'witch_poison') applyWitchPoison(runtime, round, results);
   if (actionType === 'day_speech') applyDaySpeech(round, results);
   if (actionType === 'day_vote') applyDayVote(runtime, round, results);
+  if (actionType?.startsWith('sheriff_')) applySheriffActionResults(runtime, round, actionType, results);
+}
+
+function applyWolfSpeech(runtime: Runtime, round: Round, results: ActionResult[]): void {
+  ensureWolfTeamContext(runtime, round);
+  const order = round.night.wolfSpeechOrder || [];
+  const byActor = new Map(results.map((result) => [Number(result.actorId), result]));
+  round.night.wolfSpeeches = order
+    .map((id) => byActor.get(Number(id)))
+    .filter(Boolean)
+    .map((result) => ({
+      playerId: result!.actorId,
+      text: result!.payload.speech || result!.payload.text || '',
+      phase: 'night-wolf',
+      day: round.day,
+      thinking: result!.payload.thinking || ''
+    }));
+}
+
+function applyWolfVote(runtime: Runtime, round: Round, results: ActionResult[]): void {
+  round.night.wolfChoices = {};
+  for (const result of results) {
+    round.night.wolfChoices[result.actorId] = result.payload.target!;
+  }
+  round.night.wolfVoteTally = countTargets(round.night.wolfChoices);
+  const topIds = getTopCandidateIds(round.night.wolfVoteTally);
+  round.night.wolfTarget = topIds[0] || topTarget(round.night.wolfChoices);
+  round.night.wolfStrategy = buildWolfStrategySummary(round.night.wolfChoices, round.night.wolfTarget, runtime.agents);
 }
 
 function applyWolfKill(runtime: Runtime, round: Round, results: ActionResult[]): void {
@@ -177,6 +219,11 @@ function getActorsForStep(runtime: Runtime, step: Step, round: Round): Agent[] {
   const actionType = step.config.actionType;
   const actors = (action: string): Agent[] => getAliveActorsByAction(runtime, action) as unknown as Agent[];
   if (actionType === 'wolf_kill') return actors('kill');
+  if (actionType === 'wolf_speech' || actionType === 'wolf_vote') {
+    const context = ensureWolfTeamContext(runtime, round);
+    const byId = new Map(actors('kill').map((agent) => [Number(agent.id), agent]));
+    return context.wolfSpeechOrder.map((id) => byId.get(Number(id))).filter(Boolean) as Agent[];
+  }
   if (actionType === 'seer_check') return actors('inspectFaction').slice(0, 1);
   if (actionType === 'guard_protect') return actors('guard').slice(0, 1);
   if (actionType === 'witch_save') return round.night?.wolfTarget ? actors('save').slice(0, 1) : [];
@@ -188,12 +235,18 @@ function getActorsForStep(runtime: Runtime, step: Step, round: Round): Agent[] {
   }
   if (actionType === 'day_speech') return sortBySeat(runtime.agents.filter((agent) => agent.alive));
   if (actionType === 'day_vote') return sortBySeat(runtime.agents.filter((agent) => agent.alive && agent.canVote));
+  if (actionType?.startsWith('sheriff_')) return getSheriffActorsForAction(runtime, round, actionType);
   return [];
 }
 
 function getTargetIds(runtime: Runtime, step: Step): number[] {
   const alive = runtime.agents.filter((agent) => agent.alive);
-  if (step.config.actionType === 'wolf_kill') return alive.filter((agent) => agent.faction !== 'wolves').map((agent) => agent.id);
+  if (step.config.actionType === 'wolf_kill' || step.config.actionType === 'wolf_vote') return alive.filter((agent) => agent.faction !== 'wolves').map((agent) => agent.id);
+  if (step.config.actionType === 'wolf_speech') return [];
+  if (step.config.actionType?.startsWith('sheriff_')) {
+    const round = ensureRound(runtime.state, step.config.day);
+    return getSheriffTargetIds(round, step.config.actionType);
+  }
   return alive.map((agent) => agent.id);
 }
 
@@ -222,3 +275,5 @@ export {
   getTargetIds,
   findPendingHunter
 };
+
+export type { ActionResult, Agent, Round, Runtime, Step };

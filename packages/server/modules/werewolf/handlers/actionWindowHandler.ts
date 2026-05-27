@@ -9,7 +9,10 @@ import {
 import type { ActionWindow } from '../actionWindows';
 import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
 import type { Runtime } from '../runtime';
-const { applyActionResults, getActorsForStep, getTargetIds } = require('../reducers');
+import { applyActionResults, getActorsForStep, getTargetIds } from '../reducers';
+import type { ActionResult as ReducerActionResult, Runtime as ReducerRuntime, Round as ReducerRound, Step as ReducerStep } from '../reducers';
+import { shouldSkipSheriffAction } from '../sheriffWorkflow';
+import { ensureWolfTeamContext } from '../wolfTeam';
 import { runActionWindowAiTask, validateActionWindowAiResult } from '../aiActions';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
@@ -47,7 +50,10 @@ function createActionWindowHandler() {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
       const runtime = createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!);
-      const actors = getActorsForStep(runtime, step, round);
+      if (step.config.actionType?.startsWith('sheriff_') && shouldSkipSheriffAction(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound, step.config.actionType)) {
+        return skipAction(match, step, runtime);
+      }
+      const actors = getActorsForStep(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, round as unknown as ReducerRound);
       if (!actors.length) return skipAction(match, step, runtime);
 
       if (!hasOpenWork(match.id, step.id, step.config.actionType)) {
@@ -58,7 +64,7 @@ function createActionWindowHandler() {
         return waitForActionWindow({ match, step, state, round, actors });
       }
 
-      applyActionResults(runtime, step, collectActionResults(match.id, step.id, step.config.actionType!));
+      applyActionResults(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, collectActionResults(match.id, step.id, step.config.actionType!) as unknown as ReducerActionResult[]);
       const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
       resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
       return {
@@ -89,15 +95,21 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
   round: Record<string, unknown>;
   actors: unknown[];
 }): HandlerResult {
+  if (step.config.actionType === 'wolf_kill' || step.config.actionType === 'wolf_speech' || step.config.actionType === 'wolf_vote') {
+    ensureWolfTeamContext(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound);
+  }
   const window = buildActionWindow({
     match,
     step,
     state: state as unknown as Record<string, unknown>,
     actionType: step.config.actionType!,
     actors: actors as Parameters<typeof buildActionWindow>[0]['actors'],
-    targetIds: getTargetIds(runtime, step),
+    targetIds: getTargetIds(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep),
     optional: Boolean(step.config.optional)
   });
+  const nextState = step.config.actionType === 'wolf_kill' || step.config.actionType === 'wolf_speech' || step.config.actionType === 'wolf_vote'
+    ? { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: window }
+    : { ...state, currentStep: step.id, currentActionWindow: window };
   const work = createActionBlockers({
     match,
     step,
@@ -107,11 +119,11 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
   });
   return {
     status: 'WAITING',
-    state: { ...state, currentStep: step.id, currentActionWindow: window },
+    state: nextState,
     blockers: work.blockers,
     tasks: work.tasks,
     pendingActions: work.pendingActions,
-    events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionWindow: window })]
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionWindow: window })]
   };
 }
 
@@ -133,7 +145,9 @@ function waitForActionWindow({ match, step, state, round, actors }: {
   return {
     status: 'WAITING',
     state: { ...state, currentStep: step.id },
-    blockers: work.blockers
+    blockers: work.blockers,
+    tasks: work.tasks,
+    pendingActions: work.pendingActions
   };
 }
 

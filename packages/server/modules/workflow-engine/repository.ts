@@ -437,6 +437,11 @@ function listSnapshots(matchId: string, limit: number = 20): MatchSnapshot[] {
     .map(rowToSnapshot).filter((s): s is MatchSnapshot => s !== null);
 }
 
+function getLatestSnapshot(matchId: string): MatchSnapshot | null {
+  return rowToSnapshot(getDb().prepare('SELECT * FROM match_snapshots WHERE match_id = ? ORDER BY version DESC, id DESC LIMIT 1')
+    .get(matchId) as MatchSnapshotRow | undefined);
+}
+
 function upsertActionWindowEpoch(epoch: ActionWindowEpochInput): ActionWindowEpoch | null {
   getDb().prepare(`
     INSERT INTO action_window_epochs (
@@ -635,6 +640,7 @@ export {
   submitPendingAction,
   expirePendingActions,
   listSnapshots,
+  getLatestSnapshot,
   upsertActionWindowEpoch,
   getActionWindowEpoch,
   listActionWindowEpochs,
