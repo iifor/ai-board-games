@@ -1,5 +1,4 @@
 import { PHASES, PHASE_LIMITS } from './constants';
-import { askHost } from './prompts';
 import type { DebateConfig, Topic } from './prompts';
 import { createPhase, emitSpeech, pushSpeech, summarizeDebatePhase } from './speech';
 import type { EmitContext, SpeechResult } from './speech';
@@ -206,16 +205,11 @@ async function safeHost(
   fallback: string,
   options: { includeTopic?: boolean; cacheable?: boolean } = {},
 ): Promise<string> {
-  if (!ctx.config.host?.apiKey) {
-    ctx.fallbackAudit.record({ gameType: 'debate', phase: phaseName, skillId: 'host-announce', reason: 'missing-api-key', fallbackValue: fallback });
-    return fallback;
-  }
-  try {
-    return String(await askHost(ctx.config, ctx.state.topic, phaseName, prompt, undefined, options) || fallback).replace(/\s+/g, ' ').trim();
-  } catch (error) {
-    ctx.fallbackAudit.record({ gameType: 'debate', phase: phaseName, skillId: 'host-announce', reason: (error as Error).message, fallbackValue: fallback });
-    return fallback;
-  }
+  void ctx;
+  void phaseName;
+  void prompt;
+  void options;
+  return fallback;
 }
 
 function getPostgameSpeakers(agents: DebatePlayer[], mvpId?: number | null): DebatePlayer[] {

@@ -4,3 +4,4 @@ logs/
 data/
 .env
 server/resources/audio/
+packages/server/resources

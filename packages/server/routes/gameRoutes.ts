@@ -35,11 +35,7 @@ router.get('/health', (_request: Request, response: Response) => {
       id: config.host.id || 0,
       name: config.host.name,
       nickname: config.host.nickname,
-      provider: config.host.provider,
-      model: config.host.model,
-      baseUrl: config.host.baseUrl,
-      apiKeyEnv: config.host.apiKeyEnv,
-      hasApiKey: Boolean(config.host.apiKey),
+      controlMode: 'workflow',
       avatar: config.host.avatar || '',
       avatarUrl: config.host.avatarUrl || config.host.avatar || '',
       voicePackageId: config.host.voicePackageId || null
@@ -92,7 +88,14 @@ router.post('/voice/synthesize-media', async (request: Request, response: Respon
 
     const voice = getVoicePackage(voicePackageId as number);
     if (!voice || !voice.enabled) throw new AppError(ErrorCodes.NOT_FOUND, '语音包不存在或未启用', 404);
-    if (!isAzureVoice(voice)) throw new AppError('UNSUPPORTED_VOICE', '该语音包不支持服务端语音媒体。', 422);
+    if (!isAzureVoice(voice)) {
+      response.status(422).json({
+        code: 'UNSUPPORTED_VOICE',
+        message: '该语音包不支持服务端语音媒体。',
+        data: null
+      });
+      return;
+    }
 
     response.json(await synthesizeVoiceMedia(voice, text));
   } catch (error) {

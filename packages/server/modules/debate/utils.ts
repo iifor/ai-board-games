@@ -245,8 +245,7 @@ function publicDebateHost(host: DebateHost = {}): Record<string, unknown> {
   return {
     id: host.id || 0, name: host.name || host.nickname || '主持人',
     nickname: host.nickname || host.name || '主持人', avatar: host.avatar || '',
-    avatarUrl: host.avatarUrl || host.avatar || '', provider: host.provider || '',
-    model: host.model || '', voicePackageId: host.voicePackageId || null,
+    avatarUrl: host.avatarUrl || host.avatar || '', voicePackageId: host.voicePackageId || null,
   };
 }
 

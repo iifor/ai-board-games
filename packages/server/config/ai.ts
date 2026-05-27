@@ -51,11 +51,7 @@ interface AiConfig {
 
 interface AppSettings {
   defaultHostPlayerId: number | null;
-  hostModelId?: number | null;
-  defaultHostModelId?: number | null;
 }
-
-type HostModelSource = Pick<AgentConfig, 'provider' | 'providerName' | 'baseUrl' | 'apiKeyEnv' | 'apiKey' | 'apiFormat' | 'model' | 'modelId' | 'temperature' | 'thinkingEnabled'>;
 
 function getAiConfig(): AiConfig {
   loadEnvFile();
@@ -74,20 +70,16 @@ function getAiConfig(): AiConfig {
   const appSettings = settings.getAppSettings() as AppSettings;
   const host = normalizeHost({
     players: aiPlayers,
-    defaultHostPlayerId: appSettings.defaultHostPlayerId,
-    configuredModel: resolveConfiguredHostModel(
-      runtimeModels,
-      appSettings.hostModelId ?? appSettings.defaultHostModelId ?? null,
-    )
+    defaultHostPlayerId: appSettings.defaultHostPlayerId
   });
   const providers = Object.fromEntries(runtimeModels.map((model: Record<string, unknown>) => [model.provider, modelToProvider(model)]));
-  const missingProviders = getMissingProviders({ host, players: aiPlayers });
+  const missingProviders = getMissingProviders(aiPlayers);
 
   return {
     ...DEFAULT_CONFIG,
     providers,
     configuredProviders: {},
-    usedProviderNames: Array.from(new Set([host.provider, ...aiPlayers.map((p: AgentConfig) => p.provider)].filter(Boolean))),
+    usedProviderNames: Array.from(new Set(aiPlayers.map((p: AgentConfig) => p.provider).filter(Boolean))),
     host,
     players: aiPlayers,
     realReady: aiPlayers.length > 0 && missingProviders.length === 0,
@@ -117,61 +109,41 @@ function normalizePlayer(player: Record<string, unknown>, models: Record<string,
 function normalizeHost(input: {
   players?: AgentConfig[];
   defaultHostPlayerId?: number | null;
-  configuredModel?: Record<string, unknown> | null;
 }): AgentConfig {
   const players = input.players || [];
   const defaultPlayer = players.find((p) => Number(p.id) === Number(input.defaultHostPlayerId));
   if (defaultPlayer) {
-    return { ...DEFAULT_CONFIG.host, ...defaultPlayer, id: defaultPlayer.id,
+    return { ...emptyHost(), id: defaultPlayer.id,
       name: defaultPlayer.name || defaultPlayer.nickname || DEFAULT_CONFIG.host.name,
       nickname: defaultPlayer.nickname || defaultPlayer.name || DEFAULT_CONFIG.host.nickname,
-      temperature: Number(defaultPlayer.temperature ?? DEFAULT_CONFIG.host.temperature),
-      thinkingEnabled: defaultPlayer.thinkingEnabled || false,
+      avatar: defaultPlayer.avatar || '',
+      avatarUrl: defaultPlayer.avatarUrl || defaultPlayer.avatar || '',
+      voicePackageId: defaultPlayer.voicePackageId || null,
       defaultHostPlayerId: defaultPlayer.id };
   }
-  const modelSource = input.configuredModel
-    ? hostModelSourceFromRuntimeModel(input.configuredModel)
-    : hostModelSourceFromPlayer(players[0]);
-  return { ...DEFAULT_CONFIG.host, ...modelSource,
-    defaultHostPlayerId: null } as AgentConfig;
+  return { ...emptyHost(), defaultHostPlayerId: null };
 }
 
-function resolveConfiguredHostModel(models: Record<string, unknown>[], hostModelId?: number | null): Record<string, unknown> | null {
-  if (hostModelId) {
-    return models.find((model) => Number(model.id) === Number(hostModelId)) || null;
-  }
-  return null;
-}
-
-function hostModelSourceFromRuntimeModel(model: Record<string, unknown>): HostModelSource {
-  const provider = modelToProvider(model);
+function emptyHost(): AgentConfig {
   return {
-    provider: provider.name || '',
-    providerName: provider.name || '',
-    baseUrl: provider.baseUrl || '',
-    apiKeyEnv: 'DATABASE_MODEL_API_KEY',
-    apiKey: provider.apiKey || '',
-    apiFormat: (model.apiFormat as string) || 'openai-compatible',
-    model: (model.name as string) || '',
-    modelId: (model.id as number) || null,
+    id: 0,
+    name: DEFAULT_CONFIG.host.name,
+    nickname: DEFAULT_CONFIG.host.nickname,
+    avatar: '',
+    avatarUrl: '',
+    provider: '',
+    providerName: '',
+    baseUrl: '',
+    apiKeyEnv: '',
+    apiKey: '',
+    apiFormat: '',
+    model: '',
+    modelId: null,
     temperature: DEFAULT_CONFIG.host.temperature,
-    thinkingEnabled: (model.thinkingEnabled as boolean) || false
-  };
-}
-
-function hostModelSourceFromPlayer(player?: AgentConfig): Partial<HostModelSource> {
-  if (!player) return {};
-  return {
-    provider: player.provider,
-    providerName: player.providerName,
-    baseUrl: player.baseUrl,
-    apiKeyEnv: player.apiKeyEnv,
-    apiKey: player.apiKey,
-    apiFormat: player.apiFormat,
-    model: player.model,
-    modelId: player.modelId,
-    temperature: Number(player.temperature ?? DEFAULT_CONFIG.host.temperature),
-    thinkingEnabled: player.thinkingEnabled || false
+    personality: '',
+    sex: '',
+    voicePackageId: null,
+    thinkingEnabled: false
   };
 }
 
@@ -191,9 +163,9 @@ function modelToProvider(model: Record<string, unknown>): ProviderInfo {
     apiFormat: (model.apiFormat as string) || 'openai-compatible' };
 }
 
-function getMissingProviders(config: { host: AgentConfig; players: AgentConfig[] }): Array<{ provider: string; apiKeyEnv: string }> {
+function getMissingProviders(players: AgentConfig[]): Array<{ provider: string; apiKeyEnv: string }> {
   const missing = new Map<string, string>();
-  for (const agent of [config.host, ...config.players]) {
+  for (const agent of players) {
     if (!agent.provider || !agent.model || !agent.apiKey) {
       missing.set(agent.provider || '未绑定模型', agent.apiKeyEnv || 'DATABASE_MODEL_API_KEY');
     }

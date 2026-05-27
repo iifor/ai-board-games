@@ -268,7 +268,6 @@ function getRequestConfig(
       : selectPlayersForGame(config, playerIds, gameType, options);
   const host = resolveRequestHost(config, options.hostId);
   const selectedProviders = new Set([
-    host.provider,
     ...selected.map((player: AiConfigPlayer) => player.provider),
   ]);
   const missingProviders = config.missingProviders.filter(
