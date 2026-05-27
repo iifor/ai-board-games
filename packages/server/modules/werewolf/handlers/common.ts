@@ -1,9 +1,13 @@
 import { serializeWerewolfState } from '../runtime';
+import type { ChannelType } from '@ai-presenter/shared/types/channelTypes';
+import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 
 interface WerewolfEvent {
   type: string;
   payload: Record<string, unknown>;
   idempotencyKey: string;
+  channel?: ChannelType;
+  scopeKey?: string;
 }
 
 interface StepState {
@@ -17,8 +21,10 @@ function createWerewolfEvent(
   state: Record<string, unknown>,
   workflowEvent: string,
   message: string,
-  extra: Record<string, unknown> = {}
+  extra: Record<string, unknown> = {},
+  options: { channel?: ChannelType; scopeKey?: string } = {}
 ): WerewolfEvent {
+  const channel = options.channel || CHANNEL_TYPES.PUBLIC;
   return {
     type: workflowEvent,
     payload: {
@@ -26,9 +32,13 @@ function createWerewolfEvent(
       workflowEvent,
       message,
       game: serializeWerewolfState(match, state),
+      channel,
+      scopeKey: options.scopeKey,
       ...extra
     },
-    idempotencyKey: `${match.id}:${step.id}:${workflowEvent}`
+    idempotencyKey: `${match.id}:${step.id}:${workflowEvent}`,
+    channel,
+    scopeKey: options.scopeKey
   };
 }
 

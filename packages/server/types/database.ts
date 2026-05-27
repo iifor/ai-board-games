@@ -181,6 +181,8 @@ interface WorkflowEventRow {
   player_id: string | null;
   payload_json: string;
   visibility: string;
+  channel: string;
+  scope_key: string | null;
   visible_to_player_ids_json: string;
   idempotency_key: string | null;
   created_at: string;

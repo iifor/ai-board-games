@@ -36,6 +36,8 @@ interface WorkflowEvent {
   playerId: string | undefined;
   payload: unknown;
   visibility: string;
+  channel: string;
+  scopeKey: string | undefined;
   visibleToPlayerIds: (string | number)[];
   idempotencyKey: string | undefined;
   createdAt: string;

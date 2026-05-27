@@ -356,6 +356,13 @@ function migrate(db: Database | JsonDb): void {
   ensureColumn(db, 'models', 'thinking_enabled', "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, 'ai_tasks', 'worker_id', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'ai_tasks', 'claimed_at', 'TEXT');
+
+  // Channel + Scope model migration
+  ensureColumn(db, 'workflow_events', 'channel', "TEXT NOT NULL DEFAULT 'public'");
+  ensureColumn(db, 'workflow_events', 'scope_key', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_workflow_events_channel ON workflow_events(match_id, channel)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_workflow_events_scope ON workflow_events(match_id, channel, scope_key)');
+
   migrateLegacyModelProviders(db);
 
   // Fix null/empty/consensus game types

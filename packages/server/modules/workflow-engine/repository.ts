@@ -58,6 +58,8 @@ interface EventInput {
   playerId?: string | number | null;
   payload?: unknown;
   visibility?: string;
+  channel?: string;
+  scopeKey?: string | null;
   visibleToPlayerIds?: unknown[];
   idempotencyKey?: string | null;
   createdAt?: string;
@@ -196,14 +198,15 @@ function appendEvent(event: EventInput): WorkflowEventRow {
     if (existing) return existing;
   }
   const seq = event.seq || nextEventSeq(event.matchId);
+  const channel = event.channel || (event.visibility === 'public' ? 'public' : event.visibility === 'system' ? 'system' : 'scope');
   const result = getDb().prepare(`
     INSERT OR IGNORE INTO workflow_events (
       match_id, seq, type, step_id, player_id, payload_json, visibility,
-      visible_to_player_ids_json, idempotency_key, created_at
+      channel, scope_key, visible_to_player_ids_json, idempotency_key, created_at
     )
     VALUES (
       @match_id, @seq, @type, @step_id, @player_id, @payload_json, @visibility,
-      @visible_to_player_ids_json, @idempotency_key, @created_at
+      @channel, @scope_key, @visible_to_player_ids_json, @idempotency_key, @created_at
     )
   `).run({
     match_id: event.matchId,
@@ -213,6 +216,8 @@ function appendEvent(event: EventInput): WorkflowEventRow {
     player_id: event.playerId == null ? null : String(event.playerId),
     payload_json: toJson(event.payload || {}),
     visibility: event.visibility || 'public',
+    channel,
+    scope_key: event.scopeKey || null,
     visible_to_player_ids_json: toJson(event.visibleToPlayerIds || []),
     idempotency_key: event.idempotencyKey || null,
     created_at: event.createdAt || nowIso(),

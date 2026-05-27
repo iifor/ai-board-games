@@ -66,6 +66,8 @@ function publicMatch(row: MatchRow | null | undefined): Match | null {
 
 function rowToEvent(row: WorkflowEventRow | null | undefined): WorkflowEvent | null {
   if (!row) return null;
+  const visibility = row.visibility;
+  const channel = row.channel || (visibility === 'public' ? 'public' : visibility === 'system' ? 'system' : 'scope');
   return {
     id: row.id,
     matchId: row.match_id,
@@ -74,7 +76,9 @@ function rowToEvent(row: WorkflowEventRow | null | undefined): WorkflowEvent | n
     stepId: row.step_id || undefined,
     playerId: row.player_id || undefined,
     payload: parseJson(row.payload_json, {}),
-    visibility: row.visibility,
+    visibility,
+    channel,
+    scopeKey: row.scope_key || undefined,
     visibleToPlayerIds: parseJson(row.visible_to_player_ids_json, []),
     idempotencyKey: row.idempotency_key || undefined,
     createdAt: row.created_at,

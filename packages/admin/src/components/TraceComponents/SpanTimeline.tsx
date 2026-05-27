@@ -1,5 +1,6 @@
 import { Table, Tag, Typography } from 'antd';
 import type { Span } from '../../types/trace';
+import { translateSpanType, translateStatus } from '../../constants/traceLabels';
 
 const { Text } = Typography;
 const STATUS_COLORS: Record<string, string> = { ok: 'success', error: 'error', fallback: 'warning' };
@@ -41,14 +42,6 @@ function flattenTree(nodes: SpanNode[], depth = 0): FlatSpan[] {
   return result;
 }
 
-const SPAN_TYPE_LABELS: Record<string, string> = {
-  'game-root': '游戏根',
-  'llm-call': 'LLM 调用',
-  'agent-decision': 'Agent 决策',
-  'phase': '阶段',
-  'skill-execution': '技能执行'
-};
-
 interface SpanTimelineProps {
   spans?: Span[];
   onSelectSpan?: (span: Span) => void;
@@ -76,11 +69,11 @@ export function SpanTimeline({ spans = [], onSelectSpan }: SpanTimelineProps) {
         },
         {
           title: '类型', dataIndex: 'span_type', key: 'type', width: 100,
-          render: (t: string) => <Tag>{SPAN_TYPE_LABELS[t] || t}</Tag>
+          render: (t: string) => <Tag>{translateSpanType(t)}</Tag>
         },
         {
           title: '状态', dataIndex: 'status', key: 'status', width: 80,
-          render: (s: string) => <Tag color={STATUS_COLORS[s] || 'default'}>{s}</Tag>
+          render: (s: string) => <Tag color={STATUS_COLORS[s] || 'default'}>{translateStatus(s)}</Tag>
         },
         {
           title: '开始', dataIndex: 'start_time', key: 'start', width: 180,

@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { Card, Descriptions, Tag, Typography } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { translateProvider, translateModelName } from '../../constants/traceLabels';
 import type { LlmCall } from '../../types/trace';
 
 const { Text } = Typography;
 
+type GetNickname = (playerId: number | undefined | null) => string;
+
 interface LlmCallCardProps {
   call: LlmCall;
   defaultCollapsed?: boolean;
+  getNickname?: GetNickname;
 }
 
 interface LlmMessage {
@@ -15,7 +19,7 @@ interface LlmMessage {
   content: string;
 }
 
-export function LlmCallCard({ call, defaultCollapsed = true }: LlmCallCardProps) {
+export function LlmCallCard({ call, defaultCollapsed = true, getNickname }: LlmCallCardProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   if (!call) return null;
@@ -34,9 +38,9 @@ export function LlmCallCard({ call, defaultCollapsed = true }: LlmCallCardProps)
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {isError ? <CloseCircleOutlined style={{ color: '#ff4d4f' }} /> : <CheckCircleOutlined style={{ color: '#52c41a' }} />}
-          <Tag color="blue">{call.provider}</Tag>
-          <Text strong>{call.model}</Text>
-          {call.player_id && <Tag>玩家 {call.player_id}</Tag>}
+          {call.player_id && <Tag color="cyan">{getNickname?.(call.player_id) || `玩家 ${call.player_id}`}</Tag>}
+          <Tag color="blue">{translateProvider(call.provider)}</Tag>
+          <Text strong>{translateModelName(call.model)}</Text>
           {call.player_role && <Tag>{call.player_role}</Tag>}
           <Text type="secondary" style={{ fontSize: 12 }}>{call.latency_ms}ms</Text>
           {isError && <Text type="danger" style={{ fontSize: 12 }}>{call.error_message}</Text>}

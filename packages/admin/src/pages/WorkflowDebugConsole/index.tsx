@@ -60,36 +60,36 @@ export function WorkflowDebugConsole() {
   }
 
   const tabs = useMemo(() => [
-    tableTab('events', 'Events', data.events as DebugRecord[], eventColumns),
-    tableTab('aiTasks', 'AI Tasks', data.aiTasks as DebugRecord[], aiTaskColumns(runAction)),
-    tableTab('pendingActions', 'Pending Actions', data.pendingActions as DebugRecord[], basicColumns),
-    tableTab('actionWindows', 'Action Windows', data.actionWindows as DebugRecord[], basicColumns),
-    tableTab('effects', 'Effects', data.effects as DebugRecord[], effectColumns),
-    tableTab('interrupts', 'Interrupts', data.interrupts as DebugRecord[], interruptColumns(runAction)),
-    tableTab('snapshots', 'Snapshots', data.snapshots as DebugRecord[], basicColumns)
+    tableTab('events', '事件', data.events as DebugRecord[], eventColumns),
+    tableTab('aiTasks', 'AI 任务', data.aiTasks as DebugRecord[], aiTaskColumns(runAction)),
+    tableTab('pendingActions', '待处理行动', data.pendingActions as DebugRecord[], basicColumns),
+    tableTab('actionWindows', '行动窗口', data.actionWindows as DebugRecord[], basicColumns),
+    tableTab('effects', '效果', data.effects as DebugRecord[], effectColumns),
+    tableTab('interrupts', '中断', data.interrupts as DebugRecord[], interruptColumns(runAction)),
+    tableTab('snapshots', '快照', data.snapshots as DebugRecord[], basicColumns)
   ], [data]);
 
   return (
     <section>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Card title="Workflow Debug Console" size="small">
+        <Card title="工作流调试控制台" size="small">
           <Space.Compact style={{ width: '100%' }}>
-            <Input value={matchId} onChange={(event) => setMatchId(event.target.value)} placeholder="match id" onPressEnter={() => load()} />
+            <Input value={matchId} onChange={(event) => setMatchId(event.target.value)} placeholder="输入 Match ID" onPressEnter={() => load()} />
             <Button type="primary" loading={loading} onClick={() => load()}>加载</Button>
-            <Button disabled={!matchId} onClick={() => runAction(() => tickWorkflowMatch(matchId))}>Tick</Button>
+            <Button disabled={!matchId} onClick={() => runAction(() => tickWorkflowMatch(matchId))}>推进</Button>
           </Space.Compact>
         </Card>
 
         {match ? (
           <Row gutter={[12, 12]}>
-            <Col span={8}><StatCard title="Status" value={String(match.status || '-')} /></Col>
-            <Col span={8}><StatCard title="Workflow" value={String(match.workflowId || '-')} /></Col>
-            <Col span={8}><StatCard title="Step Index" value={String(match.currentStepIndex ?? '-')} /></Col>
+            <Col span={8}><StatCard title="状态" value={String(match.status || '-')} /></Col>
+            <Col span={8}><StatCard title="工作流" value={String(match.workflowId || '-')} /></Col>
+            <Col span={8}><StatCard title="当前步骤" value={String(match.currentStepIndex ?? '-')} /></Col>
           </Row>
         ) : <Alert type="info" message="输入 matchId 查看 workflow 运行态、事件、任务、效果和中断。" showIcon />}
 
         {match && (
-          <Card title="Create Interrupt" size="small">
+          <Card title="创建中断" size="small">
             <Form form={form} layout="inline" onFinish={(values) => runAction(() => createWorkflowInterrupt(matchId, {
               interruptType: values.interruptType || 'manual_debug',
               stepId: values.stepId || null,
@@ -97,11 +97,11 @@ export function WorkflowDebugConsole() {
               priority: values.priority || 0,
               payload: { note: values.note || '' }
             }))}>
-              <Form.Item name="interruptType"><Input placeholder="interrupt type" /></Form.Item>
-              <Form.Item name="stepId"><Input placeholder="step id" /></Form.Item>
-              <Form.Item name="effectId"><Input placeholder="effect id" /></Form.Item>
-              <Form.Item name="priority"><InputNumber placeholder="priority" /></Form.Item>
-              <Form.Item name="note"><Input placeholder="note" /></Form.Item>
+              <Form.Item name="interruptType"><Input placeholder="中断类型" /></Form.Item>
+              <Form.Item name="stepId"><Input placeholder="步骤 ID" /></Form.Item>
+              <Form.Item name="effectId"><Input placeholder="效果 ID" /></Form.Item>
+              <Form.Item name="priority"><InputNumber placeholder="优先级" /></Form.Item>
+              <Form.Item name="note"><Input placeholder="备注" /></Form.Item>
               <Button htmlType="submit">创建中断</Button>
             </Form>
           </Card>
@@ -127,38 +127,38 @@ function tableTab(key: string, label: string, rows: DebugRecord[] = [], columns:
 
 const basicColumns: ColumnsType<DebugRecord> = [
   { title: 'ID', dataIndex: 'id', ellipsis: true },
-  { title: 'Step', dataIndex: 'stepId', ellipsis: true },
-  { title: 'Type', dataIndex: 'actionType', ellipsis: true },
-  { title: 'Status', dataIndex: 'status', render: (value) => <Tag>{String(value || '-')}</Tag> },
-  { title: 'Payload', render: (_, row) => <JsonCell value={row.payload || row.window || row.state || row.error} /> }
+  { title: '步骤', dataIndex: 'stepId', ellipsis: true },
+  { title: '类型', dataIndex: 'actionType', ellipsis: true },
+  { title: '状态', dataIndex: 'status', render: (value) => <Tag>{String(value || '-')}</Tag> },
+  { title: '数据', render: (_, row) => <JsonCell value={row.payload || row.window || row.state || row.error} /> }
 ];
 
 const eventColumns: ColumnsType<DebugRecord> = [
-  { title: 'Seq', dataIndex: 'seq', width: 70 },
-  { title: 'Type', dataIndex: 'type', ellipsis: true },
-  { title: 'Step', dataIndex: 'stepId', ellipsis: true },
-  { title: 'Payload', render: (_, row) => <JsonCell value={row.payload} /> }
+  { title: '序号', dataIndex: 'seq', width: 70 },
+  { title: '类型', dataIndex: 'type', ellipsis: true },
+  { title: '步骤', dataIndex: 'stepId', ellipsis: true },
+  { title: '数据', render: (_, row) => <JsonCell value={row.payload} /> }
 ];
 
 const effectColumns: ColumnsType<DebugRecord> = [
   { title: 'ID', dataIndex: 'id', ellipsis: true },
-  { title: 'Effect', dataIndex: 'effectType', ellipsis: true },
-  { title: 'Status', dataIndex: 'status', render: (value) => <Tag color={value === 'applied' ? 'green' : 'default'}>{String(value || '-')}</Tag> },
-  { title: 'Payload', render: (_, row) => <JsonCell value={row.payload} /> }
+  { title: '效果', dataIndex: 'effectType', ellipsis: true },
+  { title: '状态', dataIndex: 'status', render: (value) => <Tag color={value === 'applied' ? 'green' : 'default'}>{String(value || '-')}</Tag> },
+  { title: '数据', render: (_, row) => <JsonCell value={row.payload} /> }
 ];
 
 function aiTaskColumns(runAction: (action: () => Promise<unknown>) => Promise<void>): ColumnsType<DebugRecord> {
   return [
     { title: 'ID', dataIndex: 'id', ellipsis: true },
-    { title: 'Action', dataIndex: 'action', ellipsis: true },
-    { title: 'Status', dataIndex: 'status', render: (value) => <Tag>{String(value || '-')}</Tag> },
-    { title: 'Error', render: (_, row) => <JsonCell value={row.error} /> },
+    { title: '行动', dataIndex: 'action', ellipsis: true },
+    { title: '状态', dataIndex: 'status', render: (value) => <Tag>{String(value || '-')}</Tag> },
+    { title: '错误', render: (_, row) => <JsonCell value={row.error} /> },
     {
-      title: 'Ops',
+      title: '操作',
       render: (_, row) => (
         <Space>
-          <Button size="small" onClick={() => runAction(() => retryWorkflowAiTask(String(row.id)))}>Retry</Button>
-          <Button size="small" danger onClick={() => runAction(() => cancelWorkflowAiTask(String(row.id)))}>Cancel</Button>
+          <Button size="small" onClick={() => runAction(() => retryWorkflowAiTask(String(row.id)))}>重试</Button>
+          <Button size="small" danger onClick={() => runAction(() => cancelWorkflowAiTask(String(row.id)))}>取消</Button>
         </Space>
       )
     }
@@ -168,15 +168,15 @@ function aiTaskColumns(runAction: (action: () => Promise<unknown>) => Promise<vo
 function interruptColumns(runAction: (action: () => Promise<unknown>) => Promise<void>): ColumnsType<DebugRecord> {
   return [
     { title: 'ID', dataIndex: 'id', ellipsis: true },
-    { title: 'Type', dataIndex: 'interruptType', ellipsis: true },
-    { title: 'Status', dataIndex: 'status', render: (value) => <Tag>{String(value || '-')}</Tag> },
-    { title: 'Payload', render: (_, row) => <JsonCell value={row.payload} /> },
+    { title: '类型', dataIndex: 'interruptType', ellipsis: true },
+    { title: '状态', dataIndex: 'status', render: (value) => <Tag>{String(value || '-')}</Tag> },
+    { title: '数据', render: (_, row) => <JsonCell value={row.payload} /> },
     {
-      title: 'Ops',
+      title: '操作',
       render: (_, row) => (
         <Space>
-          <Button size="small" onClick={() => runAction(() => resolveWorkflowInterrupt(String(row.id), { status: 'resolved', resolution: { manual: true } }))}>Resolve</Button>
-          <Button size="small" onClick={() => runAction(() => resolveWorkflowInterrupt(String(row.id), { status: 'rejected', resolution: { manual: true } }))}>Reject</Button>
+          <Button size="small" onClick={() => runAction(() => resolveWorkflowInterrupt(String(row.id), { status: 'resolved', resolution: { manual: true } }))}>通过</Button>
+          <Button size="small" onClick={() => runAction(() => resolveWorkflowInterrupt(String(row.id), { status: 'rejected', resolution: { manual: true } }))}>拒绝</Button>
         </Space>
       )
     }

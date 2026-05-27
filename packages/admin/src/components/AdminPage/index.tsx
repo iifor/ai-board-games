@@ -69,7 +69,7 @@ const MENU_ITEMS: ItemType[] = [
   },
   { key: '/voices', icon: <SoundOutlined />, label: '语音管理' },
   { key: '/traces', icon: <EyeOutlined />, label: 'AI 观测' }
-, { key: '/workflow-debug', icon: <PartitionOutlined />, label: 'Workflow Debug' }
+, { key: '/workflow-debug', icon: <PartitionOutlined />, label: '工作流调试' }
 ];
 
 export function AdminPage() {

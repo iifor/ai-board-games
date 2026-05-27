@@ -3,6 +3,7 @@ import { LlmCallCard } from '../../components/TraceComponents/LlmCallCard';
 import { AgentDecisionCard } from '../../components/TraceComponents/AgentDecisionCard';
 import { RelatedSection, RelationItem } from './TraceRelationList';
 import { TraceJsonBlock } from './TraceJsonBlock';
+import { translateEventTitle, translateDecisionType, translateModelName, translateProvider, translateSpanType, translateSpanName, translateStatus } from '../../constants/traceLabels';
 import type { Span, LlmCall, AgentDecision, TraceSnapshot, TraceEvent, TraceRelations, DetailDrawerState, DetailType } from '../../types/trace';
 
 const { Text, Title } = Typography;
@@ -24,14 +25,17 @@ const TITLE_MAP: Record<DetailType, string> = {
   event: '事件明细'
 };
 
+type GetNickname = (playerId: number | undefined | null) => string;
+
 interface TraceDetailDrawerProps {
   detail: DetailDrawerState | null;
   relations: TraceRelations;
   onClose: () => void;
   onOpenDetail: (detail: DetailDrawerState) => void;
+  getNickname?: GetNickname;
 }
 
-export function TraceDetailDrawer({ detail, relations, onClose, onOpenDetail }: TraceDetailDrawerProps) {
+export function TraceDetailDrawer({ detail, relations, onClose, onOpenDetail, getNickname }: TraceDetailDrawerProps) {
   const record = detail?.record;
   const spanContext = record && 'span_id' in record && record.span_id ? relations?.getSpanContext(record.span_id as string) : null;
   const currentSpanContext = detail?.type === 'span' ? relations?.getSpanContext((record as Span)?.id) : null;
@@ -50,37 +54,41 @@ export function TraceDetailDrawer({ detail, relations, onClose, onOpenDetail }: 
           span={record as Span}
           related={currentSpanContext}
           onOpenDetail={onOpenDetail}
+          getNickname={getNickname}
         />
       )}
       {detail?.type === 'llm' && (
         <>
           <RelatedSpan span={spanContext?.span} onOpenDetail={onOpenDetail} />
-          <LlmCallCard call={record as LlmCall} defaultCollapsed={false} />
+          <LlmCallCard call={record as LlmCall} defaultCollapsed={false} getNickname={getNickname} />
         </>
       )}
       {detail?.type === 'decision' && (
         <>
           <RelatedSpan span={spanContext?.span} onOpenDetail={onOpenDetail} />
-          <AgentDecisionCard decision={record as AgentDecision} />
+          <AgentDecisionCard decision={record as AgentDecision} getNickname={getNickname} />
           <RelatedSection title="同 Span 下的 LLM 调用" emptyText="暂无关联 LLM 调用">
             {spanContext?.llmCalls?.map((call) => (
               <RelationItem
                 key={call.id}
-                title={call.model}
-                tags={[call.provider, call.player_id ? `玩家 ${call.player_id}` : undefined]}
+                title={translateModelName(call.model)}
+                tags={[translateProvider(call.provider), call.player_id ? getNickname?.(call.player_id) : undefined].filter(Boolean) as string[]}
                 onClick={() => onOpenDetail({ type: 'llm', record: call })}
               />
             ))}
           </RelatedSection>
           <RelatedSection title="同 Span 下的事件" emptyText="暂无关联事件">
-            {spanContext?.events?.map((event) => (
-              <RelationItem
-                key={event.id}
-                title={event.event_type}
-                tags={[event.phase, event.day != null ? `Day ${event.day}` : undefined]}
-                onClick={() => onOpenDetail({ type: 'event', record: event })}
-              />
-            ))}
+            {spanContext?.events?.map((event) => {
+              const payload = parseJson(event.event_json);
+              return (
+                <RelationItem
+                  key={event.id}
+                  title={translateEventTitle(event.event_type, payload)}
+                  tags={[event.phase, event.day != null ? `Day ${event.day}` : undefined]}
+                  onClick={() => onOpenDetail({ type: 'event', record: event })}
+                />
+              );
+            })}
           </RelatedSection>
         </>
       )}
@@ -98,20 +106,23 @@ interface SpanDetailProps {
   span: Span;
   related: ReturnType<TraceRelations['getSpanContext']> | null;
   onOpenDetail: (detail: DetailDrawerState) => void;
+  getNickname?: GetNickname;
 }
 
-function SpanDetail({ span, related, onOpenDetail }: SpanDetailProps) {
+function SpanDetail({ span, related, onOpenDetail, getNickname }: SpanDetailProps) {
   if (!span) return null;
   const attrs = parseJson(span.attributes_json);
   const error = span.error_json ? parseJson(span.error_json, null) : null;
+  const playerTag = (playerId?: number | null) =>
+    playerId && getNickname ? getNickname(playerId) : (playerId ? `玩家 ${playerId}` : undefined);
 
   return (
     <div>
       <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
         <Descriptions.Item label="Span ID"><Text code>{span.id}</Text></Descriptions.Item>
-        <Descriptions.Item label="名称">{span.span_name}</Descriptions.Item>
-        <Descriptions.Item label="类型"><Tag>{span.span_type}</Tag></Descriptions.Item>
-        <Descriptions.Item label="状态">{span.status}</Descriptions.Item>
+        <Descriptions.Item label="名称">{translateSpanName(span.span_name)}</Descriptions.Item>
+        <Descriptions.Item label="类型"><Tag>{translateSpanType(span.span_type)}</Tag></Descriptions.Item>
+        <Descriptions.Item label="状态"><Tag color={span.status === 'ok' ? 'success' : span.status === 'error' ? 'error' : 'default'}>{translateStatus(span.status)}</Tag></Descriptions.Item>
         <Descriptions.Item label="开始时间">{span.start_time ? new Date(span.start_time).toLocaleString() : '-'}</Descriptions.Item>
         <Descriptions.Item label="结束时间">{span.end_time ? new Date(span.end_time).toLocaleString() : '-'}</Descriptions.Item>
       </Descriptions>
@@ -121,8 +132,8 @@ function SpanDetail({ span, related, onOpenDetail }: SpanDetailProps) {
         {related?.llmCalls?.map((call) => (
           <RelationItem
             key={call.id}
-            title={call.model}
-            tags={[call.provider, call.player_id ? `玩家 ${call.player_id}` : undefined]}
+            title={translateModelName(call.model)}
+            tags={[translateProvider(call.provider), playerTag(call.player_id)].filter(Boolean) as string[]}
             onClick={() => onOpenDetail({ type: 'llm', record: call })}
           />
         ))}
@@ -131,21 +142,24 @@ function SpanDetail({ span, related, onOpenDetail }: SpanDetailProps) {
         {related?.decisions?.map((decision) => (
           <RelationItem
             key={decision.id}
-            title={decision.decision_type}
-            tags={[decision.player_id ? `玩家 ${decision.player_id}` : undefined, decision.phase]}
+            title={translateDecisionType(decision.decision_type)}
+            tags={[playerTag(decision.player_id), decision.phase].filter(Boolean) as string[]}
             onClick={() => onOpenDetail({ type: 'decision', record: decision })}
           />
         ))}
       </RelatedSection>
       <RelatedSection title="关联事件" emptyText="暂无关联事件">
-        {related?.events?.map((event) => (
-          <RelationItem
-            key={event.id}
-            title={event.event_type}
-            tags={[event.phase, event.day != null ? `Day ${event.day}` : undefined]}
-            onClick={() => onOpenDetail({ type: 'event', record: event })}
-          />
-        ))}
+        {related?.events?.map((event) => {
+          const payload = parseJson(event.event_json);
+          return (
+            <RelationItem
+              key={event.id}
+              title={translateEventTitle(event.event_type, payload)}
+              tags={[event.phase, event.day != null ? `Day ${event.day}` : undefined]}
+              onClick={() => onOpenDetail({ type: 'event', record: event })}
+            />
+          );
+        })}
       </RelatedSection>
       {error && (
         <>
@@ -168,7 +182,7 @@ function RelatedSpan({ span, onOpenDetail }: RelatedSpanProps) {
       {span && (
         <RelationItem
           title={span.span_name}
-          tags={[span.span_type, span.status]}
+          tags={[translateSpanType(span.span_type), translateStatus(span.status)]}
           onClick={() => onOpenDetail({ type: 'span', record: span })}
         />
       )}

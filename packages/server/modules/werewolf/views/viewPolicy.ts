@@ -1,3 +1,6 @@
+import { canAccess, buildViewerContext } from './informationLayer';
+import type { ViewerContext } from '@ai-presenter/shared/types/channelTypes';
+
 const VIEW_MODE_GOD = 'god';
 const VIEW_MODE_PLAYER = 'player';
 const { assertAbortableWerewolfBoundary } = require('../failures/failurePolicy');
@@ -69,6 +72,8 @@ interface Round {
 
 interface GameEvent {
   type: string;
+  channel?: string;
+  scopeKey?: string;
   game?: Record<string, unknown>;
   round?: Round;
   players?: Player[];
@@ -272,11 +277,30 @@ function cloneNight(night: NightData, round: Round = {}): NightData {
 
 function isEventVisible(event: GameEvent, context: ProjectionContext = { mode: VIEW_MODE_GOD }): boolean {
   if (context.mode === VIEW_MODE_GOD) return true;
+
+  // New channel model: delegate to InformationLayer
+  if (event.channel) {
+    const viewer = projectionContextToViewerContext(context);
+    return canAccess(event as { channel: string; scopeKey?: string }, viewer);
+  }
+
+  // Legacy fallback: role-based event type filtering
   if (WOLF_EVENT_TYPES.has(event.type)) return context.viewerFaction === 'wolves';
   if (SEER_EVENT_TYPES.has(event.type)) return context.viewerRoleId === 'seer';
   if (GUARD_EVENT_TYPES.has(event.type)) return context.viewerRoleId === 'guard';
   if (WITCH_EVENT_TYPES.has(event.type)) return context.viewerRoleId === 'witch';
   return true;
+}
+
+function projectionContextToViewerContext(context: ProjectionContext): ViewerContext {
+  const roles: string[] = [];
+  if (context.viewerRoleId) roles.push(context.viewerRoleId);
+  return buildViewerContext({
+    type: 'player',
+    playerId: context.viewerPlayerId != null ? Number(context.viewerPlayerId) : undefined,
+    faction: context.viewerFaction || undefined,
+    roles
+  });
 }
 
 function projectEventMeta(event: Record<string, unknown>, context: ProjectionContext): Record<string, unknown> {

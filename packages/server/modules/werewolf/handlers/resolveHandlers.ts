@@ -18,6 +18,8 @@ import { createWerewolfEvent, completed, isDone, markStepComplete } from './comm
 import type { StepState } from './common';
 import { recordWorkflowEffects } from '../../workflow-engine/effects';
 import { actionRequestedMessage, actionResolvedMessage, effectResolvedMessage } from '../messages';
+import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
+import { resolveActionChannel } from './actionChannel';
 
 interface Match {
   id: string;
@@ -58,7 +60,7 @@ function createNightResolveHandler() {
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('night', step.config.day), { effects: resolved.effects })]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('night', step.config.day), { effects: resolved.effects }, { channel: CHANNEL_TYPES.PUBLIC })]
       };
     },
     runAiTask: runHunterAiTask,
@@ -80,7 +82,7 @@ function createExileResolveHandler() {
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('day', step.config.day), { effects: resolved.effects })]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('day', step.config.day), { effects: resolved.effects }, { channel: CHANNEL_TYPES.PUBLIC })]
       };
     },
     runAiTask: runHunterAiTask,
@@ -114,7 +116,7 @@ function createHunterWindow({ match, step, state, runtime, round, hunter }: {
       blockers: work.blockers,
       tasks: work.tasks,
       pendingActions: work.pendingActions,
-      events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(actionType, (round as { day?: number }).day), { actionWindow: window })]
+      events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(actionType, (round as { day?: number }).day), { actionWindow: window }, { channel: CHANNEL_TYPES.PUBLIC })]
     };
   }
   if (!allActionWorkSucceeded(match.id, step.id, actionType, 1)) {
@@ -147,7 +149,7 @@ function createSheriffResolveHandler() {
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', actionResolvedMessage('sheriff_resolve', step.config.day), { sheriffElection: round.sheriffElection, sheriffId: round.sheriffId })]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', actionResolvedMessage('sheriff_resolve', step.config.day), { sheriffElection: round.sheriffElection, sheriffId: round.sheriffId }, { channel: CHANNEL_TYPES.PUBLIC })]
       };
     }
   };

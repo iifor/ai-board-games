@@ -17,6 +17,7 @@ import { runActionWindowAiTask, validateActionWindowAiResult } from '../aiAction
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
 import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage } from '../messages';
+import { resolveActionChannel } from './actionChannel';
 
 interface Match {
   id: string;
@@ -67,10 +68,11 @@ function createActionWindowHandler() {
       applyActionResults(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, collectActionResults(match.id, step.id, step.config.actionType!) as unknown as ReducerActionResult[]);
       const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
       resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
+      const resolvedChannel = resolveActionChannel(step.config.actionType || '');
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day))]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day), {}, resolvedChannel)]
       };
     },
     runAiTask: runActionWindowAiTask,
@@ -80,10 +82,11 @@ function createActionWindowHandler() {
 
 function skipAction(match: Match, step: Step, runtime: Runtime): HandlerResult {
   const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id }, step.id);
+  const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
   return {
     status: 'COMPLETED',
     state: nextState,
-    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_skipped', actionSkippedMessage(step.config.actionType, step.config.day))]
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_skipped', actionSkippedMessage(step.config.actionType, step.config.day), {}, { channel, scopeKey })]
   };
 }
 
@@ -117,13 +120,14 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     actors: actors as Parameters<typeof createActionBlockers>[0]['actors'],
     promptContext: { day: step.config.day, actionType: step.config.actionType, round }
   });
+  const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
   return {
     status: 'WAITING',
     state: nextState,
     blockers: work.blockers,
     tasks: work.tasks,
     pendingActions: work.pendingActions,
-    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionWindow: window })]
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionWindow: window }, { channel, scopeKey })]
   };
 }
 

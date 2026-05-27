@@ -110,6 +110,8 @@ export interface TimelineRow {
   time: string;
   title: string;
   description: string;
+  phase?: string;
+  detail?: string;
   record: Span | LlmCall | AgentDecision | TraceEvent;
 }
 

@@ -77,6 +77,8 @@ interface WorkflowEventPayload {
 function projectWorkflowOutboxEvent(matchId: string, workflowEvent: WorkflowEventPayload): Record<string, unknown> {
   const payload = (workflowEvent?.payload || {}) as Record<string, unknown>;
   const game = payload.game || currentSerializedGame(matchId);
+  const channel = payload.channel || workflowEvent.channel || 'public';
+  const scopeKey = payload.scopeKey || workflowEvent.scopeKey;
   const base = {
     type: 'workflow-event',
     matchId,
@@ -85,7 +87,9 @@ function projectWorkflowOutboxEvent(matchId: string, workflowEvent: WorkflowEven
     message: payload.message,
     game,
     actionWindow: payload.actionWindow,
-    effects: payload.effects
+    effects: payload.effects,
+    channel,
+    scopeKey
   };
   if (workflowEvent.type === 'werewolf_action_submitted') {
     return { ...base, ...projectWerewolfAction(payload, game as Record<string, unknown>) };

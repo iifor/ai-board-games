@@ -1,20 +1,24 @@
 import { Card, Descriptions, Tag, Typography } from 'antd';
+import { translateDecisionType } from '../../constants/traceLabels';
 import type { AgentDecision } from '../../types/trace';
 
 const { Text } = Typography;
 
+type GetNickname = (playerId: number | undefined | null) => string;
+
 interface AgentDecisionCardProps {
   decision: AgentDecision;
+  getNickname?: GetNickname;
 }
 
-export function AgentDecisionCard({ decision }: AgentDecisionCardProps) {
+export function AgentDecisionCard({ decision, getNickname }: AgentDecisionCardProps) {
   if (!decision) return null;
 
   return (
     <Card size="small" style={{ marginBottom: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <Tag color="purple">{decision.decision_type}</Tag>
-        {decision.player_id && <Tag>玩家 {decision.player_id}</Tag>}
+        {decision.player_id && <Tag color="cyan">{getNickname?.(decision.player_id) || `玩家 ${decision.player_id}`}</Tag>}
+        <Tag color="purple">{translateDecisionType(decision.decision_type)}</Tag>
         {decision.player_role && <Tag color="blue">{decision.player_role}</Tag>}
         {decision.phase && <Tag>{decision.phase}</Tag>}
         {decision.day != null && <Text type="secondary">Day {decision.day}</Text>}

@@ -74,7 +74,8 @@
       "Bash(pnpm --filter @ai-presenter/shared run check)",
       "Bash(pnpm --filter @ai-presenter/admin run check)",
       "Bash(pnpm --filter @ai-presenter/client run check)",
-      "Bash(pnpm --filter @ai-presenter/client run build)"
+      "Bash(pnpm --filter @ai-presenter/client run build)",
+      "Bash(./node_modules/.bin/tsc --noEmit)"
     ]
   }
 }
