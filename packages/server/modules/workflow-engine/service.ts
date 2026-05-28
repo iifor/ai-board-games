@@ -125,6 +125,7 @@ function completeAiTask(taskId: string, result: AiTaskResult | Record<string, un
       type: (result as AiTaskResult).eventType || 'ai_task_succeeded',
       payload,
       idempotencyKey: `${task.id}:result`,
+      visibility: 'system',
     }],
   });
   return wakeTick(task.matchId);

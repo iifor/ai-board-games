@@ -88,7 +88,7 @@ function createActionWindowHandler() {
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day), {}, resolvedChannel)]
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType }, resolvedChannel)]
       };
     },
     runAiTask: runActionWindowAiTask,
@@ -138,7 +138,7 @@ function skipAction(match: Match, step: Step, runtime: Runtime): HandlerResult {
   return {
     status: 'COMPLETED',
     state: nextState,
-    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_skipped', actionSkippedMessage(step.config.actionType, step.config.day), {}, { channel, scopeKey })]
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_skipped', actionSkippedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType }, { channel, scopeKey })]
   };
 }
 
@@ -179,7 +179,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     blockers: work.blockers,
     tasks: work.tasks,
     pendingActions: work.pendingActions,
-    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionWindow: window }, { channel, scopeKey })]
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType, actionWindow: window }, { channel, scopeKey })]
   };
 }
 

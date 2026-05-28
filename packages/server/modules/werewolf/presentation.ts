@@ -56,6 +56,9 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
   if (workflowEvent === 'werewolf_action_submitted' && SILENT_ACTIONS.has(actionType)) {
     return silent(actionDisplayText(actionType, '已完成'), 'badge', actionType);
   }
+  if (workflowEvent === 'werewolf_action_skipped' && SILENT_ACTIONS.has(actionType)) {
+    return silent(actionDisplayText(actionType, '已跳过'), 'badge', actionType);
+  }
   if (workflowEvent === 'werewolf_effect_resolved') {
     return silent(publicResolveText(input.stepId, message), 'status', 'effect-resolved');
   }

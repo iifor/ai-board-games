@@ -5,7 +5,8 @@
 
 // ─── 工作流事件类型 ───
 const WORKFLOW_EVENT_LABELS: Record<string, string> = {
-  'werewolf_action_submitted': '狼队行动完成',
+  'match_created': '游戏开始',
+  'werewolf_action_submitted': '行动完成',
   'werewolf_action_requested': '行动窗口开启',
   'werewolf_action_skipped': '行动跳过',
   'werewolf_effect_resolved': '效果结算',
@@ -21,8 +22,8 @@ const WORKFLOW_EVENT_LABELS: Record<string, string> = {
 const GAME_EVENT_LABELS: Record<string, string> = {
   // 狼人夜晚
   'wolf-wake': '狼人睁眼',
-  'wolf-leader': '狼人领袖',
-  'wolf-speech': '狼人夜聊',
+  'wolf-leader': '狼队队长',
+  'wolf-speech': '狼队战术讨论',
   'wolf-vote': '狼人投票',
   // 预言家
   'seer-wake': '预言家睁眼',
@@ -144,7 +145,7 @@ const DECISION_TYPE_LABELS: Record<string, string> = {
 const ACTION_TYPE_LABELS: Record<string, string> = {
   'wolf_kill': '狼人袭击',
   'wolf_speech': '狼人夜聊',
-  'wolf_vote': '狼人刀口投票',
+  'wolf_vote': '狼人投票',
   'seer_check': '预言家查验',
   'guard_protect': '守卫守护',
   'witch_save': '女巫解药',
@@ -159,6 +160,29 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   'sheriff_runoff_speech': '警长复投发言',
   'sheriff_runoff_vote': '警长复投投票',
   'sheriff_resolve': '警长竞选结算',
+  'self_destruct': '狼人自爆',
+};
+
+// ─── 行动类别标签（用于更细致的事件标题）───
+const ACTION_CATEGORY_LABELS: Record<string, string> = {
+  'wolf_kill': '狼人行动',
+  'wolf_speech': '狼人行动',
+  'wolf_vote': '狼人行动',
+  'seer_check': '预言家行动',
+  'guard_protect': '守卫行动',
+  'witch_save': '女巫行动',
+  'witch_poison': '女巫行动',
+  'hunter_shot': '猎人行动',
+  'day_speech': '发言',
+  'day_vote': '投票',
+  'sheriff_signup': '警长竞选',
+  'sheriff_speech': '警长竞选',
+  'sheriff_withdraw': '警长竞选',
+  'sheriff_vote': '警长竞选',
+  'sheriff_runoff_speech': '警长竞选',
+  'sheriff_runoff_vote': '警长竞选',
+  'sheriff_resolve': '警长竞选',
+  'self_destruct': '狼人自爆',
 };
 
 // ─── 阶段/流程标签 ───
@@ -207,14 +231,15 @@ function translateEventType(type: string): string {
 function translateEventTitle(type: string, payload?: Record<string, unknown> | null): string {
   const base = WORKFLOW_EVENT_LABELS[type] || GAME_EVENT_LABELS[type] || type;
   if (!payload) return base;
-  const actionType = payload.action_type as string | undefined;
+  const actionType = (payload.action_type || payload.actionType) as string | undefined;
   if (!actionType) return base;
   const actionLabel = ACTION_TYPE_LABELS[actionType] || actionType;
-  // 为 workflow 事件添加行动主语
-  if (type === 'werewolf_action_submitted') return `${actionLabel} — 完成`;
-  if (type === 'werewolf_action_requested') return `${actionLabel} — 等待行动`;
-  if (type === 'werewolf_action_skipped') return `${actionLabel} — 跳过`;
-  if (type === 'werewolf_effect_resolved') return `${actionLabel} — 效果结算`;
+  const category = ACTION_CATEGORY_LABELS[actionType];
+  // 为 workflow 事件添加行动主语，使用类别+具体行动的格式
+  if (type === 'werewolf_action_submitted') return category ? `${category}：${actionLabel} — 完成` : `${actionLabel} — 完成`;
+  if (type === 'werewolf_action_requested') return category ? `${category}：${actionLabel} — 等待行动` : `${actionLabel} — 等待行动`;
+  if (type === 'werewolf_action_skipped') return category ? `${category}：${actionLabel} — 跳过` : `${actionLabel} — 跳过`;
+  if (type === 'werewolf_effect_resolved') return category ? `${category}：${actionLabel} — 效果结算` : `${actionLabel} — 效果结算`;
   return base;
 }
 
@@ -276,6 +301,7 @@ export {
   PHASE_LABELS,
   DECISION_TYPE_LABELS,
   ACTION_TYPE_LABELS,
+  ACTION_CATEGORY_LABELS,
   STATUS_LABELS,
   translateEventType,
   translateEventTitle,

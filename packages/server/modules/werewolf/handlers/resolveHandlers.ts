@@ -116,7 +116,7 @@ function createHunterWindow({ match, step, state, runtime, round, hunter }: {
       blockers: work.blockers,
       tasks: work.tasks,
       pendingActions: work.pendingActions,
-      events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(actionType, (round as { day?: number }).day), { actionWindow: window }, { channel: CHANNEL_TYPES.PUBLIC })]
+      events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(actionType, (round as { day?: number }).day), { actionType, actionWindow: window }, { channel: CHANNEL_TYPES.PUBLIC })]
     };
   }
   if (!allActionWorkSucceeded(match.id, step.id, actionType, 1)) {
@@ -132,7 +132,7 @@ function createHunterWindow({ match, step, state, runtime, round, hunter }: {
   return {
     status: 'COMPLETED',
     state: nextState,
-    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', actionResolvedMessage(actionType, (round as { day?: number }).day), { effects: effect ? [effect] : [] })]
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', actionResolvedMessage(actionType, (round as { day?: number }).day), { actionType, effects: effect ? [effect] : [] })]
   };
 }
 

@@ -139,7 +139,7 @@ function projectWerewolfAction(payload: Record<string, unknown>, game: Record<st
     };
   }
   return {
-    message: `${actorId || '玩家'}号完成${ACTION_LABELS[actionType] || '行动'}。`,
+    message: ``,
     game
   };
 }

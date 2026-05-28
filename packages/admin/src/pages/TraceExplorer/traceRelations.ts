@@ -71,15 +71,15 @@ export function buildTraceTimeline({ spans = [], llmCalls = [], decisions = [], 
     ...events.map((record) => {
       const payload = parseEventPayload(record.event_json);
       const matchId = extractMatchId(payload);
-      const message = (payload?.message as string) || '';
+      const message = ((payload?.event as Record<string, unknown>)?.message as string) || '';
       return {
         id: `event-${record.id}`,
         type: 'event' as const,
         time: record.received_at,
         title: translateEventTitle(record.event_type, payload),
-        description: record.phase ? translatePhase(record.phase) : '',
+        description: message || (record.phase ? translatePhase(record.phase) : ''),
         phase: record.phase ? translatePhase(record.phase) : undefined,
-        detail: [matchId, truncate(message, 80)].filter(Boolean).join(' | ') || undefined,
+        detail: matchId || undefined,
         record
       };
     })

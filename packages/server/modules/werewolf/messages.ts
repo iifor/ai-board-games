@@ -19,14 +19,14 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 function phaseStartedMessage(phase: string | undefined, day: number | undefined): string {
-  if (phase === 'night') return `第${day || 1}夜开始，天黑请闭眼。`;
-  if (phase === 'day') return `第${day || 1}天开始，天亮了。`;
+  if (phase === 'night') return `天黑请闭眼`;
+  if (phase === 'day') return `天亮了。`;
   return '流程进入下一阶段。';
 }
 
 function actionRequestedMessage(actionType?: string, day?: number): string {
-  if (actionType === 'wolf_speech') return `第${day || 1}夜狼人请睁眼，确认同伴并依次夜聊。`;
-  if (actionType === 'wolf_vote') return `第${day || 1}夜狼人统一刀口投票。`;
+  if (actionType === 'wolf_speech') return `狼人请睁眼`;
+  if (actionType === 'wolf_vote') return `狼人请投票`;
   return `${roundPrefix(day)}${actionLabel(actionType)}行动开始。`;
 }
 
@@ -39,8 +39,8 @@ function actionSkippedMessage(actionType?: string, day?: number): string {
 }
 
 function effectResolvedMessage(phase?: string, day?: number): string {
-  if (phase === 'night') return `第${day || 1}夜行动结算完成。`;
-  if (phase === 'day') return `第${day || 1}天放逐结算完成。`;
+  if (phase === 'night') return ``;
+  if (phase === 'day') return ``;
   return `${roundPrefix(day)}效果结算完成。`;
 }
 

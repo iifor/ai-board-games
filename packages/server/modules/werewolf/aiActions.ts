@@ -248,7 +248,7 @@ async function runDayVoteAction(runtime: Runtime, actor: Agent, alive: Agent[]):
 
 async function runSheriffSignupAction(actor: Agent): Promise<Record<string, unknown>> {
   const parsed = await actor.playerAgent.askJson([
-    '第一天警长竞选开始。你是否上警竞选警长？',
+    '警长竞选开始。请选择竞选警长？',
     '只返回 JSON：{"run":true} 或 {"run":false}。'
   ].join('\n\n'), { maxTokens: 40, fallback: { run: Number(actor.id) <= 3 } });
   return { run: Boolean(parsed?.run) };

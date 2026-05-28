@@ -243,6 +243,7 @@ function listEventsAfter(matchId: string, afterSeq: number = 0): WorkflowEvent[]
 
 function insertOutbox(matchId: string, eventRow: WorkflowEventRow | null): void {
   if (!eventRow) return;
+  if (eventRow.visibility === 'system') return;
   getDb().prepare(`
     INSERT OR IGNORE INTO outbox_messages (match_id, event_seq, status, payload_json, created_at, updated_at)
     VALUES (?, ?, 'pending', ?, ?, ?)
