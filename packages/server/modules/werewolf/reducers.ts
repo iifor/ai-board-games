@@ -1,4 +1,4 @@
-import { countTargets, topTarget } from './winCheck';
+import { countTargets, topTarget, eliminate } from './winCheck';
 import {
   hasRoleAction,
   sortBySeat,
@@ -61,6 +61,7 @@ interface Round {
   exile?: { id: number; reason: string } | null;
   idiotReveal?: { id: number; reason: string } | null;
   lastWords?: Array<Record<string, unknown>>;
+  selfDestruct?: { playerId: number; text: string; day: number } | null;
   [key: string]: unknown;
 }
 
@@ -204,6 +205,14 @@ function applyDaySpeech(round: Round, results: ActionResult[]): void {
     day: round.day,
     thinking: result.payload.thinking || ''
   }));
+  const selfDestruct = results.find((result) => result.payload.selfDestruct || result.payload.intent === 'selfDestruct');
+  if (selfDestruct && !round.selfDestruct) {
+    round.selfDestruct = {
+      playerId: selfDestruct.actorId,
+      text: String(selfDestruct.payload.selfDestructText || selfDestruct.payload.text || `${selfDestruct.actorId}号狼人自爆。`),
+      day: round.day
+    };
+  }
 }
 
 function applyDayVote(runtime: Runtime, round: Round, results: ActionResult[]): void {
@@ -217,6 +226,7 @@ function applyDayVote(runtime: Runtime, round: Round, results: ActionResult[]): 
 
 function getActorsForStep(runtime: Runtime, step: Step, round: Round): Agent[] {
   const actionType = step.config.actionType;
+  if (round.selfDestruct && (actionType === 'day_speech' || actionType === 'day_vote')) return [];
   const actors = (action: string): Agent[] => getAliveActorsByAction(runtime, action) as unknown as Agent[];
   if (actionType === 'wolf_kill') return actors('kill');
   if (actionType === 'wolf_speech' || actionType === 'wolf_vote') {
@@ -260,6 +270,16 @@ function findPendingHunter(agents: Agent[], round: Round, deaths: Array<{ id: nu
   ) || null;
 }
 
+function applySelfDestruct(runtime: Runtime, round: Round): void {
+  if (!round.selfDestruct?.playerId) return;
+  eliminate(runtime.agents as never, Number(round.selfDestruct.playerId), round.day, 'self_destruct');
+  round.publicSummary = `第${round.day}天，${round.selfDestruct.playerId}号狼人自爆，白天流程中止。`;
+}
+
+function hasSelfDestruct(round: Round): boolean {
+  return Boolean(round.selfDestruct?.playerId);
+}
+
 function ensureRound(state: State, day: number): Round {
   let round = (state.rounds || []).find((item) => Number(item.day) === Number(day));
   if (!round) {
@@ -273,7 +293,9 @@ export {
   applyActionResults,
   getActorsForStep,
   getTargetIds,
-  findPendingHunter
+  findPendingHunter,
+  applySelfDestruct,
+  hasSelfDestruct
 };
 
 export type { ActionResult, Agent, Round, Runtime, Step };

@@ -29,6 +29,13 @@ export interface GameEvent {
   ackId?: string;
   narration?: string;
   message?: string;
+  presentation?: {
+    speakableText?: string;
+    displayText?: string;
+    displayMode?: string;
+    uiHint?: string;
+    suppressSpeech?: boolean;
+  };
   subtitle?: { text?: string; speakerLabel?: string; speakerRole?: string };
   speech?: { playerId: string; text: string; side?: string; fullText?: string; thinking?: string };
   testimony?: { playerId: string; text: string; fullText?: string; thinking?: string };
@@ -41,6 +48,7 @@ export interface GameEvent {
   phase?: string | { speeches?: unknown[]; stageSummary?: string };
   round?: WerewolfRound;
   shot?: { from: string; target: string };
+  selfDestruct?: { playerId?: string | number; text?: string; day?: number };
   seerCheck?: { target: string; result?: string };
   sheriffCandidateIds?: number[];
   playerId?: string;

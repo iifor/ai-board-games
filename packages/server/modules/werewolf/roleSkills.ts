@@ -39,7 +39,8 @@ function createWerewolfRoleSkillRegistry(modeConfig: ModeConfig, skillRegistry: 
   for (const slot of slots) {
     const roleId = (slot as ModeRoleEntry).roleId || (slot as ModeRoleEntry).id || (slot as string);
     const roleConfig: RoleConfig = typeof slot === 'string' ? getRoleConfig(modeConfig, roleId) : { ...getRoleConfig(modeConfig, roleId), ...slot };
-    const actions = [...new Set([...getRoleActions(roleConfig), 'speakOnly', 'voteOnly'])];
+    const factionSkills = roleConfig.faction === 'wolves' ? ['selfDestruct'] : [];
+    const actions = [...new Set([...getRoleActions(roleConfig), ...factionSkills, 'speakOnly', 'voteOnly'])];
     roleSkills.registerMany(roleId, actions.map((action) => skillRegistry.get(action)).filter(Boolean) as AgentSkill[]);
   }
   return roleSkills;

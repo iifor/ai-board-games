@@ -16,6 +16,7 @@ import {
   getWerewolfModePlayerCount,
   getWerewolfFlowLabel,
   getWerewolfNarration,
+  getWerewolfDisplayText,
   formatWerewolfSeatLabel,
   normalizeWerewolfSelectedIds,
   sanitizeWerewolfSelectedIds,
@@ -122,7 +123,10 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     cancel,
     applyServerEvent,
     playPendingEvent: (event: GameEvent, controls: { setAckTimer: (delay: number) => void }) => speechPlaybackRef.current?.playPendingWerewolfEvent(event, controls) || false,
-    getNarration: (event: GameEvent) => event.subtitle?.text || event.narration || getWerewolfNarration(event),
+    getNarration: (event: GameEvent) => {
+      if (event.presentation?.suppressSpeech) return '';
+      return event.presentation?.speakableText || event.subtitle?.text || event.narration || getWerewolfNarration(event);
+    },
     getSpeechOptions: (event: GameEvent) => {
       const speakerId = event?.speech?.playerId || event?.testimony?.playerId;
       const speechPlayer = speakerId
@@ -135,7 +139,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
         ? { playerId: speakerId, voicePackageId: speechPlayer?.voicePackageId, audioUrl: event.audioUrl }
         : { voicePackageId: hostVoicePackageId, audioUrl: event.audioUrl };
     },
-    getAckDelay: (event: GameEvent) => event.type === 'speech' || event.type === 'wolf-speech' ? 280 : 120,
+    getAckDelay: (event: GameEvent) => event.type === 'speech' || event.type === 'wolf-speech' || event.type === 'self-destruct' ? 280 : 120,
     onError: (error: Error | GameEvent) => {
       setStatus('error');
       setStreamMessage((error as Error).message || (error as GameEvent).message || '狼人杀生成失败');
@@ -236,7 +240,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
 
   function applyServerEvent(event: GameEvent): void {
     if (event.type === 'workflow-event') {
-      if (event.message) setStreamMessage(event.message);
+      const displayText = getWerewolfDisplayText(event);
+      if (displayText) setStreamMessage(displayText);
       if (event.game) setGame(event.game);
       updateWorkflowNightAction(event);
       updateWorkflowSpeech(event);
@@ -247,7 +252,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     updateNightActionType(event);
     updateSheriffCandidateIds(event);
     const flowLabel = getWerewolfFlowLabel(event);
-    if (flowLabel || event.message) setStreamMessage(flowLabel || event.message || '');
+    const displayText = getWerewolfDisplayText(event);
+    if (flowLabel || displayText) setStreamMessage(flowLabel || displayText || '');
     if (event.game) {
       setGame(event.game);
       if (event.game.clientViewMode) setClientViewMode(event.game.clientViewMode as string);
@@ -267,10 +273,10 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       return;
     }
 
-    if ((event.type === 'speech' || event.type === 'wolf-speech' || event.type === 'sheriff-speech' || event.type === 'sheriff-runoff-speech') && event.speech) {
+    if ((event.type === 'speech' || event.type === 'wolf-speech' || event.type === 'self-destruct' || event.type === 'sheriff-speech' || event.type === 'sheriff-runoff-speech') && event.speech) {
       setActiveThinking(null);
       const speakerLabel = formatWerewolfSeatLabel(event.speech.playerId, (event.game?.players || displayGame.players || []) as Player[]);
-      setStreamMessage(event.type === 'wolf-speech' ? `${speakerLabel}狼人夜聊` : `${speakerLabel}正在发言`);
+      setStreamMessage(event.type === 'wolf-speech' ? `${speakerLabel}狼人夜聊` : event.type === 'self-destruct' ? `${speakerLabel}狼人自爆` : `${speakerLabel}正在发言`);
       setActiveSpeech({
         id: '',
         playerId: event.speech.playerId,
@@ -299,7 +305,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       return;
     }
 
-    const subtitleText = event.subtitle?.text || event.narration || getWerewolfNarration(event) || event.message;
+    const subtitleText = event.presentation?.suppressSpeech ? '' : event.subtitle?.text || event.narration || getWerewolfNarration(event);
     if (subtitleText && event.type !== 'game') {
       setActiveSpeech({ id: '', playerId: null, text: subtitleText, wordBoundaries: event.wordBoundaries || null, currentTimeMs: null });
     }

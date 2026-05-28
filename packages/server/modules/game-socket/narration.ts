@@ -81,6 +81,10 @@ interface RoundData {
 interface NarrationEvent {
   type?: string;
   message?: string;
+  presentation?: {
+    speakableText?: string;
+    suppressSpeech?: boolean;
+  };
   game?: GameData;
   speech?: SpeechData;
   testimony?: TestimonyData;
@@ -93,6 +97,8 @@ interface NarrationEvent {
 }
 
 function getNarration(event: NarrationEvent): string {
+  if (event.presentation?.suppressSpeech) return '';
+  if (event.presentation?.speakableText) return event.presentation.speakableText;
   if (event.game?.type === 'werewolf') return getWerewolfNarration(event);
   if (event.game?.type === 'debate') return getDebateNarration(event);
   return event.message || '';
@@ -125,6 +131,7 @@ function getWerewolfNarration(event: NarrationEvent): string {
   if (event.type === 'sheriff-badge-transfer' || event.type === 'sheriff-badge-tear')
     return event.message || getSheriffBadgeNarration(event.sheriffTransfer);
   if (event.type === 'speech') return event.speech?.text || '';
+  if (event.type === 'self-destruct') return event.speech?.text || event.message || '狼人自爆。';
   if (event.type === 'vote-result') return event.message || '白天投票结果公布';
   if (event.type === 'last-words' || event.type === 'exile-words')
     return event.testimony?.text || '';

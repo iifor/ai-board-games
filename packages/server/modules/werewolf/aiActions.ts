@@ -26,6 +26,7 @@ interface Agent {
 
 interface PlayerAgent {
   thinkingEnabled?: boolean;
+  hasSkill?: (action: string) => boolean;
   askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
   askVoteTarget: (prompt: string, validIds: number[], fallback: number | undefined) => Promise<number>;
 }
@@ -206,10 +207,26 @@ function buildWolfSpeechContext(round: Round): Array<Record<string, unknown>> {
 }
 
 async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent): Promise<Record<string, unknown>> {
+  const publicContext = buildDaySpeechContext(round);
   const text = actor.thinkingEnabled && actor.playerAgent.thinkingEnabled
-    ? await askSpeechWithThinking(actor, round.day, round.publicSummary || '', fallbackSpeech(actor, round.day))
-    : { content: await askSpeech(actor, round.day, round.publicSummary || '', fallbackSpeech(actor, round.day)) };
-  return { text: text.content || text, thinking: text.thinking || '' };
+    ? await askSpeechWithThinking(actor, round.day, publicContext, fallbackSpeech(actor, round.day))
+    : { content: await askSpeech(actor, round.day, publicContext, fallbackSpeech(actor, round.day)) };
+  const speechText = String(text.content || text || '');
+  const result: Record<string, unknown> = { text: speechText, thinking: text.thinking || '' };
+  if (actor.faction === 'wolves' && actor.playerAgent.hasSkill?.('selfDestruct')) {
+    const selfDestruct = await runRoleSkill(runtime, 'selfDestruct', {
+      actor,
+      phase: 'day',
+      publicContext,
+      speechText
+    });
+    if (selfDestruct?.use) {
+      result.intent = 'selfDestruct';
+      result.selfDestruct = true;
+      result.selfDestructText = String(selfDestruct.text || `${actor.id}号狼人自爆。`);
+    }
+  }
+  return result;
 }
 
 async function runDayVoteAction(runtime: Runtime, actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
@@ -251,6 +268,20 @@ function taskTargetIds(runtime: Runtime, round: Round, actionType: string): numb
   const key = actionType === 'sheriff_runoff_vote' ? 'runoffCandidateIds' : 'candidates';
   const ids = Array.isArray(election?.[key]) ? election[key] as number[] : [];
   return ids.length ? ids.map(Number) : runtime.agents.filter((agent) => agent.alive).map((agent) => agent.id);
+}
+
+function buildDaySpeechContext(round: Round): string {
+  const lines = [round.publicSummary || ''];
+  const election = round.sheriffElection as Record<string, unknown> | null | undefined;
+  const sheriffSpeeches = Array.isArray(election?.speeches) ? election.speeches as Array<Record<string, unknown>> : [];
+  const daySpeeches = Array.isArray(round.speeches) ? round.speeches as Array<Record<string, unknown>> : [];
+  if (sheriffSpeeches.length) {
+    lines.push(`警上发言：\n${sheriffSpeeches.map((speech) => `${speech.playerId}号：${speech.text || ''}`).join('\n')}`);
+  }
+  if (daySpeeches.length) {
+    lines.push(`本轮已公开发言：\n${daySpeeches.map((speech) => `${speech.playerId}号：${speech.text || ''}`).join('\n')}`);
+  }
+  return lines.filter(Boolean).join('\n\n') || '暂无公开信息。';
 }
 
 function runRoleSkill(runtime: Runtime, action: string, context: Record<string, unknown>): Promise<Record<string, unknown>> {

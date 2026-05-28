@@ -64,6 +64,7 @@ export const EVENT_LABELS: Record<string, string> = {
   'last-words': '夜晚遗言',
   'exile-words': '放逐遗言',
   'hunter-shot': '猎人开枪',
+  'self-destruct': '狼人自爆',
   game: '胜负结算',
   host: '主持播报'
 };

@@ -113,8 +113,60 @@ test('wolf speech window opens all wolves but queues speakers in leader order be
     tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 2, result: { payload: { speech: '先打4。' } } };
     const waiting = handler.execute({ match, step: speechStep, state: opened.state } as never);
     assert.equal(waiting.status, 'WAITING');
+    assert.equal(waiting.state?.rounds[0].night.wolfSpeeches[0].text, '先打4。');
     assert.equal(waiting.tasks?.[0].playerId, 3);
     assert.equal(waiting.blockers?.[0].taskId, waiting.tasks?.[0].id);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('ordered day speech records public chain and stops on wolf self destruct', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+
+    const state = createState();
+    state.players = [
+      player(1, 'villager', 'good', []),
+      player(2, 'werewolf', 'wolves', ['kill']),
+      player(3, 'villager', 'good', [])
+    ];
+    const match = { id: 'm-day-chain', config: { players: state.players }, createdAt: 'now' };
+    const handler = createActionWindowHandler();
+    const step = { id: 'day_speech_1', type: 'werewolf.action_window', config: { day: 1, phase: 'day', actionType: 'day_speech', ordered: true } };
+
+    const opened = handler.execute({ match, step, state } as never);
+    assert.equal(opened.status, 'WAITING');
+    assert.equal(opened.tasks?.[0].playerId, 1);
+    tasks.push(...(opened.tasks || []));
+
+    tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 1, result: { payload: { text: '我站边预言家。' } } };
+    const waiting = handler.execute({ match, step, state: opened.state } as never);
+    assert.equal(waiting.status, 'WAITING');
+    assert.equal(waiting.state?.rounds[0].speeches[0].text, '我站边预言家。');
+    assert.equal(waiting.tasks?.[0].playerId, 2);
+    tasks.push(...(waiting.tasks || []));
+
+    tasks[1] = {
+      ...tasks[1],
+      status: 'succeeded',
+      playerId: 2,
+      result: { payload: { text: '我不装了。', selfDestruct: true, selfDestructText: '2号狼人自爆。' } }
+    };
+    const completed = handler.execute({ match, step, state: waiting.state } as never);
+    assert.equal(completed.status, 'COMPLETED');
+    assert.equal(completed.state?.rounds[0].selfDestruct.playerId, 2);
+    assert.equal(completed.state?.players.find((item: Record<string, unknown>) => Number(item.id) === 2).alive, false);
+    assert.equal(completed.events?.[0].type, 'werewolf_self_destruct');
   } finally {
     patchRepo(repo, original);
   }

@@ -53,6 +53,7 @@ interface SkillResult {
   use?: boolean;
   survives?: boolean;
   ok?: boolean;
+  text?: string;
 }
 
 function createWerewolfSkillRegistry(): InstanceType<typeof AgentSkillRegistry> {
@@ -126,6 +127,28 @@ function createWerewolfSkills() {
         if (!valid.length) return { target: null };
         const target = await actor.playerAgent.askVoteTarget('你是猎人，已出局。请选择是否开枪带走一名玩家。必须选择一名目标。', valid, fallback!);
         return { target };
+      }
+    },
+    {
+      action: 'selfDestruct',
+      prompt: '狼人白天可以自爆，立即出局并中止当前白天流程。',
+      async execute({ actor, phase, publicContext, speechText }: SkillContext): Promise<SkillResult> {
+        if (actor.faction !== 'wolves' || actor.alive === false || phase !== 'day') return { use: false };
+        const parsed = await actor.playerAgent.askJson([
+          '你是狼人，当前处于白天公开流程。你可以选择是否发动自爆。',
+          '自爆效果：你立即出局，本轮白天发言/投票中止，流程进入后续胜负检查或夜晚。',
+          `当前公开信息：\n${publicContext || '暂无公开信息。'}`,
+          `你刚才的公开发言：${speechText || '暂无'}`,
+          '只有在继续发言会明显暴露狼队、或自爆能保护狼队/打断关键归票时才使用。',
+          '只返回 JSON：{"use":false,"text":""} 或 {"use":true,"text":"自爆宣言"}。'
+        ].join('\n\n'), {
+          maxTokens: 140,
+          fallback: { use: false, text: '' },
+          skillId: 'selfDestruct',
+          phase: 'day'
+        });
+        const text = String(parsed?.text || '').trim();
+        return { use: Boolean(parsed?.use), text };
       }
     },
     {

@@ -31,7 +31,7 @@ export function buildEventLogEntry(event: GameEvent): EventLogEntry | null {
   const round = event.round || gameRounds[gameRounds.length - 1];
   const day = round?.day ? `? ${round.day} ?` : '';
   const title = [day, EVENT_LABELS[event.type] || event.type].filter(Boolean).join(' · ');
-  const text = getWerewolfFlowLabel(event) || event.message || event.narration || getEventSummary(event) || getWerewolfNarration(event);
+  const text = getWerewolfFlowLabel(event) || getWerewolfDisplayText(event) || event.narration || getEventSummary(event) || getWerewolfNarration(event);
   if (!text) return null;
   return {
     id: `${Date.now()}-${event.type}-${Math.random().toString(16).slice(2)}`,
@@ -49,6 +49,10 @@ function getEventSummary(event: GameEvent): string {
     const players = event.game?.players || [];
     return `${formatWerewolfSeatLabel(event.shot.from, players)}猎人开枪，带走 ${formatWerewolfSeatLabel(event.shot.target, players)}。`;
   }
+  if (event.type === 'self-destruct') {
+    const players = event.game?.players || [];
+    return `${formatWerewolfSeatLabel(event.speech?.playerId || event.selfDestruct?.playerId || '', players)}狼人自爆，白天流程中止。`;
+  }
   if (event.type === 'sheriff-result') {
     const players = event.game?.players || [];
     return event.message || (event.round?.sheriffId ? `${formatWerewolfSeatLabel(event.round.sheriffId, players)}当选警长。` : '本局无人当选警长。');
@@ -61,7 +65,7 @@ function getEventIcon(type: string): React.ReactElement {
   if (type === 'night-result' || type === 'phase-start' || type.endsWith('-wake') || type.startsWith('witch-')) return <Moon size={18} />;
   if (type === 'day-start') return <Sun size={18} />;
   if (type === 'vote-result' || type === 'sheriff-vote' || type === 'sheriff-runoff-vote') return <Vote size={18} />;
-  if (type === 'hunter-shot') return <Swords size={18} />;
+  if (type === 'hunter-shot' || type === 'self-destruct') return <Swords size={18} />;
   if (type.startsWith('sheriff-') || type === 'speech-order') return <Crown size={18} />;
   if (type === 'game') return <Shield size={18} />;
   if (type === 'players') return <Users size={18} />;
@@ -254,10 +258,16 @@ export function getRoundResult(round: WerewolfRound | null, players: Player[] = 
 }
 
 export function getWerewolfNarration(event: GameEvent | null | undefined): string {
-  if (event?.type === 'speech' || event?.type === 'wolf-speech' || event?.type === 'sheriff-speech' || event?.type === 'sheriff-runoff-speech') return event.speech?.text || '';
+  if (event?.presentation?.suppressSpeech) return '';
+  if (event?.presentation?.speakableText) return event.presentation.speakableText;
+  if (event?.type === 'speech' || event?.type === 'wolf-speech' || event?.type === 'self-destruct' || event?.type === 'sheriff-speech' || event?.type === 'sheriff-runoff-speech') return event.speech?.text || '';
   if (event?.type === 'last-words' || event?.type === 'exile-words') return event.testimony?.text || '';
   if (event?.type === 'hunter-shot') return getEventSummary(event);
   return event?.message || event?.narration || '';
+}
+
+export function getWerewolfDisplayText(event: GameEvent | null | undefined): string {
+  return event?.presentation?.displayText || event?.message || '';
 }
 
 export function getWerewolfFlowLabel(event: GameEvent | null | undefined): string {

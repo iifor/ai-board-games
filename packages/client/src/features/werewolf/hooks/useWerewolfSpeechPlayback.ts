@@ -62,7 +62,13 @@ export function useWerewolfSpeechPlayback({
 
   return {
     clearSubtitleTimer,
-    playPendingWerewolfEvent: playPendingEvent
+    playPendingWerewolfEvent: (event, controls) => {
+      if (event.presentation?.suppressSpeech && !event.speech && !event.testimony) {
+        controls.setAckTimer(120);
+        return true;
+      }
+      return playPendingEvent(event, controls);
+    }
   };
 }
 

@@ -3,3 +3,4 @@ export * from './roles';
 export * from './players';
 export * from './nightActions';
 export * from './rounds';
+export { getWerewolfDisplayText } from '../werewolfUtils';

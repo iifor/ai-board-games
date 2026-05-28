@@ -28,7 +28,7 @@ function createWerewolfSteps(): WorkflowStep[] {
     steps.push({ id: `night_resolve_${day}`, type: 'werewolf.night_resolve', name: `第${day}夜结算`, config: { day, phase: 'night' } });
     steps.push({ id: `day_start_${day}`, type: 'werewolf.day_start', name: `第${day}天开始`, config: { day, phase: 'day' } });
     if (day === 1) addSheriffSteps(steps, day);
-    steps.push({ id: `day_speech_${day}`, type: 'werewolf.action_window', name: `第${day}天发言`, config: { day, phase: 'day', actionType: 'day_speech' } });
+    steps.push({ id: `day_speech_${day}`, type: 'werewolf.action_window', name: `第${day}天发言`, config: { day, phase: 'day', actionType: 'day_speech', ordered: true } });
     steps.push({ id: `day_vote_${day}`, type: 'werewolf.action_window', name: `第${day}天投票`, config: { day, phase: 'day', actionType: 'day_vote' } });
     steps.push({ id: `exile_resolve_${day}`, type: 'werewolf.exile_resolve', name: `第${day}天放逐结算`, config: { day, phase: 'day' } });
     steps.push({ id: `check_win_${day}`, type: 'werewolf.check_win', name: `第${day}天胜负检查`, config: { day } });

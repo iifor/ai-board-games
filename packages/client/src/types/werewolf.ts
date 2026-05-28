@@ -9,6 +9,7 @@ export interface WerewolfRound {
   votes?: Record<string, string>;
   voteTally?: Record<string, number>;
   speeches?: unknown[];
+  selfDestruct?: { playerId?: string | number; text?: string; day?: number } | null;
 }
 
 export interface WerewolfNight {

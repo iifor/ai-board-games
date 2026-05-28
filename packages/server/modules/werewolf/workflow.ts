@@ -6,6 +6,7 @@ import { createWerewolfSteps } from './steps';
 import { createWerewolfHandlers } from './handlers';
 import { ACTION_LABELS } from './messages';
 import { createInitialWerewolfState, serializeWerewolfState } from './runtime';
+import { resolveWerewolfPresentation } from './presentation';
 
 const WEREWOLF_WORKFLOW_ID = 'werewolf.workflow.basic.v1';
 
@@ -79,20 +80,32 @@ function projectWorkflowOutboxEvent(matchId: string, workflowEvent: WorkflowEven
   const game = payload.game || currentSerializedGame(matchId);
   const channel = payload.channel || workflowEvent.channel || 'public';
   const scopeKey = payload.scopeKey || workflowEvent.scopeKey;
+  const workflowEventType = String(payload.workflowEvent || workflowEvent.type || '');
+  const actionType = String(payload.actionType || (payload.actionWindow as Record<string, unknown> | undefined)?.actionType || inferActionType(String(payload.stepId || workflowEvent.stepId || '')) || '');
   const base = {
     type: 'workflow-event',
     matchId,
     event: workflowEvent,
-    workflowEvent: payload.workflowEvent || workflowEvent.type,
+    workflowEvent: workflowEventType,
     message: payload.message,
     game,
     actionWindow: payload.actionWindow,
     effects: payload.effects,
     channel,
-    scopeKey
+    scopeKey,
+    presentation: resolveWerewolfPresentation({
+      workflowEvent: workflowEventType,
+      actionType,
+      stepId: String(payload.stepId || workflowEvent.stepId || ''),
+      phase: String((payload.actionWindow as Record<string, unknown> | undefined)?.phase || ''),
+      message: String(payload.message || '')
+    })
   };
   if (workflowEvent.type === 'werewolf_action_submitted') {
-    return { ...base, ...projectWerewolfAction(payload, game as Record<string, unknown>) };
+    return withPresentation({ ...base, ...projectWerewolfAction(payload, game as Record<string, unknown>) }, payload);
+  }
+  if (workflowEvent.type === 'werewolf_self_destruct') {
+    return withPresentation({ ...base, ...projectSelfDestruct(payload, game as Record<string, unknown>) }, payload);
   }
   return base;
 }
@@ -102,6 +115,7 @@ function projectWerewolfAction(payload: Record<string, unknown>, game: Record<st
   const actorId = payload.actorId as number | string | undefined;
   if (actionType === 'day_speech') {
     return {
+      type: 'speech',
       message: payload.text,
       speech: {
         playerId: actorId,
@@ -113,6 +127,7 @@ function projectWerewolfAction(payload: Record<string, unknown>, game: Record<st
   }
   if ((actionType === 'wolf_kill' || actionType === 'wolf_speech') && payload.speech) {
     return {
+      type: 'wolf-speech',
       message: payload.speech,
       speech: {
         playerId: actorId,
@@ -126,6 +141,49 @@ function projectWerewolfAction(payload: Record<string, unknown>, game: Record<st
     message: `${actorId || '玩家'}号完成${ACTION_LABELS[actionType] || '行动'}。`,
     game
   };
+}
+
+function projectSelfDestruct(payload: Record<string, unknown>, game: Record<string, unknown>): Record<string, unknown> {
+  const selfDestruct = payload.selfDestruct as Record<string, unknown> | undefined;
+  const actorId = payload.actorId || selfDestruct?.playerId;
+  const speech = payload.speech as Record<string, unknown> | undefined;
+  const text = String(speech?.text || selfDestruct?.text || `${actorId || '狼人'}号狼人自爆。`);
+  return {
+    type: 'self-destruct',
+    message: text,
+    selfDestruct,
+    speech: {
+      playerId: actorId,
+      text,
+      fullText: text
+    },
+    game
+  };
+}
+
+function withPresentation(event: Record<string, unknown>, payload: Record<string, unknown>): Record<string, unknown> {
+  const speech = event.speech as Record<string, unknown> | undefined;
+  return {
+    ...event,
+    presentation: resolveWerewolfPresentation({
+      workflowEvent: String(event.workflowEvent || payload.workflowEvent || ''),
+      eventType: String(event.type || ''),
+      actionType: String(payload.actionType || ''),
+      stepId: String(payload.stepId || ''),
+      message: String(event.message || payload.message || ''),
+      speechText: String(speech?.text || '')
+    })
+  };
+}
+
+function inferActionType(stepId: string): string {
+  const known = [
+    'wolf_speech', 'wolf_vote', 'seer_check', 'guard_protect', 'witch_save',
+    'witch_poison', 'day_speech', 'day_vote', 'sheriff_signup',
+    'sheriff_speech', 'sheriff_withdraw', 'sheriff_vote',
+    'sheriff_runoff_speech', 'sheriff_runoff_vote'
+  ];
+  return known.find((action) => stepId.startsWith(action)) || '';
 }
 
 function currentSerializedGame(matchId: string): Record<string, unknown> | null {
