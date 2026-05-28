@@ -13,7 +13,14 @@ function slugifyPlainId(text: string): string {
   return String(text || 'id').toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '').slice(0, 64);
 }
 
-const EXECUTABLE_WEREWOLF_ACTIONS = new Set(['kill', 'inspectFaction', 'save', 'poison', 'guard', 'shootOnDeath', 'surviveExileOnce', 'voteOnly', 'speakOnly']);
+const EXECUTABLE_WEREWOLF_ACTIONS = new Set([
+  'kill', 'wolf_kill', 'wolf_vote', 'wolf_speech',
+  'inspectFaction', 'seer_check',
+  'save', 'witch_save',
+  'poison', 'witch_poison',
+  'guard', 'guard_protect',
+  'shootOnDeath', 'surviveExileOnce', 'voteOnly', 'speakOnly'
+]);
 
 function normalizeWerewolfFaction(value: unknown): string {
   const factions = ['good', 'wolves'];

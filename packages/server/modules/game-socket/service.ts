@@ -107,6 +107,7 @@ interface SessionMessage {
   werewolfMode?: string | Record<string, unknown>;
   replayGameId?: string;
   clientViewMode?: string;
+  debugMode?: boolean;
   replayView?: Record<string, unknown>;
   ackId?: number;
   action?: string;
@@ -120,6 +121,7 @@ interface RunSessionOptions {
   werewolfMode?: string | Record<string, unknown>;
   replayGameId?: string;
   clientViewMode?: string;
+  debugMode?: boolean;
   replayView?: Record<string, unknown>;
 }
 
@@ -159,6 +161,7 @@ function attachGameSocket(server: import('http').Server): void {
             werewolfMode: message.werewolfMode,
             replayGameId: message.replayGameId,
             clientViewMode: message.clientViewMode,
+            debugMode: message.debugMode,
             replayView: message.replayView,
           },
         ).catch((error: unknown) => {
@@ -206,7 +209,8 @@ async function runSession(
     await sender.send({
       type: 'host',
       message: getStartMessage(safeGameType),
-      game: { type: safeGameType, host: publicSocketHost(config.host) },
+      debugMode: Boolean((config as Record<string, unknown>).debugMode),
+      game: { type: safeGameType, debugMode: Boolean((config as Record<string, unknown>).debugMode), host: publicSocketHost(config.host) },
     });
   }
 
@@ -280,6 +284,7 @@ function getRequestConfig(
     debateTeams: DebateTeams | null;
     werewolfMode: string | Record<string, unknown> | null;
     clientViewMode: string;
+    debugMode: boolean;
     realReady: boolean;
   } = {
     ...config,
@@ -291,11 +296,12 @@ function getRequestConfig(
     debateTeams: options.debateTeams || null,
     werewolfMode: options.werewolfMode || null,
     clientViewMode: options.clientViewMode || 'god',
-    missingProviders,
-    realReady: missingProviders.length === 0,
+    debugMode: Boolean(options.debugMode),
+    missingProviders: options.debugMode ? [] : missingProviders,
+    realReady: Boolean(options.debugMode) || missingProviders.length === 0,
   };
   if (mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
-  if (scopedConfig.missingProviders.length) {
+  if (!scopedConfig.debugMode && scopedConfig.missingProviders.length) {
     const missing = scopedConfig.missingProviders
       .map((item) => `${item.provider}(${item.apiKeyEnv})`)
       .join('、');

@@ -66,6 +66,7 @@ interface Agent {
 interface WerewolfState {
   werewolfMode?: ModeConfig;
   modeConfig?: ModeConfig;
+  debugMode?: boolean;
   clientViewMode?: string;
   host?: Record<string, unknown>;
   players?: Record<string, unknown>[];
@@ -135,6 +136,7 @@ function createInitialWerewolfState(config: Record<string, unknown>): WerewolfSt
   return {
     werewolfMode: modeConfig,
     modeConfig,
+    debugMode: Boolean(config.debugMode),
     clientViewMode: (config.clientViewMode as string) || 'god',
     host: publicHost(config.host),
     players: agents.map((agent: Agent) => ({ ...publicPlayer(agent), roleConfig: agent.roleConfig })),
@@ -162,6 +164,7 @@ function createRuntime(match: Match, stateOverride: WerewolfState | null = null)
   const state: WerewolfState = {
     ...sourceState,
     modeConfig,
+    debugMode: Boolean(sourceState.debugMode || config.debugMode),
     rounds: clone(sourceState.rounds || []),
     players: agents.map((agent) => ({ ...publicPlayer(agent), roleConfig: agent.roleConfig }))
   };
@@ -247,6 +250,7 @@ function serializeWerewolfState(match: Match, state: WerewolfState): Record<stri
       terms: { good: 'good', wolves: 'wolves', keyFigure: 'werewolf', cover: 'god' },
       truth: winner ? ((state.players || []) as Record<string, unknown>[]).map((player) => `${player.id}:${player.roleLabel || player.role}`).join(', ') : ''
     },
+    debugMode: Boolean(state.debugMode),
     clientViewMode: state.clientViewMode || 'god',
     host: state.host,
     werewolfMode: modeDetail,
@@ -283,6 +287,7 @@ function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): Record
       host: matchConfig.host || {},
       players: matchConfig.players,
       werewolfMode: matchConfig.werewolfMode,
+      debugMode: Boolean(matchConfig.debugMode),
       clientViewMode: matchConfig.clientViewMode || 'god'
     };
   }
@@ -295,6 +300,7 @@ function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): Record
     host: resolveHost(base, matchConfig.hostId),
     players: selectedIds.size ? (base.players as Player[]).filter((player) => selectedIds.has(Number(player.id))) : base.players,
     werewolfMode: matchConfig.werewolfMode,
+    debugMode: Boolean(matchConfig.debugMode),
     clientViewMode: matchConfig.clientViewMode || 'god'
   };
 }

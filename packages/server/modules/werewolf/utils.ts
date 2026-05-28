@@ -19,6 +19,21 @@ interface RoleConfigForActions {
   [key: string]: unknown;
 }
 
+const ROLE_ACTION_ALIASES: Record<string, string[]> = {
+  kill: ['wolf_kill', 'wolf_vote', 'wolf_speech'],
+  wolf_kill: ['kill'],
+  wolf_vote: ['kill'],
+  wolf_speech: ['kill'],
+  inspectFaction: ['seer_check'],
+  seer_check: ['inspectFaction'],
+  save: ['witch_save'],
+  witch_save: ['save'],
+  poison: ['witch_poison'],
+  witch_poison: ['poison'],
+  guard: ['guard_protect'],
+  guard_protect: ['guard']
+};
+
 interface AgentForFallback {
   id: number;
   faction?: string;
@@ -416,7 +431,10 @@ function getRoleActions(roleConfig: RoleConfigForActions): string[] {
 }
 
 function hasRoleAction(roleConfig: RoleConfigForActions | null | undefined, action: string): boolean {
-  return getRoleActions(roleConfig || {}).includes(action);
+  const actions = getRoleActions(roleConfig || {});
+  if (actions.includes(action)) return true;
+  const aliases = ROLE_ACTION_ALIASES[action] || [];
+  return aliases.some((alias) => actions.includes(alias));
 }
 
 function fallbackSpeech(agent: AgentForFallback, day: number): string {

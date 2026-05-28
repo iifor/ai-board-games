@@ -87,6 +87,26 @@ test('reducers select actors and pending hunter', () => {
   assert.equal(findPendingHunter([hunter] as never, round as never, [{ id: 6 }] as never)?.id, 6);
 });
 
+test('reducers select night actors with workflow action aliases', () => {
+  const round = createRound(1);
+  round.night.wolfTarget = 5;
+  const ctx = {
+    agents: [
+      actor(1, 'wolves', ['kill']),
+      actor(2, 'good', ['seer_check']),
+      actor(3, 'good', ['guard_protect']),
+      actor(4, 'good', ['witch_save', 'witch_poison'])
+    ],
+    modeConfig: { witch: {}, sheriff: {} },
+    state: { rounds: [round] }
+  };
+
+  assert.deepEqual(getActorsForStep(ctx as never, { config: { actionType: 'seer_check' } } as never, round as never).map((item: TestAgent) => item.id), [2]);
+  assert.deepEqual(getActorsForStep(ctx as never, { config: { actionType: 'guard_protect' } } as never, round as never).map((item: TestAgent) => item.id), [3]);
+  assert.deepEqual(getActorsForStep(ctx as never, { config: { actionType: 'witch_save' } } as never, round as never).map((item: TestAgent) => item.id), [4]);
+  assert.deepEqual(getActorsForStep(ctx as never, { config: { actionType: 'witch_poison' } } as never, round as never).map((item: TestAgent) => item.id), [4]);
+});
+
 test('wolf team context shares wolves and prefers high identity leader', () => {
   const ctx = runtime();
   ctx.agents = [

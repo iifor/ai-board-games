@@ -54,6 +54,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<number[]>([]);
   const [clientViewMode, setClientViewMode] = useState('god');
+  const [debugMode, setDebugMode] = useState(false);
   const [setupError, setSetupError] = useState('');
   const [selectedHostId, setSelectedHostId] = useState<number | null>(null);
   const [visibleRolePlayerId, setVisibleRolePlayerId] = useState<string | number | null>(null);
@@ -128,6 +129,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       return event.presentation?.speakableText || event.subtitle?.text || event.narration || getWerewolfNarration(event);
     },
     getSpeechOptions: (event: GameEvent) => {
+      const eventDebugMode = Boolean(event.debugMode || event.game?.debugMode || displayGame.debugMode);
       const speakerId = event?.speech?.playerId || event?.testimony?.playerId;
       const speechPlayer = speakerId
         ? (displayGame.players || []).find((player: Player) => Number(player.id) === Number(speakerId))
@@ -136,8 +138,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
         ? ((event.game as Record<string, unknown>).host as Record<string, unknown>).voicePackageId as number | undefined
         : undefined;
       return speakerId
-        ? { playerId: speakerId, voicePackageId: speechPlayer?.voicePackageId, audioUrl: event.audioUrl }
-        : { voicePackageId: hostVoicePackageId, audioUrl: event.audioUrl };
+        ? { playerId: speakerId, voicePackageId: eventDebugMode ? null : speechPlayer?.voicePackageId, audioUrl: eventDebugMode ? undefined : event.audioUrl }
+        : { voicePackageId: eventDebugMode ? null : hostVoicePackageId, audioUrl: eventDebugMode ? undefined : event.audioUrl };
     },
     getAckDelay: (event: GameEvent) => event.type === 'speech' || event.type === 'wolf-speech' || event.type === 'self-destruct' ? 280 : 120,
     onError: (error: Error | GameEvent) => {
@@ -210,6 +212,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       viewMode = clientViewMode;
     }
     const hostId = (options.hostId as number | null) ?? selectedHostId;
+    const nextDebugMode = Boolean(options.debugMode ?? debugMode);
     if (!modeConfig?.id && !options.replayGameId) {
       setStatus('error');
       setStreamMessage('暂无可用狼人杀模式，请先在 B 端启用模式。');
@@ -226,6 +229,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     setWerewolfMode(modeConfig);
     setSelectedPlayerIds(sortedPlayerIds);
     setClientViewMode(viewMode === 'player' ? 'player' : 'god');
+    setDebugMode(nextDebugMode);
     setModeDialogOpen(false);
     setStatus('streaming');
     setStreamMessage('游戏准备中...');
@@ -234,6 +238,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       hostId: hostId || undefined,
       werewolfMode: modeConfig?.id || '',
       clientViewMode: viewMode === 'player' ? 'player' : 'god',
+      debugMode: nextDebugMode,
       replayGameId: (options.replayGameId as string) || ''
     });
   }
@@ -257,6 +262,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     if (event.game) {
       setGame(event.game);
       if (event.game.clientViewMode) setClientViewMode(event.game.clientViewMode as string);
+      if (event.game.debugMode != null) setDebugMode(Boolean(event.game.debugMode));
       if (event.game.audienceSession?.viewerPlayerId) setVisibleRolePlayerId(event.game.audienceSession.viewerPlayerId);
     }
     if (event.players) {
@@ -474,11 +480,13 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
           selectedPlayerIds={selectedPlayerIds}
           viewMode={clientViewMode}
           onViewModeChange={setClientViewMode}
+          debugMode={debugMode}
+          onDebugModeChange={setDebugMode}
           onPlayerToggle={(id: number | string) => setSelectedPlayerIds((value) => toggleWerewolfPlayerId(value, id, werewolfMode))}
           hostId={selectedHostId}
           onHostChange={(id: number | null) => setSelectedHostId(id ?? null)}
           error={setupError}
-          onStart={(mode: WerewolfMode, playerIds: number[], viewMode: string, opts: { hostId?: number | null }) => startGame(mode, playerIds, viewMode, opts)}
+          onStart={(mode: WerewolfMode, playerIds: number[], viewMode: string, opts: { hostId?: number | null; debugMode?: boolean }) => startGame(mode, playerIds, viewMode, opts)}
         />
       )}
 

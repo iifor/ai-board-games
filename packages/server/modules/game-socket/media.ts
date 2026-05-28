@@ -39,6 +39,7 @@ interface GameHost {
 
 interface GameData {
   id?: string;
+  debugMode?: boolean;
   players?: GamePlayer[];
   host?: GameHost;
   [key: string]: unknown;
@@ -181,6 +182,7 @@ function withPlayableDetails(event: NarrationEvent, fullText: string): MediaEven
 }
 
 function resolveEventVoice(event: NarrationEvent): VoicePackage | null {
+  if ((event as Record<string, unknown>)?.debugMode || event.game?.debugMode) return null;
   const playerId = event.speech?.playerId || event.testimony?.playerId;
   if (playerId) {
     const player = event.game?.players?.find(

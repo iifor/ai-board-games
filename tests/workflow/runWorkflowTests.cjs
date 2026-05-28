@@ -10,6 +10,7 @@ const testFiles = [
   'werewolfEffects.test.ts',
   'werewolfReducers.test.ts',
   'werewolfActionWindow.test.ts',
+  'werewolfDebugActions.test.ts',
   'werewolfFakeWorkflow.test.ts',
   'werewolfPresentation.test.ts',
   'eventProjection.test.ts',

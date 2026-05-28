@@ -275,6 +275,37 @@
   background: rgba(16, 58, 38, 0.62);
 }
 
+.werewolf-debug-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 12px;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid rgba(255, 216, 130, 0.28);
+  border-radius: 8px;
+  color: rgba(255, 247, 221, 0.92);
+  background: rgba(42, 31, 8, 0.54);
+  text-align: center;
+}
+
+.werewolf-debug-toggle.active {
+  border-color: rgba(255, 216, 130, 0.72);
+  background: rgba(80, 52, 10, 0.72);
+}
+
+.werewolf-debug-toggle span {
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.werewolf-debug-toggle small {
+  color: rgba(255, 247, 221, 0.64);
+  font-size: 12px;
+}
+
 .werewolf-view-mode-switch button svg {
   grid-row: span 2;
   align-self: center;

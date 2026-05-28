@@ -1,4 +1,4 @@
-import { Check, Eye, Moon, UserRound, Users } from 'lucide-react';
+import { Bug, Check, Eye, Moon, UserRound, Users } from 'lucide-react';
 import { classNames } from '../../../../utils/classNames';
 import { formatWerewolfModeSummary, getWerewolfModePlayerCount } from '../../utils';
 import { PanelHeader } from '../PanelHeader';
@@ -14,12 +14,14 @@ interface WerewolfModeDialogProps {
   selectedPlayerIds: number[];
   viewMode: string;
   onViewModeChange: (mode: string) => void;
+  debugMode: boolean;
+  onDebugModeChange: (enabled: boolean) => void;
   onPlayerToggle: (id: number | string) => void;
   hostId: number | null;
   onHostChange: (id: number | null) => void;
   error: string;
   onCancel: () => void;
-  onStart: (mode: WerewolfMode, playerIds: number[], viewMode: string, opts: { hostId?: number | null }) => void;
+  onStart: (mode: WerewolfMode, playerIds: number[], viewMode: string, opts: { hostId?: number | null; debugMode?: boolean }) => void;
 }
 
 export function WerewolfModeDialog({
@@ -30,6 +32,8 @@ export function WerewolfModeDialog({
   selectedPlayerIds,
   viewMode,
   onViewModeChange,
+  debugMode,
+  onDebugModeChange,
   onPlayerToggle,
   hostId,
   onHostChange,
@@ -113,12 +117,17 @@ export function WerewolfModeDialog({
                 <small>开局随机代入一名玩家</small>
               </button>
             </div>
+            <button type="button" className={classNames('werewolf-debug-toggle', debugMode && 'active')} onClick={() => onDebugModeChange(!debugMode)}>
+              <Bug size={18} />
+              <span>调试模式</span>
+              <small>固定发言，浏览器语音</small>
+            </button>
           </section>
         </div>
         {error && <p className="werewolf-setup-error">{error}</p>}
         <footer>
           <span></span>
-          <button type="button" className="primary" disabled={!canStart} onClick={() => selectedMode && onStart(selectedMode, selectedPlayerIds, selectedViewMode, { hostId })}>开始游戏</button>
+          <button type="button" className="primary" disabled={!canStart} onClick={() => selectedMode && onStart(selectedMode, selectedPlayerIds, selectedViewMode, { hostId, debugMode })}>开始游戏</button>
         </footer>
       </section>
     </div>

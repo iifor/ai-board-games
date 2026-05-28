@@ -18,6 +18,7 @@ function getWerewolfExtraFields(event: GameEvent, text: string): Partial<SpeechS
 }
 
 function getWerewolfVoicePackageId(event: GameEvent, game: GameState | null, playerId: string): number | null {
+  if (event?.debugMode || event?.game?.debugMode || game?.debugMode) return null;
   if (!playerId) {
     const hostRecord = (event?.game as Record<string, unknown> | undefined)?.host as Record<string, unknown> | undefined;
     return (hostRecord?.voicePackageId as number) || null;

@@ -30,6 +30,7 @@ function createWerewolfWorkflowMatch(config: Record<string, unknown>): Record<st
       werewolfMode: (state.werewolfMode as { id?: string })?.id || (config.werewolfMode as { id?: string })?.id || config.werewolfMode || 'standard',
       hostId: (config.host as { id?: number })?.id || null,
       selectedPlayerIds: ((config.players || []) as Array<{ id: number }>).map((player) => player.id),
+      debugMode: Boolean(config.debugMode),
       clientViewMode: config.clientViewMode || 'god'
     },
     initialState: state

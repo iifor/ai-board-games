@@ -13,6 +13,7 @@ const { topTarget } = require('./winCheck');
 const { rotateFromSeat, fallbackSpeech, fallbackVote } = require('./utils');
 const { getAliveActorsByAction } = require('./actionWindows');
 const { ensureWolfTeamContext } = require('./wolfTeam');
+import { isWerewolfDebugMode, runDebugHunterAction, runDebugWerewolfAction } from './debugActions';
 
 interface Agent {
   id: number;
@@ -110,7 +111,9 @@ async function runActionWindowAiTask({ match, step, task }: { match: Match; step
   const round: Round = ensureRound(runtime.state, step.config.day);
   const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
   if (!actor) throw Object.assign(new Error(`Actor not found: ${task.playerId}`), { severity: 'high' });
-  const payload = await runWerewolfAiAction(runtime, round, actor, step.config.actionType!);
+  const payload = isWerewolfDebugMode(runtime)
+    ? runDebugWerewolfAction(runtime, round, actor, step.config.actionType!)
+    : await runWerewolfAiAction(runtime, round, actor, step.config.actionType!);
   return {
     eventType: 'werewolf_action_submitted',
     rawOutput: payload,
@@ -127,6 +130,14 @@ async function runHunterAiTask({ match, step, task }: { match: Match; step: Step
   const runtime: Runtime = createRuntime(repo.getMatch(match.id) || match);
   const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
   if (!actor) throw Object.assign(new Error(`Hunter not found: ${task.playerId}`), { severity: 'high' });
+  if (isWerewolfDebugMode(runtime)) {
+    const payload = runDebugHunterAction(runtime, actor);
+    return {
+      eventType: 'werewolf_action_submitted',
+      rawOutput: payload,
+      payload: { actionType: 'hunter_shot', actorId: actor.id, ...payload }
+    };
+  }
   const target = await executeSkillWithTrace(runtime.skillRegistry, 'shootOnDeath', {
     actor,
     agents: runtime.agents,

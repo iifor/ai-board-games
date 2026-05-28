@@ -75,8 +75,9 @@ export function useSpeechPlayback({
   function speakSingle(text: string, playerId: string | null | undefined, ackId: string | undefined, event: GameEvent): boolean {
     clearSubtitleTimer();
     const isHostSpeech = !playerId;
-    const voicePkgId = isHostSpeech ? null : getVoicePackageId(event, game, playerId!);
-    const audioUrl = isHostSpeech ? null : event?.audioUrl;
+    const browserSpeechOnly = shouldUseBrowserSpeechOnly(event, game);
+    const voicePkgId = isHostSpeech || browserSpeechOnly ? null : getVoicePackageId(event, game, playerId!);
+    const audioUrl = isHostSpeech || browserSpeechOnly ? null : event?.audioUrl;
     const wordBoundaries = isHostSpeech ? null : event?.wordBoundaries || null;
     let speechId: string | null = null;
     return speak(text, acknowledgePending, {
@@ -107,4 +108,8 @@ export function useSpeechPlayback({
 
 function getDefaultPlaybackDelay(_event: GameEvent, narration: string, splitConfig: PlayableTextOptions): number {
   return getPlayablePlaybackDelay(narration, splitConfig);
+}
+
+function shouldUseBrowserSpeechOnly(event: GameEvent, game: GameState | null): boolean {
+  return Boolean(event?.debugMode || event?.game?.debugMode || game?.debugMode);
 }

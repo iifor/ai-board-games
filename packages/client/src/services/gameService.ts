@@ -44,6 +44,7 @@ type GameSocketStartPayload = {
   debateTeams?: Partial<DebateTeamDraft> | null;
   werewolfMode?: string;
   clientViewMode?: string;
+  debugMode?: boolean;
   replayView?: boolean;
   replayGameId?: string;
 };
@@ -130,6 +131,7 @@ export interface OpenGameSocketOptions {
   debateTeams?: Partial<DebateTeamDraft> | null;
   werewolfMode?: string;
   clientViewMode?: string;
+  debugMode?: boolean;
   replayView?: boolean;
   replayGameId?: string;
   onEvent: (event: GameEvent, socket: WebSocket) => void;
@@ -145,6 +147,7 @@ export function openGameSocket({
   debateTeams,
   werewolfMode,
   clientViewMode,
+  debugMode,
   replayView,
   replayGameId,
   onEvent,
@@ -165,6 +168,7 @@ export function openGameSocket({
       debateTeams,
       werewolfMode,
       clientViewMode,
+      debugMode,
       replayView,
       replayGameId
     };

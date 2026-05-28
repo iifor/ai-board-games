@@ -19,6 +19,7 @@ export interface GameState {
   config?: { subtitleMaxChars?: number };
   subtitleMaxChars?: number;
   clientViewMode?: string;
+  debugMode?: boolean;
   audienceSession?: { viewerPlayerId?: string };
   createdAt?: string;
   [key: string]: unknown;
