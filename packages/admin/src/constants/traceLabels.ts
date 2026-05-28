@@ -161,74 +161,6 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   'sheriff_resolve': '警长竞选结算',
 };
 
-// ─── 模型显示名称 ───
-const MODEL_DISPLAY_NAMES: Record<string, string> = {
-  // DeepSeek
-  'deepseek-v4-pro': 'DeepSeek V4 Pro',
-  'deepseek-v3': 'DeepSeek V3',
-  'deepseek-r1': 'DeepSeek R1',
-  'deepseek-chat': 'DeepSeek Chat',
-  // 通义千问
-  'qwen-max': '通义千问 Max',
-  'qwen-plus': '通义千问 Plus',
-  'qwen-turbo': '通义千问 Turbo',
-  'qwen-long': '通义千问 Long',
-  'qwen2.5-72b-instruct': 'Qwen 2.5 72B',
-  // 通义分析
-  'tongyi-xiaomi-analysis-flash': '通义小米分析',
-  // 文心一言
-  'ernie-4.0-8k': '文心一言 4.0',
-  'ernie-3.5-8k': '文心一言 3.5',
-  'ernie-speed-8k': '文心一言 Speed',
-  // 豆包
-  'doubao-pro-32k': '豆包 Pro',
-  'doubao-lite-32k': '豆包 Lite',
-  // Kimi
-  'moonshot-v1-128k': 'Kimi 128K',
-  'moonshot-v1-32k': 'Kimi 32K',
-  'moonshot-v1-8k': 'Kimi 8K',
-  // 智谱
-  'glm-4': '智谱 GLM-4',
-  'glm-4-flash': '智谱 GLM-4 Flash',
-  'glm-3-turbo': '智谱 GLM-3 Turbo',
-  // Claude
-  'claude-3-5-sonnet': 'Claude 3.5 Sonnet',
-  'claude-3-opus': 'Claude 3 Opus',
-  'claude-3-haiku': 'Claude 3 Haiku',
-  'claude-sonnet-4-6': 'Claude Sonnet 4.6',
-  'claude-opus-4-7': 'Claude Opus 4.7',
-  // OpenAI
-  'gpt-4o': 'GPT-4o',
-  'gpt-4o-mini': 'GPT-4o Mini',
-  'gpt-4-turbo': 'GPT-4 Turbo',
-  'gpt-3.5-turbo': 'GPT-3.5 Turbo',
-  'o1-preview': 'o1 Preview',
-  'o1-mini': 'o1 Mini',
-  // Gemini
-  'gemini-pro': 'Gemini Pro',
-  'gemini-1.5-pro': 'Gemini 1.5 Pro',
-  'gemini-2.0-flash': 'Gemini 2.0 Flash',
-};
-
-// ─── 供应商显示名称 ───
-const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-  'deepseek': 'DeepSeek',
-  'qwen': '通义千问',
-  'tongyi': '通义',
-  'baidu': '文心一言',
-  'ernie': '文心一言',
-  'doubao': '豆包',
-  'bytedance': '豆包',
-  'moonshot': 'Kimi',
-  'kimi': 'Kimi',
-  'zhipu': '智谱',
-  'glm': '智谱',
-  'openai': 'OpenAI',
-  'anthropic': 'Anthropic',
-  'google': 'Google',
-  'gemini': 'Google',
-};
-
 // ─── 阶段/流程标签 ───
 const PHASE_LABELS: Record<string, string> = {
   'night': '夜晚',
@@ -318,13 +250,12 @@ function translateActionType(type: string): string {
 
 /** 翻译模型名称，格式：显示名（raw_id）*/
 function translateModelName(model: string): string {
-  const display = MODEL_DISPLAY_NAMES[model];
-  return display ? `${display}（${model}）` : model;
+  return model;
 }
 
 /** 翻译供应商名称 */
 function translateProvider(provider: string): string {
-  return PROVIDER_DISPLAY_NAMES[provider.toLowerCase()] || provider;
+  return provider;
 }
 
 /** 翻译状态 */
@@ -345,8 +276,6 @@ export {
   PHASE_LABELS,
   DECISION_TYPE_LABELS,
   ACTION_TYPE_LABELS,
-  MODEL_DISPLAY_NAMES,
-  PROVIDER_DISPLAY_NAMES,
   STATUS_LABELS,
   translateEventType,
   translateEventTitle,

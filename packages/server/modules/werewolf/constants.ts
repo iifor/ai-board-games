@@ -1,4 +1,4 @@
-const MAX_DAYS = 5;
+const MAX_DAYS = 6;
 
 const FACTION_GOOD = 'good';
 const FACTION_WOLVES = 'wolves';
