@@ -9,7 +9,7 @@ interface SkillAgent {
   revealedIdiot?: boolean;
   canVote?: boolean;
   playerAgent: {
-    askVoteTarget: (prompt: string, validIds: number[], fallback: number) => Promise<number>;
+    askVoteTarget: (prompt: string, validIds: number[], options?: Record<string, unknown>) => Promise<number | null>;
     askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
   };
   [key: string]: unknown;
@@ -37,11 +37,13 @@ interface SkillContext {
   actor: SkillAgent;
   alive: SkillAliveAgent[];
   agents?: SkillAliveAgent[];
-  fallback?: number;
   topTarget?: number | null;
   victim?: SkillAliveAgent | null;
   round?: SkillRound;
   modeConfig?: SkillModeConfig;
+  speechText?: string;
+  publicContext?: string;
+  phase?: string;
   [key: string]: unknown;
 }
 
@@ -65,9 +67,9 @@ function createWerewolfSkills() {
     {
       action: 'kill',
       prompt: '夜晚选择击杀目标。',
-      async execute({ actor, alive, fallback, topTarget }: SkillContext): Promise<SkillResult> {
+      async execute({ actor, alive, topTarget }: SkillContext): Promise<SkillResult> {
         const valid = alive.filter((agent) => agent.faction !== 'wolves').map((agent) => agent.id);
-        const target = await actor.playerAgent.askVoteTarget('狼人夜晚行动：请选择今晚击杀目标。', valid, fallback!);
+        const target = await actor.playerAgent.askVoteTarget('狼人夜晚行动：请选择今晚击杀目标。', valid);
         return { actorId: actor.id, target, topTarget };
       }
     },
@@ -76,7 +78,7 @@ function createWerewolfSkills() {
       prompt: '夜晚查验一名玩家阵营。',
       async execute({ actor, alive, agents }: SkillContext): Promise<SkillResult> {
         const valid = alive.filter((agent) => agent.id !== actor.id).map((agent) => agent.id);
-        const target = await actor.playerAgent.askVoteTarget('预言家夜晚行动：请选择一名玩家查验阵营。', valid, valid[0]);
+        const target = await actor.playerAgent.askVoteTarget('预言家夜晚行动：请选择一名玩家查验阵营。', valid);
         const targetAgent = agents?.find((agent) => agent.id === target);
         return { target, result: targetAgent?.faction === 'wolves' ? '狼人' : '好人' };
       }
@@ -86,7 +88,7 @@ function createWerewolfSkills() {
       prompt: '夜晚守护一名玩家，不能连续两晚守护同一人。',
       async execute({ actor, alive }: SkillContext): Promise<SkillResult> {
         const valid = alive.map((agent) => agent.id).filter((id) => id !== actor.lastGuardTarget);
-        const target = await actor.playerAgent.askVoteTarget('守卫夜晚行动：请选择今晚守护目标，不能连续两晚守同一人。', valid, valid[0]);
+        const target = await actor.playerAgent.askVoteTarget('守卫夜晚行动：请选择今晚守护目标，不能连续两晚守同一人。', valid);
         return { target };
       }
     },
@@ -100,8 +102,9 @@ function createWerewolfSkills() {
         const parsed = await actor.playerAgent.askJson([
           `今晚狼人袭击了 ${victim!.id} 号。你还有解药。${victim!.id === actor.id ? '首夜允许自救。' : ''}`,
           '是否使用解药救人？只返回 JSON：{"use":true}，不要返回理由。'
-        ].join('\n\n'), { maxTokens: 40, fallback: { use: Math.random() > 0.25 } });
-        return { use: Boolean(parsed?.use) };
+        ].join('\n\n'), { maxTokens: 40 });
+        // AI 失败 → 不使用解药（保守）
+        return { use: parsed?.use === true };
       }
     },
     {
@@ -114,19 +117,21 @@ function createWerewolfSkills() {
           '你还有毒药。请选择是否使用毒药；不用毒药时 target 返回 null。',
           `可选目标：${valid.join('、')}`,
           '只返回 JSON：{"use":false,"target":null}，不要返回理由。'
-        ].join('\n\n'), { maxTokens: 60, fallback: { use: false, target: null } });
-        const target = Number(parsed?.target);
-        return parsed?.use && valid.includes(target) ? { use: true, target } : { use: false, target: null };
+        ].join('\n\n'), { maxTokens: 60 });
+        // AI 失败 → 不使用毒药（保守）
+        if (!parsed) return { use: false, target: null };
+        const target = Number(parsed.target);
+        return parsed.use && valid.includes(target) ? { use: true, target } : { use: false, target: null };
       }
     },
     {
       action: 'shootOnDeath',
       prompt: '死亡或放逐时可以开枪带走一名玩家。',
-      async execute({ actor, agents, fallback }: SkillContext): Promise<SkillResult> {
+      async execute({ actor, agents }: SkillContext): Promise<SkillResult> {
         const valid = (agents || []).filter((agent) => agent.alive).map((agent) => agent.id);
         if (!valid.length) return { target: null };
-        const target = await actor.playerAgent.askVoteTarget('你是猎人，已出局。请选择是否开枪带走一名玩家。必须选择一名目标。', valid, fallback!);
-        return { target };
+        const target = await actor.playerAgent.askVoteTarget('你是猎人，已出局。请选择是否开枪带走一名玩家。必须选择一名目标。', valid);
+        return { target }; // null = 不开枪
       }
     },
     {
@@ -143,12 +148,13 @@ function createWerewolfSkills() {
           '只返回 JSON：{"use":false,"text":""} 或 {"use":true,"text":"自爆宣言"}。'
         ].join('\n\n'), {
           maxTokens: 140,
-          fallback: { use: false, text: '' },
           skillId: 'selfDestruct',
           phase: 'day'
         });
-        const text = String(parsed?.text || '').trim();
-        return { use: Boolean(parsed?.use), text };
+        // AI 失败 → 不自爆（保守）
+        if (!parsed) return { use: false, text: '' };
+        const text = String(parsed.text || '').trim();
+        return { use: Boolean(parsed.use), text };
       }
     },
     {

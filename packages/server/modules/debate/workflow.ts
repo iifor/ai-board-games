@@ -461,7 +461,7 @@ function createDebateAgents(
     agent.baseSystemPrompt = buildSystemPrompt(agent, topic, PHASES[0]);
     agent.baseSystemPromptHash = buildAgentHash(agent.baseSystemPrompt as string);
     agent.playerAgent = new DebateAgent(agent, agent.baseSystemPrompt as string, {
-      onFallback: (entry: Record<string, unknown>) => fallbackAudit.record(entry),
+      onError: (entry: Record<string, unknown>) => fallbackAudit.record(entry),
       gameId,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration: playerAgent typed as unknown via index signature

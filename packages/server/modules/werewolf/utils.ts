@@ -437,43 +437,19 @@ function hasRoleAction(roleConfig: RoleConfigForActions | null | undefined, acti
   return aliases.some((alias) => actions.includes(alias));
 }
 
-function fallbackSpeech(agent: AgentForFallback, day: number): string {
-  if (agent.faction === 'wolves') return `第${day}天我先看发言状态，别急着把票集中到单点。昨晚死亡更像是在制造焦点，我怀疑有人顺势带节奏。`;
-  if (hasRoleAction(agent.roleConfig, 'inspectFaction')) return `我会优先看谁在回避站边。今天别只听情绪，要把昨晚死亡和投票意图连起来。`;
-  if (hasRoleAction(agent.roleConfig, 'save') || hasRoleAction(agent.roleConfig, 'poison')) return `药的信息现在不适合摊开说，但我会盯紧谁在用身份压力逼别人表态。`;
-  if (hasRoleAction(agent.roleConfig, 'guard')) return `昨晚结果说明狼队有明确目标。今天要听逻辑闭环，别被单句爆点带偏。`;
-  if (hasRoleAction(agent.roleConfig, 'shootOnDeath')) return `我会把票压在最像狼的人身上。如果有人强行抗推弱发言位，我会重点怀疑。`;
-  if (hasRoleAction(agent.roleConfig, 'surviveExileOnce')) return `我先听完整轮逻辑，别急着把弱发言位打死。今天更要看谁在偷换死亡信息。`;
-  return `我没有太多信息，只能看发言和票型。现在最可疑的是那些急着定性、却不给理由的人。`;
-}
-
-function fallbackLastWords(agent: AgentForFallback): string {
-  return `${agent.id}号遗言：别只看我出局这件事，回头复盘谁最早把票推到我身上。`;
-}
-
-function fallbackVote(agent: AgentForFallback, agents: AgentForFallback[]): number | undefined {
-  const alive = agents.filter((item) => item.alive && item.id !== agent.id);
-  const wolf = alive.find((item) => item.faction === 'wolves');
-  if (agent.faction !== 'wolves' && wolf) return wolf.id;
-  const good = alive.find((item) => item.faction !== 'wolves');
-  return (agent.faction === 'wolves' && good ? good : alive[0])?.id;
-}
-
 export {
   shuffle, sortBySeat, rotateFromSeat, getNextAliveId, getClockStartId,
   getSheriffSpeechOrder, getSheriffNightDeathSpeechOrder, getTopCandidateIds,
   prefetchOrderedSpeechTexts, buildWolfStrategySummary, getVoteMessage,
   buildSheriffVoteMessage, buildSpeechOrderMessage, buildSheriffBadgeMessage,
   buildPublicLog, collectWerewolfPublicMemoryEntries,
-  getRoleConfig, getRoleLabel, getRoleActions, hasRoleAction,
-  fallbackSpeech, fallbackLastWords, fallbackVote
+  getRoleConfig, getRoleLabel, getRoleActions, hasRoleAction
 };
 
 export type {
   SeatItem,
   AgentForLabel,
   RoleConfigForActions,
-  AgentForFallback,
   Round,
   ModeConfigForRole,
   RoleConfigFull,

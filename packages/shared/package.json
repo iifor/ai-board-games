@@ -19,6 +19,10 @@
       "types": "./dist/constants/*.d.ts",
       "default": "./dist/constants/*.js"
     },
+    "./utils/*": {
+      "types": "./dist/utils/*.d.ts",
+      "default": "./dist/utils/*.js"
+    },
     "./vite-plugins/*": "./vite-plugins/*"
   },
   "devDependencies": {

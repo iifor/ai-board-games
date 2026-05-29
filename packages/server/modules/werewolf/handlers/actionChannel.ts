@@ -1,25 +1,18 @@
 import type { ChannelType } from '@ai-presenter/shared/types/channelTypes';
-import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
+import { resolveActionChannel as resolveChannel } from '@ai-presenter/shared/utils/channelResolution';
+import type { ChannelInfo } from '@ai-presenter/shared/utils/channelResolution';
 
+// Re-export from shared (backward-compatible)
 interface ActionChannelInfo {
   channel: ChannelType;
   scopeKey?: string;
 }
 
-const SCOPE_ACTION_MAP: Record<string, string> = {
-  wolf_kill: 'wolves',
-  wolf_speech: 'wolves',
-  wolf_vote: 'wolves',
-  seer_check: 'seer',
-  guard_protect: 'guard',
-  witch_save: 'witch',
-  witch_poison: 'witch'
-};
-
 function resolveActionChannel(actionType: string): ActionChannelInfo {
-  const scopeKey = SCOPE_ACTION_MAP[actionType];
-  if (scopeKey) return { channel: CHANNEL_TYPES.SCOPE, scopeKey };
-  return { channel: CHANNEL_TYPES.PUBLIC };
+  const { channel, scopeKey } = resolveChannel(actionType);
+  const info: ActionChannelInfo = { channel };
+  if (scopeKey) info.scopeKey = scopeKey;
+  return info;
 }
 
 export { resolveActionChannel };

@@ -203,7 +203,7 @@ function createWerewolfAgents(
     agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry);
     agent.baseSystemPromptHash = hashText(agent.baseSystemPrompt!);
     agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt!, {
-      onFallback: (entry: unknown) => fallbackAudit.record(entry as Record<string, unknown>),
+      onError: (entry: unknown) => fallbackAudit.record(entry as Record<string, unknown>),
       gameId
     });
     roleSkillRegistry?.applyToPlayer(agent.playerAgent, roleId);
@@ -377,25 +377,25 @@ function createPublicWerewolfEvent(event: WerewolfEvent = {}): WerewolfEvent {
   };
 }
 
-async function askSpeech(agent: WerewolfAgent, day: number, context: string, fallback: string, limit: number = WEREWOLF.DAY_SPEECH_CHAR_LIMIT): Promise<string> {
+async function askSpeech(agent: WerewolfAgent, day: number, context: string, limit: number = WEREWOLF.DAY_SPEECH_CHAR_LIMIT): Promise<string | null> {
   return agent.playerAgent.askText([
     `第 ${day} 天白天发言。`,
     `公开赛况：\n${context || '暂无公开信息。'}`,
     `你的状态：${agent.alive ? '存活' : '已出局'}；身份：${getRoleLabel(agent)}`,
     `请发表自然语言发言，建议不超过 ${limit} 字。`
-  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit, fallback });
+  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit });
 }
 
-async function askSpeechWithThinking(agent: WerewolfAgent, day: number, context: string, fallback: string, limit: number = WEREWOLF.DAY_SPEECH_CHAR_LIMIT): Promise<{ content: string; thinking: string }> {
+async function askSpeechWithThinking(agent: WerewolfAgent, day: number, context: string, limit: number = WEREWOLF.DAY_SPEECH_CHAR_LIMIT): Promise<{ content: string; thinking: string } | null> {
   return agent.playerAgent.askTextWithThinking([
     `第 ${day} 天白天发言。`,
     `公开赛况：\n${context || '暂无公开信息。'}`,
     `你的状态：${agent.alive ? '存活' : '已出局'}；身份：${getRoleLabel(agent)}`,
     `请发表自然语言发言，建议不超过 ${limit} 字。`
-  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit, fallback });
+  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit });
 }
 
-async function askWolfNightSpeech(agent: WerewolfAgent, day: number, wolfSpeeches: WolfSpeech[], isLeader: boolean): Promise<string> {
+async function askWolfNightSpeech(agent: WerewolfAgent, day: number, wolfSpeeches: WolfSpeech[], isLeader: boolean): Promise<string | null> {
   const history = (wolfSpeeches || [])
     .map((speech) => `${speech.playerId}号：${speech.text}`)
     .join('\n');
@@ -405,10 +405,10 @@ async function askWolfNightSpeech(agent: WerewolfAgent, day: number, wolfSpeeche
     `第 ${day} 夜狼人行动。${title}`,
     `已知狼队夜聊：\n${history || '你是本夜第一位发言的狼人。'}`,
     `可以选择不发言；发言时请只输出狼队战术发言，建议不超过 ${limit} 字。`
-  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit, fallback: '' });
+  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit });
 }
 
-async function askWolfNightSpeechWithThinking(agent: WerewolfAgent, day: number, wolfSpeeches: WolfSpeech[], isLeader: boolean): Promise<{ content: string; thinking: string }> {
+async function askWolfNightSpeechWithThinking(agent: WerewolfAgent, day: number, wolfSpeeches: WolfSpeech[], isLeader: boolean): Promise<{ content: string; thinking: string } | null> {
   const history = (wolfSpeeches || [])
     .map((speech) => `${speech.playerId}号：${speech.text}`)
     .join('\n');
@@ -418,33 +418,27 @@ async function askWolfNightSpeechWithThinking(agent: WerewolfAgent, day: number,
     `第 ${day} 夜狼人行动。${title}`,
     `已知狼队夜聊：\n${history || '你是本夜第一位发言的狼人。'}`,
     `可以选择不发言；发言时请只输出狼队战术发言，建议不超过 ${limit} 字。`
-  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit, fallback: '' });
+  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit });
 }
 
-async function askSheriffSpeech(agent: WerewolfAgent, day: number, context: string, isRunoff: boolean): Promise<string> {
+async function askSheriffSpeech(agent: WerewolfAgent, day: number, context: string, isRunoff: boolean): Promise<string | null> {
   const title = isRunoff ? '警长竞选复发言' : '警上竞选发言';
   const limit = WEREWOLF.SHERIFF_SPEECH_CHAR_LIMIT;
   return agent.playerAgent.askText([
     `第${day}天${title}。`,
     `公开赛况：\n${context || '暂无公开信息。'}`,
     `你的身份：${getRoleLabel(agent)}。请发表警长竞选发言，建议不超过 ${limit} 字。`
-  ].join('\n\n'), {
-    maxTokens: Math.ceil(limit * 2.5), limit,
-    fallback: `${agent.id}号参与警长竞选。请先听完整轮发言，再根据站边、发言和夜晚信息判断。`
-  });
+  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit });
 }
 
-async function askSheriffSpeechWithThinking(agent: WerewolfAgent, day: number, context: string, isRunoff: boolean): Promise<{ content: string; thinking: string }> {
+async function askSheriffSpeechWithThinking(agent: WerewolfAgent, day: number, context: string, isRunoff: boolean): Promise<{ content: string; thinking: string } | null> {
   const title = isRunoff ? '警长竞选复发言' : '警上竞选发言';
   const limit = WEREWOLF.SHERIFF_SPEECH_CHAR_LIMIT;
   return agent.playerAgent.askTextWithThinking([
     `第${day}天${title}。`,
     `公开赛况：\n${context || '暂无公开信息。'}`,
     `你的身份：${getRoleLabel(agent)}。请发表警长竞选发言，建议不超过 ${limit} 字。`
-  ].join('\n\n'), {
-    maxTokens: Math.ceil(limit * 2.5), limit,
-    fallback: `${agent.id}号参与警长竞选。请先听完整轮发言，再根据站边、发言和夜晚信息判断。`
-  });
+  ].join('\n\n'), { maxTokens: Math.ceil(limit * 2.5), limit });
 }
 
 export {

@@ -18,7 +18,9 @@
     "check:admin": "pnpm --filter @ai-presenter/admin run check",
     "check:server": "pnpm --filter @ai-presenter/server run check",
     "check:shared": "pnpm --filter @ai-presenter/shared run check",
-    "test:workflow": "node --preserve-symlinks --preserve-symlinks-main ./tests/workflow/runWorkflowTests.cjs"
+    "test:workflow": "node --preserve-symlinks --preserve-symlinks-main ./tests/workflow/runWorkflowTests.cjs",
+    "test:unit": "node --preserve-symlinks --preserve-symlinks-main ./tests/unit/runUnitTests.cjs",
+    "test:migration": "node --preserve-symlinks --preserve-symlinks-main ./tests/migration/runMigrationTests.cjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

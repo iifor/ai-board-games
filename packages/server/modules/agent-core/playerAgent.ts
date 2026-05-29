@@ -25,20 +25,16 @@ interface Player {
 }
 
 interface AskTextOptions {
-  fallback?: string;
   limit?: number;
   maxTokens?: number;
   skillId?: string;
   phase?: string;
-  severity?: string;
 }
 
 interface AskJsonOptions {
-  fallback?: Record<string, unknown>;
   maxTokens?: number;
   skillId?: string;
   phase?: string;
-  severity?: string;
 }
 
 interface AskVoteOptions {
@@ -47,23 +43,22 @@ interface AskVoteOptions {
 }
 
 interface PlayerAgentOptions {
-  onFallback?: (entry: FallbackEntry) => void;
+  onError?: (entry: FallbackEntry) => void;
   gameId?: string;
   gameType?: string;
   resolveRole?: (item: Player) => string;
   resolveFaction?: (item: Player) => string;
 }
 
-function normalizeText(text: unknown, limit: number, fallback: string): string {
+function normalizeText(text: unknown, limit: number): string {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!clean) return String(fallback || '');
   return clean;
 }
 
 class BasePlayerAgent {
   player: Player;
   messages: ChatMessage[];
-  onFallback?: (entry: FallbackEntry) => void;
+  onError?: (entry: FallbackEntry) => void;
   thinkingEnabled: boolean;
   gameId: string | null;
   gameType: string;
@@ -74,7 +69,7 @@ class BasePlayerAgent {
   constructor(player: Player, systemPrompt: string, options: PlayerAgentOptions = {}) {
     this.player = player;
     this.messages = [{ role: 'system', content: systemPrompt }];
-    this.onFallback = options.onFallback;
+    this.onError = options.onError;
     this.thinkingEnabled = Boolean(player.thinkingEnabled);
     this.gameId = options.gameId || null;
     this.gameType = options.gameType || '';
@@ -109,59 +104,66 @@ class BasePlayerAgent {
     return this.skillRegistry.execute(action, { ...context, actor: context.actor || this.player });
   }
 
-  async askText(prompt: string, options: AskTextOptions = {}): Promise<string> {
-    const fallback = options.fallback || '';
+  // -----------------------------------------------------------
+  // AI 调用方法 — 失败时返回 null，不使用兜底值
+  // -----------------------------------------------------------
+
+  async askText(prompt: string, options: AskTextOptions = {}): Promise<string | null> {
     const limit = options.limit || 260;
     if (!this.player.apiKey) {
-      this.recordFallback(options.skillId || 'player-text', 'missing-api-key', fallback, options);
-      return normalizeText(fallback, limit, fallback);
+      this.recordError(options.skillId || 'player-text', 'missing-api-key', options);
+      return null;
     }
     try {
       const reply = await this.call(prompt, options.maxTokens || 800);
-      return normalizeText(reply, limit, fallback);
+      return normalizeText(reply, limit);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      this.recordFallback(options.skillId || 'player-text', err.message, fallback, options);
-      return normalizeText(fallback, limit, fallback);
+      this.recordError(options.skillId || 'player-text', err.message, options);
+      return null;
     }
   }
 
-  async askJson(prompt: string, options: AskJsonOptions = {}): Promise<Record<string, unknown> | undefined> {
+  async askJson(prompt: string, options: AskJsonOptions = {}): Promise<Record<string, unknown> | null> {
     if (!this.player.apiKey) {
-      this.recordFallback(options.skillId || 'player-json', 'missing-api-key', options.fallback, { ...options, severity: 'error' });
-      return options.fallback;
+      this.recordError(options.skillId || 'player-json', 'missing-api-key', options);
+      return null;
     }
     try {
       const parsed = parseJsonObject(await this.call(prompt, options.maxTokens || 120)) as Record<string, unknown> | null;
       if (parsed) return parsed;
+      // 重试一次（JSON 格式问题，不是内容问题）
       const retryParsed = parseJsonObject(await this.call(`${prompt}\n\nReturn one valid JSON object only.`, options.maxTokens || 120)) as Record<string, unknown> | null;
       if (retryParsed) return retryParsed;
-      this.recordFallback(options.skillId || 'player-json', 'invalid-json', options.fallback, { ...options, severity: 'error' });
-      return options.fallback;
+      this.recordError(options.skillId || 'player-json', 'invalid-json', options);
+      return null;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      this.recordFallback(options.skillId || 'player-json', err.message, options.fallback, { ...options, severity: 'error' });
-      return options.fallback;
+      this.recordError(options.skillId || 'player-json', err.message, options);
+      return null;
     }
   }
 
-  async askVoteTarget(prompt: string, validIds: number[], fallback: number, options: AskVoteOptions = {}): Promise<number> {
+  async askVoteTarget(prompt: string, validIds: number[], options: AskVoteOptions = {}): Promise<number | null> {
     const parsed = await this.askJson([
       prompt,
       `Valid targets: ${validIds.join(', ')}`,
       'Return JSON only, for example {"target":2}.'
     ].join('\n\n'), {
       maxTokens: 60,
-      fallback: { target: fallback },
       skillId: options.skillId || 'player-vote',
       phase: options.phase,
-      severity: 'error'
     });
-    const target = Number(parsed?.target);
+    if (!parsed) return null;
+    const target = Number(parsed.target);
     if (validIds.includes(target)) return target;
-    this.recordFallback(options.skillId || 'player-vote', 'invalid-target', fallback, { ...options, severity: 'error' });
-    return fallback;
+    this.recordError(options.skillId || 'player-vote', 'invalid-target', options);
+    return null;
   }
+
+  // -----------------------------------------------------------
+  // LLM 调用
+  // -----------------------------------------------------------
 
   async call(prompt: string, maxTokens?: number): Promise<string> {
     this.messages.push({ role: 'user', content: prompt });
@@ -203,36 +205,38 @@ class BasePlayerAgent {
     return result;
   }
 
-  async askTextWithThinking(prompt: string, options: AskTextOptions = {}): Promise<{ content: string; thinking: string }> {
-    const fallback = options.fallback || '';
+  async askTextWithThinking(prompt: string, options: AskTextOptions = {}): Promise<{ content: string; thinking: string } | null> {
     const limit = options.limit || 260;
     if (!this.player.apiKey) {
-      this.recordFallback(options.skillId || 'player-text', 'missing-api-key', fallback, options);
-      return { content: normalizeText(fallback, limit, fallback), thinking: '' };
+      this.recordError(options.skillId || 'player-text', 'missing-api-key', options);
+      return null;
     }
     try {
       const { content, thinking } = await this.callWithThinking(prompt, options.maxTokens || 800);
-      return { content: normalizeText(content, limit, fallback), thinking };
+      return { content: normalizeText(content, limit), thinking };
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      this.recordFallback(options.skillId || 'player-text', err.message, fallback, options);
-      return { content: normalizeText(fallback, limit, fallback), thinking: '' };
+      this.recordError(options.skillId || 'player-text', err.message, options);
+      return null;
     }
   }
 
-  recordFallback(
+  // -----------------------------------------------------------
+  // 错误记录（替代原来的 recordFallback）
+  // -----------------------------------------------------------
+
+  recordError(
     skillId: string,
     reason: string,
-    fallbackValue: unknown,
     options: { phase?: string; severity?: string } = {}
   ): void {
-    this.onFallback?.({
+    this.onError?.({
       gameType: this.gameType,
       phase: options.phase || null,
       skillId,
       actorId: this.player.id,
       reason,
-      fallbackValue,
+      fallbackValue: null, // 不再使用兜底值
       severity: options.severity || 'warning'
     });
   }

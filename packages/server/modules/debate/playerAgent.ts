@@ -2,7 +2,7 @@ import { BasePlayerAgent } from '../agent-core';
 import type { DebatePlayer } from './utils';
 
 interface DebateAgentOptions {
-  onFallback?: (entry: Record<string, unknown>) => void;
+  onError?: (entry: Record<string, unknown>) => void;
   gameId?: string;
   [key: string]: unknown;
 }

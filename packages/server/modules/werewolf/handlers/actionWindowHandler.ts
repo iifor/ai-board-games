@@ -14,7 +14,7 @@ import type { ActionResult as ReducerActionResult, Runtime as ReducerRuntime, Ro
 import { shouldSkipSheriffAction } from '../sheriffWorkflow';
 import { ensureWolfTeamContext } from '../wolfTeam';
 import { runActionWindowAiTask, validateActionWindowAiResult } from '../aiActions';
-import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
+import { createWerewolfEvent, publishGameEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
 import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage, phaseStartMessage, phaseResultMessage, phaseEndMessage } from '../messages';
 import { hasActionPhase, getActionPhaseConfig } from '../actionPhases';
@@ -122,6 +122,28 @@ function createActionWindowHandler() {
         }
       }
 
+      // Phase 4: 双写 phase-end 到 EventBus（如果有阶段结束）
+      if (hasActionPhase(step.config.actionType || '')) {
+        const endMsg = (() => {
+          const pc = getActionPhaseConfig(step.config.actionType!);
+          const pctx = buildPhaseContext(step.config.actionType!, partialResults, round);
+          const pmsgs = pc?.buildMessages(step.config.day || 1, pctx);
+          return pmsgs ? pmsgs.end : phaseEndMessage(step.config.actionType, step.config.day);
+        })();
+        if (endMsg) {
+          publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+            builder.setStep(step.id);
+            builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+            builder.setDay(step.config.day || 1);
+            return builder.build('phase-end', {
+              phase: step.config.phase || 'night',
+              actionType: step.config.actionType,
+              message: endMsg,
+            });
+          });
+        }
+      }
+
       return {
         status: 'COMPLETED',
         state: nextState,
@@ -149,6 +171,15 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
   const selfDestruct = (round as { selfDestruct?: Record<string, unknown> }).selfDestruct || {};
   const actorId = Number(selfDestruct.playerId || 0);
   const text = String(selfDestruct.text || `${actorId || '狼人'}号狼人自爆。`);
+
+  // Phase 4: 双写 self-destruct 到 EventBus
+  publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+    builder.setStep(step.id);
+    builder.setPhase('day');
+    builder.setDay(step.config.day || 1);
+    return builder.buildSelfDestruct({ playerId: actorId, text });
+  });
+
   return {
     status: 'COMPLETED',
     state: nextState,
@@ -172,6 +203,18 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
 function skipAction(match: Match, step: Step, runtime: Runtime): HandlerResult {
   const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id }, step.id);
   const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
+
+  // Phase 4: 双写 action-skipped 到 EventBus
+  publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+    builder.setStep(step.id);
+    builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+    builder.setDay(step.config.day || 1);
+    return builder.build('action-skipped', {
+      actionType: step.config.actionType,
+      skipReason: 'no_actors_or_condition',
+    }, channel, scopeKey);
+  });
+
   return {
     status: 'COMPLETED',
     state: nextState,
@@ -212,6 +255,18 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
   const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
   const events: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType, actionWindow: window }, { channel, scopeKey })];
 
+  // Phase 4: 双写 action-requested 到 EventBus
+  publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+    builder.setStep(step.id);
+    builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+    builder.setDay(step.config.day || 1);
+    return builder.buildActionRequested(
+      step.config.actionType || '',
+      (actors as Array<{ id: number }>).map(a => a.id),
+      { actionWindow: window as unknown as Record<string, unknown>, channel, scopeKey },
+    );
+  });
+
   // 添加阶段开始事件（预言家、女巫、守卫等）
   if (hasActionPhase(step.config.actionType || '')) {
     events.push(createWerewolfEvent(
@@ -223,6 +278,18 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
       { actionType: step.config.actionType },
       { channel: CHANNEL_TYPES.PUBLIC }
     ));
+
+    // Phase 4: 双写 phase-start 到 EventBus
+    publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+      builder.setStep(step.id);
+      builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+      builder.setDay(step.config.day || 1);
+      return builder.build('phase-start', {
+        phase: step.config.phase || 'night',
+        actionType: step.config.actionType,
+        message: phaseStartMessage(step.config.actionType, step.config.day),
+      });
+    });
   }
 
   return {

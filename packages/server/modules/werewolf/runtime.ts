@@ -4,6 +4,43 @@ const { createWerewolfRoleSkillRegistry } = require('./roleSkills');
 const { PlayerAgent } = require('./playerAgent');
 const { buildSystemPrompt, createRound, publicHost, publicPlayer } = require('./agents');
 const { getRoleConfig, shuffle } = require('./utils');
+import type { WerewolfEventBus } from './eventBus';
+import type { GameEventBuilder } from './gameEventBuilder';
+import type { SkillEventEmitter } from '../agent-core/skillEventEmitter';
+import { createSkillEventEmitter } from '../agent-core/skillEventEmitter';
+
+// ============================================================
+// Match 级别的事件基础设施注册表
+// ============================================================
+
+const matchInfra = new Map<string, {
+  eventBus: WerewolfEventBus;
+  gameEventBuilder: GameEventBuilder;
+  skillEventEmitter: SkillEventEmitter;
+}>();
+
+/** 注册 match 的事件基础设施 */
+export function registerMatchInfra(
+  matchId: string,
+  eventBus: WerewolfEventBus,
+  gameEventBuilder: GameEventBuilder,
+): void {
+  matchInfra.set(matchId, {
+    eventBus,
+    gameEventBuilder,
+    skillEventEmitter: createSkillEventEmitter(eventBus, gameEventBuilder),
+  });
+}
+
+/** 取消注册 */
+export function unregisterMatchInfra(matchId: string): void {
+  matchInfra.delete(matchId);
+}
+
+/** 获取 match 的事件基础设施 */
+export function getMatchInfra(matchId: string) {
+  return matchInfra.get(matchId);
+}
 
 interface Player {
   id: number;
@@ -116,6 +153,9 @@ interface Runtime {
   agents: Agent[];
   state: WerewolfState;
   ctx: RuntimeContext;
+  eventBus?: WerewolfEventBus;
+  gameEventBuilder?: GameEventBuilder;
+  skillEventEmitter?: SkillEventEmitter;
 }
 
 function createInitialWerewolfState(config: Record<string, unknown>): WerewolfState {
@@ -149,8 +189,21 @@ function createInitialWerewolfState(config: Record<string, unknown>): WerewolfSt
   };
 }
 
-function createRuntime(match: Match, stateOverride: WerewolfState | null = null): Runtime {
+function createRuntime(
+  match: Match,
+  stateOverride: WerewolfState | null = null,
+  _eventBus?: WerewolfEventBus,
+  _gameEventBuilder?: GameEventBuilder,
+  _skillEventEmitter?: SkillEventEmitter,
+): Runtime {
   const sourceState: WerewolfState = stateOverride || match.state || {};
+
+  // 从注册表获取事件基础设施（优先于直接传入的参数）
+  const infra = getMatchInfra(match.id);
+  const eventBus = _eventBus || infra?.eventBus;
+  const gameEventBuilder = _gameEventBuilder || infra?.gameEventBuilder;
+  const skillEventEmitter = _skillEventEmitter || infra?.skillEventEmitter;
+
   const config = resolveRuntimeConfig(match.config);
   const modeConfig: ModeConfig = sourceState.modeConfig || require('../werewolf-config/service').getWerewolfModeConfig(match.config?.werewolfMode);
   const skillRegistry = createWerewolfSkillRegistry();
@@ -187,7 +240,13 @@ function createRuntime(match: Match, stateOverride: WerewolfState | null = null)
     emit: async () => {},
     serialize: () => serializeWerewolfState(match, state)
   };
-  return { config, modeConfig, skillRegistry, fallbackAudit, roleSkillRegistry, agents, state, ctx };
+  return {
+    config, modeConfig, skillRegistry, fallbackAudit,
+    roleSkillRegistry, agents, state, ctx,
+    eventBus,
+    gameEventBuilder,
+    skillEventEmitter,
+  };
 }
 
 function createRuntimeAgent(
@@ -222,7 +281,7 @@ function createRuntimeAgent(
   };
   agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry);
   agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt, {
-    onFallback: (entry: unknown) => (fallbackAudit as { record: (entry: unknown) => void }).record(entry),
+    onError: (entry: unknown) => (fallbackAudit as { record: (entry: unknown) => void }).record(entry),
     gameId
   });
   (roleSkillRegistry as { applyToPlayer?: (agent: InstanceType<typeof PlayerAgent>, roleId: string) => void })?.applyToPlayer?.(agent.playerAgent, roleId);

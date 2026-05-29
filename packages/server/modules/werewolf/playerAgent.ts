@@ -1,7 +1,8 @@
 import { BasePlayerAgent, normalizeText } from '../agent-core';
+import type { PlayerAgentOptions as BasePlayerAgentOptions } from '../agent-core';
 
 interface PlayerAgentOptions {
-  onFallback?: (entry: unknown) => void;
+  onError?: (entry: unknown) => void;
   gameId?: string;
   [key: string]: unknown;
 }
@@ -19,8 +20,10 @@ interface PlayerLike {
 
 class PlayerAgent extends BasePlayerAgent {
   constructor(player: PlayerLike, systemPrompt: string, options: PlayerAgentOptions = {}) {
+    const { onError, ...rest } = options;
     super(player, systemPrompt, {
-      ...options,
+      ...rest,
+      onError,
       gameType: 'werewolf',
       resolveRole: (item: PlayerLike) => item.role || item.roleLabel || '',
       resolveFaction: (item: PlayerLike) => item.faction || ''

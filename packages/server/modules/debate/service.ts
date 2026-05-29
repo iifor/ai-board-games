@@ -165,7 +165,7 @@ function createDebateAgents(
     agent.baseSystemPrompt = buildSystemPrompt(agent, topic, PHASES[0]);
     agent.baseSystemPromptHash = buildAgentHash(agent.baseSystemPrompt as string);
     const playerAgent = new DebateAgent(agent, agent.baseSystemPrompt as string, {
-      onFallback: (entry: Record<string, unknown>) => fallbackAudit.record(entry as unknown as Parameters<typeof fallbackAudit.record>[0]),
+      onError: (entry: Record<string, unknown>) => fallbackAudit.record(entry as unknown as Parameters<typeof fallbackAudit.record>[0]),
       gameId,
     });
     agent.playerAgent = playerAgent as unknown as DebatePlayer['playerAgent'];

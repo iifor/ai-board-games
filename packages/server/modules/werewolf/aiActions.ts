@@ -10,10 +10,11 @@ const {
   askSheriffSpeechWithThinking
 } = require('./agents');
 const { topTarget } = require('./winCheck');
-const { rotateFromSeat, fallbackSpeech, fallbackVote } = require('./utils');
+const { rotateFromSeat } = require('./utils');
 const { getAliveActorsByAction } = require('./actionWindows');
 const { ensureWolfTeamContext } = require('./wolfTeam');
 import { isWerewolfDebugMode, runDebugHunterAction, runDebugWerewolfAction } from './debugActions';
+import { resolveActionChannel } from '@ai-presenter/shared/utils/channelResolution';
 
 interface Agent {
   id: number;
@@ -29,7 +30,7 @@ interface PlayerAgent {
   thinkingEnabled?: boolean;
   hasSkill?: (action: string) => boolean;
   askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
-  askVoteTarget: (prompt: string, validIds: number[], fallback: number | undefined) => Promise<number>;
+  askVoteTarget: (prompt: string, validIds: number[], options?: Record<string, unknown>) => Promise<number | null>;
 }
 
 interface Runtime {
@@ -83,20 +84,24 @@ interface ActionResult {
   payload: Record<string, unknown>;
 }
 
+// ============================================================
+// AI 行动分发
+// ============================================================
+
 async function runWerewolfAiAction(runtime: Runtime, round: Round, actor: Agent, actionType: string): Promise<Record<string, unknown>> {
   const alive = runtime.agents.filter((agent) => agent.alive);
   if (actionType === 'wolf_kill') return runWolfKillAction(runtime, round, actor, alive);
   if (actionType === 'wolf_speech') return runWolfSpeechAction(runtime, round, actor);
   if (actionType === 'wolf_vote') return runWolfVoteAction(runtime, round, actor, alive);
-  if (actionType === 'seer_check') return runRoleSkill(runtime, 'inspectFaction', { actor, alive, agents: runtime.agents, phase: 'night' });
-  if (actionType === 'guard_protect') return runRoleSkill(runtime, 'guard', { actor, alive, phase: 'night' });
+  if (actionType === 'seer_check') return runRoleSkillNullSafe(runtime, 'inspectFaction', { actor, alive, agents: runtime.agents, phase: 'night' });
+  if (actionType === 'guard_protect') return runRoleSkillNullSafe(runtime, 'guard', { actor, alive, phase: 'night' });
   if (actionType === 'witch_save') {
     const victim = runtime.agents.find((agent) => Number(agent.id) === Number(round.night.wolfTarget));
-    return runRoleSkill(runtime, 'save', { actor, victim, round, modeConfig: runtime.modeConfig, phase: 'night' });
+    return runRoleSkillNullSafe(runtime, 'save', { actor, victim, round, modeConfig: runtime.modeConfig, phase: 'night' });
   }
-  if (actionType === 'witch_poison') return runRoleSkill(runtime, 'poison', { actor, alive, phase: 'night' });
+  if (actionType === 'witch_poison') return runRoleSkillNullSafe(runtime, 'poison', { actor, alive, phase: 'night' });
   if (actionType === 'day_speech') return runDaySpeechAction(runtime, round, actor);
-  if (actionType === 'day_vote') return runDayVoteAction(runtime, actor, alive);
+  if (actionType === 'day_vote') return runDayVoteAction(actor, alive);
   if (actionType === 'sheriff_signup') return runSheriffSignupAction(actor);
   if (actionType === 'sheriff_speech') return runSheriffSpeechAction(round, actor, false);
   if (actionType === 'sheriff_withdraw') return runSheriffWithdrawAction(actor);
@@ -106,6 +111,10 @@ async function runWerewolfAiAction(runtime: Runtime, round: Round, actor: Agent,
   throw Object.assign(new Error(`Unsupported werewolf action: ${actionType}`), { severity: 'high' });
 }
 
+// ============================================================
+// 主入口
+// ============================================================
+
 async function runActionWindowAiTask({ match, step, task }: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
   const runtime: Runtime = createRuntime(repo.getMatch(match.id) || match);
   const round: Round = ensureRound(runtime.state, step.config.day);
@@ -114,6 +123,10 @@ async function runActionWindowAiTask({ match, step, task }: { match: Match; step
   const payload = isWerewolfDebugMode(runtime)
     ? runDebugWerewolfAction(runtime, round, actor, step.config.actionType!)
     : await runWerewolfAiAction(runtime, round, actor, step.config.actionType!);
+
+  // Phase 3: 通过 EventBus 发布 action-submitted 事件
+  publishActionSubmitted(runtime, match, step, actor.id, payload);
+
   return {
     eventType: 'werewolf_action_submitted',
     rawOutput: payload,
@@ -138,20 +151,29 @@ async function runHunterAiTask({ match, step, task }: { match: Match; step: Step
       payload: { actionType: 'hunter_shot', actorId: actor.id, ...payload }
     };
   }
-  const target = await executeSkillWithTrace(runtime.skillRegistry, 'shootOnDeath', {
-    actor,
-    agents: runtime.agents,
-    fallback: fallbackVote(actor, runtime.agents),
-    phase: step.config.phase || 'death',
-    state: runtime.ctx.state,
-    gameType: 'werewolf',
-    fallbackAudit: runtime.fallbackAudit
-  });
-  return {
-    eventType: 'werewolf_action_submitted',
-    rawOutput: target,
-    payload: { actionType: 'hunter_shot', actorId: actor.id, target: target.target }
-  };
+
+  try {
+    const result = await executeSkillWithTrace(runtime.skillRegistry, 'shootOnDeath', {
+      actor,
+      agents: runtime.agents,
+      phase: step.config.phase || 'death',
+      state: runtime.ctx.state,
+      gameType: 'werewolf',
+    });
+    const target = (result as { target?: number | null } | null)?.target ?? null;
+    return {
+      eventType: 'werewolf_action_submitted',
+      rawOutput: result,
+      payload: { actionType: 'hunter_shot', actorId: actor.id, target }
+    };
+  } catch {
+    // AI 调用失败 → 猎人不开枪
+    return {
+      eventType: 'werewolf_action_submitted',
+      rawOutput: null,
+      payload: { actionType: 'hunter_shot', actorId: actor.id, target: null }
+    };
+  }
 }
 
 function validateActionWindowAiResult({ result }: { result: { payload?: { actionType?: string; actorId?: unknown } } }): void {
@@ -164,6 +186,10 @@ function validateHunterAiResult({ result }: { result: { payload?: { actorId?: un
   if (!result?.payload?.actorId) throw Object.assign(new Error('Hunter shot result is invalid'), { severity: 'high' });
 }
 
+// ============================================================
+// 狼人行动
+// ============================================================
+
 async function runWolfKillAction(runtime: Runtime, round: Round, actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
   const context = ensureWolfTeamContext(runtime, round);
   const wolves = getAliveActorsByAction(runtime, 'kill');
@@ -173,27 +199,52 @@ async function runWolfKillAction(runtime: Runtime, round: Round, actor: Agent, a
   round.night.wolfSpeechOrder = speechOrder;
   const isLeader = Number(actor.id) === Number(leader.id);
   const sharedSpeeches = buildWolfSpeechContext(round);
-  const text = actor.thinkingEnabled && actor.playerAgent.thinkingEnabled
-    ? await askWolfNightSpeechWithThinking(actor, round.day, sharedSpeeches, isLeader)
-    : { content: await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader) };
-  const result = await runRoleSkill(runtime, 'kill', {
-    actor,
-    alive,
-    fallback: alive.find((agent) => agent.faction !== 'wolves')?.id || alive[0]?.id,
-    topTarget,
-    phase: 'night'
-  });
-  return { target: result.target, speech: text.content || text, thinking: text.thinking || '' };
+
+  // 狼人夜聊发言
+  let speechText = '';
+  let thinkingText = '';
+  if (actor.thinkingEnabled && actor.playerAgent.thinkingEnabled) {
+    const result = await askWolfNightSpeechWithThinking(actor, round.day, sharedSpeeches, isLeader);
+    if (result) {
+      speechText = typeof result === 'string' ? result : (result as { content?: string; thinking?: string }).content || '';
+      thinkingText = typeof result === 'string' ? '' : (result as { thinking?: string }).thinking || '';
+    }
+  } else {
+    const result = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader);
+    speechText = result || '';
+  }
+
+  // 狼人选刀目标
+  try {
+    const result = await executeSkillWithTrace(runtime.skillRegistry, 'kill', {
+      actor,
+      alive,
+      topTarget,
+      phase: 'night',
+      state: runtime.ctx.state,
+      gameType: 'werewolf',
+    });
+    const target = (result as { target?: number | null } | null)?.target ?? null;
+    return { target, speech: speechText, thinking: thinkingText };
+  } catch {
+    return { target: null, speech: speechText, thinking: thinkingText };
+  }
 }
 
 async function runWolfSpeechAction(runtime: Runtime, round: Round, actor: Agent): Promise<Record<string, unknown>> {
   const context = ensureWolfTeamContext(runtime, round);
   const isLeader = Number(actor.id) === Number(context.wolfLeaderId);
   const sharedSpeeches = buildWolfSpeechContext(round);
-  const text = actor.thinkingEnabled && actor.playerAgent.thinkingEnabled
-    ? await askWolfNightSpeechWithThinking(actor, round.day, sharedSpeeches, isLeader)
-    : { content: await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader) };
-  return { speech: text.content || text, thinking: text.thinking || '' };
+
+  if (actor.thinkingEnabled && actor.playerAgent.thinkingEnabled) {
+    const result = await askWolfNightSpeechWithThinking(actor, round.day, sharedSpeeches, isLeader);
+    if (result) {
+      return { speech: (result as { content?: string }).content || result, thinking: (result as { thinking?: string }).thinking || '' };
+    }
+    return { speech: '', thinking: '' };
+  }
+  const text = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader);
+  return { speech: text || '', thinking: '' };
 }
 
 async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
@@ -205,8 +256,8 @@ async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, a
   const target = await actor.playerAgent.askVoteTarget([
     '狼人夜晚刀口投票。请在听完所有狼队夜聊后选择今晚击杀目标。',
     `狼队夜聊记录：\n${speeches || '暂无发言。'}`
-  ].join('\n\n'), valid, valid[0] || fallbackVote(actor, runtime.agents));
-  return { target };
+  ].join('\n\n'), valid);
+  return { target }; // null = 弃票
 }
 
 function buildWolfSpeechContext(round: Round): Array<Record<string, unknown>> {
@@ -217,62 +268,98 @@ function buildWolfSpeechContext(round: Round): Array<Record<string, unknown>> {
     : existing;
 }
 
+// ============================================================
+// 白天行动
+// ============================================================
+
 async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent): Promise<Record<string, unknown>> {
   const publicContext = buildDaySpeechContext(round);
-  const text = actor.thinkingEnabled && actor.playerAgent.thinkingEnabled
-    ? await askSpeechWithThinking(actor, round.day, publicContext, fallbackSpeech(actor, round.day))
-    : { content: await askSpeech(actor, round.day, publicContext, fallbackSpeech(actor, round.day)) };
-  const speechText = String(text.content || text || '');
-  const result: Record<string, unknown> = { text: speechText, thinking: text.thinking || '' };
-  if (actor.faction === 'wolves' && actor.playerAgent.hasSkill?.('selfDestruct')) {
-    const selfDestruct = await runRoleSkill(runtime, 'selfDestruct', {
-      actor,
-      phase: 'day',
-      publicContext,
-      speechText
-    });
-    if (selfDestruct?.use) {
-      result.intent = 'selfDestruct';
-      result.selfDestruct = true;
-      result.selfDestructText = String(selfDestruct.text || `${actor.id}号狼人自爆。`);
+
+  let speechText = '';
+  let thinkingText = '';
+  if (actor.thinkingEnabled && actor.playerAgent.thinkingEnabled) {
+    const result = await askSpeechWithThinking(actor, round.day, publicContext);
+    if (result) {
+      speechText = (result as { content?: string }).content || String(result);
+      thinkingText = (result as { thinking?: string }).thinking || '';
+    }
+  } else {
+    const result = await askSpeech(actor, round.day, publicContext);
+    speechText = result || '';
+  }
+
+  const result: Record<string, unknown> = { text: speechText, thinking: thinkingText };
+
+  // 狼人自爆检查
+  if (speechText && actor.faction === 'wolves' && actor.playerAgent.hasSkill?.('selfDestruct')) {
+    try {
+      const selfDestruct = await executeSkillWithTrace(runtime.skillRegistry, 'selfDestruct', {
+        actor,
+        phase: 'day',
+        publicContext,
+        speechText,
+        state: runtime.ctx.state,
+        gameType: 'werewolf',
+      });
+      if ((selfDestruct as { use?: boolean } | null)?.use) {
+        result.intent = 'selfDestruct';
+        result.selfDestruct = true;
+        result.selfDestructText = String((selfDestruct as { text?: string }).text || `${actor.id}号狼人自爆。`);
+      }
+    } catch {
+      // 自爆检查失败 → 不自爆
     }
   }
+
   return result;
 }
 
-async function runDayVoteAction(runtime: Runtime, actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
+async function runDayVoteAction(actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
   const valid = alive.map((agent) => agent.id).filter((id) => Number(id) !== Number(actor.id));
-  const target = await actor.playerAgent.askVoteTarget('请选择你要放逐的玩家。', valid, fallbackVote(actor, runtime.agents));
-  return { target };
+  const target = await actor.playerAgent.askVoteTarget('请选择你要放逐的玩家。', valid);
+  return { target }; // null = 弃票
 }
+
+// ============================================================
+// 警长行动
+// ============================================================
 
 async function runSheriffSignupAction(actor: Agent): Promise<Record<string, unknown>> {
   const parsed = await actor.playerAgent.askJson([
     '警长竞选开始。请选择竞选警长？',
     '只返回 JSON：{"run":true} 或 {"run":false}。'
-  ].join('\n\n'), { maxTokens: 40, fallback: { run: Number(actor.id) <= 3 } });
-  return { run: Boolean(parsed?.run) };
+  ].join('\n\n'), { maxTokens: 40 });
+  return { run: parsed?.run === true };
 }
 
 async function runSheriffSpeechAction(round: Round, actor: Agent, runoff: boolean): Promise<Record<string, unknown>> {
-  const text = actor.thinkingEnabled && actor.playerAgent.thinkingEnabled
-    ? await askSheriffSpeechWithThinking(actor, round.day, '公开信息已通过上下文同步。', runoff)
-    : { content: await askSheriffSpeech(actor, round.day, '公开信息已通过上下文同步。', runoff) };
-  return { text: text.content || text, thinking: text.thinking || '' };
+  if (actor.thinkingEnabled && actor.playerAgent.thinkingEnabled) {
+    const result = await askSheriffSpeechWithThinking(actor, round.day, '公开信息已通过上下文同步。', runoff);
+    if (result) {
+      return { text: (result as { content?: string }).content || result, thinking: (result as { thinking?: string }).thinking || '' };
+    }
+    return { text: '', thinking: '' };
+  }
+  const text = await askSheriffSpeech(actor, round.day, '公开信息已通过上下文同步。', runoff);
+  return { text: text || '', thinking: '' };
 }
 
 async function runSheriffWithdrawAction(actor: Agent): Promise<Record<string, unknown>> {
   const parsed = await actor.playerAgent.askJson([
     '你的警上竞选发言已经结束。你是否退水退出警长竞选？',
     '只返回 JSON：{"withdraw":true} 或 {"withdraw":false}。'
-  ].join('\n\n'), { maxTokens: 40, fallback: { withdraw: false } });
-  return { withdraw: Boolean(parsed?.withdraw) };
+  ].join('\n\n'), { maxTokens: 40 });
+  return { withdraw: parsed?.withdraw === true };
 }
 
 async function runSheriffVoteAction(actor: Agent, candidateIds: number[]): Promise<Record<string, unknown>> {
-  const target = await actor.playerAgent.askVoteTarget('警长竞选投票，请从候选人中选择警长。', candidateIds, candidateIds[0]);
-  return { target };
+  const target = await actor.playerAgent.askVoteTarget('警长竞选投票，请从候选人中选择警长。', candidateIds);
+  return { target }; // null = 弃票
 }
+
+// ============================================================
+// 辅助函数
+// ============================================================
 
 function taskTargetIds(runtime: Runtime, round: Round, actionType: string): number[] {
   const election = round.sheriffElection;
@@ -295,13 +382,75 @@ function buildDaySpeechContext(round: Round): string {
   return lines.filter(Boolean).join('\n\n') || '暂无公开信息。';
 }
 
-function runRoleSkill(runtime: Runtime, action: string, context: Record<string, unknown>): Promise<Record<string, unknown>> {
-  return executeSkillWithTrace(runtime.skillRegistry, action, {
-    ...context,
-    state: runtime.ctx.state,
-    gameType: 'werewolf',
-    fallbackAudit: runtime.fallbackAudit
-  });
+/**
+ * 执行角色技能，AI 失败时返回 null target（技能不生效）
+ */
+async function runRoleSkillNullSafe(runtime: Runtime, action: string, context: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const result = await executeSkillWithTrace(runtime.skillRegistry, action, {
+      ...context,
+      state: runtime.ctx.state,
+      gameType: 'werewolf',
+    });
+    return result as Record<string, unknown>;
+  } catch {
+    // AI 失败 → 不使用技能
+    return action === 'save' || action === 'poison'
+      ? { use: false }
+      : { target: null };
+  }
+}
+
+/**
+ * Phase 3: 发布 action-submitted 事件到 EventBus
+ */
+function publishActionSubmitted(
+  runtime: Runtime,
+  match: Match,
+  step: Step,
+  actorId: number,
+  payload: Record<string, unknown>,
+): void {
+  const eventBus = (runtime as Record<string, unknown>).eventBus as { publish: (e: unknown) => void } | undefined;
+  const gameEventBuilder = (runtime as Record<string, unknown>).gameEventBuilder as {
+    setStep: (s: string) => unknown;
+    setPhase: (p: string) => unknown;
+    setDay: (d: number) => unknown;
+    buildActionSubmitted: (actionType: string, actorId: number, opts: Record<string, unknown>) => unknown;
+  } | undefined;
+
+  if (!eventBus || !gameEventBuilder) return;
+
+  try {
+    const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
+    gameEventBuilder.setStep(step.id);
+    gameEventBuilder.setPhase((step.config.phase as string) || 'night');
+    gameEventBuilder.setDay(step.config.day || 1);
+
+    const speechPayload = payload.speech || payload.text
+      ? {
+          playerId: actorId,
+          text: (payload.speech || payload.text || '') as string,
+          thinking: (payload.thinking || '') as string,
+        }
+      : undefined;
+
+    const event = gameEventBuilder.buildActionSubmitted(
+      step.config.actionType || '',
+      actorId,
+      {
+        targetId: payload.target as number | undefined,
+        speech: speechPayload,
+        result: payload,
+        channel,
+        scopeKey,
+      },
+    );
+
+    eventBus.publish(event);
+  } catch (error) {
+    console.error(`[aiActions] 发布 action-submitted 事件失败:`, (error as Error).message);
+  }
 }
 
 export {

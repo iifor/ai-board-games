@@ -1,6 +1,8 @@
 import { serializeWerewolfState } from '../runtime';
 import type { ChannelType } from '@ai-presenter/shared/types/channelTypes';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
+import type { WerewolfEventBus } from '../eventBus';
+import type { GameEventBuilder } from '../gameEventBuilder';
 
 interface WerewolfEvent {
   type: string;
@@ -42,6 +44,28 @@ function createWerewolfEvent(
   };
 }
 
+// ============================================================
+// Phase 4: EventBus 双写助手
+// ============================================================
+
+/**
+ * 通过 EventBus 发布 GameEvent（双写路径，不影响传统事件流）
+ * 如果 eventBus/gameEventBuilder 不可用则静默跳过
+ */
+function publishGameEvent(
+  eventBus: WerewolfEventBus | undefined,
+  gameEventBuilder: GameEventBuilder | undefined,
+  builderFn: (builder: GameEventBuilder) => unknown,
+): void {
+  if (!eventBus || !gameEventBuilder) return;
+  try {
+    const event = builderFn(gameEventBuilder);
+    if (event) eventBus.publish(event as Parameters<WerewolfEventBus['publish']>[0]);
+  } catch (error) {
+    console.error(`[handlers/common] 发布 GameEvent 失败:`, (error as Error).message);
+  }
+}
+
 function completed(state: StepState, stepId: string) {
   return { status: 'COMPLETED', state: markStepComplete(state, stepId) };
 }
@@ -59,6 +83,7 @@ function markStepComplete(state: StepState, stepId: string): StepState {
 
 export {
   createWerewolfEvent,
+  publishGameEvent,
   completed,
   isDone,
   markStepComplete

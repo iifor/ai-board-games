@@ -5,10 +5,6 @@ const VIEW_MODE_GOD = 'god';
 const VIEW_MODE_PLAYER = 'player';
 const { assertAbortableWerewolfBoundary } = require('../failures/failurePolicy');
 
-const WOLF_EVENT_TYPES = new Set(['wolf-wake', 'wolf-leader', 'wolf-speech', 'wolf-vote']);
-const SEER_EVENT_TYPES = new Set(['seer-wake', 'seer-check']);
-const GUARD_EVENT_TYPES = new Set(['guard-wake', 'guard-action']);
-const WITCH_EVENT_TYPES = new Set(['witch-antidote', 'witch-poison', 'witch-action']);
 
 interface AudienceSession {
   mode: string;
@@ -278,17 +274,13 @@ function cloneNight(night: NightData, round: Round = {}): NightData {
 function isEventVisible(event: GameEvent, context: ProjectionContext = { mode: VIEW_MODE_GOD }): boolean {
   if (context.mode === VIEW_MODE_GOD) return true;
 
-  // New channel model: delegate to InformationLayer
+  // 所有新事件都有 channel 元数据，通过 InformationLayer 做访问控制
   if (event.channel) {
     const viewer = projectionContextToViewerContext(context);
     return canAccess(event as { channel: string; scopeKey?: string }, viewer);
   }
 
-  // Legacy fallback: role-based event type filtering
-  if (WOLF_EVENT_TYPES.has(event.type)) return context.viewerFaction === 'wolves';
-  if (SEER_EVENT_TYPES.has(event.type)) return context.viewerRoleId === 'seer';
-  if (GUARD_EVENT_TYPES.has(event.type)) return context.viewerRoleId === 'guard';
-  if (WITCH_EVENT_TYPES.has(event.type)) return context.viewerRoleId === 'witch';
+  // 没有 channel 的事件默认可见（安全回退）
   return true;
 }
 
