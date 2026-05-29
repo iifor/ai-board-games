@@ -9,9 +9,7 @@ import { createEventBusWithDefaults } from './eventBus';
 import { createGameEventBuilder } from './gameEventBuilder';
 import { createEventDeliverySubscriber } from './eventDeliverySubscriber';
 import { createChannelRouter } from './channelRouter';
-import type { ChannelRouter } from './channelRouter';
 import { createAudienceStream } from './audienceStream';
-import type { AudienceStream } from './audienceStream';
 
 const WEREWOLF_WORKFLOW_ID = 'werewolf.workflow.basic.v1';
 
@@ -33,7 +31,6 @@ function createWerewolfWorkflowMatch(config: Record<string, unknown>): Record<st
     gameType: 'werewolf',
     config: {
       werewolfMode: (state.werewolfMode as { id?: string })?.id || (config.werewolfMode as { id?: string })?.id || config.werewolfMode || 'standard',
-      hostId: (config.host as { id?: number })?.id || null,
       selectedPlayerIds: ((config.players || []) as Array<{ id: number }>).map((player) => player.id),
       debugMode: Boolean(config.debugMode),
       clientViewMode: config.clientViewMode || 'god'
@@ -49,8 +46,9 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
   // Phase 5-6: EventBus + ChannelRouter + AudienceStream (完整事件驱动栈)
   const eventBus = createEventBusWithDefaults();
   const gameEventBuilder = createGameEventBuilder(match.id as string);
-  const channelRouter = createChannelRouter(eventBus);
-  const audienceStream = createAudienceStream(eventBus);
+  // ChannelRouter 和 AudienceStream 通过 EventBus 订阅自动工作
+  createChannelRouter(eventBus);
+  createAudienceStream(eventBus);
   registerMatchInfra(match.id as string, eventBus, gameEventBuilder);
 
   // Phase 5: 用 EventBus 订阅替代 outbox 轮询
@@ -70,12 +68,8 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
     markTraceComplete(trace);
     flushTrace(trace);
     const result = serializeWerewolfState(finalMatch, finalMatch.state);
-    // Phase 6: 暴露 ChannelRouter 和 AudienceStream 供 game-socket 使用
-    return Object.assign(result, {
-      _channelRouter: channelRouter,
-      _audienceStream: audienceStream,
-      _eventBus: eventBus,
-    });
+    // Phase 6: ChannelRouter/AudienceStream/EventBus 通过 matchInfra 注册表获取
+    return result;
   } catch (error) {
     markTraceError(trace, (error as Error).message || String(error));
     flushTrace(trace);

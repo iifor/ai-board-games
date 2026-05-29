@@ -1,10 +1,9 @@
-import React, { useMemo } from 'react';
-import { MessageSquareText, X } from 'lucide-react';
+import React, { useMemo, useState, useRef } from 'react';
+import { MessageSquareText, X, Shuffle } from 'lucide-react';
 import { DebateDialogFooter } from '../DebateDialogFooter';
 import { DebatePlayerPool } from '../DebatePlayerPool';
 import { DebateTeamBoard } from '../DebateTeamBoard';
 import { DebateTopicFields } from '../DebateTopicFields';
-import { HostSeat } from '../../../../components/common/HostSeat';
 import {
   normalizeDebateTeamDraft,
   getDebateTeamKey,
@@ -134,6 +133,43 @@ export function DebateTopicDialog({
     }
   }
 
+  const [randomizing, setRandomizing] = useState(false);
+  const playerIdsRef = useRef(effectivePlayerIds);
+  playerIdsRef.current = effectivePlayerIds;
+
+  async function handleRandomize(): Promise<void> {
+    if (isReplayLocked || randomizing) return;
+    setRandomizing(true);
+    const ids = playerIdsRef.current;
+    try {
+      const response = await fetch('/api/toc/randomize-debate-teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerIds: ids }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ message: '请求失败' }));
+        console.error('随机分配失败:', err.message);
+        return;
+      }
+      const data = await response.json();
+      if (data?.debateTeams) {
+        const dt = data.debateTeams;
+        onTeamsChange(normalizeDebateTeamDraft({
+          proIds: dt.proIds || [],
+          conIds: dt.conIds || [],
+          judgeIds: dt.judgeIds || [],
+          proCaptainId: dt.captainEnabled ? dt.proCaptainId : null,
+          conCaptainId: dt.captainEnabled ? dt.conCaptainId : null,
+        }, ids));
+      }
+    } catch (error) {
+      console.error('随机分配请求失败:', error);
+    } finally {
+      setRandomizing(false);
+    }
+  }
+
   return (
     <div className="debate-topic-backdrop" role="presentation">
       <section className="debate-topic-dialog" role="dialog" aria-modal="true" aria-label="辩论赛设置">
@@ -142,9 +178,21 @@ export function DebateTopicDialog({
             <span><MessageSquareText size={24} /></span>
             <h2>辩论赛设置</h2>
           </div>
-          <button type="button" className="debate-topic-close" onClick={onCancel} aria-label="关闭">
-            <X size={28} />
-          </button>
+          <div className="debate-dialog-header-actions">
+            <button
+              type="button"
+              className="debate-randomize-btn"
+              onClick={handleRandomize}
+              disabled={randomizing || isReplayLocked}
+              title="随机分配玩家阵营和辩位"
+            >
+              <Shuffle size={16} />
+              <span>{randomizing ? '分配中...' : '随机分配'}</span>
+            </button>
+            <button type="button" className="debate-topic-close" onClick={onCancel} aria-label="关闭">
+              <X size={28} />
+            </button>
+          </div>
         </header>
 
         <DebateTopicFields topic={effectiveTopic} disabled={isReplayLocked} onChange={update} />
@@ -160,12 +208,6 @@ export function DebateTopicDialog({
           getPlayer={getPlayer}
           onCaptainDrop={setCaptain}
           onDrop={handleDrop}
-        />
-        <HostSeat
-          hostPlayer={hostPlayer}
-          players={players}
-          onSelect={(id) => onHostChange?.(id)}
-          onRemove={() => onHostChange?.(null)}
         />
         <DebatePlayerPool players={audiencePlayers} disabled={isReplayLocked} onDrop={returnPlayerToAudience} />
         <DebateDialogFooter

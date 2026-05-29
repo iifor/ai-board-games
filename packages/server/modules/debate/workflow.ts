@@ -353,7 +353,6 @@ function createDebateWorkflowMatch(config: DebateConfig): WorkflowMatch {
   const runtimeConfig = {
     topic: config.topic,
     debateTeams: config.debateTeams,
-    hostId: config.host?.id || null,
     selectedPlayerIds: (config as Record<string, unknown>).selectedPlayerIds || (config.players || []).map((player) => player.id),
   };
   return _createWorkflowMatch({
@@ -526,17 +525,9 @@ function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): Debate
     topic: matchConfig.topic as Topic,
     debateTeams: matchConfig.debateTeams as DebateConfig['debateTeams'],
     selectedPlayerIds: [...selectedIds],
-    host: resolveHost(base, matchConfig.hostId as number),
+    host: base.host || {},
     players,
   };
-}
-
-function resolveHost(config: DebateConfig, hostId: number | null): DebateHost {
-  const id = Number(hostId);
-  if (!id) return config.host || {};
-  const player = config.players.find((item) => Number(item.id) === id) as unknown as DebateHost | undefined;
-  if (!player) return config.host || {};
-  return { ...config.host, ...player, name: player.name || player.nickname, nickname: player.nickname || player.name };
 }
 
 function createPhaseFromStep(step: WorkflowStep): DebatePhase {

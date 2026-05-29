@@ -1,9 +1,9 @@
 const WEREWOLF_NIGHT_PROMPTS: Record<string, string> = {
-  wolfWake: '狼人请睁眼。请选择今晚要击杀的玩家。',
-  seerWake: '预言家请睁眼。请选择你要查验的玩家。',
+  wolfWake: '狼人请睁眼',
+  seerWake: '预言家请睁眼。请选择要查验的玩家。',
   guardWake: '守卫请睁眼。请选择要守护的玩家。',
-  witchAntidote: '女巫请睁眼。今晚有人倒牌，你要使用解药吗？',
-  witchPoison: '你要使用毒药吗？'
+  witchAntidote: '女巫请睁眼。今晚它倒牌，你要救吗？',
+  witchPoison: '你有一瓶毒药，你要用吗？'
 } as const;
 
 const WEREWOLF_NIGHT_PROMPT_KEYS: Record<string, string> = {

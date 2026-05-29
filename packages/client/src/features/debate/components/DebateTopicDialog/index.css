@@ -81,6 +81,37 @@
   padding: 0 !important;
 }
 
+.debate-dialog-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.debate-randomize-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border: 1px solid rgba(95, 171, 255, 0.46);
+  border-radius: 8px;
+  background: rgba(11, 46, 107, 0.42);
+  color: #d4e6ff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.debate-randomize-btn:hover:not(:disabled) {
+  background: rgba(22, 70, 148, 0.56);
+  border-color: rgba(95, 171, 255, 0.74);
+}
+
+.debate-randomize-btn:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
 .debate-topic-dialog label {
   display: flex;
   flex-direction: row;

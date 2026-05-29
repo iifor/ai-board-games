@@ -139,6 +139,64 @@ router.put('/player-selections/:gameType', express.json(), (request: Request, re
   }
 });
 
+// ============================================================
+// 辩论赛随机分配
+// ============================================================
+
+router.post('/randomize-debate-teams', express.json(), (request: Request, response: Response, next: NextFunction) => {
+  try {
+    const config = getAiConfig();
+    const allPlayers = config.players || [];
+    const body = request.body as Record<string, unknown> | undefined;
+    const requestedIds: number[] = Array.isArray(body?.playerIds)
+      ? (body!.playerIds as (number | string)[]).map(Number).filter((n) => n > 0)
+      : [];
+
+    // 确定参与玩家
+    const pool = requestedIds.length
+      ? allPlayers.filter((p: { id: number | string }) => requestedIds.includes(Number(p.id)))
+      : allPlayers;
+
+    if (pool.length < 8) {
+      response.status(400).json({
+        error: 'INSUFFICIENT_PLAYERS',
+        message: `随机分配至少需要 8 名玩家，当前只有 ${pool.length} 人。`,
+      });
+      return;
+    }
+
+    // 随机排列
+    const shuffled = shuffleArray(pool);
+    const selected = shuffled.slice(0, Math.min(12, Math.max(8, shuffled.length)));
+
+    const proIds = selected.slice(0, 4).map((p: { id: number | string }) => Number(p.id));
+    const conIds = selected.slice(4, 8).map((p: { id: number | string }) => Number(p.id));
+    const judgeIds = selected.slice(8).map((p: { id: number | string }) => Number(p.id));
+
+    response.json({
+      debateTeams: {
+        proIds,
+        conIds,
+        judgeIds,
+        captainEnabled: true,
+        proCaptainId: proIds[0],
+        conCaptainId: conIds[0],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 router.get('/diagnostics/openai', async (request: Request, response: Response, next: NextFunction) => {
   try {
     const config = getAiConfig();

@@ -2,7 +2,6 @@ import { Bug, Check, Eye, Moon, UserRound, Users } from 'lucide-react';
 import { classNames } from '../../../../utils/classNames';
 import { formatWerewolfModeSummary, getWerewolfModePlayerCount } from '../../utils';
 import { PanelHeader } from '../PanelHeader';
-import { HostSeat } from '../../../../components/common/HostSeat';
 import type { Player, WerewolfMode } from '../../../../types';
 import './index.css';
 
@@ -74,12 +73,6 @@ export function WerewolfModeDialog({
           </section>
           <section>
             <PanelHeader icon={<Users size={18} />} title={`玩家 ${selectedCount}/${requiredCount || '-'}`} />
-            <HostSeat
-              hostPlayer={hostPlayer}
-              players={players}
-              onSelect={(id: number | string | null) => onHostChange?.(id as number | null)}
-              onRemove={() => onHostChange?.(null)}
-            />
             <div className="werewolf-player-grid">
               {players.length ? players.map((player) => {
                 const checked = selectedPlayerIds.includes(Number(player.id));

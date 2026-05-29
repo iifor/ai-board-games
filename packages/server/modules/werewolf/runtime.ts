@@ -356,20 +356,12 @@ function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): Record
   return {
     ...base,
     mode: 'real',
-    host: resolveHost(base, matchConfig.hostId),
+    host: base.host || {},
     players: selectedIds.size ? (base.players as Player[]).filter((player) => selectedIds.has(Number(player.id))) : base.players,
     werewolfMode: matchConfig.werewolfMode,
     debugMode: Boolean(matchConfig.debugMode),
     clientViewMode: matchConfig.clientViewMode || 'god'
   };
-}
-
-function resolveHost(config: Record<string, unknown>, hostId: unknown): Record<string, unknown> {
-  const id = Number(hostId);
-  if (!id) return (config.host || {}) as Record<string, unknown>;
-  const player = (config.players as Player[])?.find((item) => Number(item.id) === id);
-  if (!player) return (config.host || {}) as Record<string, unknown>;
-  return { ...(config.host as Record<string, unknown>), ...player, name: player.name || player.nickname, nickname: player.nickname || player.name };
 }
 
 function expandRoleSlots(roles: unknown[] = []): unknown[] {

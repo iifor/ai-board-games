@@ -103,7 +103,6 @@ interface SessionMessage {
   gameType?: string;
   topic?: Record<string, unknown>;
   debateTeams?: DebateTeams;
-  hostId?: number | string;
   werewolfMode?: string | Record<string, unknown>;
   replayGameId?: string;
   clientViewMode?: string;
@@ -117,7 +116,6 @@ interface SessionMessage {
 interface RunSessionOptions {
   topic?: Record<string, unknown>;
   debateTeams?: DebateTeams;
-  hostId?: number | string;
   werewolfMode?: string | Record<string, unknown>;
   replayGameId?: string;
   clientViewMode?: string;
@@ -148,6 +146,10 @@ function attachGameSocket(server: import('http').Server): void {
       const message = parseMessage(raw) as SessionMessage | null;
       if (!message) return;
 
+      if (message.type === 'randomize-teams') {
+        handleRandomizeTeams(session, message.playerIds);
+      }
+
       if (message.type === 'start') {
         runSession(
           session,
@@ -157,7 +159,6 @@ function attachGameSocket(server: import('http').Server): void {
           {
             topic: message.topic,
             debateTeams: message.debateTeams,
-            hostId: message.hostId,
             werewolfMode: message.werewolfMode,
             replayGameId: message.replayGameId,
             clientViewMode: message.clientViewMode,
@@ -270,7 +271,7 @@ function getRequestConfig(
     gameType === 'debate' && hasDebateTeamConfig(options.debateTeams)
       ? selectDebateTeamPlayers(config, options.debateTeams!)
       : selectPlayersForGame(config, playerIds, gameType, options);
-  const host = resolveRequestHost(config, options.hostId);
+  const host = config.host; // 不再需要指定主持人席位，使用全局默认主持人
   const selectedProviders = new Set([
     ...selected.map((player: AiConfigPlayer) => player.provider),
   ]);
@@ -310,38 +311,6 @@ function getRequestConfig(
     );
   }
   return { ...scopedConfig, mode: 'real' };
-}
-
-function resolveRequestHost(
-  config: AiConfig,
-  hostId?: number | string,
-): AiConfigHost {
-  const id = Number(hostId);
-  if (!id) return config.host;
-  const player = config.players.find((item) => Number(item.id) === id);
-  if (!player) return config.host;
-  return {
-    ...config.host,
-    id: player.id,
-    name: player.name || player.nickname || config.host.name,
-    nickname: player.nickname || player.name || config.host.nickname,
-    provider: player.provider,
-    providerName: player.providerName || player.provider,
-    baseUrl: player.baseUrl,
-    apiKeyEnv: player.apiKeyEnv,
-    apiKey: player.apiKey,
-    apiFormat: player.apiFormat,
-    model: player.model,
-    modelId: player.modelId,
-    temperature: Number(
-      player.temperature ?? config.host.temperature ?? 0.35,
-    ),
-    personality: player.personality || '',
-    sex: player.sex || '',
-    avatar: player.avatar || '',
-    avatarUrl: player.avatarUrl || player.avatar || '',
-    voicePackageId: player.voicePackageId || null,
-  };
 }
 
 function publicSocketHost(host: AiConfigHost = {}): Record<string, unknown> {
@@ -448,14 +417,70 @@ function getSavedPlayerIds(gameType: string): number[] {
   }
 }
 
+// ============================================================
+// 辩论赛随机分配
+// ============================================================
+
+function shuffle<T>(arr: T[]): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function handleRandomizeTeams(session: GameSession, playerIds?: (number | string)[]): void {
+  try {
+    const config = getAiConfig();
+    const allPlayers = config.players || [];
+    const ids = (playerIds || []).map(Number).filter((n) => n > 0);
+
+    // 确定参与玩家：优先用传入的 playerIds，否则取全部
+    const pool = ids.length
+      ? allPlayers.filter((p: AiConfigPlayer) => ids.includes(Number(p.id)))
+      : allPlayers;
+
+    if (pool.length < 8) {
+      session.send({ type: 'error', message: `随机分配至少需要 8 名玩家，当前只有 ${pool.length} 人。` });
+      return;
+    }
+
+    // 随机排列
+    const shuffled = shuffle(pool);
+    // 取前 12 人（或全部），最少 8 人
+    const selected = shuffled.slice(0, Math.min(12, Math.max(8, shuffled.length)));
+
+    const proIds = selected.slice(0, 4).map((p: AiConfigPlayer) => Number(p.id));
+    const conIds = selected.slice(4, 8).map((p: AiConfigPlayer) => Number(p.id));
+    const judgeIds = selected.slice(8).map((p: AiConfigPlayer) => Number(p.id));
+    const proCaptainId = proIds[0];
+    const conCaptainId = conIds[0];
+
+    session.send({
+      type: 'teams-randomized',
+      debateTeams: {
+        proIds,
+        conIds,
+        judgeIds,
+        captainEnabled: true,
+        proCaptainId,
+        conCaptainId,
+      },
+    });
+  } catch (error) {
+    session.send({ type: 'error', message: `随机分配失败：${(error as Error).message}` });
+  }
+}
+
 export {
   attachGameSocket,
   runSession,
   normalizeGameType,
   getRunner,
   getRequestConfig,
-  resolveRequestHost,
   publicSocketHost,
   selectPlayersForGame,
   getSavedPlayerIds,
+  handleRandomizeTeams,
 };

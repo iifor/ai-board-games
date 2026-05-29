@@ -132,25 +132,27 @@ function getStoredAudienceSession(game: Game = {}): AudienceSession {
 function createProjectionContext(game: Game = {}, override: Record<string, unknown> = {}): ProjectionContext {
   const stored = getStoredAudienceSession(game);
   const mode = normalizeWerewolfViewMode(override.mode || stored.mode);
+
+  // 上帝视角不需要找 viewer
+  if (mode === VIEW_MODE_GOD) return { mode };
+
+  // 玩家视角：尝试找到 viewer player，找不到则回退到上帝视角
   const viewerPlayerId = Number(override.viewerPlayerId || stored.viewerPlayerId) || null;
   const viewer = findViewer(game.players || [], viewerPlayerId);
 
-  assertAbortableWerewolfBoundary(
-    mode !== VIEW_MODE_PLAYER || viewer,
-    'VISIBILITY_POLICY_FAILED',
-    'Player view projection requires a valid viewer player.'
-  );
+  if (!viewer) {
+    console.warn('[viewPolicy] Player view projection fallback to god view — no valid viewer player found.');
+    return { mode: VIEW_MODE_GOD };
+  }
 
-  return mode === VIEW_MODE_GOD
-    ? { mode }
-    : {
-        mode,
-        viewerPlayerId: Number(viewer!.id),
-        viewerRoleId: viewer!.role || stored.viewerRoleId || null,
-        viewerFaction: viewer!.faction || stored.viewerFaction || null,
-        lockMode: 'fixed',
-        afterDeath: 'dead-player-view'
-      };
+  return {
+    mode,
+    viewerPlayerId: Number(viewer.id),
+    viewerRoleId: viewer.role || stored.viewerRoleId || null,
+    viewerFaction: viewer.faction || stored.viewerFaction || null,
+    lockMode: 'fixed',
+    afterDeath: 'dead-player-view'
+  };
 }
 
 function projectWerewolfEvent(event: GameEvent, context: ProjectionContext = { mode: VIEW_MODE_GOD }): GameEvent | null {
