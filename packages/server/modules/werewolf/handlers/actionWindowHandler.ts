@@ -16,7 +16,8 @@ import { ensureWolfTeamContext } from '../wolfTeam';
 import { runActionWindowAiTask, validateActionWindowAiResult } from '../aiActions';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
-import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage } from '../messages';
+import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage, phaseStartMessage, phaseResultMessage, phaseEndMessage } from '../messages';
+import { hasActionPhase, getActionPhaseConfig } from '../actionPhases';
 import { resolveActionChannel } from './actionChannel';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 
@@ -85,10 +86,46 @@ function createActionWindowHandler() {
       const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
       resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
       const resolvedChannel = resolveActionChannel(step.config.actionType || '');
+      const completedEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType }, resolvedChannel)];
+
+      // 添加阶段结果和阶段结束事件（预言家、女巫、守卫等）
+      if (hasActionPhase(step.config.actionType || '')) {
+        const phaseConfig = getActionPhaseConfig(step.config.actionType!);
+        const phaseContext = buildPhaseContext(step.config.actionType!, partialResults, round);
+        const phaseMessages = phaseConfig?.buildMessages(step.config.day || 1, phaseContext);
+
+        // 阶段结果事件
+        if (phaseMessages?.result) {
+          completedEvents.push(createWerewolfEvent(
+            match,
+            step,
+            nextState as unknown as Record<string, unknown>,
+            'werewolf_phase_result',
+            phaseMessages.result,
+            { actionType: step.config.actionType, ...phaseContext },
+            { channel: CHANNEL_TYPES.PUBLIC }
+          ));
+        }
+
+        // 阶段结束事件（请闭眼）- 只在消息非空时生成
+        const endMessage = phaseMessages ? phaseMessages.end : phaseEndMessage(step.config.actionType, step.config.day);
+        if (endMessage) {
+          completedEvents.push(createWerewolfEvent(
+            match,
+            step,
+            nextState as unknown as Record<string, unknown>,
+            'werewolf_phase_end',
+            endMessage,
+            { actionType: step.config.actionType },
+            { channel: CHANNEL_TYPES.PUBLIC }
+          ));
+        }
+      }
+
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType }, resolvedChannel)]
+        events: completedEvents
       };
     },
     runAiTask: runActionWindowAiTask,
@@ -173,14 +210,57 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     promptContext: { day: step.config.day, actionType: step.config.actionType, round }
   });
   const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
+  const events: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType, actionWindow: window }, { channel, scopeKey })];
+
+  // 添加阶段开始事件（预言家、女巫、守卫等）
+  if (hasActionPhase(step.config.actionType || '')) {
+    events.push(createWerewolfEvent(
+      match,
+      step,
+      nextState as unknown as Record<string, unknown>,
+      'werewolf_phase_start',
+      phaseStartMessage(step.config.actionType, step.config.day),
+      { actionType: step.config.actionType },
+      { channel: CHANNEL_TYPES.PUBLIC }
+    ));
+  }
+
   return {
     status: 'WAITING',
     state: nextState,
     blockers: work.blockers,
     tasks: work.tasks,
     pendingActions: work.pendingActions,
-    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType, actionWindow: window }, { channel, scopeKey })]
+    events
   };
+}
+
+function buildPhaseContext(actionType: string, results: ReducerActionResult[], round: Record<string, unknown>): Record<string, unknown> {
+  const night = (round as { night?: Record<string, unknown> }).night || {};
+  const context: Record<string, unknown> = {};
+
+  if (actionType === 'seer_check' && results.length > 0) {
+    const result = results[0];
+    context.seerResult = result?.payload?.result || result?.payload?.faction || '未知';
+    context.target = result?.payload?.target;
+  }
+
+  if (actionType === 'witch_save') {
+    context.wolfTarget = night.wolfTarget || null;
+    context.target = results.length > 0 ? results[0]?.payload?.target : null;
+  }
+
+  if (actionType === 'witch_poison') {
+    context.witchPoisonUsed = results.length > 0;
+    context.target = results.length > 0 ? results[0]?.payload?.target : null;
+  }
+
+  if (actionType === 'guard_protect') {
+    context.guardTarget = results.length > 0 ? results[0]?.payload?.target : null;
+    context.target = context.guardTarget;
+  }
+
+  return context;
 }
 
 function waitForActionWindow({ match, step, state, round, actors }: {

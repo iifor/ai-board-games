@@ -18,10 +18,13 @@ interface PresentationInput {
 
 const SILENT_ACTIONS = new Set([
   'wolf_vote',
+]);
+
+const PHASE_ACTION_TYPES = new Set([
   'seer_check',
   'guard_protect',
   'witch_save',
-  'witch_poison'
+  'witch_poison',
 ]);
 
 function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPresentation {
@@ -34,8 +37,11 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
   if (eventType === 'speech' || actionType === 'day_speech') {
     return speak(speechText || message, '玩家发言', 'speech', 'player-speech');
   }
-  if (eventType === 'wolf-speech' || actionType === 'wolf_speech') {
+  if (eventType === 'wolf-speech' || (actionType === 'wolf_speech' && speechText)) {
     return speak(speechText || message, '狼队夜聊', 'speech', 'wolf-speech');
+  }
+  if (workflowEvent === 'werewolf_action_submitted' && actionType === 'wolf_speech') {
+    return silent(actionDisplayText('wolf_speech', '已完成'), 'badge', 'wolf-speech');
   }
   if (eventType === 'self-destruct' || workflowEvent === 'werewolf_self_destruct') {
     return speak(speechText || message || '狼人自爆。', '狼人自爆', 'speech', 'self-destruct');
@@ -53,12 +59,36 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
   if (workflowEvent === 'werewolf_action_requested' && SILENT_ACTIONS.has(actionType)) {
     return silent(actionDisplayText(actionType, '行动中'), 'badge', actionType);
   }
+  if (workflowEvent === 'werewolf_action_requested' && PHASE_ACTION_TYPES.has(actionType)) {
+    return silent(actionDisplayText(actionType, '行动中'), 'badge', actionType);
+  }
+  if (workflowEvent === 'werewolf_action_submitted' && PHASE_ACTION_TYPES.has(actionType)) {
+    return silent(actionDisplayText(actionType, '已完成'), 'badge', actionType);
+  }
+  if (workflowEvent === 'werewolf_action_skipped' && PHASE_ACTION_TYPES.has(actionType)) {
+    return silent(actionDisplayText(actionType, '已跳过'), 'badge', actionType);
+  }
   if (workflowEvent === 'werewolf_action_submitted' && SILENT_ACTIONS.has(actionType)) {
     return silent(actionDisplayText(actionType, '已完成'), 'badge', actionType);
   }
   if (workflowEvent === 'werewolf_action_skipped' && SILENT_ACTIONS.has(actionType)) {
     return silent(actionDisplayText(actionType, '已跳过'), 'badge', actionType);
   }
+
+  // 夜间角色行动阶段事件
+  if (workflowEvent === 'werewolf_phase_start' && PHASE_ACTION_TYPES.has(actionType)) {
+    return speak(message, message, 'status', `${actionType}-start`);
+  }
+  if (workflowEvent === 'werewolf_phase_action' && PHASE_ACTION_TYPES.has(actionType)) {
+    return silent(message, 'badge', actionType);
+  }
+  if (workflowEvent === 'werewolf_phase_result' && PHASE_ACTION_TYPES.has(actionType)) {
+    return speak(message, message, 'status', `${actionType}-result`);
+  }
+  if (workflowEvent === 'werewolf_phase_end' && PHASE_ACTION_TYPES.has(actionType)) {
+    return speak(message, message, 'status', `${actionType}-end`);
+  }
+
   if (workflowEvent === 'werewolf_effect_resolved') {
     return silent(publicResolveText(input.stepId, message), 'status', 'effect-resolved');
   }
@@ -108,6 +138,7 @@ function isDayStart(stepId?: string, message?: string): boolean {
 
 function actionDisplayText(actionType: string, suffix: string): string {
   const labels: Record<string, string> = {
+    wolf_speech: '狼队战术部署',
     wolf_vote: '狼队投票',
     seer_check: '预言家查验',
     guard_protect: '守卫守护',

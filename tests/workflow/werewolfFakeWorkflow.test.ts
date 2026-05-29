@@ -220,6 +220,50 @@ test('human pending action submission lets werewolf action window continue', () 
   }
 });
 
+test('witch close eyes is emitted only after poison phase', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'witch', 'good', ['save', 'poison']),
+      player(3, 'villager', 'good', [])
+    ];
+    state.rounds[0].night.wolfTarget = 3;
+    const match = { id: 'm-witch-close', config: { players: state.players }, createdAt: 'now' };
+    const handler = createActionWindowHandler();
+
+    const saveStep = { id: 'witch_save_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'witch_save', optional: true } };
+    const saveOpened = handler.execute({ match, step: saveStep, state } as never);
+    tasks.push(...(saveOpened.tasks || []));
+    tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 2, result: { payload: { use: false } } };
+    const saveCompleted = handler.execute({ match, step: saveStep, state: saveOpened.state } as never);
+    assert.equal(saveCompleted.status, 'COMPLETED');
+    assert.equal((saveCompleted.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_phase_end').length, 0);
+
+    const poisonStep = { id: 'witch_poison_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'witch_poison', optional: true } };
+    const poisonOpened = handler.execute({ match, step: poisonStep, state: saveCompleted.state } as never);
+    tasks.push(...(poisonOpened.tasks || []));
+    tasks[1] = { ...tasks[1], status: 'succeeded', playerId: 2, result: { payload: { use: false, target: null } } };
+    const poisonCompleted = handler.execute({ match, step: poisonStep, state: poisonOpened.state } as never);
+    const closeEvents = (poisonCompleted.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_phase_end');
+    assert.equal(closeEvents.length, 1);
+    assert.equal((closeEvents[0] as Record<string, unknown>).payload.message, '女巫请闭眼。');
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
 test('first day sheriff election windows resolve a human election', () => {
   const original = snapshotRepo(repo);
   const pendingActions: Array<Record<string, unknown>> = [];

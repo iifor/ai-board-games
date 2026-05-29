@@ -144,7 +144,7 @@ const DECISION_TYPE_LABELS: Record<string, string> = {
 // ─── 行动类型（ACTION_LABELS 的镜像，供 trace 页面使用）───
 const ACTION_TYPE_LABELS: Record<string, string> = {
   'wolf_kill': '狼人袭击',
-  'wolf_speech': '狼人夜聊',
+  'wolf_speech': '狼队战术部署',
   'wolf_vote': '狼人投票',
   'seer_check': '预言家查验',
   'guard_protect': '守卫守护',
