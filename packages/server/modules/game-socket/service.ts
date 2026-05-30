@@ -207,11 +207,27 @@ async function runSession(
   );
 
   if (safeGameType !== 'debate') {
+    const gamePlayers = ((config as Record<string, unknown>).players as Array<Record<string, unknown>> || []).map((player) => ({
+      id: Number(player.id),
+      name: player.name || player.nickname || '',
+      nickname: player.nickname || player.name || '',
+      avatar: player.avatar || '',
+      avatarUrl: player.avatarUrl || player.avatar || '',
+      alive: true,
+      role: '',
+      roleLabel: '',
+      faction: '',
+    }));
     await sender.send({
       type: 'host',
       message: getStartMessage(safeGameType),
       debugMode: Boolean((config as Record<string, unknown>).debugMode),
-      game: { type: safeGameType, debugMode: Boolean((config as Record<string, unknown>).debugMode), host: publicSocketHost(config.host) },
+      game: {
+        type: safeGameType,
+        debugMode: Boolean((config as Record<string, unknown>).debugMode),
+        host: publicSocketHost(config.host),
+        players: gamePlayers,
+      },
     });
   }
 

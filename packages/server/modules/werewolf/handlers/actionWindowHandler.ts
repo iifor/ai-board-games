@@ -7,7 +7,7 @@ import {
   resolveActionWindow
 } from '../actionWindows';
 import type { ActionWindow } from '../actionWindows';
-import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
+import { createRuntime, ensureRound, syncRuntimeState, serializeWerewolfState } from '../runtime';
 import type { Runtime } from '../runtime';
 import { applyActionResults, applySelfDestruct, getActorsForStep, getTargetIds, hasSelfDestruct } from '../reducers';
 import type { ActionResult as ReducerActionResult, Runtime as ReducerRuntime, Round as ReducerRound, Step as ReducerStep } from '../reducers';
@@ -52,6 +52,11 @@ function createActionWindowHandler() {
     execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
       const runtime = createRuntime(match, state);
+      // Phase 4 fix: 将游戏状态快照注入 builder，使后续事件携带 game.players
+      if (runtime.gameEventBuilder) {
+        const snapshot = serializeWerewolfState(match, state as unknown as Record<string, unknown>);
+        runtime.gameEventBuilder.setGame(snapshot as unknown as Parameters<typeof runtime.gameEventBuilder.setGame>[0]);
+      }
       const round = ensureRound(runtime.state, step.config.day!);
       if (hasSelfDestruct(round as unknown as ReducerRound) && step.config.actionType === 'day_vote') {
         return skipAction(match, step, runtime);

@@ -51,14 +51,19 @@ function createWerewolfEvent(
 /**
  * 通过 EventBus 发布 GameEvent（双写路径，不影响传统事件流）
  * 如果 eventBus/gameEventBuilder 不可用则静默跳过
+ * @param gameSnapshot 可选：序列化后的游戏状态快照，会注入到事件的 game 字段
  */
 function publishGameEvent(
   eventBus: WerewolfEventBus | undefined,
   gameEventBuilder: GameEventBuilder | undefined,
   builderFn: (builder: GameEventBuilder) => unknown,
+  gameSnapshot?: Record<string, unknown>,
 ): void {
   if (!eventBus || !gameEventBuilder) return;
   try {
+    if (gameSnapshot) {
+      gameEventBuilder.setGame(gameSnapshot as Parameters<GameEventBuilder['setGame']>[0]);
+    }
     const event = builderFn(gameEventBuilder);
     if (event) eventBus.publish(event as Parameters<WerewolfEventBus['publish']>[0]);
   } catch (error) {
