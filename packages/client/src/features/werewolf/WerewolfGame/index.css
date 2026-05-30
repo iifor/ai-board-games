@@ -52,13 +52,12 @@
 }
 
 .werewolf-idle-brand p,
-.werewolf-idle-brand h2,
 .werewolf-idle-brand span {
   margin: 0;
 }
 
 .werewolf-idle-brand p {
-  font-size: 92px;
+  font-size: 50px;
   font-weight: 900;
   letter-spacing: 0;
   line-height: 0.95;
@@ -77,29 +76,11 @@
   letter-spacing: 0.5px;
 }
 
-.werewolf-idle-brand h2 {
-  margin-top: 16px;
-  font-size: 38px;
-  font-weight: 850;
-}
-
-.werewolf-idle-brand h2::before,
-.werewolf-idle-brand h2::after {
-  content: "◆";
-  color: rgba(208, 196, 255, 0.78);
-  font-size: 15px;
-  margin: 0 10px;
-}
-
-.werewolf-idle-brand h2::before {
-  margin-left: 0;
-}
-
 .werewolf-idle-brand span {
   display: block;
   margin-top: 7px;
   color: rgba(230, 235, 255, 0.74);
-  font-size: 16px;
+  font-size: 24px;
   font-weight: 800;
 }
 

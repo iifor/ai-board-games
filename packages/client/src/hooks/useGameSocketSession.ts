@@ -109,14 +109,16 @@ export function useGameSocketSession({
       return;
     }
 
-    latestRef.current.applyServerEvent?.(event);
-
-    if (!event.ackId) return;
-    // 正在播放语音时，新事件入队等待，避免打断当前播报
+    if (!event.ackId) {
+      latestRef.current.applyServerEvent?.(event);
+      return;
+    }
+    // 正在播放语音时，新事件入队等待，避免打断当前播报 + 视觉先于音频
     if (speakingRef.current) {
       deferredQueueRef.current.push({ event, socket });
       return;
     }
+    latestRef.current.applyServerEvent?.(event);
     pendingAckRef.current = { socket, ackId: event.ackId };
     pendingEventRef.current = event;
     speakingRef.current = true;
@@ -135,6 +137,7 @@ export function useGameSocketSession({
     // 处理队列中的下一个事件
     const next = deferredQueueRef.current.shift();
     if (next) {
+      latestRef.current.applyServerEvent?.(next.event);
       pendingAckRef.current = { socket: next.socket, ackId: next.event.ackId! };
       pendingEventRef.current = next.event;
       // speakingRef 保持 true，继续播放下一条
