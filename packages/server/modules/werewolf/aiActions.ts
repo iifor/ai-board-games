@@ -106,7 +106,7 @@ async function runWerewolfAiAction(runtime: Runtime, round: Round, actor: Agent,
   }
   if (actionType === 'witch_poison') return runRoleSkillNullSafe(runtime, 'poison', { actor, alive, phase: 'night' });
   if (actionType === 'day_speech') return runDaySpeechAction(runtime, round, actor);
-  if (actionType === 'day_vote') return runDayVoteAction(actor, alive);
+  if (actionType === 'day_vote') return runDayVoteAction(actor, alive, runtime);
   if (actionType === 'sheriff_signup') return runSheriffSignupAction(actor);
   if (actionType === 'sheriff_speech') return runSheriffSpeechAction(round, actor, false);
   if (actionType === 'sheriff_withdraw') return runSheriffWithdrawAction(round, actor);
@@ -311,9 +311,13 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
   return result;
 }
 
-async function runDayVoteAction(actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
+async function runDayVoteAction(actor: Agent, alive: Agent[], runtime: Runtime): Promise<Record<string, unknown>> {
   const valid = alive.map((agent) => agent.id).filter((id) => Number(id) !== Number(actor.id));
-  const target = await actor.playerAgent.askVoteTarget(DAY_VOTE_PROMPT, valid);
+  const deadList = runtime.agents.filter((a) => !a.alive).map((a) => `${a.id}号(${a.deathReason || '已出局'})`);
+  const prompt = deadList.length
+    ? [`请选择你要放逐的玩家。`, `已出局玩家：${deadList.join('、')}不可被投票`].join('\n')
+    : DAY_VOTE_PROMPT;
+  const target = await actor.playerAgent.askVoteTarget(prompt, valid);
   return { target }; // null = 弃票
 }
 

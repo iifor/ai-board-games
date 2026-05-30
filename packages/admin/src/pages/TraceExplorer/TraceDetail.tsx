@@ -74,6 +74,8 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
   const reversedDecisions = [...decisions].reverse();
   const reversedSnapshots = [...snapshots].reverse();
   const reversedEvents = [...events].reverse();
+  const errorEvents = events.filter((e) => e.event_type === 'ai-error');
+  const reversedErrorEvents = [...errorEvents].reverse();
 
   const goBack = () => {
     if (embedded && onClose) { onClose(); return; }
@@ -166,6 +168,39 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
           scroll={{ x: 760, y: 'calc(100vh - 330px)' }}
           rowClassName="admin-trace-row"
           onRow={(record) => ({ onClick: () => setDetailDrawer({ type: 'snapshot', record }) })}
+        />
+      )
+    },
+    {
+      key: 'errors', label: `异常 (${errorEvents.length})`,
+      children: (
+        <Table
+          className="admin-trace-table"
+          dataSource={reversedErrorEvents} rowKey="id" size="small"
+          columns={[
+            { title: '异常原因', dataIndex: 'event_json', key: 'reason', width: 200, render: (json: string | Record<string, unknown>) => {
+              const data = (typeof json === 'string' ? (() => { try { return JSON.parse(json) as Record<string, unknown>; } catch { return null; } })() : (json as Record<string, unknown> || null)) as Record<string, unknown> | null;
+              const inner = (data?.event as Record<string, unknown> | undefined);
+              return <Text type="danger">{String(inner?.reason || data?.reason || '未知')}</Text>;
+            }},
+            { title: '技能', key: 'skillId', width: 120, render: (_: unknown, record: TraceEvent) => {
+              const data = (typeof record.event_json === 'string' ? (() => { try { return JSON.parse(record.event_json) as Record<string, unknown>; } catch { return null; } })() : (record.event_json as Record<string, unknown> || null)) as Record<string, unknown> | null;
+              const inner = (data?.event as Record<string, unknown> | undefined);
+              return <Tag>{String(inner?.skillId || data?.skillId || '-')}</Tag>;
+            }},
+            { title: '玩家', key: 'playerId', width: 100, render: (_: unknown, record: TraceEvent) => {
+              const data = (typeof record.event_json === 'string' ? (() => { try { return JSON.parse(record.event_json) as Record<string, unknown>; } catch { return null; } })() : (record.event_json as Record<string, unknown> || null)) as Record<string, unknown> | null;
+              const inner = (data?.event as Record<string, unknown> | undefined);
+              const actorId = (inner?.actorId ?? data?.actorId) as number | undefined;
+              return actorId != null ? <Tag color="cyan">{getPlayerLabel(Number(actorId))}</Tag> : <Text type="secondary">-</Text>;
+            }},
+            { title: 'Phase', dataIndex: 'phase', key: 'phase', width: 80 },
+            { title: '时间', dataIndex: 'received_at', key: 'received_at', width: 180, render: (t: string) => t ? new Date(t).toLocaleString() : '-' }
+          ]}
+          pagination={false}
+          scroll={{ x: 760, y: 'calc(100vh - 330px)' }}
+          rowClassName="admin-trace-row"
+          onRow={(record) => ({ onClick: () => setDetailDrawer({ type: 'event', record }) })}
         />
       )
     },

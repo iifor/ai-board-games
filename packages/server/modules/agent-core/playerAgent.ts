@@ -1,6 +1,7 @@
 import { callOpenAIChat, callModelChatWithThinking, parseJsonObject } from '../llm';
 import { AgentSkillRegistry, AgentSkill } from './skillRegistry';
 import { FallbackEntry } from './fallbackAudit';
+import { getActiveTrace, recordEvent } from '../observability';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -239,6 +240,23 @@ class BasePlayerAgent {
       fallbackValue: null, // 不再使用兜底值
       severity: options.severity || 'warning'
     });
+    // 同步写入 trace 观测
+    try {
+      const trace = getActiveTrace(this.gameId || '');
+      if (trace) {
+        recordEvent(trace, {
+          type: 'ai-error',
+          phase: options.phase || '',
+          event: {
+            skillId,
+            actorId: this.player.id,
+            reason,
+            severity: options.severity || 'warning',
+            playerRole: this.resolveRole(this.player),
+          }
+        });
+      }
+    } catch { /* trace 记录失败不影响主流程 */ }
   }
 }
 
