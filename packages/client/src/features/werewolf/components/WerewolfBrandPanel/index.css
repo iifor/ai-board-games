@@ -10,14 +10,13 @@
 }
 
 .werewolf-title-panel p,
-.werewolf-title-panel h2,
 .werewolf-title-panel span {
   margin: 0;
 }
 
 .werewolf-title-panel p {
   color: #cbbdff;
-  font-size: 50px;
+  font-size: 40px;
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
