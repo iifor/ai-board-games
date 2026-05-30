@@ -354,9 +354,9 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
 
   function updateWorkflowNightAction(event: GameEvent): void {
     const actionWindow = event.actionWindow as { actionType?: string; actorIds?: Array<number | string> } | undefined;
-    const payload = (event.event as Record<string, unknown>)?.payload as Record<string, unknown> | undefined;
-    const actionType = String(actionWindow?.actionType || payload?.actionType || '');
-    const actorIds = (actionWindow?.actorIds || []).map(Number).filter(Boolean);
+    // 优先读顶层 actionType（EventBus 路径），回退到 legacy event.payload 路径
+    const actionType = String(event.actionType || actionWindow?.actionType || '');
+    const actorIds = (event.nightActionActorIds as number[] || actionWindow?.actorIds || []).map(Number).filter(Boolean);
 
     // 处理阶段事件
     const workflowEvent = String(event.workflowEvent || payload?.workflowEvent || '');
@@ -396,11 +396,19 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
 
   function updateWorkflowSpeech(event: GameEvent): void {
     if (!event.speech) return;
-    const workflowActionType = String(((event.event as Record<string, unknown> | undefined)?.payload as Record<string, unknown> | undefined)?.actionType || '');
-    if (workflowActionType !== 'wolf_speech' && workflowActionType !== 'wolf_kill') return;
+    // 优先读顶层 actionType（EventBus 路径），回退到 legacy event.payload 路径
+    const actionType = String(event.actionType || '');
+    const isWolfSpeech = actionType === 'wolf_speech' || actionType === 'wolf_kill';
+    const isDaySpeech = actionType === 'day_speech';
+    if (!isWolfSpeech && !isDaySpeech) return;
+
     setActiveThinking(null);
     const speakerLabel = formatWerewolfSeatLabel(event.speech.playerId, (event.game?.players || displayGame.players || []) as Player[]);
-    setStreamMessage(`${speakerLabel}狼队战术部署`);
+    if (isWolfSpeech) {
+      setStreamMessage(`${speakerLabel} 狼队战术部署`);
+    } else if (isDaySpeech) {
+      setStreamMessage(`${speakerLabel} 发言中`);
+    }
     setActiveSpeech({
       id: '',
       playerId: event.speech.playerId,

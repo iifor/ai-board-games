@@ -34,6 +34,7 @@
 .werewolf-elimination-list {
   max-height: 100%;
   overflow-y: auto;
+  padding-bottom: 50px;
 }
 
 .werewolf-elimination-list article svg {

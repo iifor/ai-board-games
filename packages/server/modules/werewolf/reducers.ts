@@ -5,7 +5,6 @@ import {
   getTopCandidateIds,
   buildWolfStrategySummary,
   getSheriffSpeechOrder,
-  getClockStartId,
   getNextAliveId,
   rotateFromSeat
 } from './utils';
@@ -236,6 +235,14 @@ function buildDaySpeechOrder(runtime: Runtime, round: Round): Agent[] {
   const alive = runtime.agents.filter((agent) => agent.alive);
   if (!alive.length) return [];
 
+  // 如果本轮已确定发言顺序，直接复用（避免 Math.random() 每次调用产生不同结果）
+  const storedIds = (round.daySpeech as Record<string, unknown> | undefined)?.playerIds as number[] | undefined;
+  if (Array.isArray(storedIds) && storedIds.length) {
+    return storedIds
+      .map((id) => alive.find((a) => Number(a.id) === Number(id)))
+      .filter(Boolean) as Agent[];
+  }
+
   const sheriffId = round.sheriffId ? Number(round.sheriffId) : null;
 
   // 优先级 A：有警长 → 警长指定顺时针/逆时针发言
@@ -269,7 +276,7 @@ function buildDaySpeechOrder(runtime: Runtime, round: Round): Agent[] {
   }
 
   // 优先级 C：无警长无死亡 → 随机起始顺时针
-  const startId = getClockStartId(alive);
+  const startId = alive[Math.floor(Math.random() * alive.length)].id;
   const ordered = rotateFromSeat(alive, startId, 'clockwise') as Agent[];
   round.daySpeech = {
     source: 'random',

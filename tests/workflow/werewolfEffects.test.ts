@@ -32,7 +32,7 @@ test('night effects respect guard and witch save, then apply poison', () => {
 
   const result = resolveNightEffects(agents as never, round as never);
 
-  assert.deepEqual(result.deaths, [{ id: 3, reason: 'witch_poison' }]);
+  assert.deepEqual(result.deaths, [{ id: 3, reason: '女巫毒杀' }]);
   assert.equal(agents.find((item) => item.id === 2)?.alive, true);
   assert.equal(agents.find((item) => item.id === 3)?.alive, false);
   assert.equal(round.nightRevealed, true);

@@ -13,12 +13,14 @@ export function WerewolfBrandPanel({ game, mode, showRoles, onShowRolesChange }:
   const playerPerspective = game?.clientViewMode === 'player';
   return (
     <section className="werewolf-title-panel">
-      <p>AI 狼人杀 {(game?.event as Record<string, unknown>)?.version as string}</p>
-      <span>{mode?.name || (game.event as Record<string, unknown>)?.name as string}</span>
-      <button type="button" onClick={() => !playerPerspective && onShowRolesChange((value: boolean) => !value)} disabled={playerPerspective}>
-        {showRoles ? <Eye size={18} /> : <EyeOff size={18} />}
-        <span>{playerPerspective ? '玩家视角' : showRoles ? '上帝视角' : '隐藏身份'}</span>
-      </button>
+      <p>AI 狼人杀</p>
+      <div>
+        <span>{mode?.name || (game.event as Record<string, unknown>)?.name as string}</span>
+        <span onClick={() => !playerPerspective && onShowRolesChange((value: boolean) => !value)} disabled={playerPerspective}>
+          {showRoles ? <Eye size={18} /> : <EyeOff size={18} />}
+          <span>{playerPerspective ? '玩家视角' : showRoles ? '上帝视角' : '隐藏身份'}</span>
+        </span>
+      </div>
     </section>
   );
 }

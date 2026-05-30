@@ -138,7 +138,7 @@ export function buildRoundProgress(rounds: WerewolfRound[], currentRound: Werewo
     items.push({
       key: `night-${day}`,
       phase: 'night',
-      label: `夜晚 ${day}`,
+      label: `第${day}天：夜晚`,
       active: Number(currentRound?.day) === day && currentRound?.phase === 'night'
     });
     const hasDay = round.phase === 'day'
@@ -151,12 +151,12 @@ export function buildRoundProgress(rounds: WerewolfRound[], currentRound: Werewo
       items.push({
         key: `day-${day}`,
         phase: 'day',
-        label: `白天 ${day}`,
+        label: `第${day}天：白天`,
         active: Number(currentRound?.day) === day && currentRound?.phase === 'day'
       });
     }
   });
-  return items.reverse().slice(0, 8);
+  return items.slice(-8);
 }
 
 export function getGameStats(players: Player[]): { alive: number; dead: number } {
@@ -201,7 +201,10 @@ export function sortPlayersById(players: Player[] = []): Player[] {
 
 export function getWerewolfSeatNumber(playerId: string | number, players: Player[] = []): number | string {
   const index = sortPlayersById(players).findIndex((player) => Number(player.id) === Number(playerId));
-  return index >= 0 ? index + 1 : Number(playerId) || '';
+  if (index >= 0) return index + 1;
+  // 找不到时，如果 ID 看起来像座位号（1-20），直接使用；否则返回空
+  const num = Number(playerId);
+  return (num > 0 && num <= 20) ? num : '';
 }
 
 export function formatWerewolfSeatLabel(playerId: string | number, players: Player[] = []): string {

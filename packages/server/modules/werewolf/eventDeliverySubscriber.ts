@@ -61,13 +61,19 @@ export class EventDeliverySubscriber {
 
   private toFlatEvent(event: GameEvent): Record<string, unknown> {
     const payload = event.payload as Record<string, unknown>;
-    // 发言和警长类事件保留原始 type，不包装为 workflow-event
+    // 发言 + 警长类事件保留原始 type，不包装为 workflow-event
     const isSpeech =
       event.type === 'speech' ||
       event.type === 'wolf-speech' ||
       event.type === 'self-destruct';
     const isSheriff = event.type.startsWith('sheriff-');
     const keepOriginalType = isSpeech || isSheriff;
+
+    // action-submitted 事件的 speech 嵌套在 payload.speech 中
+    const nestedSpeech = payload.speech as Record<string, unknown> | undefined;
+    const hasSpeech = isSpeech
+      || payload.playerId !== undefined
+      || (nestedSpeech && typeof nestedSpeech === 'object' && (nestedSpeech.playerId || nestedSpeech.text));
 
     const flat: Record<string, unknown> = {
       type: keepOriginalType ? event.type : 'workflow-event',
@@ -84,13 +90,28 @@ export class EventDeliverySubscriber {
 
     if (event.game) {
       flat.game = event.game;
+      // 从 game snapshot 提取警长候选人 ID（供 C 端举手图标使用）
+      const gameRounds = (event.game as unknown as { rounds?: Array<Record<string, unknown>> }).rounds;
+      if (Array.isArray(gameRounds) && gameRounds.length > 0) {
+        const latestRound = gameRounds[gameRounds.length - 1];
+        const sheriffElection = latestRound?.sheriffElection as Record<string, unknown> | undefined;
+        if (sheriffElection) {
+          const signedUp = Array.isArray(sheriffElection.signedUpIds)
+            ? (sheriffElection.signedUpIds as number[])
+            : [];
+          const candidates = Array.isArray(sheriffElection.candidates)
+            ? (sheriffElection.candidates as number[])
+            : [];
+          flat.sheriffCandidateIds = signedUp.length > 0 ? signedUp : candidates;
+        }
+      }
     }
 
-    if (isSpeech || payload.playerId !== undefined) {
+    if (hasSpeech) {
       flat.speech = {
-        playerId: payload.playerId || payload.actorId,
-        text: payload.text || '',
-        thinking: payload.thinking || '',
+        playerId: nestedSpeech?.playerId || payload.playerId || payload.actorId,
+        text: (nestedSpeech?.text || payload.text || '') as string,
+        thinking: (nestedSpeech?.thinking || payload.thinking || '') as string,
       };
     }
 

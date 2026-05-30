@@ -18,6 +18,7 @@ interface CreateMatchInput {
   gameType?: string;
   config?: Record<string, unknown>;
   initialState?: Record<string, unknown>;
+  matchId?: string;
 }
 
 interface AiTaskResult {
@@ -44,9 +45,9 @@ interface DrainOptions {
   workerId?: string;
 }
 
-function createWorkflowMatch({ workflowId, gameType, config, initialState }: CreateMatchInput): Match {
+function createWorkflowMatch({ workflowId, gameType, config, initialState, matchId }: CreateMatchInput): Match {
   const workflow = getWorkflow(workflowId);
-  const id = createId(gameType || workflow.gameType || 'match');
+  const id = matchId || createId(gameType || workflow.gameType || 'match');
   repo.createMatch({
     id,
     game_type: gameType || workflow.gameType || 'unknown',

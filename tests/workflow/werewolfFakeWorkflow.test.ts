@@ -146,26 +146,29 @@ test('ordered day speech records public chain and stops on wolf self destruct', 
 
     const opened = handler.execute({ match, step, state } as never);
     assert.equal(opened.status, 'WAITING');
-    assert.equal(opened.tasks?.[0].playerId, 1);
+    // 优先级 C（随机起始）：不依赖特定顺序，仅验证第一个发言者是存活玩家
+    const firstPlayerId = opened.tasks?.[0].playerId;
+    assert.ok([1, 2, 3].includes(Number(firstPlayerId)), `unexpected first speaker: ${firstPlayerId}`);
     tasks.push(...(opened.tasks || []));
 
-    tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 1, result: { payload: { text: '我站边预言家。' } } };
+    tasks[0] = { ...tasks[0], status: 'succeeded', playerId: firstPlayerId, result: { payload: { text: '我站边预言家。' } } };
     const waiting = handler.execute({ match, step, state: opened.state } as never);
     assert.equal(waiting.status, 'WAITING');
     assert.equal(waiting.state?.rounds[0].speeches[0].text, '我站边预言家。');
-    assert.equal(waiting.tasks?.[0].playerId, 2);
+    const secondPlayerId = waiting.tasks?.[0].playerId;
+    assert.ok(secondPlayerId !== firstPlayerId, 'second speaker should differ from first');
     tasks.push(...(waiting.tasks || []));
 
     tasks[1] = {
       ...tasks[1],
       status: 'succeeded',
-      playerId: 2,
-      result: { payload: { text: '我不装了。', selfDestruct: true, selfDestructText: '2号狼人自爆。' } }
+      playerId: secondPlayerId,
+      result: { payload: { text: '我不装了。', selfDestruct: true, selfDestructText: `${secondPlayerId}号狼人自爆。` } }
     };
     const completed = handler.execute({ match, step, state: waiting.state } as never);
     assert.equal(completed.status, 'COMPLETED');
-    assert.equal(completed.state?.rounds[0].selfDestruct.playerId, 2);
-    assert.equal(completed.state?.players.find((item: Record<string, unknown>) => Number(item.id) === 2).alive, false);
+    assert.equal(completed.state?.rounds[0].selfDestruct.playerId, Number(secondPlayerId));
+    assert.equal(completed.state?.players.find((item: Record<string, unknown>) => Number(item.id) === Number(secondPlayerId)).alive, false);
     assert.equal(completed.events?.[0].type, 'werewolf_self_destruct');
   } finally {
     patchRepo(repo, original);

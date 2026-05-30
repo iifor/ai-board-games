@@ -56,10 +56,12 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
   witch_save: {
     actionType: 'witch_save',
     roleName: '女巫',
-    buildMessages: () => ({
+    buildMessages: (_day: number, context: Record<string, unknown> = {}) => ({
       start: `女巫请睁眼。`,
-      result: `今晚它倒下了，你要救吗？`,
-      end: '',
+      result: context.witchSaveUsed
+        ? `女巫使用了解药，救了${context.target || context.wolfTarget || '?'}号玩家`
+        : `女巫没有使用解药`,
+      end: '',  // 女巫在毒药阶段后才闭眼
     }),
   },
   witch_poison: {

@@ -237,7 +237,10 @@ async function runSession(
   })) as GameRecord;
   await sender.flush();
 
-  saveGameRecord({ ...game, audioResources: sender.getAudioResources() } as unknown as SaveGameInput);
+  // 调试模式不保存数据库，只保留 AI 观测数据
+  if (!(config as Record<string, unknown>).debugMode) {
+    saveGameRecord({ ...game, audioResources: sender.getAudioResources() } as unknown as SaveGameInput);
+  }
 
   await sender.send({
     type:

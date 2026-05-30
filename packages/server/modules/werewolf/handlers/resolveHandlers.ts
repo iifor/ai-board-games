@@ -14,12 +14,13 @@ import { findPendingHunter } from '../reducers';
 import type { Agent as ReducerAgent, Round as ReducerRound } from '../reducers';
 import { isSheriffResolveReady, resolveSheriffElection, shouldRunSheriffElection } from '../sheriffWorkflow';
 import { runHunterAiTask, validateHunterAiResult } from '../aiActions';
-import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
+import { createWerewolfEvent, publishGameEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
 import { recordWorkflowEffects } from '../../workflow-engine/effects';
 import { actionRequestedMessage, actionResolvedMessage, effectResolvedMessage } from '../messages';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
-import { resolveActionChannel } from './actionChannel';
+import { checkWin, checkPostExileWin } from '../winCheck';
+import type { WerewolfAgent } from '../winCheck';
 
 interface Match {
   id: string;
@@ -55,12 +56,21 @@ function createNightResolveHandler() {
       const resolved = resolveNightEffects(runtime.agents as never, round as never);
       const hunter = findPendingHunter(runtime.agents as unknown as ReducerAgent[], round as unknown as ReducerRound, resolved.deaths);
       if (hunter) return createHunterWindow({ match, step, state, runtime, round, hunter });
-      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id }, step.id);
+      const winResult = runtime.agents?.length
+        ? checkWin(runtime.agents as WerewolfAgent[], step.config.day || 1, runtime.modeConfig as Record<string, unknown> || {}, {})
+        : { winner: null, winReason: '' } as { winner: string | null; winReason: string };
+      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}) }, step.id);
       recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: resolved.effects as unknown as Record<string, unknown>[] });
+
+      const outEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('night', step.config.day), { effects: resolved.effects }, { channel: CHANNEL_TYPES.PUBLIC })];
+      if (winResult.winner) {
+        outEvents.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
+      }
+
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('night', step.config.day), { effects: resolved.effects }, { channel: CHANNEL_TYPES.PUBLIC })]
+        events: outEvents
       };
     },
     runAiTask: runHunterAiTask,
@@ -77,12 +87,35 @@ function createExileResolveHandler() {
       const resolved = resolveExileEffects(runtime.agents as never, round as never, runtime.modeConfig as never);
       const hunter = findPendingHunter(runtime.agents as unknown as ReducerAgent[], round as unknown as ReducerRound, resolved.exile ? [resolved.exile] : []);
       if (hunter) return createHunterWindow({ match, step, state, runtime, round, hunter });
-      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id }, step.id);
+      const winResult = runtime.agents?.length
+        ? (checkWin(runtime.agents as WerewolfAgent[], step.config.day || 1, runtime.modeConfig as Record<string, unknown> || {}, {})
+          || checkPostExileWin(runtime.agents as WerewolfAgent[], step.config.day || 1))
+        : { winner: null, winReason: '' } as { winner: string | null; winReason: string };
+      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}) }, step.id);
       recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: resolved.effects as unknown as Record<string, unknown>[] });
+
+      // EventBus: 发布放逐结果
+      if (resolved.exile) {
+        publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+          builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
+          return builder.buildVoteResult(
+            (round as { votes?: Record<string, number> }).votes || {},
+            (round as { voteTally?: Record<string, number> }).voteTally || {},
+            resolved.exile,
+            `${resolved.exile.id}号玩家被放逐`,
+          );
+        });
+      }
+
+      const outEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('day', step.config.day), { effects: resolved.effects }, { channel: CHANNEL_TYPES.PUBLIC })];
+      if (winResult.winner) {
+        outEvents.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
+      }
+
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('day', step.config.day), { effects: resolved.effects }, { channel: CHANNEL_TYPES.PUBLIC })]
+        events: outEvents
       };
     },
     runAiTask: runHunterAiTask,
@@ -146,6 +179,17 @@ function createSheriffResolveHandler() {
         resolveSheriffElection(runtime as never, round as never);
       }
       const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
+
+      // Day 1 警长竞选完成后播报死亡结果
+      const nightDeaths = (round as { night?: { deaths?: Array<{ id: number; reason: string }> } }).night?.deaths || [];
+      const deathMessage = nightDeaths.length
+        ? `昨晚${nightDeaths.map((d) => `${d.id}号玩家`).join('、')}死亡`
+        : '昨晚是平安夜';
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
+        return builder.buildNightResult(nightDeaths, deathMessage);
+      });
+
       return {
         status: 'COMPLETED',
         state: nextState,

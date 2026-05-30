@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 
 const SPEECH_ACK_TIMEOUT_MS = 120000;
+const DEFAULT_ACK_TIMEOUT_MS = 15000;
 
 interface SessionCancelledError extends Error {
   code: string;
@@ -72,6 +73,13 @@ function createSession(socket: WebSocket): GameSession {
       };
       if (isSpeechWaitPayload(payload)) {
         item.timer = setTimeout(() => handleSpeechAckTimeout(ackId), SPEECH_ACK_TIMEOUT_MS);
+      } else {
+        // 非发言事件也加超时保护，避免回放永久卡住
+        item.timer = setTimeout(() => {
+          if (!pending.has(ackId)) return;
+          pending.delete(ackId);
+          item.resolve();
+        }, DEFAULT_ACK_TIMEOUT_MS);
       }
       pending.set(ackId, item);
     });
@@ -92,13 +100,21 @@ function createSession(socket: WebSocket): GameSession {
   function setPaused(value: boolean): void {
     paused = Boolean(value);
     for (const [ackId, item] of pending.entries()) {
-      if (!isSpeechWaitPayload(item.payload)) continue;
       if (item.timer) {
         clearTimeout(item.timer);
         item.timer = null;
       }
       if (!paused) {
-        item.timer = setTimeout(() => handleSpeechAckTimeout(ackId), SPEECH_ACK_TIMEOUT_MS);
+        const ms = isSpeechWaitPayload(item.payload) ? SPEECH_ACK_TIMEOUT_MS : DEFAULT_ACK_TIMEOUT_MS;
+        if (isSpeechWaitPayload(item.payload)) {
+          item.timer = setTimeout(() => handleSpeechAckTimeout(ackId), ms);
+        } else {
+          item.timer = setTimeout(() => {
+            if (!pending.has(ackId)) return;
+            pending.delete(ackId);
+            item.resolve();
+          }, ms);
+        }
       }
     }
   }

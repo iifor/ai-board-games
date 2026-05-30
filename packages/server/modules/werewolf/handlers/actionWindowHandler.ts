@@ -21,6 +21,12 @@ import { hasActionPhase, getActionPhaseConfig } from '../actionPhases';
 import { resolveActionChannel } from './actionChannel';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 
+/** 已有独立睁眼事件的夜晚行动 — phase-start 不再重复发布 */
+const NIGHT_WAKE_ACTIONS = new Set([
+  'wolf_speech', 'wolf_vote', 'wolf_kill',
+  'seer_check', 'guard_protect', 'witch_save', 'witch_poison',
+]);
+
 interface Match {
   id: string;
   [key: string]: unknown;
@@ -285,6 +291,41 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     });
   }
 
+  // 夜晚行动：发布角色睁眼事件供 C 端展示睁眼效果
+  if (step.config.phase === 'night') {
+    const wakeMessage = phaseStartMessage(step.config.actionType, step.config.day);
+    if (step.config.actionType === 'wolf_speech' || step.config.actionType === 'wolf_vote' || step.config.actionType === 'wolf_kill') {
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id).setPhase('night').setDay(step.config.day || 1);
+        return builder.buildWolfWake(wakeMessage);
+      });
+    } else if (step.config.actionType === 'seer_check') {
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id).setPhase('night').setDay(step.config.day || 1);
+        return builder.buildSeerWake(wakeMessage);
+      });
+    } else if (step.config.actionType === 'guard_protect') {
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id).setPhase('night').setDay(step.config.day || 1);
+        return builder.buildGuardWake(wakeMessage);
+      });
+    } else if (step.config.actionType === 'witch_save') {
+      const wolfTarget = (round as { night?: { wolfTarget?: number | null } }).night?.wolfTarget;
+      const saveMessage = wolfTarget
+        ? `女巫请睁眼，今晚${wolfTarget}号玩家死亡，你有一瓶解药，你要用吗？`
+        : wakeMessage;
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id).setPhase('night').setDay(step.config.day || 1);
+        return builder.buildWitchAntidote(saveMessage);
+      });
+    } else if (step.config.actionType === 'witch_poison') {
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id).setPhase('night').setDay(step.config.day || 1);
+        return builder.buildWitchPoison(wakeMessage);
+      });
+    }
+  }
+
   // 添加阶段开始事件（预言家、女巫、守卫等）
   if (hasActionPhase(step.config.actionType || '')) {
     events.push(createWerewolfEvent(
@@ -297,17 +338,20 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
       { channel: CHANNEL_TYPES.PUBLIC }
     ));
 
-    // Phase 4: 双写 phase-start 到 EventBus
-    publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
-      builder.setStep(step.id);
-      builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
-      builder.setDay(step.config.day || 1);
-      return builder.build('phase-start', {
-        phase: step.config.phase || 'night',
-        actionType: step.config.actionType,
-        message: phaseStartMessage(step.config.actionType, step.config.day),
+    // Phase 4: 双写 phase-start 到 EventBus（已有独立 wake 事件的夜晚行动跳过，避免双重播报）
+    const hasDedicatedWake = step.config.phase === 'night' && NIGHT_WAKE_ACTIONS.has(step.config.actionType || '');
+    if (!hasDedicatedWake) {
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id);
+        builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+        builder.setDay(step.config.day || 1);
+        return builder.build('phase-start', {
+          phase: step.config.phase || 'night',
+          actionType: step.config.actionType,
+          message: phaseStartMessage(step.config.actionType, step.config.day),
+        });
       });
-    });
+    }
   }
 
   return {
@@ -332,6 +376,7 @@ function buildPhaseContext(actionType: string, results: ReducerActionResult[], r
 
   if (actionType === 'witch_save') {
     context.wolfTarget = night.wolfTarget || null;
+    context.witchSaveUsed = results.length > 0 && results[0]?.payload?.use === true;
     context.target = results.length > 0 ? results[0]?.payload?.target : null;
   }
 

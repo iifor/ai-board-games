@@ -55,7 +55,7 @@ function phaseStartMessage(actionType?: string, day?: number): string {
     witch_poison: `你有一瓶毒药，你要用吗？`,
     guard_protect: `守卫请睁眼，请选择今晚守护的目标。`,
     wolf_speech: `狼人请睁眼`,
-    wolf_vote: `狼人请统一刀口。`,
+    wolf_vote: `请选择今晚目标`,
   };
   return messages[actionType || ''] || `${roundPrefix(day)}${actionLabel(actionType)}开始。`;
 }
@@ -66,7 +66,7 @@ function phaseResultMessage(actionType?: string, day?: number, result?: Record<s
     return `它的身份是${faction}。`;
   }
   if (actionType === 'witch_save') {
-    return `今晚它倒下了，你要救吗？`;
+    return ''; // 解药使用结果通过 actionPhases 播报
   }
   if (actionType === 'witch_poison') {
     return ''; // 不播报，用药信息只在C端展示
@@ -80,12 +80,12 @@ function phaseResultMessage(actionType?: string, day?: number, result?: Record<s
 
 function phaseEndMessage(actionType?: string, day?: number): string {
   const messages: Record<string, string> = {
-    seer_check: `预言家请闭眼。`,
-    witch_save: `女巫请闭眼。`,
-    witch_poison: `女巫请闭眼。`,
-    guard_protect: `守卫请闭眼。`,
-    wolf_speech: `狼人请闭眼。`,
-    wolf_vote: `狼人请闭眼。`,
+    seer_check: `预言家请闭眼`,
+    witch_save: ``,
+    witch_poison: `女巫请闭眼`,
+    guard_protect: `守卫请闭眼`,
+    wolf_speech: `狼人请闭眼`,
+    wolf_vote: `狼人请闭眼`,
   };
   return messages[actionType || ''] || `${roundPrefix(day)}${actionLabel(actionType)}结束。`;
 }

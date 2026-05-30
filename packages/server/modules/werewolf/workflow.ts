@@ -10,6 +10,7 @@ import { createGameEventBuilder } from './gameEventBuilder';
 import { createEventDeliverySubscriber } from './eventDeliverySubscriber';
 import { createChannelRouter } from './channelRouter';
 import { createAudienceStream } from './audienceStream';
+import { randomBytes } from 'crypto';
 
 const WEREWOLF_WORKFLOW_ID = 'werewolf.workflow.basic.v1';
 
@@ -23,12 +24,13 @@ function registerWerewolfWorkflow(): void {
   registerWorkflow(werewolfWorkflow, createWerewolfHandlers() as unknown as Record<string, StepHandler>);
 }
 
-function createWerewolfWorkflowMatch(config: Record<string, unknown>): Record<string, unknown> {
+function createWerewolfWorkflowMatch(config: Record<string, unknown>, matchId?: string): Record<string, unknown> {
   registerWerewolfWorkflow();
   const state = createInitialWerewolfState(config);
   return workflowService.createWorkflowMatch({
     workflowId: WEREWOLF_WORKFLOW_ID,
     gameType: 'werewolf',
+    matchId,
     config: {
       werewolfMode: (state.werewolfMode as { id?: string })?.id || (config.werewolfMode as { id?: string })?.id || config.werewolfMode || 'standard',
       selectedPlayerIds: ((config.players || []) as Array<{ id: number }>).map((player) => player.id),
@@ -40,24 +42,23 @@ function createWerewolfWorkflowMatch(config: Record<string, unknown>): Record<st
 }
 
 async function runWerewolfWorkflow(config: Record<string, unknown>, options: { onEvent?: (event: Record<string, unknown>) => void } = {}): Promise<Record<string, unknown>> {
-  const match = createWerewolfWorkflowMatch(config);
-  const trace = createTraceContext(match.id as string, 'werewolf', String(config.werewolfMode || 'workflow'));
-
-  // Phase 5-6: EventBus + ChannelRouter + AudienceStream (完整事件驱动栈)
+  // Phase 5-6: EventBus 必须在 createWorkflowMatch 之前创建（首个 tickMatch 需要用它发布事件）
+  const matchId = `werewolf-${Date.now()}-${randomBytes(6).toString('hex')}`;
   const eventBus = createEventBusWithDefaults();
-  const gameEventBuilder = createGameEventBuilder(match.id as string);
-  // ChannelRouter 和 AudienceStream 通过 EventBus 订阅自动工作
+  const gameEventBuilder = createGameEventBuilder(matchId);
+  registerMatchInfra(matchId, eventBus, gameEventBuilder);
   createChannelRouter(eventBus);
   createAudienceStream(eventBus);
-  registerMatchInfra(match.id as string, eventBus, gameEventBuilder);
 
-  // Phase 5: 用 EventBus 订阅替代 outbox 轮询
   const deliverySubscriber = options.onEvent
     ? createEventDeliverySubscriber(eventBus, options.onEvent)
     : null;
   if (deliverySubscriber) {
     deliverySubscriber.start();
   }
+
+  const match = createWerewolfWorkflowMatch(config, matchId);
+  const trace = createTraceContext(match.id as string, 'werewolf', String(config.werewolfMode || 'workflow'));
 
   try {
     while (true) {

@@ -30,9 +30,9 @@ function isWerewolfDebugMode(runtime: { state?: Record<string, unknown>; config?
 function runDebugWerewolfAction(runtime: DebugRuntime, round: DebugRound, actor: DebugAgent, actionType: string): Record<string, unknown> {
   const alive = (runtime.agents || []).filter((agent) => agent.alive !== false);
   if (actionType === 'wolf_kill') {
-    return { target: firstTarget(alive, actor, (agent) => agent.faction !== 'wolves'), speech: debugSpeech(actor), thinking: '' };
+    return { target: firstTarget(alive, actor, (agent) => agent.faction !== 'wolves'), speech: debugSpeech(actor, runtime.agents), thinking: '' };
   }
-  if (actionType === 'wolf_speech') return { speech: debugSpeech(actor), thinking: '' };
+  if (actionType === 'wolf_speech') return { speech: debugSpeech(actor, runtime.agents), thinking: '' };
   if (actionType === 'wolf_vote') return { target: firstTarget(alive, actor, (agent) => agent.faction !== 'wolves') };
   if (actionType === 'seer_check') {
     const target = firstTarget(alive, actor, (agent) => Number(agent.id) !== Number(actor.id));
@@ -44,13 +44,13 @@ function runDebugWerewolfAction(runtime: DebugRuntime, round: DebugRound, actor:
   }
   if (actionType === 'witch_save') return { use: false };
   if (actionType === 'witch_poison') return { use: false, target: null };
-  if (actionType === 'day_speech') return { text: debugSpeech(actor), thinking: '' };
+  if (actionType === 'day_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
   if (actionType === 'day_vote') return { target: firstTarget(alive, actor, (agent) => Number(agent.id) !== Number(actor.id)) };
   if (actionType === 'sheriff_signup') return { run: false };
-  if (actionType === 'sheriff_speech') return { text: debugSpeech(actor), thinking: '' };
+  if (actionType === 'sheriff_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
   if (actionType === 'sheriff_withdraw') return { withdraw: false };
   if (actionType === 'sheriff_vote') return { target: firstSheriffTarget(round, alive, actor) };
-  if (actionType === 'sheriff_runoff_speech') return { text: debugSpeech(actor), thinking: '' };
+  if (actionType === 'sheriff_runoff_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
   if (actionType === 'sheriff_runoff_vote') return { target: firstSheriffTarget(round, alive, actor, 'runoffCandidateIds') };
   return {};
 }
@@ -60,8 +60,10 @@ function runDebugHunterAction(runtime: DebugRuntime, actor: DebugAgent): Record<
   return { target: alive[0]?.id || null };
 }
 
-function debugSpeech(actor: DebugAgent): string {
-  return `我是${actor.id}号，${actor.faction === 'wolves' ? '狼人' : '好人'}，调试发言`;
+function debugSpeech(actor: DebugAgent, agents?: DebugAgent[]): string {
+  const sorted = (agents || []).slice().sort((a, b) => Number(a.id) - Number(b.id));
+  const seatNumber = sorted.findIndex((a) => Number(a.id) === Number(actor.id)) + 1 || Number(actor.id) || '';
+  return `我是${seatNumber}号，${actor.faction === 'wolves' ? '狼人' : '好人'}，调试发言`;
 }
 
 function firstTarget(alive: DebugAgent[], actor: DebugAgent, predicate: (agent: DebugAgent) => boolean): number | null {

@@ -53,19 +53,19 @@ interface ExileEffectsResult {
 function resolveNightEffects(agents: WerewolfAgent[], round: Round): NightEffectsResult {
   const effects: Effect[] = [];
   const night = round.night || {};
-  if (night.wolfTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.KILL, target: night.wolfTarget, reason: 'wolf_kill' });
+  if (night.wolfTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.KILL, target: night.wolfTarget, reason: '狼人袭击' });
   if (night.guardTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.PROTECT, target: night.guardTarget });
   if (night.witchSave && night.witchSaveTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.SAVE, target: night.witchSaveTarget });
-  if (night.witchPoisonTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.POISON, target: night.witchPoisonTarget, reason: 'witch_poison' });
+  if (night.witchPoisonTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.POISON, target: night.witchPoisonTarget, reason: '女巫毒杀' });
 
   const protectedTarget = night.guardTarget;
   const savedTarget = night.witchSave ? night.witchSaveTarget : null;
   const deaths: Array<{ id: number; reason: string }> = [];
   if (night.wolfTarget && Number(night.wolfTarget) !== Number(protectedTarget) && Number(night.wolfTarget) !== Number(savedTarget)) {
-    deaths.push({ id: night.wolfTarget, reason: 'wolf_kill' });
+    deaths.push({ id: night.wolfTarget, reason: '狼人袭击' });
   }
   if (night.witchPoisonTarget && !deaths.some((death) => Number(death.id) === Number(night.witchPoisonTarget))) {
-    deaths.push({ id: night.witchPoisonTarget, reason: 'witch_poison' });
+    deaths.push({ id: night.witchPoisonTarget, reason: '女巫毒杀' });
   }
   night.deaths = deaths;
   for (const death of deaths) eliminate(agents, death.id, round.day, death.reason);
@@ -92,9 +92,9 @@ function resolveExileEffects(agents: WerewolfAgent[], round: Round, modeConfig: 
     return { effects, exile: null };
   }
 
-  eliminate(agents, exileId, round.day, 'exile');
-  round.exile = { id: exileId, reason: 'exile' };
-  effects.push({ type: WEREWOLF_EFFECT_TYPES.EXILE, target: exileId, reason: 'exile' });
+  eliminate(agents, exileId, round.day, '放逐');
+  round.exile = { id: exileId, reason: '放逐' };
+  effects.push({ type: WEREWOLF_EFFECT_TYPES.EXILE, target: exileId, reason: '放逐' });
   return { effects, exile: round.exile };
 }
 
@@ -103,7 +103,7 @@ function applyHunterShot(agents: WerewolfAgent[], round: Round, shot: { from?: n
   const hunter = agents.find((agent) => Number(agent.id) === Number(shot.from));
   if (!hunter || hunter.hunterShotUsed || !hasRoleAction(hunter.roleConfig, 'shootOnDeath')) return null;
   hunter.hunterShotUsed = true;
-  eliminate(agents, shot.target, round.day, 'hunter_shot');
+  eliminate(agents, shot.target, round.day, '猎人开枪');
   round.hunterShot = { from: shot.from, target: shot.target, reason: shot.reason || 'death' };
   return { type: WEREWOLF_EFFECT_TYPES.HUNTER_SHOT, source: shot.from, target: shot.target };
 }
