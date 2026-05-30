@@ -30,6 +30,10 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
     });
 
     const state = createState();
+    state.players = [
+      ...(state.players as Record<string, unknown>[]),
+      player(4, 'seer', 'good', ['inspectFaction'])
+    ];
     state.rounds[0].night.wolfLeaderId = 2;
     const match = { id: 'm-fake', config: { players: state.players }, createdAt: 'now' };
     const wolfStep = { id: 'wolf_kill_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'wolf_kill' } };

@@ -1,7 +1,7 @@
 import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
 import { createWerewolfEvent, publishGameEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
-import { phaseStartedMessage } from '../messages';
+import { buildWerewolfRuleIntro, phaseStartedMessage } from '../messages';
 import { checkDawnBindVote } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
 
@@ -100,11 +100,26 @@ function createDayStartHandler() {
   };
 }
 
-function createInstantHandler(eventType: string, message: string) {
+function createInstantHandler(eventType: string, message: string, options: { audienceCue?: boolean } = {}) {
   return {
     execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
       if (isDone(state, step.id)) return completed(state, step.id);
       const nextState = markStepComplete({ ...state, currentStep: step.id }, step.id);
+      if (options.audienceCue) {
+        const runtime = createRuntime(match, nextState);
+        // 优先用 state 中的 modeConfig（首次 tick 可能为空），回退到 B 端配置
+        const modeCfg = runtime.modeConfig
+          || (() => { try { const { getWerewolfModeConfig } = require('../../werewolf-config/service'); return getWerewolfModeConfig((match.config as Record<string, unknown> | undefined)?.werewolfMode || 'standard'); } catch { return null; } })();
+        if (modeCfg) {
+          const text = buildWerewolfRuleIntro(modeCfg as Record<string, unknown>);
+          publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+            builder.setStep(step.id).setPhase('night').setDay(1);
+            return builder.build('phase-changed', { text }, 'public', undefined, {
+              audienceCue: { kind: 'rule-intro', display: 'modal', speech: 'browser', textField: 'text', once: true }
+            });
+          }, syncRuntimeState(runtime) as unknown as Record<string, unknown>);
+        }
+      }
       return { status: 'COMPLETED', state: nextState, events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, eventType, message)] };
     }
   };

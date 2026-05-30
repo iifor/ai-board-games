@@ -85,6 +85,7 @@ export class EventDeliverySubscriber {
       channel: event.channel,
       scopeKey: event.scopeKey,
       presentation: event.presentation ? { ...event.presentation } : {},
+      audienceCue: event.audienceCue ? { ...event.audienceCue } : undefined,
       metadata: event.metadata ? { ...event.metadata } : {},
     };
 
@@ -117,6 +118,10 @@ export class EventDeliverySubscriber {
 
     if (payload.actionWindow) {
       flat.actionWindow = payload.actionWindow;
+    }
+
+    if (payload.text !== undefined) {
+      flat.text = payload.text;
     }
 
     if (payload.targetId !== undefined) {

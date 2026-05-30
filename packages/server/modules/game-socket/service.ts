@@ -20,6 +20,7 @@ const { runWerewolfWorkflow } = require('../werewolf');
 // werewolf-config/service is TS but loaded via require to match existing pattern
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { getWerewolfModeConfig } = require('../werewolf-config');
+import { buildWerewolfRuleIntro } from '../werewolf/messages';
 
 // werewolf/views/viewPolicy is still JS — use require for now
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -205,35 +206,6 @@ async function runSession(
     session,
     safeGameType === 'debate' ? { phaseLookahead: 1 } : { prefetchCount: 2 },
   );
-
-  if (safeGameType !== 'debate') {
-    const gamePlayers = ((config as Record<string, unknown>).players as Array<Record<string, unknown>> || []).map((player) => ({
-      id: Number(player.id),
-      name: player.name || player.nickname || '',
-      nickname: player.nickname || player.name || '',
-      avatar: player.avatar || '',
-      avatarUrl: player.avatarUrl || player.avatar || '',
-      alive: true,
-      role: '',
-      roleLabel: '',
-      faction: '',
-    }));
-    const modeConfig = (config as Record<string, unknown>).werewolfMode as Record<string, unknown> | undefined;
-    const ruleIntro = safeGameType === 'werewolf' && modeConfig
-      ? (() => { const { buildWerewolfRuleIntro } = require('../werewolf/messages'); return buildWerewolfRuleIntro(modeConfig); })()
-      : '';
-    await sender.send({
-      type: 'host',
-      message: ruleIntro || getStartMessage(safeGameType),
-      debugMode: Boolean((config as Record<string, unknown>).debugMode),
-      game: {
-        type: safeGameType,
-        debugMode: Boolean((config as Record<string, unknown>).debugMode),
-        host: publicSocketHost(config.host),
-        players: gamePlayers,
-      },
-    });
-  }
 
   const runner = getRunner(safeGameType);
   const game = (await runner(config, {

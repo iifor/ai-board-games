@@ -100,6 +100,9 @@ export function useGameSocketSession({
     });
   }
 
+  const eventQueueRef = useRef<Array<{ event: GameEvent; socket: WebSocket }>>([]);
+  const processingRef = useRef(false);
+
   function handleSocketEvent(event: GameEvent, socket: WebSocket) {
     if (event.type === 'error') {
       latestRef.current.onError?.(event);
@@ -109,6 +112,11 @@ export function useGameSocketSession({
     latestRef.current.applyServerEvent?.(event);
 
     if (!event.ackId) return;
+    // 如果正在处理上一个事件，新事件加入队列等待
+    if (processingRef.current) {
+      eventQueueRef.current.push({ event, socket });
+      return;
+    }
     pendingAckRef.current = { socket, ackId: event.ackId };
     pendingEventRef.current = event;
     if (autoPlayRef.current) continuePendingEvent();
@@ -123,6 +131,14 @@ export function useGameSocketSession({
     pendingEventRef.current = null;
     startedAckIdsRef.current.delete(pending.ackId);
     clearPendingAckTimer();
+    // 当前事件处理完毕，处理队列中的下一个
+    processingRef.current = false;
+    const next = eventQueueRef.current.shift();
+    if (next) {
+      pendingAckRef.current = { socket: next.socket, ackId: next.event.ackId! };
+      pendingEventRef.current = next.event;
+      if (autoPlayRef.current) window.setTimeout(continuePendingEvent, 50);
+    }
   }
 
   function continuePendingEvent() {
@@ -131,7 +147,8 @@ export function useGameSocketSession({
     const ackId = event.ackId;
     if (ackId && startedAckIdsRef.current.has(ackId)) return;
     if (ackId) startedAckIdsRef.current.add(ackId);
-    latestRef.current.cancel?.();
+
+    processingRef.current = true;
     clearPendingAckTimer();
 
     const handled = latestRef.current.playPendingEvent?.(event, {

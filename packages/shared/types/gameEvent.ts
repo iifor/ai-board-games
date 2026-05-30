@@ -183,6 +183,14 @@ export interface Presentation {
   suppressSpeech: boolean;
 }
 
+export interface AudienceCue {
+  kind: string;
+  display: 'modal' | 'none';
+  speech: 'browser' | 'none';
+  textField?: 'text' | 'message' | 'narration';
+  once?: boolean;
+}
+
 // ============================================================
 // 事件元数据
 // ============================================================
@@ -217,6 +225,9 @@ export interface GameEvent<T = unknown> {
 
   // 播报信息
   presentation: Presentation;
+
+  // C 端观众提示
+  audienceCue?: AudienceCue;
 
   // 游戏快照（可选，用于回放）
   game?: SerializedGameState;

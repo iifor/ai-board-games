@@ -95,11 +95,9 @@ function roundPrefix(day?: number): string {
 }
 
 function buildWerewolfRuleIntro(modeConfig: Record<string, unknown> = {}): string {
-  const description = String(modeConfig.description || '');
+  const description = String(modeConfig.description);
   if (description) return `${description}`;
-  // 回退：无描述时用名称
-  const name = String(modeConfig.name || '标准局');
-  return `本局游戏：${name}。`;
+  return `游戏准备中...`;
 }
 
 export {

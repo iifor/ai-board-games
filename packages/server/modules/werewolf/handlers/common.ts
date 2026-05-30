@@ -62,7 +62,7 @@ function publishGameEvent(
   if (!eventBus || !gameEventBuilder) return;
   try {
     if (gameSnapshot) {
-      gameEventBuilder.setGame(gameSnapshot as Parameters<GameEventBuilder['setGame']>[0]);
+      gameEventBuilder.setGame(gameSnapshot as unknown as Parameters<GameEventBuilder['setGame']>[0]);
     }
     const event = builderFn(gameEventBuilder);
     if (event) eventBus.publish(event as Parameters<WerewolfEventBus['publish']>[0]);

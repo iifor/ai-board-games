@@ -10,15 +10,17 @@ interface ThinkingModalProps {
 export function ThinkingModal({ visible, player, thinking = '' }: ThinkingModalProps) {
   if (!visible) return null;
 
-  const name = player?.nickname || player?.name || `${player?.id || ''}号`;
+  const name = player?.nickname || player?.name;
   const isWaiting = !thinking;
+
+  const title = name ? `${name}思考中...` : '系统播报中...';
 
   return (
     <div className="thinking-backdrop" role="presentation">
       <div className="thinking-dialog" role="dialog" aria-modal="true" aria-label={`${name}正在思考`}>
         <div className="thinking-header">
           <span />
-          <strong>{name} 推理中</strong>
+          <strong>{title}</strong>
         </div>
         {isWaiting ? (
           <p className="thinking-waiting">正在分析赛况...</p>

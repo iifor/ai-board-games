@@ -15,7 +15,8 @@ interface SpeechSubtitleProps {
   className?: string;
 }
 
-export function SpeechSubtitle({ speech, players = [], getSpeakerLabel, className = '' }: SpeechSubtitleProps) {
+export function SpeechSubtitle({ speech, players = [], getSpeakerLabel, className = '', ...slot }: SpeechSubtitleProps) {
+  console.log('SpeechSubtitle: ', { speech, players }, slot);
   const text = String(speech?.text || '').trim();
   const hasWordBoundaries = Boolean(speech?.wordBoundaries?.length);
   const hasCurrentTime = speech?.currentTimeMs !== null && speech?.currentTimeMs !== undefined;

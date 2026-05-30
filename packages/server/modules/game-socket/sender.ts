@@ -101,11 +101,7 @@ function createPreparedSender(
         // 即时事件跳过 TTS 音频生成，直接发送（延迟从 ~1-5s 降到 <1ms）
         if (IMMEDIATE_EVENT_TYPES.has(item.event.type || '')) {
           const narration = item.event.narration || item.event.message || '';
-          const evt = {
-            ...item.event,
-            narration,
-            subtitle: narration ? { text: narration, playerId: null, speakerRole: 'system', speakerLabel: '系统播报' } : undefined,
-          };
+          const evt = { ...item.event, narration };
           await session.send(evt as unknown as Record<string, unknown>);
           item.resolve();
           queue.shift();

@@ -28,8 +28,16 @@ export interface GameState {
 export interface GameEvent {
   type: string;
   ackId?: string;
+  text?: string;
   narration?: string;
   message?: string;
+  audienceCue?: {
+    kind: string;
+    display?: 'modal' | 'none';
+    speech?: 'browser' | 'none';
+    textField?: 'text' | 'message' | 'narration';
+    once?: boolean;
+  };
   presentation?: {
     speakableText?: string;
     displayText?: string;

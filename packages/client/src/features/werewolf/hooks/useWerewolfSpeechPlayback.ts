@@ -1,6 +1,7 @@
 import { useSpeechPlayback } from '../../../hooks/useSpeechPlayback';
 import { getPlayablePlaybackDelay } from '../../../utils/playableText';
 import { getWerewolfNarration } from '../utils';
+import { resolveAudienceCue } from '../utils/audienceCue';
 import type { GameEvent, GameState, Player, SpeechState, PlayableTextOptions, QueueItem } from '../../../types';
 
 const WEREWOLF_NIGHT_ACTION_HOLD_MS = 1000;
@@ -8,6 +9,7 @@ const WEREWOLF_NIGHT_ACTION_EVENT_TYPES = new Set(['wolf-vote', 'seer-check', 'g
 
 interface SpeechPlaybackControls {
   setAckTimer: (delay: number) => void;
+  clearPendingAckTimer?: () => void;
 }
 
 function getWerewolfExtraFields(event: GameEvent, text: string): Partial<SpeechState> {
@@ -64,6 +66,25 @@ export function useWerewolfSpeechPlayback({
   return {
     clearSubtitleTimer,
     playPendingWerewolfEvent: (event, controls) => {
+      const cue = resolveAudienceCue(event);
+      if (cue) {
+        // audienceCue 通过弹窗展示文字，不经过字幕/subtitle 路径
+        if (speechEnabled && cue.speech === 'browser') {
+          try {
+            const utterance = new SpeechSynthesisUtterance(cue.text);
+            utterance.lang = 'zh-CN';
+            utterance.rate = 0.9;
+            utterance.onend = () => acknowledgePending();
+            window.speechSynthesis.speak(utterance);
+            return true;
+          } catch {
+            acknowledgePending();
+            return true;
+          }
+        }
+        controls.setAckTimer(getPlayablePlaybackDelay(cue.text));
+        return true;
+      }
       if (event.presentation?.suppressSpeech && !event.speech && !event.testimony) {
         controls.setAckTimer(120);
         return true;

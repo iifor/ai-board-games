@@ -5,7 +5,7 @@ import { createCheckWinHandler, createFinalizeHandler } from './resultHandlers';
 
 function createWerewolfHandlers() {
   return {
-    'werewolf.assign_roles': createInstantHandler('werewolf_phase_changed', ''),
+    'werewolf.assign_roles': createInstantHandler('werewolf_phase_changed', '', { audienceCue: true }),
     'werewolf.night_start': createNightStartHandler(),
     'werewolf.action_window': createActionWindowHandler(),
     'werewolf.night_resolve': createNightResolveHandler(),

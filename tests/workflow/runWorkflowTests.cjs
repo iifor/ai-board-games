@@ -8,6 +8,7 @@ const serverRoot = path.join(root, 'packages', 'server');
 const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
 const testFiles = [
   'werewolfEffects.test.ts',
+  'werewolfAudienceCue.test.ts',
   'werewolfReducers.test.ts',
   'werewolfActionWindow.test.ts',
   'werewolfDebugActions.test.ts',

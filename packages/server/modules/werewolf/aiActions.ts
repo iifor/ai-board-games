@@ -424,7 +424,7 @@ function publishActionSubmitted(
 
   try {
     // 刷新游戏快照（AI 任务执行后状态已变化，如警长报名）
-    (gameEventBuilder as { setGame: (g: unknown) => void }).setGame(
+    (gameEventBuilder as unknown as { setGame: (g: unknown) => void }).setGame(
       serializeWerewolfState(match, runtime.state as unknown as Record<string, unknown>)
     );
 

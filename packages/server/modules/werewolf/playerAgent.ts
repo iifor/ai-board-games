@@ -1,5 +1,4 @@
 import { BasePlayerAgent, normalizeText } from '../agent-core';
-import type { PlayerAgentOptions as BasePlayerAgentOptions } from '../agent-core';
 
 interface PlayerAgentOptions {
   onError?: (entry: unknown) => void;

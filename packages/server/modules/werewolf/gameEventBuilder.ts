@@ -9,6 +9,7 @@ import type {
   GameEventType,
   EventMetadata,
   Presentation,
+  AudienceCue,
   SerializedGameState,
   PhaseStartPayload,
   ActionRequestedPayload,
@@ -113,7 +114,7 @@ export class GameEventBuilder {
     payload: T,
     channel: ChannelType = CHANNEL_TYPES.PUBLIC,
     scopeKey?: string,
-    options?: { actionType?: string; message?: string; speechText?: string }
+    options?: { actionType?: string; message?: string; speechText?: string; audienceCue?: AudienceCue }
   ): GameEvent<T> {
     return {
       id: randomUUID(),
@@ -123,6 +124,7 @@ export class GameEventBuilder {
       payload,
       metadata: this.buildMetadata(),
       presentation: this.buildPresentation(type, payload as Record<string, unknown>, options),
+      audienceCue: options?.audienceCue,
       game: this.game || undefined
     };
   }

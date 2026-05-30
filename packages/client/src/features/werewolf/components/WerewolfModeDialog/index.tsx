@@ -35,7 +35,6 @@ export function WerewolfModeDialog({
   onDebugModeChange,
   onPlayerToggle,
   hostId,
-  onHostChange,
   error,
   onCancel,
   onStart
@@ -44,7 +43,6 @@ export function WerewolfModeDialog({
   const selectedCount = selectedPlayerIds.length;
   const canStart = Boolean(selectedMode?.id) && selectedCount === requiredCount;
   const selectedViewMode = viewMode === 'player' ? 'player' : 'god';
-  const hostPlayer = players.find((p) => Number(p.id) === Number(hostId)) || null;
 
   return (
     <div className="werewolf-mode-backdrop" role="presentation">
@@ -65,7 +63,6 @@ export function WerewolfModeDialog({
                   key={mode.id}
                 >
                   <strong>{mode.name}</strong>
-                  <span>{(mode as WerewolfMode & { description?: string }).description}</span>
                   <small>{formatWerewolfModeSummary(mode)}</small>
                 </button>
               )) : <p className="werewolf-mode-empty">暂无可用狼人杀模式，请先在 B 端启用模式。</p>}
