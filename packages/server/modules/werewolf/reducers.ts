@@ -3,7 +3,11 @@ import {
   hasRoleAction,
   sortBySeat,
   getTopCandidateIds,
-  buildWolfStrategySummary
+  buildWolfStrategySummary,
+  getSheriffSpeechOrder,
+  getClockStartId,
+  getNextAliveId,
+  rotateFromSeat
 } from './utils';
 import { getAliveActorsByAction } from './actionWindows';
 import {
@@ -224,6 +228,68 @@ function applyDayVote(runtime: Runtime, round: Round, results: ActionResult[]): 
   }
 }
 
+// ============================================================
+// 白天发言顺序（三档优先级）
+// ============================================================
+
+function buildDaySpeechOrder(runtime: Runtime, round: Round): Agent[] {
+  const alive = runtime.agents.filter((agent) => agent.alive);
+  if (!alive.length) return [];
+
+  const sheriffId = round.sheriffId ? Number(round.sheriffId) : null;
+
+  // 优先级 A：有警长 → 警长指定顺时针/逆时针发言
+  if (sheriffId && alive.some((a) => Number(a.id) === sheriffId)) {
+    const daySpeech = round.daySpeech as Record<string, unknown> | undefined;
+    const direction = String(daySpeech?.direction || 'clockwise');
+    const ordered = getSheriffSpeechOrder(alive, sheriffId, direction);
+    // 写入 round.daySpeech 供前端和 AI 记忆使用
+    round.daySpeech = {
+      source: 'sheriff',
+      direction,
+      sheriffId,
+      playerIds: ordered.map((a) => Number(a.id)),
+    };
+    return ordered as Agent[];
+  }
+
+  // 优先级 B：无警长，有已公开死亡 → 从死亡下一位顺时针
+  const deathId = resolveRecentDeathId(round);
+  if (deathId) {
+    const startId = getNextAliveId(alive, deathId, 'clockwise') ?? alive[0].id;
+    const ordered = rotateFromSeat(alive, startId, 'clockwise') as Agent[];
+    round.daySpeech = {
+      source: 'death',
+      direction: 'clockwise',
+      startPlayerId: startId,
+      deathId,
+      playerIds: ordered.map((a) => Number(a.id)),
+    };
+    return ordered;
+  }
+
+  // 优先级 C：无警长无死亡 → 随机起始顺时针
+  const startId = getClockStartId(alive);
+  const ordered = rotateFromSeat(alive, startId, 'clockwise') as Agent[];
+  round.daySpeech = {
+    source: 'random',
+    direction: 'clockwise',
+    startPlayerId: startId,
+    playerIds: ordered.map((a) => Number(a.id)),
+  };
+  return ordered;
+}
+
+/** 获取最近公开死亡的玩家 ID：放逐 > 夜晚死亡 */
+function resolveRecentDeathId(round: Round): number | null {
+  if (round.exile?.id) return Number(round.exile.id);
+  const nightDeaths = round.night?.deaths;
+  if (Array.isArray(nightDeaths) && nightDeaths.length > 0) {
+    return Number(nightDeaths[nightDeaths.length - 1].id);
+  }
+  return null;
+}
+
 function getActorsForStep(runtime: Runtime, step: Step, round: Round): Agent[] {
   const actionType = step.config.actionType;
   if (round.selfDestruct && (actionType === 'day_speech' || actionType === 'day_vote')) return [];
@@ -243,7 +309,7 @@ function getActorsForStep(runtime: Runtime, step: Step, round: Round): Agent[] {
     const witchConfig = modeConfig?.witch as Record<string, unknown> | undefined;
     return witch && !(witchConfig?.onePotionPerNight && round.night?.witchSave) ? [witch] : [];
   }
-  if (actionType === 'day_speech') return sortBySeat(runtime.agents.filter((agent) => agent.alive));
+  if (actionType === 'day_speech') return buildDaySpeechOrder(runtime, round);
   if (actionType === 'day_vote') return sortBySeat(runtime.agents.filter((agent) => agent.alive && agent.canVote));
   if (actionType?.startsWith('sheriff_')) return getSheriffActorsForAction(runtime, round, actionType);
   return [];

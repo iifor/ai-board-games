@@ -15,6 +15,7 @@ const { getAliveActorsByAction } = require('./actionWindows');
 const { ensureWolfTeamContext } = require('./wolfTeam');
 import { isWerewolfDebugMode, runDebugHunterAction, runDebugWerewolfAction } from './debugActions';
 import { resolveActionChannel } from '@ai-presenter/shared/utils/channelResolution';
+import { serializeWerewolfState } from './runtime';
 
 interface Agent {
   id: number;
@@ -422,6 +423,11 @@ function publishActionSubmitted(
   if (!eventBus || !gameEventBuilder) return;
 
   try {
+    // 刷新游戏快照（AI 任务执行后状态已变化，如警长报名）
+    (gameEventBuilder as { setGame: (g: unknown) => void }).setGame(
+      serializeWerewolfState(match, runtime.state as unknown as Record<string, unknown>)
+    );
+
     const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
     gameEventBuilder.setStep(step.id);
     gameEventBuilder.setPhase((step.config.phase as string) || 'night');

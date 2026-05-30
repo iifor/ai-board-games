@@ -61,13 +61,16 @@ export class EventDeliverySubscriber {
 
   private toFlatEvent(event: GameEvent): Record<string, unknown> {
     const payload = event.payload as Record<string, unknown>;
+    // 发言和警长类事件保留原始 type，不包装为 workflow-event
     const isSpeech =
       event.type === 'speech' ||
       event.type === 'wolf-speech' ||
       event.type === 'self-destruct';
+    const isSheriff = event.type.startsWith('sheriff-');
+    const keepOriginalType = isSpeech || isSheriff;
 
     const flat: Record<string, unknown> = {
-      type: isSpeech ? event.type : 'workflow-event',
+      type: keepOriginalType ? event.type : 'workflow-event',
       matchId: event.metadata.matchId,
       workflowEvent: event.type,
       actionType: String(payload.actionType || ''),

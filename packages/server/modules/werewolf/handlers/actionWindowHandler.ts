@@ -272,6 +272,19 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     );
   });
 
+  // 警长类行动：发布 sheriff-start 事件供 C 端展示举手图标
+  if (step.config.actionType?.startsWith('sheriff_')) {
+    publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+      builder.setStep(step.id);
+      builder.setPhase('day');
+      builder.setDay(step.config.day || 1);
+      return builder.buildSheriffEvent('sheriff-start', {
+        election: (round as { sheriffElection?: Record<string, unknown> }).sheriffElection || {},
+        message: actionRequestedMessage(step.config.actionType, step.config.day),
+      });
+    });
+  }
+
   // 添加阶段开始事件（预言家、女巫、守卫等）
   if (hasActionPhase(step.config.actionType || '')) {
     events.push(createWerewolfEvent(
