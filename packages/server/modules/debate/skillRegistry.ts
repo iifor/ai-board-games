@@ -51,7 +51,7 @@ function createDebateSkills(): Skill[] {
         const parsed = await (actor as unknown as { playerAgent: { askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null> } }).playerAgent.askJson([
           '请点评双方表现，并给出胜负倾向。',
           '公开赛况已通过上文增量同步。',
-          `只返回 JSON：{"winner":"pro","text":"建议${PHASE_LIMITS.judges}字以内点评（弱约束，超出也正常输出）"}，winner 只能是 pro/con/draw。`,
+          `只返回JSON对象：{"winner":"pro","text":"建议${PHASE_LIMITS.judges}字以内点评"}，winner 只能是 pro/con/draw。`,
         ].join('\n\n'), {
           maxTokens: Math.ceil(PHASE_LIMITS.judges * 2.5),
           fallback: { winner: 'draw', text: '双方都有亮点，正方结构完整，反方反击积极，胜负取决于评判标准。' },
@@ -74,7 +74,7 @@ function createDebateSkills(): Skill[] {
           '请从正反方 8 位选手中评选最佳辩手。',
           `可选对象：${(contestants as DebatePlayer[]).map((agent) => `${agent.id}号${agent.nickname}`).join('、')}`,
           '公开赛况已通过上文增量同步。',
-          '只返回 JSON：{"target":2}，不要返回理由。',
+          '只返回JSON对象：{"target":2}。',
         ].join('\n\n'), {
           maxTokens: 80,
           fallback: { target: fallback.id },

@@ -149,7 +149,7 @@ class BasePlayerAgent {
     const parsed = await this.askJson([
       prompt,
       `无效的目标: ${validIds.join(', ')}`,
-      '只返回json, 比如{"target":2}.'
+      '只返回json, 比如{"target":2}'
     ].join('\n\n'), {
       maxTokens: 60,
       skillId: options.skillId || 'player-vote',

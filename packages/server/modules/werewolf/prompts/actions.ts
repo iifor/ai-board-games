@@ -38,7 +38,7 @@ export function buildSaveActionPrompt(victimId: number, isSelf: boolean, canSelf
   const lines = [
     `今晚狼人袭击了 ${victimId} 号。你还有解药。`,
     isSelf && canSelfSave ? '首夜允许自救。' : '',
-    '是否使用解药救人？只返回 JSON：{"use":true}，不要返回理由。'
+    '是否使用解药救人？只返回JSON对象：：{"use":true, reason":""}。'
   ].filter(Boolean);
   return lines.join('\n\n');
 }
@@ -48,7 +48,7 @@ export function buildPoisonActionPrompt(validIds: number[]): string {
   return [
     '你还有毒药。请选择是否使用毒药；不用毒药时 target 返回 null。',
     `可选目标：${validIds.join('、')}`,
-    '只返回 JSON：{"use":false,"target":null}，不要返回理由。'
+    '只返回JSON对象：{"use":false,"target":null, reason":""}'
   ].join('\n\n');
 }
 
@@ -65,7 +65,7 @@ export function buildSelfDestructActionPrompt(publicContext: string, speechText:
     `当前公开信息：\n${publicContext || '暂无公开信息。'}`,
     `你刚才的公开发言：${speechText || '暂无'}`,
     '建议在继续发言会明显暴露狼队、或自爆能保护狼队/打断关键归票时才使用。',
-    '只返回 JSON：{"use":false,"text":""} 或 {"use":true,"text":"自爆宣言"}。'
+    '只返回JSON对象：{"use":false,"text":""} 或 {"use":true,"text":"自爆宣言"}。'
   ].join('\n\n');
 }
 
@@ -85,7 +85,7 @@ export const DAY_VOTE_PROMPT = '请选择你要放逐的玩家。';
 /** 警长竞选报名 */
 export const SHERIFF_SIGNUP_PROMPT = [
   '警长竞选开始。请选择竞选警长？',
-  '只返回 JSON：{"run":true} 或 {"run":false}。'
+  '只返回JSON对象：{"run":true} 或 {"run":false}。'
 ].join('\n\n');
 
 /** 警长退水 */
@@ -94,7 +94,7 @@ export function buildSheriffWithdrawPrompt(context: string): string {
     '你的警上竞选发言已经结束。请根据所有警上候选人的发言内容，判断是否退水退出警长竞选。',
     `警上发言记录：\n${context || '暂无警上发言。'}`,
     '判断标准：如果你的发言明显弱于其他候选人，或你认为其他候选人更适合担任警长，可以选择退水。',
-    '只返回 JSON：{"withdraw":true} 或 {"withdraw":false}。'
+    '只返回JSON对象：{"withdraw":true} 或 {"withdraw":false}。'
   ].join('\n\n');
 }
 
