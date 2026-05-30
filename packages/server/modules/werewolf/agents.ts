@@ -209,7 +209,7 @@ function createWerewolfAgents(
       seerChecks: [],
       votes: []
     };
-    agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry);
+    agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry, selected, modeConfig);
     agent.baseSystemPromptHash = hashText(agent.baseSystemPrompt!);
     agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt!, {
       onError: (entry: unknown) => fallbackAudit.record(entry as Record<string, unknown>),
