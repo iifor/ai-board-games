@@ -73,15 +73,23 @@ export async function askWolfNightSpeech(
   options: { thinking?: boolean; limit?: number } = {}
 ): Promise<string | { content: string; thinking: string } | null> {
   const history = (wolfSpeeches || [])
+    .filter((speech) => String(speech.playerId) !== '系统' && String(speech.playerId) !== 'host')
     .map((speech) => `${speech.playerId}号：${speech.text}`)
     .join('\n');
-  const title = isLeader ? '你是本夜狼队领袖，请先做战术部署。' : '轮到你进行狼队夜聊。';
-  const limit = options.limit ?? WEREWOLF.WOLF_NIGHT_SPEECH_CHAR_LIMIT;
+  const title = isLeader ? '请作为狼队队长作战术部署。' : '请基于当前已知信息和队长战术，进行发言讨论。';
+  let limit = options.limit ?? WEREWOLF.WOLF_NIGHT_SPEECH_CHAR_LIMIT;
+  if (isLeader && limit) {
+    limit = limit * 1.5;
+  }
+  const sharedInfo = (wolfSpeeches || []).find((s) => String(s.playerId) === '系统');
+  const contextLine = sharedInfo ? `【队伍信息】${sharedInfo.text}` : '';
+  const historySection = history ? `已知狼队夜聊：\n${history}` : '';
   const prompt = [
     `第 ${day} 夜狼人行动。${title}`,
-    `已知狼队夜聊：\n${history || '你是本夜第一位发言的狼人。'}`,
+    contextLine,
+    historySection,
     `可以选择不发言；发言时请只输出狼队战术发言，建议不超过 ${limit} 字。`
-  ].join('\n\n');
+  ].filter(Boolean).join('\n\n');
   const apiOpts = { maxTokens: Math.ceil(limit * 2.5), limit };
 
   if (options.thinking) {

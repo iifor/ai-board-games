@@ -17,7 +17,7 @@ function ensureWolfTeamContext(runtime: Runtime, round: Round): WolfTeamContext 
   night.wolfIds = wolves.map((wolf) => wolf.id);
   night.wolfLeaderId = leader?.id || null;
   night.wolfSpeechOrder = order.map((wolf) => wolf.id);
-  night.wolfSharedInfo = buildWolfSharedInfo(wolves, leader?.id || null);
+  night.wolfSharedInfo = buildWolfSharedInfo(wolves, leader?.id || null, runtime.agents);
   return {
     wolfIds: night.wolfIds,
     wolfLeaderId: night.wolfLeaderId,
@@ -45,10 +45,16 @@ function wolfLeaderPriority(agent: Agent): number {
   return 0;
 }
 
-function buildWolfSharedInfo(wolves: Agent[], leaderId: number | null): string {
-  const wolfLabels = wolves.map((wolf) => `${wolf.id}号${wolf.roleLabel || wolf.role || '狼人'}`).join('、');
-  const leader = leaderId ? `${leaderId}号` : '无';
-  return `狼人请睁眼。狼队成员：${wolfLabels || '无'}。本夜狼队领袖：${leader}。请先互通身份信息，再依次发言并统一刀口。`;
+function buildWolfSharedInfo(wolves: Agent[], leaderId: number | null, allAgents?: Agent[]): string {
+  const sortedAll = sortBySeat(allAgents || wolves);
+  const seatOf = (id: number | null): string => {
+    if (id == null) return '?';
+    const idx = sortedAll.findIndex((a) => Number(a.id) === Number(id));
+    return idx >= 0 ? String(idx + 1) : String(id);
+  };
+  const wolfLabels = wolves.map((wolf) => `${seatOf(wolf.id)}号${wolf.roleLabel || wolf.role || '狼人'}`).join('、');
+  const leader = leaderId ? `${seatOf(leaderId)}号` : '无';
+  return `狼队成员：${wolfLabels || '无'}。本夜队长：${leader}。请先互通身份，再依次发言并统一刀口。`;
 }
 
 export {

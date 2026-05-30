@@ -197,8 +197,7 @@ function buildPlayerRosterModule(players: PlayerInfo[]): string {
   const lines = sorted.map((p, index) => {
     const seat = index + 1;
     const displayName = p.nickname || p.name || `${seat}号`;
-    const sexLabel = p.sex || '未知';
-    return `${seat}号：${displayName}（${sexLabel}）`;
+    return `${seat}号：${displayName}`;
   });
   return ['【本局玩家】', ...lines].join('\n');
 }
