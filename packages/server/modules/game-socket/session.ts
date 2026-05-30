@@ -50,7 +50,9 @@ function createSession(socket: WebSocket): GameSession {
 
   function send(payload: Record<string, unknown>): void {
     if (socket.readyState !== socket.OPEN) return;
-    socket.send(JSON.stringify(payload));
+    const ackId = nextId;
+    nextId += 1;
+    socket.send(JSON.stringify({ ...payload, ackId }));
   }
 
   function sendAndWait(payload: Record<string, unknown>): Promise<void> {

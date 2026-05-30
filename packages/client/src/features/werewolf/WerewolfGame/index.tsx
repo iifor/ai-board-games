@@ -61,7 +61,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   const [showRoles, setShowRoles] = useState(true);
   const speechPlaybackRef = useRef<ReturnType<typeof useWerewolfSpeechPlayback> | null>(null);
   const replayStartedRef = useRef('');
-  const { speechEnabled, speak, cancel } = useSpeechQueue();
+  const { speechEnabled, speak, cancel, unlock } = useSpeechQueue();
 
   useEffect(() => {
     fetchWerewolfModes()
@@ -207,6 +207,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   }
 
   function startGame(modeConfig: WerewolfMode | null = werewolfMode, playerIds: number[] = selectedPlayerIds, viewMode?: string | Record<string, unknown>, options: Record<string, unknown> = {}): void {
+    unlock(); // 利用用户点击手势解锁浏览器语音合成
     if (viewMode && typeof viewMode === 'object') {
       options = viewMode;
       viewMode = clientViewMode;

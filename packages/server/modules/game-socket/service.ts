@@ -218,9 +218,13 @@ async function runSession(
       roleLabel: '',
       faction: '',
     }));
+    const modeConfig = (config as Record<string, unknown>).werewolfMode as Record<string, unknown> | undefined;
+    const ruleIntro = safeGameType === 'werewolf' && modeConfig
+      ? (() => { const { buildWerewolfRuleIntro } = require('../werewolf/messages'); return buildWerewolfRuleIntro(modeConfig); })()
+      : '';
     await sender.send({
       type: 'host',
-      message: getStartMessage(safeGameType),
+      message: ruleIntro || getStartMessage(safeGameType),
       debugMode: Boolean((config as Record<string, unknown>).debugMode),
       game: {
         type: safeGameType,

@@ -23,7 +23,24 @@ interface PreparedSender {
   send: (event: SessionEvent) => Promise<void>;
 }
 
-const IMMEDIATE_EVENT_TYPES = new Set(['thinking']);
+// 不需要等待客户端 ACK 的事件类型（通知类、阶段类、睁眼类）
+// 只有发言类事件需要 sendAndWait 确保 TTS 播放完毕
+const IMMEDIATE_EVENT_TYPES = new Set([
+  'host', 'thinking',
+  'action-requested', 'action-submitted', 'action-skipped',
+  'phase-start', 'phase-end', 'phase-changed',
+  'day-start',
+  'wolf-wake', 'wolf-leader', 'seer-wake', 'guard-wake',
+  'witch-antidote', 'witch-poison', 'witch-action',
+  'sheriff-start', 'sheriff-speech', 'sheriff-candidates',
+  'sheriff-vote', 'sheriff-runoff-speech', 'sheriff-runoff-vote',
+  'sheriff-result', 'sheriff-badge-transfer', 'sheriff-badge-tear',
+  'night-result', 'vote-result', 'speech-order',
+  'effect-applied', 'effect-resolved',
+  'skill-requested', 'skill-thinking', 'skill-executing',
+  'skill-completed', 'skill-failed',
+  'death-announced',
+]);
 
 function createPreparedSender(
   session: GameSession,
@@ -81,14 +98,24 @@ function createPreparedSender(
     try {
       while (queue.length) {
         const item = queue[0];
+        // 即时事件跳过 TTS 音频生成，直接发送（延迟从 ~1-5s 降到 <1ms）
+        if (IMMEDIATE_EVENT_TYPES.has(item.event.type || '')) {
+          const narration = item.event.narration || item.event.message || '';
+          const evt = {
+            ...item.event,
+            narration,
+            subtitle: narration ? { text: narration, playerId: null, speakerRole: 'system', speakerLabel: '系统播报' } : undefined,
+          };
+          await session.send(evt as unknown as Record<string, unknown>);
+          item.resolve();
+          queue.shift();
+          continue;
+        }
+
         try {
           const prepared = await item.prepared;
           collectPreparedAudioResources(prepared, audioResources);
-          if (IMMEDIATE_EVENT_TYPES.has(prepared.type || '')) {
-            await session.send(prepared as unknown as Record<string, unknown>);
-          } else {
-            await session.sendAndWait(prepared as unknown as Record<string, unknown>);
-          }
+          await session.sendAndWait(prepared as unknown as Record<string, unknown>);
           item.resolve();
         } catch (error) {
           item.reject(error as Error);

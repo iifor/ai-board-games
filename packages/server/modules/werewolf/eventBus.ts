@@ -238,7 +238,7 @@ export class LoggingMiddleware implements EventMiddleware {
   name = 'logging';
 
   process(event: GameEvent, next: () => void): void {
-    console.log(`[EventBus] ${event.type} | channel=${event.channel} | scope=${event.scopeKey || '-'}`);
+    // console.log(`[EventBus] ${event.type} | channel=${event.channel} | scope=${event.scopeKey || '-'}`);
     next();
   }
 }
