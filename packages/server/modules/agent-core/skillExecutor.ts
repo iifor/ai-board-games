@@ -1,4 +1,4 @@
-import { startSkillSpan, endSpan } from '../observability/tracer';
+import { startSkillSpan, endSpan, getActiveTrace, recordDecision } from '../observability/tracer';
 import { AgentSkillRegistry } from './skillRegistry';
 import { FallbackEntry } from './fallbackAudit';
 
@@ -52,10 +52,11 @@ async function executeSkillWithTrace(
     const executionContext = { ...context, action };
     const result = await executeResolvedSource(source, action, executionContext);
     endSpan(span, 'ok', {});
+    // 记录 AI 决策到 trace
+    recordDecisionForTrace(context, action, result, true);
     return result;
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    // 记录错误但不返回兜底值
     context.actor?.playerAgent?.onError?.({
       gameType: context.gameType || '',
       phase: (context.phase as PhaseLike)?.id || (context.phase as string) || null,
@@ -66,6 +67,8 @@ async function executeSkillWithTrace(
       severity: 'error'
     });
     endSpan(span, 'error', {}, err);
+    // 记录失败决策到 trace
+    recordDecisionForTrace(context, action, null, false, err.message);
     throw err;
   }
 }
@@ -91,6 +94,30 @@ function resolveSkillSource(
 ): AgentSkillRegistry | PlayerAgentLike {
   if (context.actor?.playerAgent?.hasSkill?.(action)) return context.actor.playerAgent;
   return registry;
+}
+
+function recordDecisionForTrace(
+  context: SkillExecutionContext, action: string, result: unknown, success: boolean, errorReason?: string
+): void {
+  try {
+    const gameId = context.gameId || (context.state as Record<string, unknown> | undefined)?.gameId as string || '';
+    const trace = getActiveTrace(gameId);
+    if (!trace) return;
+    const data = result as Record<string, unknown> | null | undefined;
+    recordDecision(trace, {
+      playerId: context.actor?.id != null ? Number(context.actor.id) : undefined,
+      playerRole: (context.actor as Record<string, unknown> | undefined)?.role as string || undefined,
+      playerFaction: (context.actor as Record<string, unknown> | undefined)?.faction as string || undefined,
+      decisionType: action,
+      phase: (context.phase as PhaseLike)?.id || (context.phase as string) || '',
+      day: (context.state as Record<string, unknown> | undefined)?.day as number || (context as Record<string, unknown>).day as number || undefined,
+      skillId: action,
+      responseText: data ? JSON.stringify(data) : null,
+      chosenTarget: data?.target != null ? Number(data.target) : undefined,
+      fallbackUsed: !success,
+      fallbackReason: errorReason || null,
+    });
+  } catch { /* trace 记录失败不影响主流程 */ }
 }
 
 export { executeSkillWithTrace };

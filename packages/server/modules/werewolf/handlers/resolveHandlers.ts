@@ -18,6 +18,7 @@ import { createWerewolfEvent, publishGameEvent, completed, isDone, markStepCompl
 import type { StepState } from './common';
 import { recordWorkflowEffects } from '../../workflow-engine/effects';
 import { actionRequestedMessage, actionResolvedMessage, effectResolvedMessage } from '../messages';
+import { getActiveTrace, recordSnapshot } from '../../observability/tracer';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import { checkWin, checkPostExileWin } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
@@ -67,6 +68,7 @@ function createNightResolveHandler() {
         outEvents.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
       }
 
+      recordGameSnapshotIfTrace(match.id, runtime as unknown as Record<string, unknown>, 'night_resolve');
       return {
         status: 'COMPLETED',
         state: nextState,
@@ -112,6 +114,7 @@ function createExileResolveHandler() {
         outEvents.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
       }
 
+      recordGameSnapshotIfTrace(match.id, runtime as unknown as Record<string, unknown>, 'exile_resolve');
       return {
         status: 'COMPLETED',
         state: nextState,
@@ -197,6 +200,16 @@ function createSheriffResolveHandler() {
       };
     }
   };
+}
+
+function recordGameSnapshotIfTrace(matchId: string, runtime: Record<string, unknown>, checkpoint: string): void {
+  try {
+    const trace = getActiveTrace(matchId);
+    if (!trace) return;
+    const { serializeWerewolfState } = require('../runtime');
+    const snapshot = serializeWerewolfState({ id: matchId }, runtime as Record<string, unknown>);
+    recordSnapshot(trace, checkpoint, snapshot, { day: (runtime.rounds as Array<Record<string, unknown>> | undefined)?.length || undefined, phase: (runtime as Record<string, unknown>).phase as string || undefined });
+  } catch { /* best-effort */ }
 }
 
 export {

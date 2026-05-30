@@ -10,6 +10,7 @@ import { runWerewolfWorkflow } from '../werewolf';
 import { getWerewolfModeConfig } from '../werewolf-config';
 import { buildWerewolfRuleIntro } from '../werewolf/messages';
 import { createProjectionContext, projectWerewolfGame } from '../werewolf/views/viewPolicy';
+import { getActiveTrace, recordEvent } from '../observability';
 
 // games is TS — import directly
 import { saveGameRecord } from '../games';
@@ -200,7 +201,14 @@ async function runSession(
 
   // 调试模式不保存数据库，只保留 AI 观测数据
   if (!(config as Record<string, unknown>).debugMode) {
-    saveGameRecord({ ...game, audioResources: sender.getAudioResources() } as unknown as SaveGameInput);
+    try {
+      saveGameRecord({ ...game, audioResources: sender.getAudioResources() } as unknown as SaveGameInput);
+    } catch (error) {
+      const err = error as Error;
+      console.error('[runSession] 保存对局记录失败:', err.message);
+      const trace = getActiveTrace((game as Record<string, unknown>)?.id as string || '');
+      if (trace) recordEvent(trace, { type: 'save-error', phase: '', event: { reason: err.message } });
+    }
   }
 
   await sender.send({
