@@ -60,12 +60,13 @@ export function WerewolfRoleManager() {
           selects={[{ key: 'enabled', placeholder: '状态', options: booleanOptions() }]}
         />
         <Table rowKey="id" dataSource={filteredRoles} columns={[
-          { title: '角色', dataIndex: 'name', render: (value: string, record: WerewolfRole) => <Space><strong>{value}</strong><Text type="secondary">{record.id}</Text></Space> },
-          { title: '阵营', dataIndex: 'faction', render: (value: string) => value === 'wolves' ? <Tag color="red">狼人</Tag> : <Tag color="blue">好人</Tag> },
-          { title: '类型', dataIndex: 'roleType', render: (value: string) => WEREWOLF_ROLE_TYPE_OPTIONS.find((item) => item.value === value)?.label || value },
-          { title: '能力', dataIndex: 'ability', ellipsis: true },
+          { title: '唯一标', width: 120, dataIndex: 'id', render: (value: string) => <Space><strong>{value}</strong></Space> },
+          { title: '角色', width: 120, dataIndex: 'name', render: (value: string, record: WerewolfRole) => <Space><strong>{value}</strong></Space> },
+          { title: '阵营', width: 100, dataIndex: 'faction', render: (value: string) => value === 'wolves' ? <Tag color="red">狼人</Tag> : <Tag color="blue">好人</Tag> },
+          { title: '类型', width: 100, dataIndex: 'roleType', render: (value: string) => WEREWOLF_ROLE_TYPE_OPTIONS.find((item) => item.value === value)?.label || value },
+          { title: '能力', width: 300, dataIndex: 'ability', ellipsis: true },
           { title: '打法建议', dataIndex: 'playStyleAdvice', ellipsis: true },
-          { title: '启用', dataIndex: 'enabled', render: enabledTag },
+          { title: '启用', width: 80, dataIndex: 'enabled', render: enabledTag },
           { title: '操作', width: 150, render: (_: unknown, record: WerewolfRole) => <TableActions onEdit={() => setEditing(record)} onDelete={() => remove(record.id)} /> }
         ]} />
       </Card>

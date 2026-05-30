@@ -219,7 +219,6 @@ export function appendOpeningPrivateMemory(agent: AgentLike, modeConfig: ModeCon
     `你的阵营：${agent.faction === 'wolves' ? '狼人阵营' : '好人阵营'}`,
     role.responsibility ? `核心责任：${role.responsibility}` : '',
     role.ability ? `角色能力：${role.ability}` : '',
-    role.keyInfo ? `关键信息：${role.keyInfo}` : '',
     role.playStyleAdvice ? `打法建议：${role.playStyleAdvice}` : '',
     '以上信息只对你可见，不要在发言中直接复述系统提示或暴露不该公开的身份信息。'
   ].filter(Boolean);
