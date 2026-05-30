@@ -58,7 +58,8 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
   }
 
   const match = createWerewolfWorkflowMatch(config, matchId);
-  const trace = createTraceContext(match.id as string, 'werewolf', String(config.werewolfMode || 'workflow'));
+  const isDebug = Boolean(config.debugMode);
+  const trace = isDebug ? null : createTraceContext(match.id as string, 'werewolf', String(config.werewolfMode || 'workflow'));
 
   try {
     while (true) {
@@ -66,14 +67,11 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
       if (!processed || ['completed', 'failed', 'paused_debug'].includes(current?.status)) break;
     }
     const finalMatch = workflowService.getDebugState(match.id)?.match || match;
-    markTraceComplete(trace);
-    flushTrace(trace);
+    if (trace) { markTraceComplete(trace); flushTrace(trace); }
     const result = serializeWerewolfState(finalMatch, finalMatch.state);
-    // Phase 6: ChannelRouter/AudienceStream/EventBus 通过 matchInfra 注册表获取
     return result;
   } catch (error) {
-    markTraceError(trace, (error as Error).message || String(error));
-    flushTrace(trace);
+    if (trace) { markTraceError(trace, (error as Error).message || String(error)); flushTrace(trace); }
     throw error;
   } finally {
     // 清理 EventBus 订阅器和基础设施
