@@ -1,10 +1,8 @@
-// werewolf/announcements is still JS — use require for now
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const {
+import {
   getWerewolfNightPrompt,
   buildSheriffStartMessage,
   buildSheriffResultMessage,
-} = require('../werewolf/announcements');
+} from '../werewolf/announcements';
 
 interface SpeechData {
   text?: string;

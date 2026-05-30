@@ -5,10 +5,7 @@ import { AppError, ErrorCodes } from '../../utils/errors';
 import type { Game, GameSummary } from '../../types/api';
 import type { GameRow } from '../../types/database';
 import type { GameListFilters } from './repository';
-
-// upload module is still JS — use require for now
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const upload = require('../upload');
+import * as upload from '../upload';
 
 interface SaveGameInput {
   id: string;

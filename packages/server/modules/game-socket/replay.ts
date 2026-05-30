@@ -5,25 +5,19 @@ import { createPreparedSender } from './sender';
 import { isSessionCancelled } from './session';
 import type { GameSession } from './session';
 import type { PreparedSender } from './sender';
-
-// werewolf/views/viewPolicy is still JS — use require for now
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const {
+import {
   createProjectionContext,
   projectWerewolfEvent,
   projectWerewolfGame,
   projectPlayers,
-} = require('../werewolf/views/viewPolicy');
-
-// werewolf/announcements is still JS — use require for now
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const {
+} from '../werewolf/views/viewPolicy';
+import {
   buildDayStartMessage,
   buildNightPublicMessage,
   buildSheriffStartMessage,
   buildSheriffResultMessage,
   getWerewolfNightPrompt,
-} = require('../werewolf/announcements');
+} from '../werewolf/announcements';
 
 // --- Interfaces ---
 
@@ -219,11 +213,13 @@ async function replayGameSession(
     gameType === 'debate' ? { phaseLookahead: 1 } : { prefetchCount: 2 },
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const replayProjection =
     gameType === 'werewolf'
-      ? createProjectionContext(replayGame, options.replayView || {})
+      ? createProjectionContext(replayGame as any, options.replayView || {})
       : null;
-  const replayPlayers =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const replayPlayers: any[] =
     gameType === 'werewolf'
       ? createWerewolfReplayPlayers(replayGame.players || [])
       : replayGame.players || [];
@@ -233,19 +229,22 @@ async function replayGameSession(
       ? projectPlayers(replayPlayers, replayProjection)
       : replayPlayers,
     game: replayProjection
-      ? projectWerewolfGame(getPlaybackGameSnapshot(replayGame), replayProjection)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? projectWerewolfGame(getPlaybackGameSnapshot(replayGame) as any, replayProjection)
       : getPlaybackGameSnapshot(replayGame),
   });
   for (const event of buildReplayPlaybackEvents(replayGame)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const projected = replayProjection
-      ? projectWerewolfEvent(event, replayProjection)
+      ? projectWerewolfEvent(event as any, replayProjection)
       : event;
     if (projected) await sender.enqueue(projected);
   }
   await sender.flush();
   await sender.send({
     type: 'game',
-    game: replayProjection ? projectWerewolfGame(replayGame, replayProjection) : replayGame,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    game: replayProjection ? projectWerewolfGame(replayGame as any, replayProjection) : replayGame,
   });
   session.close();
 }
@@ -403,7 +402,8 @@ function buildWerewolfReplayPlaybackEvents(game: ReplayGame): Record<string, unk
       type: 'night-result',
       phaseKey: dayPhaseKey,
       round: nightRound,
-      message: buildNightPublicMessage(nightRound),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      message: buildNightPublicMessage(nightRound as any),
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds),
     });
     appendWerewolfBadgePlaybackEvents(
@@ -535,7 +535,8 @@ function appendWerewolfSheriffPlaybackEvents(
   };
   pushWerewolfPlaybackEvent(events, 'sheriff-start', phaseKey, visibleRound, game, replayPlayers, visibleRounds, {
     sheriffCandidateIds: visibleRound.sheriffElection!.candidates,
-    message: buildSheriffStartMessage(visibleRound),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    message: buildSheriffStartMessage(visibleRound as any),
   });
 
   for (const speech of election.speeches || []) {
@@ -636,7 +637,8 @@ function appendWerewolfSheriffPlaybackEvents(
     replayPlayers,
     visibleRounds,
     {
-      message: buildSheriffResultMessage(visibleRound, game.werewolfMode || {}),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      message: buildSheriffResultMessage(visibleRound as any, game.werewolfMode || {}),
     },
   );
 }

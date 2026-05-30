@@ -10,6 +10,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { migrate } from './migrations';
 
 const projectRoot = path.join(__dirname, '..', '..');
 const JSON_PATH = path.join(projectRoot, 'data', 'ai-presenter.fallback.json');
@@ -66,8 +67,8 @@ function main(): void {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = OFF');
 
-  const { migrate } = require('./migrations');
-  migrate(db);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  migrate(db as any);
 
   const tx = db.transaction(() => {
     upsertSkins(db, jsonData.skins || []);

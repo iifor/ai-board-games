@@ -1,5 +1,4 @@
-const { PlayerAgent } = require('./playerAgent');
-import * as constants from './constants';
+import { PlayerAgent } from './playerAgent';
 import * as workflow from './workflow';
 import { WerewolfEventBus, createEventBus, createEventBusWithDefaults } from './eventBus';
 import { GameEventBuilder, createGameEventBuilder } from './gameEventBuilder';
@@ -19,10 +18,29 @@ import { EventDeliverySubscriber, createEventDeliverySubscriber } from './eventD
 
 workflow.registerWerewolfWorkflow();
 
-module.exports = {
+// Re-export workflow members
+export {
+  WEREWOLF_WORKFLOW_ID,
+  werewolfWorkflow,
+  registerWerewolfWorkflow,
+  createWerewolfWorkflowMatch,
+  runWerewolfWorkflow,
+  serializeWerewolfState,
+} from './workflow';
+
+// Re-export constants
+export {
+  MAX_DAYS,
+  FACTION_GOOD,
+  FACTION_WOLVES,
+  ROLE_TYPE_GOD,
+  ROLE_TYPE_WOLF,
+  ROLE_TYPE_VILLAGER,
+  EXECUTABLE_WEREWOLF_ACTIONS,
+} from './constants';
+
+export {
   PlayerAgent,
-  ...workflow,
-  ...constants,
   // Phase 2-6: 事件驱动架构组件
   WerewolfEventBus,
   createEventBus,

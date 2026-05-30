@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { BUILTIN_TEMPLATE } = require('../skin-engine/constants') as { BUILTIN_TEMPLATE: Record<string, unknown> };
+import { BUILTIN_TEMPLATE } from '../skin-engine/constants';
 
 const SKIN_NAME_MAX_LENGTH = 200 as const;
 

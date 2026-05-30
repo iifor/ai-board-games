@@ -1,71 +1,35 @@
-const repo = require('../workflow-engine/repository');
-const { executeSkillWithTrace } = require('../agent-core');
-const { createRuntime, ensureRound } = require('./runtime');
-const {
+import * as repo from '../workflow-engine/repository';
+import { executeSkillWithTrace } from '../agent-core';
+import { createRuntime, ensureRound } from './runtime';
+import {
   askSpeech,
   askWolfNightSpeech,
   askSheriffSpeech,
-} = require('./prompts/speech');
-const {
+} from './prompts/speech';
+import {
   buildWolfVotePrompt,
   DAY_VOTE_PROMPT,
   SHERIFF_SIGNUP_PROMPT,
   buildSheriffWithdrawPrompt,
   SHERIFF_VOTE_PROMPT,
-} = require('./prompts/actions');
-const { topTarget } = require('./winCheck');
-const { rotateFromSeat } = require('./utils');
-const { getAliveActorsByAction } = require('./actionWindows');
-const { ensureWolfTeamContext } = require('./wolfTeam');
+} from './prompts/actions';
+import { topTarget } from './winCheck';
+import { rotateFromSeat } from './utils';
+import { getAliveActorsByAction } from './actionWindows';
+import { ensureWolfTeamContext } from './wolfTeam';
 import { isWerewolfDebugMode, runDebugHunterAction, runDebugWerewolfAction } from './debugActions';
 import { resolveActionChannel } from '@ai-presenter/shared/utils/channelResolution';
 import { serializeWerewolfState } from './runtime';
 
-interface Agent {
-  id: number;
-  alive?: boolean;
-  faction?: string;
-  thinkingEnabled?: boolean;
-  playerAgent: PlayerAgent;
-  roleConfig?: Record<string, unknown>;
-  [key: string]: unknown;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Agent = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Match = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Runtime = any;
 
-interface PlayerAgent {
-  thinkingEnabled?: boolean;
-  hasSkill?: (action: string) => boolean;
-  askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
-  askVoteTarget: (prompt: string, validIds: number[], options?: Record<string, unknown>) => Promise<number | null>;
-}
-
-interface Runtime {
-  agents: Agent[];
-  modeConfig: Record<string, unknown>;
-  skillRegistry: unknown;
-  fallbackAudit?: unknown;
-  state: Record<string, unknown>;
-  ctx: { state: Record<string, unknown> };
-  [key: string]: unknown;
-}
-
-interface Round {
-  day: number;
-  night: {
-    wolfTarget?: number | null;
-    wolfLeaderId?: number | null;
-    wolfSpeechOrder?: number[];
-    wolfSpeeches?: unknown[];
-    [key: string]: unknown;
-  };
-  sheriffElection?: Record<string, unknown> | null;
-  publicSummary?: string;
-  [key: string]: unknown;
-}
-
-interface Match {
-  id: string;
-  [key: string]: unknown;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Round = any;
 
 interface Step {
   id: string;
@@ -208,7 +172,8 @@ async function runWolfKillAction(runtime: Runtime, round: Round, actor: Agent, a
   // 狼人夜聊发言
   let speechText = '';
   let thinkingText = '';
-  const nightResult = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nightResult: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
   if (nightResult) {
     if (typeof nightResult === 'string') {
       speechText = nightResult;
@@ -240,7 +205,8 @@ async function runWolfSpeechAction(runtime: Runtime, round: Round, actor: Agent)
   const isLeader = Number(actor.id) === Number(context.wolfLeaderId);
   const sharedSpeeches = buildWolfSpeechContext(round);
 
-  const result = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
   if (result) {
     if (typeof result === 'string') return { speech: result, thinking: '' };
     return { speech: result.content || '', thinking: result.thinking || '' };
@@ -258,7 +224,8 @@ async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, a
   return { target }; // null = 弃票
 }
 
-function buildWolfSpeechContext(round: Round): Array<Record<string, unknown>> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildWolfSpeechContext(round: Round): any[] {
   const sharedInfo = String(round.night.wolfSharedInfo || '');
   const existing = Array.isArray(round.night.wolfSpeeches) ? round.night.wolfSpeeches as Array<Record<string, unknown>> : [];
   return sharedInfo
@@ -275,7 +242,8 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
 
   let speechText = '';
   let thinkingText = '';
-  const speechResult = await askSpeech(actor, round.day, publicContext, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const speechResult: any = await askSpeech(actor, round.day, publicContext, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
   if (speechResult) {
     if (typeof speechResult === 'string') {
       speechText = speechResult;
@@ -313,9 +281,9 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
 
 async function runDayVoteAction(actor: Agent, alive: Agent[], runtime: Runtime): Promise<Record<string, unknown>> {
   const valid = alive.map((agent) => agent.id).filter((id) => Number(id) !== Number(actor.id));
-  const deadList = runtime.agents.filter((a) => !a.alive).map((a) => `${a.id}号(${a.deathReason || '已出局'})`);
+  const deadList = runtime.agents.filter((a) => !a.alive).map((a) => `${a.id}号`);
   const prompt = deadList.length
-    ? [`请选择你要放逐的玩家。`, `已出局玩家：${deadList.join('、')}不可被投票`].join('\n')
+    ? [`请选择你要放逐的玩家。`, `不可投票给已出局玩家：${deadList.join('、')}`].join('\n')
     : DAY_VOTE_PROMPT;
   const target = await actor.playerAgent.askVoteTarget(prompt, valid);
   return { target }; // null = 弃票
@@ -331,7 +299,8 @@ async function runSheriffSignupAction(actor: Agent): Promise<Record<string, unkn
 }
 
 async function runSheriffSpeechAction(round: Round, actor: Agent, runoff: boolean): Promise<Record<string, unknown>> {
-  const result = await askSheriffSpeech(actor, round.day, '公开信息已通过上下文同步。', runoff, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result: any = await askSheriffSpeech(actor, round.day, '公开信息已通过上下文同步。', runoff, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
   if (result) {
     if (typeof result === 'string') return { text: result, thinking: '' };
     return { text: result.content || '', thinking: result.thinking || '' };

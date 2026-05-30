@@ -4,27 +4,12 @@ import { createSession, isSessionCancelled, parseMessage } from './session';
 import { createPreparedSender } from './sender';
 import { replayGameSession } from './replay';
 import type { GameSession } from './session';
-
-// config is still JS — use require for now
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { getAiConfig } = require('../../config');
-
-// aiDebateRunner is still JS — use require for now
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { runAiDebate } = require('../../aiDebateRunner');
-
-// werewolf is still JS — use require for now
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { runWerewolfWorkflow } = require('../werewolf');
-
-// werewolf-config/service is TS but loaded via require to match existing pattern
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { getWerewolfModeConfig } = require('../werewolf-config');
+import { getAiConfig } from '../../config';
+import { runAiDebate } from '../../aiDebateRunner';
+import { runWerewolfWorkflow } from '../werewolf';
+import { getWerewolfModeConfig } from '../werewolf-config';
 import { buildWerewolfRuleIntro } from '../werewolf/messages';
-
-// werewolf/views/viewPolicy is still JS — use require for now
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { createProjectionContext, projectWerewolfGame } = require('../werewolf/views/viewPolicy');
+import { createProjectionContext, projectWerewolfGame } from '../werewolf/views/viewPolicy';
 
 // games is TS — import directly
 import { saveGameRecord } from '../games';
@@ -261,7 +246,7 @@ function getRequestConfig(
   gameType = 'werewolf',
   options: RunSessionOptions = {},
 ): AiConfig & { mode: string } {
-  const config = getAiConfig() as AiConfig;
+  const config = getAiConfig() as unknown as AiConfig;
   const selected =
     gameType === 'debate' && hasDebateTeamConfig(options.debateTeams)
       ? selectDebateTeamPlayers(config, options.debateTeams!)
@@ -427,7 +412,8 @@ function shuffle<T>(arr: T[]): T[] {
 
 function handleRandomizeTeams(session: GameSession, playerIds?: (number | string)[]): void {
   try {
-    const config = getAiConfig();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const config = getAiConfig() as any;
     const allPlayers = config.players || [];
     const ids = (playerIds || []).map(Number).filter((n) => n > 0);
 

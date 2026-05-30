@@ -148,8 +148,8 @@ class BasePlayerAgent {
   async askVoteTarget(prompt: string, validIds: number[], options: AskVoteOptions = {}): Promise<number | null> {
     const parsed = await this.askJson([
       prompt,
-      `Valid targets: ${validIds.join(', ')}`,
-      'Return JSON only, for example {"target":2}.'
+      `无效的目标: ${validIds.join(', ')}`,
+      '只返回json, 比如{"target":2}.'
     ].join('\n\n'), {
       maxTokens: 60,
       skillId: options.skillId || 'player-vote',

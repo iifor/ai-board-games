@@ -1,9 +1,9 @@
 import { createFallbackAudit } from '../agent-core';
-const { createWerewolfSkillRegistry } = require('./roles');
-const { createWerewolfRoleSkillRegistry } = require('./roleSkills');
-const { PlayerAgent } = require('./playerAgent');
-const { buildSystemPrompt, createRound, publicHost, publicPlayer } = require('./agents');
-const { getRoleConfig, shuffle } = require('./utils');
+import { createWerewolfSkillRegistry } from './roles';
+import { createWerewolfRoleSkillRegistry } from './roleSkills';
+import { PlayerAgent } from './playerAgent';
+import { buildSystemPrompt, createRound, publicHost, publicPlayer } from './agents';
+import { getRoleConfig, shuffle } from './utils';
 import type { WerewolfEventBus } from './eventBus';
 import type { GameEventBuilder } from './gameEventBuilder';
 import type { SkillEventEmitter } from '../agent-core/skillEventEmitter';
@@ -69,12 +69,17 @@ interface ModeConfig {
 }
 
 interface RoleConfig {
-  id: string;
-  name: string;
-  faction: string;
-  roleType: string;
-  rule: Record<string, unknown>;
+  id?: string;
+  name?: string;
+  faction?: string;
+  roleType?: string;
+  rule?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+interface SkillRegistryLike {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get: (action: string) => any;
 }
 
 interface Agent {
@@ -93,8 +98,8 @@ interface Agent {
   usedPoison: boolean;
   lastGuardTarget: number | null;
   hunterShotUsed: boolean;
-  seerChecks: unknown[];
-  votes: unknown[];
+  seerChecks: Array<Record<string, unknown>>;
+  votes: Array<Record<string, unknown>>;
   baseSystemPrompt?: string;
   playerAgent?: InstanceType<typeof PlayerAgent>;
   [key: string]: unknown;
@@ -178,8 +183,10 @@ function createInitialWerewolfState(config: Record<string, unknown>): WerewolfSt
     modeConfig,
     debugMode: Boolean(config.debugMode),
     clientViewMode: (config.clientViewMode as string) || 'god',
-    host: publicHost(config.host),
-    players: agents.map((agent: Agent) => ({ ...publicPlayer(agent), roleConfig: agent.roleConfig })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    host: publicHost(config.host as any) as unknown as Record<string, unknown>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    players: agents.map((agent: Agent) => ({ ...publicPlayer(agent as any), roleConfig: agent.roleConfig })),
     rounds: [],
     winner: null,
     winReason: '',
@@ -255,7 +262,7 @@ function createRuntimeAgent(
   roleConfig: RoleConfig,
   wolves: number[],
   modeConfig: ModeConfig,
-  skillRegistry: unknown,
+  skillRegistry: SkillRegistryLike,
   fallbackAudit: unknown,
   gameId: string,
   roleSkillRegistry: unknown,
@@ -327,7 +334,7 @@ function serializeWerewolfState(match: Match, state: WerewolfState): Record<stri
 function ensureRound(state: WerewolfState, day: number): Record<string, unknown> {
   let round = (state.rounds || []).find((item) => Number((item as Record<string, unknown>).day) === Number(day)) as Record<string, unknown> | undefined;
   if (!round) {
-    round = createRound(day);
+    round = createRound(day) as unknown as Record<string, unknown>;
     state.rounds = [...(state.rounds || []), round];
   }
   return round;

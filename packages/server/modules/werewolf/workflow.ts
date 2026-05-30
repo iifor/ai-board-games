@@ -1,4 +1,4 @@
-const workflowService = require('../workflow-engine/service');
+import * as workflowService from '../workflow-engine/service';
 import { registerWorkflow } from '../workflow-engine/workflowRegistry';
 import type { StepHandler, Workflow } from '../workflow-engine/workflowRegistry';
 import { createTraceContext, flushTrace, markTraceComplete, markTraceError } from '../observability';
@@ -38,7 +38,7 @@ function createWerewolfWorkflowMatch(config: Record<string, unknown>, matchId?: 
       clientViewMode: config.clientViewMode || 'god'
     },
     initialState: state
-  });
+  }) as unknown as Record<string, unknown>;
 }
 
 async function runWerewolfWorkflow(config: Record<string, unknown>, options: { onEvent?: (event: Record<string, unknown>) => void } = {}): Promise<Record<string, unknown>> {
@@ -63,12 +63,13 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
 
   try {
     while (true) {
-      const { processed, match: current } = await workflowService.drainAiTasks(match.id, { maxTasks: 1 });
-      if (!processed || ['completed', 'failed', 'paused_debug'].includes(current?.status)) break;
+      const { processed, match: current } = await workflowService.drainAiTasks(match.id as string, { maxTasks: 1 });
+      if (!processed || ['completed', 'failed', 'paused_debug'].includes(current?.status as string)) break;
     }
-    const finalMatch = workflowService.getDebugState(match.id)?.match || match;
+    const finalMatch = workflowService.getDebugState(match.id as string)?.match || match;
     if (trace) { markTraceComplete(trace); flushTrace(trace); }
-    const result = serializeWerewolfState(finalMatch, finalMatch.state);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = serializeWerewolfState(finalMatch as any, (finalMatch as Record<string, unknown>).state as import('./runtime').WerewolfState);
     return result;
   } catch (error) {
     if (trace) { markTraceError(trace, (error as Error).message || String(error)); flushTrace(trace); }

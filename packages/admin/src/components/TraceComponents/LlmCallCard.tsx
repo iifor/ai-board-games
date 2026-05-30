@@ -69,8 +69,7 @@ export function LlmCallCard({ call, defaultCollapsed = true, getNickname }: LlmC
                 background: '#fafafa', padding: 8, borderRadius: 4, margin: '4px 0 0',
                 maxHeight: 300, overflow: 'auto', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word'
               }}>
-                {String(msg.content || '').slice(0, 2000)}
-                {String(msg.content || '').length > 2000 ? '\n\n... (内容已截断)' : ''}
+                {String(msg.content || '')}
               </pre>
             </div>
           ))}
@@ -82,8 +81,7 @@ export function LlmCallCard({ call, defaultCollapsed = true, getNickname }: LlmC
                 background: '#f6ffed', padding: 8, borderRadius: 4, margin: '4px 0 0',
                 maxHeight: 200, overflow: 'auto', fontSize: 12, whiteSpace: 'pre-wrap'
               }}>
-                {call.response_text.slice(0, 1500)}
-                {call.response_text.length > 1500 ? '\n\n... (内容已截断)' : ''}
+                {call.response_text}
               </pre>
             </div>
           )}
@@ -95,7 +93,7 @@ export function LlmCallCard({ call, defaultCollapsed = true, getNickname }: LlmC
                 background: '#fff7e6', padding: 8, borderRadius: 4, margin: '4px 0 0',
                 maxHeight: 200, overflow: 'auto', fontSize: 12, whiteSpace: 'pre-wrap'
               }}>
-                {call.thinking_text.slice(0, 1500)}
+                {call.thinking_text}
               </pre>
             </div>
           )}

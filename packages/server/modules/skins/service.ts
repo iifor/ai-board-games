@@ -5,9 +5,7 @@ import { AppError, ErrorCodes } from '../../utils/errors';
 import { getDb } from '../../db';
 import type { Skin } from '../../types/api';
 import type { SkinTemplateInput } from './utils';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const skinEngine = require('../skin-engine') as { getMarkdownSkinTemplates: () => SkinTemplateInput[] };
+import { getMarkdownSkinTemplates } from '../skin-engine';
 
 function listSkins(enabledOnly = false): Skin[] {
   return repo.findAllSkins(enabledOnly).map(rowToSkin).filter((s): s is Skin => s !== null);
@@ -54,7 +52,8 @@ function deleteSkin(id: string): { ok: boolean } {
 }
 
 function importMarkdownSkins(): Skin[] {
-  const templates = skinEngine.getMarkdownSkinTemplates();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const templates: any[] = getMarkdownSkinTemplates();
   const skins: SkinTemplateInput[] = templates.length ? templates : [BUILTIN_TEMPLATE as unknown as SkinTemplateInput];
   const db = getDb();
   const tx = db.transaction(() => skins.forEach((skin) => repo.insertSkin(skinToRow(skin))));

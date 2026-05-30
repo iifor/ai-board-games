@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as upload from '../upload/service';
@@ -64,7 +65,6 @@ function loadWordBoundaries(cacheKey: string, gameId: string | null): WordBounda
 }
 
 function getCacheHash(cacheKey: string): string {
-  const crypto = require('crypto');
   return crypto.createHash('sha256').update(String(cacheKey || '')).digest('hex');
 }
 

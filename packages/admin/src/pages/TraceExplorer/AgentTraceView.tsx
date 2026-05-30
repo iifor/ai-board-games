@@ -72,7 +72,7 @@ export function AgentTraceView() {
         : playerLlmCalls[0].messages_json as Array<{ role: string; content: string }>;
       if (Array.isArray(msgs)) {
         const sysMsg = msgs.find((m) => m.role === 'system');
-        if (sysMsg) personaText = String(sysMsg.content || '').slice(0, 600);
+        if (sysMsg) personaText = String(sysMsg.content || '');
       }
     } catch { /* ignore */ }
   }

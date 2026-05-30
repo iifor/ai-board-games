@@ -1,9 +1,9 @@
 import { canAccess, buildViewerContext } from './informationLayer';
+import { assertAbortableWerewolfBoundary } from '../failures/failurePolicy';
 import type { ViewerContext } from '@ai-presenter/shared/types/channelTypes';
 
 const VIEW_MODE_GOD = 'god';
 const VIEW_MODE_PLAYER = 'player';
-const { assertAbortableWerewolfBoundary } = require('../failures/failurePolicy');
 
 
 interface AudienceSession {

@@ -1,5 +1,5 @@
-const { MATCH_STATUS } = require('@ai-presenter/shared/types/workflowTypes');
-const { checkWin } = require('../winCheck');
+import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
+import { checkWin } from '../winCheck';
 import { createRuntime, syncRuntimeState } from '../runtime';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';

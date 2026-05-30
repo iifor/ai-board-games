@@ -64,7 +64,7 @@ export function buildSelfDestructActionPrompt(publicContext: string, speechText:
     '自爆效果：你立即出局，本轮白天发言/投票中止，流程进入后续胜负检查或夜晚。',
     `当前公开信息：\n${publicContext || '暂无公开信息。'}`,
     `你刚才的公开发言：${speechText || '暂无'}`,
-    '只有在继续发言会明显暴露狼队、或自爆能保护狼队/打断关键归票时才使用。',
+    '建议在继续发言会明显暴露狼队、或自爆能保护狼队/打断关键归票时才使用。',
     '只返回 JSON：{"use":false,"text":""} 或 {"use":true,"text":"自爆宣言"}。'
   ].join('\n\n');
 }
