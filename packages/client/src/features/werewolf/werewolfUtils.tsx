@@ -270,6 +270,9 @@ export function getWerewolfNarration(event: GameEvent | null | undefined): strin
 }
 
 export function getWerewolfDisplayText(event: GameEvent | null | undefined): string {
+  if (event?.audienceCue?.display) {
+    return '[系统播报中]';
+  }
   return event?.presentation?.displayText || event?.message || '';
 }
 

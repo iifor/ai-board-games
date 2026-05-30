@@ -100,6 +100,9 @@ export function useGameSocketSession({
     });
   }
 
+  const speakingRef = useRef(false);
+  const deferredQueueRef = useRef<Array<{ event: GameEvent; socket: WebSocket }>>([]);
+
   function handleSocketEvent(event: GameEvent, socket: WebSocket) {
     if (event.type === 'error') {
       latestRef.current.onError?.(event);
@@ -109,8 +112,14 @@ export function useGameSocketSession({
     latestRef.current.applyServerEvent?.(event);
 
     if (!event.ackId) return;
+    // 正在播放语音时，新事件入队等待，避免打断当前播报
+    if (speakingRef.current) {
+      deferredQueueRef.current.push({ event, socket });
+      return;
+    }
     pendingAckRef.current = { socket, ackId: event.ackId };
     pendingEventRef.current = event;
+    speakingRef.current = true;
     if (autoPlayRef.current) continuePendingEvent();
   }
 
@@ -123,6 +132,16 @@ export function useGameSocketSession({
     pendingEventRef.current = null;
     startedAckIdsRef.current.delete(pending.ackId);
     clearPendingAckTimer();
+    // 处理队列中的下一个事件
+    const next = deferredQueueRef.current.shift();
+    if (next) {
+      pendingAckRef.current = { socket: next.socket, ackId: next.event.ackId! };
+      pendingEventRef.current = next.event;
+      // speakingRef 保持 true，继续播放下一条
+      if (autoPlayRef.current) window.setTimeout(continuePendingEvent, 60);
+    } else {
+      speakingRef.current = false;
+    }
   }
 
   function continuePendingEvent() {

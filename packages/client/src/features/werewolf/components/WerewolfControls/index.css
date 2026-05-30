@@ -1,6 +1,6 @@
 .werewolf-controls {
   position: absolute;
-  z-index: 60;
+  z-index: 600;
   top: 30px;
   right: 54px;
   display: flex;
