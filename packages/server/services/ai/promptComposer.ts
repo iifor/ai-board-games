@@ -35,7 +35,7 @@ function buildPlayerPersonaModule(player: Player = {}): string {
     .replace(/\s+/g, ' ')
     .trim();
   return [
-    `玩家人格：昵称 ${nickname}。`,
+    `昵称 ${nickname}。`,
     persona
       ? `表达风格和思维倾向：${persona}`
       : '表达自然、有个性，但不要脱离当前游戏目标。',
