@@ -3,12 +3,16 @@ const { executeSkillWithTrace } = require('../agent-core');
 const { createRuntime, ensureRound } = require('./runtime');
 const {
   askSpeech,
-  askSpeechWithThinking,
   askWolfNightSpeech,
-  askWolfNightSpeechWithThinking,
   askSheriffSpeech,
-  askSheriffSpeechWithThinking
-} = require('./agents');
+} = require('./prompts/speech');
+const {
+  buildWolfVotePrompt,
+  DAY_VOTE_PROMPT,
+  SHERIFF_SIGNUP_PROMPT,
+  buildSheriffWithdrawPrompt,
+  SHERIFF_VOTE_PROMPT,
+} = require('./prompts/actions');
 const { topTarget } = require('./winCheck');
 const { rotateFromSeat } = require('./utils');
 const { getAliveActorsByAction } = require('./actionWindows');
@@ -105,7 +109,7 @@ async function runWerewolfAiAction(runtime: Runtime, round: Round, actor: Agent,
   if (actionType === 'day_vote') return runDayVoteAction(actor, alive);
   if (actionType === 'sheriff_signup') return runSheriffSignupAction(actor);
   if (actionType === 'sheriff_speech') return runSheriffSpeechAction(round, actor, false);
-  if (actionType === 'sheriff_withdraw') return runSheriffWithdrawAction(actor);
+  if (actionType === 'sheriff_withdraw') return runSheriffWithdrawAction(round, actor);
   if (actionType === 'sheriff_vote') return runSheriffVoteAction(actor, taskTargetIds(runtime, round, 'sheriff_vote'));
   if (actionType === 'sheriff_runoff_speech') return runSheriffSpeechAction(round, actor, true);
   if (actionType === 'sheriff_runoff_vote') return runSheriffVoteAction(actor, taskTargetIds(runtime, round, 'sheriff_runoff_vote'));
@@ -204,15 +208,14 @@ async function runWolfKillAction(runtime: Runtime, round: Round, actor: Agent, a
   // 狼人夜聊发言
   let speechText = '';
   let thinkingText = '';
-  if (actor.thinkingEnabled && actor.playerAgent.thinkingEnabled) {
-    const result = await askWolfNightSpeechWithThinking(actor, round.day, sharedSpeeches, isLeader);
-    if (result) {
-      speechText = typeof result === 'string' ? result : (result as { content?: string; thinking?: string }).content || '';
-      thinkingText = typeof result === 'string' ? '' : (result as { thinking?: string }).thinking || '';
+  const nightResult = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  if (nightResult) {
+    if (typeof nightResult === 'string') {
+      speechText = nightResult;
+    } else {
+      speechText = nightResult.content || '';
+      thinkingText = nightResult.thinking || '';
     }
-  } else {
-    const result = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader);
-    speechText = result || '';
   }
 
   // 狼人选刀目标
@@ -237,15 +240,12 @@ async function runWolfSpeechAction(runtime: Runtime, round: Round, actor: Agent)
   const isLeader = Number(actor.id) === Number(context.wolfLeaderId);
   const sharedSpeeches = buildWolfSpeechContext(round);
 
-  if (actor.thinkingEnabled && actor.playerAgent.thinkingEnabled) {
-    const result = await askWolfNightSpeechWithThinking(actor, round.day, sharedSpeeches, isLeader);
-    if (result) {
-      return { speech: (result as { content?: string }).content || result, thinking: (result as { thinking?: string }).thinking || '' };
-    }
-    return { speech: '', thinking: '' };
+  const result = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  if (result) {
+    if (typeof result === 'string') return { speech: result, thinking: '' };
+    return { speech: result.content || '', thinking: result.thinking || '' };
   }
-  const text = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader);
-  return { speech: text || '', thinking: '' };
+  return { speech: '', thinking: '' };
 }
 
 async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
@@ -254,10 +254,7 @@ async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, a
   const speeches = (round.night.wolfSpeeches || [])
     .map((speech: Record<string, unknown>) => `${speech.playerId}号：${speech.text || ''}`)
     .join('\n');
-  const target = await actor.playerAgent.askVoteTarget([
-    '狼人夜晚刀口投票。请在听完所有狼队夜聊后选择今晚击杀目标。',
-    `狼队夜聊记录：\n${speeches || '暂无发言。'}`
-  ].join('\n\n'), valid);
+  const target = await actor.playerAgent.askVoteTarget(buildWolfVotePrompt(speeches), valid);
   return { target }; // null = 弃票
 }
 
@@ -278,15 +275,14 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
 
   let speechText = '';
   let thinkingText = '';
-  if (actor.thinkingEnabled && actor.playerAgent.thinkingEnabled) {
-    const result = await askSpeechWithThinking(actor, round.day, publicContext);
-    if (result) {
-      speechText = (result as { content?: string }).content || String(result);
-      thinkingText = (result as { thinking?: string }).thinking || '';
+  const speechResult = await askSpeech(actor, round.day, publicContext, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  if (speechResult) {
+    if (typeof speechResult === 'string') {
+      speechText = speechResult;
+    } else {
+      speechText = speechResult.content || '';
+      thinkingText = speechResult.thinking || '';
     }
-  } else {
-    const result = await askSpeech(actor, round.day, publicContext);
-    speechText = result || '';
   }
 
   const result: Record<string, unknown> = { text: speechText, thinking: thinkingText };
@@ -317,7 +313,7 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
 
 async function runDayVoteAction(actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
   const valid = alive.map((agent) => agent.id).filter((id) => Number(id) !== Number(actor.id));
-  const target = await actor.playerAgent.askVoteTarget('请选择你要放逐的玩家。', valid);
+  const target = await actor.playerAgent.askVoteTarget(DAY_VOTE_PROMPT, valid);
   return { target }; // null = 弃票
 }
 
@@ -326,35 +322,27 @@ async function runDayVoteAction(actor: Agent, alive: Agent[]): Promise<Record<st
 // ============================================================
 
 async function runSheriffSignupAction(actor: Agent): Promise<Record<string, unknown>> {
-  const parsed = await actor.playerAgent.askJson([
-    '警长竞选开始。请选择竞选警长？',
-    '只返回 JSON：{"run":true} 或 {"run":false}。'
-  ].join('\n\n'), { maxTokens: 40 });
+  const parsed = await actor.playerAgent.askJson(SHERIFF_SIGNUP_PROMPT, { maxTokens: 40 });
   return { run: parsed?.run === true };
 }
 
 async function runSheriffSpeechAction(round: Round, actor: Agent, runoff: boolean): Promise<Record<string, unknown>> {
-  if (actor.thinkingEnabled && actor.playerAgent.thinkingEnabled) {
-    const result = await askSheriffSpeechWithThinking(actor, round.day, '公开信息已通过上下文同步。', runoff);
-    if (result) {
-      return { text: (result as { content?: string }).content || result, thinking: (result as { thinking?: string }).thinking || '' };
-    }
-    return { text: '', thinking: '' };
+  const result = await askSheriffSpeech(actor, round.day, '公开信息已通过上下文同步。', runoff, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  if (result) {
+    if (typeof result === 'string') return { text: result, thinking: '' };
+    return { text: result.content || '', thinking: result.thinking || '' };
   }
-  const text = await askSheriffSpeech(actor, round.day, '公开信息已通过上下文同步。', runoff);
-  return { text: text || '', thinking: '' };
+  return { text: '', thinking: '' };
 }
 
-async function runSheriffWithdrawAction(actor: Agent): Promise<Record<string, unknown>> {
-  const parsed = await actor.playerAgent.askJson([
-    '你的警上竞选发言已经结束。你是否退水退出警长竞选？',
-    '只返回 JSON：{"withdraw":true} 或 {"withdraw":false}。'
-  ].join('\n\n'), { maxTokens: 40 });
+async function runSheriffWithdrawAction(round: Round, actor: Agent): Promise<Record<string, unknown>> {
+  const context = buildDaySpeechContext(round);
+  const parsed = await actor.playerAgent.askJson(buildSheriffWithdrawPrompt(context), { maxTokens: 40 });
   return { withdraw: parsed?.withdraw === true };
 }
 
 async function runSheriffVoteAction(actor: Agent, candidateIds: number[]): Promise<Record<string, unknown>> {
-  const target = await actor.playerAgent.askVoteTarget('警长竞选投票，请从候选人中选择警长。', candidateIds);
+  const target = await actor.playerAgent.askVoteTarget(SHERIFF_VOTE_PROMPT, candidateIds);
   return { target }; // null = 弃票
 }
 
