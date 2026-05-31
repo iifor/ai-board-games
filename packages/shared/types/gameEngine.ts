@@ -1,0 +1,173 @@
+import type { ChannelType, ViewerContext as BaseViewerContext } from './channelTypes';
+
+type ActorId = string | number;
+type GameEngineChannel = ChannelType;
+
+type WorkflowEffectStatus = 'proposed' | 'applied' | 'cancelled' | 'failed';
+
+interface EngineError {
+  code: string;
+  message: string;
+  details?: unknown;
+}
+
+interface EngineResult<T = unknown> {
+  ok: boolean;
+  data?: T;
+  error?: EngineError;
+}
+
+interface DomainAction {
+  id: string;
+  matchId: string;
+  windowId: string;
+  actorId: ActorId;
+  actionType: string;
+  payload: Record<string, unknown>;
+  idempotencyKey: string;
+  traceId?: string;
+  causationId?: string;
+  correlationId?: string;
+  submittedAt?: string;
+}
+
+interface WorkflowEffect {
+  id: string;
+  matchId: string;
+  effectType: string;
+  status: WorkflowEffectStatus;
+  payload: Record<string, unknown>;
+  priority?: number;
+  stepId?: string;
+  sourceActionId?: string;
+  sourceEventSeq?: number;
+  appliedEventSeq?: number;
+  traceId?: string;
+  causationId?: string;
+  correlationId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface DomainEvent {
+  id: string;
+  matchId: string;
+  type: string;
+  payload: Record<string, unknown>;
+  channel: GameEngineChannel;
+  scopeKey?: string;
+  seq?: number;
+  stepId?: string;
+  actorId?: ActorId;
+  traceId?: string;
+  causationId?: string;
+  correlationId?: string;
+  idempotencyKey?: string;
+  createdAt?: string;
+}
+
+interface ActionWindowSnapshot {
+  id: string;
+  matchId: string;
+  stepId: string;
+  actionType: string;
+  status: string;
+  actorIds: ActorId[];
+  targetIds?: ActorId[];
+  orderMode?: string;
+  completionPolicy?: string;
+  payload?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface MatchSnapshot {
+  id: string;
+  gameType: string;
+  workflowId: string;
+  status: string;
+  currentStepIndex: number;
+  version: number;
+  config: Record<string, unknown>;
+  state: Record<string, unknown>;
+}
+
+type ViewerContext = BaseViewerContext;
+
+interface ChannelPolicy {
+  canAccess?: (event: DomainEvent, viewer: ViewerContext) => boolean;
+  matchScope?: (scopeKey: string, viewer: ViewerContext, event: DomainEvent) => boolean;
+}
+
+interface EffectResolverContext {
+  match: MatchSnapshot | null;
+  state: Record<string, unknown>;
+  effect: WorkflowEffect;
+}
+
+interface EffectResolver {
+  effectType: string;
+  resolve: (context: EffectResolverContext) => DomainEvent[] | Promise<DomainEvent[]>;
+}
+
+interface CreateEffectsContext {
+  match: MatchSnapshot | null;
+  state: Record<string, unknown>;
+  actionWindow?: ActionWindowSnapshot | null;
+}
+
+type CreateEffectsFromAction = (
+  action: DomainAction,
+  context: CreateEffectsContext
+) => WorkflowEffect[] | Promise<WorkflowEffect[]>;
+
+interface SkillDefinition {
+  id: string;
+  inputSchema?: unknown;
+  outputSchema?: unknown;
+  timeoutMs?: number;
+  retryPolicy?: Record<string, unknown>;
+  fallbackPolicy?: Record<string, unknown>;
+  visibility?: GameEngineChannel;
+}
+
+interface GameDefinition {
+  gameType: string;
+  version: string;
+  workflowId: string;
+  skills?: SkillDefinition[];
+  actionSchemas?: Record<string, unknown>;
+  createEffectsFromAction?: CreateEffectsFromAction;
+  effectResolvers?: EffectResolver[];
+  channelPolicy?: ChannelPolicy;
+  metadata?: Record<string, unknown>;
+}
+
+interface InvariantIssue {
+  code: string;
+  message: string;
+  severity: 'error' | 'warning';
+  details?: unknown;
+}
+
+export type {
+  ActorId,
+  GameEngineChannel,
+  WorkflowEffectStatus,
+  EngineError,
+  EngineResult,
+  DomainAction,
+  WorkflowEffect,
+  DomainEvent,
+  ActionWindowSnapshot,
+  MatchSnapshot,
+  ViewerContext,
+  ChannelPolicy,
+  EffectResolverContext,
+  EffectResolver,
+  CreateEffectsContext,
+  CreateEffectsFromAction,
+  SkillDefinition,
+  GameDefinition,
+  InvariantIssue,
+};

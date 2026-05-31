@@ -11,7 +11,9 @@ const testFiles = [
   'gameEventBuilder.test.ts',
   'eventBus.test.ts',
   'audienceStream.test.ts',
-  'skillEventEmitter.test.ts'
+  'skillEventEmitter.test.ts',
+  'gameEngineContracts.test.ts',
+  'gameEngineActionEffect.test.ts'
 ].map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];

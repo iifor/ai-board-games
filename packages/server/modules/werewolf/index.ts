@@ -28,6 +28,14 @@ export {
   serializeWerewolfState,
 } from './workflow';
 
+export {
+  WEREWOLF_GAME_DEFINITION_VERSION,
+  WEREWOLF_GAME_DEFINITION,
+  werewolfChannelPolicy,
+  createWerewolfGameDefinition,
+  createWerewolfEffectsFromAction,
+} from './definition';
+
 // Re-export constants
 export {
   MAX_DAYS,
