@@ -22,7 +22,8 @@ async function prepareVoiceAudio(
   if (!content || !isServerTtsVoice(voice)) return null;
 
   const cacheKey = buildAudioCacheKey(voice, content);
-  const cached = upload.getGeneratedAudio(cacheKey, 'mp3', gameId);
+  const extension = getVoiceAudioExtension(voice);
+  const cached = upload.getGeneratedAudio(cacheKey, extension, gameId);
   if (cached) {
     const boundaries = loadWordBoundaries(cacheKey, gameId);
     return {
@@ -34,7 +35,7 @@ async function prepareVoiceAudio(
   }
 
   const audio = await synthesizeVoicePreview(voice, content, { collectWordBoundaries: true });
-  const saved = upload.saveCachedGeneratedAudio(cacheKey, audio.buffer, 'mp3', gameId);
+  const saved = upload.saveCachedGeneratedAudio(cacheKey, audio.buffer, extension, gameId);
   if (audio.wordBoundaries?.length) {
     saveWordBoundaries(cacheKey, audio.wordBoundaries, gameId);
   }
@@ -66,6 +67,14 @@ function loadWordBoundaries(cacheKey: string, gameId: string | null): WordBounda
 
 function getCacheHash(cacheKey: string): string {
   return crypto.createHash('sha256').update(String(cacheKey || '')).digest('hex');
+}
+
+function getVoiceAudioExtension(voice: VoicePackage): string {
+  if (String(voice.provider || '').toLowerCase() === 'mimo') {
+    const format = String(process.env.MIMO_TTS_FORMAT || 'mp3').toLowerCase();
+    if (['mp3', 'wav', 'opus'].includes(format)) return format;
+  }
+  return 'mp3';
 }
 
 export { prepareVoiceAudio, isAzureVoice, isServerTtsVoice, buildAudioCacheKey };

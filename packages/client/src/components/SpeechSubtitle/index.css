@@ -55,8 +55,6 @@
   transform: translate(-50%, -50%);
   width: min(520px, 90vw);
   max-height: 62vh;
-  min-width: 30vw;
-  min-height: 200px;
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(92, 188, 255, 0.46);
@@ -93,11 +91,9 @@
 }
 
 .speech-subtitle--debate {
-  bottom: 30px;
   font-size: 22px;
   font-weight: 850;
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.35);
 }
 
 @keyframes subtitle-pop-in {

@@ -202,7 +202,14 @@ async function runSession(
   // 调试模式不保存数据库，只保留 AI 观测数据
   if (!(config as Record<string, unknown>).debugMode) {
     try {
-      saveGameRecord({ ...game, audioResources: sender.getAudioResources() } as unknown as SaveGameInput);
+      saveGameRecord({
+        ...game,
+        players: withSourcePlayerIds(
+          game.players as Array<Record<string, unknown>> | undefined,
+          normalizeSelectedPlayerIds(config.selectedPlayerIds),
+        ),
+        audioResources: sender.getAudioResources()
+      } as unknown as SaveGameInput);
     } catch (error) {
       const err = error as Error;
       console.error('[runSession] 保存对局记录失败:', err.message);
@@ -223,6 +230,21 @@ async function runSession(
         : game,
   });
   session.close();
+}
+
+function withSourcePlayerIds(
+  players: Array<Record<string, unknown>> | undefined,
+  selectedPlayerIds: number[] = [],
+): Array<Record<string, unknown>> | undefined {
+  if (!Array.isArray(players)) return players;
+  return players.map((player, index) => ({
+    ...player,
+    sourcePlayerId: Number(player.sourcePlayerId || selectedPlayerIds[index] || player.id),
+  }));
+}
+
+function normalizeSelectedPlayerIds(value: unknown): number[] {
+  return Array.isArray(value) ? value.map(Number).filter(Boolean) : [];
 }
 
 // --- Helpers ---

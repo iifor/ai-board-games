@@ -37,6 +37,7 @@ function seedData(): void {
     voices.seedVoicePackages();
   }
   voices.seedMissingAzureVoices();
+  voices.seedMissingMimoVoices();
   if ((db.prepare('SELECT COUNT(*) AS count FROM werewolf_roles').get() as { count: number }).count === 0) {
     const { DEFAULT_WEREWOLF_ROLES } = require('./db/seed');
     DEFAULT_WEREWOLF_ROLES.forEach((r: Record<string, unknown>) => werewolfConfig.upsertWerewolfRole(r));

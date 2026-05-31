@@ -100,7 +100,7 @@ router.post('/voice/synthesize-media', async (request: Request, response: Respon
     response.json(await synthesizeVoiceMedia(voice, text));
   } catch (error) {
     next((error as { code?: string }).code === ErrorCodes.UPSTREAM_ERROR
-      ? new AppError(ErrorCodes.UPSTREAM_ERROR, 'Azure 语音媒体生成失败', 502)
+      ? new AppError(ErrorCodes.UPSTREAM_ERROR, '语音媒体生成失败', 502)
       : error);
   }
 });

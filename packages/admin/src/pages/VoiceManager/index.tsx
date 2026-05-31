@@ -119,7 +119,8 @@ function VoiceModal({ open, initialValues, onCancel, onSave }: VoiceModalProps) 
       <Form.Item name="provider" label="供应商">
         <Select options={[
           { value: 'browser', label: '浏览器本地语音' },
-          { value: 'azure', label: 'Azure Speech' }
+          { value: 'azure', label: 'Azure Speech' },
+          { value: 'mimo', label: 'Mimo TTS' }
         ]} />
       </Form.Item>
       <Form.Item name="voiceId" label="Voice ID"><Input placeholder="如 zh-CN-XiaoxiaoNeural" /></Form.Item>

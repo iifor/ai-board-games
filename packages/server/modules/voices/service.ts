@@ -1,6 +1,6 @@
 import * as repo from './repository';
 import { rowToVoicePackage, voicePackageToRow } from './utils';
-import { DEFAULT_VOICE_PACKAGES, DEFAULT_AZURE_VOICE_PACKAGES } from './constants';
+import { DEFAULT_VOICE_PACKAGES, DEFAULT_AZURE_VOICE_PACKAGES, DEFAULT_MIMO_VOICE_PACKAGES } from './constants';
 import { AppError, ErrorCodes } from '../../utils/errors';
 import { synthesizeVoicePreview } from '../tts';
 import type { VoicePackage } from '../../types/api';
@@ -56,8 +56,18 @@ function seedMissingAzureVoices(): void {
   });
 }
 
+function seedMissingMimoVoices(): void {
+  const existingSignatures = new Set(repo.findVoiceSignaturesByProvider('mimo'));
+  DEFAULT_MIMO_VOICE_PACKAGES.forEach((voice) => {
+    const signature = repo.buildVoiceSignature(voice.voiceId, voice.style);
+    if (!signature || existingSignatures.has(signature)) return;
+    createVoicePackage(voice);
+    existingSignatures.add(signature);
+  });
+}
+
 function seedVoicePackages(): void {
   DEFAULT_VOICE_PACKAGES.forEach((v) => createVoicePackage(v));
 }
 
-export { listVoicePackages, getVoicePackage, createVoicePackage, updateVoicePackage, deleteVoicePackage, previewVoice, seedMissingAzureVoices, seedVoicePackages };
+export { listVoicePackages, getVoicePackage, createVoicePackage, updateVoicePackage, deleteVoicePackage, previewVoice, seedMissingAzureVoices, seedMissingMimoVoices, seedVoicePackages };

@@ -33,6 +33,15 @@ function findAzureVoiceIds(): string[] {
     .map(r => String(r.voice_id || '').toLowerCase()).filter(Boolean);
 }
 
+function findVoiceSignaturesByProvider(provider: string): string[] {
+  return (getDb().prepare('SELECT voice_id, style FROM voice_packages WHERE lower(provider) = lower(?)').all(provider) as { voice_id: string; style: string }[])
+    .map(row => buildVoiceSignature(row.voice_id, row.style)).filter(Boolean);
+}
+
+function buildVoiceSignature(voiceId: string | null | undefined, style: string | null | undefined): string {
+  return `${String(voiceId || '').trim().toLowerCase()}::${String(style || '').trim().toLowerCase()}`;
+}
+
 function insertVoice(row: InsertVoiceRow): number {
   const result = getDb().prepare(`
     INSERT INTO voice_packages (name, provider, voice_id, language, gender, style, rate, pitch, temperature, sample_text, description, enabled, created_at, updated_at)
@@ -55,5 +64,5 @@ function deleteVoiceById(id: string | number): void {
   getDb().prepare('DELETE FROM voice_packages WHERE id = ?').run(Number(id));
 }
 
-export { findVoiceById, findAllVoices, findAzureVoiceIds, insertVoice, updateVoice, deleteVoiceById };
+export { findVoiceById, findAllVoices, findAzureVoiceIds, findVoiceSignaturesByProvider, buildVoiceSignature, insertVoice, updateVoice, deleteVoiceById };
 export type { InsertVoiceRow, UpdateVoiceRow };

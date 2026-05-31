@@ -92,5 +92,35 @@ const DEFAULT_AZURE_VOICE_PACKAGES: VoicePackageInput[] = (
   enabled: true
 }));
 
-export { DEFAULT_VOICE_PACKAGES, DEFAULT_AZURE_VOICE_PACKAGES };
+const DEFAULT_MIMO_VOICE_PACKAGES: VoicePackageInput[] = (
+  [
+    ['冰糖', 'female', '温和自然', '请用温和、自然、清晰的中文口吻朗读，语速适中，适合日常角色发言。'],
+    ['冰糖', 'female', '活泼轻快', '请用活泼、轻快、有亲和力的中文口吻朗读，情绪明亮但不要夸张。'],
+    ['冰糖', 'female', '冷静分析', '请用冷静、克制、逻辑清晰的中文口吻朗读，适合推理和复盘。'],
+    ['茉莉', 'female', '亲切叙述', '请用亲切、柔和、叙述感强的中文口吻朗读，停顿自然。'],
+    ['茉莉', 'female', '悬疑旁白', '请用低声、悬疑、带一点紧张感的中文旁白口吻朗读。'],
+    ['茉莉', 'female', '坚定表达', '请用坚定、清晰、有说服力的中文口吻朗读，适合辩论陈述。'],
+    ['苏打', 'male', '沉稳男声', '请用沉稳、可靠、节奏稳定的中文男声口吻朗读。'],
+    ['苏打', 'male', '主持播报', '请用专业、清晰、有主持感的中文口吻朗读，适合流程播报。'],
+    ['苏打', 'male', '紧张对抗', '请用紧张、警觉、带对抗感的中文口吻朗读，但保持吐字清晰。'],
+    ['白桦', 'male', '理性推理', '请用理性、克制、推理感强的中文口吻朗读，重点突出判断过程。'],
+    ['白桦', 'male', '故事讲述', '请用有画面感、节奏舒展的中文故事讲述口吻朗读。'],
+    ['白桦', 'male', '严肃裁决', '请用严肃、权威、简洁有力的中文口吻朗读，适合裁决和总结。']
+  ] as [string, string, string, string][]
+).map(([voiceId, gender, styleName, style]) => ({
+  name: `Mimo ${voiceId} - ${styleName}`,
+  provider: 'mimo',
+  voiceId,
+  language: 'zh-CN',
+  gender,
+  style,
+  rate: '0%',
+  pitch: '0%',
+  temperature: 0.85,
+  sampleText: '你好，我正在使用 Mimo 中文语音包进行试听。',
+  description: `Mimo TTS 中文音色 ${voiceId}，${styleName}风格。`,
+  enabled: true
+}));
+
+export { DEFAULT_VOICE_PACKAGES, DEFAULT_AZURE_VOICE_PACKAGES, DEFAULT_MIMO_VOICE_PACKAGES };
 export type { VoicePackageInput };

@@ -8,6 +8,11 @@ interface PendingAck {
   ackId: number | string;
 }
 
+interface DeferredSocketEvent {
+  event: GameEvent;
+  socket: WebSocket;
+}
+
 interface UseGameSocketSessionParams {
   gameType: string;
   speechEnabled: boolean;
@@ -44,6 +49,7 @@ export function useGameSocketSession({
   const socketRef = useRef<WebSocket | null>(null);
   const pendingAckRef = useRef<PendingAck | null>(null);
   const pendingEventRef = useRef<GameEvent | null>(null);
+  const deferredQueueRef = useRef<DeferredSocketEvent[]>([]);
   const startedAckIdsRef = useRef<Set<number | string>>(new Set());
   const autoPlayRef = useRef<boolean>(false);
   const ackTimerRef = useRef<number | null>(null);
@@ -71,6 +77,7 @@ export function useGameSocketSession({
   function resetSessionRefs() {
     pendingAckRef.current = null;
     pendingEventRef.current = null;
+    deferredQueueRef.current = [];
     startedAckIdsRef.current.clear();
     autoPlayRef.current = false;
     clearPendingAckTimer();
@@ -111,29 +118,41 @@ export function useGameSocketSession({
       return;
     }
 
-    // 正在播放时收到新事件：立即 ACK 旧事件，直接处理新事件（浏览器 speechSynthesis 自动取消旧语音）
+    // Queue ack-backed events so visuals advance only after playback sends ack.
     if (pendingAckRef.current) {
-      const old = pendingAckRef.current;
-      old.socket.send(JSON.stringify({ type: 'ack', ackId: old.ackId }));
-      pendingAckRef.current = null;
-      pendingEventRef.current = null;
+      deferredQueueRef.current.push({ event, socket });
+      return;
     }
 
-    latestRef.current.applyServerEvent?.(event);
-    pendingAckRef.current = { socket, ackId: event.ackId };
-    pendingEventRef.current = event;
-    if (autoPlayRef.current) continuePendingEvent();
+    startPendingEvent(event, socket);
   }
 
   function acknowledgePending() {
     const pending = pendingAckRef.current;
-    if (!pending?.ackId || pending.socket.readyState !== WebSocket.OPEN) return;
-    pending.socket.send(JSON.stringify({ type: 'ack', ackId: pending.ackId }));
-    latestRef.current.onAcknowledge?.();
+    if (!pending?.ackId) return;
+    if (pending.socket.readyState === WebSocket.OPEN) {
+      pending.socket.send(JSON.stringify({ type: 'ack', ackId: pending.ackId }));
+    }
+    const acknowledgedAckId = pending.ackId;
     pendingAckRef.current = null;
     pendingEventRef.current = null;
-    startedAckIdsRef.current.delete(pending.ackId);
+    startedAckIdsRef.current.delete(acknowledgedAckId);
     clearPendingAckTimer();
+    latestRef.current.onAcknowledge?.();
+    startNextDeferredEvent();
+  }
+
+  function startPendingEvent(event: GameEvent, socket: WebSocket) {
+    latestRef.current.applyServerEvent?.(event);
+    pendingAckRef.current = { socket, ackId: event.ackId! };
+    pendingEventRef.current = event;
+    if (autoPlayRef.current) continuePendingEvent();
+  }
+
+  function startNextDeferredEvent() {
+    const next = deferredQueueRef.current.shift();
+    if (!next) return;
+    startPendingEvent(next.event, next.socket);
   }
 
   function continuePendingEvent() {

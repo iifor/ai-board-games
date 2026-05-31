@@ -17,7 +17,7 @@ interface SaveGameInput {
   winner?: string | null;
   winReason?: string;
   topic?: Record<string, unknown>;
-  players?: { id?: number; playerId?: number; [key: string]: unknown }[];
+  players?: { id?: number; playerId?: number; sourcePlayerId?: number; [key: string]: unknown }[];
   rounds?: unknown[];
   event?: Record<string, unknown>;
   clientViewMode?: unknown;
@@ -60,7 +60,7 @@ function saveGameRecord(game: SaveGameInput): GameSummary[] {
     repo.deleteGamePlayers(row.id);
     if (Array.isArray(game.players)) {
       game.players.forEach((p) => {
-        repo.insertGamePlayer(row.id, p.id || p.playerId || 0, toJson(p));
+        repo.insertGamePlayer(row.id, p.sourcePlayerId || p.playerId || p.id || 0, toJson(p));
       });
     }
   });

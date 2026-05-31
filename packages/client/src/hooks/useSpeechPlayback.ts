@@ -77,20 +77,20 @@ export function useSpeechPlayback({
     const isHostSpeech = !playerId;
     const browserSpeechOnly = shouldUseBrowserSpeechOnly(event, game);
     const voicePkgId = isHostSpeech || browserSpeechOnly ? null : getVoicePackageId(event, game, playerId!);
-    const audioUrl = isHostSpeech || browserSpeechOnly ? null : event?.audioUrl;
-    const wordBoundaries = isHostSpeech ? null : event?.wordBoundaries || null;
+    const audioUrl = browserSpeechOnly ? null : event?.audioUrl;
+    const wordBoundaries = browserSpeechOnly ? null : event?.wordBoundaries || null;
     let speechId: string | null = null;
     return speak(text, acknowledgePending, {
       playerId: playerId || undefined,
       voicePackageId: voicePkgId,
       audioUrl: audioUrl || undefined,
-      audioMimeType: isHostSpeech ? undefined : event?.audioMimeType,
+      audioMimeType: event?.audioMimeType,
       wordBoundaries: wordBoundaries || undefined,
       onStart: (media) => {
         speechId = playSubtitleText(text, playerId, ackId, {
           ...event,
-          currentTimeMs: isHostSpeech ? undefined : 0,
-          wordBoundaries: isHostSpeech ? undefined : media?.wordBoundaries || wordBoundaries || undefined
+          currentTimeMs: audioUrl ? 0 : undefined,
+          wordBoundaries: media?.wordBoundaries || wordBoundaries || undefined
         });
       },
       onTimeChange: (currentTimeMs) => {

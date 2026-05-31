@@ -5,7 +5,6 @@ import {
   getChineseVoices,
   clampFinite,
   getSpeechFallbackDelay,
-  fetchServerSpeechMedia,
   getSpeechPlaybackText
 } from '../utils/speech';
 import { createBrowserSpeechUtterance, createSilentSpeechUnlockUtterance } from './speech/browserSpeech';
@@ -124,14 +123,16 @@ export function useSpeechQueue() {
           window.setTimeout(finish, 0);
           return;
         }
-        const media: SpeechMedia = item.audioUrl
-          ? {
-            text: spokenText,
-            audioUrl: item.audioUrl,
-            audioMimeType: item.audioMimeType || 'audio/mpeg',
-            wordBoundaries: item.wordBoundaries || null
-          }
-          : await fetchServerSpeechMedia(spokenText, item.voicePackageId);
+        if (!item.audioUrl) {
+          fallbackToBrowserSpeech();
+          return;
+        }
+        const media: SpeechMedia = {
+          text: spokenText,
+          audioUrl: item.audioUrl,
+          audioMimeType: item.audioMimeType || 'audio/mpeg',
+          wordBoundaries: item.wordBoundaries || null
+        };
         const url = media.audioUrl;
         const audio = new Audio(url);
         audioRef.current = audio;
@@ -157,7 +158,7 @@ export function useSpeechQueue() {
       }
     };
 
-    if (item.audioUrl || item.voicePackageId) playServerSpeech();
+    if (item.audioUrl) playServerSpeech();
     else playBrowserSpeech();
     function startAudioTimeUpdates(audio: HTMLAudioElement, item: QueueItem) {
       clearAudioTimeRaf();

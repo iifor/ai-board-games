@@ -76,6 +76,10 @@ async function synthesizeMimoVoice(voicePackage: VoicePackage, text: string): Pr
 
 function buildMimoSpeechPayload(voicePackage: VoicePackage, text: string): Record<string, unknown> {
   const style = String(voicePackage.style || '').trim();
+  const voice = String(voicePackage.voiceId || process.env.MIMO_TTS_VOICE || '').trim();
+  if (!voice) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Mimo TTS requires voiceId or MIMO_TTS_VOICE.', 400);
+  }
   const messages: Array<{ role: string; content: string }> = [];
   if (style) messages.push({ role: 'user', content: style });
   messages.push({ role: 'assistant', content: text });
@@ -84,7 +88,7 @@ function buildMimoSpeechPayload(voicePackage: VoicePackage, text: string): Recor
     model: process.env.MIMO_TTS_MODEL || DEFAULT_MIMO_TTS_MODEL,
     messages,
     audio: {
-      voice: voicePackage.voiceId || process.env.MIMO_TTS_VOICE || 'mimo_zh_male',
+      voice,
       format: normalizeMimoAudioFormat(process.env.MIMO_TTS_FORMAT || 'mp3')
     }
   };
@@ -96,13 +100,12 @@ function getMimoBaseUrl(): string {
 
 function normalizeMimoAudioFormat(value: string): string {
   const format = String(value || '').trim().toLowerCase();
-  if (['mp3', 'wav', 'pcm', 'opus'].includes(format)) return format;
+  if (['mp3', 'wav', 'opus'].includes(format)) return format;
   return 'mp3';
 }
 
 function getAudioMimeType(format: string): string {
   if (format === 'wav') return 'audio/wav';
-  if (format === 'pcm') return 'audio/L16';
   if (format === 'opus') return 'audio/ogg';
   return 'audio/mpeg';
 }

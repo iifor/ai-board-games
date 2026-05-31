@@ -35,6 +35,8 @@ function buildAudioCacheKey(voice: VoicePackage, text: string): string {
     style: voice.style,
     rate: voice.rate,
     pitch: voice.pitch,
+    model: String(voice.provider || '').toLowerCase() === 'mimo' ? process.env.MIMO_TTS_MODEL || '' : '',
+    format: String(voice.provider || '').toLowerCase() === 'mimo' ? process.env.MIMO_TTS_FORMAT || 'mp3' : '',
     text: String(text || '').trim()
   });
 }

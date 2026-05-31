@@ -255,10 +255,12 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   function applyServerEvent(event: GameEvent): void {
     handleAudienceCue(event);
     if (event.type === 'workflow-event') {
+      const displayEvent = resolveWorkflowDisplayEvent(event);
       const displayText = getWerewolfDisplayText(event);
-      if (displayText) setStreamMessage(displayText);
+      const flowLabel = getWerewolfFlowLabel(displayEvent);
+      if (displayText || flowLabel) setStreamMessage(displayText || flowLabel || '');
       if (event.game) setGame(event.game);
-      updateWorkflowNightAction(event);
+      updateWorkflowNightAction(displayEvent);
       updateWorkflowSpeech(event);
       archiveServerEvent(event);
       return;
@@ -409,13 +411,45 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       setSeerCheckTarget(null);
     } else if (actionType === 'seer_check') {
       setNightActionType('seer-wake');
+      setNightActionActorIds(actorIds);
+      setSeerCheckTarget(null);
     } else if (actionType === 'guard_protect') {
       setNightActionType('guard-wake');
+      setNightActionActorIds(actorIds);
+      setSeerCheckTarget(null);
     } else if (actionType === 'witch_save') {
       setNightActionType('witch-antidote');
+      setNightActionActorIds(actorIds);
+      setSeerCheckTarget(null);
     } else if (actionType === 'witch_poison') {
       setNightActionType('witch-poison');
+      setNightActionActorIds(actorIds);
+      setSeerCheckTarget(null);
     }
+  }
+
+  function resolveWorkflowDisplayEvent(event: GameEvent): GameEvent {
+    const workflowEvent = String(event.workflowEvent || '');
+    const actionWindow = event.actionWindow as { actionType?: string } | undefined;
+    const actionType = String(event.actionType || actionWindow?.actionType || '');
+    const displayType = mapWorkflowEventType(workflowEvent) || mapNightActionType(actionType);
+    return displayType ? { ...event, type: displayType } : event;
+  }
+
+  function mapWorkflowEventType(workflowEvent: string): string {
+    if (['wolf-wake', 'wolf-leader', 'seer-wake', 'guard-wake', 'witch-antidote', 'witch-poison'].includes(workflowEvent)) {
+      return workflowEvent;
+    }
+    return '';
+  }
+
+  function mapNightActionType(actionType: string): string {
+    if (actionType === 'wolf_speech' || actionType === 'wolf_vote' || actionType === 'wolf_kill') return 'wolf-wake';
+    if (actionType === 'seer_check') return 'seer-wake';
+    if (actionType === 'guard_protect') return 'guard-wake';
+    if (actionType === 'witch_save') return 'witch-antidote';
+    if (actionType === 'witch_poison') return 'witch-poison';
+    return '';
   }
 
   function updateWorkflowSpeech(event: GameEvent): void {

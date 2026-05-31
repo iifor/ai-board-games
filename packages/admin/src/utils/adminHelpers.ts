@@ -92,6 +92,7 @@ export function formatApiFormat(value: string | undefined): string {
 
 export function formatVoiceProvider(value: string | number | null | undefined): string {
   if (value === 'azure') return 'Azure Speech';
+  if (value === 'mimo') return 'Mimo TTS';
   if (value === 'browser') return '浏览器本地语音';
   return String(value || '-');
 }
