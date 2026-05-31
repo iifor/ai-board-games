@@ -24,6 +24,8 @@ interface RoleConfig {
 
 interface PlayerInput {
   id: number;
+  sourcePlayerId?: number;
+  seatNumber?: number;
   name?: string;
   nickname?: string;
   avatar?: string;
@@ -145,6 +147,8 @@ interface SheriffBadgeTransfer {
 
 interface PublicPlayer {
   id: number;
+  sourcePlayerId?: number;
+  seatNumber?: number;
   name?: string;
   nickname?: string;
   avatar?: string;
@@ -182,7 +186,7 @@ function createWerewolfAgents(
   roleSkillRegistry: RoleSkillRegistry | null = null
 ): WerewolfAgent[] {
   const roleSlots = expandModeRoleSlots(modeConfig.roles);
-  const selected = config.players.slice(0, roleSlots.length);
+  const selected = toSeatPlayers(config.players.slice(0, roleSlots.length));
   const roles = shuffle(roleSlots);
   const resolveRoleId = (entry: string | ModeRoleEntry): string => typeof entry === 'string' ? entry : (entry?.roleId || entry?.id || '');
   const wolves = selected.filter((_, index) => getRoleConfig(modeConfig, resolveRoleId(roles[index])).faction === 'wolves').map((player) => player.id);
@@ -229,6 +233,18 @@ function expandModeRoleSlots(roles: Array<string | ModeRoleEntry> = []): Array<s
   });
 }
 
+function toSeatPlayers(players: PlayerInput[]): PlayerInput[] {
+  return players.map((player, index) => {
+    const seatNumber = index + 1;
+    return {
+      ...player,
+      sourcePlayerId: Number(player.sourcePlayerId || player.id),
+      seatNumber,
+      id: seatNumber,
+    };
+  });
+}
+
 function createRound(day: number): Round {
   return {
     day,
@@ -249,7 +265,8 @@ function createRound(day: number): Round {
 
 function publicPlayer(agent: WerewolfAgent): PublicPlayer {
   return {
-    id: agent.id, name: agent.name, nickname: agent.nickname, avatar: agent.avatar,
+    id: agent.id, sourcePlayerId: agent.sourcePlayerId as number | undefined, seatNumber: (agent.seatNumber as number | undefined) || agent.id,
+    name: agent.name, nickname: agent.nickname, avatar: agent.avatar,
     provider: agent.provider, voicePackageId: agent.voicePackageId, model: agent.model,
     sex: agent.sex || '未知', personality: agent.personality,
     role: agent.role, roleLabel: getRoleLabel(agent), faction: agent.faction,

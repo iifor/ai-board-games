@@ -4,6 +4,7 @@ import * as repo from '../../packages/server/modules/workflow-engine/repository'
 import { createActionWindowHandler } from '../../packages/server/modules/werewolf/handlers/actionWindowHandler';
 import { createNightResolveHandler, createExileResolveHandler, createSheriffResolveHandler } from '../../packages/server/modules/werewolf/handlers/resolveHandlers';
 import { createRound } from '../../packages/server/modules/werewolf/agents';
+import { createInitialWerewolfState } from '../../packages/server/modules/werewolf/runtime';
 
 type RepoPatch = Pick<typeof repo,
   'upsertActionWindowEpoch' |
@@ -13,6 +14,19 @@ type RepoPatch = Pick<typeof repo,
   'listPendingActions' |
   'createWorkflowEffect'
 >;
+
+test('initial werewolf state normalizes selected database ids to seat numbers', () => {
+  const selectedIds = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 20];
+  const state = createInitialWerewolfState({
+    werewolfMode: 'standard-12',
+    players: selectedIds.map((id) => ({ id, nickname: `P${id}` })),
+  });
+
+  assert.deepEqual(state.players?.map((player) => player.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(state.players?.map((player) => player.sourcePlayerId), selectedIds);
+  assert.equal(state.players?.[10].id, 11);
+  assert.equal(state.players?.[10].sourcePlayerId, 14);
+});
 
 test('fake werewolf action window opens, completes, and night resolve emits effects', () => {
   const original = snapshotRepo(repo);

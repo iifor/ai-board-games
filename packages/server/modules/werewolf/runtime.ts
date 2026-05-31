@@ -74,6 +74,8 @@ async function flushMatchEventPublishes(matchId: string): Promise<void> {
 
 interface Player {
   id: number;
+  sourcePlayerId?: number;
+  seatNumber?: number;
   name?: string;
   nickname?: string;
   alive?: boolean;
@@ -200,7 +202,7 @@ function createInitialWerewolfState(config: Record<string, unknown>): WerewolfSt
   const roleSkillRegistry = createWerewolfRoleSkillRegistry(modeConfig, skillRegistry);
   const fallbackAudit = createFallbackAudit(`werewolf-${Date.now()}`, 'werewolf', { gameType: 'werewolf' });
   const roleSlots = expandRoleSlots(modeConfig.roles);
-  const selected = (config.players as Player[]).slice(0, roleSlots.length);
+  const selected = toSeatPlayers((config.players as Player[]).slice(0, roleSlots.length));
   const shuffledRoles = shuffle(roleSlots);
   const wolves = selected.filter((_: Player, index: number) => getRoleConfig(modeConfig, roleIdOf(shuffledRoles[index])).faction === 'wolves').map((player: Player) => player.id);
   const agents = selected.map((player: Player, index: number) => {
@@ -248,7 +250,9 @@ function createRuntime(
   const fallbackAudit = createFallbackAudit(match.id, 'werewolf', { gameType: 'werewolf' });
   const wolves = ((sourceState.players || []) as Record<string, unknown>[]).filter((player) => player.faction === 'wolves').map((player) => player.id as number);
   const agents: Agent[] = ((sourceState.players || []) as Record<string, unknown>[]).map((snapshot) => {
-    const source = ((config.players || []) as Record<string, unknown>[]).find((player) => Number(player.id) === Number(snapshot.id)) || snapshot;
+    const source = ((config.players || []) as Record<string, unknown>[]).find((player) =>
+      Number(player.id) === Number(snapshot.sourcePlayerId || snapshot.id)
+    ) || snapshot;
     return createRuntimeAgent({ ...source, ...snapshot } as unknown as Player, snapshot.role as string, (snapshot.roleConfig as RoleConfig) || getRoleConfig(modeConfig, snapshot.role as string), wolves, modeConfig, skillRegistry, fallbackAudit, match.id, roleSkillRegistry, (sourceState.players || []) as Array<{ id: number; nickname?: string; name?: string; sex?: string }>);
   });
   const state: WerewolfState = {
@@ -300,6 +304,9 @@ function createRuntimeAgent(
 ): Agent {
   const agent: Agent = {
     ...player,
+    id: Number(player.seatNumber || player.id),
+    sourcePlayerId: Number(player.sourcePlayerId || player.id),
+    seatNumber: Number(player.seatNumber || player.id),
     role: roleId,
     roleConfig,
     roleLabel: roleConfig.name,
@@ -330,6 +337,18 @@ function createRuntimeAgent(
   return agent;
 }
 
+function toSeatPlayers(players: Player[]): Player[] {
+  return players.map((player, index) => {
+    const seatNumber = index + 1;
+    return {
+      ...player,
+      sourcePlayerId: Number(player.sourcePlayerId || player.id),
+      seatNumber,
+      id: seatNumber,
+    };
+  });
+}
+
 function serializeWerewolfState(match: Match, state: WerewolfState): Record<string, unknown> {
   const modeDetail = state.werewolfMode || state.modeConfig || {};
   const winner = state.winner || null;
@@ -351,7 +370,7 @@ function serializeWerewolfState(match: Match, state: WerewolfState): Record<stri
     clientViewMode: state.clientViewMode || 'god',
     host: state.host,
     werewolfMode: modeDetail,
-    players: ((state.players || []) as Array<Record<string, unknown> & { roleConfig?: unknown }>).map(({ roleConfig, ...player }) => player).sort((a, b) => Number(a.id) - Number(b.id)),
+    players: ((state.players || []) as Array<Record<string, unknown> & { roleConfig?: unknown; sourcePlayerId?: unknown }>).map(({ roleConfig, sourcePlayerId, ...player }) => player).sort((a, b) => Number(a.id) - Number(b.id)),
     rounds: state.rounds || [],
     winner,
     winReason: state.winReason || '',

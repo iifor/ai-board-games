@@ -106,7 +106,7 @@ class BasePlayerAgent {
   }
 
   // -----------------------------------------------------------
-  // AI 调用方法 — 失败时返回 null，不使用兜底值
+  // AI call helpers: return null on failure, no fallback value.
   // -----------------------------------------------------------
 
   async askText(prompt: string, options: AskTextOptions = {}): Promise<string | null> {
@@ -133,7 +133,7 @@ class BasePlayerAgent {
     try {
       const parsed = parseJsonObject(await this.call(prompt, options.maxTokens || 120)) as Record<string, unknown> | null;
       if (parsed) return parsed;
-      // 重试一次（JSON 格式问题，不是内容问题）
+      // Retry once for JSON formatting issues.
       const retryParsed = parseJsonObject(await this.call(`${prompt}\n\nReturn one valid JSON object only.`, options.maxTokens || 120)) as Record<string, unknown> | null;
       if (retryParsed) return retryParsed;
       this.recordError(options.skillId || 'player-json', 'invalid-json', options);
@@ -148,22 +148,22 @@ class BasePlayerAgent {
   async askVoteTarget(prompt: string, validIds: number[], options: AskVoteOptions = {}): Promise<number | null> {
     const parsed = await this.askJson([
       prompt,
-      `无效的目标: ${validIds.join(', ')}`,
-      '只返回json, 比如{"target":2}'
+      `Valid target seat numbers: ${validIds.join(', ')}`,
+      'Return JSON only, for example {"targetSeat":2}. targetSeat must be one of the listed seat numbers.'
     ].join('\n\n'), {
       maxTokens: 60,
       skillId: options.skillId || 'player-vote',
       phase: options.phase,
     });
     if (!parsed) return null;
-    const target = Number(parsed.target);
+    const target = Number(parsed.targetSeat ?? parsed.target);
     if (validIds.includes(target)) return target;
     this.recordError(options.skillId || 'player-vote', 'invalid-target', options);
     return null;
   }
 
   // -----------------------------------------------------------
-  // LLM 调用
+  // LLM call helpers.
   // -----------------------------------------------------------
 
   async call(prompt: string, maxTokens?: number): Promise<string> {
@@ -223,7 +223,7 @@ class BasePlayerAgent {
   }
 
   // -----------------------------------------------------------
-  // 错误记录（替代原来的 recordFallback）
+  // Error recording.
   // -----------------------------------------------------------
 
   recordError(
@@ -237,10 +237,10 @@ class BasePlayerAgent {
       skillId,
       actorId: this.player.id,
       reason,
-      fallbackValue: null, // 不再使用兜底值
+      fallbackValue: null,
       severity: options.severity || 'warning'
     });
-    // 同步写入 trace 观测
+    // Record to trace when available.
     try {
       const trace = getActiveTrace(this.gameId || '');
       if (trace) {
@@ -256,7 +256,7 @@ class BasePlayerAgent {
           }
         });
       }
-    } catch { /* trace 记录失败不影响主流程 */ }
+    } catch { /* Trace recording must not affect the main flow. */ }
   }
 }
 

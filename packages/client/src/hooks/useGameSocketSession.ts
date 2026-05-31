@@ -44,6 +44,7 @@ export function useGameSocketSession({
   const socketRef = useRef<WebSocket | null>(null);
   const pendingAckRef = useRef<PendingAck | null>(null);
   const pendingEventRef = useRef<GameEvent | null>(null);
+  const legacyDeferredRef = useRef<{ event: GameEvent; socket: WebSocket } | null>(null);
   const startedAckIdsRef = useRef<Set<number | string>>(new Set());
   const autoPlayRef = useRef<boolean>(false);
   const ackTimerRef = useRef<number | null>(null);
@@ -71,6 +72,7 @@ export function useGameSocketSession({
   function resetSessionRefs() {
     pendingAckRef.current = null;
     pendingEventRef.current = null;
+    legacyDeferredRef.current = null;
     startedAckIdsRef.current.clear();
     autoPlayRef.current = false;
     clearPendingAckTimer();
@@ -100,9 +102,6 @@ export function useGameSocketSession({
     });
   }
 
-  const speakingRef = useRef(false);
-  const deferredQueueRef = useRef<Array<{ event: GameEvent; socket: WebSocket }>>([]);
-
   function handleSocketEvent(event: GameEvent, socket: WebSocket) {
     if (event.type === 'error') {
       latestRef.current.onError?.(event);
@@ -113,15 +112,15 @@ export function useGameSocketSession({
       latestRef.current.applyServerEvent?.(event);
       return;
     }
-    // 正在播放语音时，新事件入队等待，避免打断当前播报 + 视觉先于音频
-    if (speakingRef.current) {
-      deferredQueueRef.current.push({ event, socket });
+
+    if (pendingAckRef.current) {
+      if (!legacyDeferredRef.current) legacyDeferredRef.current = { event, socket };
       return;
     }
+
     latestRef.current.applyServerEvent?.(event);
     pendingAckRef.current = { socket, ackId: event.ackId };
     pendingEventRef.current = event;
-    speakingRef.current = true;
     if (autoPlayRef.current) continuePendingEvent();
   }
 
@@ -134,16 +133,14 @@ export function useGameSocketSession({
     pendingEventRef.current = null;
     startedAckIdsRef.current.delete(pending.ackId);
     clearPendingAckTimer();
-    // 处理队列中的下一个事件
-    const next = deferredQueueRef.current.shift();
-    if (next) {
+
+    const next = legacyDeferredRef.current;
+    legacyDeferredRef.current = null;
+    if (next?.event.ackId) {
       latestRef.current.applyServerEvent?.(next.event);
-      pendingAckRef.current = { socket: next.socket, ackId: next.event.ackId! };
+      pendingAckRef.current = { socket: next.socket, ackId: next.event.ackId };
       pendingEventRef.current = next.event;
-      // speakingRef 保持 true，继续播放下一条
       if (autoPlayRef.current) window.setTimeout(continuePendingEvent, 60);
-    } else {
-      speakingRef.current = false;
     }
   }
 

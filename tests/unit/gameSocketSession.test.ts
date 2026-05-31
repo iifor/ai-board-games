@@ -7,6 +7,8 @@ import { createPreparedSender, isImmediateEvent, isRuleIntroEvent } from '../../
 interface SentPayload {
   type?: string;
   ackId?: number;
+  workflowEvent?: string;
+  audienceCue?: { kind?: string };
   [key: string]: unknown;
 }
 
@@ -65,7 +67,7 @@ test('GameSession treats rule intro as long playback wait payload', () => {
   }), false);
 });
 
-test('PreparedSender waits for rule intro ack before sending later events', async () => {
+test('PreparedSender sends display events one at a time behind ack', async () => {
   const sent: SentPayload[] = [];
   const waiters: Array<() => void> = [];
   const session = {
@@ -88,7 +90,7 @@ test('PreparedSender waits for rule intro ack before sending later events', asyn
   await sender.enqueue({
     type: 'workflow-event',
     workflowEvent: 'phase-changed',
-    message: '本局游戏：标准局。',
+    message: 'rule intro',
     audienceCue: { kind: 'rule-intro', display: 'modal', speech: 'browser', textField: 'text', once: true },
   });
   await sender.enqueue({
@@ -97,6 +99,11 @@ test('PreparedSender waits for rule intro ack before sending later events', asyn
     actionType: 'wolf_vote',
     message: '',
     presentation: { suppressSpeech: true },
+  });
+  await sender.enqueue({
+    type: 'workflow-event',
+    workflowEvent: 'action-submitted',
+    speech: { playerId: 2, text: 'wolf speech' },
   });
   await waitFor(() => sent.length === 1);
 
@@ -108,14 +115,22 @@ test('PreparedSender waits for rule intro ack before sending later events', asyn
   await waitFor(() => sent.length === 2);
 
   assert.equal(sent[1].workflowEvent, 'action-requested');
-  assert.equal(sent[1].ackId, undefined);
+  assert.equal(sent[1].ackId, 2);
+  assert.equal(sent.length, 2);
+
+  waiters[1]();
+  await waitFor(() => sent.length === 3);
+
+  assert.equal(sent[2].workflowEvent, 'action-submitted');
+  assert.equal(sent[2].ackId, 3);
 });
 
-test('PreparedSender keeps speech events waitable while ordinary workflow events are immediate', () => {
+test('PreparedSender classifies C-end workflow events as display events', () => {
   assert.equal(isRuleIntroEvent({ audienceCue: { kind: 'rule-intro' } }), true);
   assert.equal(isImmediateEvent({ type: 'workflow-event', workflowEvent: 'phase-changed', audienceCue: { kind: 'rule-intro' } }), false);
-  assert.equal(isImmediateEvent({ type: 'workflow-event', workflowEvent: 'action-requested' }), true);
-  assert.equal(isImmediateEvent({ type: 'workflow-event', workflowEvent: 'action-submitted', speech: { text: '狼人发言' } }), false);
+  assert.equal(isImmediateEvent({ type: 'workflow-event', workflowEvent: 'action-requested' }), false);
+  assert.equal(isImmediateEvent({ type: 'workflow-event', workflowEvent: 'action-submitted', speech: { text: 'wolf speech' } }), false);
+  assert.equal(isImmediateEvent({ type: 'error', message: 'failed' }), true);
 });
 
 async function waitFor(predicate: () => boolean): Promise<void> {
