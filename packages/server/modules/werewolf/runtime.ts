@@ -17,6 +17,7 @@ const matchInfra = new Map<string, {
   eventBus: WerewolfEventBus;
   gameEventBuilder: GameEventBuilder;
   skillEventEmitter: SkillEventEmitter;
+  pendingPublishes: Set<Promise<void>>;
 }>();
 
 /** 注册 match 的事件基础设施 */
@@ -29,6 +30,7 @@ export function registerMatchInfra(
     eventBus,
     gameEventBuilder,
     skillEventEmitter: createSkillEventEmitter(eventBus, gameEventBuilder),
+    pendingPublishes: new Set(),
   });
 }
 
@@ -40,6 +42,34 @@ export function unregisterMatchInfra(matchId: string): void {
 /** 获取 match 的事件基础设施 */
 export function getMatchInfra(matchId: string) {
   return matchInfra.get(matchId);
+}
+
+function trackMatchEventPublish(matchId: string, publishPromise: Promise<void>): void {
+  const infra = matchInfra.get(matchId);
+  if (!infra) {
+    publishPromise.catch((error) => {
+      console.error(`[werewolf/runtime] GameEvent publish failed after unregister (${matchId}):`, (error as Error).message);
+    });
+    return;
+  }
+
+  let tracked: Promise<void>;
+  tracked = publishPromise
+    .catch((error) => {
+      console.error(`[werewolf/runtime] GameEvent publish failed (${matchId}):`, (error as Error).message);
+    })
+    .finally(() => {
+      infra.pendingPublishes.delete(tracked);
+    });
+  infra.pendingPublishes.add(tracked);
+}
+
+async function flushMatchEventPublishes(matchId: string): Promise<void> {
+  const infra = matchInfra.get(matchId);
+  if (!infra) return;
+  while (infra.pendingPublishes.size > 0) {
+    await Promise.all([...infra.pendingPublishes]);
+  }
 }
 
 interface Player {
@@ -394,7 +424,9 @@ export {
   serializeWerewolfState,
   ensureRound,
   syncRuntimeState,
-  resolveRuntimeConfig
+  resolveRuntimeConfig,
+  trackMatchEventPublish,
+  flushMatchEventPublishes
 };
 
 export type { Agent, Runtime, WerewolfState, ModeConfig, RoleConfig };

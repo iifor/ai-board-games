@@ -1,4 +1,4 @@
-import { Eye, FlaskConical, Hand, Shield, Star, Swords } from 'lucide-react';
+import { Hand, Star } from 'lucide-react';
 import { formatAvatarUrl } from '../../../../utils/avatar';
 import { classNames } from '../../../../utils/classNames';
 import { getPlayerModelName } from '../../../../utils/player';

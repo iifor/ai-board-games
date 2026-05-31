@@ -1,3 +1,5 @@
+import { getSeatNumber } from '../utils';
+
 // ============================================================
 // 主持播报提示词 —— 游戏流程中向所有玩家展示的文本
 // ============================================================
@@ -38,10 +40,10 @@ interface RoundWithNight {
   night?: RoundNight;
 }
 
-function buildNightPublicMessage(round: RoundWithNight = {}): string {
+function buildNightPublicMessage(round: RoundWithNight = {}, agents?: Array<{ id: number }>): string {
   const deaths = Array.isArray(round.night?.deaths) ? round.night.deaths : [];
   if (!deaths.length) return '昨晚是平安夜。';
-  return `昨晚${deaths.map((item) => `${item.id}号`).join('、')}死亡。`;
+  return `昨晚${deaths.map((item) => `${getSeatNumber(item.id, agents)}号`).join('、')}死亡。`;
 }
 
 function buildDayStartMessage(): string {
@@ -65,9 +67,9 @@ function buildSheriffStartMessage(round: RoundWithSheriff = {}): string {
   return '现在进入警长竞选。上警玩家依次发言。';
 }
 
-function buildSheriffResultMessage(round: RoundWithSheriff = {}, _modeConfig: Record<string, unknown> = {}): string {
+function buildSheriffResultMessage(round: RoundWithSheriff = {}, _modeConfig: Record<string, unknown> = {}, agents?: Array<{ id: number }>): string {
   if (!round.sheriffId) return '警长竞选结束，本局没有警长。';
-  return `${round.sheriffId}号当选警长。`;
+  return `${getSeatNumber(round.sheriffId, agents)}号当选警长。`;
 }
 
 // ---- 动作标签 ----

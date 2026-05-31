@@ -26,7 +26,7 @@ interface SessionEvent {
 interface GameSession {
   send: (payload: Record<string, unknown>) => void;
   sendAndWait: (payload: Record<string, unknown>) => Promise<void>;
-  resolveAck: (ackId: number) => void;
+  resolveAck: (ackId: number | string) => void;
   close: () => void;
   setPaused: (value: boolean) => void;
   skipCurrentPhase: () => void;
@@ -50,9 +50,7 @@ function createSession(socket: WebSocket): GameSession {
 
   function send(payload: Record<string, unknown>): void {
     if (socket.readyState !== socket.OPEN) return;
-    const ackId = nextId;
-    nextId += 1;
-    socket.send(JSON.stringify({ ...payload, ackId }));
+    socket.send(JSON.stringify(payload));
   }
 
   function sendAndWait(payload: Record<string, unknown>): Promise<void> {
@@ -87,11 +85,13 @@ function createSession(socket: WebSocket): GameSession {
     });
   }
 
-  function resolveAck(ackId: number): void {
-    const item = pending.get(ackId);
+  function resolveAck(ackId: number | string): void {
+    const id = Number(ackId);
+    if (!Number.isFinite(id)) return;
+    const item = pending.get(id);
     if (!item) return;
     if (item.timer) clearTimeout(item.timer);
-    pending.delete(ackId);
+    pending.delete(id);
     item.resolve();
   }
 
@@ -167,7 +167,9 @@ function createSession(socket: WebSocket): GameSession {
 }
 
 function isSpeechWaitPayload(payload: Record<string, unknown>): boolean {
+  const audienceCue = payload?.audienceCue as { kind?: unknown } | undefined;
   return (
+    audienceCue?.kind === 'rule-intro' ||
     payload?.type === 'speech' ||
     payload?.type === 'wolf-speech' ||
     payload?.type === 'last-words' ||

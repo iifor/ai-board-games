@@ -1,6 +1,6 @@
 import * as repo from '../workflow-engine/repository';
 import { executeSkillWithTrace } from '../agent-core';
-import { createRuntime, ensureRound } from './runtime';
+import { createRuntime, ensureRound, trackMatchEventPublish } from './runtime';
 import {
   askSpeech,
   askWolfNightSpeech,
@@ -14,7 +14,7 @@ import {
   SHERIFF_VOTE_PROMPT,
 } from './prompts/actions';
 import { topTarget } from './winCheck';
-import { rotateFromSeat } from './utils';
+import { rotateFromSeat, getSeatNumber } from './utils';
 import { getAliveActorsByAction } from './actionWindows';
 import { ensureWolfTeamContext } from './wolfTeam';
 import { isWerewolfDebugMode, runDebugHunterAction, runDebugWerewolfAction } from './debugActions';
@@ -73,7 +73,7 @@ async function runWerewolfAiAction(runtime: Runtime, round: Round, actor: Agent,
   if (actionType === 'day_vote') return runDayVoteAction(actor, alive, runtime);
   if (actionType === 'sheriff_signup') return runSheriffSignupAction(actor);
   if (actionType === 'sheriff_speech') return runSheriffSpeechAction(round, actor, false);
-  if (actionType === 'sheriff_withdraw') return runSheriffWithdrawAction(round, actor);
+  if (actionType === 'sheriff_withdraw') return runSheriffWithdrawAction(round, actor, runtime.agents);
   if (actionType === 'sheriff_vote') return runSheriffVoteAction(actor, taskTargetIds(runtime, round, 'sheriff_vote'));
   if (actionType === 'sheriff_runoff_speech') return runSheriffSpeechAction(round, actor, true);
   if (actionType === 'sheriff_runoff_vote') return runSheriffVoteAction(actor, taskTargetIds(runtime, round, 'sheriff_runoff_vote'));
@@ -173,7 +173,7 @@ async function runWolfKillAction(runtime: Runtime, round: Round, actor: Agent, a
   let speechText = '';
   let thinkingText = '';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nightResult: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  const nightResult: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, agents: runtime.agents });
   if (nightResult) {
     if (typeof nightResult === 'string') {
       speechText = nightResult;
@@ -206,7 +206,7 @@ async function runWolfSpeechAction(runtime: Runtime, round: Round, actor: Agent)
   const sharedSpeeches = buildWolfSpeechContext(round);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+  const result: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, agents: runtime.agents });
   if (result) {
     if (typeof result === 'string') return { speech: result, thinking: '' };
     return { speech: result.content || '', thinking: result.thinking || '' };
@@ -218,7 +218,7 @@ async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, a
   ensureWolfTeamContext(runtime, round);
   const valid = alive.filter((agent) => agent.faction !== 'wolves').map((agent) => agent.id);
   const speeches = (round.night.wolfSpeeches || [])
-    .map((speech: Record<string, unknown>) => `${speech.playerId}号：${speech.text || ''}`)
+    .map((speech: Record<string, unknown>) => `${getSeatNumber(speech.playerId as number, runtime.agents)}号：${speech.text || ''}`)
     .join('\n');
   const target = await actor.playerAgent.askVoteTarget(buildWolfVotePrompt(speeches), valid);
   return { target }; // null = 弃票
@@ -238,7 +238,7 @@ function buildWolfSpeechContext(round: Round): any[] {
 // ============================================================
 
 async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent): Promise<Record<string, unknown>> {
-  const publicContext = buildDaySpeechContext(round);
+  const publicContext = buildDaySpeechContext(round, runtime.agents);
 
   let speechText = '';
   let thinkingText = '';
@@ -269,7 +269,7 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
       if ((selfDestruct as { use?: boolean } | null)?.use) {
         result.intent = 'selfDestruct';
         result.selfDestruct = true;
-        result.selfDestructText = String((selfDestruct as { text?: string }).text || `${actor.id}号狼人自爆。`);
+        result.selfDestructText = String((selfDestruct as { text?: string }).text || `${getSeatNumber(actor.id, runtime.agents)}号狼人自爆。`);
       }
     } catch {
       // 自爆检查失败 → 不自爆
@@ -281,7 +281,7 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
 
 async function runDayVoteAction(actor: Agent, alive: Agent[], runtime: Runtime): Promise<Record<string, unknown>> {
   const valid = alive.map((agent) => agent.id).filter((id) => Number(id) !== Number(actor.id));
-  const deadList = runtime.agents.filter((a) => !a.alive).map((a) => `${a.id}号`);
+  const deadList = runtime.agents.filter((a) => !a.alive).map((a) => `${getSeatNumber(a.id, runtime.agents)}号`);
   const prompt = deadList.length
     ? [`请选择你要放逐的玩家。`, `不可投票给已出局玩家：${deadList.join('、')}`].join('\n')
     : DAY_VOTE_PROMPT;
@@ -308,8 +308,8 @@ async function runSheriffSpeechAction(round: Round, actor: Agent, runoff: boolea
   return { text: '', thinking: '' };
 }
 
-async function runSheriffWithdrawAction(round: Round, actor: Agent): Promise<Record<string, unknown>> {
-  const context = buildDaySpeechContext(round);
+async function runSheriffWithdrawAction(round: Round, actor: Agent, agents?: Agent[]): Promise<Record<string, unknown>> {
+  const context = buildDaySpeechContext(round, agents);
   const parsed = await actor.playerAgent.askJson(buildSheriffWithdrawPrompt(context), { maxTokens: 40 });
   return { withdraw: parsed?.withdraw === true };
 }
@@ -330,16 +330,16 @@ function taskTargetIds(runtime: Runtime, round: Round, actionType: string): numb
   return ids.length ? ids.map(Number) : runtime.agents.filter((agent) => agent.alive).map((agent) => agent.id);
 }
 
-function buildDaySpeechContext(round: Round): string {
+function buildDaySpeechContext(round: Round, agents?: Agent[]): string {
   const lines = [round.publicSummary || ''];
   const election = round.sheriffElection as Record<string, unknown> | null | undefined;
   const sheriffSpeeches = Array.isArray(election?.speeches) ? election.speeches as Array<Record<string, unknown>> : [];
   const daySpeeches = Array.isArray(round.speeches) ? round.speeches as Array<Record<string, unknown>> : [];
   if (sheriffSpeeches.length) {
-    lines.push(`警上发言：\n${sheriffSpeeches.map((speech) => `${speech.playerId}号：${speech.text || ''}`).join('\n')}`);
+    lines.push(`警上发言：\n${sheriffSpeeches.map((speech) => `${getSeatNumber(speech.playerId as number, agents)}号：${speech.text || ''}`).join('\n')}`);
   }
   if (daySpeeches.length) {
-    lines.push(`本轮已公开发言：\n${daySpeeches.map((speech) => `${speech.playerId}号：${speech.text || ''}`).join('\n')}`);
+    lines.push(`本轮已公开发言：\n${daySpeeches.map((speech) => `${getSeatNumber(speech.playerId as number, agents)}号：${speech.text || ''}`).join('\n')}`);
   }
   return lines.filter(Boolean).join('\n\n') || '暂无公开信息。';
 }
@@ -373,7 +373,7 @@ function publishActionSubmitted(
   actorId: number,
   payload: Record<string, unknown>,
 ): void {
-  const eventBus = (runtime as Record<string, unknown>).eventBus as { publish: (e: unknown) => void } | undefined;
+  const eventBus = (runtime as Record<string, unknown>).eventBus as { publish: (e: unknown) => Promise<void> | void } | undefined;
   const gameEventBuilder = (runtime as Record<string, unknown>).gameEventBuilder as {
     setStep: (s: string) => unknown;
     setPhase: (p: string) => unknown;
@@ -414,7 +414,7 @@ function publishActionSubmitted(
       },
     );
 
-    eventBus.publish(event);
+    trackMatchEventPublish(match.id, Promise.resolve(eventBus.publish(event)));
   } catch (error) {
     console.error(`[aiActions] 发布 action-submitted 事件失败:`, (error as Error).message);
   }

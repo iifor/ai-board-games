@@ -15,7 +15,7 @@ interface UseDebateSpeechPlaybackParams {
 interface UseDebateSpeechPlaybackReturn {
   clearSubtitleTimer: () => void;
   playPendingDebateEvent: (event: GameEvent, controls: { setAckTimer: (delay: number) => void }) => boolean;
-  playSubtitleText: (text: string, playerId: string | null | undefined, ackId: string | undefined, event: GameEvent) => string;
+  playSubtitleText: (text: string, playerId: string | null | undefined, ackId: number | string | undefined, event: GameEvent) => string;
 }
 
 function getDebateExtraFields(event: GameEvent, text: string): Partial<SpeechState> {

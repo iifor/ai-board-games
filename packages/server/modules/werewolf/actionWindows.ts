@@ -62,7 +62,7 @@ function buildActionWindow({ match, step, state, actionType, actors, targetIds =
   targetIds?: number[];
   optional?: boolean;
 }): ActionWindow {
-  const actorList: Agent[] = sortBySeat(actors || []);
+  const actorList: Agent[] = step.config.ordered ? (actors || []) : sortBySeat(actors || []);
   const epochId = `${match.id}:${step.id}:${actionType}`;
   const window: ActionWindow = {
     id: epochId,
@@ -194,7 +194,12 @@ function resolveActionWindow(matchId: string, stepId: string, actionType: string
 function selectActorsForWindow(matchId: string, stepId: string, window: ActionWindow, actors: Agent[]): Agent[] {
   if (window.orderMode !== 'ordered') return actors || [];
   const completed = collectActionResults(matchId, stepId, window.actionType).length;
-  const next = (actors || [])[completed];
+  const orderedActors = Array.isArray(window.actorIds) && window.actorIds.length
+    ? window.actorIds
+        .map((id) => (actors || []).find((actor) => Number(actor.id) === Number(id)))
+        .filter((actor): actor is Agent => Boolean(actor))
+    : (actors || []);
+  const next = orderedActors[completed];
   return next ? [next] : [];
 }
 

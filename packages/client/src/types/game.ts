@@ -27,7 +27,7 @@ export interface GameState {
 
 export interface GameEvent {
   type: string;
-  ackId?: string;
+  ackId?: number | string;
   text?: string;
   narration?: string;
   message?: string;

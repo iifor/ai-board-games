@@ -1,4 +1,3 @@
-import { Eye, EyeOff } from 'lucide-react';
 import type { GameState, WerewolfMode } from '../../../../types';
 import './index.css';
 

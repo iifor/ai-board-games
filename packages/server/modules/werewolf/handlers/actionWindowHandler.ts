@@ -20,6 +20,7 @@ import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage, ph
 import { hasActionPhase, getActionPhaseConfig } from '../actionPhases';
 import { resolveActionChannel } from './actionChannel';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
+import { getSeatNumber } from '../utils';
 
 /** 已有独立睁眼事件的夜晚行动 — phase-start 不再重复发布 */
 const NIGHT_WAKE_ACTIONS = new Set([
@@ -181,7 +182,7 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
   resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
   const selfDestruct = (round as { selfDestruct?: Record<string, unknown> }).selfDestruct || {};
   const actorId = Number(selfDestruct.playerId || 0);
-  const text = String(selfDestruct.text || `${actorId || '狼人'}号狼人自爆。`);
+  const text = String(selfDestruct.text || `${actorId ? getSeatNumber(actorId, runtime.agents) : '狼人'}号狼人自爆。`);
 
   // Phase 4: 双写 self-destruct 到 EventBus
   publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
@@ -199,7 +200,7 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
       step,
       nextState as unknown as Record<string, unknown>,
       'werewolf_self_destruct',
-      `狼人自爆：${actorId}号玩家出局，白天流程中止。`,
+      `狼人自爆：${getSeatNumber(actorId, runtime.agents)}号玩家出局，白天流程中止。`,
       {
         actionType: 'self_destruct',
         actorId,
@@ -264,7 +265,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     promptContext: { day: step.config.day, actionType: step.config.actionType, round }
   });
   const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
-  const events: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType, actionWindow: window }, { channel, scopeKey })];
+  const events: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType, actionWindow: cloneActionWindow(window) }, { channel, scopeKey })];
 
   // Phase 4: 双写 action-requested 到 EventBus
   publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
@@ -274,7 +275,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     return builder.buildActionRequested(
       step.config.actionType || '',
       (actors as Array<{ id: number }>).map(a => a.id),
-      { actionWindow: window as unknown as Record<string, unknown>, channel, scopeKey },
+      { actionWindow: cloneActionWindow(window), channel, scopeKey },
     );
   });
 
@@ -312,7 +313,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     } else if (step.config.actionType === 'witch_save') {
       const wolfTarget = (round as { night?: { wolfTarget?: number | null } }).night?.wolfTarget;
       const saveMessage = wolfTarget
-        ? `女巫请睁眼，今晚${wolfTarget}号玩家死亡，你有一瓶解药，你要用吗？`
+        ? `女巫请睁眼，今晚${getSeatNumber(wolfTarget, runtime.agents)}号玩家死亡，你有一瓶解药，你要用吗？`
         : wakeMessage;
       publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
         builder.setStep(step.id).setPhase('night').setDay(step.config.day || 1);
@@ -391,6 +392,14 @@ function buildPhaseContext(actionType: string, results: ReducerActionResult[], r
   }
 
   return context;
+}
+
+function cloneActionWindow(window: ActionWindow): Record<string, unknown> {
+  return {
+    ...window,
+    actorIds: [...(window.actorIds || [])],
+    targetIds: [...(window.targetIds || [])],
+  };
 }
 
 function waitForActionWindow({ match, step, state, round, actors }: {

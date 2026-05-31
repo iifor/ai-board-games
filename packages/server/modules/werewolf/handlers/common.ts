@@ -1,6 +1,7 @@
-import { serializeWerewolfState } from '../runtime';
+import { serializeWerewolfState, trackMatchEventPublish } from '../runtime';
 import type { ChannelType } from '@ai-presenter/shared/types/channelTypes';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
+import type { GameEvent } from '@ai-presenter/shared/types/gameEvent';
 import type { WerewolfEventBus } from '../eventBus';
 import type { GameEventBuilder } from '../gameEventBuilder';
 
@@ -65,7 +66,10 @@ function publishGameEvent(
       gameEventBuilder.setGame(gameSnapshot as unknown as Parameters<GameEventBuilder['setGame']>[0]);
     }
     const event = builderFn(gameEventBuilder);
-    if (event) eventBus.publish(event as Parameters<WerewolfEventBus['publish']>[0]);
+    if (event) {
+      const gameEvent = event as GameEvent;
+      trackMatchEventPublish(gameEvent.metadata.matchId, eventBus.publish(gameEvent));
+    }
   } catch (error) {
     console.error(`[handlers/common] 发布 GameEvent 失败:`, (error as Error).message);
   }

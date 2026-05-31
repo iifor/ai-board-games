@@ -32,7 +32,7 @@ test('audience cue is preserved as flat socket event with text', async () => {
 
   assert.equal(delivered.length, 1);
   assert.equal(delivered[0].type, 'workflow-event');
-  assert.equal(delivered[0].text, '本局游戏：标准局');
+  assert.equal(delivered[0].text, '本局游戏：标准局。');
   assert.deepEqual(delivered[0].audienceCue, {
     kind: 'rule-intro',
     display: 'modal',
@@ -41,4 +41,3 @@ test('audience cue is preserved as flat socket event with text', async () => {
     once: true
   });
 });
-

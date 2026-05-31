@@ -1,6 +1,7 @@
 import { AgentSkillRegistry } from '../agent-core';
 import { PHASE_LIMITS } from './constants';
 import { getDebateRoleName } from './prompts';
+import { seatLabel } from './utils';
 import type { DebatePlayer, DebatePhase } from './utils';
 
 interface SkillContext {
@@ -70,21 +71,23 @@ function createDebateSkills(): Skill[] {
       prompt: '评选最佳辩手。',
       async execute({ actor, contestants, fallbackAudit }: SkillContext) {
         const fallback = (contestants as DebatePlayer[])[Math.floor(Math.random() * (contestants as DebatePlayer[]).length)];
+        const contestantList = (contestants as DebatePlayer[]);
         const parsed = await (actor as unknown as { playerAgent: { askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null> } }).playerAgent.askJson([
           '请从正反方 8 位选手中评选最佳辩手。',
-          `可选对象：${(contestants as DebatePlayer[]).map((agent) => `${agent.id}号${agent.nickname}`).join('、')}`,
+          `可选对象：${contestantList.map((agent) => `${seatLabel(agent.side, agent.sideIndex)}${agent.nickname}`).join('、')}`,
           '公开赛况已通过上文增量同步。',
-          '只返回JSON对象：{"target":2}。',
+          `只返回JSON对象：{"target":"${seatLabel(contestantList[0]?.side, contestantList[0]?.sideIndex)}"}，target 填座位名称。`,
         ].join('\n\n'), {
           maxTokens: 80,
-          fallback: { target: fallback.id },
+          fallback: { target: seatLabel(fallback.side, fallback.sideIndex) },
           skillId: 'vote_mvp',
           phase: 'mvp',
           severity: 'error',
         });
-        const target = Number(parsed?.target);
-        if ((contestants as DebatePlayer[]).some((agent) => agent.id === target)) {
-          return { voterId: actor.id, target };
+        const targetLabel = String(parsed?.target || '');
+        const matched = contestantList.find((agent) => seatLabel(agent.side, agent.sideIndex) === targetLabel);
+        if (matched) {
+          return { voterId: actor.id, target: matched.id };
         }
         fallbackAudit?.record({
           gameType: 'debate',

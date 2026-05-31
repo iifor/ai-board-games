@@ -6,7 +6,7 @@
 // ============================================================
 
 import { WEREWOLF } from '@ai-presenter/shared/constants/gameLimits';
-import { getRoleLabel } from '../utils';
+import { getRoleLabel, getSeatNumber } from '../utils';
 import type { PlayerAgent } from '../playerAgent';
 
 // ---- 轻量接口 ----
@@ -59,22 +59,22 @@ export async function askSpeech(
 
 export async function askWolfNightSpeech(
   agent: AgentLike, day: number, wolfSpeeches: WolfSpeech[], isLeader: boolean,
-  options?: { thinking?: false; limit?: number }
+  options?: { thinking?: false; limit?: number; agents?: Array<{ id: number }> }
 ): Promise<string | null>;
 export async function askWolfNightSpeech(
   agent: AgentLike, day: number, wolfSpeeches: WolfSpeech[], isLeader: boolean,
-  options: { thinking: true; limit?: number }
+  options: { thinking: true; limit?: number; agents?: Array<{ id: number }> }
 ): Promise<{ content: string; thinking: string } | null>;
 export async function askWolfNightSpeech(
   agent: AgentLike,
   day: number,
   wolfSpeeches: WolfSpeech[],
   isLeader: boolean,
-  options: { thinking?: boolean; limit?: number } = {}
+  options: { thinking?: boolean; limit?: number; agents?: Array<{ id: number }> } = {}
 ): Promise<string | { content: string; thinking: string } | null> {
   const history = (wolfSpeeches || [])
     .filter((speech) => String(speech.playerId) !== '系统' && String(speech.playerId) !== 'host')
-    .map((speech) => `${speech.playerId}号：${speech.text}`)
+    .map((speech) => `${getSeatNumber(speech.playerId, options.agents)}号：${speech.text}`)
     .join('\n');
   const title = isLeader ? '请作为狼队队长作战术部署。' : '请基于当前已知信息和队长战术，进行发言讨论。';
   let limit = options.limit ?? WEREWOLF.WOLF_NIGHT_SPEECH_CHAR_LIMIT;

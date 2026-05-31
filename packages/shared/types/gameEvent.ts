@@ -233,7 +233,7 @@ export interface GameEvent<T = unknown> {
   game?: SerializedGameState;
 
   // ACK 机制
-  ackId?: string;
+  ackId?: number | string;
 }
 
 // ============================================================

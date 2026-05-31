@@ -1,5 +1,6 @@
 import { isSessionCancelled, getEventPhaseKey } from './session';
 import { prepareOutgoingEvent, collectPreparedAudioResources } from './media';
+import { getNarration } from './narration';
 import type { GameSession, SessionEvent } from './session';
 import type { MediaEvent } from './media';
 
@@ -99,10 +100,13 @@ function createPreparedSender(
       while (queue.length) {
         const item = queue[0];
         // 即时事件跳过 TTS 音频生成，直接发送（延迟从 ~1-5s 降到 <1ms）
-        if (IMMEDIATE_EVENT_TYPES.has(item.event.type || '')) {
-          const narration = item.event.narration || item.event.message || '';
-          const evt = { ...item.event, narration };
-          await session.send(evt as unknown as Record<string, unknown>);
+        // 但仍需注入正确的 narration 文本，否则客户端播报内容为空
+
+        if (isImmediateEvent(item.event)) {
+          const narration = getNarration(item.event as Parameters<typeof getNarration>[0]) || item.event.narration || item.event.message || '';
+          const evt: Record<string, unknown> = { ...item.event, narration };
+          if (!evt.message && narration) evt.message = narration;
+          await session.send(evt);
           item.resolve();
           queue.shift();
           continue;
@@ -162,5 +166,27 @@ function exceedsPhaseLookahead(events: SessionEvent[], phaseLookahead: number): 
   return phaseKeys.length > phaseLookahead + 1;
 }
 
-export { createPreparedSender, exceedsPhaseLookahead };
+function isImmediateEvent(event: SessionEvent): boolean {
+  if (isRuleIntroEvent(event)) return false;
+  if (hasPlayableSpeech(event)) return false;
+  const eventType = String(event.type || '');
+  const workflowEvent = String(event.workflowEvent || '');
+  return IMMEDIATE_EVENT_TYPES.has(eventType) || IMMEDIATE_EVENT_TYPES.has(workflowEvent);
+}
+
+function isRuleIntroEvent(event: SessionEvent): boolean {
+  const cue = event.audienceCue as { kind?: unknown } | undefined;
+  return cue?.kind === 'rule-intro';
+}
+
+function hasPlayableSpeech(event: SessionEvent): boolean {
+  const speech = event.speech as { text?: unknown } | undefined;
+  const testimony = event.testimony as { text?: unknown; testimony?: unknown } | undefined;
+  return Boolean(
+    String(speech?.text || '').trim() ||
+    String(testimony?.text || testimony?.testimony || '').trim(),
+  );
+}
+
+export { createPreparedSender, exceedsPhaseLookahead, isImmediateEvent, isRuleIntroEvent };
 export type { PreparedSender, SenderOptions };

@@ -233,6 +233,14 @@ function debaterAt(agents: DebatePlayer[], side: string, index: number): DebateP
   return agents.filter((agent) => agent.side === side)[index] || null;
 }
 
+const SIDE_LABELS: Record<string, string> = { pro: '正方', con: '反方', judge: '评委' };
+const INDEX_LABELS = ['一辩', '二辩', '三辩', '四辩'];
+
+function seatLabel(side: string, sideIndex: number | null): string {
+  if (side === 'judge') return '评委';
+  return `${SIDE_LABELS[side] || side}${INDEX_LABELS[sideIndex ?? 0] || ''}`;
+}
+
 function cleanText(value: unknown): string {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
@@ -303,7 +311,7 @@ function serializeGame({
 export {
   TOPICS, shuffle, choose, normalizeTopic, getConfiguredDebateSetup,
   syncDebateMemory, publicDebateLog, debaterAt, cleanText, publicPlayer,
-  publicDebateHost, buildAgentHash, serializeGame,
+  publicDebateHost, buildAgentHash, serializeGame, seatLabel,
 };
 export type {
   DebatePlayer, SpeechEntry, DebatePhase, DebateHost, MemoryEntry,

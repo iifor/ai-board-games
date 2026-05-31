@@ -5,6 +5,8 @@ import { getNarration } from './narration';
 import type { NarrationEvent } from './narration';
 import type { VoicePackage } from '../../types/api';
 
+const TTS_PREPARE_TIMEOUT_MS = 8000;
+
 interface SpeechData {
   text?: string;
   playerId?: number | string;
@@ -109,7 +111,7 @@ async function prepareEventMedia(event: NarrationEvent): Promise<MediaEvent> {
   try {
     const speechText = stripSpeechParentheses(text);
     if (!speechText) return result;
-    const saved = await prepareVoiceAudio(voice, speechText, (event.game?.id as string) ?? null);
+    const saved = await prepareVoiceAudioWithTimeout(voice, speechText, (event.game?.id as string) ?? null);
     if (!saved) return result;
     return {
       ...result,
@@ -121,6 +123,25 @@ async function prepareEventMedia(event: NarrationEvent): Promise<MediaEvent> {
   } catch (error) {
     return { ...result, mediaError: (error as Error).message };
   }
+}
+
+function prepareVoiceAudioWithTimeout(
+  voice: VoicePackage,
+  text: string,
+  gameId: string | null,
+): Promise<PreparedAudioResult | null> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<PreparedAudioResult | null>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`TTS prepare timeout after ${TTS_PREPARE_TIMEOUT_MS}ms`));
+    }, TTS_PREPARE_TIMEOUT_MS);
+  });
+  return Promise.race([
+    prepareVoiceAudio(voice, text, gameId) as Promise<PreparedAudioResult | null>,
+    timeout,
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 function getEventSpeakerRole(event: NarrationEvent, text = ''): string {
@@ -205,5 +226,6 @@ export {
   getPlayableEventText,
   withPlayableDetails,
   resolveEventVoice,
+  prepareVoiceAudioWithTimeout,
 };
 export type { MediaEvent };

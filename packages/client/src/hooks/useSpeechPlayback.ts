@@ -57,7 +57,7 @@ export function useSpeechPlayback({
     return true;
   }
 
-  function playSubtitleText(text: string, playerId: string | null | undefined, ackId: string | undefined, event: GameEvent): string {
+  function playSubtitleText(text: string, playerId: string | null | undefined, ackId: number | string | undefined, event: GameEvent): string {
     clearSubtitleTimer();
     const baseId = `${ackId || Date.now()}-${playerId || 'system'}`;
     const extra = getExtraFields(event, text);
@@ -72,7 +72,7 @@ export function useSpeechPlayback({
     return baseId;
   }
 
-  function speakSingle(text: string, playerId: string | null | undefined, ackId: string | undefined, event: GameEvent): boolean {
+  function speakSingle(text: string, playerId: string | null | undefined, ackId: number | string | undefined, event: GameEvent): boolean {
     clearSubtitleTimer();
     const isHostSpeech = !playerId;
     const browserSpeechOnly = shouldUseBrowserSpeechOnly(event, game);

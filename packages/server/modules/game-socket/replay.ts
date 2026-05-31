@@ -313,9 +313,11 @@ function buildReplayPlaybackEvents(game: ReplayGame): Record<string, unknown>[] 
     const playedPhases: DebatePhase[] = [];
     for (const phase of game.phases || []) {
       const currentPhase: DebatePhase = { ...phase, speeches: [] };
+      const phaseName = currentPhase.name || '下一';
       events.push({
         type: 'phase-start',
         phase: currentPhase,
+        message: `现在进入${phaseName}环节。`,
         game: getPlaybackGameSnapshot(game, [...playedPhases, currentPhase]),
       });
       for (const speech of getRoundSpeeches(phase)) {
@@ -331,6 +333,7 @@ function buildReplayPlaybackEvents(game: ReplayGame): Record<string, unknown>[] 
       events.push({
         type: 'phase-end',
         phase: currentPhase,
+        message: `${phaseName}环节结束。`,
         game: getPlaybackGameSnapshot(game, [...playedPhases, currentPhase]),
       });
       playedPhases.push(currentPhase);
@@ -403,7 +406,7 @@ function buildWerewolfReplayPlaybackEvents(game: ReplayGame): Record<string, unk
       phaseKey: dayPhaseKey,
       round: nightRound,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      message: buildNightPublicMessage(nightRound as any),
+      message: buildNightPublicMessage(nightRound as any, replayPlayers as unknown as Array<{ id: number }>),
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds),
     });
     appendWerewolfBadgePlaybackEvents(
@@ -638,7 +641,7 @@ function appendWerewolfSheriffPlaybackEvents(
     visibleRounds,
     {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      message: buildSheriffResultMessage(visibleRound as any, game.werewolfMode || {}),
+      message: buildSheriffResultMessage(visibleRound as any, game.werewolfMode || {}, replayPlayers as unknown as Array<{ id: number }>),
     },
   );
 }

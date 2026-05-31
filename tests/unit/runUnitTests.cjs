@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '../..');
 const serverRoot = path.join(root, 'packages', 'server');
 const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
 const testFiles = [
+  'gameSocketSession.test.ts',
   'gameEventBuilder.test.ts',
   'eventBus.test.ts',
   'audienceStream.test.ts',

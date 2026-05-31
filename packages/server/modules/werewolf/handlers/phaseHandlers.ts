@@ -4,6 +4,7 @@ import type { StepState } from './common';
 import { buildWerewolfRuleIntro, phaseStartedMessage } from '../messages';
 import { checkDawnBindVote } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
+import { getSeatNumber } from '../utils';
 
 interface Match {
   id: string;
@@ -78,7 +79,7 @@ function createDayStartHandler() {
       if (step.config.day !== 1) {
         const nightDeaths = (round as { night?: { deaths?: Array<{ id: number; reason: string }> } }).night?.deaths || [];
         const deathMessage = nightDeaths.length
-          ? `昨晚${nightDeaths.map((d) => `${d.id}号玩家`).join('、')}死亡`
+          ? `昨晚${nightDeaths.map((d) => `${getSeatNumber(d.id, runtime.agents)}号玩家`).join('、')}死亡`
           : '昨晚是平安夜';
         publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
           builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);

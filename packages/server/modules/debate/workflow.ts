@@ -236,10 +236,13 @@ const handlers: Record<string, {
       }
 
       const nextState = applyAiTurnResult(match, step, state, phase, taskSpecs, existing);
+      const speechEvents = buildDebateSpeechEvents(match, step, nextState, phase.id, taskSpecs);
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: [{
+        events: [
+          ...speechEvents,
+          {
           type: 'workflow_step_completed',
           payload: {
             stepId: step.id,
@@ -249,7 +252,8 @@ const handlers: Record<string, {
             game: serializeDebateState(match, nextState),
           },
           idempotencyKey: `${match.id}:${step.id}:completed`,
-        }],
+          },
+        ],
       };
     },
     async runAiTask({ match, task }: { match: WorkflowMatch; task: AiTask }): Promise<RuntimeResult> {
@@ -378,16 +382,7 @@ async function runDebateWorkflow(config: DebateConfig, options: { onEvent?: (eve
 async function flushOutbox(matchId: string, onEvent?: (event: Record<string, unknown>) => void): Promise<void> {
   const messages = listPendingOutbox(matchId) as unknown as WorkflowEvent[];
   for (const message of messages) {
-    await onEvent?.({
-      type: 'workflow-event',
-      matchId,
-      event: message.payload,
-      workflowEvent: (message.payload as Record<string, unknown>)?.payload ? ((message.payload as Record<string, unknown>).payload as Record<string, unknown>).workflowEvent : undefined,
-      message: (message.payload as Record<string, unknown>)?.payload ? ((message.payload as Record<string, unknown>).payload as Record<string, unknown>).message : undefined,
-      game: (message.payload as Record<string, unknown>)?.payload ? ((message.payload as Record<string, unknown>).payload as Record<string, unknown>).game : undefined,
-      phase: (message.payload as Record<string, unknown>)?.payload ? ((message.payload as Record<string, unknown>).payload as Record<string, unknown>).phase : undefined,
-      speech: (message.payload as Record<string, unknown>)?.payload ? ((message.payload as Record<string, unknown>).payload as Record<string, unknown>).speech : undefined,
-    });
+    await onEvent?.(projectDebateOutboxEvent(message, matchId));
     markOutboxSent(message.id as unknown as number);
   }
 }
@@ -679,6 +674,74 @@ function collectWinnerVotes(phase: DebatePhase): Record<string, string> {
   return votes;
 }
 
+function buildDebateSpeechEvents(
+  match: WorkflowMatch,
+  step: WorkflowStep,
+  state: WorkflowState,
+  phaseId: string,
+  taskSpecs: TaskSpec[],
+): HandlerResult['events'] {
+  const specs = taskSpecs.filter((spec) => spec.action !== 'vote_mvp');
+  if (!specs.length) return [];
+  const currentPhase = (state.phases || []).find((item) => item.id === phaseId);
+  if (!currentPhase) return [];
+  const speeches = currentPhase.speeches || [];
+  const game = serializeDebateState(match, state);
+  const events: NonNullable<HandlerResult['events']> = [];
+  for (const spec of specs) {
+    const expectedKind = getDebateSpeechKind(spec.action, currentPhase.id);
+    const speech = [...speeches].reverse().find((item) =>
+      Number(item.playerId) === Number(spec.actorId) &&
+      String(item.kind || '') === expectedKind
+    );
+    if (!speech) continue;
+    events.push({
+      type: 'speech',
+      payload: {
+        phase: currentPhase,
+        speech,
+        game,
+      },
+      idempotencyKey: `${match.id}:${step.id}:speech:${speech.playerId}:${speech.kind || 'speech'}`,
+    });
+  }
+  return events;
+}
+
+function getDebateSpeechKind(action: string, phaseId: string): string {
+  if (action === 'crossfire_question') return 'question';
+  if (action === 'crossfire_answer') return 'answer';
+  if (action === 'judge_review') return 'judge-review';
+  return phaseId;
+}
+
+function projectDebateOutboxEvent(message: WorkflowEvent, matchId: string): Record<string, unknown> {
+  const event = (message.payload || {}) as Record<string, unknown>;
+  const payload = event.payload && typeof event.payload === 'object'
+    ? event.payload as Record<string, unknown>
+    : {};
+  const eventType = String(event.type || '');
+  const base = {
+    matchId,
+    event,
+    workflowEvent: payload.workflowEvent || eventType,
+    message: payload.message,
+    game: payload.game,
+    phase: payload.phase,
+    speech: payload.speech,
+  };
+  if (eventType === 'speech') {
+    return {
+      type: 'speech',
+      ...base,
+    };
+  }
+  return {
+    type: 'workflow-event',
+    ...base,
+  };
+}
+
 function normalizeTaskResult(spec: Record<string, unknown>, result: unknown): RuntimeResult {
   if (spec.action === 'judge_review') {
     return {
@@ -788,4 +851,6 @@ export {
   createDebateWorkflowMatch,
   runDebateWorkflow,
   serializeDebateState,
+  buildDebateSpeechEvents,
+  projectDebateOutboxEvent,
 };

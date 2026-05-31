@@ -95,7 +95,7 @@ interface SessionMessage {
   clientViewMode?: string;
   debugMode?: boolean;
   replayView?: Record<string, unknown>;
-  ackId?: number;
+  ackId?: number | string;
   action?: string;
   [key: string]: unknown;
 }

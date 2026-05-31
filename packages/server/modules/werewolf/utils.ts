@@ -170,6 +170,13 @@ function getClockStartId(alive: Array<{ id: number }>): number {
   return seatIds.find((id) => id >= hour) || seatIds[0];
 }
 
+function getSeatNumber(playerId: number | string, allPlayers?: Array<{ id: number }>): number {
+  if (!allPlayers?.length) return Number(playerId);
+  const sorted = [...allPlayers].sort((a, b) => Number(a.id) - Number(b.id));
+  const index = sorted.findIndex((p) => Number(p.id) === Number(playerId));
+  return index >= 0 ? index + 1 : Number(playerId);
+}
+
 function getSheriffSpeechOrder(alive: SeatItem[], sheriffId: number, direction: string = 'clockwise'): SeatItem[] {
   const speakers = sortBySeat(alive).filter((agent) => Number(agent.id) !== Number(sheriffId));
   const sheriff = alive.find((agent) => Number(agent.id) === Number(sheriffId));
@@ -220,49 +227,50 @@ function buildWolfStrategySummary(wolfChoices: Record<string, number> | null | u
   const choices = Object.entries(wolfChoices || {});
   if (!choices.length || !wolfTarget) return '';
   const target = agents.find((agent) => Number(agent.id) === Number(wolfTarget));
-  const targetLabel = target ? `${target.id}号${getRoleLabel(target)}` : `${wolfTarget}号`;
+  const targetLabel = target ? `${getSeatNumber(target.id as number, agents as unknown as Array<{ id: number }>)}号${getRoleLabel(target)}` : `${getSeatNumber(wolfTarget!, agents as unknown as Array<{ id: number }>)}号`;
   const focused = choices.every(([, targetId]) => Number(targetId) === Number(wolfTarget));
   return focused ? `狼队统一刀口 ${targetLabel}。` : `狼队刀口分散，最终集中到 ${targetLabel}。`;
 }
 
-function getVoteMessage(round: Round): string {
-  if (round.idiotReveal) return `发言结束，开始放逐投票。请所有玩家投票。${round.idiotReveal.id}号翻牌为白痴，免除本次放逐并失去投票权。`;
+function getVoteMessage(round: Round, agents?: Array<{ id: number }>): string {
+  if (round.idiotReveal) return `发言结束，开始放逐投票。请所有玩家投票。${getSeatNumber(round.idiotReveal.id, agents)}号翻牌为白痴，免除本次放逐并失去投票权。`;
   if (!round.exile) return '发言结束，开始放逐投票。请所有玩家投票。本轮无人被放逐。';
-  return `发言结束，开始放逐投票。请所有玩家投票。${round.exile.id}号玩家被放逐出局。`;
+  return `发言结束，开始放逐投票。请所有玩家投票。${getSeatNumber(round.exile.id, agents)}号玩家被放逐出局。`;
 }
 
-function buildSheriffVoteMessage(round: Round, runoff: boolean): string {
+function buildSheriffVoteMessage(round: Round, runoff: boolean, agents?: Array<{ id: number }>): string {
   if (!runoff) return '退水结束，开始投票。';
   const tally = runoff ? round.sheriffElection?.runoffTally : round.sheriffElection?.tally;
   const topIds = getTopCandidateIds(tally);
   if (!topIds.length) return runoff ? '警长复投无人形成有效票型。' : '警长竞选无人形成有效票型。';
-  if (topIds.length > 1) return `${runoff ? '警长复投' : '警长竞选投票'}平票：${topIds.map((id) => `${id}号`).join('、')}。`;
-  return `${runoff ? '警长复投' : '警长竞选投票'}最高票为${topIds[0]}号。`;
+  if (topIds.length > 1) return `${runoff ? '警长复投' : '警长竞选投票'}平票：${topIds.map((id) => `${getSeatNumber(id, agents)}号`).join('、')}。`;
+  return `${runoff ? '警长复投' : '警长竞选投票'}最高票为${getSeatNumber(topIds[0], agents)}号。`;
 }
 
-function buildSpeechOrderMessage(round: Round): string {
+function buildSpeechOrderMessage(round: Round, agents?: Array<{ id: number }>): string {
   if (round.daySpeech?.source === 'sheriff') {
-    return `警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，从${round.daySpeech.startPlayerId}号开始。`;
+    return `警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，从${getSeatNumber(round.daySpeech.startPlayerId!, agents)}号开始。`;
   }
   if (round.daySpeech?.source === 'night-death') {
-    return `现在${round.daySpeech.startPlayerId}号开始发言。`;
+    return `现在${getSeatNumber(round.daySpeech.startPlayerId!, agents)}号开始发言。`;
   }
-  return `从${round.daySpeech?.startPlayerId || ''}号开始发言。`;
+  const startId = round.daySpeech?.startPlayerId;
+  return `从${startId != null ? getSeatNumber(startId, agents) : ''}号开始发言。`;
 }
 
-function buildSheriffBadgeMessage(transfer: { action: string; from: number; to?: number }): string {
-  if (transfer.action === 'transfer') return `${transfer.from}号警长出局，将警徽移交给${transfer.to}号。`;
-  return `${transfer.from}号警长出局，选择撕掉警徽。`;
+function buildSheriffBadgeMessage(transfer: { action: string; from: number; to?: number }, agents?: Array<{ id: number }>): string {
+  if (transfer.action === 'transfer') return `${getSeatNumber(transfer.from, agents)}号警长出局，将警徽移交给${getSeatNumber(transfer.to!, agents)}号。`;
+  return `${getSeatNumber(transfer.from, agents)}号警长出局，选择撕掉警徽。`;
 }
 
 function buildPublicLog(rounds: Round[], agents: AgentForPublicLog[]): string {
   return rounds.map((round) => [
     `第${round.day}天：${round.publicSummary || ''}`,
-    round.sheriffId ? `警长：${round.sheriffId}号` : '',
-    round.exile ? `放逐：${round.exile.id}号` : '',
-    round.idiotReveal ? `白痴翻牌：${round.idiotReveal.id}号` : '',
-    round.hunterShot ? `猎人开枪：${round.hunterShot.from}号带走${round.hunterShot.target}号` : ''
-  ].filter(Boolean).join('；')).join('\n') || `存活玩家：${agents.filter((agent) => agent.alive).map((agent) => `${agent.id}号`).join('、')}`;
+    round.sheriffId ? `警长：${getSeatNumber(round.sheriffId, agents)}号` : '',
+    round.exile ? `放逐：${getSeatNumber(round.exile.id, agents)}号` : '',
+    round.idiotReveal ? `白痴翻牌：${getSeatNumber(round.idiotReveal.id, agents)}号` : '',
+    round.hunterShot ? `猎人开枪：${getSeatNumber(round.hunterShot.from, agents)}号带走${getSeatNumber(round.hunterShot.target, agents)}号` : ''
+  ].filter(Boolean).join('；')).join('\n') || `存活玩家：${agents.filter((agent) => agent.alive).map((agent) => `${getSeatNumber(agent.id, agents)}号`).join('、')}`;
 }
 
 function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentForPublicLog[] = []): MemoryEntry[] {
@@ -283,7 +291,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
       entries.push(createMemoryEntry(
         `werewolf:day:${day}:speech-order`,
         'result',
-        `第${day}天白天发言顺序：${formatIds(round.daySpeech.playerIds)}。方向：${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}。`,
+        `第${day}天白天发言顺序：${formatIds(round.daySpeech.playerIds, agents)}。方向：${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}。`,
         baseOrder + 50
       ));
     }
@@ -294,7 +302,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
         entries.push(createMemoryEntry(
           `werewolf:day:${day}:sheriff-candidates`,
           'result',
-          `第${day}天警长竞选上警玩家：${formatIds(election.signedUpIds)}。`,
+          `第${day}天警长竞选上警玩家：${formatIds(election.signedUpIds, agents)}。`,
           baseOrder + 100
         ));
       }
@@ -302,7 +310,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
         entries.push(createMemoryEntry(
           `werewolf:day:${day}:sheriff-speech:${index}:${speech.playerId}`,
           'speech',
-          `第${day}天警长竞选发言，${speech.playerId}号：${speech.text}`,
+          `第${day}天警长竞选发言，${getSeatNumber(speech.playerId, agents)}号：${speech.text}`,
           baseOrder + 110 + index
         ));
       });
@@ -310,7 +318,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
         entries.push(createMemoryEntry(
           `werewolf:day:${day}:sheriff-withdrawn`,
           'result',
-          `第${day}天警长竞选退水玩家：${formatIds(election.withdrawnIds)}。`,
+          `第${day}天警长竞选退水玩家：${formatIds(election.withdrawnIds, agents)}。`,
           baseOrder + 180
         ));
       }
@@ -318,7 +326,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
         entries.push(createMemoryEntry(
           `werewolf:day:${day}:sheriff-votes`,
           'vote',
-          `第${day}天警长竞选投票：${formatVotes(election.votes)}。`,
+          `第${day}天警长竞选投票：${formatVotes(election.votes, agents)}。`,
           baseOrder + 190
         ));
       }
@@ -326,7 +334,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
         entries.push(createMemoryEntry(
           `werewolf:day:${day}:sheriff-runoff-speech:${index}:${speech.playerId}`,
           'speech',
-          `第${day}天警长竞选复投发言，${speech.playerId}号：${speech.text}`,
+          `第${day}天警长竞选复投发言，${getSeatNumber(speech.playerId, agents)}号：${speech.text}`,
           baseOrder + 210 + index
         ));
       });
@@ -334,7 +342,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
         entries.push(createMemoryEntry(
           `werewolf:day:${day}:sheriff-runoff-votes`,
           'vote',
-          `第${day}天警长竞选复投：${formatVotes(election.runoffVotes)}。`,
+          `第${day}天警长竞选复投：${formatVotes(election.runoffVotes, agents)}。`,
           baseOrder + 280
         ));
       }
@@ -344,7 +352,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
       entries.push(createMemoryEntry(
         `werewolf:day:${day}:last-words:${index}:${words.playerId}`,
         'speech',
-        `第${day}天遗言，${words.playerId}号：${words.text}`,
+        `第${day}天遗言，${getSeatNumber(words.playerId, agents)}号：${words.text}`,
         baseOrder + 300 + index
       ));
     });
@@ -353,7 +361,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
       entries.push(createMemoryEntry(
         `werewolf:day:${day}:day-speech:${index}:${speech.playerId}`,
         'speech',
-        `第${day}天白天发言，${speech.playerId}号：${speech.text}`,
+        `第${day}天白天发言，${getSeatNumber(speech.playerId, agents)}号：${speech.text}`,
         baseOrder + 400 + index
       ));
     });
@@ -362,7 +370,7 @@ function collectWerewolfPublicMemoryEntries(rounds: Round[] = [], agents: AgentF
       entries.push(createMemoryEntry(
         `werewolf:day:${day}:day-votes`,
         'vote',
-        `第${day}天放逐投票：${formatVotes(round.votes)}。`,
+        `第${day}天放逐投票：${formatVotes(round.votes, agents)}。`,
         baseOrder + 900
       ));
     }
@@ -374,12 +382,12 @@ function buildWerewolfRoundSummary(round: Round = {} as Round, agents: AgentForP
   const day = Number(round.day || 0);
   const parts: string[] = [];
   if (round.publicSummary) parts.push(round.publicSummary);
-  if (round.sheriffId) parts.push(`警长是${round.sheriffId}号`);
-  if (round.exile) parts.push(`${round.exile.id}号被放逐`);
-  if (round.idiotReveal) parts.push(`${round.idiotReveal.id}号白痴翻牌`);
-  if (round.hunterShot) parts.push(`${round.hunterShot.from}号猎人带走${round.hunterShot.target}号`);
+  if (round.sheriffId) parts.push(`警长是${getSeatNumber(round.sheriffId, agents)}号`);
+  if (round.exile) parts.push(`${getSeatNumber(round.exile.id, agents)}号被放逐`);
+  if (round.idiotReveal) parts.push(`${getSeatNumber(round.idiotReveal.id, agents)}号白痴翻牌`);
+  if (round.hunterShot) parts.push(`${getSeatNumber(round.hunterShot.from, agents)}号猎人带走${getSeatNumber(round.hunterShot.target, agents)}号`);
   if (!parts.length && day === 1) {
-    parts.push(`存活玩家：${agents.filter((agent) => agent.alive).map((agent) => `${agent.id}号`).join('、')}`);
+    parts.push(`存活玩家：${agents.filter((agent) => agent.alive).map((agent) => `${getSeatNumber(agent.id, agents)}号`).join('、')}`);
   }
   return parts.length ? `第${day}天摘要：${parts.join('；')}。` : '';
 }
@@ -388,13 +396,13 @@ function createMemoryEntry(id: string, type: string, text: string, order: number
   return { id, scope: 'public', type, text, order };
 }
 
-function formatIds(ids: number[] = []): string {
-  return ids.map((id) => `${id}号`).join('、') || '无';
+function formatIds(ids: number[] = [], agents?: Array<{ id: number }>): string {
+  return ids.map((id) => `${getSeatNumber(id, agents)}号`).join('、') || '无';
 }
 
-function formatVotes(votes: Record<string, number> = {}): string {
+function formatVotes(votes: Record<string, number> = {}, agents?: Array<{ id: number }>): string {
   return Object.entries(votes)
-    .map(([playerId, target]) => `${playerId}号投${target}号`)
+    .map(([playerId, target]) => `${getSeatNumber(playerId, agents)}号投${getSeatNumber(target, agents)}号`)
     .join('、') || '无';
 }
 
@@ -439,6 +447,7 @@ function hasRoleAction(roleConfig: RoleConfigForActions | null | undefined, acti
 
 export {
   shuffle, sortBySeat, rotateFromSeat, getNextAliveId, getClockStartId,
+  getSeatNumber,
   getSheriffSpeechOrder, getSheriffNightDeathSpeechOrder, getTopCandidateIds,
   prefetchOrderedSpeechTexts, buildWolfStrategySummary, getVoteMessage,
   buildSheriffVoteMessage, buildSpeechOrderMessage, buildSheriffBadgeMessage,

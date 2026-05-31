@@ -4,7 +4,7 @@ import type { StepHandler, Workflow } from '../workflow-engine/workflowRegistry'
 import { createTraceContext, flushTrace, markTraceComplete, markTraceError } from '../observability';
 import { createWerewolfSteps } from './steps';
 import { createWerewolfHandlers } from './handlers';
-import { createInitialWerewolfState, serializeWerewolfState, registerMatchInfra, unregisterMatchInfra } from './runtime';
+import { createInitialWerewolfState, serializeWerewolfState, registerMatchInfra, unregisterMatchInfra, flushMatchEventPublishes } from './runtime';
 import { createEventBusWithDefaults } from './eventBus';
 import { createGameEventBuilder } from './gameEventBuilder';
 import { createEventDeliverySubscriber } from './eventDeliverySubscriber';
@@ -49,6 +49,7 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
   registerMatchInfra(matchId, eventBus, gameEventBuilder);
   createChannelRouter(eventBus);
   createAudienceStream(eventBus);
+  
 
   const deliverySubscriber = options.onEvent
     ? createEventDeliverySubscriber(eventBus, options.onEvent)
@@ -60,13 +61,13 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
   const match = createWerewolfWorkflowMatch(config, matchId);
   const isDebug = Boolean(config.debugMode);
   const trace = isDebug ? null : createTraceContext(match.id as string, 'werewolf', String(config.werewolfMode || 'workflow'));
-
   try {
     while (true) {
       const { processed, match: current } = await workflowService.drainAiTasks(match.id as string, { maxTasks: 1 });
       if (!processed || ['completed', 'failed', 'paused_debug'].includes(current?.status as string)) break;
     }
     const finalMatch = workflowService.getDebugState(match.id as string)?.match || match;
+    await flushMatchEventPublishes(match.id as string);
     if (trace) { markTraceComplete(trace); flushTrace(trace); }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = serializeWerewolfState(finalMatch as any, (finalMatch as Record<string, unknown>).state as import('./runtime').WerewolfState);
@@ -76,6 +77,7 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
     throw error;
   } finally {
     // 清理 EventBus 订阅器和基础设施
+    await flushMatchEventPublishes(match.id as string);
     if (deliverySubscriber) {
       deliverySubscriber.stop();
       const errors = deliverySubscriber.getErrorCount();

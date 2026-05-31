@@ -123,7 +123,7 @@ function getWerewolfNarration(event: NarrationEvent): string {
   if (event.type === 'sheriff-runoff-vote')
     return event.message || getSheriffVoteNarration(event.round, true);
   if (event.type === 'sheriff-result')
-    return event.message || buildSheriffResultMessage(event.round, event.game?.werewolfMode || {});
+    return event.message || buildSheriffResultMessage(event.round, event.game?.werewolfMode || {}, event.game?.players as Array<{ id: number }> | undefined);
   if (event.type === 'speech-order')
     return event.message || getWerewolfSpeechOrderNarration(event.round);
   if (event.type === 'sheriff-badge-transfer' || event.type === 'sheriff-badge-tear')

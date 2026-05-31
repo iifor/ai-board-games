@@ -6,7 +6,8 @@ import {
   buildWolfStrategySummary,
   getSheriffSpeechOrder,
   getNextAliveId,
-  rotateFromSeat
+  rotateFromSeat,
+  getSeatNumber
 } from './utils';
 import { getAliveActorsByAction } from './actionWindows';
 import {
@@ -114,7 +115,7 @@ function applyActionResults(runtime: Runtime, step: Step, results: ActionResult[
   if (actionType === 'guard_protect') applyGuardProtect(runtime, round, results);
   if (actionType === 'witch_save') applyWitchSave(runtime, round, results);
   if (actionType === 'witch_poison') applyWitchPoison(runtime, round, results);
-  if (actionType === 'day_speech') applyDaySpeech(round, results);
+  if (actionType === 'day_speech') applyDaySpeech(round, results, runtime.agents);
   if (actionType === 'day_vote') applyDayVote(runtime, round, results);
   if (actionType?.startsWith('sheriff_')) applySheriffActionResults(runtime, round, actionType, results);
 }
@@ -200,7 +201,7 @@ function applyWitchPoison(runtime: Runtime, round: Round, results: ActionResult[
   if (witch) witch.usedPoison = true;
 }
 
-function applyDaySpeech(round: Round, results: ActionResult[]): void {
+function applyDaySpeech(round: Round, results: ActionResult[], agents?: Agent[]): void {
   round.speeches = results.map((result) => ({
     playerId: result.actorId,
     text: result.payload.text || '',
@@ -212,7 +213,7 @@ function applyDaySpeech(round: Round, results: ActionResult[]): void {
   if (selfDestruct && !round.selfDestruct) {
     round.selfDestruct = {
       playerId: selfDestruct.actorId,
-      text: String(selfDestruct.payload.selfDestructText || selfDestruct.payload.text || `${selfDestruct.actorId}号狼人自爆。`),
+      text: String(selfDestruct.payload.selfDestructText || selfDestruct.payload.text || `${getSeatNumber(selfDestruct.actorId, agents)}号狼人自爆。`),
       day: round.day
     };
   }
@@ -346,7 +347,7 @@ function findPendingHunter(agents: Agent[], round: Round, deaths: Array<{ id: nu
 function applySelfDestruct(runtime: Runtime, round: Round): void {
   if (!round.selfDestruct?.playerId) return;
   eliminate(runtime.agents as never, Number(round.selfDestruct.playerId), round.day, 'self_destruct');
-  round.publicSummary = `第${round.day}天，${round.selfDestruct.playerId}号狼人自爆，白天流程中止。`;
+  round.publicSummary = `第${round.day}天，${getSeatNumber(round.selfDestruct.playerId, runtime.agents)}号狼人自爆，白天流程中止。`;
 }
 
 function hasSelfDestruct(round: Round): boolean {

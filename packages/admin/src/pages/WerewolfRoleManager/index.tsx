@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { App as AntApp, Button, Card, Form, Input, InputNumber, Select, Space, Switch, Table, Tag, Typography } from 'antd';
+import { App as AntApp, Button, Card, Form, Input, InputNumber, Select, Space, Switch, Table, Tag } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { adminRequest } from '../../services/adminApi';
 import { WEREWOLF_FACTION_OPTIONS, WEREWOLF_ROLE_TYPE_OPTIONS } from '../../constants/adminConstants';
@@ -9,8 +9,6 @@ import { TableActions } from '../../components/shared/TableActions';
 import { ListFilterBar } from '../../components/shared/ListFilterBar';
 import type { WerewolfRole } from '../../types/entities';
 import type { FilterState } from '../../types/api';
-
-const { Text } = Typography;
 
 export function WerewolfRoleManager() {
   const { message } = AntApp.useApp();
@@ -61,7 +59,7 @@ export function WerewolfRoleManager() {
         />
         <Table rowKey="id" dataSource={filteredRoles} columns={[
           { title: '唯一标', width: 120, dataIndex: 'id', render: (value: string) => <Space><strong>{value}</strong></Space> },
-          { title: '角色', width: 120, dataIndex: 'name', render: (value: string, record: WerewolfRole) => <Space><strong>{value}</strong></Space> },
+          { title: '角色', width: 120, dataIndex: 'name', render: (value: string) => <Space><strong>{value}</strong></Space> },
           { title: '阵营', width: 100, dataIndex: 'faction', render: (value: string) => value === 'wolves' ? <Tag color="red">狼人</Tag> : <Tag color="blue">好人</Tag> },
           { title: '类型', width: 100, dataIndex: 'roleType', render: (value: string) => WEREWOLF_ROLE_TYPE_OPTIONS.find((item) => item.value === value)?.label || value },
           { title: '能力', width: 300, dataIndex: 'ability', ellipsis: true },

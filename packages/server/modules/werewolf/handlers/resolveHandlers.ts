@@ -22,6 +22,7 @@ import { getActiveTrace, recordSnapshot } from '../../observability/tracer';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import { checkWin, checkPostExileWin } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
+import { getSeatNumber } from '../utils';
 
 interface Match {
   id: string;
@@ -104,7 +105,7 @@ function createExileResolveHandler() {
             (round as { votes?: Record<string, number> }).votes || {},
             (round as { voteTally?: Record<string, number> }).voteTally || {},
             resolved.exile,
-            `${resolved.exile.id}号玩家被放逐`,
+            `${getSeatNumber(resolved.exile.id, runtime.agents)}号玩家被放逐`,
           );
         });
       }
@@ -186,7 +187,7 @@ function createSheriffResolveHandler() {
       // Day 1 警长竞选完成后播报死亡结果
       const nightDeaths = (round as { night?: { deaths?: Array<{ id: number; reason: string }> } }).night?.deaths || [];
       const deathMessage = nightDeaths.length
-        ? `昨晚${nightDeaths.map((d) => `${d.id}号玩家`).join('、')}死亡`
+        ? `昨晚${nightDeaths.map((d) => `${getSeatNumber(d.id, runtime.agents)}号玩家`).join('、')}死亡`
         : '昨晚是平安夜';
       publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
         builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);

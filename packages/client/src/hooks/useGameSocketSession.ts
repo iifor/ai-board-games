@@ -5,7 +5,7 @@ import type { OpenGameSocketOptions } from '../services/gameService';
 
 interface PendingAck {
   socket: WebSocket;
-  ackId: string;
+  ackId: number | string;
 }
 
 interface UseGameSocketSessionParams {
@@ -44,7 +44,7 @@ export function useGameSocketSession({
   const socketRef = useRef<WebSocket | null>(null);
   const pendingAckRef = useRef<PendingAck | null>(null);
   const pendingEventRef = useRef<GameEvent | null>(null);
-  const startedAckIdsRef = useRef<Set<string>>(new Set());
+  const startedAckIdsRef = useRef<Set<number | string>>(new Set());
   const autoPlayRef = useRef<boolean>(false);
   const ackTimerRef = useRef<number | null>(null);
   const latestRef = useRef<UseGameSocketSessionParams>({
@@ -127,9 +127,9 @@ export function useGameSocketSession({
 
   function acknowledgePending() {
     const pending = pendingAckRef.current;
-    latestRef.current.onAcknowledge?.();
     if (!pending?.ackId || pending.socket.readyState !== WebSocket.OPEN) return;
     pending.socket.send(JSON.stringify({ type: 'ack', ackId: pending.ackId }));
+    latestRef.current.onAcknowledge?.();
     pendingAckRef.current = null;
     pendingEventRef.current = null;
     startedAckIdsRef.current.delete(pending.ackId);
