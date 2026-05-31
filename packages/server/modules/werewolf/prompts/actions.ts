@@ -36,7 +36,7 @@ export function buildGuardActionPrompt(): string {
 /** 女巫解药 */
 export function buildSaveActionPrompt(victimId: number, isSelf: boolean, canSelfSave: boolean): string {
   const lines = [
-    `今晚狼人袭击了 ${victimId} 号。你还有解药。`,
+    `今晚狼人袭击了 ${victimId} 号。你还有解药。如果是自救，则不要返回原因（reason）。`,
     isSelf && canSelfSave ? '首夜允许自救。' : '',
     '是否使用解药救人？只返回JSON对象：：{"use":true, reason":""}。'
   ].filter(Boolean);
@@ -46,9 +46,9 @@ export function buildSaveActionPrompt(victimId: number, isSelf: boolean, canSelf
 /** 女巫毒药 */
 export function buildPoisonActionPrompt(validIds: number[]): string {
   return [
-    '你还有毒药。请选择是否使用毒药；不用毒药时 target 返回 null。',
+    '你还有毒药。请选择是否使用毒药；不用毒药时 target 返回 null，不使用毒药的时候不要返回原因（reason）。',
     `可选目标：${validIds.join('、')}`,
-    '只返回JSON对象：{"use":false,"target":null, reason":""}'
+    '只返回JSON对象：{"use":false,"target":null, reason":null}'
   ].join('\n\n');
 }
 

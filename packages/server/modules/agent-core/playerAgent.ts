@@ -130,11 +130,12 @@ class BasePlayerAgent {
       this.recordError(options.skillId || 'player-json', 'missing-api-key', options);
       return null;
     }
+    const jsonOnly = '\n\nReturn ONLY a raw JSON object. Do NOT wrap in ```json blocks. No explanations outside the JSON.';
     try {
-      const parsed = parseJsonObject(await this.call(prompt, options.maxTokens || 120)) as Record<string, unknown> | null;
+      const parsed = parseJsonObject(await this.call(prompt + jsonOnly, options.maxTokens || 120)) as Record<string, unknown> | null;
       if (parsed) return parsed;
-      // Retry once for JSON formatting issues.
-      const retryParsed = parseJsonObject(await this.call(`${prompt}\n\nReturn one valid JSON object only.`, options.maxTokens || 120)) as Record<string, unknown> | null;
+      // 重试一次
+      const retryParsed = parseJsonObject(await this.call(`${prompt}\n\nReturn one valid JSON object only. No markdown wrapping.`, options.maxTokens || 120)) as Record<string, unknown> | null;
       if (retryParsed) return retryParsed;
       this.recordError(options.skillId || 'player-json', 'invalid-json', options);
       return null;
