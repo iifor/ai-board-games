@@ -44,7 +44,6 @@ export function useGameSocketSession({
   const socketRef = useRef<WebSocket | null>(null);
   const pendingAckRef = useRef<PendingAck | null>(null);
   const pendingEventRef = useRef<GameEvent | null>(null);
-  const legacyDeferredRef = useRef<{ event: GameEvent; socket: WebSocket } | null>(null);
   const startedAckIdsRef = useRef<Set<number | string>>(new Set());
   const autoPlayRef = useRef<boolean>(false);
   const ackTimerRef = useRef<number | null>(null);
@@ -72,7 +71,6 @@ export function useGameSocketSession({
   function resetSessionRefs() {
     pendingAckRef.current = null;
     pendingEventRef.current = null;
-    legacyDeferredRef.current = null;
     startedAckIdsRef.current.clear();
     autoPlayRef.current = false;
     clearPendingAckTimer();
@@ -113,9 +111,12 @@ export function useGameSocketSession({
       return;
     }
 
+    // 正在播放时收到新事件：立即 ACK 旧事件，直接处理新事件（浏览器 speechSynthesis 自动取消旧语音）
     if (pendingAckRef.current) {
-      if (!legacyDeferredRef.current) legacyDeferredRef.current = { event, socket };
-      return;
+      const old = pendingAckRef.current;
+      old.socket.send(JSON.stringify({ type: 'ack', ackId: old.ackId }));
+      pendingAckRef.current = null;
+      pendingEventRef.current = null;
     }
 
     latestRef.current.applyServerEvent?.(event);
@@ -133,15 +134,6 @@ export function useGameSocketSession({
     pendingEventRef.current = null;
     startedAckIdsRef.current.delete(pending.ackId);
     clearPendingAckTimer();
-
-    const next = legacyDeferredRef.current;
-    legacyDeferredRef.current = null;
-    if (next?.event.ackId) {
-      latestRef.current.applyServerEvent?.(next.event);
-      pendingAckRef.current = { socket: next.socket, ackId: next.event.ackId };
-      pendingEventRef.current = next.event;
-      if (autoPlayRef.current) window.setTimeout(continuePendingEvent, 60);
-    }
   }
 
   function continuePendingEvent() {

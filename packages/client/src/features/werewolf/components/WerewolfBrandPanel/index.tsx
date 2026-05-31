@@ -16,7 +16,7 @@ export function WerewolfBrandPanel({ game, mode, showRoles, onShowRolesChange }:
       <div>
         <span>{mode?.name || (game.event as Record<string, unknown>)?.name as string}</span>
         <span onClick={() => !playerPerspective && onShowRolesChange((value: boolean) => !value)}>
-          <span>{playerPerspective ? '玩家视角' : showRoles ? '上帝视角' : '隐藏身份'}</span>
+          <span>({playerPerspective ? '玩家视角' : showRoles ? '上帝视角' : '隐藏身份'})</span>
         </span>
       </div>
     </section>

@@ -45,7 +45,7 @@ function deleteGameById(id: string): void {
 }
 
 function insertGamePlayer(gameId: string, playerId: number, snapshotJson: string): void {
-  getDb().prepare('INSERT INTO game_players (game_id, player_id, player_snapshot_json) VALUES (?, ?, ?)').run(gameId, playerId, snapshotJson);
+  getDb().prepare('INSERT OR IGNORE INTO game_players (game_id, player_id, player_snapshot_json) VALUES (?, ?, ?)').run(gameId, playerId, snapshotJson);
 }
 
 function deleteGamePlayers(gameId: string): void {
