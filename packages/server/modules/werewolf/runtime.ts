@@ -370,7 +370,7 @@ function serializeWerewolfState(match: Match, state: WerewolfState): Record<stri
     clientViewMode: state.clientViewMode || 'god',
     host: state.host,
     werewolfMode: modeDetail,
-    players: ((state.players || []) as Array<Record<string, unknown> & { roleConfig?: unknown; sourcePlayerId?: unknown }>).map(({ roleConfig, sourcePlayerId, ...player }) => player).sort((a, b) => Number(a.id) - Number(b.id)),
+    players: ((state.players || []) as Array<Record<string, unknown> & { roleConfig?: unknown; sourcePlayerId?: unknown }>).map(({ roleConfig, ...player }) => player).sort((a, b) => Number(a.id) - Number(b.id)),
     rounds: state.rounds || [],
     winner,
     winReason: state.winReason || '',

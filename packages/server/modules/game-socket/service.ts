@@ -10,7 +10,7 @@ import { runWerewolfWorkflow } from '../werewolf';
 import { getWerewolfModeConfig } from '../werewolf-config';
 import { buildWerewolfRuleIntro } from '../werewolf/messages';
 import { createProjectionContext, projectWerewolfGame } from '../werewolf/views/viewPolicy';
-import { getActiveTrace, recordEvent } from '../observability';
+import { getActiveTrace, recordEvent, markTraceError, flushTrace } from '../observability';
 
 // games is TS — import directly
 import { saveGameRecord } from '../games';
@@ -214,9 +214,16 @@ async function runSession(
       const err = error as Error;
       console.error('[runSession] 保存对局记录失败:', err.message);
       const trace = getActiveTrace((game as Record<string, unknown>)?.id as string || '');
-      if (trace) recordEvent(trace, { type: 'save-error', phase: '', event: { reason: err.message } });
+      if (trace) {
+        markTraceError(trace, `保存对局记录失败: ${err.message}`);
+        recordEvent(trace, { type: 'save-error', phase: '', event: { reason: err.message } });
+      }
     }
   }
+
+  // 无论 saveGameRecord 成败，在此最终 flush trace，确保覆盖完整 session 生命周期
+  const sessionTrace = getActiveTrace((game as Record<string, unknown>)?.id as string || '');
+  if (sessionTrace) { flushTrace(sessionTrace); }
 
   await sender.send({
     type:

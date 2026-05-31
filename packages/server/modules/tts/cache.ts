@@ -5,6 +5,7 @@ import * as upload from '../upload/service';
 import { synthesizeVoicePreview } from './service';
 import { isAzureVoice, isServerTtsVoice, buildAudioCacheKey } from './utils';
 import type { VoicePackage, WordBoundary } from './utils';
+import { getActiveTrace, recordEvent } from '../observability';
 
 interface VoiceAudioResult {
   audioUrl: string;
@@ -26,6 +27,19 @@ async function prepareVoiceAudio(
   const cached = upload.getGeneratedAudio(cacheKey, extension, gameId);
   if (cached) {
     const boundaries = loadWordBoundaries(cacheKey, gameId);
+    const trace = gameId ? getActiveTrace(gameId) : null;
+    if (trace) {
+      recordEvent(trace, {
+        type: 'tts-cached',
+        phase: 'tts',
+        event: {
+          provider: String(voice.provider || 'unknown'),
+          voiceId: voice.voiceId || null,
+          gameId,
+          textLength: content.length,
+        }
+      });
+    }
     return {
       audioUrl: cached.url,
       audioMimeType: 'audio/mpeg',
@@ -34,17 +48,53 @@ async function prepareVoiceAudio(
     };
   }
 
-  const audio = await synthesizeVoicePreview(voice, content, { collectWordBoundaries: true });
-  const saved = upload.saveCachedGeneratedAudio(cacheKey, audio.buffer, extension, gameId);
-  if (audio.wordBoundaries?.length) {
-    saveWordBoundaries(cacheKey, audio.wordBoundaries, gameId);
+  const ttsStart = Date.now();
+  try {
+    const audio = await synthesizeVoicePreview(voice, content, { collectWordBoundaries: true });
+    const latencyMs = Date.now() - ttsStart;
+    const saved = upload.saveCachedGeneratedAudio(cacheKey, audio.buffer, extension, gameId);
+    if (audio.wordBoundaries?.length) {
+      saveWordBoundaries(cacheKey, audio.wordBoundaries, gameId);
+    }
+    const trace = gameId ? getActiveTrace(gameId) : null;
+    if (trace) {
+      recordEvent(trace, {
+        type: 'tts-synthesized',
+        phase: 'tts',
+        event: {
+          provider: String(voice.provider || 'unknown'),
+          voiceId: voice.voiceId || null,
+          gameId,
+          textLength: content.length,
+          latencyMs,
+        }
+      });
+    }
+    return {
+      audioUrl: saved.url,
+      audioMimeType: audio.mimeType || 'audio/mpeg',
+      audioCached: false,
+      wordBoundaries: audio.wordBoundaries?.length ? audio.wordBoundaries : null
+    };
+  } catch (error) {
+    const latencyMs = Date.now() - ttsStart;
+    const trace = gameId ? getActiveTrace(gameId) : null;
+    if (trace) {
+      recordEvent(trace, {
+        type: 'tts-error',
+        phase: 'tts',
+        event: {
+          provider: String(voice.provider || 'unknown'),
+          voiceId: voice.voiceId || null,
+          gameId,
+          textLength: content.length,
+          latencyMs,
+          errorMessage: (error as Error).message || String(error),
+        }
+      });
+    }
+    throw error;
   }
-  return {
-    audioUrl: saved.url,
-    audioMimeType: audio.mimeType || 'audio/mpeg',
-    audioCached: false,
-    wordBoundaries: audio.wordBoundaries?.length ? audio.wordBoundaries : null
-  };
 }
 
 function saveWordBoundaries(cacheKey: string, boundaries: WordBoundary[], gameId: string | null): void {

@@ -68,7 +68,7 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
     }
     const finalMatch = workflowService.getDebugState(match.id as string)?.match || match;
     await flushMatchEventPublishes(match.id as string);
-    if (trace) { markTraceComplete(trace); flushTrace(trace); }
+    if (trace) { markTraceComplete(trace); /* flushTrace 推迟到 runSession 中 saveGameRecord 之后 */ }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = serializeWerewolfState(finalMatch as any, (finalMatch as Record<string, unknown>).state as import('./runtime').WerewolfState);
     return result;

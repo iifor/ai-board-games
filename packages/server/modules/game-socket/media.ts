@@ -2,6 +2,7 @@ import { getVoicePackage } from '../voices';
 import { isServerTtsVoice, prepareVoiceAudio } from '../tts';
 import { stripSpeechParentheses } from '../../services/text/playableText';
 import { getNarration } from './narration';
+import { getActiveTrace, recordEvent } from '../observability';
 import type { NarrationEvent } from './narration';
 import type { VoicePackage } from '../../types/api';
 
@@ -108,11 +109,28 @@ async function prepareEventMedia(event: NarrationEvent): Promise<MediaEvent> {
   if (!isServerTtsVoice(voice))
     return result;
 
+  const gameId = (event.game?.id as string) ?? null;
+
   try {
     const speechText = stripSpeechParentheses(text);
     if (!speechText) return result;
-    const saved = await prepareVoiceAudioWithTimeout(voice, speechText, (event.game?.id as string) ?? null);
+    const saved = await prepareVoiceAudioWithTimeout(voice, speechText, gameId);
     if (!saved) return result;
+
+    const trace = gameId ? getActiveTrace(gameId) : null;
+    if (trace) {
+      recordEvent(trace, {
+        type: 'tts-event-prepared',
+        phase: 'tts',
+        event: {
+          speakerRole: subtitle?.speakerRole || 'unknown',
+          textLength: speechText.length,
+          cached: saved.audioCached,
+          audioUrl: saved.audioUrl,
+        }
+      });
+    }
+
     return {
       ...result,
       audioUrl: saved.audioUrl,
@@ -121,6 +139,17 @@ async function prepareEventMedia(event: NarrationEvent): Promise<MediaEvent> {
       wordBoundaries: saved.wordBoundaries || null,
     };
   } catch (error) {
+    const trace = gameId ? getActiveTrace(gameId) : null;
+    if (trace) {
+      recordEvent(trace, {
+        type: 'tts-event-error',
+        phase: 'tts',
+        event: {
+          speakerRole: subtitle?.speakerRole || 'unknown',
+          errorMessage: (error as Error).message || String(error),
+        }
+      });
+    }
     return { ...result, mediaError: (error as Error).message };
   }
 }
