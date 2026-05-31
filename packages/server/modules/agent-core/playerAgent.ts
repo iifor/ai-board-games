@@ -159,6 +159,20 @@ class BasePlayerAgent {
     if (!parsed) return null;
     const target = Number(parsed.targetSeat ?? parsed.target);
     if (validIds.includes(target)) return target;
+    // 重试一次：目标无效，告诉 LLM 重新选择
+    const retryParsed = await this.askJson([
+      prompt,
+      `Valid target seat numbers: ${validIds.join(', ')}`,
+      `You returned ${target}, which is NOT in the valid list. Pick ONLY from: ${validIds.join(', ')}.`,
+      'Return JSON: {"targetSeat":<number from the valid list>}.'
+    ].join('\n\n'), {
+      maxTokens: 60,
+      skillId: options.skillId || 'player-vote',
+      phase: options.phase,
+    });
+    if (!retryParsed) return null;
+    const retryTarget = Number(retryParsed.targetSeat ?? retryParsed.target);
+    if (validIds.includes(retryTarget)) return retryTarget;
     this.recordError(options.skillId || 'player-vote', 'invalid-target', options);
     return null;
   }

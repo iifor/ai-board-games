@@ -1,5 +1,5 @@
 import { synthesizeVoiceMedia, synthesizeVoicePreview } from './service';
-import { prepareVoiceAudio, isAzureVoice, buildAudioCacheKey } from './cache';
+import { prepareVoiceAudio, isAzureVoice, isServerTtsVoice, buildAudioCacheKey } from './cache';
 
-export { synthesizeVoicePreview, synthesizeVoiceMedia, prepareVoiceAudio, isAzureVoice, buildAudioCacheKey };
+export { synthesizeVoicePreview, synthesizeVoiceMedia, prepareVoiceAudio, isAzureVoice, isServerTtsVoice, buildAudioCacheKey };
 export * from './utils';

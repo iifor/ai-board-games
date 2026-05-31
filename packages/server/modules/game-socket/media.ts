@@ -1,5 +1,5 @@
 import { getVoicePackage } from '../voices';
-import { prepareVoiceAudio } from '../tts';
+import { isServerTtsVoice, prepareVoiceAudio } from '../tts';
 import { stripSpeechParentheses } from '../../services/text/playableText';
 import { getNarration } from './narration';
 import type { NarrationEvent } from './narration';
@@ -105,7 +105,7 @@ async function prepareEventMedia(event: NarrationEvent): Promise<MediaEvent> {
   if (!text) return result;
 
   const voice = resolveEventVoice(event);
-  if (!voice || !voice.enabled || String(voice.provider || '').toLowerCase() !== 'azure')
+  if (!isServerTtsVoice(voice))
     return result;
 
   try {

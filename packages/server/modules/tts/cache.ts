@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as upload from '../upload/service';
 import { synthesizeVoicePreview } from './service';
-import { isAzureVoice, buildAudioCacheKey } from './utils';
+import { isAzureVoice, isServerTtsVoice, buildAudioCacheKey } from './utils';
 import type { VoicePackage, WordBoundary } from './utils';
 
 interface VoiceAudioResult {
@@ -19,7 +19,7 @@ async function prepareVoiceAudio(
   gameId: string | null = null
 ): Promise<VoiceAudioResult | null> {
   const content = String(text || '').trim();
-  if (!content || !isAzureVoice(voice)) return null;
+  if (!content || !isServerTtsVoice(voice)) return null;
 
   const cacheKey = buildAudioCacheKey(voice, content);
   const cached = upload.getGeneratedAudio(cacheKey, 'mp3', gameId);
@@ -68,4 +68,4 @@ function getCacheHash(cacheKey: string): string {
   return crypto.createHash('sha256').update(String(cacheKey || '')).digest('hex');
 }
 
-export { prepareVoiceAudio, isAzureVoice, buildAudioCacheKey };
+export { prepareVoiceAudio, isAzureVoice, isServerTtsVoice, buildAudioCacheKey };

@@ -1,9 +1,10 @@
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
-import { DEFAULT_SAMPLE_TEXT } from './constants';
+import { DEFAULT_SAMPLE_TEXT, getAzureTtsTimeoutMs } from './constants';
 import {
   getAzureSpeechKey, normalizeEndpoint, parseRegionFromEndpoint,
   buildAzureSsml
 } from './utils';
+import { synthesizeMimoVoice } from './mimo';
 import { AppError, ErrorCodes } from '../../utils/errors';
 import type { VoicePackage, WordBoundary } from './utils';
 
@@ -27,6 +28,7 @@ async function synthesizeVoicePreview(
   const content = String(text || voicePackage.sampleText || DEFAULT_SAMPLE_TEXT).trim() || DEFAULT_SAMPLE_TEXT;
 
   if (provider === 'azure') return synthesizeAzureVoice(voicePackage, content, options);
+  if (provider === 'mimo') return synthesizeMimoVoice(voicePackage, content);
   throw new AppError('UNSUPPORTED_VOICE', '该语音包使用浏览器本地语音，请在前端直接试听。', 422);
 }
 
@@ -69,6 +71,20 @@ async function synthesizeAzureVoice(
   const collectBoundaries = options.collectWordBoundaries !== false;
 
   return new Promise((resolve, reject) => {
+    let synthesizer: sdk.SpeechSynthesizer | null = null;
+    let settled = false;
+    const timeoutMs = getAzureTtsTimeoutMs();
+    const finish = <T>(handler: (value: T) => void, value: T): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (synthesizer) synthesizer.close();
+      handler(value);
+    };
+    const timer = setTimeout(() => {
+      finish(reject, new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure 语音合成超时：${timeoutMs}ms`, 504));
+    }, timeoutMs);
+
     try {
       const speechConfig = sdk.SpeechConfig.fromSubscription(key, region);
       speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
@@ -76,7 +92,7 @@ async function synthesizeAzureVoice(
 
       const pullStream = sdk.AudioOutputStream.createPullStream();
       const audioConfig = sdk.AudioConfig.fromStreamOutput(pullStream);
-      const synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
+      synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
 
       const wordBoundaries: WordBoundary[] = [];
       if (collectBoundaries) {
@@ -94,26 +110,24 @@ async function synthesizeAzureVoice(
       synthesizer.speakSsmlAsync(
         ssml,
         (result) => {
-          synthesizer.close();
           if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-            resolve({
+            finish(resolve, {
               buffer: Buffer.from(result.audioData),
               mimeType: 'audio/mpeg',
               wordBoundaries
             });
           } else {
             const detail = sdk.CancellationDetails.fromResult(result);
-            reject(new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure 语音合成失败：${detail.errorDetails || result.reason}`, 502));
+            finish(reject, new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure 语音合成失败：${detail.errorDetails || result.reason}`, 502));
           }
         },
         (error) => {
-          synthesizer.close();
-          reject(new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure 语音合成失败：${error}`, 502));
+          finish(reject, new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure 语音合成失败：${error}`, 502));
         }
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      reject(new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure SDK 初始化失败：${message}`, 503));
+      finish(reject, new AppError(ErrorCodes.UPSTREAM_ERROR, `Azure SDK 初始化失败：${message}`, 503));
     }
   });
 }

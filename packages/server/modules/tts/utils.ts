@@ -19,6 +19,14 @@ function isAzureVoice(voice: VoicePackage | null | undefined): boolean {
   return Boolean(voice?.enabled) && String(voice?.provider || '').toLowerCase() === 'azure';
 }
 
+function isMimoVoice(voice: VoicePackage | null | undefined): boolean {
+  return Boolean(voice?.enabled) && String(voice?.provider || '').toLowerCase() === 'mimo';
+}
+
+function isServerTtsVoice(voice: VoicePackage | null | undefined): boolean {
+  return isAzureVoice(voice) || isMimoVoice(voice);
+}
+
 function buildAudioCacheKey(voice: VoicePackage, text: string): string {
   return JSON.stringify({
     provider: voice.provider,
@@ -57,6 +65,12 @@ function getAzureSpeechKey(): string {
     || '';
 }
 
+function getMimoApiKey(): string {
+  return process.env.MIMO_API_KEY
+    || process.env.MIMO_TTS_API_KEY
+    || '';
+}
+
 function buildAzureSsml(voicePackage: VoicePackage, text: string): string {
   const language = escapeXml(voicePackage.language || 'zh-CN');
   const voiceId = escapeXml(voicePackage.voiceId || 'zh-CN-XiaoxiaoNeural');
@@ -79,10 +93,13 @@ function buildAzureSsml(voicePackage: VoicePackage, text: string): string {
 export type { VoicePackage, WordBoundary };
 export {
   isAzureVoice,
+  isMimoVoice,
+  isServerTtsVoice,
   buildAudioCacheKey,
   escapeXml,
   normalizeEndpoint,
   parseRegionFromEndpoint,
   getAzureSpeechKey,
+  getMimoApiKey,
   buildAzureSsml
 };

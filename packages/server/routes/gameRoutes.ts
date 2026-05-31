@@ -6,7 +6,7 @@ import { getGame, listGames } from '../modules/games';
 import { getVoicePackage } from '../modules/voices';
 import { listSkins } from '../modules/skins';
 import { listWerewolfModes } from '../modules/werewolf-config';
-import { isAzureVoice, synthesizeVoiceMedia, synthesizeVoicePreview } from '../modules/tts';
+import { isServerTtsVoice, synthesizeVoiceMedia, synthesizeVoicePreview } from '../modules/tts';
 import { AppError, ErrorCodes } from '../utils/errors';
 
 const router = express.Router();
@@ -88,7 +88,7 @@ router.post('/voice/synthesize-media', async (request: Request, response: Respon
 
     const voice = getVoicePackage(voicePackageId as number);
     if (!voice || !voice.enabled) throw new AppError(ErrorCodes.NOT_FOUND, '语音包不存在或未启用', 404);
-    if (!isAzureVoice(voice)) {
+    if (!isServerTtsVoice(voice)) {
       response.status(422).json({
         code: 'UNSUPPORTED_VOICE',
         message: '该语音包不支持服务端语音媒体。',
