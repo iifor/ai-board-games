@@ -124,7 +124,7 @@ function isApiResponse<T>(value: ApiResponse<T> | T): value is ApiResponse<T> {
 }
 
 export interface OpenGameSocketOptions {
-  gameType?: string;
+  gameType: string;
   playerIds?: number[];
   hostId?: number | string;
   topic?: Partial<DebateTopic> | null;
@@ -140,7 +140,7 @@ export interface OpenGameSocketOptions {
 }
 
 export function openGameSocket({
-  gameType = 'debate',
+  gameType,
   playerIds,
   hostId,
   topic,
