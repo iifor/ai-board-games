@@ -61,7 +61,7 @@ export function SpeechSubtitle({ speech, players = [], getSpeakerLabel, classNam
   return (
     <aside className={fallbackClassName} aria-live="polite">
       <p className="speech-subtitle__speaker">{speaker}发言：</p>
-      <p>{timeline.fullText || text}</p>
+      <pre>{timeline.fullText || text}</pre>
     </aside>
   );
 }

@@ -52,7 +52,7 @@ export function WerewolfArena({
   const phaseTitle = getPhaseTitle(currentRound, streamMessage);
   const sheriffCandidates = getVisibleSheriffCandidates(currentRound, sheriffCandidateIds);
   const nightActors = new Set((nightActionPlayerIds || []).map(Number));
-  const nightActive = currentRound?.phase === 'night';
+  const nightActive = currentRound?.phase === 'night' || !game?.rounds?.length;
 
   return (
     <section className={nightActive ? 'werewolf-arena night-active' : 'werewolf-arena'}>
@@ -92,12 +92,11 @@ export function WerewolfArena({
 
         <section className="werewolf-center-card" aria-live="polite">
           <span className="werewolf-phase-kicker">{currentRound?.phase === 'night' ? '夜晚行动' : currentRound?.phase === 'day' ? '白天议事' : '实时观战'}</span>
-          <h2>{currentRound ? `${currentRound.phase === 'night' ? '夜晚' : '白天'}第 ${currentRound.day || 1} 轮` : '等待开局'}</h2>
+          <h2>{currentRound ? `${currentRound.phase === 'night' ? '夜晚' : '白天'}第 ${currentRound.day || 1} 轮` : '游戏准备中'}</h2>
           <dl>
             <div><dt>存活玩家</dt><dd>{stats.alive}</dd></div>
             <div><dt>出局玩家</dt><dd>{stats.dead}</dd></div>
           </dl>
-          <p>{streamMessage}</p>
           <strong>{getRoundResult(currentRound, orderedPlayers)}</strong>
         </section>
       </section>

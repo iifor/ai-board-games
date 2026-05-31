@@ -64,6 +64,7 @@ export interface NightBadge {
   theme?: NightBadgeTheme;
   title: string;
   label?: string;
+  use?: boolean;
 }
 
 export interface NightBadgeTheme {

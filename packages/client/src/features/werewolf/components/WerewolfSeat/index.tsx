@@ -69,7 +69,7 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadge
                 title={badge.title}
                 key={`${badge.kind}-${badge.target || badge.label || badgeIndex}`}
               >
-                {getNightBadgeIcon(badge.kind, 30, '#fff1a1')}
+                {/* {getNightBadgeIcon(badge.kind, 30, '#fff1a1')} */}
                 {badge.prefix && <b>{badge.prefix}</b>}
                 {badge.target && <b>{badge.targetLabel || `${badge.target}号`}</b>}
                 {!badge.target && badge.label && <b>{badge.label}</b>}
@@ -90,9 +90,9 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadge
   );
 }
 
-function getNightBadgeIcon(kind: string, size: number = 13, color: string = '#fff'): React.ReactElement {
-  if (kind === 'wolf') return <Swords size={size} color={color} />;
-  if (kind === 'guard') return <Shield size={size} color={color} />;
-  if (kind === 'seer') return <Eye size={size} color={color} />;
-  return <FlaskConical size={size} color={color} />;
-}
+// function getNightBadgeIcon(kind: string, size: number = 13, color: string = '#fff'): React.ReactElement {
+//   if (kind === 'wolf') return <Swords size={size} color={color} />;
+//   if (kind === 'guard') return <Shield size={size} color={color} />;
+//   if (kind === 'seer') return <Eye size={size} color={color} />;
+//   return <FlaskConical size={size} color={color} />;
+// }

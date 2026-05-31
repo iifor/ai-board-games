@@ -491,7 +491,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
         onSkipPhase={skipCurrentReplayPhase}
       />
 
-      {status === 'idle' || !displayGame.rounds?.length ? (
+      {status === 'idle' ? (
         <section className="werewolf-idle-stage" aria-label="狼人杀等待开局">
           <div className="werewolf-idle-brand">
             <p>狼人杀</p>

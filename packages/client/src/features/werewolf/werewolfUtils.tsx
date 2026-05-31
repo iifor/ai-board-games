@@ -257,7 +257,7 @@ export function getRoundResult(round: WerewolfRound | null, players: Player[] = 
   const exile = round.exile
     ? `放逐：${formatWerewolfSeatLabel(round.exile.id, players)}`
     : round.idiotReveal ? `白痴翻牌：${formatWerewolfSeatLabel(round.idiotReveal.id, players)}` : '放逐：暂无';
-  return `${night} ? ${exile}`;
+  return `${night} | ${exile}`;
 }
 
 export function getWerewolfNarration(event: GameEvent | null | undefined): string {
@@ -382,23 +382,24 @@ function appendWitchNightActionBadges(badges: NightBadge[], night: WerewolfNight
   if (night.witchSaveTarget) {
     badges.push(createNightTargetBadge('antidote', night.witchSaveTarget, players, { prefix: '救', titlePrefix: '解救' }));
   } else if (hasCompletedWitchAntidoteAction(nightActionType)) {
-    badges.push({ kind: 'antidote', label: '不救', title: '解药不用', theme: WEREWOLF_NIGHT_BADGE_THEME.muted });
+    badges.push({ kind: 'antidote', label: '不救', use: false, title: '解药不用', theme: WEREWOLF_NIGHT_BADGE_THEME.muted });
   }
 
   if (night.witchPoisonTarget) {
     badges.push(createNightTargetBadge('poison', night.witchPoisonTarget, players, { prefix: '毒', titlePrefix: '毒药' }));
   } else if (nightActionType === 'witch-poison-action') {
-    badges.push({ kind: 'poison', label: '不毒', title: '毒药不用', theme: WEREWOLF_NIGHT_BADGE_THEME.muted });
+    badges.push({ kind: 'poison', label: '不毒', use: false, title: '毒药不用', theme: WEREWOLF_NIGHT_BADGE_THEME.muted });
   }
 }
 
 function createNightTargetBadge(kind: string, target: string, players: Player[], options: NightBadgeOptions = {}): NightBadge {
-  const seatNumber = getWerewolfSeatNumber(target, players);
-  const targetLabel = seatNumber ? `${seatNumber}号` : `${target}号`;
+  const seatNumber = getWerewolfSeatNumber(target, players) || null;
+  const targetLabel = seatNumber ? `${seatNumber}号` : `空守`;
   return {
     kind,
     target,
     targetLabel,
+    use: Boolean(seatNumber),
     prefix: options.prefix,
     result: options.result,
     theme: options.theme,

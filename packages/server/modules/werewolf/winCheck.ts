@@ -106,7 +106,7 @@ function checkDawnBindVote(agents: WerewolfAgent[], day: number): WinResult {
   const aliveWolves = agents.filter((agent) => agent.alive && agent.faction === 'wolves').length;
   const aliveGood = agents.filter((agent) => agent.alive && agent.faction !== 'wolves').length;
   if (aliveWolves > 0 && aliveWolves >= aliveGood) {
-    return { winner: 'wolves', winReason: `第 ${day} 天天亮，狼人数量达到或超过好人，狼人绑票胜利。` };
+    return { winner: 'wolves', winReason: `狼人绑票胜利。` };
   }
   return { winner: null, winReason: '' };
 }

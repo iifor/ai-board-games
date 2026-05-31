@@ -48,32 +48,48 @@
 }
 
 .speech-subtitle--fallback {
-  top: 50%;
+  top: 45%;
   left: 50%;
   bottom: auto;
   right: auto;
   transform: translate(-50%, -50%);
-  max-width: 72vw;
-  padding: 24px 36px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.8);
-  color: #222;
-  font-size: 30px;
-  line-height: 1.7;
-  white-space: normal;
-  animation: subtitle-pop-in 0.28s ease-out;
-  text-align: left;
+  width: min(520px, 90vw);
+  max-height: 62vh;
+  min-width: 30vw;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(92, 188, 255, 0.46);
+  border-radius: 10px;
+  background: rgba(5, 22, 54, 0.95);
+  box-shadow: 0 0 22px rgba(52, 163, 255, 0.22), inset 0 0 12px rgba(70, 176, 255, 0.08);
+  color: #bdeeff;
+  overflow: hidden;
 }
 
 .speech-subtitle--fallback .speech-subtitle__speaker {
-  display: block;
-  font-size: 26px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: var(--accent-color);
-  border-right: 0;
-  padding-right: 0;
-  color: var(--accent-color);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(92, 188, 255, 0.18);
+  flex-shrink: 0;
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 22px;
+}
+
+.speech-subtitle--fallback pre {
+  margin: 0;
+  padding: 20px;
+  font-size: 16px;
+  line-height: 1.7;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #bdeeff;
+  background: none;
+  border: none;
 }
 
 .speech-subtitle--debate {
@@ -82,17 +98,6 @@
   font-weight: 850;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.35);
-}
-
-.speech-subtitle--debate.speech-subtitle--fallback {
-  top: 50%;
-  bottom: auto;
-  max-width: 72vw;
-  padding: 22px 30px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #222;
-  font-size: 26px;
-  line-height: 1.65;
 }
 
 @keyframes subtitle-pop-in {
