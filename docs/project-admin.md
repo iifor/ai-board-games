@@ -1,0 +1,131 @@
+# B 端后台管理架构
+
+## 项目概述
+
+B 端位于 `packages/admin`，面向运营、配置和调试人员，负责玩家、模型供应商、模型、音色、狼人杀角色/模式、皮肤、历史对局、AI 观测和工作流调试。
+
+## 技术栈
+
+- React 18
+- React DOM
+- React Router
+- Vite
+- TypeScript
+- Ant Design
+- @ant-design/icons
+- @uiw/react-json-view
+- `@ai-presenter/shared`
+
+## 目录结构
+
+```txt
+packages/admin/
+├── package.json
+├── tsconfig.json
+├── vite.config.mjs
+└── src/
+    ├── main.tsx
+    ├── components/
+    │   ├── AdminPage/
+    │   ├── GameDetailDrawer/
+    │   ├── TraceComponents/
+    │   └── shared/
+    ├── constants/
+    │   ├── adminConstants.ts
+    │   └── traceLabels.ts
+    ├── hooks/
+    │   └── usePlayerNicknames.ts
+    ├── pages/
+    │   ├── Dashboard/
+    │   ├── GameHistory/
+    │   ├── ModelManager/
+    │   ├── ModelProviderManager/
+    │   ├── PlayerManager/
+    │   ├── SkinManager/
+    │   ├── TraceExplorer/
+    │   ├── VoiceManager/
+    │   ├── WerewolfModeManager/
+    │   ├── WerewolfRoleManager/
+    │   └── WorkflowDebugConsole/
+    ├── services/
+    │   └── adminApi.ts
+    ├── types/
+    ├── utils/
+    └── styles.css
+```
+
+## 架构设计
+
+后台以 `AdminPage` 为主框架，使用 React Router 管理后台路由。页面模块通过 `services/adminApi.ts` 调用 `/api/admin/*`，服务端资源模块负责最终参数校验、权限边界、数据读写和错误处理。
+
+后台主要职责：
+
+- 配置类：玩家、模型供应商、模型、音色、狼人杀角色和模式、皮肤。
+- 历史类：辩论赛、狼人杀、旧共识迷图历史和详情。
+- 观测类：trace、LLM 请求、agent 决策、span 时间线。
+- 调试类：工作流 match、tick、pending action、AI task、interrupt。
+
+## 核心模块
+
+### AdminPage
+
+- 后台主布局和导航入口。
+- 管理后台路由组合。
+- 连接各管理页面。
+
+### adminApi
+
+`packages/admin/src/services/adminApi.ts` 统一封装后台 API 请求，覆盖：
+
+- `players`
+- `model-providers`
+- `models`
+- `voices`
+- `werewolf-config`
+- `games`
+- `skins`
+- `upload`
+- `settings`
+- `observability`
+- `workflow-engine`
+
+### 页面模块
+
+- `Dashboard`：后台概览。
+- `GameHistory`：历史对局列表和详情入口。
+- `PlayerManager`：玩家资料、头像、人格、模型、音色、启用状态。
+- `ModelProviderManager`：模型供应商配置。
+- `ModelManager`：供应商下模型配置。
+- `VoiceManager`：音色配置。
+- `WerewolfRoleManager`：狼人杀角色管理。
+- `WerewolfModeManager`：狼人杀模式和角色配置。
+- `SkinManager`：皮肤资源管理。
+- `TraceExplorer`：AI trace、span、LLM 调用、agent 决策查看。
+- `WorkflowDebugConsole`：工作流调试控制台。
+
+### 观测组件
+
+`TraceComponents` 提供 trace 相关展示组件：
+
+- `AgentDecisionCard`
+- `LlmCallCard`
+- `SpanTimeline`
+
+## 配置与部署
+
+常用命令：
+
+```bash
+pnpm run dev:admin
+pnpm run build:admin
+pnpm run check:admin
+```
+
+构建产物输出到 `dist/admin`，由服务端挂载到 `/admin`。`dist/` 不作为源码目录维护。
+
+## 扩展点与注意事项
+
+- 新增后台页面放入 `src/pages/<PageName>`。
+- 新增通用后台组件放入 `src/components` 或 `src/components/shared`。
+- API 调用集中到 `services/adminApi.ts`，页面不要散落 fetch 细节。
+- 页面只负责表单、交互、状态展示和调用 API；核心业务规则留在服务端。

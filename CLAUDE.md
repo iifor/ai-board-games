@@ -20,6 +20,18 @@
 
 开发前必须先阅读当前目录结构，并优先复用已有模块
 
+首次访问项目时，必须先阅读 `docs/README.md` 和 `docs/project-summary.md`，再按任务阅读对应文档：
+
+- 后端服务：`docs/project-server.md`
+- 游戏流程、AI 调度、WebSocket：`docs/project-workflow.md`
+- C 端游戏前台：`docs/project-client.md`
+- B 端管理后台：`docs/project-admin.md`
+- 共享类型、schema、常量、测试：`docs/project-shared.md`
+
+不允许在未阅读项目文档前直接进行无目的全局扫代码。文档用于建立项目地图；源码用于核实具体实现细节。
+
+如果修改了项目流程、模块划分、关键 API、数据结构、运行配置、工作流、共享类型或重要约定，必须同步更新 `docs/` 中对应文档。如果发现文档与代码不一致，以代码为准完成判断，并在同次变更中修正文档。
+
 如果项目没有明确结构，默认采用以下结构：
 
 ```txt
