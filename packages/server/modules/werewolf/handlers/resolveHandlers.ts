@@ -23,6 +23,8 @@ import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import { checkWin, checkPostExileWin } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
 import { getSeatNumber } from '../utils';
+import { auditNightResolutionShadow } from '../engineNightResolutionAudit';
+import type { NightResolutionShadowAudit } from '../engineNightResolutionAudit';
 
 interface Match {
   id: string;
@@ -55,11 +57,22 @@ function createNightResolveHandler() {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
       const runtime = createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!);
+      const day = step.config.day || Number(round.day) || 1;
+      const stateBeforeLegacy = cloneRecord(runtime.state as unknown as Record<string, unknown>);
       const resolved = resolveNightEffects(runtime.agents as never, round as never);
+      const shadowAudit = auditNightResolutionShadow({
+        stateBeforeLegacy,
+        day,
+        legacy: {
+          effects: resolved.effects as unknown as Array<Record<string, unknown>>,
+          deaths: resolved.deaths,
+        },
+      });
+      const shadowAuditEvent = createNightResolutionShadowAuditEvent(match, step, stateBeforeLegacy, shadowAudit);
       const hunter = findPendingHunter(runtime.agents as unknown as ReducerAgent[], round as unknown as ReducerRound, resolved.deaths);
-      if (hunter) return createHunterWindow({ match, step, state, runtime, round, hunter });
+      if (hunter) return appendHandlerEvents(createHunterWindow({ match, step, state, runtime, round, hunter }), [shadowAuditEvent]);
       const winResult = runtime.agents?.length
-        ? checkWin(runtime.agents as WerewolfAgent[], step.config.day || 1, runtime.modeConfig as Record<string, unknown> || {}, {})
+        ? checkWin(runtime.agents as WerewolfAgent[], day, runtime.modeConfig as Record<string, unknown> || {}, {})
         : { winner: null, winReason: '' } as { winner: string | null; winReason: string };
       const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}) }, step.id);
       recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: resolved.effects as unknown as Record<string, unknown>[] });
@@ -68,6 +81,7 @@ function createNightResolveHandler() {
       if (winResult.winner) {
         outEvents.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
       }
+      outEvents.push(shadowAuditEvent);
 
       recordGameSnapshotIfTrace(match.id, runtime as unknown as Record<string, unknown>, 'night_resolve');
       return {
@@ -78,6 +92,40 @@ function createNightResolveHandler() {
     },
     runAiTask: runHunterAiTask,
     validateAiResult: validateHunterAiResult
+  };
+}
+
+function createNightResolutionShadowAuditEvent(
+  match: Match,
+  step: Step,
+  state: Record<string, unknown>,
+  audit: NightResolutionShadowAudit,
+): unknown {
+  return {
+    ...createWerewolfEvent(
+      match,
+      step,
+      state,
+      'werewolf_night_resolution_shadow_audited',
+      'night resolution shadow audit',
+      {
+        day: audit.day,
+        status: audit.status,
+        legacy: audit.legacy,
+        engine: audit.engine,
+        mismatches: audit.mismatches,
+        error: audit.error,
+      },
+      { channel: CHANNEL_TYPES.SYSTEM },
+    ),
+    visibility: 'system',
+  };
+}
+
+function appendHandlerEvents(result: HandlerResult, events: unknown[]): HandlerResult {
+  return {
+    ...result,
+    events: [...(result.events || []), ...events],
   };
 }
 
@@ -211,6 +259,10 @@ function recordGameSnapshotIfTrace(matchId: string, runtime: Record<string, unkn
     const snapshot = serializeWerewolfState({ id: matchId }, runtime as Record<string, unknown>);
     recordSnapshot(trace, checkpoint, snapshot, { day: (runtime.rounds as Array<Record<string, unknown>> | undefined)?.length || undefined, phase: (runtime as Record<string, unknown>).phase as string || undefined });
   } catch { /* best-effort */ }
+}
+
+function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(value || {})) as Record<string, unknown>;
 }
 
 export {

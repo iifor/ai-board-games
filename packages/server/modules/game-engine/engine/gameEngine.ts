@@ -1,5 +1,7 @@
 import type {
   DomainAction,
+  EngineDebugState,
+  EngineDefinitionSummary,
   EngineResult,
   GameDefinition,
   WorkflowEffect,
@@ -11,7 +13,7 @@ import { EffectResolutionService, EffectResolverRegistry } from '../effect/effec
 import { SqliteMatchStateStore } from '../state/sqliteMatchStateStore';
 import type { MatchStateStore } from '../state/matchStateStore';
 import { WorkflowRuntime } from '../workflow/workflowRuntime';
-import { assertCanTick } from './invariantChecker';
+import { assertCanTick, collectEngineInvariants } from './invariantChecker';
 import { GameDefinitionRegistry } from './gameDefinitionRegistry';
 
 interface GameEngineOptions {
@@ -119,10 +121,22 @@ class GameEngine {
   async resolveEffects(matchId: string): Promise<EngineResult<{ events: unknown[] }>> {
     const match = this.store.loadMatch(matchId);
     if (!match) return failure('MATCH_NOT_FOUND', `Match not found: ${matchId}`);
-    this.requireDefinitionForMatch(match.gameType, match.config?.gameDefinitionVersion as string | undefined);
-    const service = new EffectResolutionService(this.store, this.effectResolverRegistry, this.channelSystem);
+    const definition = this.requireDefinitionForMatch(match.gameType, match.config?.gameDefinitionVersion as string | undefined);
+    const service = new EffectResolutionService(this.store, this.effectResolverRegistry, this.channelSystem, {
+      projectState: definition.projectState,
+    });
     const events = await service.resolvePending(matchId, match.state);
     return { ok: true, data: { events } };
+  }
+
+  getDebugState(matchId: string): EngineDebugState {
+    const storeState = this.store.getDebugState(matchId);
+    return {
+      ...storeState,
+      definitions: this.listDefinitions().map(toDefinitionSummary),
+      invariants: collectEngineInvariants(storeState),
+      generatedAt: new Date().toISOString(),
+    };
   }
 
   private requireDefinition(gameType: string, version?: string): GameDefinition {
@@ -176,6 +190,15 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 function failure<T = never>(code: string, message: string, details?: unknown): EngineResult<T> {
   return { ok: false, error: { code, message, details } };
+}
+
+function toDefinitionSummary(definition: GameDefinition): EngineDefinitionSummary {
+  return {
+    gameType: definition.gameType,
+    version: definition.version,
+    workflowId: definition.workflowId,
+    metadata: definition.metadata,
+  };
 }
 
 export { GameEngine };

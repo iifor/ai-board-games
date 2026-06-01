@@ -2,6 +2,7 @@ import type {
   ActionWindowSnapshot,
   DomainAction,
   DomainEvent,
+  EngineStoreDebugState,
   InvariantIssue,
   MatchSnapshot,
   WorkflowEffect,
@@ -39,24 +40,81 @@ function checkEventChannelInvariant(events: Array<Partial<DomainEvent>>): Invari
   const channelSystem = new ChannelSystem();
   return events.flatMap((event) => {
     const result = channelSystem.validateEvent(event);
-    return result.ok ? [] : [error(result.error!.code, result.error!.message, event)];
+    return result.ok ? [] : [error(result.error!.code, result.error!.message, {
+      subjectType: 'event',
+      subjectId: event.id,
+      details: event,
+    })];
   });
 }
 
-function checkUnappliedEffectInvariant(effect: WorkflowEffect): InvariantIssue[] {
+function checkEffectLifecycleInvariant(effect: WorkflowEffect): InvariantIssue[] {
+  const subject = { subjectType: 'effect' as const, subjectId: effect.id };
   if (effect.status !== 'applied' && effect.appliedEventSeq) {
-    return [error('EFFECT_SEQ_WITHOUT_APPLY', `Effect ${effect.id} has appliedEventSeq without applied status.`)];
+    return [error('EFFECT_SEQ_WITHOUT_APPLY', `Effect ${effect.id} has appliedEventSeq without applied status.`, subject)];
+  }
+  if (effect.status === 'applied' && !effect.appliedEventSeq) {
+    return [error('EFFECT_APPLIED_WITHOUT_SEQ', `Applied effect ${effect.id} must reference appliedEventSeq.`, subject)];
   }
   return [];
 }
 
-function error(code: string, message: string, details?: unknown): InvariantIssue {
-  return { code, message, details, severity: 'error' };
+function checkDuplicateEventIdempotencyInvariant(events: DomainEvent[]): InvariantIssue[] {
+  const seen = new Map<string, DomainEvent>();
+  const issues: InvariantIssue[] = [];
+  for (const event of events) {
+    if (!event.idempotencyKey) continue;
+    const first = seen.get(event.idempotencyKey);
+    if (first) {
+      issues.push(error(
+        'DUPLICATE_EVENT_IDEMPOTENCY_KEY',
+        `Duplicate event idempotencyKey detected: ${event.idempotencyKey}`,
+        {
+          subjectType: 'event',
+          subjectId: event.id,
+          details: { firstEventId: first.id, duplicateEventId: event.id, idempotencyKey: event.idempotencyKey },
+        },
+      ));
+      continue;
+    }
+    seen.set(event.idempotencyKey, event);
+  }
+  return issues;
+}
+
+function collectEngineInvariants(debugState: EngineStoreDebugState): InvariantIssue[] {
+  return [
+    ...checkEventChannelInvariant(debugState.events),
+    ...debugState.effects.flatMap(checkEffectLifecycleInvariant),
+    ...checkDuplicateEventIdempotencyInvariant(debugState.events),
+  ];
+}
+
+function checkUnappliedEffectInvariant(effect: WorkflowEffect): InvariantIssue[] {
+  return checkEffectLifecycleInvariant(effect);
+}
+
+function error(
+  code: string,
+  message: string,
+  options: { subjectType?: InvariantIssue['subjectType']; subjectId?: string; details?: unknown } = {},
+): InvariantIssue {
+  return {
+    code,
+    message,
+    subjectType: options.subjectType,
+    subjectId: options.subjectId,
+    details: options.details,
+    severity: 'error',
+  };
 }
 
 export {
   assertCanTick,
   checkActionWindowInvariant,
   checkEventChannelInvariant,
+  checkEffectLifecycleInvariant,
+  checkDuplicateEventIdempotencyInvariant,
+  collectEngineInvariants,
   checkUnappliedEffectInvariant,
 };

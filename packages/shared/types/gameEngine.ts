@@ -121,6 +121,17 @@ type CreateEffectsFromAction = (
   context: CreateEffectsContext
 ) => WorkflowEffect[] | Promise<WorkflowEffect[]>;
 
+interface StateProjectionContext {
+  match: MatchSnapshot | null;
+  event: DomainEvent;
+}
+
+type ProjectStateFromEvent = (
+  state: Record<string, unknown>,
+  event: DomainEvent,
+  context: StateProjectionContext
+) => Record<string, unknown>;
+
 interface SkillDefinition {
   id: string;
   inputSchema?: unknown;
@@ -139,6 +150,7 @@ interface GameDefinition {
   actionSchemas?: Record<string, unknown>;
   createEffectsFromAction?: CreateEffectsFromAction;
   effectResolvers?: EffectResolver[];
+  projectState?: ProjectStateFromEvent;
   channelPolicy?: ChannelPolicy;
   metadata?: Record<string, unknown>;
 }
@@ -147,7 +159,29 @@ interface InvariantIssue {
   code: string;
   message: string;
   severity: 'error' | 'warning';
+  subjectType?: 'match' | 'action-window' | 'effect' | 'event' | 'definition';
+  subjectId?: string;
   details?: unknown;
+}
+
+interface EngineDefinitionSummary {
+  gameType: string;
+  version: string;
+  workflowId: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface EngineStoreDebugState {
+  match: MatchSnapshot | null;
+  actionWindows: ActionWindowSnapshot[];
+  effects: WorkflowEffect[];
+  events: DomainEvent[];
+  generatedAt: string;
+}
+
+interface EngineDebugState extends EngineStoreDebugState {
+  definitions: EngineDefinitionSummary[];
+  invariants: InvariantIssue[];
 }
 
 export type {
@@ -167,7 +201,12 @@ export type {
   EffectResolver,
   CreateEffectsContext,
   CreateEffectsFromAction,
+  StateProjectionContext,
+  ProjectStateFromEvent,
   SkillDefinition,
   GameDefinition,
   InvariantIssue,
+  EngineDefinitionSummary,
+  EngineStoreDebugState,
+  EngineDebugState,
 };

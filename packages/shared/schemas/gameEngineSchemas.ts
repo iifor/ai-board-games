@@ -80,11 +80,21 @@ const gameDefinitionSchema = z.object({
     effectType: z.string().min(1),
     resolve: z.function(),
   })).optional(),
+  projectState: z.function().optional(),
   channelPolicy: z.object({
     canAccess: z.function().optional(),
     matchScope: z.function().optional(),
   }).optional(),
   metadata: recordSchema.optional(),
+});
+
+const invariantIssueSchema = z.object({
+  code: z.string().min(1),
+  message: z.string().min(1),
+  severity: z.enum(['error', 'warning']),
+  subjectType: z.enum(['match', 'action-window', 'effect', 'event', 'definition']).optional(),
+  subjectId: z.string().optional(),
+  details: z.unknown().optional(),
 });
 
 export {
@@ -94,4 +104,5 @@ export {
   workflowEffectSchema,
   domainEventSchema,
   gameDefinitionSchema,
+  invariantIssueSchema,
 };

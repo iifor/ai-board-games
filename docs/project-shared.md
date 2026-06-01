@@ -65,14 +65,25 @@ tests/
 - `speechTypes.ts`：语音和字幕相关类型。
 - `channelTypes.ts`：事件通道和可见性类型。
 - `gameEvent.ts`：游戏事件类型。
-- `gameEngine.ts`：通用游戏引擎类型。
+- `gameEngine.ts`：通用游戏引擎类型，包括 `GameDefinition`、`DomainAction`、`WorkflowEffect`、`DomainEvent`、`ChannelPolicy`、debug state、invariant issue、状态投影契约。
 
 ### Schema
 
 - `gameSchemas.ts`：游戏参数校验 schema。
 - `workflowSchemas.ts`：工作流参数校验 schema。
-- `gameEngineSchemas.ts`：游戏引擎 schema。
+- `gameEngineSchemas.ts`：游戏引擎 schema，校验 definition、action、effect、event、channel policy 和可选 `projectState`。
 - `skillRegistry.ts`：技能注册相关 schema。
+
+### 通用 Game Engine 类型
+
+`packages/shared/types/gameEngine.ts` 是 `packages/server/modules/game-engine` 的共享 contract：
+
+- `GameDefinition`：游戏接入点，声明 `gameType`、`version`、`workflowId`、action schema、effect resolver、channel policy 和可选 `projectState`。
+- `DomainAction`：玩家或 AI 在 ActionWindow 内提交的结构化动作，不直接修改状态。
+- `WorkflowEffect`：由 action 派生的待结算效果，必须由 resolver 统一处理。
+- `DomainEvent`：唯一事实事件，必须带 `channel`，`scope` 事件必须带 `scopeKey`。
+- `ProjectStateFromEvent`：Phase 2 引入的状态投影函数，用于把已落库的 event 投影到 match state。
+- `EngineDebugState` / `InvariantIssue`：内部调试和不变量检查输出，不作为公开 HTTP API。
 
 ### 常量和工具
 

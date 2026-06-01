@@ -76,6 +76,10 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
     } as never);
     assert.equal(nightResolved.status, 'COMPLETED');
     assert.equal(nightResolved.events?.[0].type, 'werewolf_effect_resolved');
+    const auditEvent = (nightResolved.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_night_resolution_shadow_audited') as Record<string, unknown> | undefined;
+    assert.equal(auditEvent?.channel, 'system');
+    assert.equal(auditEvent?.visibility, 'system');
+    assert.equal((auditEvent?.payload as Record<string, unknown> | undefined)?.status, 'matched');
     assert.equal(effects.length, 1);
     assert.equal(nightResolved.state?.players.find((player: Record<string, unknown>) => Number(player.id) === 2).alive, false);
 
@@ -90,6 +94,46 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
     } as never);
     assert.equal(exileResolved.status, 'COMPLETED');
     assert.equal(exileResolved.state?.rounds[0].exile.id, 3);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('night resolve shadow audit is emitted when hunter window pauses resolution', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  const epochs: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => { epochs.push(epoch); return epoch; },
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'hunter', 'good', ['shootOnDeath']),
+      player(3, 'villager', 'good', [])
+    ];
+    state.rounds[0].night.wolfTarget = 2;
+    const match = { id: 'm-hunter-audit', config: { players: state.players }, createdAt: 'now' };
+
+    const nightResolved = createNightResolveHandler().execute({
+      match,
+      step: { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } },
+      state
+    } as never);
+
+    assert.equal(nightResolved.status, 'WAITING');
+    assert.equal(nightResolved.events?.[0].type, 'werewolf_action_requested');
+    const auditEvent = (nightResolved.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_night_resolution_shadow_audited') as Record<string, unknown> | undefined;
+    assert.equal(auditEvent?.channel, 'system');
+    assert.equal(auditEvent?.visibility, 'system');
+    assert.equal((auditEvent?.payload as Record<string, unknown> | undefined)?.status, 'matched');
   } finally {
     patchRepo(repo, original);
   }

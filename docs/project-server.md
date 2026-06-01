@@ -154,6 +154,19 @@ C 端 REST 路由挂载到 `/api/toc`，主要能力包括：
 - 狼人杀模式读取。
 - 历史对局列表和详情。
 
+### 通用游戏引擎模块
+
+`modules/game-engine` 是通用 AI 玩家游戏引擎 core 骨架，当前只作为后端内部模块使用，不新增 HTTP API。
+
+- `engine`：`GameEngine`、`GameDefinitionRegistry`、`InvariantChecker`。
+- `workflow`：包装现有 `workflow-engine` 创建和 tick 能力。
+- `action-window`：ActionWindow 生命周期和 action 提交合法性校验。
+- `effect`：`EffectQueue` 和 `EffectResolutionService`，负责 `Action -> Effect -> Event -> State` 链路。
+- `channel`：统一校验 DomainEvent 可见性通道。
+- `state`：`MatchStateStore` 接口和 SQLite adapter，隔离 core 与数据库实现。
+
+当前阶段复用既有工作流表，不新增数据库表。`SqliteMatchStateStore` 通过现有 `matches.state_json` 保存投影后的 match state，通过 `workflow_effects` 和 `workflow_events` 保存 effect/event。
+
 ### 数据库层
 
 数据库默认使用 SQLite，文件在 `data/consensus-mist.sqlite`。核心入口：

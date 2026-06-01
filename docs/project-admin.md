@@ -101,7 +101,7 @@ packages/admin/
 - `WerewolfModeManager`：狼人杀模式和角色配置。
 - `SkinManager`：皮肤资源管理。
 - `TraceExplorer`：AI trace、span、LLM 调用、agent 决策查看。
-- `WorkflowDebugConsole`：工作流调试控制台。
+- `WorkflowDebugConsole`：工作流调试控制台，包含 match 事件、任务、pending action、effect、interrupt，以及狼人杀夜间结算 Shadow Audit 汇总。
 
 ### 观测组件
 

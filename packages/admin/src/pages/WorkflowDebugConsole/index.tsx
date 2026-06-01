@@ -9,6 +9,11 @@ import {
   retryWorkflowAiTask,
   tickWorkflowMatch
 } from '../../services/adminApi';
+import {
+  getNightResolutionAuditRows,
+  summarizeNightResolutionAudits
+} from './nightResolutionAudit';
+import type { NightResolutionAuditRow, NightResolutionAuditStatus } from './nightResolutionAudit';
 
 const { Text, Paragraph } = Typography;
 
@@ -34,6 +39,8 @@ export function WorkflowDebugConsole() {
   const [form] = Form.useForm();
   const data = debug || {};
   const match = data.match as Record<string, unknown> | undefined;
+  const auditRows = useMemo(() => getNightResolutionAuditRows(data.events as DebugRecord[]), [data.events]);
+  const auditSummary = useMemo(() => summarizeNightResolutionAudits(auditRows), [auditRows]);
 
   async function load(id = matchId) {
     if (!id.trim()) return;
@@ -88,6 +95,8 @@ export function WorkflowDebugConsole() {
           </Row>
         ) : <Alert type="info" message="输入 matchId 查看 workflow 运行态、事件、任务、效果和中断。" showIcon />}
 
+        {match && <NightResolutionAuditCard rows={auditRows} summary={auditSummary} />}
+
         {match && (
           <Card title="创建中断" size="small">
             <Form form={form} layout="inline" onFinish={(values) => runAction(() => createWorkflowInterrupt(matchId, {
@@ -124,6 +133,62 @@ function tableTab(key: string, label: string, rows: DebugRecord[] = [], columns:
     children: <Table size="small" rowKey={(row, index) => String(row.id ?? row.seq ?? index)} columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} />
   };
 }
+
+function NightResolutionAuditCard({
+  rows,
+  summary,
+}: {
+  rows: NightResolutionAuditRow[];
+  summary: ReturnType<typeof summarizeNightResolutionAudits>;
+}) {
+  const alert = getAuditAlert(summary);
+  return (
+    <Card title="Night Resolution Shadow Audit" size="small">
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Alert type={alert.type} message={alert.message} showIcon />
+        <Row gutter={[12, 12]}>
+          <Col span={4}><StatCard title="Total" value={String(summary.total)} /></Col>
+          <Col span={4}><StatCard title="Matched" value={String(summary.matched)} /></Col>
+          <Col span={4}><StatCard title="Mismatched" value={String(summary.mismatched)} /></Col>
+          <Col span={4}><StatCard title="Failed" value={String(summary.auditFailed)} /></Col>
+          <Col span={4}><StatCard title="Unknown" value={String(summary.unknown)} /></Col>
+          <Col span={4}><StatCard title="Latest" value={summary.latestStatus} /></Col>
+        </Row>
+        <Table
+          size="small"
+          rowKey="key"
+          columns={nightResolutionAuditColumns}
+          dataSource={rows}
+          pagination={{ pageSize: 5 }}
+        />
+      </Space>
+    </Card>
+  );
+}
+
+function getAuditAlert(summary: ReturnType<typeof summarizeNightResolutionAudits>): { type: 'success' | 'warning' | 'error' | 'info'; message: string } {
+  if (!summary.total) return { type: 'info', message: 'No night resolution shadow audit events found.' };
+  if (summary.auditFailed) return { type: 'error', message: 'Night resolution shadow audit failed in at least one event.' };
+  if (summary.mismatched || summary.unknown) return { type: 'warning', message: 'Night resolution shadow audit has mismatched or unknown events.' };
+  return { type: 'success', message: 'All night resolution shadow audits matched the legacy resolver.' };
+}
+
+function statusColor(status: NightResolutionAuditStatus): string {
+  if (status === 'matched') return 'green';
+  if (status === 'mismatched') return 'orange';
+  if (status === 'audit_failed') return 'red';
+  return 'default';
+}
+
+const nightResolutionAuditColumns: ColumnsType<NightResolutionAuditRow> = [
+  { title: 'Seq', dataIndex: 'seq', width: 72 },
+  { title: 'Day', dataIndex: 'day', width: 72 },
+  { title: 'Status', dataIndex: 'status', width: 130, render: (value: NightResolutionAuditStatus) => <Tag color={statusColor(value)}>{value}</Tag> },
+  { title: 'Mismatch', render: (_, row) => row.mismatchFields.length ? row.mismatchFields.join(', ') : '-' },
+  { title: 'Legacy deaths', render: (_, row) => <JsonCell value={row.legacyDeaths} /> },
+  { title: 'Engine deaths', render: (_, row) => <JsonCell value={row.engineDeaths} /> },
+  { title: 'Details', render: (_, row) => <JsonCell value={row.payload} /> }
+];
 
 const basicColumns: ColumnsType<DebugRecord> = [
   { title: 'ID', dataIndex: 'id', ellipsis: true },

@@ -13,7 +13,9 @@ const testFiles = [
   'audienceStream.test.ts',
   'skillEventEmitter.test.ts',
   'gameEngineContracts.test.ts',
-  'gameEngineActionEffect.test.ts'
+  'gameEngineActionEffect.test.ts',
+  'werewolfNightResolutionAudit.test.ts',
+  'nightResolutionAuditViewModel.test.ts'
 ].map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];

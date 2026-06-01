@@ -2,6 +2,7 @@ import * as repo from '../../workflow-engine/repository';
 import type {
   ActionWindowSnapshot,
   DomainEvent,
+  EngineStoreDebugState,
   MatchSnapshot,
   WorkflowEffect as EngineWorkflowEffect,
 } from '@ai-presenter/shared/types/gameEngine';
@@ -51,6 +52,13 @@ class SqliteMatchStateStore implements MatchStateStore {
     return this.listActionWindows(matchId).find((window) => window.id === windowId) || null;
   }
 
+  saveMatchState(matchId: string, state: Record<string, unknown>): MatchSnapshot | null {
+    repo.updateMatch(matchId, {
+      state_json: JSON.stringify(state),
+    });
+    return this.loadMatch(matchId);
+  }
+
   enqueueEffect(effect: EngineWorkflowEffect): EngineWorkflowEffect {
     const stored = repo.createWorkflowEffect({
       id: effect.id,
@@ -81,6 +89,16 @@ class SqliteMatchStateStore implements MatchStateStore {
       applied_event_seq: patch.appliedEventSeq,
     });
     return stored ? toEngineEffect(stored) : null;
+  }
+
+  getDebugState(matchId: string): EngineStoreDebugState {
+    return {
+      match: this.loadMatch(matchId),
+      actionWindows: this.listActionWindows(matchId),
+      effects: this.listEffects(matchId),
+      events: this.listEvents(matchId),
+      generatedAt: new Date().toISOString(),
+    };
   }
 }
 

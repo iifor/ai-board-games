@@ -36,6 +36,16 @@ packages/server/modules/
 │   ├── projection.ts       # 状态投影
 │   ├── routes.ts
 │   └── controller.ts
+├── game-engine/
+│   ├── engine/             # GameEngine、definition registry、invariant checker
+│   ├── workflow/           # workflow-engine facade
+│   ├── action-window/      # ActionWindow 生命周期和提交校验
+│   ├── agent/              # AgentRuntime contract
+│   ├── skill/              # SkillRegistry contract
+│   ├── effect/             # EffectQueue、EffectResolver
+│   ├── event/              # DomainEvent EventBus
+│   ├── channel/            # ChannelSystem 可见性校验
+│   └── state/              # MatchStateStore 与 SQLite adapter
 ├── debate/
 │   ├── workflow.ts
 │   ├── service.ts
@@ -133,6 +143,46 @@ flowchart TD
 - `aiTaskWorker`：执行已领取 AI task。
 - `effects`：管理工作流效果和 interrupt。
 - `projection`：生成前端或调试所需状态投影。
+
+### game-engine
+
+`game-engine` 是通用 AI 玩家游戏引擎骨架，当前作为 `workflow-engine` 之上的内部 facade 使用，暂不替换现有狼人杀和辩论赛主流程。
+
+- `GameEngine`：注册 `GameDefinition`、创建 match、tick、提交 action、解析 pending effect，并提供 `getDebugState(matchId)`。
+- `WorkflowRuntime`：包装现有 `workflow-engine` 创建和推进能力，避免第一阶段重写 tick。
+- `ActionWindowManager`：校验 ActionWindow 是否存在、是否打开、actor/actionType 是否合法。
+- `EffectQueue`：把合法 `DomainAction` 转为 `WorkflowEffect` 并写入队列。
+- `EffectResolutionService`：通过 resolver 把 effect 结算为 `DomainEvent`，再按游戏定义的 `projectState` 投影回 match state。
+- `ChannelSystem`：校验所有 `DomainEvent` 必须声明 channel，`scope` event 必须声明 `scopeKey`。
+- `InvariantChecker`：聚合 debug state 中的 channel、effect lifecycle、重复 idempotencyKey 等不变量问题。
+- `MatchStateStore`：隔离 core 与 SQLite 细节，SQLite adapter 复用现有 `matches`、`pending_actions`、`workflow_effects`、`workflow_events`。
+
+当前狼人杀 adapter 只迁移低风险动作：
+
+- `wolf_vote` / `wolf_kill` -> `kill` effect -> `wolf_target_selected` wolves scope event -> 更新 `round.night.wolfChoices / wolfVoteTally / wolfTarget / wolfStrategy`。
+- `seer_check` -> `inspect` effect -> `seer_checked` scope event -> 更新 `round.night.seerCheck` 和预言家玩家记录。
+- `guard_protect` -> `protect` effect -> `guard_protected` scope event -> 更新 `round.night.guardTarget` 和守卫玩家记录。
+- `witch_save` -> `save` effect -> `witch_saved` scope event -> 更新 `round.night.witchSave / witchSaveTarget` 和女巫解药使用状态。
+- `witch_poison` -> `poison` effect -> `witch_poisoned` scope event -> 更新 `round.night.witchPoisonTarget` 和女巫毒药使用状态。
+
+狼队刀口 event 是 `scope: wolves`，只表达狼队内部目标选择，不公开给普通观众，也不直接造成死亡。
+女巫相关 event 仍是 `scope: witch`，不会公开给普通观众；公开死亡结算仍由现有夜间结算流程处理。
+
+夜间死亡结算已新增旁路 resolver：
+
+- `night_resolution` effect -> `night_resolved` public event，只公开 `day/deaths/message`。
+- 同一 resolver 额外产出 `night_resolution_audited` system event，记录内部输入、effects 和死亡明细，供 debug 使用。
+- `night_resolved` 可投影 `round.night.deaths`、`nightRevealed`、`publicSummary` 和死亡玩家状态。
+
+Shadow audit 接入方式：
+
+- `werewolf.night_resolve` 仍以 legacy `resolveNightEffects` 作为真实结算主路径。
+- handler 在 legacy 结算前克隆输入 state，结算后调用 Engine Core `resolveEngineNightResolution` 做旁路对比。
+- 对比结果写入 `werewolf_night_resolution_shadow_audited` system event，包含 `matched / mismatched / audit_failed` 状态。
+- shadow audit event 必须使用 `visibility: system`，只供 debug/invariant 使用，不进入 C 端 outbox。
+- B 端 `WorkflowDebugConsole` 会从 debug API 的 `events` 中汇总展示 shadow audit 结果，便于确认真实对局是否长期 matched。
+
+旁路 resolver 暂不接管真实 `werewolf.night_resolve` handler，避免同时改动猎人开枪窗口、胜负检查、trace 快照和 C 端播放链路。
 
 ### 辩论赛流程
 

@@ -5,6 +5,9 @@ export {
   assertCanTick,
   checkActionWindowInvariant,
   checkEventChannelInvariant,
+  checkEffectLifecycleInvariant,
+  checkDuplicateEventIdempotencyInvariant,
+  collectEngineInvariants,
   checkUnappliedEffectInvariant,
 } from './engine/invariantChecker';
 

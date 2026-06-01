@@ -5,6 +5,8 @@ import {
   ChannelSystem,
   EngineSkillRegistry,
   GameEngine,
+  checkEffectLifecycleInvariant,
+  checkEventChannelInvariant,
 } from '../../packages/server/modules/game-engine';
 import type { GameDefinition } from '../../packages/shared/types/gameEngine';
 import { MemoryMatchStateStore, createMatch, createWindow } from './gameEngineTestUtils';
@@ -30,6 +32,19 @@ test('GameEngine rejects duplicate GameDefinition registration', () => {
   assert.throws(() => engine.registerDefinition(definition), /already registered/);
 });
 
+test('GameEngine rejects tick for terminal matches before workflow runtime is called', () => {
+  const store = new MemoryMatchStateStore();
+  store.addMatch(createMatch({
+    gameType: 'test-game',
+    workflowId: 'test.workflow',
+    status: 'completed',
+  }));
+  const engine = new GameEngine({ store });
+  engine.registerDefinition(createDefinition());
+
+  assert.throws(() => engine.tick('match-test'), /completed/);
+});
+
 test('ChannelSystem rejects missing channel and scoped events without scopeKey', () => {
   const channelSystem = new ChannelSystem();
 
@@ -50,6 +65,50 @@ test('ChannelSystem rejects missing channel and scoped events without scopeKey',
 
   assert.equal(scoped.ok, false);
   assert.equal(scoped.error?.code, 'SCOPE_KEY_REQUIRED');
+});
+
+test('Invariant checker reports missing channel and missing scopeKey', () => {
+  const issues = checkEventChannelInvariant([{
+    id: 'event-1',
+    matchId: 'match-test',
+    type: 'test',
+    payload: {},
+  }]);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].code, 'CHANNEL_REQUIRED');
+
+  const scopedIssues = checkEventChannelInvariant([{
+    id: 'event-2',
+    matchId: 'match-test',
+    type: 'test',
+    payload: {},
+    channel: 'scope',
+  }]);
+  assert.equal(scopedIssues.length, 1);
+  assert.equal(scopedIssues[0].code, 'SCOPE_KEY_REQUIRED');
+});
+
+test('Invariant checker validates effect lifecycle state', () => {
+  const proposedIssues = checkEffectLifecycleInvariant({
+    id: 'effect-proposed',
+    matchId: 'match-test',
+    effectType: 'inspect',
+    status: 'proposed',
+    payload: {},
+    appliedEventSeq: 1,
+  });
+  assert.equal(proposedIssues.length, 1);
+  assert.equal(proposedIssues[0].code, 'EFFECT_SEQ_WITHOUT_APPLY');
+
+  const appliedIssues = checkEffectLifecycleInvariant({
+    id: 'effect-applied',
+    matchId: 'match-test',
+    effectType: 'inspect',
+    status: 'applied',
+    payload: {},
+  });
+  assert.equal(appliedIssues.length, 1);
+  assert.equal(appliedIssues[0].code, 'EFFECT_APPLIED_WITHOUT_SEQ');
 });
 
 test('ActionWindow outside action is rejected before effect creation', async () => {
@@ -74,6 +133,55 @@ test('ActionWindow outside action is rejected before effect creation', async () 
 
   assert.equal(result.ok, false);
   assert.equal(result.error?.code, 'ACTION_WINDOW_NOT_FOUND');
+});
+
+test('Memory store keeps event idempotency keys unique', () => {
+  const store = new MemoryMatchStateStore();
+  const event = {
+    id: 'event-1',
+    matchId: 'match-test',
+    type: 'test-event',
+    payload: {},
+    channel: 'public' as const,
+    idempotencyKey: 'same-key',
+  };
+
+  store.appendEvents([event]);
+  store.appendEvents([{ ...event, id: 'event-2' }]);
+
+  assert.equal(store.listEvents('match-test').length, 1);
+});
+
+test('GameEngine debug state aggregates match, windows, effects, events, definitions and invariants', () => {
+  const store = new MemoryMatchStateStore();
+  store.addMatch(createMatch({ gameType: 'test-game', workflowId: 'test.workflow' }));
+  store.addActionWindow(createWindow({ actionType: 'seer_check' }));
+  store.enqueueEffect({
+    id: 'effect-1',
+    matchId: 'match-test',
+    effectType: 'inspect',
+    status: 'proposed',
+    payload: {},
+  });
+  store.appendEvents([{
+    id: 'event-1',
+    matchId: 'match-test',
+    type: 'test-event',
+    payload: {},
+    channel: 'public',
+    idempotencyKey: 'event-1',
+  }]);
+
+  const engine = new GameEngine({ store });
+  engine.registerDefinition(createDefinition());
+  const debug = engine.getDebugState('match-test');
+
+  assert.equal(debug.match?.id, 'match-test');
+  assert.equal(debug.actionWindows.length, 1);
+  assert.equal(debug.effects.length, 1);
+  assert.equal(debug.events.length, 1);
+  assert.equal(debug.definitions.length, 1);
+  assert.deepEqual(debug.invariants, []);
 });
 
 test('Invalid action schema output is rejected', async () => {

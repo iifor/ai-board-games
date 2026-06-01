@@ -1,6 +1,7 @@
 import type {
   ActionWindowSnapshot,
   DomainEvent,
+  EngineStoreDebugState,
   MatchSnapshot,
   WorkflowEffect,
 } from '../../packages/shared/types/gameEngine';
@@ -56,6 +57,14 @@ class MemoryMatchStateStore implements MatchStateStore {
     return this.windows.get(`${matchId}:${windowId}`) || null;
   }
 
+  saveMatchState(matchId: string, state: Record<string, unknown>): MatchSnapshot | null {
+    const existing = this.matches.get(matchId);
+    if (!existing) return null;
+    const next = { ...existing, state };
+    this.matches.set(matchId, next);
+    return next;
+  }
+
   enqueueEffect(effect: WorkflowEffect): WorkflowEffect {
     const existing = this.effects.get(effect.id);
     if (existing) return existing;
@@ -75,6 +84,16 @@ class MemoryMatchStateStore implements MatchStateStore {
     const next = { ...existing, ...patch };
     this.effects.set(effectId, next);
     return next;
+  }
+
+  getDebugState(matchId: string): EngineStoreDebugState {
+    return {
+      match: this.loadMatch(matchId),
+      actionWindows: this.listActionWindows(matchId),
+      effects: this.listEffects(matchId),
+      events: this.listEvents(matchId),
+      generatedAt: new Date().toISOString(),
+    };
   }
 
   private findExistingEvent(event: DomainEvent): DomainEvent | null {
