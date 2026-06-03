@@ -18,6 +18,13 @@ interface AgentLike {
   [key: string]: unknown;
 }
 
+interface SpeechPromptOptions {
+  thinking?: boolean;
+  limit?: number;
+  promptOverride?: string;
+  stateless?: boolean;
+}
+
 interface WolfSpeech {
   playerId: number;
   text: string;
@@ -28,20 +35,20 @@ interface WolfSpeech {
 
 export async function askSpeech(
   agent: AgentLike, day: number, context: string,
-  options?: { thinking?: false; limit?: number }
+  options?: SpeechPromptOptions & { thinking?: false }
 ): Promise<string | null>;
 export async function askSpeech(
   agent: AgentLike, day: number, context: string,
-  options: { thinking: true; limit?: number }
+  options: SpeechPromptOptions & { thinking: true }
 ): Promise<{ content: string; thinking: string } | null>;
 export async function askSpeech(
   agent: AgentLike,
   day: number,
   context: string,
-  options: { thinking?: boolean; limit?: number } = {}
+  options: SpeechPromptOptions = {}
 ): Promise<string | { content: string; thinking: string } | null> {
   const limit = options.limit ?? WEREWOLF.DAY_SPEECH_CHAR_LIMIT;
-  const prompt = [
+  const prompt = options.promptOverride || [
     `第 ${day} 天白天发言。`,
     `公开赛况：\n${context || '暂无公开信息。'}`,
     `你的状态：${agent.alive ? '存活' : '已出局'}；身份：${getRoleLabel(agent as Record<string, unknown>)}`,
@@ -50,27 +57,31 @@ export async function askSpeech(
   const apiOpts = { maxTokens: Math.ceil(limit * 2.5), limit };
 
   if (options.thinking) {
-    return agent.playerAgent.askTextWithThinking(prompt, apiOpts);
+    return options.stateless && agent.playerAgent.askTextWithThinkingOnce
+      ? agent.playerAgent.askTextWithThinkingOnce(prompt, apiOpts)
+      : agent.playerAgent.askTextWithThinking(prompt, apiOpts);
   }
-  return agent.playerAgent.askText(prompt, apiOpts);
+  return options.stateless && agent.playerAgent.askTextOnce
+    ? agent.playerAgent.askTextOnce(prompt, apiOpts)
+    : agent.playerAgent.askText(prompt, apiOpts);
 }
 
 // ---- 狼人夜聊 ----
 
 export async function askWolfNightSpeech(
   agent: AgentLike, day: number, wolfSpeeches: WolfSpeech[], isLeader: boolean,
-  options?: { thinking?: false; limit?: number; agents?: Array<{ id: number }> }
+  options?: SpeechPromptOptions & { thinking?: false; agents?: Array<{ id: number }> }
 ): Promise<string | null>;
 export async function askWolfNightSpeech(
   agent: AgentLike, day: number, wolfSpeeches: WolfSpeech[], isLeader: boolean,
-  options: { thinking: true; limit?: number; agents?: Array<{ id: number }> }
+  options: SpeechPromptOptions & { thinking: true; agents?: Array<{ id: number }> }
 ): Promise<{ content: string; thinking: string } | null>;
 export async function askWolfNightSpeech(
   agent: AgentLike,
   day: number,
   wolfSpeeches: WolfSpeech[],
   isLeader: boolean,
-  options: { thinking?: boolean; limit?: number; agents?: Array<{ id: number }> } = {}
+  options: SpeechPromptOptions & { agents?: Array<{ id: number }> } = {}
 ): Promise<string | { content: string; thinking: string } | null> {
   const history = (wolfSpeeches || [])
     .filter((speech) => String(speech.playerId) !== '系统' && String(speech.playerId) !== 'host')
@@ -84,7 +95,7 @@ export async function askWolfNightSpeech(
   const sharedInfo = (wolfSpeeches || []).find((s) => String(s.playerId) === '系统');
   const contextLine = sharedInfo ? `【队伍信息】${sharedInfo.text}` : '';
   const historySection = history ? `已知狼队夜聊：\n${history}` : '';
-  const prompt = [
+  const prompt = options.promptOverride || [
     `第 ${day} 夜狼人行动。${title}`,
     contextLine,
     historySection,
@@ -93,31 +104,35 @@ export async function askWolfNightSpeech(
   const apiOpts = { maxTokens: Math.ceil(limit * 2.5), limit };
 
   if (options.thinking) {
-    return agent.playerAgent.askTextWithThinking(prompt, apiOpts);
+    return options.stateless && agent.playerAgent.askTextWithThinkingOnce
+      ? agent.playerAgent.askTextWithThinkingOnce(prompt, apiOpts)
+      : agent.playerAgent.askTextWithThinking(prompt, apiOpts);
   }
-  return agent.playerAgent.askText(prompt, apiOpts);
+  return options.stateless && agent.playerAgent.askTextOnce
+    ? agent.playerAgent.askTextOnce(prompt, apiOpts)
+    : agent.playerAgent.askText(prompt, apiOpts);
 }
 
 // ---- 警长竞选发言 ----
 
 export async function askSheriffSpeech(
   agent: AgentLike, day: number, context: string, isRunoff: boolean,
-  options?: { thinking?: false; limit?: number }
+  options?: SpeechPromptOptions & { thinking?: false }
 ): Promise<string | null>;
 export async function askSheriffSpeech(
   agent: AgentLike, day: number, context: string, isRunoff: boolean,
-  options: { thinking: true; limit?: number }
+  options: SpeechPromptOptions & { thinking: true }
 ): Promise<{ content: string; thinking: string } | null>;
 export async function askSheriffSpeech(
   agent: AgentLike,
   day: number,
   context: string,
   isRunoff: boolean,
-  options: { thinking?: boolean; limit?: number } = {}
+  options: SpeechPromptOptions = {}
 ): Promise<string | { content: string; thinking: string } | null> {
   const title = isRunoff ? '警长竞选复发言' : '警上竞选发言';
   const limit = options.limit ?? WEREWOLF.SHERIFF_SPEECH_CHAR_LIMIT;
-  const prompt = [
+  const prompt = options.promptOverride || [
     `第${day}天${title}。`,
     `公开赛况：\n${context || '暂无公开信息。'}`,
     `你的身份：${getRoleLabel(agent as Record<string, unknown>)}。请发表警长竞选发言，建议不超过 ${limit} 字。`
@@ -125,9 +140,13 @@ export async function askSheriffSpeech(
   const apiOpts = { maxTokens: Math.ceil(limit * 2.5), limit };
 
   if (options.thinking) {
-    return agent.playerAgent.askTextWithThinking(prompt, apiOpts);
+    return options.stateless && agent.playerAgent.askTextWithThinkingOnce
+      ? agent.playerAgent.askTextWithThinkingOnce(prompt, apiOpts)
+      : agent.playerAgent.askTextWithThinking(prompt, apiOpts);
   }
-  return agent.playerAgent.askText(prompt, apiOpts);
+  return options.stateless && agent.playerAgent.askTextOnce
+    ? agent.playerAgent.askTextOnce(prompt, apiOpts)
+    : agent.playerAgent.askText(prompt, apiOpts);
 }
 
 export type { WolfSpeech };

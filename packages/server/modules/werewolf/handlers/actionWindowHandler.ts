@@ -21,6 +21,9 @@ import { hasActionPhase, getActionPhaseConfig } from '../actionPhases';
 import { resolveActionChannel } from './actionChannel';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import { getSeatNumber } from '../utils';
+import { recordWerewolfInteractionFeedback } from '../interactionFeedbackTrace';
+import { canUseWerewolfActionEngineBridge, runWerewolfActionEngineBridge } from '../actionEngineBridge';
+import type { WerewolfActionEngineShadowAudit } from '../actionEngineBridge';
 
 /** 已有独立睁眼事件的夜晚行动 — phase-start 不再重复发布 */
 const NIGHT_WAKE_ACTIONS = new Set([
@@ -92,13 +95,41 @@ function createActionWindowHandler() {
         return waitForActionWindow({ match, step, state: partialApplied ? { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: state.currentActionWindow } : state, round, actors });
       }
 
-      if (!partialApplied) {
+      const shouldUseEngineBridge = !partialApplied && canUseWerewolfActionEngineBridge(step.config.actionType);
+      const engineBridgeResult = shouldUseEngineBridge
+        ? runWerewolfActionEngineBridge({
+            match,
+            step,
+            state: state as unknown as Record<string, unknown>,
+            actionWindow: state.currentActionWindow as Record<string, unknown> | null | undefined,
+            results: partialResults,
+          })
+        : null;
+
+      let actionState = engineBridgeResult?.state || null;
+      if (!partialApplied && !engineBridgeResult) {
         applyActionResults(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, partialResults);
+        actionState = syncRuntimeState(runtime) as unknown as Record<string, unknown>;
       }
-      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
+      if (!actionState) actionState = syncRuntimeState(runtime) as unknown as Record<string, unknown>;
+      for (const result of partialResults) {
+        recordWerewolfInteractionFeedback({
+          matchId: match.id,
+          actionType: step.config.actionType,
+          actorId: result.actorId,
+          payload: result.payload as Record<string, unknown>,
+          round: round as Record<string, unknown>,
+          day: step.config.day,
+          phase: step.config.phase,
+        });
+      }
+      const nextState = markStepComplete({ ...actionState, currentStep: step.id, currentActionWindow: null }, step.id);
       resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
       const resolvedChannel = resolveActionChannel(step.config.actionType || '');
       const completedEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType }, resolvedChannel)];
+      if (engineBridgeResult?.audit) {
+        completedEvents.push(createActionEngineShadowAuditEvent(match, step, nextState as unknown as Record<string, unknown>, engineBridgeResult.audit));
+      }
 
       // 添加阶段结果和阶段结束事件（预言家、女巫、守卫等）
       if (hasActionPhase(step.config.actionType || '')) {
@@ -115,8 +146,9 @@ function createActionWindowHandler() {
             'werewolf_phase_result',
             phaseMessages.result,
             { actionType: step.config.actionType, ...phaseContext },
-            { channel: CHANNEL_TYPES.PUBLIC }
+            resolvedChannel
           ));
+          publishScopedPhaseResultEvent(runtime, step, phaseMessages.result, phaseContext, resolvedChannel);
         }
 
         // 阶段结束事件（请闭眼）- 只在消息非空时生成
@@ -209,6 +241,34 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
       },
       { channel: CHANNEL_TYPES.PUBLIC }
     )]
+  };
+}
+
+function createActionEngineShadowAuditEvent(
+  match: Match,
+  step: Step,
+  state: Record<string, unknown>,
+  audit: WerewolfActionEngineShadowAudit,
+): unknown {
+  return {
+    ...createWerewolfEvent(
+      match,
+      step,
+      state,
+      'werewolf_action_engine_shadow_audited',
+      'action engine shadow audit',
+      {
+        day: audit.day,
+        actionType: audit.actionType,
+        status: audit.status,
+        legacy: audit.legacy,
+        engine: audit.engine,
+        mismatches: audit.mismatches,
+        error: audit.error,
+      },
+      { channel: CHANNEL_TYPES.SYSTEM },
+    ),
+    visibility: 'system',
   };
 }
 
@@ -392,6 +452,33 @@ function buildPhaseContext(actionType: string, results: ReducerActionResult[], r
   }
 
   return context;
+}
+
+function publishScopedPhaseResultEvent(
+  runtime: Runtime,
+  step: Step,
+  message: string,
+  phaseContext: Record<string, unknown>,
+  channelInfo: ReturnType<typeof resolveActionChannel>,
+): void {
+  if (step.config.actionType !== 'seer_check') return;
+  publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+    builder.setStep(step.id);
+    builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+    builder.setDay(step.config.day || 1);
+    return builder.build(
+      'seer-check',
+      {
+        phase: step.config.phase || 'night',
+        actionType: step.config.actionType,
+        message,
+        ...phaseContext,
+      },
+      channelInfo.channel,
+      channelInfo.scopeKey,
+      { actionType: step.config.actionType, message },
+    );
+  });
 }
 
 function cloneActionWindow(window: ActionWindow): Record<string, unknown> {

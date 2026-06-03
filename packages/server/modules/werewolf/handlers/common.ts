@@ -4,6 +4,7 @@ import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import type { GameEvent } from '@ai-presenter/shared/types/gameEvent';
 import type { WerewolfEventBus } from '../eventBus';
 import type { GameEventBuilder } from '../gameEventBuilder';
+import { guardWerewolfWorkflowEventChannel } from './channelGuard';
 
 interface WerewolfEvent {
   type: string;
@@ -27,21 +28,30 @@ function createWerewolfEvent(
   extra: Record<string, unknown> = {},
   options: { channel?: ChannelType; scopeKey?: string } = {}
 ): WerewolfEvent {
-  const channel = options.channel || CHANNEL_TYPES.PUBLIC;
+  const basePayload = {
+    stepId: step.id,
+    workflowEvent,
+    message,
+    game: serializeWerewolfState(match, state),
+    ...extra
+  };
+  const guarded = guardWerewolfWorkflowEventChannel({
+    workflowEvent,
+    payload: basePayload,
+    channel: options.channel || CHANNEL_TYPES.PUBLIC,
+    scopeKey: options.scopeKey,
+  });
   return {
     type: workflowEvent,
     payload: {
-      stepId: step.id,
-      workflowEvent,
-      message,
-      game: serializeWerewolfState(match, state),
-      channel,
-      scopeKey: options.scopeKey,
-      ...extra
+      ...basePayload,
+      channel: guarded.channel,
+      scopeKey: guarded.scopeKey,
+      channelInvariantIssues: guarded.invariantIssues,
     },
     idempotencyKey: `${match.id}:${step.id}:${workflowEvent}`,
-    channel,
-    scopeKey: options.scopeKey
+    channel: guarded.channel,
+    scopeKey: guarded.scopeKey
   };
 }
 

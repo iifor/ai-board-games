@@ -60,3 +60,9 @@ export {
   askWolfNightSpeech,
   askSheriffSpeech,
 } from './speech';
+
+export {
+  buildWerewolfPromptBundle,
+  buildWerewolfActionPrompt,
+  renderWerewolfPromptBundle,
+} from './context';

@@ -76,6 +76,18 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
   const reversedEvents = [...events].reverse();
   const errorEvents = events.filter((e) => e.event_type === 'ai-error');
   const reversedErrorEvents = [...errorEvents].reverse();
+  const attentionRows = timelineRows.filter((row) => {
+    if (row.type === 'event') {
+      const record = row.record as TraceEvent;
+      return record.event_type === 'werewolf_interaction_feedback' || record.event_type === 'ai-error';
+    }
+    if (row.type === 'decision') {
+      const record = row.record as AgentDecision;
+      return Boolean(record.fallback_used);
+    }
+    return false;
+  });
+  const reversedAttentionRows = [...attentionRows].reverse();
 
   const goBack = () => {
     if (embedded && onClose) { onClose(); return; }
@@ -98,6 +110,10 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
     {
       key: 'timeline', label: `时间线 (${timelineRows.length})`,
       children: <TraceTimelineTable rows={reversedTimeline} onOpenDetail={setDetailDrawer} />
+    },
+    {
+      key: 'attention', label: `关键事件 (${attentionRows.length})`,
+      children: <TraceTimelineTable rows={reversedAttentionRows} onOpenDetail={setDetailDrawer} />
     },
     {
       key: 'llm', label: `LLM 调用 (${llmCalls.length})`,

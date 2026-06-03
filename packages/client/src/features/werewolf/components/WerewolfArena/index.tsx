@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
-import { formatWerewolfSeatLabel, getGameStats, getPhaseTitle, getRoundResult, getWerewolfActionTarget, getWerewolfNightActionBadges, getWerewolfSeatNumber, shouldShowWerewolfActionTargets } from '../../utils';
+import { formatWerewolfSeatLabel, getGameStats, getPhaseTitle, getRoundResult, getWerewolfActionTarget, getWerewolfNightActionBadges, getWerewolfSeatNumber, resolveActiveSheriffId, shouldShowWerewolfActionTargets } from '../../utils';
 import { WerewolfBrandPanel } from '../WerewolfBrandPanel';
 import { RoleConfigPanel } from '../RoleConfigPanel';
 import { RoundProgressPanel } from '../RoundProgressPanel';
@@ -51,6 +51,7 @@ export function WerewolfArena({
   const stats = getGameStats(orderedPlayers);
   const phaseTitle = getPhaseTitle(currentRound, streamMessage);
   const sheriffCandidates = getVisibleSheriffCandidates(currentRound, sheriffCandidateIds);
+  const activeSheriffId = resolveActiveSheriffId((game.rounds || []) as WerewolfRound[], currentRound);
   const nightActors = new Set((nightActionPlayerIds || []).map(Number));
   const nightActive = currentRound?.phase === 'night' || !game?.rounds?.length;
 
@@ -78,7 +79,7 @@ export function WerewolfArena({
                 nightActionBadges={getWerewolfNightActionBadges(currentRound, player, nightActionType, orderedPlayers)}
                 isNightActor={nightActive && nightActors.has(Number(player.id))}
                 seerInspectionTarget={nightActive && player.role === 'seer' ? seerCheckTarget : null}
-                isSheriff={Number(currentRound?.sheriffId) === Number(player.id)}
+                isSheriff={Number(activeSheriffId) === Number(player.id)}
                 isSheriffCandidate={sheriffCandidates.has(Number(player.id))}
                 showRoles={showRoles}
                 visibleRolePlayerId={visibleRolePlayerId}

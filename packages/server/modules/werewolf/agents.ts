@@ -168,6 +168,7 @@ interface PublicPlayer {
   lastWords?: string;
   usedAntidote?: boolean;
   usedPoison?: boolean;
+  lastGuardTarget?: number | null;
   hunterShotUsed?: boolean;
   seerChecks?: Array<Record<string, unknown>>;
   votes?: Array<Record<string, unknown>>;
@@ -273,7 +274,8 @@ function publicPlayer(agent: WerewolfAgent): PublicPlayer {
     alive: agent.alive, deathDay: agent.deathDay, deathReason: agent.deathReason,
     canVote: agent.canVote, revealedIdiot: agent.revealedIdiot,
     lastWords: agent.lastWords, usedAntidote: agent.usedAntidote,
-    usedPoison: agent.usedPoison, hunterShotUsed: agent.hunterShotUsed,
+    usedPoison: agent.usedPoison, lastGuardTarget: agent.lastGuardTarget,
+    hunterShotUsed: agent.hunterShotUsed,
     seerChecks: agent.seerChecks, votes: agent.votes
   };
 }

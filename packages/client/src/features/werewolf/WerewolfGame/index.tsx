@@ -22,7 +22,8 @@ import {
   normalizeWerewolfSelectedIds,
   sanitizeWerewolfSelectedIds,
   sortPlayersById,
-  toggleWerewolfPlayerId
+  toggleWerewolfPlayerId,
+  mergeWerewolfEventIntoGame
 } from '../utils';
 import type { GameState, GameEvent, GameStatus, Player, WerewolfMode, EventLogEntry, SpeechState } from '../../../types';
 import './index.css';
@@ -259,7 +260,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       const displayText = getWerewolfDisplayText(event);
       const flowLabel = getWerewolfFlowLabel(displayEvent);
       if (displayText || flowLabel) setStreamMessage(displayText || flowLabel || '');
-      if (event.game) setGame(event.game);
+      applyGameEventState(event);
       updateWorkflowNightAction(displayEvent);
       updateWorkflowSpeech(event);
       archiveServerEvent(event);
@@ -271,17 +272,11 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     const flowLabel = getWerewolfFlowLabel(event);
     const displayText = getWerewolfDisplayText(event);
     if (flowLabel || displayText) setStreamMessage(flowLabel || displayText || '');
+    applyGameEventState(event);
     if (event.game) {
-      setGame(event.game);
       if (event.game.clientViewMode) setClientViewMode(event.game.clientViewMode as string);
       if (event.game.debugMode != null) setDebugMode(Boolean(event.game.debugMode));
       if (event.game.audienceSession?.viewerPlayerId) setVisibleRolePlayerId(event.game.audienceSession.viewerPlayerId);
-    }
-    if (event.players) {
-      setGame((value) => ({
-        ...(event.game || value || EMPTY_WEREWOLF),
-        players: event.players
-      }));
     }
     archiveServerEvent(event);
 
@@ -426,6 +421,10 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       setNightActionActorIds(actorIds);
       setSeerCheckTarget(null);
     }
+  }
+
+  function applyGameEventState(event: GameEvent): void {
+    setGame((value) => mergeWerewolfEventIntoGame(value || EMPTY_WEREWOLF, event));
   }
 
   function resolveWorkflowDisplayEvent(event: GameEvent): GameEvent {

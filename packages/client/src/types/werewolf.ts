@@ -5,7 +5,9 @@ export interface WerewolfRound {
   exile?: { id: string };
   idiotReveal?: { id: string };
   sheriffId?: string;
+  sheriffBadge?: { status?: string; [key: string]: unknown };
   sheriffElection?: SheriffElection;
+  sheriffTransfers?: Array<Record<string, unknown>>;
   votes?: Record<string, string>;
   voteTally?: Record<string, number>;
   speeches?: unknown[];

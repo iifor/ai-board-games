@@ -15,6 +15,11 @@ const testFiles = [
   'gameEngineContracts.test.ts',
   'gameEngineActionEffect.test.ts',
   'werewolfNightResolutionAudit.test.ts',
+  'werewolfChannelGuard.test.ts',
+  'werewolfInteractionFeedbackTrace.test.ts',
+  'werewolfActionEngineBridge.test.ts',
+  'werewolfPromptContext.test.ts',
+  'werewolfClientDisplayState.test.ts',
   'nightResolutionAuditViewModel.test.ts'
 ].map((file) => path.join(__dirname, file));
 

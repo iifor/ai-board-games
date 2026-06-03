@@ -167,6 +167,8 @@ C 端 REST 路由挂载到 `/api/toc`，主要能力包括：
 
 当前阶段复用既有工作流表，不新增数据库表。`SqliteMatchStateStore` 通过现有 `matches.state_json` 保存投影后的 match state，通过 `workflow_effects` 和 `workflow_events` 保存 effect/event。
 
+狼人杀 `werewolf.action_window` 已通过 werewolf 专用 bridge 接入 Engine Core 的 action/effect/resolver/projector contract。当前接管范围限于夜间行动状态写入，不接管夜间死亡结算、Socket 播放轴或 TTS。bridge 会写入 `werewolf_action_engine_shadow_audited` system workflow event，用于持续对比 legacy reducer 与 Engine Core 投影结果。
+
 ### 数据库层
 
 数据库默认使用 SQLite，文件在 `data/consensus-mist.sqlite`。核心入口：

@@ -8,7 +8,7 @@ import {
 } from '../actionWindows';
 import type { ActionWindow } from '../actionWindows';
 import { applyHunterShot, resolveExileEffects, resolveNightEffects } from '../effects';
-import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
+import { createRuntime, ensureRound, syncRuntimeState, serializeWerewolfState } from '../runtime';
 import type { Runtime } from '../runtime';
 import { findPendingHunter } from '../reducers';
 import type { Agent as ReducerAgent, Round as ReducerRound } from '../reducers';
@@ -25,6 +25,7 @@ import type { WerewolfAgent } from '../winCheck';
 import { getSeatNumber } from '../utils';
 import { auditNightResolutionShadow } from '../engineNightResolutionAudit';
 import type { NightResolutionShadowAudit } from '../engineNightResolutionAudit';
+import { recordWerewolfInteractionFeedback } from '../interactionFeedbackTrace';
 
 interface Match {
   id: string;
@@ -155,7 +156,7 @@ function createExileResolveHandler() {
             resolved.exile,
             `${getSeatNumber(resolved.exile.id, runtime.agents)}号玩家被放逐`,
           );
-        });
+        }, serializeWerewolfState(match, nextState as unknown as Record<string, unknown>));
       }
 
       const outEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('day', step.config.day), { effects: resolved.effects }, { channel: CHANNEL_TYPES.PUBLIC })];
@@ -211,6 +212,20 @@ function createHunterWindow({ match, step, state, runtime, round, hunter }: {
   }
   const result = collectActionResults(match.id, step.id, actionType)[0];
   const effect = applyHunterShot(runtime.agents as never, round as never, { from: (hunter as { id: number }).id, target: Number(result?.payload?.target), reason: (round as { phase?: string }).phase });
+  recordWerewolfInteractionFeedback({
+    matchId: match.id,
+    actionType,
+    actorId: (hunter as { id: number }).id,
+    payload: {
+      ...(result?.payload || {}),
+      target: effect ? result?.payload?.target : null,
+      reason: (round as { phase?: string }).phase,
+    } as Record<string, unknown>,
+    round,
+    day: (round as { day?: number }).day,
+    phase: (round as { phase?: string }).phase || step.config.phase,
+    reason: (round as { phase?: string }).phase || null,
+  });
   const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
   resolveActionWindow(match.id, step.id, actionType, state.currentActionWindow as unknown as ActionWindow);
   if (effect) recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: [effect as unknown as Record<string, unknown>] });

@@ -72,12 +72,15 @@ export function buildTraceTimeline({ spans = [], llmCalls = [], decisions = [], 
       const payload = parseEventPayload(record.event_json);
       const matchId = extractMatchId(payload);
       const message = ((payload?.event as Record<string, unknown>)?.message as string) || '';
+      const feedbackDescription = record.event_type === 'werewolf_interaction_feedback'
+        ? describeInteractionFeedback(payload)
+        : '';
       return {
         id: `event-${record.id}`,
         type: 'event' as const,
         time: record.received_at,
         title: translateEventTitle(record.event_type, payload),
-        description: message || (record.phase ? translatePhase(record.phase) : ''),
+        description: feedbackDescription || message || (record.phase ? translatePhase(record.phase) : ''),
         phase: record.phase ? translatePhase(record.phase) : undefined,
         detail: matchId || undefined,
         record
@@ -103,6 +106,17 @@ function extractMatchId(payload: Record<string, unknown> | null): string | undef
   // debate: matchId 直接在顶层
   if (payload.matchId) return String(payload.matchId);
   return undefined;
+}
+
+function describeInteractionFeedback(payload: Record<string, unknown> | null): string {
+  if (!payload) return '';
+  const parts = [
+    payload.actorId != null ? `actor=${payload.actorId}` : '',
+    payload.target != null ? `target=${payload.target}` : '',
+    payload.result ? `result=${String(payload.result)}` : '',
+    payload.scopeKey ? `scope=${String(payload.scopeKey)}` : `channel=${String(payload.channel || '')}`,
+  ].filter(Boolean);
+  return parts.join(' / ');
 }
 
 function truncate(text: string | undefined, maxLen: number): string | undefined {

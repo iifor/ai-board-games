@@ -43,6 +43,10 @@ interface AskVoteOptions {
   phase?: string;
 }
 
+interface AskOnceOptions extends AskTextOptions {
+  messages?: ChatMessage[];
+}
+
 interface PlayerAgentOptions {
   onError?: (entry: FallbackEntry) => void;
   gameId?: string;
@@ -125,6 +129,22 @@ class BasePlayerAgent {
     }
   }
 
+  async askTextOnce(prompt: string, options: AskOnceOptions = {}): Promise<string | null> {
+    const limit = options.limit || 260;
+    if (!this.player.apiKey) {
+      this.recordError(options.skillId || 'player-text', 'missing-api-key', options);
+      return null;
+    }
+    try {
+      const reply = await this.callOnce(options.messages || this.buildOneShotMessages(prompt), options.maxTokens || 800);
+      return normalizeText(reply, limit);
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.recordError(options.skillId || 'player-text', err.message, options);
+      return null;
+    }
+  }
+
   async askJson(prompt: string, options: AskJsonOptions = {}): Promise<Record<string, unknown> | null> {
     if (!this.player.apiKey) {
       this.recordError(options.skillId || 'player-json', 'missing-api-key', options);
@@ -136,6 +156,26 @@ class BasePlayerAgent {
       if (parsed) return parsed;
       // 重试一次
       const retryParsed = parseJsonObject(await this.call(`${prompt}\n\nReturn one valid JSON object only. No markdown wrapping.`, options.maxTokens || 120)) as Record<string, unknown> | null;
+      if (retryParsed) return retryParsed;
+      this.recordError(options.skillId || 'player-json', 'invalid-json', options);
+      return null;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.recordError(options.skillId || 'player-json', err.message, options);
+      return null;
+    }
+  }
+
+  async askJsonOnce(prompt: string, options: AskJsonOptions & { messages?: ChatMessage[] } = {}): Promise<Record<string, unknown> | null> {
+    if (!this.player.apiKey) {
+      this.recordError(options.skillId || 'player-json', 'missing-api-key', options);
+      return null;
+    }
+    const jsonOnly = '\n\nReturn ONLY a raw JSON object. Do NOT wrap in ```json blocks. No explanations outside the JSON.';
+    try {
+      const parsed = parseJsonObject(await this.callOnce(options.messages || this.buildOneShotMessages(prompt + jsonOnly), options.maxTokens || 120)) as Record<string, unknown> | null;
+      if (parsed) return parsed;
+      const retryParsed = parseJsonObject(await this.callOnce(this.buildOneShotMessages(`${prompt}\n\nReturn one valid JSON object only. No markdown wrapping.`), options.maxTokens || 120)) as Record<string, unknown> | null;
       if (retryParsed) return retryParsed;
       this.recordError(options.skillId || 'player-json', 'invalid-json', options);
       return null;
@@ -177,6 +217,36 @@ class BasePlayerAgent {
     return null;
   }
 
+  async askVoteTargetOnce(prompt: string, validIds: number[], options: AskVoteOptions = {}): Promise<number | null> {
+    const parsed = await this.askJsonOnce([
+      prompt,
+      `Valid target seat numbers: ${validIds.join(', ')}`,
+      'Return JSON only, for example {"targetSeat":2}. targetSeat must be one of the listed seat numbers.'
+    ].join('\n\n'), {
+      maxTokens: 60,
+      skillId: options.skillId || 'player-vote',
+      phase: options.phase,
+    });
+    if (!parsed) return null;
+    const target = Number(parsed.targetSeat ?? parsed.target);
+    if (validIds.includes(target)) return target;
+    const retryParsed = await this.askJsonOnce([
+      prompt,
+      `Valid target seat numbers: ${validIds.join(', ')}`,
+      `You returned ${target}, which is NOT in the valid list. Pick ONLY from: ${validIds.join(', ')}.`,
+      'Return JSON: {"targetSeat":<number from the valid list>}.'
+    ].join('\n\n'), {
+      maxTokens: 60,
+      skillId: options.skillId || 'player-vote',
+      phase: options.phase,
+    });
+    if (!retryParsed) return null;
+    const retryTarget = Number(retryParsed.targetSeat ?? retryParsed.target);
+    if (validIds.includes(retryTarget)) return retryTarget;
+    this.recordError(options.skillId || 'player-vote', 'invalid-target', options);
+    return null;
+  }
+
   // -----------------------------------------------------------
   // LLM call helpers.
   // -----------------------------------------------------------
@@ -199,6 +269,31 @@ class BasePlayerAgent {
     });
     this.messages.push({ role: 'assistant', content: reply });
     return reply;
+  }
+
+  private buildOneShotMessages(prompt: string): ChatMessage[] {
+    const system = this.messages.find((message) => message.role === 'system') || this.messages[0];
+    return [
+      system || { role: 'system', content: '' },
+      { role: 'user', content: prompt },
+    ];
+  }
+
+  async callOnce(messages: ChatMessage[], maxTokens?: number): Promise<string> {
+    return callOpenAIChat({
+      apiKey: this.player.apiKey!,
+      baseUrl: this.player.baseUrl,
+      provider: this.player.provider,
+      model: this.player.model!,
+      apiFormat: this.player.apiFormat,
+      temperature: this.player.temperature,
+      messages,
+      maxTokens,
+      _gameId: this.gameId,
+      _playerId: this.player.id,
+      _playerRole: this.resolveRole(this.player),
+      _playerFaction: this.resolveFaction(this.player)
+    });
   }
 
   async callWithThinking(prompt: string, maxTokens?: number): Promise<CallResult> {
@@ -230,6 +325,35 @@ class BasePlayerAgent {
     try {
       const { content, thinking } = await this.callWithThinking(prompt, options.maxTokens || 800);
       return { content: normalizeText(content, limit), thinking };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.recordError(options.skillId || 'player-text', err.message, options);
+      return null;
+    }
+  }
+
+  async askTextWithThinkingOnce(prompt: string, options: AskOnceOptions = {}): Promise<{ content: string; thinking: string } | null> {
+    const limit = options.limit || 260;
+    if (!this.player.apiKey) {
+      this.recordError(options.skillId || 'player-text', 'missing-api-key', options);
+      return null;
+    }
+    try {
+      const result = await callModelChatWithThinking({
+        apiKey: this.player.apiKey!,
+        baseUrl: this.player.baseUrl,
+        provider: this.player.provider,
+        model: this.player.model!,
+        apiFormat: this.player.apiFormat,
+        temperature: this.player.temperature,
+        messages: options.messages || this.buildOneShotMessages(prompt),
+        maxTokens: options.maxTokens || 800,
+        _gameId: this.gameId,
+        _playerId: this.player.id,
+        _playerRole: this.resolveRole(this.player),
+        _playerFaction: this.resolveFaction(this.player)
+      });
+      return { content: normalizeText(result.content, limit), thinking: result.thinking };
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.recordError(options.skillId || 'player-text', err.message, options);
@@ -276,4 +400,4 @@ class BasePlayerAgent {
 }
 
 export { BasePlayerAgent, normalizeText };
-export type { Player, PlayerAgentOptions, AskTextOptions, AskJsonOptions, AskVoteOptions, CallResult };
+export type { Player, PlayerAgentOptions, AskTextOptions, AskJsonOptions, AskVoteOptions, CallResult, ChatMessage };

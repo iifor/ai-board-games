@@ -4,7 +4,9 @@ import * as repo from '../../packages/server/modules/workflow-engine/repository'
 import { createActionWindowHandler } from '../../packages/server/modules/werewolf/handlers/actionWindowHandler';
 import { createNightResolveHandler, createExileResolveHandler, createSheriffResolveHandler } from '../../packages/server/modules/werewolf/handlers/resolveHandlers';
 import { createRound } from '../../packages/server/modules/werewolf/agents';
-import { createInitialWerewolfState } from '../../packages/server/modules/werewolf/runtime';
+import { createInitialWerewolfState, createRuntime, flushMatchEventPublishes, registerMatchInfra, unregisterMatchInfra } from '../../packages/server/modules/werewolf/runtime';
+import { createEventBusWithDefaults } from '../../packages/server/modules/werewolf/eventBus';
+import { createGameEventBuilder } from '../../packages/server/modules/werewolf/gameEventBuilder';
 
 type RepoPatch = Pick<typeof repo,
   'upsertActionWindowEpoch' |
@@ -68,6 +70,9 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
     const completed = actionHandler.execute({ match, step: wolfStep, state: opened.state } as never);
     assert.equal(completed.status, 'COMPLETED');
     assert.equal(completed.state?.rounds[0].night.wolfTarget, 2);
+    const actionAuditEvent = (completed.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_action_engine_shadow_audited') as Record<string, unknown> | undefined;
+    assert.equal(actionAuditEvent?.channel, 'system');
+    assert.equal((actionAuditEvent?.payload as Record<string, unknown> | undefined)?.status, 'matched');
 
     const nightResolved = createNightResolveHandler().execute({
       match,
@@ -325,6 +330,186 @@ test('witch close eyes is emitted only after poison phase', () => {
     assert.equal(closeEvents.length, 1);
     assert.equal((closeEvents[0] as Record<string, unknown>).payload.message, '女巫请闭眼。');
   } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('private night action phase results are scoped and not public', () => {
+  const cases = [
+    {
+      actionType: 'seer_check',
+      actor: player(4, 'seer', 'good', ['inspectFaction']),
+      payload: { target: 2, result: '好人' },
+      scopeKey: 'seer',
+    },
+    {
+      actionType: 'guard_protect',
+      actor: player(5, 'guard', 'good', ['guard']),
+      payload: { target: 2 },
+      scopeKey: 'guard',
+    },
+    {
+      actionType: 'witch_save',
+      actor: player(6, 'witch', 'good', ['save', 'poison']),
+      payload: { use: true, target: 2 },
+      scopeKey: 'witch',
+      wolfTarget: 2,
+    },
+    {
+      actionType: 'witch_poison',
+      actor: player(6, 'witch', 'good', ['save', 'poison']),
+      payload: { use: true, target: 2 },
+      scopeKey: 'witch',
+    },
+  ];
+
+  for (const item of cases) {
+    const original = snapshotRepo(repo);
+    const tasks: Array<Record<string, unknown>> = [];
+    try {
+      patchRepo(repo, {
+        upsertActionWindowEpoch: (epoch: never) => epoch,
+        listEvents: () => [],
+        createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+        listPendingActions: () => [],
+        listAiTasks: () => tasks as never,
+        createWorkflowEffect: (effect: never) => effect
+      });
+
+      const state = createState();
+      state.players = [...(state.players as Record<string, unknown>[]), item.actor];
+      if (item.wolfTarget) state.rounds[0].night.wolfTarget = item.wolfTarget;
+      const match = { id: `m-private-${item.actionType}`, config: { players: state.players }, createdAt: 'now' };
+      const handler = createActionWindowHandler();
+      const step = { id: `${item.actionType}_1`, type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: item.actionType } };
+
+      const opened = handler.execute({ match, step, state } as never);
+      assert.equal(opened.status, 'WAITING');
+      assert.equal(opened.events?.[0].channel, 'scope');
+      tasks.push(...(opened.tasks || []));
+      tasks[0] = {
+        ...tasks[0],
+        status: 'succeeded',
+        playerId: item.actor.id,
+        result: { payload: item.payload }
+      };
+
+      const completed = handler.execute({ match, step, state: opened.state } as never);
+      assert.equal(completed.status, 'COMPLETED');
+      const submittedEvent = (completed.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_action_submitted') as Record<string, unknown> | undefined;
+      assert.equal(submittedEvent?.channel, 'scope', item.actionType);
+      assert.equal(submittedEvent?.scopeKey, item.scopeKey, item.actionType);
+      const resultEvent = (completed.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_phase_result') as Record<string, unknown> | undefined;
+      if (resultEvent) {
+        assert.equal(resultEvent.channel, 'scope', item.actionType);
+        assert.equal(resultEvent.scopeKey, item.scopeKey, item.actionType);
+        assert.equal((resultEvent.payload as Record<string, unknown> | undefined)?.channel, 'scope', item.actionType);
+        assert.equal((resultEvent.payload as Record<string, unknown> | undefined)?.scopeKey, item.scopeKey, item.actionType);
+      }
+      const auditEvent = (completed.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_action_engine_shadow_audited') as Record<string, unknown> | undefined;
+      assert.equal(auditEvent?.channel, 'system', item.actionType);
+      assert.equal(auditEvent?.visibility, 'system', item.actionType);
+      const auditPayload = auditEvent?.payload as Record<string, unknown> | undefined;
+      assert.equal(auditPayload?.status, 'matched', `${item.actionType}: ${JSON.stringify(auditPayload)}`);
+    } finally {
+      patchRepo(repo, original);
+    }
+  }
+});
+
+test('seer check result is injected into seer private LLM memory on runtime rebuild', () => {
+  const state = createState();
+  state.players = [
+    ...(state.players as Record<string, unknown>[]),
+    {
+      ...player(4, 'seer', 'good', ['inspectFaction']),
+      seerChecks: [{ day: 1, target: 2, result: '好人' }],
+    },
+  ];
+  state.rounds[0].night.seerCheck = { target: 2, result: '好人' };
+  const match = { id: 'm-seer-memory', config: { players: state.players }, state, createdAt: 'now' };
+
+  const runtime = createRuntime(match as never);
+  const seer = runtime.agents.find((agent: Record<string, unknown>) => Number(agent.id) === 4) as Record<string, unknown> | undefined;
+  const messages = ((seer?.playerAgent as { messages?: Array<{ content: string }> } | undefined)?.messages || [])
+    .map((message) => message.content)
+    .join('\n');
+
+  assert.match(messages, /预言家私密查验结果/);
+  assert.match(messages, /第1晚，你查验了2号，结果是：好人。/);
+});
+
+test('wolf private prompt lists teammates with live and eliminated status', () => {
+  const state = createState();
+  state.players = [
+    player(1, 'werewolf', 'wolves', ['kill']),
+    player(2, 'werewolf', 'wolves', ['kill']),
+    player(3, 'werewolf', 'wolves', ['kill'], { alive: false, deathDay: 1, deathReason: '放逐' }),
+  ];
+  const match = { id: 'm-wolf-team-memory', config: { players: state.players }, state, createdAt: 'now' };
+
+  const runtime = createRuntime(match as never);
+  const wolf = runtime.agents.find((agent: Record<string, unknown>) => Number(agent.id) === 1) as Record<string, unknown> | undefined;
+  const messages = ((wolf?.playerAgent as { messages?: Array<{ content: string }> } | undefined)?.messages || [])
+    .map((message) => message.content)
+    .join('\n');
+
+  assert.match(messages, /狼队私密信息/);
+  assert.match(messages, /2号（[^）]*存活）/);
+  assert.match(messages, /3号（[^）]*已出局）/);
+});
+
+test('seer check phase result is published to EventBus as scoped seer feedback', async () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  const delivered: Array<Record<string, unknown>> = [];
+  const matchId = 'm-seer-eventbus';
+  const eventBus = createEventBusWithDefaults();
+  const gameEventBuilder = createGameEventBuilder(matchId);
+  const unsubscribe = eventBus.subscribeAll((event) => {
+    delivered.push(event as unknown as Record<string, unknown>);
+  });
+  registerMatchInfra(matchId, eventBus, gameEventBuilder);
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'villager', 'good', []),
+      player(4, 'seer', 'good', ['inspectFaction']),
+    ];
+    const match = { id: matchId, config: { players: state.players }, createdAt: 'now' };
+    const handler = createActionWindowHandler();
+    const step = { id: 'seer_check_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'seer_check' } };
+
+    const opened = handler.execute({ match, step, state } as never);
+    tasks.push(...(opened.tasks || []));
+    tasks[0] = {
+      ...tasks[0],
+      status: 'succeeded',
+      playerId: 4,
+      result: { payload: { target: 2, result: '好人' } }
+    };
+
+    const completed = handler.execute({ match, step, state: opened.state } as never);
+    assert.equal(completed.status, 'COMPLETED');
+    await flushMatchEventPublishes(matchId);
+
+    const seerEvent = delivered.find((event) => event.type === 'seer-check');
+    assert.equal(seerEvent?.channel, 'scope');
+    assert.equal(seerEvent?.scopeKey, 'seer');
+    assert.match(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), /2号玩家的查验结果是：好人/);
+  } finally {
+    unsubscribe();
+    unregisterMatchInfra(matchId);
     patchRepo(repo, original);
   }
 });

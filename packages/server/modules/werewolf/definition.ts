@@ -9,7 +9,7 @@ import type {
   ViewerContext,
   WorkflowEffect,
 } from '@ai-presenter/shared/types/gameEngine';
-import { WEREWOLF_WORKFLOW_ID, registerWerewolfWorkflow } from './workflow';
+import { WEREWOLF_WORKFLOW_ID } from './workflow';
 import { countTargets, topTarget } from './winCheck';
 import { buildWolfStrategySummary, getTopCandidateIds } from './utils';
 import { createNightResolutionResolver, projectNightResolutionStateFromEvent } from './engineNightResolution';
@@ -57,7 +57,6 @@ const werewolfChannelPolicy: ChannelPolicy = {
 };
 
 function createWerewolfGameDefinition(): GameDefinition {
-  registerWerewolfWorkflow();
   return {
     gameType: 'werewolf',
     version: WEREWOLF_GAME_DEFINITION_VERSION,
@@ -493,11 +492,8 @@ function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
   return JSON.parse(JSON.stringify(value || {})) as Record<string, unknown>;
 }
 
-const WEREWOLF_GAME_DEFINITION = createWerewolfGameDefinition();
-
 export {
   WEREWOLF_GAME_DEFINITION_VERSION,
-  WEREWOLF_GAME_DEFINITION,
   werewolfChannelPolicy,
   createWerewolfGameDefinition,
   createWerewolfEffectsFromAction,

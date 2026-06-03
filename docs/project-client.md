@@ -165,3 +165,11 @@ pnpm run check:client
 - API 请求必须放到 `services`。
 - 前端不保存密钥、不做最终权限判断、不决定核心游戏结果。
 - loading、error、empty 状态应在前端明确展示。
+
+## Werewolf C 端状态合并约定
+
+狼人杀 C 端不能把每一条 socket 事件携带的 `game` 或 `round` 当成完整真相直接覆盖本地状态。部分 EventBus 事件只包含当前展示所需的局部字段，例如 `vote-result` 的 `votes/tally/exile`、警长事件的 `sheriffElection/sheriffId/sheriffTransfer`。`WerewolfGame` 通过 `utils/gameState.ts` 合并这些局部事件：
+
+- `mergeWerewolfEventIntoGame` 保留已知玩家、round、警徽、警长竞选和投票字段，只用新事件覆盖明确携带的字段。
+- `resolveActiveSheriffId` 会从当前 round 和历史 rounds 反查有效警徽，避免进入后续夜晚或下一天后警徽图标消失。
+- `vote-result` 事件即使没有完整 `game` snapshot，也会用顶层 `votes/tally/exile` patch 到对应 day 的 round，供座位投票角标展示。

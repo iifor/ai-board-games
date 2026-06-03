@@ -30,7 +30,6 @@ export {
 
 export {
   WEREWOLF_GAME_DEFINITION_VERSION,
-  WEREWOLF_GAME_DEFINITION,
   werewolfChannelPolicy,
   createWerewolfGameDefinition,
   createWerewolfEffectsFromAction,

@@ -95,6 +95,7 @@ export class EventDeliverySubscriber {
       const gameRounds = (event.game as unknown as { rounds?: Array<Record<string, unknown>> }).rounds;
       if (Array.isArray(gameRounds) && gameRounds.length > 0) {
         const latestRound = gameRounds[gameRounds.length - 1];
+        flat.round = latestRound;
         const sheriffElection = latestRound?.sheriffElection as Record<string, unknown> | undefined;
         if (sheriffElection) {
           const signedUp = Array.isArray(sheriffElection.signedUpIds)
@@ -107,6 +108,20 @@ export class EventDeliverySubscriber {
         }
       }
     }
+
+    if (payload.votes !== undefined) flat.votes = payload.votes;
+    if (payload.tally !== undefined) flat.tally = payload.tally;
+    if (payload.voteTally !== undefined) flat.voteTally = payload.voteTally;
+    if (payload.exile !== undefined) flat.exile = payload.exile;
+    if (payload.deaths !== undefined) flat.deaths = payload.deaths;
+    if (payload.election !== undefined) {
+      flat.election = payload.election;
+      flat.sheriffElection = payload.election;
+    }
+    if (payload.sheriffElection !== undefined) flat.sheriffElection = payload.sheriffElection;
+    if (payload.sheriffId !== undefined) flat.sheriffId = payload.sheriffId;
+    if (payload.sheriffTransfer !== undefined) flat.sheriffTransfer = payload.sheriffTransfer;
+    if (payload.transfer !== undefined) flat.sheriffTransfer = payload.transfer;
 
     if (hasSpeech) {
       flat.speech = {

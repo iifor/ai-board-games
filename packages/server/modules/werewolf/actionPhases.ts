@@ -17,6 +17,7 @@ interface NightActionPhaseConfig {
 
 interface PhaseContext {
   wolfTarget?: number | string | null;
+  target?: number | string | null;
   seerResult?: string | null;
   witchSaveUsed?: boolean;
   witchPoisonUsed?: boolean;
@@ -48,7 +49,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `预言家请睁眼，请选择查验的目标`,
       result: context?.seerResult
-        ? `它的身份是${context.seerResult}`
+        ? `${context.target || '?'}号玩家的查验结果是：${context.seerResult}`
         : '',
       end: `预言家请闭眼`,
     }),

@@ -3,6 +3,7 @@ import { createWerewolfSkillRegistry } from './roles';
 import { createWerewolfRoleSkillRegistry } from './roleSkills';
 import { PlayerAgent } from './playerAgent';
 import { buildSystemPrompt, createRound, publicHost, publicPlayer } from './agents';
+import { appendSeerCheckPrivateMemory } from './prompts/system';
 import { getRoleConfig, shuffle } from './utils';
 import type { WerewolfEventBus } from './eventBus';
 import type { GameEventBuilder } from './gameEventBuilder';
@@ -300,7 +301,16 @@ function createRuntimeAgent(
   fallbackAudit: unknown,
   gameId: string,
   roleSkillRegistry: unknown,
-  allPlayers?: Array<{ id: number; nickname?: string; name?: string; sex?: string }>
+  allPlayers?: Array<{
+    id: number;
+    nickname?: string;
+    name?: string;
+    sex?: string;
+    role?: string;
+    roleLabel?: string;
+    faction?: string;
+    alive?: boolean;
+  }>
 ): Agent {
   const agent: Agent = {
     ...player,
@@ -334,6 +344,7 @@ function createRuntimeAgent(
     role: 'system',
     content: `Mode: ${modeConfig.name || modeConfig.id || 'werewolf'}. Role: ${roleConfig.name || roleId}.`
   });
+  appendSeerCheckPrivateMemory(agent, allPlayers);
   return agent;
 }
 

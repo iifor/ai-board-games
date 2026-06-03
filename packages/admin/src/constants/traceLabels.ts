@@ -9,6 +9,7 @@ const WORKFLOW_EVENT_LABELS: Record<string, string> = {
   'werewolf_action_submitted': '行动完成',
   'werewolf_action_requested': '行动窗口开启',
   'werewolf_action_skipped': '行动跳过',
+  'werewolf_interaction_feedback': '角色交互反馈',
   'werewolf_effect_resolved': '效果结算',
   'werewolf_game_completed': '对局结束',
   'werewolf_phase_changed': '阶段切换',
@@ -185,6 +186,14 @@ const ACTION_CATEGORY_LABELS: Record<string, string> = {
   'self_destruct': '狼人自爆',
 };
 
+const INTERACTION_FEEDBACK_LABELS: Record<string, string> = {
+  'seer_check_result': '预言家查验',
+  'guard_protect_result': '守卫守护',
+  'witch_save_result': '女巫解药',
+  'witch_poison_result': '女巫毒药',
+  'hunter_shot_result': '猎人开枪',
+};
+
 // ─── 阶段/流程标签 ───
 const PHASE_LABELS: Record<string, string> = {
   'night': '夜晚',
@@ -235,6 +244,11 @@ function translateEventTitle(type: string, payload?: Record<string, unknown> | n
   if (!actionType) return base;
   const actionLabel = ACTION_TYPE_LABELS[actionType] || actionType;
   const category = ACTION_CATEGORY_LABELS[actionType];
+  if (type === 'werewolf_interaction_feedback') {
+    const feedbackKind = payload.feedbackKind as string | undefined;
+    const feedbackLabel = INTERACTION_FEEDBACK_LABELS[feedbackKind || ''] || actionLabel;
+    return `交互反馈：${feedbackLabel}`;
+  }
   // 为 workflow 事件添加行动主语，使用类别+具体行动的格式
   if (type === 'werewolf_action_submitted') return category ? `${category}：${actionLabel} — 完成` : `${actionLabel} — 完成`;
   if (type === 'werewolf_action_requested') return category ? `${category}：${actionLabel} — 等待行动` : `${actionLabel} — 等待行动`;

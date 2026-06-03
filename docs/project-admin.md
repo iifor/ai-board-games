@@ -111,6 +111,10 @@ packages/admin/
 - `LlmCallCard`
 - `SpanTimeline`
 
+`TraceExplorer` 会识别 `werewolf_interaction_feedback` 事件，并在时间线中展示狼人杀角色交互反馈，例如预言家查验、守卫守护、女巫用药和猎人开枪。该事件可能包含私密角色信息，只用于 B 端调试观测。
+
+Trace 详情页提供“关键事件”筛选入口，聚合狼人杀交互反馈、AI error 和 fallback 决策，便于快速排查行动反馈与异常路径。
+
 ## 配置与部署
 
 常用命令：
