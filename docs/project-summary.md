@@ -46,7 +46,8 @@
 │   ├── project-workflow.md
 │   ├── project-client.md
 │   ├── project-admin.md
-│   └── project-shared.md
+│   ├── project-shared.md
+│   └── project-prompts.md
 ├── packages/
 │   ├── client/                 # C 端游戏前台
 │   ├── admin/                  # B 端管理后台
@@ -103,6 +104,7 @@ flowchart TD
 
 - 后端服务架构：见 `docs/project-server.md`。
 - 游戏工作流与 AI 调度：见 `docs/project-workflow.md`。
+- 狼人杀 AI 玩家提示词与 LLM 调用：见 `docs/project-prompts.md`。
 - C 端游戏前台：见 `docs/project-client.md`。
 - B 端管理后台：见 `docs/project-admin.md`。
 - 共享类型、schema、测试：见 `docs/project-shared.md`。

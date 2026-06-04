@@ -10,6 +10,7 @@
 4. C 端游戏前台任务读 `docs/project-client.md`。
 5. B 端后台管理任务读 `docs/project-admin.md`。
 6. 共享类型、schema、常量、测试任务读 `docs/project-shared.md`。
+7. 狼人杀 AI 玩家提示词、PromptContext、LLM 调用和 trace 观测任务读 `docs/project-prompts.md`。
 
 ## 文档维护规则
 
@@ -39,3 +40,4 @@
 - `project-client.md`：C 端游戏前台架构。
 - `project-admin.md`：B 端后台管理架构。
 - `project-shared.md`：共享类型、schema、常量和测试约定。
+- `project-prompts.md`：狼人杀 AI 玩家提示词、动态上下文、LLM 调用和观测约定。
