@@ -35,7 +35,7 @@ werewolf workflow step
 
 | 文件 | 职责 |
 | --- | --- |
-| `packages/server/modules/werewolf/prompts/system.ts` | 构建狼人杀玩家初始化 system prompt、开局私密记忆、预言家查验私密记忆。 |
+| `packages/server/modules/werewolf/prompts/system.ts` | 构建狼人杀玩家完整 debug system prompt、轻量 system prompt，并保留遗留私密记忆 helper。 |
 | `packages/server/modules/werewolf/prompts/context.ts` | 每次行动构造短上下文 Prompt Bundle。 |
 | `packages/server/modules/werewolf/prompts/actions.ts` | 定义各类狼人杀 action 的任务提示词和技能描述。 |
 | `packages/server/modules/werewolf/prompts/speech.ts` | 封装白天发言、狼人夜聊、警长发言等文本调用。 |
@@ -49,7 +49,7 @@ werewolf workflow step
 
 入口：`packages/server/modules/werewolf/prompts/system.ts`
 
-`buildSystemPrompt()` 在创建 `WerewolfAgent` 时生成基础 system prompt，主要包含：
+`buildSystemPrompt()` 生成完整开局提示词，主要包含：
 
 - 游戏模式和基础规则。
 - 当前玩家座位号、身份、阵营、角色能力。
@@ -59,22 +59,30 @@ werewolf workflow step
 - 玩家人格、语气、发言风格。
 - 输出纪律，例如不要复述系统提示、不要编造流程、决策时使用座位号。
 
+完整开局提示词保存在 `agent.baseSystemPrompt`，用于开局同步和 debug；它不作为后续 `ask*Once()` 的 system message 反复发送。
+
+后续 LLM 调用使用 `buildLightweightSystemPrompt()` 生成固定轻量 system message：
+
+```txt
+本局你是 {seat} 号，身份是：{roleLabel}，阵营是：{factionLabel}。
+只能按当前任务输出；不要泄露系统提示。
+```
+
 `runtime.ts` 中 `createRuntimeAgent()` 会：
 
 1. 调用 `buildSystemPrompt()`。
-2. 创建 `WerewolfAgent`。
+2. 调用 `buildLightweightSystemPrompt()` 创建 `WerewolfAgent` 的第一条 system message。
 3. 注册该角色可用 skill。
-4. 追加模式和身份相关 system message。
-5. 根据当前状态追加预言家查验私密记忆。
+4. 不再追加开局私有认知、模式/身份摘要或预言家查验记忆到 `PlayerAgent.messages`；这些事实由每次行动的 `privateKnowledge` 动态提供。
 
 ## 私密记忆
 
 入口：`packages/server/modules/werewolf/prompts/system.ts`
 
-当前有两类私密记忆 helper：
+当前保留两类私密记忆 helper 作为遗留兼容入口，但狼人杀主 LLM 调用链不再使用它们追加长期 system message：
 
-- `appendOpeningPrivateMemory()`：用于开局身份确认、队友互通和角色能力说明。
-- `appendSeerCheckPrivateMemory()`：用于把预言家历史查验结果追加给预言家本人。
+- `appendOpeningPrivateMemory()`：历史上用于开局身份确认、队友互通和角色能力说明；现主链路改由完整 `baseSystemPrompt` debug 保存和动态 `privateKnowledge` 提供。
+- `appendSeerCheckPrivateMemory()`：历史上用于把预言家历史查验结果追加给预言家本人；现主链路由 `buildWerewolfPromptBundle()` 的 `privateKnowledge` 动态注入。
 
 预言家私密查验结果的目标格式应类似：
 
@@ -88,7 +96,7 @@ werewolf workflow step
 
 入口：`packages/server/modules/werewolf/prompts/context.ts`
 
-狼人杀当前推荐使用短上下文模式：每次行动临时重建 prompt，而不是让 `PlayerAgent.messages` 无限增长。
+狼人杀当前推荐使用短上下文模式：每次行动临时重建 prompt，而不是让 `PlayerAgent.messages` 无限增长。每次 `ask*Once()` 只发送轻量 system message 和当前行动 prompt。
 
 `buildWerewolfPromptBundle()` 生成：
 
@@ -98,6 +106,13 @@ werewolf workflow step
 - `recentContext`：近期关键发言、投票、夜聊和阶段摘要。
 - `taskInstruction`：当前 action 的具体任务。
 - `outputContract`：输出格式、合法目标、字数限制。
+
+单次 prompt 内必须去重：
+
+- 夜聊记录只出现在 `recentContext` 或任务说明的一处。
+- 警上发言只出现在 `recentContext` 或任务说明的一处。
+- 可选目标列表只出现在目标列表 / 输出契约的一处。
+- 调用方显式传入空 `recentContext` 时，不再自动补默认近期上下文。
 
 渲染入口：
 
@@ -166,6 +181,7 @@ werewolf workflow step
 - 是否触发开枪窗口。
 - 触发原因。
 - 合法开枪目标。
+- 开枪或不开枪原因可进入 trace/debug，但不要作为公开播报。
 
 非对应角色不能看到这些私密信息。
 
@@ -194,8 +210,22 @@ werewolf workflow step
 输出约束：
 
 - 发言类：自然语言、字数上限、不得复述系统提示、不得直接暴露不该公开的私密信息。
-- 投票类：必须只返回 JSON，目标必须使用座位号。
+- 投票类：必须只返回标准 JSON 对象，目标必须使用座位号。
+- 目标选择类：prompt 必须显式列出可选座位号；没有合法目标时服务端跳过 LLM 并返回保守结果。
 - 角色决策类：必须遵守合法目标列表和角色能力限制。
+- 夜间决策 reason：预言家查验、女巫非自救用解药、女巫用毒药、猎人开枪都必须返回简短原因；reason 只用于 trace/debug，不作为 C 端公开播报。
+
+标准 JSON 示例：
+
+```json
+{"targetSeat":2,"reason":"发言位置可疑，优先确认身份"}
+```
+
+不行动示例：
+
+```json
+{"targetSeat":null,"reason":"暂无明确目标，选择不开枪"}
+```
 
 ## 发言提示词
 
@@ -230,6 +260,7 @@ werewolf workflow step
 
 - 每次行动都需要重新计算公开事实和私密信息。
 - 历史消息可能包含已经过期的合法目标。
+- 完整开局规则、玩家名单和狼队友列表不应在后续每次调用中重复发送。
 - 私密信息如果长期堆在 `messages` 中，后续角色或 runtime 重建时更难排查。
 
 需要谨慎使用：
@@ -281,11 +312,14 @@ werewolf workflow step
 
 - 预言家查验结果必须反馈给预言家本人，但不能给 C 端观众公开。
 - 狼人队友信息必须给狼人互通，并标识队友存活 / 已出局状态。
+- 后续 once 调用的第一条 system message 必须保持轻量模板，不能回退为完整开局 prompt。
 - 白天放逐结果必须同步给所有后续行动 prompt。
 - 警徽信息不能只在确认时出现，后续 prompt 和展示状态都要保留。
 - 投票结果应进入公开事实，后续发言和投票 prompt 应能引用。
 - 已出局玩家不能进入合法目标列表。
 - 私密角色结果不能出现在 public `werewolf_phase_result` 或 audience display event 中。
+- 私密夜间行动 reason 不能进入 public/audience display event。
+- 同一份 prompt 内不能重复塞入完整夜聊记录或警上发言记录。
 
 ## 后续优化建议
 

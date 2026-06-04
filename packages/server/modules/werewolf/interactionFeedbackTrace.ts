@@ -37,6 +37,7 @@ interface InteractionFeedbackEvent extends Record<string, unknown> {
   visibleTo: string[];
   used?: boolean;
   wolfTarget?: number | null;
+  reason?: string | null;
   triggerReason?: string | null;
 }
 
@@ -64,6 +65,7 @@ function buildWerewolfInteractionFeedbackEvent(input: InteractionFeedbackInput):
       channel: CHANNEL_TYPES.SCOPE,
       scopeKey: 'seer',
       visibleTo: ['role:seer', 'system'],
+      reason: normalizeReason(payload.reason),
     };
   }
 
@@ -77,6 +79,7 @@ function buildWerewolfInteractionFeedbackEvent(input: InteractionFeedbackInput):
       channel: CHANNEL_TYPES.SCOPE,
       scopeKey: 'guard',
       visibleTo: ['role:guard', 'system'],
+      reason: normalizeReason(payload.reason),
     };
   }
 
@@ -94,6 +97,7 @@ function buildWerewolfInteractionFeedbackEvent(input: InteractionFeedbackInput):
       visibleTo: ['role:witch', 'system'],
       used,
       wolfTarget,
+      reason: normalizeReason(payload.reason),
     };
   }
 
@@ -109,6 +113,7 @@ function buildWerewolfInteractionFeedbackEvent(input: InteractionFeedbackInput):
       scopeKey: 'witch',
       visibleTo: ['role:witch', 'system'],
       used,
+      reason: normalizeReason(payload.reason),
     };
   }
 
@@ -120,6 +125,7 @@ function buildWerewolfInteractionFeedbackEvent(input: InteractionFeedbackInput):
     result: target != null ? 'shot' : 'skipped',
     channel: CHANNEL_TYPES.PUBLIC,
     visibleTo: ['public', 'system'],
+    reason: normalizeReason(payload.reason),
     triggerReason: input.reason || String(payload.reason || ''),
   };
 }
@@ -148,6 +154,11 @@ function toNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function normalizeReason(value: unknown): string | null {
+  const reason = String(value || '').trim();
+  return reason || null;
 }
 
 export {

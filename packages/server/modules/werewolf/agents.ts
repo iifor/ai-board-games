@@ -1,7 +1,7 @@
 import { hashText } from '../../services/ai/promptComposer';
 import { PlayerAgent } from './playerAgent';
 import { getRoleConfig, getRoleLabel, shuffle } from './utils';
-import { buildSystemPrompt, appendOpeningPrivateMemory } from './prompts/system';
+import { buildSystemPrompt, buildLightweightSystemPrompt } from './prompts/system';
 import {
   askSpeech,
   askWolfNightSpeech,
@@ -216,12 +216,11 @@ function createWerewolfAgents(
     };
     agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry, selected, modeConfig);
     agent.baseSystemPromptHash = hashText(agent.baseSystemPrompt!);
-    agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt!, {
+    agent.playerAgent = new PlayerAgent(agent, buildLightweightSystemPrompt(agent, selected), {
       onError: (entry: unknown) => fallbackAudit.record(entry as Record<string, unknown>),
       gameId
     });
     roleSkillRegistry?.applyToPlayer(agent.playerAgent, roleId);
-    appendOpeningPrivateMemory(agent, modeConfig);
     return agent;
   });
 }

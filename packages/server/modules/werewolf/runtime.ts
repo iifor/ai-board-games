@@ -3,7 +3,7 @@ import { createWerewolfSkillRegistry } from './roles';
 import { createWerewolfRoleSkillRegistry } from './roleSkills';
 import { PlayerAgent } from './playerAgent';
 import { buildSystemPrompt, createRound, publicHost, publicPlayer } from './agents';
-import { appendSeerCheckPrivateMemory } from './prompts/system';
+import { buildLightweightSystemPrompt } from './prompts/system';
 import { getRoleConfig, shuffle } from './utils';
 import type { WerewolfEventBus } from './eventBus';
 import type { GameEventBuilder } from './gameEventBuilder';
@@ -335,16 +335,11 @@ function createRuntimeAgent(
     votes: Array.isArray(player.votes) ? player.votes : []
   };
   agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry, allPlayers, modeConfig);
-  agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt, {
+  agent.playerAgent = new PlayerAgent(agent, buildLightweightSystemPrompt(agent, allPlayers), {
     onError: (entry: unknown) => (fallbackAudit as { record: (entry: unknown) => void }).record(entry),
     gameId
   });
   (roleSkillRegistry as { applyToPlayer?: (agent: InstanceType<typeof PlayerAgent>, roleId: string) => void })?.applyToPlayer?.(agent.playerAgent, roleId);
-  agent.playerAgent.messages.push({
-    role: 'system',
-    content: `Mode: ${modeConfig.name || modeConfig.id || 'werewolf'}. Role: ${roleConfig.name || roleId}.`
-  });
-  appendSeerCheckPrivateMemory(agent, allPlayers);
   return agent;
 }
 

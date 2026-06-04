@@ -48,6 +48,7 @@ export {
 
 export {
   buildSystemPrompt,
+  buildLightweightSystemPrompt,
   appendOpeningPrivateMemory,
   formatModeLineup,
   formatSheriffRule,

@@ -8,6 +8,7 @@ import {
 } from './prompts/speech';
 import {
   buildWolfVotePrompt,
+  buildTargetJsonContract,
   DAY_VOTE_PROMPT,
   SHERIFF_SIGNUP_PROMPT,
   buildSheriffWithdrawPrompt,
@@ -123,33 +124,47 @@ async function runHunterAiTask({ match, step, task }: { match: Match; step: Step
   }
 
   try {
+    const round = ensureRound(runtime.state, step.config.day || 1);
+    const aliveTargets = runtime.agents
+      .filter((agent) => agent.alive && Number(agent.id) !== Number(actor.id))
+      .map((agent) => Number(agent.id));
+    if (!aliveTargets.length) {
+      return {
+        eventType: 'werewolf_action_submitted',
+        rawOutput: null,
+        payload: { actionType: 'hunter_shot', actorId: actor.id, target: null, reason: 'no-valid-target' }
+      };
+    }
     const result = await executeSkillWithTrace(runtime.skillRegistry, 'shootOnDeath', {
       actor,
       agents: runtime.agents,
       promptContext: buildActionPrompt(
         runtime,
-        ensureRound(runtime.state, step.config.day || 1),
+        round,
         actor,
         'hunter_shot',
         '你已经出局并触发猎人技能。请选择是否开枪带走一名存活玩家。',
-        '只返回 JSON，例如 {"targetSeat":2}；目标必须是存活玩家座位号。'
+        buildTargetJsonContract(aliveTargets, { reason: 'required', nullable: true }),
+        aliveTargets,
+        ''
       ),
       phase: step.config.phase || 'death',
       state: runtime.ctx.state,
       gameType: 'werewolf',
     });
     const target = (result as { target?: number | null } | null)?.target ?? null;
+    const reason = (result as { reason?: string | null } | null)?.reason ?? null;
     return {
       eventType: 'werewolf_action_submitted',
       rawOutput: result,
-      payload: { actionType: 'hunter_shot', actorId: actor.id, target }
+      payload: { actionType: 'hunter_shot', actorId: actor.id, target, reason }
     };
   } catch {
     // AI 调用失败 → 猎人不开枪
     return {
       eventType: 'werewolf_action_submitted',
       rawOutput: null,
-      payload: { actionType: 'hunter_shot', actorId: actor.id, target: null }
+      payload: { actionType: 'hunter_shot', actorId: actor.id, target: null, reason: 'ai-failed' }
     };
   }
 }
@@ -254,6 +269,7 @@ async function runWolfSpeechAction(runtime: Runtime, round: Round, actor: Agent)
 async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, alive: Agent[]): Promise<Record<string, unknown>> {
   ensureWolfTeamContext(runtime, round);
   const valid = alive.filter((agent) => agent.faction !== 'wolves').map((agent) => agent.id);
+  if (!valid.length) return { target: null, reason: 'no-valid-target' };
   const speeches = (round.night.wolfSpeeches || [])
     .map((speech: Record<string, unknown>) => `${getSeatNumber(speech.playerId as number, runtime.agents)}号：${speech.text || ''}`)
     .join('\n');
@@ -262,9 +278,10 @@ async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, a
     round,
     actor,
     'wolf_vote',
-    buildWolfVotePrompt(speeches),
-    `只返回 JSON，例如 {"targetSeat":2}；目标必须从这些非狼人存活玩家中选择：${valid.join('、')}。`,
-    valid
+    buildWolfVotePrompt(),
+    buildTargetJsonContract(valid),
+    valid,
+    speeches ? `狼队夜聊记录：\n${speeches}` : '狼队夜聊记录：暂无发言。'
   );
   const target = await askVoteTargetOnce(actor, prompt, valid, { skillId: 'wolf_vote', phase: 'night' });
   return { target }; // null = 弃票
@@ -397,22 +414,26 @@ async function runSheriffWithdrawAction(runtime: Runtime, round: Round, actor: A
     round,
     actor,
     'sheriff_withdraw',
-    buildSheriffWithdrawPrompt(context),
-    '只返回 JSON：{"withdraw":true} 或 {"withdraw":false}。'
+    buildSheriffWithdrawPrompt(),
+    '只返回标准 JSON 对象：{"withdraw":true} 或 {"withdraw":false}。',
+    undefined,
+    context
   );
   const parsed = await askJsonOnce(actor, prompt, { maxTokens: 40, skillId: 'sheriff_withdraw', phase: 'day' });
   return { withdraw: parsed?.withdraw === true };
 }
 
 async function runSheriffVoteAction(runtime: Runtime, round: Round, actor: Agent, candidateIds: number[]): Promise<Record<string, unknown>> {
+  if (!candidateIds.length) return { target: null, reason: 'no-candidates' };
   const prompt = buildActionPrompt(
     runtime,
     round,
     actor,
     'sheriff_vote',
     SHERIFF_VOTE_PROMPT,
-    `只返回 JSON，例如 {"targetSeat":2}；目标必须从候选人座位号中选择：${candidateIds.join('、')}。`,
-    candidateIds
+    buildTargetJsonContract(candidateIds),
+    candidateIds,
+    ''
   );
   const target = await askVoteTargetOnce(actor, prompt, candidateIds, { skillId: 'sheriff_vote', phase: 'day' });
   return { target }; // null = 弃票
@@ -426,7 +447,8 @@ function taskTargetIds(runtime: Runtime, round: Round, actionType: string): numb
   const election = round.sheriffElection;
   const key = actionType === 'sheriff_runoff_vote' ? 'runoffCandidateIds' : 'candidates';
   const ids = Array.isArray(election?.[key]) ? election[key] as number[] : [];
-  return ids.length ? ids.map(Number) : runtime.agents.filter((agent) => agent.alive).map((agent) => agent.id);
+  void runtime;
+  return ids.map(Number);
 }
 
 function buildDaySpeechContext(round: Round, agents?: Agent[]): string {

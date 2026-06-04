@@ -69,6 +69,7 @@ interface SkillResult {
   survives?: boolean;
   ok?: boolean;
   text?: string;
+  reason?: string | null;
 }
 
 function createWerewolfSkillRegistry(): InstanceType<typeof AgentSkillRegistry> {
@@ -82,7 +83,8 @@ function createWerewolfSkills() {
       prompt: SKILL_DESCRIPTIONS.kill,
       async execute({ actor, alive, topTarget, promptContext }: SkillContext): Promise<SkillResult> {
         const valid = alive.filter((agent) => agent.faction !== 'wolves').map((agent) => agent.id);
-        const target = await askVoteTarget(actor, withPromptContext(promptContext, buildKillActionPrompt()), valid, { skillId: 'kill', phase: 'night' });
+        if (!valid.length) return { actorId: actor.id, target: null, topTarget };
+        const target = await askVoteTarget(actor, withPromptContext(promptContext, buildKillActionPrompt(valid)), valid, { skillId: 'kill', phase: 'night' });
         return { actorId: actor.id, target, topTarget };
       }
     },
@@ -91,9 +93,12 @@ function createWerewolfSkills() {
       prompt: SKILL_DESCRIPTIONS.inspectFaction,
       async execute({ actor, alive, agents, promptContext }: SkillContext): Promise<SkillResult> {
         const valid = alive.filter((agent) => agent.id !== actor.id).map((agent) => agent.id);
-        const target = await askVoteTarget(actor, withPromptContext(promptContext, buildInspectFactionActionPrompt()), valid, { skillId: 'inspectFaction', phase: 'night' });
+        if (!valid.length) return { target: null, result: 'unknown', reason: null };
+        const parsed = await askJson(actor, withPromptContext(promptContext, buildInspectFactionActionPrompt(valid)), { maxTokens: 100, skillId: 'inspectFaction', phase: 'night' });
+        const target = parseTargetSeat(parsed);
+        if (!target || !valid.includes(target)) return { target: null, result: 'unknown', reason: normalizeReason(parsed?.reason) };
         const targetAgent = agents?.find((agent) => agent.id === target);
-        return { target, result: targetAgent?.faction === 'wolves' ? '狼人' : '好人' };
+        return { target, result: targetAgent?.faction === 'wolves' ? '狼人' : '好人', reason: normalizeReason(parsed?.reason) };
       }
     },
     {
@@ -113,9 +118,10 @@ function createWerewolfSkills() {
         const canSaveVictim = victim && !actor.usedAntidote && (victim.id !== actor.id || canSelfSave);
         if (!canSaveVictim) return { use: false };
         const prompt = withPromptContext(promptContext, buildSaveActionPrompt(victim!.id, victim!.id === actor.id, canSelfSave));
-        const parsed = await askJson(actor, prompt, { maxTokens: 40, skillId: 'save', phase: 'night' });
+        const parsed = await askJson(actor, prompt, { maxTokens: 100, skillId: 'save', phase: 'night' });
         // AI 失败 → 不使用解药（保守）
-        return { use: parsed?.use === true };
+        const use = parsed?.use === true;
+        return { use, reason: use && victim!.id !== actor.id ? normalizeReason(parsed?.reason) : null };
       }
     },
     {
@@ -124,21 +130,27 @@ function createWerewolfSkills() {
       async execute({ actor, alive, promptContext }: SkillContext): Promise<SkillResult> {
         if (actor.usedPoison) return { use: false, target: null };
         const valid = alive.filter((agent) => agent.id !== actor.id).map((agent) => agent.id);
-        const parsed = await askJson(actor, withPromptContext(promptContext, buildPoisonActionPrompt(valid)), { maxTokens: 60, skillId: 'poison', phase: 'night' });
+        if (!valid.length) return { use: false, target: null, reason: null };
+        const parsed = await askJson(actor, withPromptContext(promptContext, buildPoisonActionPrompt(valid)), { maxTokens: 100, skillId: 'poison', phase: 'night' });
         // AI 失败 → 不使用毒药（保守）
         if (!parsed) return { use: false, target: null };
-        const target = Number(parsed.target);
-        return parsed.use && valid.includes(target) ? { use: true, target } : { use: false, target: null };
+        const target = parseTargetSeat(parsed);
+        return parsed.use && target && valid.includes(target)
+          ? { use: true, target, reason: normalizeReason(parsed.reason) }
+          : { use: false, target: null, reason: normalizeReason(parsed.reason) };
       }
     },
     {
       action: 'shootOnDeath',
       prompt: SKILL_DESCRIPTIONS.shootOnDeath,
       async execute({ actor, agents, promptContext }: SkillContext): Promise<SkillResult> {
-        const valid = (agents || []).filter((agent) => agent.alive).map((agent) => agent.id);
+        const valid = (agents || []).filter((agent) => agent.alive && Number(agent.id) !== Number(actor.id)).map((agent) => agent.id);
         if (!valid.length) return { target: null };
-        const target = await askVoteTarget(actor, withPromptContext(promptContext, buildHunterShootActionPrompt()), valid, { skillId: 'shootOnDeath', phase: 'death' });
-        return { target }; // null = 不开枪
+        const parsed = await askJson(actor, withPromptContext(promptContext, buildHunterShootActionPrompt(valid)), { maxTokens: 100, skillId: 'shootOnDeath', phase: 'death' });
+        const target = parseTargetSeat(parsed);
+        return target && valid.includes(target)
+          ? { target, reason: normalizeReason(parsed?.reason) }
+          : { target: null, reason: normalizeReason(parsed?.reason) }; // null = 不开枪
       }
     },
     {
@@ -187,6 +199,16 @@ function askJson(actor: SkillAgent, prompt: string, options: Record<string, unkn
   return actor.playerAgent.askJsonOnce
     ? actor.playerAgent.askJsonOnce(prompt, options)
     : actor.playerAgent.askJson(prompt, options);
+}
+
+function parseTargetSeat(parsed: Record<string, unknown> | null | undefined): number | null {
+  const target = Number(parsed?.targetSeat ?? parsed?.target);
+  return Number.isFinite(target) && target > 0 ? target : null;
+}
+
+function normalizeReason(value: unknown): string | null {
+  const reason = String(value || '').trim();
+  return reason || null;
 }
 
 export { createWerewolfSkillRegistry, createWerewolfSkills };
