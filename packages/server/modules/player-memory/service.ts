@@ -11,6 +11,7 @@ import type {
   MemoryStats,
   MemoryTraits,
   PlayerGameMemory,
+  PaginatedMemories,
   SessionSnapshot,
 } from './types';
 
@@ -166,6 +167,32 @@ function getMemoryStats(): MemoryStats {
   };
 }
 
+function listPlayerMemories(
+  gameType?: string,
+  page = 1,
+  pageSize = 20,
+): PaginatedMemories {
+  const total = repo.countPlayerMemories(gameType);
+  const rows = repo.findAllPlayerMemories(gameType, page, pageSize);
+  const items = rows.map((row) => ({
+    id: row.id,
+    gameType: row.game_type,
+    ownerPlayerId: row.owner_player_id,
+    ownerNickname: row.owner_nickname,
+    ownerName: row.owner_name,
+    subjectPlayerId: row.subject_player_id,
+    subjectNickname: row.subject_nickname,
+    subjectName: row.subject_name,
+    gamesPlayed: row.games_played,
+    familiarityScore: row.familiarity_score,
+    traits: parseJson<MemoryTraits>(row.traits_json, {}),
+    recentSummary: row.recent_summary,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+  return { items, total, page, pageSize };
+}
+
 function clearPlayerMemories(gameType: 'werewolf' | 'debate' | 'all'): { gameType: string; deletedCount: number } {
   return {
     gameType,
@@ -315,6 +342,7 @@ export {
   loadPlayerSession,
   savePlayerSession,
   getMemoryStats,
+  listPlayerMemories,
   clearPlayerMemories,
   compactMessages,
 };

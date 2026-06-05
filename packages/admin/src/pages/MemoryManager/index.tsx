@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
-import { App as AntApp, Button, Card, Modal, Space, Statistic, Table, Typography } from 'antd';
-import { DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useCallback, useEffect, useState } from 'react';
+import { App as AntApp, Button, Card, Modal, Select, Space, Statistic, Table, Typography } from 'antd';
+import { DeleteOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   clearPlayerMemories,
+  getPlayerMemories,
   getPlayerMemoryStats,
+  type PlayerMemoryRecord,
   type PlayerMemoryStats,
 } from '../../services/adminApi';
+import { MemoryDetailDrawer } from './MemoryDetailDrawer';
 
 const { Text, Title } = Typography;
 
@@ -19,6 +22,14 @@ export function MemoryManager() {
   const { message } = AntApp.useApp();
   const [stats, setStats] = useState<PlayerMemoryStats | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [records, setRecords] = useState<PlayerMemoryRecord[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [gameTypeFilter, setGameTypeFilter] = useState<string | undefined>(undefined);
+  const [selectedRecord, setSelectedRecord] = useState<PlayerMemoryRecord | null>(null);
 
   async function load(): Promise<void> {
     setLoading(true);
@@ -35,6 +46,23 @@ export function MemoryManager() {
     void load();
   }, []);
 
+  const loadRecords = useCallback(async (): Promise<void> => {
+    setRecordsLoading(true);
+    try {
+      const result = await getPlayerMemories({ gameType: gameTypeFilter, page, pageSize });
+      setRecords(result.items);
+      setTotal(result.total);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '读取记忆记录失败');
+    } finally {
+      setRecordsLoading(false);
+    }
+  }, [gameTypeFilter, page, pageSize, message]);
+
+  useEffect(() => {
+    void loadRecords();
+  }, [loadRecords]);
+
   function confirmClear(gameType: 'werewolf' | 'debate' | 'all'): void {
     const count = gameType === 'all'
       ? Number(stats?.total || 0)
@@ -49,7 +77,9 @@ export function MemoryManager() {
         try {
           const result = await clearPlayerMemories(gameType);
           message.success(`已删除 ${result.deletedCount} 条记忆`);
+          setPage(1);
           await load();
+          await loadRecords();
         } catch (error) {
           message.error(error instanceof Error ? error.message : '清除长期记忆失败');
           throw error;
@@ -95,6 +125,75 @@ export function MemoryManager() {
         ]}
       />
 
+      <Card
+        title={
+          <Space>
+            <span>记忆记录</span>
+            <Select
+              allowClear
+              placeholder="筛选游戏类型"
+              style={{ width: 140 }}
+              value={gameTypeFilter}
+              onChange={(value) => { setGameTypeFilter(value); setPage(1); }}
+              options={[
+                { value: 'werewolf', label: '狼人杀' },
+                { value: 'debate', label: '辩论赛' },
+              ]}
+            />
+          </Space>
+        }
+      >
+        <Table
+          rowKey="id"
+          size="small"
+          loading={recordsLoading}
+          dataSource={records}
+          columns={[
+            { title: 'ID', dataIndex: 'id', width: 60 },
+            {
+              title: '画像主体', width: 120,
+              render: (_: unknown, record: PlayerMemoryRecord) =>
+                record.subjectNickname || record.subjectName || `玩家${record.subjectPlayerId}`,
+            },
+            {
+              title: '画像所有者', width: 120,
+              render: (_: unknown, record: PlayerMemoryRecord) =>
+                record.ownerNickname || record.ownerName || `玩家${record.ownerPlayerId}`,
+            },
+            {
+              title: '游戏', dataIndex: 'gameType', width: 80,
+              render: (value: string) => LABELS[value as 'werewolf' | 'debate'] ?? value,
+            },
+            { title: '交手局数', dataIndex: 'gamesPlayed', width: 80 },
+            { title: '最近摘要', dataIndex: 'recentSummary', ellipsis: true },
+            { title: '更新于', dataIndex: 'updatedAt', width: 160, render: formatTime },
+            {
+              title: '操作', width: 80,
+              render: (_: unknown, record: PlayerMemoryRecord) => (
+                <Button
+                  size="small"
+                  icon={<EyeOutlined />}
+                  onClick={(e) => { e.stopPropagation(); setSelectedRecord(record); }}
+                >
+                  查看
+                </Button>
+              ),
+            },
+          ]}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            onChange: (newPage) => setPage(newPage),
+            showSizeChanger: false,
+          }}
+          onRow={(record) => ({
+            style: { cursor: 'pointer' },
+            onClick: () => setSelectedRecord(record),
+          })}
+        />
+      </Card>
+
       <Card>
         <Title level={5}>全部长期记忆</Title>
         <Text type="secondary">同时清除狼人杀和辩论赛画像，不影响正在进行的比赛上下文。</Text>
@@ -104,6 +203,8 @@ export function MemoryManager() {
           </Button>
         </div>
       </Card>
+
+      <MemoryDetailDrawer record={selectedRecord} onClose={() => setSelectedRecord(null)} />
     </Space>
   );
 }

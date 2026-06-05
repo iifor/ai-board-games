@@ -47,6 +47,30 @@ interface MemoryStats {
   games: MemoryStatsItem[];
 }
 
+interface PlayerMemoryRecord {
+  id: number;
+  gameType: string;
+  ownerPlayerId: number;
+  ownerNickname: string;
+  ownerName: string;
+  subjectPlayerId: number;
+  subjectNickname: string;
+  subjectName: string;
+  gamesPlayed: number;
+  familiarityScore: number;
+  traits: MemoryTraits;
+  recentSummary: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PaginatedMemories {
+  items: PlayerMemoryRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export type {
   ChatMessage,
   SessionSnapshot,
@@ -54,4 +78,6 @@ export type {
   PlayerGameMemory,
   MemoryStats,
   MemoryStatsItem,
+  PlayerMemoryRecord,
+  PaginatedMemories,
 };

@@ -61,21 +61,8 @@ export function LlmCallCard({ call, defaultCollapsed = true, getNickname }: LlmC
 
       {!collapsed && (
         <div style={{ marginTop: 12 }}>
-          <Text strong>Messages ({messages.length}):</Text>
-          {messages.map((msg, i) => (
-            <div key={i} style={{ marginTop: 8 }}>
-              <Tag color={msg.role === 'system' ? 'red' : msg.role === 'user' ? 'blue' : 'green'}>{msg.role}</Tag>
-              <pre style={{
-                background: '#fafafa', padding: 8, borderRadius: 4, margin: '4px 0 0',
-                maxHeight: 300, overflow: 'auto', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word'
-              }}>
-                {String(msg.content || '')}
-              </pre>
-            </div>
-          ))}
-
           {call.response_text && (
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginBottom: 12 }}>
               <Text strong>Response:</Text>
               <pre style={{
                 background: '#f6ffed', padding: 8, borderRadius: 4, margin: '4px 0 0',
@@ -87,16 +74,29 @@ export function LlmCallCard({ call, defaultCollapsed = true, getNickname }: LlmC
           )}
 
           {call.thinking_text && (
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginBottom: 12 }}>
               <Text strong>Thinking:</Text>
               <pre style={{
                 background: '#fff7e6', padding: 8, borderRadius: 4, margin: '4px 0 0',
-                maxHeight: 200, overflow: 'auto', fontSize: 12, whiteSpace: 'pre-wrap'
+                fontSize: 12, whiteSpace: 'pre-wrap'
               }}>
                 {call.thinking_text}
               </pre>
             </div>
           )}
+
+          <Text strong>Messages ({messages.length})，最新在前:</Text>
+          {[...messages].reverse().map((msg, i) => (
+            <div key={i} style={{ marginTop: 8 }}>
+              <Tag color={msg.role === 'system' ? 'red' : msg.role === 'user' ? 'blue' : 'green'}>{msg.role}</Tag>
+              <pre style={{
+                background: '#fafafa', padding: 8, borderRadius: 4, margin: '4px 0 0',
+                fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+              }}>
+                {String(msg.content || '')}
+              </pre>
+            </div>
+          ))}
         </div>
       )}
     </Card>

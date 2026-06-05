@@ -67,6 +67,39 @@ function clearMemories(gameType?: string): number {
   return Number(result.changes || 0);
 }
 
+interface MemoryRecordWithPlayers extends PlayerGameMemoryRow {
+  owner_nickname: string;
+  owner_name: string;
+  subject_nickname: string;
+  subject_name: string;
+}
+
+function findAllPlayerMemories(
+  gameType: string | undefined,
+  page: number,
+  pageSize: number,
+): MemoryRecordWithPlayers[] {
+  const offset = (page - 1) * pageSize;
+  return getDb().prepare(`
+    SELECT m.*,
+      o.nickname AS owner_nickname, o.name AS owner_name,
+      s.nickname AS subject_nickname, s.name AS subject_name
+    FROM player_game_memories m
+    LEFT JOIN players o ON m.owner_player_id = o.id
+    LEFT JOIN players s ON m.subject_player_id = s.id
+    WHERE (? IS NULL OR m.game_type = ?)
+    ORDER BY m.updated_at DESC
+    LIMIT ? OFFSET ?
+  `).all(gameType || null, gameType || null, pageSize, offset) as MemoryRecordWithPlayers[];
+}
+
+function countPlayerMemories(gameType: string | undefined): number {
+  return (getDb().prepare(`
+    SELECT COUNT(*) AS count FROM player_game_memories
+    WHERE (? IS NULL OR game_type = ?)
+  `).get(gameType || null, gameType || null) as { count: number }).count;
+}
+
 function runInTransaction<T>(operation: () => T): T {
   return getDb().transaction(operation)() as T;
 }
@@ -94,6 +127,8 @@ function replaceSession(matchId: string, scope: string, ownerId: string, snapsho
 export {
   findMemories,
   findMemory,
+  findAllPlayerMemories,
+  countPlayerMemories,
   upsertMemory,
   getMemoryStats,
   clearMemories,

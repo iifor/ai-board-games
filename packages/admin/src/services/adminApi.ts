@@ -79,3 +79,42 @@ export function clearPlayerMemories(gameType: 'werewolf' | 'debate' | 'all') {
     body: JSON.stringify({ gameType }),
   });
 }
+
+export interface PlayerMemoryRecord {
+  id: number;
+  gameType: string;
+  ownerPlayerId: number;
+  ownerNickname: string;
+  ownerName: string;
+  subjectPlayerId: number;
+  subjectNickname: string;
+  subjectName: string;
+  gamesPlayed: number;
+  familiarityScore: number;
+  traits: Record<string, number | undefined>;
+  recentSummary: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginatedMemories {
+  items: PlayerMemoryRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export function getPlayerMemories(params?: {
+  gameType?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.gameType) searchParams.set('gameType', params.gameType);
+  if (params?.page) searchParams.set('page', String(params.page));
+  if (params?.pageSize) searchParams.set('pageSize', String(params.pageSize));
+  const query = searchParams.toString();
+  return adminRequest<PaginatedMemories>(
+    `/player-memories${query ? `?${query}` : ''}`,
+  );
+}
