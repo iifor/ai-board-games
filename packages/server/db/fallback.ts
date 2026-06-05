@@ -13,6 +13,8 @@ interface JsonDbData {
   game_players: Record<string, unknown>[];
   game_player_selections: Record<string, unknown>[];
   app_settings: Record<string, unknown>[];
+  memory_snapshots: Record<string, unknown>[];
+  player_game_memories: Record<string, unknown>[];
 }
 
 interface RunResult {
@@ -40,7 +42,9 @@ function readJsonDb(filePath: string): JsonDbData {
     games: [],
     game_players: [],
     game_player_selections: [],
-    app_settings: []
+    app_settings: [],
+    memory_snapshots: [],
+    player_game_memories: []
   };
   try {
     if (!fs.existsSync(filePath)) return empty;
@@ -211,6 +215,88 @@ function runJsonQuery(db: JsonDb, sql: string, args: unknown[], mode: string): u
     return { count: data.game_players.filter((row) => Number(row.player_id) === Number(values[0])).length };
   }
   if (lower === 'select count(*) as count from games') return { count: data.games.length };
+
+  if (lower.startsWith('select * from player_game_memories')) {
+    let rows = data.player_game_memories.filter((row) =>
+      row.game_type === values[0] && Number(row.owner_player_id) === Number(values[1])
+    );
+    if (lower.includes('subject_player_id = ?')) {
+      rows = rows.filter((row) => Number(row.subject_player_id) === Number(values[2]));
+    } else if (lower.includes('subject_player_id in')) {
+      const ids = new Set(values.slice(2).map(Number));
+      rows = rows.filter((row) => ids.has(Number(row.subject_player_id)));
+    }
+    rows.sort((a, b) =>
+      Number(b.games_played || 0) - Number(a.games_played || 0)
+      || Number(b.familiarity_score || 0) - Number(a.familiarity_score || 0)
+      || String(b.updated_at || '').localeCompare(String(a.updated_at || ''))
+    );
+    return mode === 'get' ? rows[0] : rows;
+  }
+  if (lower.startsWith('insert into player_game_memories')) {
+    const [gameType, ownerPlayerId, subjectPlayerId, gamesPlayed, familiarityScore, traitsJson, recentSummary] = values;
+    const existing = data.player_game_memories.find((row) =>
+      row.game_type === gameType
+      && Number(row.owner_player_id) === Number(ownerPlayerId)
+      && Number(row.subject_player_id) === Number(subjectPlayerId)
+    );
+    const row = {
+      id: existing?.id || Math.max(0, ...data.player_game_memories.map((item) => Number(item.id) || 0)) + 1,
+      game_type: gameType,
+      owner_player_id: ownerPlayerId,
+      subject_player_id: subjectPlayerId,
+      games_played: gamesPlayed,
+      familiarity_score: familiarityScore,
+      traits_json: traitsJson,
+      recent_summary: recentSummary,
+      created_at: existing?.created_at || now(),
+      updated_at: now(),
+    };
+    if (existing) Object.assign(existing, row);
+    else data.player_game_memories.push(row);
+    return { changes: 1, lastInsertRowid: row.id };
+  }
+  if (lower.includes('from player_game_memories') && lower.includes('group by game_type')) {
+    const grouped = new Map<string, { gameType: string; count: number; lastUpdatedAt: string | null }>();
+    data.player_game_memories.forEach((row) => {
+      const gameType = String(row.game_type);
+      const current = grouped.get(gameType) || { gameType, count: 0, lastUpdatedAt: null };
+      current.count += 1;
+      const updatedAt = String(row.updated_at || '');
+      if (!current.lastUpdatedAt || updatedAt > current.lastUpdatedAt) current.lastUpdatedAt = updatedAt;
+      grouped.set(gameType, current);
+    });
+    return [...grouped.values()];
+  }
+  if (lower.startsWith('delete from player_game_memories')) {
+    return deleteWhere(data.player_game_memories, (row) =>
+      !lower.includes('where game_type = ?') || row.game_type === values[0]
+    );
+  }
+  if (lower.startsWith('select snapshot_json, created_at from memory_snapshots')) {
+    const rows = data.memory_snapshots
+      .filter((row) => row.match_id === values[0] && row.scope === values[1] && String(row.owner_id) === String(values[2]))
+      .sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+    return rows[0];
+  }
+  if (lower.startsWith('delete from memory_snapshots')) {
+    return deleteWhere(data.memory_snapshots, (row) =>
+      row.match_id === values[0] && row.scope === values[1] && String(row.owner_id) === String(values[2])
+    );
+  }
+  if (lower.startsWith('insert into memory_snapshots')) {
+    const row = {
+      id: Math.max(0, ...data.memory_snapshots.map((item) => Number(item.id) || 0)) + 1,
+      match_id: values[0],
+      scope: values[1],
+      owner_id: values[2],
+      snapshot_json: values[3],
+      source_event_seq: 0,
+      created_at: now(),
+    };
+    data.memory_snapshots.push(row);
+    return { changes: 1, lastInsertRowid: row.id };
+  }
 
   if (lower.startsWith('insert into skins')) return upsertJsonRow(data.skins, values[0] as Record<string, unknown>, 'id');
   if (lower.startsWith('select * from skins')) return selectSkins(data, lower, values, mode);

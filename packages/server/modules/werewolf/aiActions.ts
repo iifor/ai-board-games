@@ -207,7 +207,7 @@ async function runWolfKillAction(runtime: Runtime, round: Round, actor: Agent, a
     formatWolfSpeechLines(sharedSpeeches, runtime.agents)
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nightResult: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, agents: runtime.agents, promptOverride: speechPrompt, stateless: true });
+  const nightResult: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, agents: runtime.agents, promptOverride: speechPrompt });
   if (nightResult) {
     if (typeof nightResult === 'string') {
       speechText = nightResult;
@@ -261,7 +261,7 @@ async function runWolfSpeechAction(runtime: Runtime, round: Round, actor: Agent)
   );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, agents: runtime.agents, promptOverride: prompt, stateless: true });
+  const result: any = await askWolfNightSpeech(actor, round.day, sharedSpeeches, isLeader, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, agents: runtime.agents, promptOverride: prompt });
   if (result) {
     if (typeof result === 'string') return { speech: result, thinking: '' };
     return { speech: result.content || '', thinking: result.thinking || '' };
@@ -286,7 +286,7 @@ async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, a
     valid,
     speeches ? `狼队夜聊记录：\n${speeches}` : '狼队夜聊记录：暂无发言。'
   );
-  const target = await askVoteTargetOnce(actor, prompt, valid, {
+  const target = await askVoteTarget(actor, prompt, valid, {
     skillId: 'wolf_vote',
     phase: 'night',
     allowNull: true,
@@ -322,7 +322,7 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
   let speechText = '';
   let thinkingText = '';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const speechResult: any = await askSpeech(actor, round.day, publicContext, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, promptOverride: prompt, stateless: true });
+  const speechResult: any = await askSpeech(actor, round.day, publicContext, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, promptOverride: prompt });
   if (speechResult) {
     if (typeof speechResult === 'string') {
       speechText = speechResult;
@@ -372,7 +372,7 @@ async function runDayVoteAction(actor: Agent, alive: Agent[], runtime: Runtime):
     buildTargetJsonContract(valid, { nullable: true }),
     valid
   );
-  const target = await askVoteTargetOnce(actor, prompt, valid, {
+  const target = await askVoteTarget(actor, prompt, valid, {
     skillId: 'day_vote',
     phase: 'day',
     allowNull: true,
@@ -394,7 +394,7 @@ async function runSheriffSignupAction(runtime: Runtime, round: Round, actor: Age
     SHERIFF_SIGNUP_PROMPT,
     '只返回 JSON：{"run":true} 或 {"run":false}。'
   );
-  const parsed = await askJsonOnce(actor, prompt, {
+  const parsed = await askJson(actor, prompt, {
     maxTokens: 40,
     skillId: 'sheriff_signup',
     phase: 'day',
@@ -413,7 +413,7 @@ async function runSheriffSpeechAction(runtime: Runtime, round: Round, actor: Age
     '只输出自然语言竞选发言；不要输出 JSON。'
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result: any = await askSheriffSpeech(actor, round.day, '公开信息已通过上下文同步。', runoff, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, promptOverride: prompt, stateless: true });
+  const result: any = await askSheriffSpeech(actor, round.day, '公开信息已通过上下文同步。', runoff, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, promptOverride: prompt });
   if (result) {
     if (typeof result === 'string') return { text: result, thinking: '' };
     return { text: result.content || '', thinking: result.thinking || '' };
@@ -433,7 +433,7 @@ async function runSheriffWithdrawAction(runtime: Runtime, round: Round, actor: A
     undefined,
     context
   );
-  const parsed = await askJsonOnce(actor, prompt, {
+  const parsed = await askJson(actor, prompt, {
     maxTokens: 40,
     skillId: 'sheriff_withdraw',
     phase: 'day',
@@ -454,7 +454,7 @@ async function runSheriffVoteAction(runtime: Runtime, round: Round, actor: Agent
     candidateIds,
     ''
   );
-  const target = await askVoteTargetOnce(actor, prompt, candidateIds, {
+  const target = await askVoteTarget(actor, prompt, candidateIds, {
     skillId: 'sheriff_vote',
     phase: 'day',
     allowNull: true,
@@ -602,16 +602,12 @@ function buildActionPrompt(
   });
 }
 
-function askVoteTargetOnce(actor: Agent, prompt: string, valid: number[], options: Record<string, unknown>): Promise<number | null> {
-  return actor.playerAgent.askVoteTargetOnce
-    ? actor.playerAgent.askVoteTargetOnce(prompt, valid, options)
-    : actor.playerAgent.askVoteTarget(prompt, valid, options);
+function askVoteTarget(actor: Agent, prompt: string, valid: number[], options: Record<string, unknown>): Promise<number | null> {
+  return actor.playerAgent.askVoteTarget(prompt, valid, options);
 }
 
-function askJsonOnce(actor: Agent, prompt: string, options: Record<string, unknown>): Promise<Record<string, unknown> | null> {
-  return actor.playerAgent.askJsonOnce
-    ? actor.playerAgent.askJsonOnce(prompt, options)
-    : actor.playerAgent.askJson(prompt, options);
+function askJson(actor: Agent, prompt: string, options: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+  return actor.playerAgent.askJson(prompt, options);
 }
 
 function formatWolfSpeechLines(speeches: Array<Record<string, unknown>>, agents: Agent[]): string {

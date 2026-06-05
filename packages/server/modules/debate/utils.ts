@@ -276,7 +276,7 @@ function serializeGame({
   fallbackAudit?: unknown[];
 }): SerializedGame {
   const players = agents.map((agent) => ({
-    id: agent.id, name: agent.name, nickname: agent.nickname,
+    id: agent.id, sourcePlayerId: agent.sourcePlayerId || agent.id, name: agent.name, nickname: agent.nickname,
     avatar: agent.avatar, avatarUrl: agent.avatarUrl || agent.avatar,
     provider: agent.provider, voicePackageId: agent.voicePackageId,
     model: agent.model, sex: agent.sex || '未知', personality: agent.personality,

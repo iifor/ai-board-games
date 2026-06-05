@@ -3,7 +3,12 @@ import { createWerewolfSkillRegistry } from './roles';
 import { createWerewolfRoleSkillRegistry } from './roleSkills';
 import { PlayerAgent } from './playerAgent';
 import { buildSystemPrompt, createRound, publicHost, publicPlayer } from './agents';
-import { buildLightweightSystemPrompt } from './prompts/system';
+import { hashText } from '../../services/ai/promptComposer';
+import {
+  formatRelationshipMemoryForPrompt,
+  loadPlayerSession,
+  savePlayerSession,
+} from '../player-memory';
 import { getRoleConfig, shuffle } from './utils';
 import type { WerewolfEventBus } from './eventBus';
 import type { GameEventBuilder } from './gameEventBuilder';
@@ -334,10 +339,27 @@ function createRuntimeAgent(
     seerChecks: Array.isArray(player.seerChecks) ? player.seerChecks : [],
     votes: Array.isArray(player.votes) ? player.votes : []
   };
-  agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry, allPlayers, modeConfig);
-  agent.playerAgent = new PlayerAgent(agent, buildLightweightSystemPrompt(agent, allPlayers), {
+  const stablePlayerId = Number(agent.sourcePlayerId || agent.id);
+  const relationshipMemory = formatRelationshipMemoryForPrompt(
+    'werewolf',
+    stablePlayerId,
+    allPlayers || [],
+  );
+  agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry, allPlayers, modeConfig, relationshipMemory);
+  const basePromptHash = hashText(buildSystemPrompt(agent, wolves, skillRegistry, allPlayers, modeConfig));
+  agent.baseSystemPromptHash = basePromptHash;
+  const initialMessages = loadPlayerSession('werewolf', gameId, stablePlayerId, basePromptHash) || undefined;
+  agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt, {
     onError: (entry: unknown) => (fallbackAudit as { record: (entry: unknown) => void }).record(entry),
-    gameId
+    gameId,
+    initialMessages,
+    onMessagesChanged: (messages) => savePlayerSession(
+      'werewolf',
+      gameId,
+      stablePlayerId,
+      basePromptHash,
+      messages,
+    ),
   });
   (roleSkillRegistry as { applyToPlayer?: (agent: InstanceType<typeof PlayerAgent>, roleId: string) => void })?.applyToPlayer?.(agent.playerAgent, roleId);
   return agent;

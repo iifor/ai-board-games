@@ -128,6 +128,7 @@ WebSocket：
 - `settings`：应用设置。
 - `observability`：trace、span、LLM、agent 决策观测。
 - `workflow-engine`：工作流调试 API。
+- `player-memory`：跨局玩家画像、本局 AI 会话快照、记忆统计与清除。
 
 大多数资源模块遵循：
 
@@ -184,6 +185,16 @@ C 端 REST 路由挂载到 `/api/toc`，主要能力包括：
 - 对局类：`games`、`game_players`、`game_player_selections`
 - 工作流类：`matches`、`match_snapshots`、`workflow_events`、`ai_tasks`、`pending_actions`、`outbox_messages`、`workflow_effects`、`workflow_interrupts`
 - 观测类：`game_traces`、`trace_spans`、`llm_records`、`agent_decisions`、`game_events`、`state_snapshots`
+- 记忆类：`memory_snapshots` 保存按 match 隔离的本局会话；`player_game_memories` 保存按游戏类型、观察者和被观察者聚合的跨局画像。
+
+`player_game_memories` 使用 `(game_type, owner_player_id, subject_player_id)` 唯一键，玩家标识使用稳定的 `sourcePlayerId`。比赛记录与长期画像在同一保存事务内更新，避免对局已落库但画像更新失败时返回假成功。
+
+记忆管理 API：
+
+- `GET /api/admin/player-memories/stats`
+- `POST /api/admin/player-memories/clear`，请求体 `gameType` 仅允许 `werewolf`、`debate`、`all`
+
+清除操作只删除跨局长期画像，不删除进行中的 `memory_snapshots`、历史比赛、Trace 或玩家基础人格。
 
 ## 配置与部署
 

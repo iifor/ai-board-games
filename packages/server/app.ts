@@ -16,6 +16,7 @@ import * as games from './modules/games';
 import * as settings from './modules/settings';
 import * as observability from './modules/observability';
 import * as workflowEngine from './modules/workflow-engine';
+import * as playerMemory from './modules/player-memory';
 import { registerDebateWorkflow } from './modules/debate';
 
 // Game module
@@ -71,6 +72,7 @@ function createApp(): express.Application {
   app.use('/api/admin', settings.router);
   app.use('/api/admin', observability.router);
   app.use('/api/admin', workflowEngine.router);
+  app.use('/api/admin', playerMemory.router);
 
   // Game API routes
   app.use('/api/toc', gameSocket.router);

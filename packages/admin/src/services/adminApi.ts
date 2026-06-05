@@ -58,3 +58,24 @@ export function resolveWorkflowInterrupt(interruptId: string, payload: Record<st
     body: JSON.stringify(payload)
   });
 }
+
+export interface PlayerMemoryStats {
+  total: number;
+  lastUpdatedAt: string | null;
+  games: Array<{
+    gameType: 'werewolf' | 'debate';
+    count: number;
+    lastUpdatedAt: string | null;
+  }>;
+}
+
+export function getPlayerMemoryStats() {
+  return adminRequest<PlayerMemoryStats>('/player-memories/stats');
+}
+
+export function clearPlayerMemories(gameType: 'werewolf' | 'debate' | 'all') {
+  return adminRequest<{ gameType: string; deletedCount: number }>('/player-memories/clear', {
+    method: 'POST',
+    body: JSON.stringify({ gameType }),
+  });
+}

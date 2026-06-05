@@ -28,6 +28,7 @@ interface JsonDbData {
   game_players?: Record<string, unknown>[];
   game_player_selections?: Record<string, unknown>[];
   app_settings?: Record<string, unknown>[];
+  player_game_memories?: Record<string, unknown>[];
 }
 
 interface PreparedStatement {
@@ -82,6 +83,7 @@ function main(): void {
     upsertGamePlayers(db, jsonData.game_players || []);
     upsertGamePlayerSelections(db, jsonData.game_player_selections || []);
     upsertAppSettings(db, jsonData.app_settings || []);
+    upsertPlayerGameMemories(db, jsonData.player_game_memories || []);
   });
 
   try {
@@ -107,6 +109,7 @@ const GAME_COLS = ['id', 'game_type', 'mode', 'skin_id', 'skin_name', 'winner', 
 const GP_COLS = ['game_id', 'player_id', 'player_snapshot_json'];
 const GPS_COLS = ['game_type', 'player_ids_json'];
 const SETTINGS_COLS = ['key', 'value_json'];
+const PLAYER_GAME_MEMORY_COLS = ['id', 'game_type', 'owner_player_id', 'subject_player_id', 'games_played', 'familiarity_score', 'traits_json', 'recent_summary', 'created_at', 'updated_at'];
 
 function upsert(db: Database, table: string, columns: string[], rows: Record<string, unknown>[]): void {
   if (!Array.isArray(rows) || rows.length === 0) return;
@@ -128,5 +131,6 @@ function upsertGames(db: Database, rows: Record<string, unknown>[]): void { upse
 function upsertGamePlayers(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'game_players', GP_COLS, rows); }
 function upsertGamePlayerSelections(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'game_player_selections', GPS_COLS, rows); }
 function upsertAppSettings(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'app_settings', SETTINGS_COLS, rows); }
+function upsertPlayerGameMemories(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'player_game_memories', PLAYER_GAME_MEMORY_COLS, rows); }
 
 main();

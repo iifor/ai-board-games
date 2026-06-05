@@ -6,6 +6,7 @@ import type { Game, GameSummary } from '../../types/api';
 import type { GameRow } from '../../types/database';
 import type { GameListFilters } from './repository';
 import * as upload from '../upload';
+import { recordCompletedGameMemories } from '../player-memory';
 
 interface SaveGameInput {
   id: string;
@@ -63,6 +64,7 @@ function saveGameRecord(game: SaveGameInput): GameSummary[] {
         repo.insertGamePlayer(row.id, p.sourcePlayerId || p.playerId || p.id || 0, toJson(p));
       });
     }
+    recordCompletedGameMemories(game);
   });
   tx();
   return listGames();

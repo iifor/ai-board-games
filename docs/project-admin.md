@@ -64,6 +64,7 @@ packages/admin/
 - 历史类：辩论赛、狼人杀、旧共识迷图历史和详情。
 - 观测类：trace、LLM 请求、agent 决策、span 时间线。
 - 调试类：工作流 match、tick、pending action、AI task、interrupt。
+- 记忆类：狼人杀、辩论赛及全部游戏的长期玩家画像统计与清除。
 
 ## 核心模块
 
@@ -88,6 +89,7 @@ packages/admin/
 - `settings`
 - `observability`
 - `workflow-engine`
+- `player-memories`
 
 ### 页面模块
 
@@ -102,6 +104,7 @@ packages/admin/
 - `SkinManager`：皮肤资源管理。
 - `TraceExplorer`：AI trace、span、LLM 调用、agent 决策查看。
 - `WorkflowDebugConsole`：工作流调试控制台，包含 match 事件、任务、pending action、effect、interrupt，以及狼人杀夜间结算 Shadow Audit 汇总。
+- `MemoryManager`：展示分游戏长期画像数量和最后更新时间，提供狼人杀、辩论赛、全部游戏三个危险清除操作。确认弹窗明确删除条数和不受影响的数据范围。
 
 ### 观测组件
 

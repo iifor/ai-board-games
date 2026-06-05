@@ -327,11 +327,13 @@ pnpm run test:workflow
 
 ## Werewolf dynamic prompt context
 
-狼人杀 AI 行动优先使用短上下文重建：每次行动由 `prompts/context.ts` 生成一次性 prompt bundle，包含 `systemRules / publicFacts / privateKnowledge / recentContext / taskInstruction / outputContract`。行动调用使用 `askTextOnce / askJsonOnce / askVoteTargetOnce`，不再把每次行动的 user/assistant 内容无限追加到 `PlayerAgent.messages`。
+狼人杀 AI 使用“完整开局一次 + 持久会话 + 动态增量上下文”。每次行动由 `prompts/context.ts` 生成 prompt bundle，包含 `systemRules / publicFacts / privateKnowledge / recentContext / taskInstruction / outputContract`，再通过普通 `askText / askJson / askVoteTarget` 写入当前玩家会话。会话按 `werewolf + matchId + sourcePlayerId` 保存到 `memory_snapshots`，裁剪后保留开局 system、结构化摘要和最近 12 组原始对话。
 
 公开事实必须从完整 `state.rounds` 聚合，而不是只看当前 round。后续任意发言、投票、夜间行动 prompt 都应同步夜晚死亡、白天放逐出局、白痴翻牌、猎人开枪、警长结果、警徽流转、上一轮投票结果、当前存活/已出局名单。白天放逐后，下一晚和下一天 prompt 必须包含 `X号被放逐出局`，并且该玩家不能再出现在合法投票目标中。
 
 私密信息只进入对应玩家的 prompt：狼人看到狼队友座位号和存活/已出局状态，预言家只看到自己的 `seerChecks`，女巫只看到自己的用药状态，守卫只看到自己的守护状态。非对应角色不得收到这些私密反馈。
+
+狼人杀和辩论赛会在开局 prompt 中注入当前参赛玩家的跨局聚合画像。画像按 `gameType + ownerPlayerId + subjectPlayerId` 隔离，只学习公开行为、比赛结果和赛后公开身份；不保存狼聊、查验、用药等局中私密过程。至少共同参赛两局后才达到首版注入阈值；每名对手最多两条特征，单条约 100 字，总长度硬限制约 1200 字，并明确标注为历史印象而非本局身份判断。
 
 ## Werewolf EventBus 展示字段约定
 

@@ -1,7 +1,7 @@
 import { hashText } from '../../services/ai/promptComposer';
 import { PlayerAgent } from './playerAgent';
 import { getRoleConfig, getRoleLabel, shuffle } from './utils';
-import { buildSystemPrompt, buildLightweightSystemPrompt } from './prompts/system';
+import { buildSystemPrompt } from './prompts/system';
 import {
   askSpeech,
   askWolfNightSpeech,
@@ -9,6 +9,7 @@ import {
 } from './prompts/speech';
 import type { FallbackAudit } from '../agent-core/fallbackAudit';
 import type { RoleSkillRegistry } from '../agent-core/roleSkillRegistry';
+import { formatRelationshipMemoryForPrompt } from '../player-memory';
 
 interface RoleConfig {
   name?: string;
@@ -214,9 +215,14 @@ function createWerewolfAgents(
       seerChecks: [],
       votes: []
     };
-    agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry, selected, modeConfig);
+    const relationshipMemory = formatRelationshipMemoryForPrompt(
+      'werewolf',
+      Number(agent.sourcePlayerId || agent.id),
+      selected,
+    );
+    agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry, selected, modeConfig, relationshipMemory);
     agent.baseSystemPromptHash = hashText(agent.baseSystemPrompt!);
-    agent.playerAgent = new PlayerAgent(agent, buildLightweightSystemPrompt(agent, selected), {
+    agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt, {
       onError: (entry: unknown) => fallbackAudit.record(entry as Record<string, unknown>),
       gameId
     });

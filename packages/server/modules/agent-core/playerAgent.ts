@@ -56,6 +56,8 @@ interface PlayerAgentOptions {
   gameType?: string;
   resolveRole?: (item: Player) => string;
   resolveFaction?: (item: Player) => string;
+  initialMessages?: ChatMessage[];
+  onMessagesChanged?: (messages: ChatMessage[]) => void;
 }
 
 function normalizeText(text: unknown, limit: number): string {
@@ -73,10 +75,13 @@ class BasePlayerAgent {
   resolveRole: (item: Player) => string;
   resolveFaction: (item: Player) => string;
   skillRegistry: AgentSkillRegistry;
+  onMessagesChanged?: (messages: ChatMessage[]) => void;
 
   constructor(player: Player, systemPrompt: string, options: PlayerAgentOptions = {}) {
     this.player = player;
-    this.messages = [{ role: 'system', content: systemPrompt }];
+    this.messages = options.initialMessages?.length
+      ? options.initialMessages.map((message) => ({ ...message }))
+      : [{ role: 'system', content: systemPrompt }];
     this.onError = options.onError;
     this.thinkingEnabled = Boolean(player.thinkingEnabled);
     this.gameId = options.gameId || null;
@@ -84,6 +89,7 @@ class BasePlayerAgent {
     this.resolveRole = options.resolveRole || ((item: Player) => (item.role as string) || (item.roleLabel as string) || '');
     this.resolveFaction = options.resolveFaction || ((item: Player) => (item.faction as string) || (item.side as string) || '');
     this.skillRegistry = new AgentSkillRegistry();
+    this.onMessagesChanged = options.onMessagesChanged;
   }
 
   registerSkill(skill: AgentSkill): this {
@@ -300,6 +306,7 @@ class BasePlayerAgent {
       _playerFaction: this.resolveFaction(this.player)
     });
     this.messages.push({ role: 'assistant', content: reply });
+    this.persistMessages();
     return reply;
   }
 
@@ -345,6 +352,7 @@ class BasePlayerAgent {
       _playerFaction: this.resolveFaction(this.player)
     });
     this.messages.push({ role: 'assistant', content: result.content });
+    this.persistMessages();
     return result;
   }
 
@@ -428,6 +436,10 @@ class BasePlayerAgent {
         });
       }
     } catch { /* Trace recording must not affect the main flow. */ }
+  }
+
+  private persistMessages(): void {
+    this.onMessagesChanged?.(this.messages.map((message) => ({ ...message })));
   }
 }
 

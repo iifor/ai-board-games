@@ -34,6 +34,19 @@ interface PlayerRow {
   updated_at: string;
 }
 
+interface PlayerGameMemoryRow {
+  id: number;
+  game_type: string;
+  owner_player_id: number;
+  subject_player_id: number;
+  games_played: number;
+  familiarity_score: number;
+  traits_json: string;
+  recent_summary: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ModelProviderRow {
   id: number;
   name: string;
@@ -387,6 +400,7 @@ interface StateSnapshotRow {
 export type {
   SkinRow,
   PlayerRow,
+  PlayerGameMemoryRow,
   ModelProviderRow,
   ModelRow,
   VoicePackageRow,

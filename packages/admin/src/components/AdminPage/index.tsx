@@ -5,6 +5,7 @@ import {
 } from 'antd';
 import {
   DashboardOutlined,
+  DatabaseOutlined,
   ExperimentOutlined,
   EyeOutlined,
   PartitionOutlined,
@@ -29,6 +30,7 @@ import { TraceExplorer } from '../../pages/TraceExplorer';
 import { TraceDetail } from '../../pages/TraceExplorer/TraceDetail';
 import { AgentTraceView } from '../../pages/TraceExplorer/AgentTraceView';
 import { WorkflowDebugConsole } from '../../pages/WorkflowDebugConsole';
+import { MemoryManager } from '../../pages/MemoryManager';
 import type { ItemType } from 'antd/es/menu/interface';
 
 const { Content, Sider } = Layout;
@@ -68,8 +70,9 @@ const MENU_ITEMS: ItemType[] = [
     children: [{ key: '/models/providers', label: '供应商列表' }]
   },
   { key: '/voices', icon: <SoundOutlined />, label: '语音管理' },
-  { key: '/traces', icon: <EyeOutlined />, label: 'AI 观测' }
-, { key: '/workflow-debug', icon: <PartitionOutlined />, label: '工作流调试' }
+  { key: '/traces', icon: <EyeOutlined />, label: 'AI 观测' },
+  { key: '/memories', icon: <DatabaseOutlined />, label: '记忆管理' },
+  { key: '/workflow-debug', icon: <PartitionOutlined />, label: '工作流调试' }
 ];
 
 export function AdminPage() {
@@ -122,6 +125,7 @@ function AdminShell() {
             <Route path="/traces" element={<TraceExplorer />} />
             <Route path="/traces/:id" element={<TraceDetail />} />
             <Route path="/traces/:id/player/:playerId" element={<AgentTraceView />} />
+            <Route path="/memories" element={<MemoryManager />} />
             <Route path="/workflow-debug" element={<WorkflowDebugConsole />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

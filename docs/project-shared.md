@@ -118,7 +118,7 @@ pnpm run test:migration
 
 测试目录：
 
-- `tests/unit`：通用单元测试，例如 event bus、game engine contract、socket session、skill event emitter。
+- `tests/unit`：通用单元测试，例如 event bus、game engine contract、socket session、skill event emitter、玩家记忆长度与会话裁剪。
 - `tests/workflow`：工作流测试，例如狼人杀 reducer/effects/action window、事件投影、辩论发言事件、展示事件。
 - `tests/migration`：迁移和事件映射测试。
 

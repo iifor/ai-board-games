@@ -27,7 +27,12 @@ function getDebateRoleName(agent: DebatePlayer | null | undefined): string {
   return `${sideLabel}${ordinal}辩`;
 }
 
-function buildSystemPrompt(agent: DebatePlayer, topic: Topic, phase: DebatePhase = PHASES[0]): string {
+function buildSystemPrompt(
+  agent: DebatePlayer,
+  topic: Topic,
+  phase: DebatePhase = PHASES[0],
+  relationshipMemory = '',
+): string {
   const personaModule = buildPlayerPersonaModule(agent as unknown as Parameters<typeof buildPlayerPersonaModule>[0]);
   if (agent.side === 'judge') {
     return compilePromptModules([
@@ -38,6 +43,7 @@ function buildSystemPrompt(agent: DebatePlayer, topic: Topic, phase: DebatePhase
       '你需要依据论点清晰度、反驳质量、团队协作、表达感染力进行判断。',
       '点评要具体指出双方亮点和问题，不能只说空话。',
       'MVP 投票必须从正反方选手中选择 1 位；投票任务只返回目标，不需要理由。',
+      relationshipMemory,
       `严格遵守当前环节字数限制：${phase.limit}。`,
     ]).text as string;
   }
@@ -57,6 +63,7 @@ function buildSystemPrompt(agent: DebatePlayer, topic: Topic, phase: DebatePhase
     agent.debateRole === 'captain'
       ? '你是本方队长。你需要给队友制定战术：核心论点、攻击重点、防守底线、发言分工。战术部署只面向本方，不要写给对方或评委。'
       : '',
+    relationshipMemory,
   ]).text as string;
 }
 

@@ -458,11 +458,12 @@ test('wolf private prompt lists teammates with live and eliminated status', () =
   const runtime = createRuntime(match as never);
   const wolf = runtime.agents.find((agent: Record<string, unknown>) => Number(agent.id) === 1) as Record<string, unknown> | undefined;
   const messages = ((wolf?.playerAgent as { messages?: Array<{ content: string }> } | undefined)?.messages || []);
-  const lightweightSystem = messages[0]?.content || '';
+  const openingSystem = messages[0]?.content || '';
   const openingPrompt = String(wolf?.baseSystemPrompt || '');
 
-  assert.match(lightweightSystem, /本局你是 1 号/);
-  assert.doesNotMatch(lightweightSystem, /狼队私密信息/);
+  assert.equal(openingSystem, openingPrompt);
+  assert.match(openingSystem, /本局你是 1 号/);
+  assert.match(openingSystem, /狼队私密信息/);
   assert.match(openingPrompt, /狼队私密信息/);
   assert.match(openingPrompt, /2号（[^）]*存活）/);
   assert.match(openingPrompt, /3号（[^）]*已出局）/);

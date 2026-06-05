@@ -18,6 +18,11 @@ import {
   syncDebateMemory,
   buildAgentHash,
 } from './utils';
+import {
+  formatRelationshipMemoryForPrompt,
+  loadPlayerSession,
+  savePlayerSession,
+} from '../player-memory';
 import type { DebatePlayer, DebatePhase, DebateHost, DebateConfig, SerializedGame } from './utils';
 import { createPhase, pushSpeech, summarizeDebatePhase } from './speech';
 import { stableTaskId } from '../workflow-engine/utils';
@@ -452,11 +457,23 @@ function createDebateAgents(
       speeches: [],
       messages: [],
     };
-    agent.baseSystemPrompt = buildSystemPrompt(agent, topic, PHASES[0]);
-    agent.baseSystemPromptHash = buildAgentHash(agent.baseSystemPrompt as string);
+    const stablePlayerId = Number((agent as Record<string, unknown>).sourcePlayerId || agent.id);
+    const relationshipMemory = formatRelationshipMemoryForPrompt('debate', stablePlayerId, setup.players);
+    agent.baseSystemPrompt = buildSystemPrompt(agent, topic, PHASES[0], relationshipMemory);
+    const basePromptHash = buildAgentHash(buildSystemPrompt(agent, topic, PHASES[0]));
+    agent.baseSystemPromptHash = basePromptHash;
+    const initialMessages = loadPlayerSession(
+      'debate',
+      gameId,
+      stablePlayerId,
+      basePromptHash,
+    ) || undefined;
     agent.playerAgent = new DebateAgent(agent, agent.baseSystemPrompt as string, {
       onError: (entry: Record<string, unknown>) => fallbackAudit.record(entry),
       gameId,
+      initialMessages,
+      onMessagesChanged: (messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>) =>
+        savePlayerSession('debate', gameId, stablePlayerId, basePromptHash, messages),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration: playerAgent typed as unknown via index signature
     const playerAgentInstance = agent.playerAgent as any;

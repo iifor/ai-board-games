@@ -283,6 +283,24 @@ function migrate(db: Database | JsonDb): void {
     );
     CREATE INDEX IF NOT EXISTS idx_memory_snapshots_match ON memory_snapshots(match_id, scope, owner_id);
 
+    CREATE TABLE IF NOT EXISTS player_game_memories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      game_type TEXT NOT NULL,
+      owner_player_id INTEGER NOT NULL,
+      subject_player_id INTEGER NOT NULL,
+      games_played INTEGER NOT NULL DEFAULT 0,
+      familiarity_score REAL NOT NULL DEFAULT 0,
+      traits_json TEXT NOT NULL DEFAULT '{}',
+      recent_summary TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (owner_player_id) REFERENCES players(id) ON DELETE CASCADE,
+      FOREIGN KEY (subject_player_id) REFERENCES players(id) ON DELETE CASCADE,
+      UNIQUE(game_type, owner_player_id, subject_player_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_player_game_memories_lookup
+      ON player_game_memories(game_type, owner_player_id, games_played DESC, familiarity_score DESC);
+
     CREATE TABLE IF NOT EXISTS action_window_epochs (
       id TEXT PRIMARY KEY,
       match_id TEXT NOT NULL,

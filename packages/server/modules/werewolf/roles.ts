@@ -235,15 +235,11 @@ function hasOutputContract(prompt: string): boolean {
 }
 
 function askVoteTarget(actor: SkillAgent, prompt: string, valid: number[], options: Record<string, unknown>): Promise<number | null> {
-  return actor.playerAgent.askVoteTargetOnce
-    ? actor.playerAgent.askVoteTargetOnce(prompt, valid, options)
-    : actor.playerAgent.askVoteTarget(prompt, valid, options);
+  return actor.playerAgent.askVoteTarget(prompt, valid, options);
 }
 
 function askJson(actor: SkillAgent, prompt: string, options: Record<string, unknown>): Promise<Record<string, unknown> | null> {
-  return actor.playerAgent.askJsonOnce
-    ? actor.playerAgent.askJsonOnce(prompt, options)
-    : actor.playerAgent.askJson(prompt, options);
+  return actor.playerAgent.askJson(prompt, options);
 }
 
 function parseTargetSeat(parsed: Record<string, unknown> | null | undefined): number | null {

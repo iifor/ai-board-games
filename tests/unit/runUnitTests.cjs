@@ -19,6 +19,7 @@ const testFiles = [
   'werewolfInteractionFeedbackTrace.test.ts',
   'werewolfActionEngineBridge.test.ts',
   'werewolfPromptContext.test.ts',
+  'playerMemory.test.ts',
   'werewolfClientDisplayState.test.ts',
   'nightResolutionAuditViewModel.test.ts'
 ].map((file) => path.join(__dirname, file));
