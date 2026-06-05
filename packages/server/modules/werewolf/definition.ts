@@ -65,7 +65,7 @@ function createWerewolfGameDefinition(): GameDefinition {
       wolf_vote: optionalTargetPayloadSchema,
       wolf_kill: optionalTargetPayloadSchema,
       seer_check: targetPayloadSchema,
-      guard_protect: targetPayloadSchema,
+      guard_protect: optionalTargetPayloadSchema,
       witch_save: witchSavePayloadSchema,
       witch_poison: witchPoisonPayloadSchema,
     },
@@ -93,7 +93,7 @@ function createWerewolfEffectsFromAction(
   const day = resolveActionDay(action, context);
   if (action.actionType === 'wolf_vote' || action.actionType === 'wolf_kill') return createKillEffects(action, day);
   if (action.actionType === 'seer_check') return [createInspectEffect(action, day)];
-  if (action.actionType === 'guard_protect') return [createProtectEffect(action, day)];
+  if (action.actionType === 'guard_protect') return createProtectEffects(action, day);
   if (action.actionType === 'witch_save') return createSaveEffects(action, day, context);
   if (action.actionType === 'witch_poison') return createPoisonEffects(action, day);
   return [];
@@ -148,9 +148,10 @@ function createInspectEffect(action: DomainAction, day: number): WorkflowEffect 
   };
 }
 
-function createProtectEffect(action: DomainAction, day: number): WorkflowEffect {
-  const target = Number(action.payload.target);
-  return {
+function createProtectEffects(action: DomainAction, day: number): WorkflowEffect[] {
+  const target = toPositiveNumber(action.payload.target);
+  if (!target) return [];
+  return [{
     id: `${action.id}:protect`,
     matchId: action.matchId,
     effectType: 'protect',
@@ -166,7 +167,7 @@ function createProtectEffect(action: DomainAction, day: number): WorkflowEffect 
       day,
       target,
     },
-  };
+  }];
 }
 
 function createSaveEffects(

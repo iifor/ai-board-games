@@ -111,6 +111,59 @@ test('werewolf prompt context shows wolf teammate live and eliminated status onl
   assert.doesNotMatch(villagerPrompt, /狼队刀口共识/);
 });
 
+test('werewolf prompt context never exposes wolf chat to non-wolves', () => {
+  const wolf = player(1, 'werewolf', 'wolves');
+  const villager = player(2, 'villager', 'good');
+  const rounds = [{
+    day: 1,
+    night: { wolfSpeeches: [{ playerId: 1, text: '今晚统一刀2号。' }] },
+    speeches: [{ playerId: 2, text: '公开发言。' }],
+  }];
+  const players = [wolf, villager];
+
+  const wolfPrompt = buildWerewolfActionPrompt({
+    runtime: runtime(players, rounds) as never,
+    round: rounds[0] as never,
+    actor: wolf as never,
+    actionType: 'wolf_vote',
+  });
+  const villagerPrompt = buildWerewolfActionPrompt({
+    runtime: runtime(players, rounds) as never,
+    round: rounds[0] as never,
+    actor: villager as never,
+    actionType: 'day_speech',
+  });
+
+  assert.match(wolfPrompt, /今晚统一刀2号/);
+  assert.doesNotMatch(villagerPrompt, /今晚统一刀2号/);
+  assert.doesNotMatch(villagerPrompt, /狼队夜聊/);
+  assert.match(villagerPrompt, /公开发言/);
+});
+
+test('public prompt hides death reasons and ignores duplicated public summary', () => {
+  const players = [
+    player(1, 'werewolf', 'wolves'),
+    player(2, 'villager', 'good', { alive: false, deathReason: '女巫毒杀' }),
+  ];
+  const rounds = [{
+    day: 1,
+    nightRevealed: true,
+    publicSummary: 'DUPLICATE_SUMMARY',
+    night: { deaths: [{ id: 2, reason: '女巫毒杀' }] },
+  }];
+
+  const prompt = buildWerewolfActionPrompt({
+    runtime: runtime(players, rounds) as never,
+    round: rounds[0] as never,
+    actor: players[0] as never,
+    actionType: 'day_speech',
+  });
+
+  assert.match(prompt, /第1晚死亡：2号/);
+  assert.doesNotMatch(prompt, /女巫毒杀/);
+  assert.doesNotMatch(prompt, /DUPLICATE_SUMMARY/);
+});
+
 test('stateless once calls do not append to PlayerAgent message history without api key', async () => {
   const agent = new BasePlayerAgent({ id: 1 }, 'base prompt');
   const before = agent.messages.length;
@@ -119,6 +172,63 @@ test('stateless once calls do not append to PlayerAgent message history without 
 
   assert.equal(result, null);
   assert.equal(agent.messages.length, before);
+});
+
+test('vote target accepts null without retry when the action allows skipping', async () => {
+  const agent = new BasePlayerAgent({ id: 1 }, 'system');
+  let calls = 0;
+  agent.askJsonOnce = async () => {
+    calls += 1;
+    return { targetSeat: null };
+  };
+
+  const target = await agent.askVoteTargetOnce('prompt', [2, 3], {
+    allowNull: true,
+    promptHasContract: true,
+  });
+
+  assert.equal(target, null);
+  assert.equal(calls, 1);
+});
+
+test('vote target retries null when the action requires a target', async () => {
+  const agent = new BasePlayerAgent({ id: 1 }, 'system');
+  let calls = 0;
+  agent.askJsonOnce = async () => {
+    calls += 1;
+    return calls === 1 ? { targetSeat: null } : { targetSeat: 2 };
+  };
+
+  const target = await agent.askVoteTargetOnce('prompt', [2, 3], {
+    promptHasContract: true,
+  });
+
+  assert.equal(target, 2);
+  assert.equal(calls, 2);
+});
+
+test('pre-contracted vote prompt is sent without duplicate target or JSON instructions', async () => {
+  const agent = new BasePlayerAgent({ id: 1, apiKey: 'test', model: 'test' }, 'system');
+  let sentMessages: Array<{ role: string; content: string }> = [];
+  agent.callOnce = async (messages) => {
+    sentMessages = messages;
+    return '{"targetSeat":2}';
+  };
+  const prompt = [
+    '【输出格式】',
+    '只返回标准 JSON 对象。',
+    '可选目标座位号：2、3。',
+  ].join('\n');
+
+  const target = await agent.askVoteTargetOnce(prompt, [2, 3], {
+    promptHasContract: true,
+  });
+  const userPrompt = sentMessages.find((message) => message.role === 'user')?.content || '';
+
+  assert.equal(target, 2);
+  assert.equal(countMatches(userPrompt, '可选目标座位号'), 1);
+  assert.doesNotMatch(userPrompt, /Valid target seat numbers/);
+  assert.doesNotMatch(userPrompt, /Return ONLY a raw JSON object/);
 });
 
 test('werewolf lightweight system prompt follows fixed template', () => {
@@ -260,6 +370,7 @@ test('wolf vote prompt lists targets and does not duplicate wolf chat', async ()
   assert.equal(result.target, 3);
   assert.deepEqual(captured.valid, [3]);
   assert.match(captured.prompt || '', /可选目标座位号：3/);
+  assert.equal(countMatches(captured.prompt || '', '可选目标座位号'), 1);
   assert.equal(countMatches(captured.prompt || '', '建议刀3号'), 1);
 });
 
@@ -322,6 +433,7 @@ test('sheriff vote prompt only lists candidates', async () => {
   assert.equal(result.target, 2);
   assert.deepEqual(captured.valid, [2]);
   assert.match(captured.prompt || '', /可选目标座位号：2/);
+  assert.equal(countMatches(captured.prompt || '', '可选目标座位号'), 1);
   assert.doesNotMatch(captured.prompt || '', /可选目标座位号：1、2、3/);
 });
 

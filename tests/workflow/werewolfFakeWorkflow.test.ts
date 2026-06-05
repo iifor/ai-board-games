@@ -7,6 +7,7 @@ import { createRound } from '../../packages/server/modules/werewolf/agents';
 import { createInitialWerewolfState, createRuntime, flushMatchEventPublishes, registerMatchInfra, unregisterMatchInfra } from '../../packages/server/modules/werewolf/runtime';
 import { createEventBusWithDefaults } from '../../packages/server/modules/werewolf/eventBus';
 import { createGameEventBuilder } from '../../packages/server/modules/werewolf/gameEventBuilder';
+import { buildWerewolfActionPrompt } from '../../packages/server/modules/werewolf/prompts/context';
 
 type RepoPatch = Pick<typeof repo,
   'upsertActionWindowEpoch' |
@@ -417,7 +418,7 @@ test('private night action phase results are scoped and not public', () => {
   }
 });
 
-test('seer check result is injected into seer private LLM memory on runtime rebuild', () => {
+test('seer check result is injected dynamically without extending seer message history', () => {
   const state = createState();
   state.players = [
     ...(state.players as Record<string, unknown>[]),
@@ -431,12 +432,18 @@ test('seer check result is injected into seer private LLM memory on runtime rebu
 
   const runtime = createRuntime(match as never);
   const seer = runtime.agents.find((agent: Record<string, unknown>) => Number(agent.id) === 4) as Record<string, unknown> | undefined;
-  const messages = ((seer?.playerAgent as { messages?: Array<{ content: string }> } | undefined)?.messages || [])
-    .map((message) => message.content)
-    .join('\n');
+  const messages = (seer?.playerAgent as { messages?: Array<{ content: string }> } | undefined)?.messages || [];
+  const prompt = buildWerewolfActionPrompt({
+    runtime: runtime as never,
+    round: state.rounds[0] as never,
+    actor: seer as never,
+    actionType: 'seer_check',
+  });
 
-  assert.match(messages, /预言家私密查验结果/);
-  assert.match(messages, /第1晚，你查验了2号，结果是：好人。/);
+  assert.equal(messages.length, 1);
+  assert.doesNotMatch(messages[0]?.content || '', /预言家私密查验结果/);
+  assert.match(prompt, /【你的私密信息】/);
+  assert.match(prompt, /预言家查验记录：第1晚查验2号，结果：好人。/);
 });
 
 test('wolf private prompt lists teammates with live and eliminated status', () => {

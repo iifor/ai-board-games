@@ -62,7 +62,7 @@ export function buildGuardActionPrompt(): string {
 /** 女巫解药 */
 export function buildSaveActionPrompt(victimId: number, isSelf: boolean, canSelfSave: boolean): string {
   const lines = [
-    `今晚 ${victimId} 号倒牌。你还有解药。`,
+    `今晚狼刀目标是 ${victimId} 号。你还有解药。`,
     isSelf && canSelfSave ? '首夜允许自救。' : '不允许自救。',
     isSelf
       ? '是否使用解药自救？自救不要求 reason。只返回标准 JSON 对象：{"use":true} 或 {"use":false,"reason":null}。'
@@ -78,7 +78,7 @@ export function buildPoisonActionPrompt(validIds: number[]): string {
     `可选目标座位号：${validIds.join('、') || '无'}`,
     '只返回标准 JSON 对象，不要输出 Markdown、解释或多余文本。',
     '使用毒药示例：{"use":true,"targetSeat":2,"reason":"简短原因"}。',
-    '不用毒药示例：{"use":false,"target":null,"reason":null}。'
+    '不用毒药示例：{"use":false,"targetSeat":null,"reason":null}。'
   ].join('\n\n');
 }
 
@@ -97,11 +97,11 @@ export function buildSelfDestructActionPrompt(publicContext: string, speechText:
   return [
     '你是狼人，当前处于白天公开流程。你可以选择是否发动自爆。',
     '自爆效果：你立即出局，本轮白天发言/投票中止，流程进入后续胜负检查或夜晚。',
-    `当前公开信息：\n${publicContext || '暂无公开信息。'}`,
+    publicContext ? `当前公开信息：\n${publicContext}` : '',
     `你刚才的公开发言：${speechText || '暂无'}`,
     '建议在继续发言会明显暴露狼队、或自爆能保护狼队/打断关键归票时才使用。',
     '只返回JSON对象：{"use":false,"text":""} 或 {"use":true,"text":"自爆宣言"}。'
-  ].join('\n\n');
+  ].filter(Boolean).join('\n\n');
 }
 
 // ---- 投票/竞选提示 ----
@@ -115,17 +115,13 @@ export function buildWolfVotePrompt(): string {
 export const DAY_VOTE_PROMPT = '请选择你要放逐的玩家。';
 
 /** 警长竞选报名 */
-export const SHERIFF_SIGNUP_PROMPT = [
-  '警长竞选开始。请选择竞选警长？',
-  '只返回JSON对象：{"run":true} 或 {"run":false}。'
-].join('\n\n');
+export const SHERIFF_SIGNUP_PROMPT = '警长竞选开始。请选择是否竞选警长。';
 
 /** 警长退水 */
 export function buildSheriffWithdrawPrompt(): string {
   return [
     '你的警上竞选发言已经结束。请根据所有警上候选人的发言内容，判断是否退水退出警长竞选。',
     '判断标准：如果你的发言明显弱于其他候选人，或你认为其他候选人更适合担任警长，可以选择退水。',
-    '只返回标准 JSON 对象：{"withdraw":true} 或 {"withdraw":false}。'
   ].join('\n\n');
 }
 

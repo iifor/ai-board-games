@@ -328,3 +328,14 @@ werewolf workflow step
 3. 在 TraceExplorer 增加“Prompt Bundle 视图”，按 `systemRules / publicFacts / privateKnowledge / taskInstruction / outputContract` 展示。
 4. 将 `actionType -> PromptBundle -> once call -> DomainAction` 固化为狼人杀标准链路。
 5. 对所有私密信息增加 invariant：不得进入 public event、audience display event 或 C 端 socket。
+
+## 狼人杀提示词可见性与动作契约
+
+- 狼队夜聊、狼队策略和刀口信息只进入狼人 actor 的 `privateKnowledge` 或 `recentContext`，普通玩家的发言、投票和角色行动 prompt 不得包含这些内容。
+- 公开死亡事实只公布死亡座位。狼人袭击、女巫毒杀等夜间死亡原因属于结算私密信息，不进入 `publicFacts`，已出局玩家列表也不附带 `deathReason`。
+- `publicFacts` 使用死亡、放逐、自爆、警长和票型等结构化字段生成，不再直接拼接 `publicSummary`，避免同一事实以中英文摘要和结构化字段重复出现。
+- 显式传入 `recentContext` 时完全覆盖默认近期上下文，包括显式传入空字符串的情况。
+- 狼人空刀、狼队弃票、白天弃票、警长弃票和守卫空守均使用 `{"targetSeat":null}`。猎人不开枪沿用可空目标语义；预言家查验必须返回合法的非空目标。
+- `guard_protect` 的 Engine Core payload 允许目标为空；空守通过 schema 校验，但不创建 `protect` effect。
+- 每次结构化 LLM 调用只保留一份输出契约和一份合法目标列表。`taskInstruction` 只描述任务，`outputContract` 负责 JSON schema、示例和合法目标。
+- 当 action prompt 已由 `buildWerewolfPromptBundle()` 提供完整契约时，调用方必须设置 `promptHasContract`，避免 `BasePlayerAgent` 再次追加通用 JSON-only 文案或目标列表。

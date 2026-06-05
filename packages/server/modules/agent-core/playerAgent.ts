@@ -36,11 +36,14 @@ interface AskJsonOptions {
   maxTokens?: number;
   skillId?: string;
   phase?: string;
+  promptHasContract?: boolean;
 }
 
 interface AskVoteOptions {
   skillId?: string;
   phase?: string;
+  allowNull?: boolean;
+  promptHasContract?: boolean;
 }
 
 interface AskOnceOptions extends AskTextOptions {
@@ -150,12 +153,16 @@ class BasePlayerAgent {
       this.recordError(options.skillId || 'player-json', 'missing-api-key', options);
       return null;
     }
-    const jsonOnly = '\n\nReturn ONLY a raw JSON object. Do NOT wrap in ```json blocks. No explanations outside the JSON.';
+    const jsonOnly = options.promptHasContract
+      ? ''
+      : '\n\nReturn ONLY a raw JSON object. Do NOT wrap in JSON markdown blocks. No explanations outside the JSON.';
     try {
       const parsed = parseJsonObject(await this.call(prompt + jsonOnly, options.maxTokens || 120)) as Record<string, unknown> | null;
       if (parsed) return parsed;
-      // 重试一次
-      const retryParsed = parseJsonObject(await this.call(`${prompt}\n\nReturn one valid JSON object only. No markdown wrapping.`, options.maxTokens || 120)) as Record<string, unknown> | null;
+      const retryInstruction = options.promptHasContract
+        ? 'Your previous output was not valid JSON. Return one valid JSON object matching the specified output contract.'
+        : 'Return one valid JSON object only. No markdown wrapping.';
+      const retryParsed = parseJsonObject(await this.call(`${prompt}\n\n${retryInstruction}`, options.maxTokens || 120)) as Record<string, unknown> | null;
       if (retryParsed) return retryParsed;
       this.recordError(options.skillId || 'player-json', 'invalid-json', options);
       return null;
@@ -171,11 +178,16 @@ class BasePlayerAgent {
       this.recordError(options.skillId || 'player-json', 'missing-api-key', options);
       return null;
     }
-    const jsonOnly = '\n\nReturn ONLY a raw JSON object. Do NOT wrap in ```json blocks. No explanations outside the JSON.';
+    const jsonOnly = options.promptHasContract
+      ? ''
+      : '\n\nReturn ONLY a raw JSON object. Do NOT wrap in JSON markdown blocks. No explanations outside the JSON.';
     try {
       const parsed = parseJsonObject(await this.callOnce(options.messages || this.buildOneShotMessages(prompt + jsonOnly), options.maxTokens || 120)) as Record<string, unknown> | null;
       if (parsed) return parsed;
-      const retryParsed = parseJsonObject(await this.callOnce(this.buildOneShotMessages(`${prompt}\n\nReturn one valid JSON object only. No markdown wrapping.`), options.maxTokens || 120)) as Record<string, unknown> | null;
+      const retryInstruction = options.promptHasContract
+        ? 'Your previous output was not valid JSON. Return one valid JSON object matching the specified output contract.'
+        : 'Return one valid JSON object only. No markdown wrapping.';
+      const retryParsed = parseJsonObject(await this.callOnce(this.buildOneShotMessages(`${prompt}\n\n${retryInstruction}`), options.maxTokens || 120)) as Record<string, unknown> | null;
       if (retryParsed) return retryParsed;
       this.recordError(options.skillId || 'player-json', 'invalid-json', options);
       return null;
@@ -187,64 +199,84 @@ class BasePlayerAgent {
   }
 
   async askVoteTarget(prompt: string, validIds: number[], options: AskVoteOptions = {}): Promise<number | null> {
-    const parsed = await this.askJson([
-      prompt,
-      `Valid target seat numbers: ${validIds.join(', ')}`,
-      'Return JSON only, for example {"targetSeat":2}. targetSeat must be one of the listed seat numbers.'
-    ].join('\n\n'), {
+    const parsed = await this.askJson(this.buildVotePrompt(prompt, validIds, options), {
       maxTokens: 60,
       skillId: options.skillId || 'player-vote',
       phase: options.phase,
+      promptHasContract: options.promptHasContract,
     });
     if (!parsed) return null;
-    const target = Number(parsed.targetSeat ?? parsed.target);
+    const rawTarget = this.readVoteTarget(parsed);
+    if (rawTarget == null && options.allowNull) return null;
+    const target = Number(rawTarget);
     if (validIds.includes(target)) return target;
-    // 重试一次：目标无效，告诉 LLM 重新选择
     const retryParsed = await this.askJson([
       prompt,
-      `Valid target seat numbers: ${validIds.join(', ')}`,
-      `You returned ${target}, which is NOT in the valid list. Pick ONLY from: ${validIds.join(', ')}.`,
-      'Return JSON: {"targetSeat":<number from the valid list>}.'
+      `You returned an invalid target (${String(rawTarget)}).`,
+      options.allowNull
+        ? 'Return JSON matching the specified contract with a valid targetSeat or null.'
+        : 'Return JSON matching the specified contract with a valid targetSeat.'
     ].join('\n\n'), {
       maxTokens: 60,
       skillId: options.skillId || 'player-vote',
       phase: options.phase,
+      promptHasContract: options.promptHasContract,
     });
     if (!retryParsed) return null;
-    const retryTarget = Number(retryParsed.targetSeat ?? retryParsed.target);
+    const retryRawTarget = this.readVoteTarget(retryParsed);
+    if (retryRawTarget == null && options.allowNull) return null;
+    const retryTarget = Number(retryRawTarget);
     if (validIds.includes(retryTarget)) return retryTarget;
     this.recordError(options.skillId || 'player-vote', 'invalid-target', options);
     return null;
   }
 
   async askVoteTargetOnce(prompt: string, validIds: number[], options: AskVoteOptions = {}): Promise<number | null> {
-    const parsed = await this.askJsonOnce([
-      prompt,
-      `Valid target seat numbers: ${validIds.join(', ')}`,
-      'Return JSON only, for example {"targetSeat":2}. targetSeat must be one of the listed seat numbers.'
-    ].join('\n\n'), {
+    const parsed = await this.askJsonOnce(this.buildVotePrompt(prompt, validIds, options), {
       maxTokens: 60,
       skillId: options.skillId || 'player-vote',
       phase: options.phase,
+      promptHasContract: options.promptHasContract,
     });
     if (!parsed) return null;
-    const target = Number(parsed.targetSeat ?? parsed.target);
+    const rawTarget = this.readVoteTarget(parsed);
+    if (rawTarget == null && options.allowNull) return null;
+    const target = Number(rawTarget);
     if (validIds.includes(target)) return target;
     const retryParsed = await this.askJsonOnce([
       prompt,
-      `Valid target seat numbers: ${validIds.join(', ')}`,
-      `You returned ${target}, which is NOT in the valid list. Pick ONLY from: ${validIds.join(', ')}.`,
-      'Return JSON: {"targetSeat":<number from the valid list>}.'
+      `You returned an invalid target (${String(rawTarget)}).`,
+      options.allowNull
+        ? 'Return JSON matching the specified contract with a valid targetSeat or null.'
+        : 'Return JSON matching the specified contract with a valid targetSeat.'
     ].join('\n\n'), {
       maxTokens: 60,
       skillId: options.skillId || 'player-vote',
       phase: options.phase,
+      promptHasContract: options.promptHasContract,
     });
     if (!retryParsed) return null;
-    const retryTarget = Number(retryParsed.targetSeat ?? retryParsed.target);
+    const retryRawTarget = this.readVoteTarget(retryParsed);
+    if (retryRawTarget == null && options.allowNull) return null;
+    const retryTarget = Number(retryRawTarget);
     if (validIds.includes(retryTarget)) return retryTarget;
     this.recordError(options.skillId || 'player-vote', 'invalid-target', options);
     return null;
+  }
+
+  private buildVotePrompt(prompt: string, validIds: number[], options: AskVoteOptions): string {
+    if (options.promptHasContract) return prompt;
+    return [
+      prompt,
+      `Valid target seat numbers: ${validIds.join(', ')}`,
+      options.allowNull
+        ? 'Return JSON only, for example {"targetSeat":2} or {"targetSeat":null}.'
+        : 'Return JSON only, for example {"targetSeat":2}. targetSeat must be one of the listed seat numbers.'
+    ].join('\n\n');
+  }
+
+  private readVoteTarget(parsed: Record<string, unknown>): unknown {
+    return parsed.targetSeat !== undefined ? parsed.targetSeat : parsed.target;
   }
 
   // -----------------------------------------------------------

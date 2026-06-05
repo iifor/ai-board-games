@@ -257,6 +257,39 @@ test('Werewolf guard_protect action creates private protect event, not public re
   assert.equal(channelSystem.canAccess(event, { type: 'player', roles: ['guard'] }), true);
 });
 
+test('Werewolf guard_protect action accepts empty guard and creates no effect', async () => {
+  const store = new MemoryMatchStateStore();
+  store.addMatch(createMatch({
+    state: {
+      players: [{ id: 4, role: 'guard' }, { id: 8 }],
+      rounds: [{ day: 1, phase: 'night', night: {} }],
+    },
+  }));
+  store.addActionWindow(createWindow({
+    id: 'guard-empty-window',
+    actionType: 'guard_protect',
+    actorIds: [4],
+    targetIds: [8],
+    payload: { day: 1 },
+  }));
+  const engine = new GameEngine({ store });
+  engine.registerDefinition(createWerewolfGameDefinition());
+
+  const submit = await engine.submitAction({
+    id: 'action-guard-empty',
+    matchId: 'match-test',
+    windowId: 'guard-empty-window',
+    actorId: 4,
+    actionType: 'guard_protect',
+    payload: { target: null },
+    idempotencyKey: 'action-guard-empty',
+  });
+
+  assert.equal(submit.ok, true);
+  assert.equal(submit.data?.effects.length, 0);
+  assert.equal(store.listEvents('match-test').length, 0);
+});
+
 test('Werewolf witch_save action creates private save event from current wolf target', async () => {
   const store = new MemoryMatchStateStore();
   store.addMatch(createMatch({

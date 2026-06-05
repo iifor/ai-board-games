@@ -229,7 +229,10 @@ async function runWolfKillAction(runtime: Runtime, round: Round, actor: Agent, a
         actor,
         'wolf_kill',
         '请选择今晚狼队袭击目标或空刀。',
-        '只返回 JSON，例如 {"targetSeat":2}；目标必须是非狼人存活玩家座位号。'
+        buildTargetJsonContract(
+          alive.filter((agent) => agent.faction !== 'wolves').map((agent) => agent.id),
+          { nullable: true }
+        )
       ),
       phase: 'night',
       state: runtime.ctx.state,
@@ -279,11 +282,16 @@ async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, a
     actor,
     'wolf_vote',
     buildWolfVotePrompt(),
-    buildTargetJsonContract(valid),
+    buildTargetJsonContract(valid, { nullable: true }),
     valid,
     speeches ? `狼队夜聊记录：\n${speeches}` : '狼队夜聊记录：暂无发言。'
   );
-  const target = await askVoteTargetOnce(actor, prompt, valid, { skillId: 'wolf_vote', phase: 'night' });
+  const target = await askVoteTargetOnce(actor, prompt, valid, {
+    skillId: 'wolf_vote',
+    phase: 'night',
+    allowNull: true,
+    promptHasContract: true,
+  });
   return { target }; // null = 弃票
 }
 
@@ -355,20 +363,21 @@ async function runDayVoteAction(actor: Agent, alive: Agent[], runtime: Runtime):
   const rounds = Array.isArray(runtime.state?.rounds) ? runtime.state.rounds : [];
   const round = rounds[rounds.length - 1] || ensureRound(runtime.state, 1);
   const valid = alive.filter((agent) => agent.canVote !== false).map((agent) => agent.id).filter((id) => Number(id) !== Number(actor.id));
-  const deadList = runtime.agents.filter((a) => !a.alive).map((a) => `${getSeatNumber(a.id, runtime.agents)}号`);
-  const taskPrompt = deadList.length
-    ? [`请选择你要放逐的玩家。`, `不可投票给已出局玩家：${deadList.join('、')}`].join('\n')
-    : DAY_VOTE_PROMPT;
   const prompt = buildActionPrompt(
     runtime,
     round,
     actor,
     'day_vote',
-    taskPrompt,
-    `只返回 JSON，例如 {"targetSeat":2}；目标必须从这些存活且可投票的座位号中选择：${valid.join('、')}。`,
+    DAY_VOTE_PROMPT,
+    buildTargetJsonContract(valid, { nullable: true }),
     valid
   );
-  const target = await askVoteTargetOnce(actor, prompt, valid, { skillId: 'day_vote', phase: 'day' });
+  const target = await askVoteTargetOnce(actor, prompt, valid, {
+    skillId: 'day_vote',
+    phase: 'day',
+    allowNull: true,
+    promptHasContract: true,
+  });
   return { target }; // null = 弃票
 }
 
@@ -385,7 +394,12 @@ async function runSheriffSignupAction(runtime: Runtime, round: Round, actor: Age
     SHERIFF_SIGNUP_PROMPT,
     '只返回 JSON：{"run":true} 或 {"run":false}。'
   );
-  const parsed = await askJsonOnce(actor, prompt, { maxTokens: 40, skillId: 'sheriff_signup', phase: 'day' });
+  const parsed = await askJsonOnce(actor, prompt, {
+    maxTokens: 40,
+    skillId: 'sheriff_signup',
+    phase: 'day',
+    promptHasContract: true,
+  });
   return { run: parsed?.run === true };
 }
 
@@ -419,7 +433,12 @@ async function runSheriffWithdrawAction(runtime: Runtime, round: Round, actor: A
     undefined,
     context
   );
-  const parsed = await askJsonOnce(actor, prompt, { maxTokens: 40, skillId: 'sheriff_withdraw', phase: 'day' });
+  const parsed = await askJsonOnce(actor, prompt, {
+    maxTokens: 40,
+    skillId: 'sheriff_withdraw',
+    phase: 'day',
+    promptHasContract: true,
+  });
   return { withdraw: parsed?.withdraw === true };
 }
 
@@ -431,11 +450,16 @@ async function runSheriffVoteAction(runtime: Runtime, round: Round, actor: Agent
     actor,
     'sheriff_vote',
     SHERIFF_VOTE_PROMPT,
-    buildTargetJsonContract(candidateIds),
+    buildTargetJsonContract(candidateIds, { nullable: true }),
     candidateIds,
     ''
   );
-  const target = await askVoteTargetOnce(actor, prompt, candidateIds, { skillId: 'sheriff_vote', phase: 'day' });
+  const target = await askVoteTargetOnce(actor, prompt, candidateIds, {
+    skillId: 'sheriff_vote',
+    phase: 'day',
+    allowNull: true,
+    promptHasContract: true,
+  });
   return { target }; // null = 弃票
 }
 
@@ -452,7 +476,7 @@ function taskTargetIds(runtime: Runtime, round: Round, actionType: string): numb
 }
 
 function buildDaySpeechContext(round: Round, agents?: Agent[]): string {
-  const lines = [round.publicSummary || ''];
+  const lines: string[] = [];
   const election = round.sheriffElection as Record<string, unknown> | null | undefined;
   const sheriffSpeeches = Array.isArray(election?.speeches) ? election.speeches as Array<Record<string, unknown>> : [];
   const daySpeeches = Array.isArray(round.speeches) ? round.speeches as Array<Record<string, unknown>> : [];
@@ -472,7 +496,7 @@ async function runRoleSkillNullSafe(runtime: Runtime, round: Round, actor: Agent
   try {
     const result = await executeSkillWithTrace(runtime.skillRegistry, action, {
       ...context,
-      promptContext: buildActionPrompt(runtime, round, actor, actionType),
+      promptContext: buildRoleActionPrompt(runtime, round, actor, actionType, context),
       state: runtime.ctx.state,
       gameType: 'werewolf',
     });
@@ -483,6 +507,77 @@ async function runRoleSkillNullSafe(runtime: Runtime, round: Round, actor: Agent
       ? { use: false }
       : { target: null };
   }
+}
+
+function buildRoleActionPrompt(
+  runtime: Runtime,
+  round: Round,
+  actor: Agent,
+  actionType: string,
+  context: Record<string, unknown>,
+): string {
+  const alive = Array.isArray(context.alive) ? context.alive as Agent[] : runtime.agents.filter((agent: Agent) => agent.alive);
+  if (actionType === 'seer_check') {
+    const valid = alive.filter((agent) => Number(agent.id) !== Number(actor.id)).map((agent) => Number(agent.id));
+    return buildActionPrompt(
+      runtime,
+      round,
+      actor,
+      actionType,
+      '请选择一名存活玩家查验阵营，并简要说明查验原因。',
+      buildTargetJsonContract(valid, { reason: 'required' }),
+      valid
+    );
+  }
+  if (actionType === 'guard_protect') {
+    const valid = alive
+      .map((agent) => Number(agent.id))
+      .filter((id) => Number(id) !== Number(actor.lastGuardTarget));
+    return buildActionPrompt(
+      runtime,
+      round,
+      actor,
+      actionType,
+      '请选择今晚守护目标或空守；不能连续两晚守护同一名玩家。',
+      buildTargetJsonContract(valid, { nullable: true }),
+      valid
+    );
+  }
+  if (actionType === 'witch_save') {
+    const victim = context.victim as Agent | null | undefined;
+    const canSelfSave = Number(round.day) === 1 && runtime.modeConfig?.witch?.canSelfSaveNightOne !== false;
+    const selfSaveRule = victim && Number(victim.id) === Number(actor.id)
+      ? (canSelfSave ? '本局规则允许首夜自救。' : '本局规则不允许自救。')
+      : '';
+    return buildActionPrompt(
+      runtime,
+      round,
+      actor,
+      actionType,
+      ['决定是否使用解药救今晚的狼刀目标。', selfSaveRule].filter(Boolean).join('\n'),
+      victim && Number(victim.id) !== Number(actor.id)
+        ? '只返回标准 JSON 对象：使用解药返回 {"use":true,"reason":"简短原因"}；不使用返回 {"use":false,"reason":null}。'
+        : '只返回标准 JSON 对象：{"use":true} 或 {"use":false,"reason":null}。'
+    );
+  }
+  if (actionType === 'witch_poison') {
+    const valid = alive.filter((agent) => Number(agent.id) !== Number(actor.id)).map((agent) => Number(agent.id));
+    return buildActionPrompt(
+      runtime,
+      round,
+      actor,
+      actionType,
+      '决定是否使用毒药；使用时必须简要说明原因。',
+      [
+        '只返回标准 JSON 对象，不要输出 Markdown、解释或多余文本。',
+        `可选目标座位号：${valid.join('、') || '无'}。`,
+        '使用毒药：{"use":true,"targetSeat":2,"reason":"简短原因"}。',
+        '不使用毒药：{"use":false,"targetSeat":null,"reason":null}。',
+      ].join('\n'),
+      valid
+    );
+  }
+  return buildActionPrompt(runtime, round, actor, actionType);
 }
 
 function buildActionPrompt(
