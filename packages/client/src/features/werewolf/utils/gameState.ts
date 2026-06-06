@@ -126,6 +126,9 @@ function extractEventRound(event: GameEvent): WerewolfRound | null {
     const election = readRecord(event, 'election') || readRecord(event, 'sheriffElection');
     if (election) patch.sheriffElection = election as WerewolfRound['sheriffElection'];
     if (hasOwn(event, 'sheriffId')) patch.sheriffId = event.sheriffId as string;
+    if (hasOwn(event, 'sheriffBadge')) {
+      patch.sheriffBadge = event.sheriffBadge as WerewolfRound['sheriffBadge'];
+    }
     const transfer = readRecord(event, 'sheriffTransfer');
     if (transfer) {
       patch.sheriffTransfers = [...((baseRound as RecordValue).sheriffTransfers as unknown[] || []), transfer] as unknown as WerewolfRound['sheriffTransfers'];

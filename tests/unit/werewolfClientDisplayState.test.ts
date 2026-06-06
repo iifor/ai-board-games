@@ -39,6 +39,24 @@ test('werewolf client display state clears sheriff after badge tear', () => {
   assert.equal(resolveActiveSheriffId(rounds, rounds[1]), null);
 });
 
+test('werewolf client display state applies public sheriff transfer payload', () => {
+  const game = {
+    id: 'g-sheriff',
+    rounds: [{ day: 2, phase: 'day', sheriffId: '3', sheriffBadge: { status: 'held' } }],
+    players: [{ id: 1 }, { id: 3 }],
+  };
+  const merged = mergeWerewolfEventIntoGame(game, {
+    type: 'sheriff-badge-transfer',
+    metadata: { day: 2, phase: 'day' },
+    sheriffId: 1,
+    sheriffBadge: { status: 'held' },
+    sheriffTransfer: { action: 'transfer', from: 3, to: 1 },
+  });
+
+  assert.equal(merged.rounds?.[0].sheriffId, 1);
+  assert.deepEqual(merged.rounds?.[0].sheriffBadge, { status: 'held' });
+});
+
 test('werewolf client display state patches vote-result into current round', () => {
   const game = {
     id: 'g1',

@@ -375,10 +375,16 @@ function getTargetIds(runtime: Runtime, step: Step): number[] {
   return alive.map((agent) => agent.id);
 }
 
-function findPendingHunter(agents: Agent[], round: Round, deaths: Array<{ id: number; reason: string }> | null | undefined): Agent | null {
+function findPendingHunter(
+  agents: Agent[],
+  round: Round,
+  deaths: Array<{ id: number; reason: string }> | null | undefined,
+  playerId?: number,
+): Agent | null {
   const deathIds = new Set((deaths || []).map((death) => Number(death.id)));
   return agents.find((agent) =>
     deathIds.has(Number(agent.id)) &&
+    (playerId === undefined || Number(agent.id) === Number(playerId)) &&
     hasRoleAction(agent.roleConfig, 'shootOnDeath') &&
     !agent.hunterShotUsed &&
     !agent.alive

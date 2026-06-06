@@ -84,7 +84,7 @@ function createNightResolveHandler() {
         currentStep: step.id,
         currentActionWindow: state.currentActionWindow || null,
       };
-      publishFirstNightResultOnce(context);
+      publishNightResultOnce(context);
       const result = advanceDeathResolution(context);
       if (shadowAuditEvent) result.events = [...(result.events || []), shadowAuditEvent];
       if (result.status === 'COMPLETED') {
@@ -151,15 +151,15 @@ function publishExileResultOnce(context: DeathResolutionContext): void {
     );
   }, serializeWerewolfState(context.match, context.state as unknown as Record<string, unknown>));
 }
-function publishFirstNightResultOnce(context: DeathResolutionContext): void {
-  if (Number(context.step.config.day) !== 1 || context.checkpoint.nightResultPublished) return;
+function publishNightResultOnce(context: DeathResolutionContext): void {
+  if (context.checkpoint.nightResultPublished) return;
   context.checkpoint.nightResultPublished = true;
   const deaths = (context.round.night as { deaths?: Array<{ id: number; reason: string }> } | undefined)?.deaths || [];
   const message = deaths.length
     ? `昨晚${deaths.map((death) => `${getSeatNumber(death.id, context.runtime.agents)}号玩家`).join('、')}死亡`
     : '昨晚是平安夜';
   publishGameEvent(context.runtime.eventBus, context.runtime.gameEventBuilder, (builder) => {
-    builder.setStep(context.step.id).setPhase('day').setDay(1);
+    builder.setStep(context.step.id).setPhase('day').setDay(context.step.config.day || 1);
     return builder.buildNightResult(deaths, message);
   }, serializeWerewolfState(context.match, context.state as unknown as Record<string, unknown>));
 }
@@ -177,6 +177,17 @@ function createSheriffResolveHandler() {
         currentStep: step.id,
         currentActionWindow: null,
       }, step.id);
+      if (round.sheriffId) {
+        const message = `${getSeatNumber(Number(round.sheriffId), runtime.agents)}号玩家当选警长。`;
+        publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+          builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
+          return builder.buildSheriffEvent('sheriff-result', {
+            election: (round.sheriffElection || {}) as Record<string, unknown>,
+            sheriffId: Number(round.sheriffId),
+            message,
+          });
+        }, serializeWerewolfState(match, nextState as unknown as Record<string, unknown>));
+      }
       return {
         status: 'COMPLETED',
         state: nextState,

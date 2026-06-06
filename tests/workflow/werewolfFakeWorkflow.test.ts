@@ -270,9 +270,16 @@ test('wolf kill priority stays locked when dead last god hunter shoots the last 
     const opened = handler.execute({ match, step, state } as never);
     assert.equal(opened.state?.rounds[0].winnerLock?.winner, 'wolves');
     assert.equal(opened.events?.[0].payload.game.rounds[0].winnerLock, undefined);
-    tasks.push(...(opened.tasks || []));
-    tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 2, result: { payload: { target: 1 } } };
-    const afterHunter = handler.execute({ match, step, state: opened.state } as never);
+    const hunterWindow = completeLastWordsWindow(handler, match, step, opened, tasks);
+    tasks.push(...((hunterWindow.tasks as Array<Record<string, unknown>> | undefined) || []));
+    const hunterTaskIndex = tasks.findIndex((task) => task.action === 'hunter_shot:2');
+    tasks[hunterTaskIndex] = {
+      ...tasks[hunterTaskIndex],
+      status: 'succeeded',
+      playerId: 2,
+      result: { payload: { target: 1 } },
+    };
+    const afterHunter = handler.execute({ match, step, state: hunterWindow.state } as never);
     const completed = completeLastWordsWindow(handler, match, step, afterHunter, tasks);
 
     assert.equal(completed.status, 'COMPLETED');
@@ -312,9 +319,16 @@ test('hunter shooting the last wolf gives good victory when wolf kill did not co
     const handler = createNightResolveHandler();
 
     const opened = handler.execute({ match, step, state } as never);
-    tasks.push(...(opened.tasks || []));
-    tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 2, result: { payload: { target: 1 } } };
-    const afterHunter = handler.execute({ match, step, state: opened.state } as never);
+    const hunterWindow = completeLastWordsWindow(handler, match, step, opened, tasks);
+    tasks.push(...((hunterWindow.tasks as Array<Record<string, unknown>> | undefined) || []));
+    const hunterTaskIndex = tasks.findIndex((task) => task.action === 'hunter_shot:2');
+    tasks[hunterTaskIndex] = {
+      ...tasks[hunterTaskIndex],
+      status: 'succeeded',
+      playerId: 2,
+      result: { payload: { target: 1 } },
+    };
+    const afterHunter = handler.execute({ match, step, state: hunterWindow.state } as never);
     const completed = completeLastWordsWindow(handler, match, step, afterHunter, tasks);
 
     assert.equal(completed.status, 'COMPLETED');
@@ -353,15 +367,22 @@ test('chained hunters use actor-scoped action windows', () => {
     const step = { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } };
     const handler = createNightResolveHandler();
 
-    const first = handler.execute({ match, step, state } as never);
-    tasks.push(...(first.tasks || []));
-    assert.equal(tasks[0].action, 'hunter_shot:2');
+    const firstWords = handler.execute({ match, step, state } as never);
+    const first = completeLastWordsWindow(handler, match, step, firstWords, tasks);
+    tasks.push(...((first.tasks as Array<Record<string, unknown>> | undefined) || []));
+    const firstHunterTaskIndex = tasks.findIndex((task) => task.action === 'hunter_shot:2');
+    assert.equal(tasks[firstHunterTaskIndex].action, 'hunter_shot:2');
     assert.equal(first.state?.currentActionWindow?.actionType, 'hunter_shot');
     assert.equal(first.state?.currentActionWindow?.epochActionType, 'hunter_shot:2');
-    assert.equal(epochs[0]?.actionType, 'hunter_shot:2');
-    tasks[0] = { ...tasks[0], status: 'succeeded', result: { payload: { target: 3 } } };
+    assert.equal(epochs.some((epoch) => epoch.actionType === 'hunter_shot:2'), true);
+    tasks[firstHunterTaskIndex] = {
+      ...tasks[firstHunterTaskIndex],
+      status: 'succeeded',
+      result: { payload: { target: 3 } },
+    };
 
-    const second = handler.execute({ match, step, state: first.state } as never);
+    const secondWords = handler.execute({ match, step, state: first.state } as never);
+    const second = completeLastWordsWindow(handler, match, step, secondWords, tasks);
     tasks.push(...((second.tasks as Array<Record<string, unknown>> | undefined) || []));
     const secondHunterTask = tasks.find((task) => task.action === 'hunter_shot:3');
     assert.equal(second.status, 'WAITING');
@@ -1140,12 +1161,13 @@ function completeLastWordsWindow(
   tasks: Array<Record<string, unknown>>,
 ): Record<string, unknown> {
   let result = initial;
+  const collectedEvents: unknown[] = [...((initial.events as unknown[] | undefined) || [])];
   while (result.status === 'WAITING' && (result.state as Record<string, unknown>)?.currentActionWindow) {
     const window = (result.state as { currentActionWindow?: { actionType?: string } }).currentActionWindow;
     if (window?.actionType !== 'last_words') return result;
     tasks.push(...((result.tasks as Array<Record<string, unknown>> | undefined) || []));
     for (let index = 0; index < tasks.length; index += 1) {
-      if (tasks[index].action !== 'last_words' || tasks[index].status === 'succeeded') continue;
+      if (!String(tasks[index].action || '').startsWith('last_words') || tasks[index].status === 'succeeded') continue;
       tasks[index] = {
         ...tasks[index],
         status: 'succeeded',
@@ -1153,6 +1175,7 @@ function completeLastWordsWindow(
       };
     }
     result = handler.execute({ match, step, state: result.state });
+    collectedEvents.push(...((result.events as unknown[] | undefined) || []));
   }
   if (result.status === 'WAITING') {
     throw new Error(`last words window did not complete: ${JSON.stringify({
@@ -1160,7 +1183,7 @@ function completeLastWordsWindow(
       tasks: tasks.map((task) => ({ action: task.action, playerId: task.playerId, status: task.status })),
     })}`);
   }
-  return result;
+  return { ...result, events: collectedEvents };
 }
 
 function player(id: number, role: string, faction: string, actions: string[], patch: Record<string, unknown> = {}): Record<string, unknown> {

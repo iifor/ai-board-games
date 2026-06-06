@@ -264,8 +264,8 @@ function buildSpeechOrderMessage(round: Round, agents?: Array<{ id: number }>): 
 }
 
 function buildSheriffBadgeMessage(transfer: { action: string; from: number; to?: number }, agents?: Array<{ id: number }>): string {
-  if (transfer.action === 'transfer') return `${getSeatNumber(transfer.from, agents)}号警长出局，将警徽移交给${getSeatNumber(transfer.to!, agents)}号。`;
-  return `${getSeatNumber(transfer.from, agents)}号警长出局，选择撕掉警徽。`;
+  if (transfer.action === 'transfer') return `警长把警徽移交给${getSeatNumber(transfer.to!, agents)}号玩家。`;
+  return '警长决定撕掉警徽。';
 }
 
 function buildPublicLog(rounds: Round[], agents: AgentForPublicLog[]): string {

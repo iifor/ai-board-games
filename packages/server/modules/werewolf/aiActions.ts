@@ -133,7 +133,7 @@ async function runHunterAiTask({ match, step, task }: { match: Match; step: Step
       return {
         eventType: 'werewolf_action_submitted',
         rawOutput: null,
-        payload: { actionType: 'hunter_shot', actorId: actor.id, target: null, reason: 'no-valid-target' }
+        payload: { actionType: 'hunter_shot', actorId: actor.id, target: null }
       };
     }
     const result = await executeSkillWithTrace(runtime.skillRegistry, 'shootOnDeath', {
@@ -145,7 +145,7 @@ async function runHunterAiTask({ match, step, task }: { match: Match; step: Step
         actor,
         'hunter_shot',
         '你已经出局并触发猎人技能。请选择是否开枪带走一名存活玩家。',
-        buildTargetJsonContract(aliveTargets, { reason: 'required', nullable: true }),
+        buildTargetJsonContract(aliveTargets, { reason: 'none', nullable: true }),
         aliveTargets,
         ''
       ),
@@ -154,18 +154,17 @@ async function runHunterAiTask({ match, step, task }: { match: Match; step: Step
       gameType: 'werewolf',
     });
     const target = (result as { target?: number | null } | null)?.target ?? null;
-    const reason = (result as { reason?: string | null } | null)?.reason ?? null;
     return {
       eventType: 'werewolf_action_submitted',
       rawOutput: result,
-      payload: { actionType: 'hunter_shot', actorId: actor.id, target, reason }
+      payload: { actionType: 'hunter_shot', actorId: actor.id, target }
     };
   } catch {
     // AI 调用失败 → 猎人不开枪
     return {
       eventType: 'werewolf_action_submitted',
       rawOutput: null,
-      payload: { actionType: 'hunter_shot', actorId: actor.id, target: null, reason: 'ai-failed' }
+      payload: { actionType: 'hunter_shot', actorId: actor.id, target: null }
     };
   }
 }
@@ -218,8 +217,9 @@ function sheriffBadgeResult(actorId: number, payload: Record<string, unknown>): 
 }
 
 async function runDeathActionAiTask(input: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
-  if (input.task.action === 'last_words') return runLastWordsAiTask(input);
-  return input.task.action === 'sheriff_badge_disposition'
+  const actionType = String(input.task.action || '');
+  if (actionType.startsWith('last_words')) return runLastWordsAiTask(input);
+  return actionType.startsWith('sheriff_badge_disposition')
     ? runSheriffBadgeAiTask(input)
     : runHunterAiTask(input);
 }

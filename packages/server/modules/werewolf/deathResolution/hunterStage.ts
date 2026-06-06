@@ -20,8 +20,8 @@ import { enqueueNightLastWords } from '../lastWordsWorkflow';
 import { appendUnique } from './types';
 import type { DeathResolutionContext, StageResult } from './types';
 
-function advanceHunterStage(context: DeathResolutionContext): StageResult {
-  const hunter = findPendingDeathHunter(context);
+function advanceHunterStage(context: DeathResolutionContext, playerId: number): StageResult {
+  const hunter = findPendingDeathHunter(context, playerId);
   if (!hunter) return { kind: 'idle' };
 
   const actionType = 'hunter_shot';
@@ -169,16 +169,18 @@ function advanceHunterStage(context: DeathResolutionContext): StageResult {
   };
 }
 
-function findPendingDeathHunter(context: DeathResolutionContext): ReducerAgent | null {
+function findPendingDeathHunter(context: DeathResolutionContext, playerId: number): ReducerAgent | null {
   const day = Number(context.round.day);
   const deaths = context.runtime.agents
     .filter((agent) => !agent.alive && Number(agent.deathDay) === day)
     .map((agent) => ({ id: Number(agent.id), reason: String(agent.deathReason || 'death') }));
-  return findPendingHunter(
+  const hunter = findPendingHunter(
     context.runtime.agents as unknown as ReducerAgent[],
     context.round as unknown as ReducerRound,
     deaths,
+    playerId,
   );
+  return hunter;
 }
 
 export { advanceHunterStage };

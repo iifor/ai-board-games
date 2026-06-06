@@ -19,12 +19,13 @@ import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import { appendUnique } from './types';
 import type { DeathResolutionContext, StageResult } from './types';
 
-function advanceSheriffBadgeStage(context: DeathResolutionContext): StageResult {
+function advanceSheriffBadgeStage(context: DeathResolutionContext, playerId: number): StageResult {
   const sheriff = findPendingSheriffBadgeDisposition(context.runtime as never, context.round as never);
-  if (!sheriff) return { kind: 'idle' };
+  if (!sheriff || Number(sheriff.id) !== Number(playerId)) return { kind: 'idle' };
 
   const actorId = Number(sheriff.id);
   const actionType = 'sheriff_badge_disposition';
+  const actorActionKey = `${actionType}:${actorId}`;
   const targetIds = context.runtime.agents
     .filter((agent) => agent.alive && Number(agent.id) !== actorId)
     .map((agent) => Number(agent.id));
@@ -37,12 +38,13 @@ function advanceSheriffBadgeStage(context: DeathResolutionContext): StageResult 
   }
 
   const actionStep = { ...context.step, config: { ...context.step.config, actionType } };
-  if (!hasOpenWork(context.match.id, context.step.id, actionType)) {
+  if (!hasOpenWork(context.match.id, context.step.id, actorActionKey)) {
     const window = buildActionWindow({
       match: context.match,
       step: actionStep,
       state: context.state as unknown as Record<string, unknown>,
       actionType,
+      epochActionType: actorActionKey,
       actors: [sheriff],
       targetIds,
       optional: false,
@@ -53,6 +55,7 @@ function advanceSheriffBadgeStage(context: DeathResolutionContext): StageResult 
       window,
       actors: [sheriff],
       promptContext: { day: context.round.day, actionType, round: context.round },
+      taskActionType: actorActionKey,
     });
     return {
       kind: 'waiting',
@@ -78,14 +81,19 @@ function advanceSheriffBadgeStage(context: DeathResolutionContext): StageResult 
     };
   }
 
-  if (!allActionWorkSucceeded(context.match.id, context.step.id, actionType, 1)) {
-    const window = context.state.currentActionWindow || { id: `${context.match.id}:${context.step.id}:${actionType}` };
+  if (!allActionWorkSucceeded(context.match.id, context.step.id, actorActionKey, 1)) {
+    const window = context.state.currentActionWindow || {
+      id: `${context.match.id}:${context.step.id}:${actorActionKey}`,
+      actionType,
+      epochActionType: actorActionKey,
+    };
     const work = createActionBlockers({
       match: context.match,
       step: actionStep,
       window: window as Parameters<typeof createActionBlockers>[0]['window'],
       actors: [sheriff],
       promptContext: { day: context.round.day, actionType, round: context.round },
+      taskActionType: actorActionKey,
     });
     return {
       kind: 'waiting',
@@ -98,12 +106,12 @@ function advanceSheriffBadgeStage(context: DeathResolutionContext): StageResult 
       },
     };
   }
-  const result = collectActionResults(context.match.id, context.step.id, actionType)
+  const result = collectActionResults(context.match.id, context.step.id, actorActionKey)
     .find((item) => Number(item.actorId) === actorId);
   resolveActionWindow(
     context.match.id,
     context.step.id,
-    actionType,
+    actorActionKey,
     context.state.currentActionWindow as unknown as ActionWindow,
   );
   return applyDisposition(context, sheriff, result?.payload || {});
@@ -134,8 +142,18 @@ function applyDisposition(
       .setPhase((context.step.config.phase as 'night' | 'day') || 'day')
       .setDay(context.step.config.day || 1);
     return transfer.action === 'transfer'
-      ? builder.buildSheriffBadgeTransfer({ ...transfer }, message)
-      : builder.buildSheriffBadgeTear({ ...transfer }, message);
+      ? builder.buildSheriffBadgeTransfer(
+        { ...transfer },
+        message,
+        context.round.sheriffId || null,
+        { ...(context.round.sheriffBadge || {}) },
+      )
+      : builder.buildSheriffBadgeTear(
+        { ...transfer },
+        message,
+        context.round.sheriffId || null,
+        { ...(context.round.sheriffBadge || {}) },
+      );
   }, serializeWerewolfState(context.match, context.state as unknown as Record<string, unknown>));
   return {
     kind: 'advanced',
@@ -145,7 +163,12 @@ function applyDisposition(
       context.state as unknown as Record<string, unknown>,
       transfer.action === 'transfer' ? 'werewolf_sheriff_badge_transfer' : 'werewolf_sheriff_badge_tear',
       message,
-      { actionType: 'sheriff_badge_disposition', sheriffTransfer: transfer },
+      {
+        actionType: 'sheriff_badge_disposition',
+        sheriffTransfer: transfer,
+        sheriffId: context.round.sheriffId || null,
+        sheriffBadge: context.round.sheriffBadge,
+      },
       {
         channel: CHANNEL_TYPES.PUBLIC,
         idempotencyKey: `${context.match.id}:${context.step.id}:sheriff_badge:${actorId}`,

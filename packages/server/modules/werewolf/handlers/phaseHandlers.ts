@@ -1,11 +1,17 @@
 import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
-import { createWerewolfEvent, publishGameEvent, completed, isDone, markStepComplete } from './common';
+import {
+  completed,
+  createWerewolfEvent,
+  isDone,
+  markStepComplete,
+  publishGameEvent,
+} from './common';
 import type { StepState } from './common';
 import { buildWerewolfRuleIntro, phaseStartedMessage } from '../messages';
-import { getSeatNumber } from '../utils';
 
 interface Match {
   id: string;
+  config?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -35,7 +41,6 @@ function createNightStartHandler() {
       const nextState = syncRuntimeState(runtime);
       const message = phaseStartedMessage('night', step.config.day);
 
-      // EventBus: 发布 phase-start 到客户端
       publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
         builder.setStep(step.id).setPhase('night').setDay(step.config.day || 1);
         return builder.buildPhaseStart('night', message);
@@ -44,9 +49,17 @@ function createNightStartHandler() {
       return {
         status: 'COMPLETED',
         state: markStepComplete({ ...nextState, currentStep: step.id }, step.id) as StepState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_phase_changed', message)]
+        events: [
+          createWerewolfEvent(
+            match,
+            step,
+            nextState as unknown as Record<string, unknown>,
+            'werewolf_phase_changed',
+            message,
+          ),
+        ],
       };
-    }
+    },
   };
 }
 
@@ -60,62 +73,90 @@ function createDayStartHandler() {
       const nextState = syncRuntimeState(runtime);
       const message = phaseStartedMessage('day', step.config.day);
 
-      // 规则 4：天亮绑票判定
-
-      // EventBus: 发布 day-start 到客户端
       publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
         builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
         return builder.build('day-start', { day: step.config.day, message });
       });
 
-      // Day 2+：无警长竞选，天亮即报死亡结果
-      if (step.config.day !== 1) {
-        const nightDeaths = (round as { night?: { deaths?: Array<{ id: number; reason: string }> } }).night?.deaths || [];
-        const deathMessage = nightDeaths.length
-          ? `昨晚${nightDeaths.map((d) => `${getSeatNumber(d.id, runtime.agents)}号玩家`).join('、')}死亡`
-          : '昨晚是平安夜';
-        publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
-          builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
-          return builder.buildNightResult(nightDeaths, deathMessage);
-        });
-      }
-
       return {
         status: 'COMPLETED',
         state: markStepComplete({ ...nextState, currentStep: step.id }, step.id) as StepState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_phase_changed', message)]
+        events: [
+          createWerewolfEvent(
+            match,
+            step,
+            nextState as unknown as Record<string, unknown>,
+            'werewolf_phase_changed',
+            message,
+          ),
+        ],
       };
-    }
+    },
   };
 }
 
-function createInstantHandler(eventType: string, message: string, options: { audienceCue?: boolean } = {}) {
+function createInstantHandler(
+  eventType: string,
+  message: string,
+  options: { audienceCue?: boolean } = {},
+) {
   return {
     execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
       if (isDone(state, step.id)) return completed(state, step.id);
       const nextState = markStepComplete({ ...state, currentStep: step.id }, step.id);
       if (options.audienceCue) {
         const runtime = createRuntime(match, nextState);
-        // 优先用 state 中的 modeConfig（首次 tick 可能为空），回退到 B 端配置
-        const modeCfg = runtime.modeConfig
-          || (() => { try { const { getWerewolfModeConfig } = require('../../werewolf-config/service'); return getWerewolfModeConfig((match.config as Record<string, unknown> | undefined)?.werewolfMode || 'standard'); } catch { return null; } })();
-        if (modeCfg) {
-          const text = buildWerewolfRuleIntro(modeCfg as Record<string, unknown>);
+        const modeConfig = runtime.modeConfig || loadModeConfig(match);
+        if (modeConfig) {
+          const text = buildWerewolfRuleIntro(modeConfig);
           publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
             builder.setStep(step.id).setPhase('night').setDay(1);
-            return builder.build('phase-changed', { text }, 'public', undefined, {
-              audienceCue: { kind: 'rule-intro', display: 'modal', speech: 'browser', textField: 'text', once: true }
-            });
+            return builder.build(
+              'phase-changed',
+              { text },
+              'public',
+              undefined,
+              {
+                audienceCue: {
+                  kind: 'rule-intro',
+                  display: 'modal',
+                  speech: 'browser',
+                  textField: 'text',
+                  once: true,
+                },
+              },
+            );
           }, syncRuntimeState(runtime) as unknown as Record<string, unknown>);
         }
       }
-      return { status: 'COMPLETED', state: nextState, events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, eventType, message)] };
-    }
+      return {
+        status: 'COMPLETED',
+        state: nextState,
+        events: [
+          createWerewolfEvent(
+            match,
+            step,
+            nextState as unknown as Record<string, unknown>,
+            eventType,
+            message,
+          ),
+        ],
+      };
+    },
   };
+}
+
+function loadModeConfig(match: Match): Record<string, unknown> | null {
+  try {
+    const { getWerewolfModeConfig } = require('../../werewolf-config/service');
+    return getWerewolfModeConfig(match.config?.werewolfMode || 'standard');
+  } catch {
+    return null;
+  }
 }
 
 export {
   createNightStartHandler,
   createDayStartHandler,
-  createInstantHandler
+  createInstantHandler,
 };

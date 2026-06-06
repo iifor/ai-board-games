@@ -1,7 +1,8 @@
 import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
-import { checkWin, getAliveRosterStats } from '../winCheck';
+import { checkDayWin, getAliveRosterStats } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
-import { createRuntime, syncRuntimeState } from '../runtime';
+import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
+import { resolveActiveSheriffId } from '../sheriffWorkflow';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
 
@@ -32,7 +33,14 @@ function createCheckWinHandler() {
       if (isDone(state, step.id)) return completed(state, step.id);
       if (state.winner) return { status: 'COMPLETED', state: markStepComplete({ ...state, currentStep: step.id }, step.id) };
       const runtime = createRuntime(match, state);
-      const result = checkWin(runtime.agents, step.config.day || 1, runtime.modeConfig);
+      const day = step.config.day || 1;
+      const round = ensureRound(runtime.state, day);
+      const result = checkDayWin(
+        runtime.agents,
+        day,
+        runtime.modeConfig,
+        resolveActiveSheriffId(runtime as never, round as never),
+      );
       const nextState = markStepComplete({
         ...syncRuntimeState(runtime),
         currentStep: step.id,

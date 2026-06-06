@@ -349,7 +349,7 @@ pnpm run test:workflow
 - `guard_protect`：`scope: guard`，记录守护目标。
 - `witch_save`：`scope: witch`，仅在解药可用时记录是否使用解药、救人目标和狼刀目标。
 - `witch_poison`：`scope: witch`，记录是否使用毒药和毒杀目标。
-- `hunter_shot`：`public`，记录开枪目标和触发原因。
+- `hunter_shot`：`public`，只记录是否开枪及目标；猎人 AI 输出不再要求原因。
 
 预言家、守卫、女巫的私密阶段结果必须使用行动对应的 scope channel，不允许发布为 `public`。
 
@@ -382,13 +382,13 @@ pnpm run test:workflow
 狼人杀 EventBus 交付到 C 端前会在 `eventDeliverySubscriber.ts` 扁平化关键展示字段：
 
 - `vote-result` 必须保留 `votes/tally/exile`，并尽量携带结算后的 `game` 和最新 `round`，用于 C 端展示玩家投票箭头/角标和放逐结果。
-- 警长事件必须保留 `sheriffElection/sheriffId/sheriffTransfer`，用于 C 端持续展示警徽、警长候选人和警徽流转。
+- 警长事件必须保留 `sheriffElection/sheriffId/sheriffBadge/sheriffTransfer`，用于 C 端持续展示警徽、警长候选人和警徽流转。
 - `wolf-vote` 完成事件携带动作后快照及 `wolfTarget/wolfChoices/wolfVoteTally`，保持 `scope: wolves`。
 - `seer-check` 完成事件携带动作后快照及 `seerCheck: { target, result }`，保持 `scope: seer`。
 - `witch-action` 毒药完成事件携带动作后快照及 `witchAction: { use, target, reason }`，保持 `scope: witch`；`use` 仅在严格等于 `true` 时视为用毒。
 - 这些字段属于展示状态，不改变 HTTP API 或数据库；C 端会与本地已知 `game.rounds` 做合并，而不是直接覆盖完整状态。
 
-死亡结算按“死亡技能 -> 警徽处置 -> 胜负检查”继续执行。死亡警长通过 `sheriff_badge_disposition` 行动窗决定移交或撕毁；AI 失败、非法目标或无存活目标时降级为撕毁。处置会更新 `sheriffId/sheriffBadge/sheriffTransfers`，并发布公开的 `sheriff-badge-transfer` 或 `sheriff-badge-tear`，同一死亡警长只处理一次。
+死亡警长通过 `sheriff_badge_disposition` 行动窗决定移交或撕毁；AI 失败、非法目标或无存活目标时降级为撕毁。警徽窗口只在进入白天并公布夜死后创建。处置会更新 `sheriffId/sheriffBadge/sheriffTransfers`，并发布公开的 `sheriff-badge-transfer` 或 `sheriff-badge-tear`，同一死亡警长只处理一次。
 
 白天正式发言前执行 `sheriff_speech_direction`：
 
@@ -397,22 +397,22 @@ pnpm run test:workflow
 - 无警长且有夜间死亡时，以最后播报的死者为基准，从顺时针后置位开始；平安夜随机起点并顺时针发言。
 - 当前警长从历史回合和 `sheriffTransfers` 解析，支持跨天及警徽移交。
 
-所有实际出局入口按“死亡技能 -> 警徽处置 -> 遗言 -> 胜负检查”执行。夜间有效狼人击杀会先基于“只应用该狼人击杀后的中间阵容”检查狼人胜利；若已满足当前模式的狼人胜利条件，则在当前 round 写入内部 `winnerLock`。同夜毒药、猎人开枪、警徽流和遗言继续执行，但最终胜负不得覆盖该狼人锁定结果。被守护或解药抵消的狼刀不会建立锁定。`winnerLock` 仅用于服务端工作流，不进入 C 端快照。
+所有实际出局入口进入按玩家持久化的死亡队列。首夜每名死者严格执行“遗言 -> 本人死亡技能 -> 本人警徽处置 -> 下一名死者”；技能产生的新死者追加队尾。第 2 夜以后跳过夜死遗言，放逐链仍只有被放逐者拥有遗言。全部玩家处理完成后才判胜。夜间有效狼人击杀会先基于“只应用该狼人击杀后的中间阵容”检查狼人胜利；若已满足当前模式的狼人胜利条件，则在当前 round 写入内部 `winnerLock`。同夜毒药、猎人开枪、警徽流和遗言继续执行，但最终胜负不得覆盖该狼人锁定结果。被守护或解药抵消的狼刀不会建立锁定。`winnerLock` 仅用于服务端工作流，不进入 C 端快照。
 
 死亡链编排位于 `packages/server/modules/werewolf/deathResolution/`：
 
-- `service.ts` 统一循环推进猎人、警徽、遗言和胜负阶段；各阶段只返回 `waiting/advanced/idle`，不得互相递归调用。
+- `deathQueue.ts` 维护去重的逐人死亡队列和当前玩家水位；`service.ts` 按“遗言、技能、警徽”循环推进当前玩家，队列耗尽后统一判胜。
 - `hunterStage.ts`、`sheriffBadgeStage.ts`、`lastWordsStage.ts` 分别管理对应 action window 和结果落盘。
-- `types.ts` 定义内部上下文与 `round.deathResolution` 检查点。检查点记录来源、step、初始 effect、已完成 actor 和最终状态，序列化及视角投影时移除。
+- `types.ts` 定义内部上下文与 `round.deathResolution` 检查点。检查点按玩家记录 `wordsCompleted/skillCompleted/badgeCompleted` 和 `currentDeathIndex`，序列化及视角投影时移除。
 - 旧状态没有检查点时，根据 `nightRevealed/exile/idiotReveal/currentActionWindow` 恢复，不重复应用初始死亡效果。
-- 多猎人使用 actor 级内部工作键隔离 AI task/pending action，但公开 action window 和事件仍保持 `hunter_shot`。
+- 遗言、猎人和警徽窗口均使用 actor 级内部工作键隔离 AI task/pending action，但公开 action window 和事件类型保持不变。
 - workflow 事件按猎人 actor、死亡警长、遗言来源与玩家设置幂等键；初始 effect 使用稳定 ID。放逐 `vote-result` 由检查点保证恢复执行时不重复发布，比赛结束事件按 step 去重。
 
 警长投票资格由服务端在 actor 选择和结果落盘两层校验。首投排除当前候选人与 `withdrawnIds`，复投排除复投候选人与 `withdrawnIds`；旧 pending action 或伪造提交不会进入 `voters/votes/tally`。
 
 遗言使用内部 `last_words` 有序 action window。白天只有实际被放逐者发表 `exile-words`，白痴翻牌、平票和放逐后猎人带走者不创建放逐遗言。第 1 夜所有实际死亡玩家按死亡发生顺序发表 `last-words`，包括毒杀与猎人连锁带走；第 2 夜起不创建夜死遗言。内部 `pendingLastWords` 只用于断点恢复，序列化和视角投影时移除。
 
-胜负判断只使用当前实际存活阵容：狼人全灭时好人胜利；`side` 为平民或神职任一边归零，`gods` 为神职归零，`villagers` 为平民归零，`all` 为所有好人归零。取消天亮票权比较和放逐后“下一刀必胜”推演；旧 `single` 配置读取时映射为 `side`。
+胜负判断首先使用当前实际存活阵容：狼人全灭时好人胜利；`side` 为平民或神职任一边归零，`gods` 为神职归零，`villagers` 为平民归零，`all` 为所有好人归零。白天死亡队列和警徽流完成后追加有效票权判断：存活且可投票者计 1 票，当前警长使用 `sheriff.voteWeight`，失票白痴和死者计 0；仅当狼人票权严格大于好人票权时狼人胜利，相等继续。夜间不做票权判胜。旧 `single` 配置读取时映射为 `side`。
 
 存活阵容由统一评估器分类并统计狼人、神职、平民和好人总数。标准 `roleType` 优先；历史快照缺失或异常时，按角色 ID、阵营和角色技能降级分类，猎人、女巫、预言家、守卫和白痴均计入神职，任何存活好人都必须归入神职或平民。狼刀优先锁定会保存触发瞬间的阵容统计和胜利模式，死亡链最终阶段只接受能够由该统计重新验证的狼人胜利锁；缺少阵容证据的旧锁不再直接结束尚未完成的对局。
 
@@ -421,6 +421,7 @@ pnpm run test:workflow
 
 - 女巫“一晚一药”是服务端固定规则，不依赖模式配置。任一药在当夜有效使用后，另一药阶段不创建 AI task、pending action 或展示事件；reducer 与 effect 层会再次拒绝恢复任务或伪造提交。
 - 第 1 天固定顺序为：夜间行动、`day_start`、警长竞选、`sheriff_resolve`、`night_resolve_1`、白天发言。首夜死亡在 `night_resolve_1` 前不应用，因此死者仍完整参与警长竞选。
-- `night_resolve_1` 按“公布夜死、猎人技能、警徽处置、首夜遗言、胜负判定”推进。内部 `nightResultPublished` 检查点确保恢复时不重复公布，检查点不会进入 C 端快照或精确回放载荷。
+- 每天固定在 `day_start` 后执行 `night_resolve`，先公布夜死，再按玩家推进死亡队列，因此警徽决定不会发生在天亮前。内部 `nightResultPublished` 检查点确保恢复时不重复公布。
+- `night_resolve_1` 按“公布夜死、死者 A 遗言/技能/警徽、死者 B 遗言/技能/警徽、胜负判定”推进；技能新死者追加队尾并获得同样的首夜流程。
 - 猎人死亡技能的公开 action type 仍为 `hunter_shot`，内部 task 与 action-window epoch 使用 `hunter_shot:<actorId>`，连续猎人不会共享 epoch；旧 `hunter_shot` 窗口仍可恢复。
 - AI 结果成功落盘后若后续 `wakeTick` 失败，任务保持 `succeeded`，match 转为 `paused_debug` 并记录 `workflow_advance_failed`。狼人杀 runner 只接受 `completed`，`failed/paused_debug/waiting` 均抛错，由 socket 发送 `error`，不得发送 `workflow-completed` 或保存假完成对局。

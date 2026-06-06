@@ -7,7 +7,7 @@ import {
   resolveActionWindow,
 } from '../actionWindows';
 import type { ActionWindow } from '../actionWindows';
-import { applyLastWordsResults, getPendingLastWords } from '../lastWordsWorkflow';
+import { applyLastWordsResult, getPendingLastWords } from '../lastWordsWorkflow';
 import { syncRuntimeState, serializeWerewolfState } from '../runtime';
 import { createWerewolfEvent, publishGameEvent } from '../handlers/common';
 import { actionRequestedMessage } from '../messages';
@@ -15,25 +15,40 @@ import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import { appendUnique } from './types';
 import type { DeathResolutionContext, StageResult } from './types';
 
-function advanceLastWordsStage(context: DeathResolutionContext): StageResult {
-  const pending = getPendingLastWords(context.round);
-  if (!pending.length) return { kind: 'idle' };
-  const actors = pending
-    .map((item) => context.runtime.agents.find((agent) => Number(agent.id) === Number(item.playerId)))
-    .filter((actor): actor is NonNullable<typeof actor> => Boolean(actor));
-  if (!actors.length) {
-    applyLastWordsResults(context.round, []);
+function advanceLastWordsStage(context: DeathResolutionContext, playerId: number): StageResult {
+  const pending = getPendingLastWords(context.round).find(
+    (item) => Number(item.playerId) === Number(playerId),
+  );
+  if (!pending) return { kind: 'idle' };
+  const actor = context.runtime.agents.find(
+    (candidate) => Number(candidate.id) === Number(playerId),
+  );
+  if (!actor) {
+    applyLastWordsResult(context.round, playerId, undefined);
     return { kind: 'advanced' };
   }
+  const actors = [actor];
 
   const actionType = 'last_words';
+  const actorActionKey = `${actionType}:${playerId}`;
+  const currentWindow = context.state.currentActionWindow as ActionWindow | null | undefined;
+  const hasActorWork = hasOpenWork(context.match.id, context.step.id, actorActionKey);
+  const hasLegacyWork = hasOpenWork(context.match.id, context.step.id, actionType);
+  const resumesLegacyWindow = !hasActorWork
+    && hasLegacyWork
+    && currentWindow?.actionType === actionType
+    && currentWindow.actorIds?.some((id) => Number(id) === Number(playerId));
+  const taskActionKey = resumesLegacyWindow ? actionType : actorActionKey;
+  const legacyEpochId = `${context.match.id}:${context.step.id}:${actionType}`;
+  const epochActionKey = currentWindow?.id === legacyEpochId ? actionType : actorActionKey;
   const actionStep = { ...context.step, config: { ...context.step.config, actionType, ordered: true } };
-  if (!hasOpenWork(context.match.id, context.step.id, actionType)) {
+  if (!hasOpenWork(context.match.id, context.step.id, taskActionKey)) {
     const window = buildActionWindow({
       match: context.match,
       step: actionStep,
       state: context.state as unknown as Record<string, unknown>,
       actionType,
+      epochActionType: actorActionKey,
       actors,
       targetIds: [],
       optional: false,
@@ -44,6 +59,7 @@ function advanceLastWordsStage(context: DeathResolutionContext): StageResult {
       window,
       actors,
       promptContext: { day: context.round.day, actionType, round: context.round },
+      taskActionType: taskActionKey,
     });
     return {
       kind: 'waiting',
@@ -62,21 +78,26 @@ function advanceLastWordsStage(context: DeathResolutionContext): StageResult {
           { actionType, actionWindow: window },
           {
             channel: CHANNEL_TYPES.PUBLIC,
-            idempotencyKey: `${context.match.id}:${context.step.id}:${actionType}:requested:${pending.map((item) => item.playerId).join('-')}`,
+            idempotencyKey: `${context.match.id}:${context.step.id}:${actionType}:requested:${playerId}`,
           },
         )],
       },
     };
   }
 
-  if (!allActionWorkSucceeded(context.match.id, context.step.id, actionType, actors.length)) {
-    const window = context.state.currentActionWindow || { id: `${context.match.id}:${context.step.id}:${actionType}` };
+  if (!allActionWorkSucceeded(context.match.id, context.step.id, taskActionKey, actors.length)) {
+    const window = context.state.currentActionWindow || {
+      id: `${context.match.id}:${context.step.id}:${epochActionKey}`,
+      actionType,
+      epochActionType: epochActionKey,
+    };
     const work = createActionBlockers({
       match: context.match,
       step: actionStep,
       window: window as Parameters<typeof createActionBlockers>[0]['window'],
       actors,
       promptContext: { day: context.round.day, actionType, round: context.round },
+      taskActionType: taskActionKey,
     });
     return {
       kind: 'waiting',
@@ -90,31 +111,34 @@ function advanceLastWordsStage(context: DeathResolutionContext): StageResult {
     };
   }
 
-  const results = collectActionResults(context.match.id, context.step.id, actionType);
+  const result = collectActionResults(context.match.id, context.step.id, taskActionKey)
+    .find((item) => Number(item.actorId) === Number(playerId));
   resolveActionWindow(
     context.match.id,
     context.step.id,
-    actionType,
+    epochActionKey,
     context.state.currentActionWindow as unknown as ActionWindow,
   );
-  const testimonies = applyLastWordsResults(context.round, results);
-  testimonies.forEach((testimony) => appendUnique(context.checkpoint.completedLastWordsIds, testimony.playerId));
+  const testimony = applyLastWordsResult(context.round, playerId, result);
+  if (!testimony) return { kind: 'advanced' };
+  appendUnique(context.checkpoint.completedLastWordsIds, testimony.playerId);
   context.state = {
     ...syncRuntimeState(context.runtime),
     currentStep: context.step.id,
     currentActionWindow: null,
   };
-  const events = testimonies.map((testimony) => {
-    publishGameEvent(context.runtime.eventBus, context.runtime.gameEventBuilder, (builder) => {
-      builder
-        .setStep(context.step.id)
-        .setPhase((context.step.config.phase as 'night' | 'day') || 'day')
-        .setDay(context.step.config.day || 1);
-      return testimony.source === 'exile'
-        ? builder.buildExileWords(testimony)
-        : builder.buildLastWords(testimony);
-    }, serializeWerewolfState(context.match, context.state as unknown as Record<string, unknown>));
-    return createWerewolfEvent(
+  publishGameEvent(context.runtime.eventBus, context.runtime.gameEventBuilder, (builder) => {
+    builder
+      .setStep(context.step.id)
+      .setPhase((context.step.config.phase as 'night' | 'day') || 'day')
+      .setDay(context.step.config.day || 1);
+    return testimony.source === 'exile'
+      ? builder.buildExileWords(testimony)
+      : builder.buildLastWords(testimony);
+  }, serializeWerewolfState(context.match, context.state as unknown as Record<string, unknown>));
+  return {
+    kind: 'advanced',
+    events: [createWerewolfEvent(
       context.match,
       context.step,
       context.state as unknown as Record<string, unknown>,
@@ -125,9 +149,8 @@ function advanceLastWordsStage(context: DeathResolutionContext): StageResult {
         channel: CHANNEL_TYPES.PUBLIC,
         idempotencyKey: `${context.match.id}:${context.step.id}:${testimony.source}_words:${testimony.playerId}`,
       },
-    );
-  });
-  return { kind: 'advanced', events };
+    )],
+  };
 }
 
 export { advanceLastWordsStage };

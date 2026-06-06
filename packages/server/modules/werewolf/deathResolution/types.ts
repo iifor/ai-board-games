@@ -29,7 +29,17 @@ interface DeathResolutionCheckpoint {
   completedHunterIds: number[];
   completedSheriffIds: number[];
   completedLastWordsIds: number[];
+  deathQueue: DeathQueueItem[];
+  currentDeathIndex: number;
   finalized: boolean;
+}
+
+interface DeathQueueItem {
+  playerId: number;
+  initialDeath: boolean;
+  wordsCompleted: boolean;
+  skillCompleted: boolean;
+  badgeCompleted: boolean;
 }
 
 interface DeathResolutionRound extends Record<string, unknown> {
@@ -38,6 +48,8 @@ interface DeathResolutionRound extends Record<string, unknown> {
   nightRevealed?: boolean;
   exile?: { id: number; reason?: string } | null;
   idiotReveal?: { id: number; reason?: string } | null;
+  sheriffId?: number | null;
+  sheriffBadge?: Record<string, unknown>;
   deathResolution?: DeathResolutionCheckpoint;
 }
 
@@ -76,6 +88,8 @@ function ensureDeathResolutionCheckpoint(
       round.deathResolution.nightResultPublished = source === 'night'
         && round.deathResolution.initialEffectsApplied;
     }
+    round.deathResolution.deathQueue ||= [];
+    round.deathResolution.currentDeathIndex ||= 0;
     return round.deathResolution;
   }
   const legacyApplied = source === 'night'
@@ -96,6 +110,8 @@ function ensureDeathResolutionCheckpoint(
     completedHunterIds: [],
     completedSheriffIds: [],
     completedLastWordsIds: [],
+    deathQueue: [],
+    currentDeathIndex: 0,
     finalized: false,
   };
   return round.deathResolution;
@@ -116,6 +132,7 @@ export type {
   HandlerResult,
   StageResult,
   DeathResolutionCheckpoint,
+  DeathQueueItem,
   DeathResolutionContext,
   DeathResolutionRound,
 };

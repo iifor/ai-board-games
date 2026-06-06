@@ -86,8 +86,7 @@ export function buildHunterShootActionPrompt(validIds: number[] = []): string {
   return [
     '你是猎人，已出局。请选择是否开枪带走一名玩家。',
     `可选目标座位号：${validIds.join('、')}。`,
-    '开枪时可以填写 reason 简短说明原因。',
-    '只返回标准 JSON 对象，例如 {"targetSeat":2,"reason":"简短原因"}；不开枪返回 {"targetSeat":null,"reason":"不开枪原因"}。'
+    '只返回标准 JSON 对象：开枪返回 {"targetSeat":2}；不开枪返回 {"targetSeat":null}。'
   ].join('\n');
 }
 

@@ -207,7 +207,7 @@ test('事件映射 - sheriff_events', () => {
     from: 3,
     to: 1,
     reason: '死亡转移',
-  });
+  }, '警长把警徽移交给1号玩家。', 1, { status: 'held' });
   assert.equal(transfer.type, 'sheriff-badge-transfer');
 });
 

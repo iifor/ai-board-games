@@ -382,20 +382,30 @@ export class GameEventBuilder {
   }
 
   // 警徽事件
-  buildSheriffBadgeTransfer(transfer: Record<string, unknown>, message: string): GameEvent<Record<string, unknown>> {
+  buildSheriffBadgeTransfer(
+    transfer: Record<string, unknown>,
+    message: string,
+    sheriffId: number | null,
+    sheriffBadge: Record<string, unknown>,
+  ): GameEvent<Record<string, unknown>> {
     return this.build(
       'sheriff-badge-transfer',
-      { sheriffTransfer: transfer, message },
+      { sheriffTransfer: transfer, sheriffId, sheriffBadge, message },
       CHANNEL_TYPES.PUBLIC,
       undefined,
       { message }
     );
   }
 
-  buildSheriffBadgeTear(transfer: Record<string, unknown>, message: string): GameEvent<Record<string, unknown>> {
+  buildSheriffBadgeTear(
+    transfer: Record<string, unknown>,
+    message: string,
+    sheriffId: number | null,
+    sheriffBadge: Record<string, unknown>,
+  ): GameEvent<Record<string, unknown>> {
     return this.build(
       'sheriff-badge-tear',
-      { sheriffTransfer: transfer, message },
+      { sheriffTransfer: transfer, sheriffId, sheriffBadge, message },
       CHANNEL_TYPES.PUBLIC,
       undefined,
       { message }

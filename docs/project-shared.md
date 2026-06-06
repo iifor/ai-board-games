@@ -165,8 +165,10 @@ Workflow 内部 `StatePatch` 使用路径操作表达状态增量：
 展示事件的 `presentation.requiresAck` 用于区分需要等待语音播放的事件与纯 UI 状态事件。女巫“不毒”的 `witch-action` 设置 `requiresAck: false`、空 `speakableText` 和 `suppressSpeech: true`，事件仍进入 `PlaybackEvent` 持久化，但不注入连接态 `ackId`。
 
 `last_words` 是服务端内部死亡行动，允许已死亡玩家作为 actor；公开协议继续使用既有 `last-words`、`exile-words`。内部 `pendingLastWords` 和 `winnerLock` 不属于共享快照或回放载荷。狼人杀模式 `winCondition` 的正式值为 `side/gods/villagers/all`，旧 `single` 仅作为输入兼容并归一化为 `side`。
+
+`SheriffEventPayload` 可选携带 `sheriffId/sheriffBadge`。警长当选、警徽移交和撕毁仍复用既有公开事件类型，不改变 WebSocket 连接协议；C 端以这些字段更新当前警长。猎人内部 AI 输出统一为 `{ targetSeat: number | null }`，不再包含 `reason`。
 ## 狼人杀内部兼容约定
 
 - 本次修复不改变公开 REST、WebSocket 或 `GameEvent` 类型。
-- 猎人窗口仍对外使用 `hunter_shot`；`hunter_shot:<actorId>` 仅作为服务端 AI task 与 action-window epoch 的内部键。
+- 遗言、猎人和警徽窗口仍使用原公开 action type；`last_words:<actorId>`、`hunter_shot:<actorId>`、`sheriff_badge_disposition:<actorId>` 仅作为服务端 AI task 与 action-window epoch 的内部键。
 - `nightResultPublished` 仅属于服务端死亡链检查点，序列化、视角投影和精确回放载荷必须移除。

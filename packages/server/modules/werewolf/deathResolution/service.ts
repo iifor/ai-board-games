@@ -6,9 +6,14 @@ import { createWerewolfEvent, markStepComplete } from '../handlers/common';
 import { effectResolvedMessage } from '../messages';
 import { resolveWinAfterDeathsDetailed } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
+import { resolveActiveSheriffId } from '../sheriffWorkflow';
 import { advanceHunterStage } from './hunterStage';
 import { advanceSheriffBadgeStage } from './sheriffBadgeStage';
 import { advanceLastWordsStage } from './lastWordsStage';
+import {
+  getCurrentDeath,
+  shouldHaveLastWords,
+} from './deathQueue';
 import type {
   DeathResolutionContext,
   HandlerResult,
@@ -16,28 +21,36 @@ import type {
 
 function advanceDeathResolution(context: DeathResolutionContext): HandlerResult {
   for (let index = 0; index < 64; index += 1) {
-    const hunter = advanceHunterStage(context);
-    if (hunter.kind === 'waiting') return mergeWaiting(context, hunter.result);
-    if (hunter.kind === 'advanced') {
-      context.events.push(...(hunter.events || []));
+    const death = getCurrentDeath(context);
+    if (!death) return finalizeDeathResolution(context);
+
+    if (!death.wordsCompleted) {
+      if (!shouldHaveLastWords(context, death)) {
+        death.wordsCompleted = true;
+        continue;
+      }
+      const words = advanceLastWordsStage(context, death.playerId);
+      if (words.kind === 'waiting') return mergeWaiting(context, words.result);
+      if (words.kind === 'advanced') context.events.push(...(words.events || []));
+      death.wordsCompleted = true;
       continue;
     }
 
-    const sheriff = advanceSheriffBadgeStage(context);
-    if (sheriff.kind === 'waiting') return mergeWaiting(context, sheriff.result);
-    if (sheriff.kind === 'advanced') {
-      context.events.push(...(sheriff.events || []));
+    if (!death.skillCompleted) {
+      const hunter = advanceHunterStage(context, death.playerId);
+      if (hunter.kind === 'waiting') return mergeWaiting(context, hunter.result);
+      if (hunter.kind === 'advanced') context.events.push(...(hunter.events || []));
+      death.skillCompleted = true;
       continue;
     }
 
-    const lastWords = advanceLastWordsStage(context);
-    if (lastWords.kind === 'waiting') return mergeWaiting(context, lastWords.result);
-    if (lastWords.kind === 'advanced') {
-      context.events.push(...(lastWords.events || []));
+    if (!death.badgeCompleted) {
+      const sheriff = advanceSheriffBadgeStage(context, death.playerId);
+      if (sheriff.kind === 'waiting') return mergeWaiting(context, sheriff.result);
+      if (sheriff.kind === 'advanced') context.events.push(...(sheriff.events || []));
+      death.badgeCompleted = true;
       continue;
     }
-
-    return finalizeDeathResolution(context);
   }
   throw new Error(`Death resolution exceeded stage limit: ${context.match.id}:${context.step.id}`);
 }
@@ -70,6 +83,7 @@ function finalizeDeathResolution(context: DeathResolutionContext): HandlerResult
     context.round as never,
     day,
     context.runtime.modeConfig as Record<string, unknown> || {},
+    resolveActiveSheriffId(context.runtime as never, context.round as never),
   );
   const winResult = resolution.result;
   context.checkpoint.finalized = true;

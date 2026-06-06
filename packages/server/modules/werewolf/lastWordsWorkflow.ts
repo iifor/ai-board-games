@@ -55,6 +55,30 @@ function applyLastWordsResults(round: LastWordsRound, results: LastWordsResult[]
   return records;
 }
 
+function applyLastWordsResult(
+  round: LastWordsRound,
+  playerId: number,
+  result: LastWordsResult | undefined,
+): LastWordsRecord | null {
+  const item = getPendingLastWords(round).find(
+    (candidate) => Number(candidate.playerId) === Number(playerId),
+  );
+  if (!item) return null;
+  const payload = result?.payload || {};
+  const record: LastWordsRecord = {
+    playerId: Number(item.playerId),
+    text: String(payload.text || ''),
+    ...(payload.thinking ? { thinking: String(payload.thinking) } : {}),
+    source: item.source,
+    day: Number(round.day) || 1,
+  };
+  round.lastWords = [...(round.lastWords || []), record];
+  round.pendingLastWords = (round.pendingLastWords || []).filter(
+    (candidate) => Number(candidate.playerId) !== Number(playerId),
+  );
+  return record;
+}
+
 function enqueue(round: LastWordsRound, playerIds: number[], source: LastWordsQueueItem['source']): void {
   const completed = new Set((round.lastWords || []).map((item) => Number(item.playerId)));
   const queued = new Set((round.pendingLastWords || []).map((item) => Number(item.playerId)));
@@ -73,6 +97,7 @@ export {
   enqueueExileLastWords,
   getPendingLastWords,
   applyLastWordsResults,
+  applyLastWordsResult,
 };
 
 export type {

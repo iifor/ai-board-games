@@ -4,6 +4,8 @@ import { createRound } from '../../packages/server/modules/werewolf/agents';
 import { resolveNightEffects, resolveExileEffects, applyHunterShot } from '../../packages/server/modules/werewolf/effects';
 import {
   checkWin,
+  checkDayWin,
+  getAliveVotePower,
   getAliveRosterStats,
   resolveWinAfterDeaths,
   resolveWinAfterDeathsDetailed,
@@ -174,6 +176,37 @@ test('single hunter or witch death does not eliminate the god side', () => {
   assert.equal(checkWin(roster as never, 1, { winCondition: 'side' }).winner, null);
   roster[2].alive = false;
   assert.equal(checkWin(roster as never, 1, { winCondition: 'side' }).winner, 'wolves');
+});
+
+test('day vote power requires wolves to be strictly greater than good', () => {
+  const roster = [
+    agent(1, ['kill'], { faction: 'wolves', roleConfig: { roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+    agent(2, ['kill'], { faction: 'wolves', roleConfig: { roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+    agent(3, [], { roleConfig: { roleType: 'god', rule: { actions: [{ action: 'inspectFaction' }] } } }),
+    agent(4, [], { roleConfig: { roleType: 'villager', rule: { actions: [] } } }),
+  ];
+
+  assert.deepEqual(getAliveVotePower(roster as never, 3, 1.5), { wolves: 2, good: 2.5 });
+  assert.equal(checkDayWin(roster as never, 2, { winCondition: 'all', sheriff: { voteWeight: 1.5 } }, 3).winner, null);
+  assert.equal(checkDayWin(roster as never, 2, { winCondition: 'all', sheriff: { voteWeight: 1.5 } }, 1).winner, 'wolves');
+
+  roster[3].canVote = false;
+  assert.equal(checkDayWin(roster as never, 2, { winCondition: 'all', sheriff: { voteWeight: 1.5 } }, 3).winner, 'wolves');
+  roster[2].canVote = false;
+  assert.equal(checkDayWin(roster as never, 2, { winCondition: 'all', sheriff: { voteWeight: 1.5 } }, null).winner, 'wolves');
+});
+
+test('vote power victory is evaluated during day but not night', () => {
+  const roster = [
+    agent(1, ['kill'], { faction: 'wolves', roleConfig: { roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+    agent(2, ['kill'], { faction: 'wolves', roleConfig: { roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+    agent(3, [], { roleConfig: { roleType: 'god', rule: { actions: [{ action: 'inspectFaction' }] } } }),
+  ];
+  const round = createRound(2);
+  round.phase = 'night';
+  assert.equal(resolveWinAfterDeathsDetailed(roster as never, round as never, 2, { winCondition: 'all' }).result.winner, null);
+  round.phase = 'day';
+  assert.equal(resolveWinAfterDeathsDetailed(roster as never, round as never, 2, { winCondition: 'all' }).result.winner, 'wolves');
 });
 
 test('unverifiable legacy wolf winner lock cannot end the game early', () => {

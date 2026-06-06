@@ -188,7 +188,17 @@ function formatRoundFacts(round: PromptRound, agents: PromptAgent[]): string[] {
   if (round.nightRevealed !== false && deaths.length) {
     lines.push(`第${day}晚死亡：${deaths.map((death) => `${getSeatNumber(Number(death.id), agents)}号`).join('、')}。`);
   }
-  if (round.sheriffId) lines.push(`第${day}天警长：${getSeatNumber(Number(round.sheriffId), agents)}号。`);
+  const electedSheriffId = Number((round.sheriffElection as { sheriffId?: unknown } | null)?.sheriffId || 0);
+  if (electedSheriffId) {
+    lines.push(`${getSeatNumber(electedSheriffId, agents)}号玩家当选警长。`);
+  }
+  for (const transfer of round.sheriffTransfers || []) {
+    if (transfer.action === 'transfer' && transfer.to) {
+      lines.push(`警长把警徽移交给${getSeatNumber(Number(transfer.to), agents)}号玩家。`);
+    } else if (transfer.action === 'tear') {
+      lines.push('警长决定撕掉警徽。');
+    }
+  }
   if (round.exile) lines.push(`第${day}天放逐结果：${getSeatNumber(Number(round.exile.id), agents)}号被放逐出局。`);
   if (round.idiotReveal) lines.push(`第${day}天白痴翻牌：${getSeatNumber(Number(round.idiotReveal.id), agents)}号免除放逐并失去投票权。`);
   if (round.hunterShot?.from && round.hunterShot?.target) {

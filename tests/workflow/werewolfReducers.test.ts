@@ -304,6 +304,17 @@ test('first night resolves only after sheriff election and before day speech', (
   assert.ok(nightResolve < daySpeech);
 });
 
+test('later nights enter day before publishing and resolving deaths', () => {
+  const steps = createWerewolfSteps();
+  const dayStart = steps.findIndex((step) => step.id === 'day_start_2');
+  const nightResolve = steps.findIndex((step) => step.id === 'night_resolve_2');
+  const daySpeech = steps.findIndex((step) => step.id === 'day_speech_2');
+
+  assert.ok(dayStart < nightResolve);
+  assert.ok(nightResolve < daySpeech);
+  assert.equal(steps[nightResolve].config.phase, 'day');
+});
+
 test('reducers select actors and pending hunter', () => {
   const ctx = runtime();
   const round = ctx.state.rounds[0];

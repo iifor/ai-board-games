@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildWerewolfActionPrompt } from '../../packages/server/modules/werewolf/prompts/context';
+import { buildHunterShootActionPrompt } from '../../packages/server/modules/werewolf/prompts/actions';
 import { buildLightweightSystemPrompt } from '../../packages/server/modules/werewolf/prompts/system';
 import { BasePlayerAgent } from '../../packages/server/modules/agent-core/playerAgent';
 import { runWerewolfAiAction } from '../../packages/server/modules/werewolf/aiActions';
@@ -519,7 +520,7 @@ test('sheriff vote prompt only lists candidates', async () => {
   assert.doesNotMatch(captured.prompt || '', /可选目标座位号：1、2、3/);
 });
 
-test('role decision prompts require reason where needed', async () => {
+test('role decision prompts require reason except hunter shot', async () => {
   const skills = createWerewolfSkills();
   const byAction = new Map(skills.map((skill) => [skill.action, skill]));
   const captures: string[] = [];
@@ -553,11 +554,23 @@ test('role decision prompts require reason where needed', async () => {
   assert.equal(seerResult.reason, '验中置位。');
   assert.equal(saveResult.reason, '救关键位置。');
   assert.equal(poisonResult.reason, '怀疑是狼。');
-  assert.equal(hunterResult.reason, '带走最像狼的位置。');
-  assert.ok(captures.some((promptText) => /预言家夜晚行动/.test(promptText) && /reason/.test(promptText) && /可选目标座位号：2、3、4/.test(promptText)));
-  assert.ok(captures.some((promptText) => /解药/.test(promptText) && /reason 必须填写/.test(promptText)));
-  assert.ok(captures.some((promptText) => /毒药/.test(promptText) && /reason/.test(promptText) && /可选目标座位号：1、2、4/.test(promptText)));
-  assert.ok(captures.some((promptText) => /猎人/.test(promptText) && /reason/.test(promptText) && /可选目标座位号：1、2、3/.test(promptText)));
+  assert.equal(hunterResult.reason, undefined);
+  assert.ok(
+    captures.some((promptText) => /预言家夜晚行动/.test(promptText) && /reason/.test(promptText) && /可选目标座位号：2、3、4/.test(promptText)),
+    `seer prompt missing contract: ${JSON.stringify(captures)}`,
+  );
+  assert.ok(
+    captures.some((promptText) => /解药/.test(promptText) && /reason 可以填写/.test(promptText)),
+    `antidote prompt missing reason: ${JSON.stringify(captures)}`,
+  );
+  assert.ok(
+    captures.some((promptText) => /毒药/.test(promptText) && /reason/.test(promptText) && /可选目标座位号：1、2、4/.test(promptText)),
+    `poison prompt missing reason: ${JSON.stringify(captures)}`,
+  );
+  const hunterPrompt = buildHunterShootActionPrompt([1, 2, 3]);
+  assert.match(hunterPrompt, /"targetSeat":2/);
+  assert.doesNotMatch(hunterPrompt, /"reason"/);
+  assert.match(hunterPrompt, /可选目标座位号：1、2、3/);
 });
 
 function agent(id: number, role: string, faction: string, playerAgent: Record<string, unknown> = {}) {

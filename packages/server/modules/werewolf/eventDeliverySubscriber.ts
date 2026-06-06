@@ -122,6 +122,7 @@ export class EventDeliverySubscriber {
     }
     if (payload.sheriffElection !== undefined) flat.sheriffElection = payload.sheriffElection;
     if (payload.sheriffId !== undefined) flat.sheriffId = payload.sheriffId;
+    if (payload.sheriffBadge !== undefined) flat.sheriffBadge = payload.sheriffBadge;
     if (payload.sheriffTransfer !== undefined) flat.sheriffTransfer = payload.sheriffTransfer;
     if (payload.transfer !== undefined) flat.sheriffTransfer = payload.transfer;
     if (payload.wolfTarget !== undefined) flat.wolfTarget = payload.wolfTarget;

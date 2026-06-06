@@ -184,8 +184,8 @@ function createWerewolfSkills() {
         });
         const target = parseTargetSeat(parsed);
         return target && valid.includes(target)
-          ? { target, reason: normalizeReason(parsed?.reason) }
-          : { target: null, reason: normalizeReason(parsed?.reason) }; // null = 不开枪
+          ? { target }
+          : { target: null };
       }
     },
     {

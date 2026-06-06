@@ -116,6 +116,28 @@ function checkWin(agents: WerewolfAgent[], day: number, modeConfig: ModeConfig =
   return checkWolfVictoryFromRoster(roster, day, normalizeWinCondition(modeConfig.winCondition));
 }
 
+function checkDayWin(
+  agents: WerewolfAgent[],
+  day: number,
+  modeConfig: ModeConfig = {},
+  sheriffId: number | null = null,
+): WinResult {
+  const rosterResult = checkWin(agents, day, modeConfig);
+  if (rosterResult.winner) return rosterResult;
+  const votePower = getAliveVotePower(
+    agents,
+    sheriffId,
+    modeConfig.sheriff?.voteWeight ?? 1,
+  );
+  if (votePower.wolves > votePower.good) {
+    return {
+      winner: 'wolves',
+      winReason: `第 ${day} 天，狼人有效票权 ${votePower.wolves} 严格高于好人 ${votePower.good}，狼人阵营胜利。`,
+    };
+  }
+  return { winner: null, winReason: '' };
+}
+
 function checkWolfVictory(agents: WerewolfAgent[], day: number, modeConfig: ModeConfig = {}): WinResult {
   return checkWolfVictoryFromRoster(
     getAliveRosterStats(agents),
@@ -156,6 +178,7 @@ function resolveWinAfterDeathsDetailed(
   round: Round,
   day: number,
   modeConfig: ModeConfig = {},
+  sheriffId: number | null = null,
 ): WinResolution {
   const winnerLock = round.winnerLock;
   const currentRoster = getAliveRosterStats(agents);
@@ -164,7 +187,7 @@ function resolveWinAfterDeathsDetailed(
     const rejectionReason = getWinnerLockRejectionReason(winnerLock);
     if (rejectionReason) {
       return {
-        result: checkWin(agents, day, modeConfig),
+        result: resolveCurrentRosterWin(agents, round, day, modeConfig, sheriffId),
         rejectedLock: { reason: rejectionReason, winnerLock, currentRoster, winCondition },
       };
     }
@@ -178,7 +201,7 @@ function resolveWinAfterDeathsDetailed(
       };
     }
     return {
-      result: checkWin(agents, day, modeConfig),
+      result: resolveCurrentRosterWin(agents, round, day, modeConfig, sheriffId),
       rejectedLock: {
         reason: 'trigger_roster_not_winning',
         winnerLock,
@@ -194,7 +217,19 @@ function resolveWinAfterDeathsDetailed(
       },
     };
   }
-  return { result: checkWin(agents, day, modeConfig) };
+  return { result: resolveCurrentRosterWin(agents, round, day, modeConfig, sheriffId) };
+}
+
+function resolveCurrentRosterWin(
+  agents: WerewolfAgent[],
+  round: Round,
+  day: number,
+  modeConfig: ModeConfig,
+  sheriffId: number | null,
+): WinResult {
+  return round.phase === 'day'
+    ? checkDayWin(agents, day, modeConfig, sheriffId)
+    : checkWin(agents, day, modeConfig);
 }
 
 function getWinnerLockRejectionReason(
@@ -225,7 +260,7 @@ function getAliveVotePower(
   sheriffWeight: number = 1,
 ): VotePower {
   return agents
-    .filter((agent) => agent.alive && agent.canVote)
+    .filter((agent) => agent.alive && agent.canVote !== false)
     .reduce((totals, agent) => {
       const weight = Number(agent.id) === Number(sheriffId) ? Number(sheriffWeight) || 1 : 1;
       if (agent.faction === 'wolves') totals.wolves += weight;
@@ -316,6 +351,7 @@ export {
   applyNightDeaths,
   shouldRunFirstDaySheriffElection,
   checkWin,
+  checkDayWin,
   checkWolfVictory,
   resolveWinAfterDeaths,
   resolveWinAfterDeathsDetailed,

@@ -352,6 +352,8 @@ export interface VoteResultPayload {
 
 export interface SheriffEventPayload {
   election?: Record<string, unknown>;
+  sheriffId?: number | null;
+  sheriffBadge?: Record<string, unknown>;
   speech?: unknown;
   candidates?: number[];
   message?: string;
