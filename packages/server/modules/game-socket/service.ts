@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { getDb } from '../../db';
 import { createSession, isSessionCancelled, parseMessage } from './session';
 import { createPreparedSender } from './sender';
+import { createLivePlaybackSource, createPlaybackPipeline } from './playback';
 import { replayGameSession } from './replay';
 import type { GameSession } from './session';
 import { getAiConfig } from '../../config';
@@ -9,7 +10,12 @@ import { runAiDebate } from '../../aiDebateRunner';
 import { runWerewolfWorkflow } from '../werewolf';
 import { getWerewolfModeConfig } from '../werewolf-config';
 import { buildWerewolfRuleIntro } from '../werewolf/messages';
-import { createProjectionContext, projectWerewolfGame } from '../werewolf/views/viewPolicy';
+import {
+  createProjectionContext,
+  projectWerewolfEvent,
+  projectWerewolfGame,
+} from '../werewolf/views/viewPolicy';
+import type { ProjectionContext } from '../werewolf/views/viewPolicy';
 import { getActiveTrace, recordEvent, markTraceError, flushTrace } from '../observability';
 
 // games is TS — import directly
@@ -188,44 +194,62 @@ async function runSession(
   }
   const config = getRequestConfig(mode, playerIds, safeGameType, options);
 
-  const sender = createPreparedSender(
-    session,
-    safeGameType === 'debate' ? { phaseLookahead: 1 } : { prefetchCount: 2 },
-  );
+  const viewMode = String((config as Record<string, unknown>).clientViewMode || 'god');
+  const playbackPipeline = safeGameType === 'werewolf'
+    ? createPlaybackPipeline(session, {
+        viewMode,
+        prefetchCount: 2,
+        capture: true,
+      })
+    : null;
+  const sender = playbackPipeline || createPreparedSender(session, { phaseLookahead: 1 });
+  const liveSource = playbackPipeline ? createLivePlaybackSource() : null;
+  const livePlayback = playbackPipeline && liveSource
+    ? playbackPipeline.playLive(liveSource)
+    : null;
+  let liveProjectionContext: ProjectionContext | null = null;
 
   const runner = getRunner(safeGameType);
-  const game = (await runner(config, {
-    onEvent: (event: Record<string, unknown>) => sender.enqueue(event),
-  })) as GameRecord;
+  let game: GameRecord | null = null;
+  let runnerError: unknown = null;
+  try {
+    game = (await runner(config, {
+      onEvent: (event: Record<string, unknown>) => {
+        if (liveSource) {
+          if (viewMode === 'player' && event.game) {
+            liveProjectionContext = createProjectionContext(
+              event.game as Record<string, unknown>,
+              { mode: viewMode },
+            );
+          }
+          if (
+            viewMode === 'player'
+            && !liveProjectionContext
+            && event.channel
+            && event.channel !== 'public'
+          ) return;
+          const projected = viewMode === 'player'
+            ? projectWerewolfEvent(
+                event as never,
+                liveProjectionContext || { mode: 'player' },
+              ) as Record<string, unknown> | null
+            : event;
+          if (projected) liveSource.push(projected);
+        }
+        else return sender.enqueue(event);
+      },
+    })) as GameRecord;
+  } catch (error) {
+    runnerError = error;
+  } finally {
+    liveSource?.close();
+  }
+  if (livePlayback) await livePlayback;
+  if (runnerError) throw runnerError;
+  if (!game) throw new Error('游戏流程未返回对局结果。');
   await sender.flush();
 
-  // 调试模式不保存数据库，只保留 AI 观测数据
-  if (!(config as Record<string, unknown>).debugMode) {
-    try {
-      saveGameRecord({
-        ...game,
-        players: withSourcePlayerIds(
-          game.players as Array<Record<string, unknown>> | undefined,
-          normalizeSelectedPlayerIds(config.selectedPlayerIds),
-        ),
-        audioResources: sender.getAudioResources()
-      } as unknown as SaveGameInput);
-    } catch (error) {
-      const err = error as Error;
-      console.error('[runSession] 保存对局记录失败:', err.message);
-      const trace = getActiveTrace((game as Record<string, unknown>)?.id as string || '');
-      if (trace) {
-        markTraceError(trace, `保存对局记录失败: ${err.message}`);
-        recordEvent(trace, { type: 'save-error', phase: '', event: { reason: err.message } });
-      }
-    }
-  }
-
-  // 无论 saveGameRecord 成败，在此最终 flush trace，确保覆盖完整 session 生命周期
-  const sessionTrace = getActiveTrace((game as Record<string, unknown>)?.id as string || '');
-  if (sessionTrace) { flushTrace(sessionTrace); }
-
-  await sender.send({
+  const completedEvent = {
     type:
       safeGameType === 'debate' || safeGameType === 'werewolf'
         ? 'workflow-completed'
@@ -235,8 +259,55 @@ async function runSession(
       safeGameType === 'werewolf'
         ? projectWerewolfGame(game, createProjectionContext(game))
         : game,
-  });
+  };
+  const preparedCompletedEvent = playbackPipeline
+    ? await playbackPipeline.prepare(completedEvent)
+    : null;
+
+  // 调试模式不保存数据库，只保留 AI 观测数据
+  if (!(config as Record<string, unknown>).debugMode) {
+    const playbackEvents = playbackPipeline?.getEvents() || [];
+    const audioResources = playbackPipeline
+      ? collectPlaybackAudioResources(playbackEvents)
+      : sender.getAudioResources();
+    try {
+      saveGameRecord({
+        ...game,
+        players: withSourcePlayerIds(
+          game.players as Array<Record<string, unknown>> | undefined,
+          normalizeSelectedPlayerIds(config.selectedPlayerIds),
+        ),
+        audioResources,
+        playbackEvents: safeGameType === 'werewolf' ? playbackEvents : [],
+      } as unknown as SaveGameInput);
+    } catch (error) {
+      const err = error as Error;
+      console.error('[runSession] 保存对局记录失败:', err.message);
+      const trace = getActiveTrace((game as Record<string, unknown>)?.id as string || '');
+      if (trace) {
+        markTraceError(trace, `保存对局记录失败: ${err.message}`);
+        recordEvent(trace, { type: 'save-error', phase: '', event: { reason: err.message } });
+      }
+      throw new Error(`对局保存失败，无法完成播放：${err.message}`);
+    }
+  }
+
+  // 无论 saveGameRecord 成败，在此最终 flush trace，确保覆盖完整 session 生命周期
+  const sessionTrace = getActiveTrace((game as Record<string, unknown>)?.id as string || '');
+  if (sessionTrace) { flushTrace(sessionTrace); }
+
+  if (preparedCompletedEvent && playbackPipeline) {
+    await playbackPipeline.sendPrepared(preparedCompletedEvent);
+  } else {
+    await sender.send(completedEvent);
+  }
   session.close();
+}
+
+function collectPlaybackAudioResources(
+  events: import('@ai-presenter/shared/types/playbackTypes').PlaybackEvent[],
+): string[] {
+  return [...new Set(events.flatMap((event) => event.media.map((item) => item.url)).filter(Boolean))];
 }
 
 function withSourcePlayerIds(

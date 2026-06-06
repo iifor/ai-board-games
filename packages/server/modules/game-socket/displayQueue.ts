@@ -5,6 +5,7 @@ import type { MediaEvent } from './media';
 
 interface DisplayQueueOptions {
   prefetchCount?: number;
+  onPrepared?: (event: SessionEvent) => void;
 }
 
 interface DisplayQueueItem {
@@ -21,6 +22,8 @@ interface DisplayQueue {
   enqueue: (event: SessionEvent) => Promise<void>;
   flush: () => Promise<void>;
   send: (event: SessionEvent) => Promise<void>;
+  sendPrepared: (event: SessionEvent) => Promise<void>;
+  prepare: (event: SessionEvent) => Promise<SessionEvent>;
   getAudioResources: () => string[];
 }
 
@@ -67,6 +70,19 @@ function createDisplayQueue(
     startPrefetch();
     pump();
     await item.done;
+  }
+
+  async function sendPrepared(event: SessionEvent): Promise<void> {
+    const item = createItem(event);
+    item.prepared = Promise.resolve(event as MediaEvent);
+    queue.push(item);
+    queue.sort(compareItems);
+    pump();
+    await item.done;
+  }
+
+  async function prepare(event: SessionEvent): Promise<SessionEvent> {
+    return prepareOutgoingEvent(event) as Promise<SessionEvent>;
   }
 
   async function flush(): Promise<void> {
@@ -145,6 +161,7 @@ function createDisplayQueue(
       try {
         const prepared = await item.prepared;
         collectPreparedAudioResources(prepared, audioResources);
+        options.onPrepared?.(prepared as unknown as SessionEvent);
         await session.sendAndWait(prepared as unknown as Record<string, unknown>);
         item.resolve();
       } catch (error) {
@@ -161,6 +178,8 @@ function createDisplayQueue(
     enqueue,
     flush,
     send,
+    sendPrepared,
+    prepare,
     getAudioResources(): string[] {
       return [...audioResources];
     },

@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createSession, isSpeechWaitPayload } from '../../packages/server/modules/game-socket/session';
 import { createPreparedSender, isImmediateEvent, isRuleIntroEvent } from '../../packages/server/modules/game-socket/sender';
+import {
+  createLivePlaybackSource,
+  createPlaybackPipeline,
+  createStoredPlaybackSource,
+  toPlaybackEvent,
+} from '../../packages/server/modules/game-socket/playback';
 
 interface SentPayload {
   type?: string;
@@ -132,6 +138,71 @@ test('PreparedSender classifies C-end workflow events as display events', () => 
   assert.equal(isImmediateEvent({ type: 'workflow-event', workflowEvent: 'action-submitted', speech: { text: 'wolf speech' } }), false);
   assert.equal(isImmediateEvent({ type: 'error', message: 'failed' }), true);
 });
+
+test('PlaybackPipeline replays exact prepared payloads without ack ids', async () => {
+  const liveSent: SentPayload[] = [];
+  const live = createPlaybackPipeline(createImmediateSession(liveSent) as never, {
+    viewMode: 'player',
+    capture: true,
+  });
+
+  const liveSource = createLivePlaybackSource();
+  const livePlayback = live.playLive(liveSource);
+  liveSource.push({
+    type: 'speech',
+    speech: { playerId: 2, text: '精确回放内容' },
+    game: { id: 'werewolf-test', clientViewMode: 'player' },
+  });
+  liveSource.close();
+  await livePlayback;
+  const completed = await live.prepare({
+    type: 'workflow-completed',
+    message: '游戏结束',
+    game: { id: 'werewolf-test', clientViewMode: 'player' },
+  });
+  const stored = live.getEvents();
+  assert.equal(stored.length, 2);
+  assert.equal(stored[0].viewMode, 'player');
+  assert.equal('ackId' in stored[0].payload, false);
+
+  const replaySent: SentPayload[] = [];
+  const replay = createPlaybackPipeline(createImmediateSession(replaySent) as never, {
+    viewMode: 'player',
+    capture: false,
+  });
+  await replay.play(createStoredPlaybackSource(stored));
+
+  assert.deepEqual(replaySent, stored.map((event) => event.payload));
+  assert.deepEqual(completed.payload, stored[1].payload);
+});
+
+test('PlaybackEvent strips ack ids and records media references', () => {
+  const event = toPlaybackEvent({
+    type: 'speech',
+    ackId: 99,
+    audioUrl: '/audio/test.mp3',
+    audioMimeType: 'audio/mpeg',
+  }, 'god', 7);
+
+  assert.equal(event.sequence, 7);
+  assert.equal('ackId' in event.payload, false);
+  assert.deepEqual(event.media, [{ url: '/audio/test.mp3', mimeType: 'audio/mpeg' }]);
+});
+
+function createImmediateSession(sent: SentPayload[]) {
+  return {
+    send(payload: Record<string, unknown>) {
+      sent.push(payload as SentPayload);
+    },
+    async sendAndWait(payload: Record<string, unknown>) {
+      sent.push(payload as SentPayload);
+    },
+    resolveAck() {},
+    close() {},
+    setPaused() {},
+    skipCurrentPhase() {},
+  };
+}
 
 async function waitFor(predicate: () => boolean): Promise<void> {
   for (let index = 0; index < 20; index += 1) {

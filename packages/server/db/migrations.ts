@@ -155,6 +155,21 @@ function migrate(db: Database | JsonDb): void {
       FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE RESTRICT
     );
 
+    CREATE TABLE IF NOT EXISTS game_playback_events (
+      game_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL,
+      protocol_version INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      view_mode TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      media_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (game_id, sequence),
+      FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_game_playback_events_game
+      ON game_playback_events(game_id, sequence);
+
     CREATE TABLE IF NOT EXISTS game_player_selections (
       game_type TEXT PRIMARY KEY,
       player_ids_json TEXT NOT NULL,

@@ -57,6 +57,8 @@ tests/
 
 ## 核心模块
 
+- `types/playbackTypes.ts`：定义 `PlaybackEvent`、`PlaybackEventSource`、媒体引用和播放协议版本，供实时采集、持久化和回放共同使用。
+
 ### 类型
 
 - `apiTypes.ts`：统一 API 响应类型。

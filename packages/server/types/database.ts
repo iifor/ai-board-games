@@ -146,6 +146,17 @@ interface GamePlayerRow {
   player_snapshot_json: string;
 }
 
+interface GamePlaybackEventRow {
+  game_id: string;
+  sequence: number;
+  protocol_version: number;
+  event_type: string;
+  view_mode: string;
+  payload_json: string;
+  media_json: string;
+  created_at: string;
+}
+
 interface GamePlayerSelectionRow {
   game_type: string;
   player_ids_json: string;
@@ -408,6 +419,7 @@ export type {
   WerewolfModeRow,
   GameRow,
   GamePlayerRow,
+  GamePlaybackEventRow,
   GamePlayerSelectionRow,
   AppSettingRow,
   MatchRow,

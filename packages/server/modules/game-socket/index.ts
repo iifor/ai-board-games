@@ -3,6 +3,7 @@ import { createSession } from './session';
 import { createPreparedSender } from './sender';
 import { replayGameSession } from './replay';
 import { SPEECH_ACK_TIMEOUT_MS, GAME_TYPES } from './constants';
+import { createLivePlaybackSource, createPlaybackPipeline, createStoredPlaybackSource } from './playback';
 
 // routes/gameRoutes is TS — import default
 import router from '../../routes/gameRoutes';
@@ -16,4 +17,7 @@ export {
   replayGameSession,
   SPEECH_ACK_TIMEOUT_MS,
   GAME_TYPES,
+  createPlaybackPipeline,
+  createLivePlaybackSource,
+  createStoredPlaybackSource,
 };

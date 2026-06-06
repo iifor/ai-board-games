@@ -98,6 +98,7 @@ flowchart TD
 - 服务端通过 workflow-engine 管理 match、step、AI task、pending action、event、outbox。
 - WebSocket 使用 `ackId` 等待前端播放完成后继续推进。
 - 游戏完成后保存完整对局快照，支持历史详情和回放。
+- 新狼人杀对局同时保存实际展示事件序列；实时和回放共用播放管线，旧对局继续从快照重建。
 - 管理后台与 C 端隔离，后台负责配置、观测和调试。
 
 ## 核心模块索引

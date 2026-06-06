@@ -26,6 +26,7 @@ interface JsonDbData {
   werewolf_modes?: Record<string, unknown>[];
   games?: Record<string, unknown>[];
   game_players?: Record<string, unknown>[];
+  game_playback_events?: Record<string, unknown>[];
   game_player_selections?: Record<string, unknown>[];
   app_settings?: Record<string, unknown>[];
   player_game_memories?: Record<string, unknown>[];
@@ -81,6 +82,7 @@ function main(): void {
     upsertWerewolfModes(db, jsonData.werewolf_modes || []);
     upsertGames(db, jsonData.games || []);
     upsertGamePlayers(db, jsonData.game_players || []);
+    upsertGamePlaybackEvents(db, jsonData.game_playback_events || []);
     upsertGamePlayerSelections(db, jsonData.game_player_selections || []);
     upsertAppSettings(db, jsonData.app_settings || []);
     upsertPlayerGameMemories(db, jsonData.player_game_memories || []);
@@ -107,6 +109,7 @@ const ROLE_COLS = ['id', 'name', 'faction', 'role_type', 'responsibility', 'abil
 const MODE_COLS = ['id', 'name', 'description', 'roles_json', 'rules_json', 'sheriff_json', 'win_condition', 'enabled', 'sort_order', 'created_at', 'updated_at'];
 const GAME_COLS = ['id', 'game_type', 'mode', 'skin_id', 'skin_name', 'winner', 'win_reason', 'topic_json', 'players_json', 'rounds_json', 'event_json', 'audio_resources_json', 'created_at'];
 const GP_COLS = ['game_id', 'player_id', 'player_snapshot_json'];
+const GAME_PLAYBACK_EVENT_COLS = ['game_id', 'sequence', 'protocol_version', 'event_type', 'view_mode', 'payload_json', 'media_json', 'created_at'];
 const GPS_COLS = ['game_type', 'player_ids_json'];
 const SETTINGS_COLS = ['key', 'value_json'];
 const PLAYER_GAME_MEMORY_COLS = ['id', 'game_type', 'owner_player_id', 'subject_player_id', 'games_played', 'familiarity_score', 'traits_json', 'recent_summary', 'created_at', 'updated_at'];
@@ -129,6 +132,7 @@ function upsertWerewolfRoles(db: Database, rows: Record<string, unknown>[]): voi
 function upsertWerewolfModes(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'werewolf_modes', MODE_COLS, rows); }
 function upsertGames(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'games', GAME_COLS, rows); }
 function upsertGamePlayers(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'game_players', GP_COLS, rows); }
+function upsertGamePlaybackEvents(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'game_playback_events', GAME_PLAYBACK_EVENT_COLS, rows); }
 function upsertGamePlayerSelections(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'game_player_selections', GPS_COLS, rows); }
 function upsertAppSettings(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'app_settings', SETTINGS_COLS, rows); }
 function upsertPlayerGameMemories(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'player_game_memories', PLAYER_GAME_MEMORY_COLS, rows); }

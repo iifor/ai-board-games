@@ -11,6 +11,7 @@ interface JsonDbData {
   werewolf_modes: Record<string, unknown>[];
   games: Record<string, unknown>[];
   game_players: Record<string, unknown>[];
+  game_playback_events: Record<string, unknown>[];
   game_player_selections: Record<string, unknown>[];
   app_settings: Record<string, unknown>[];
   memory_snapshots: Record<string, unknown>[];
@@ -41,6 +42,7 @@ function readJsonDb(filePath: string): JsonDbData {
     werewolf_modes: [],
     games: [],
     game_players: [],
+    game_playback_events: [],
     game_player_selections: [],
     app_settings: [],
     memory_snapshots: [],
@@ -365,6 +367,32 @@ function runJsonQuery(db: JsonDb, sql: string, args: unknown[], mode: string): u
     return upsertJsonRow(data.games, row, 'id');
   }
   if (lower.startsWith('delete from game_players')) return deleteWhere(data.game_players, (row) => row.game_id === values[0]);
+  if (lower.startsWith('delete from game_playback_events')) {
+    return deleteWhere(data.game_playback_events, (row) => row.game_id === values[0]);
+  }
+  if (lower.startsWith('insert into game_playback_events')) {
+    const row = {
+      game_id: values[0],
+      sequence: values[1],
+      protocol_version: values[2],
+      event_type: values[3],
+      view_mode: values[4],
+      payload_json: values[5],
+      media_json: values[6],
+      created_at: now(),
+    };
+    const index = data.game_playback_events.findIndex((item) =>
+      item.game_id === row.game_id && Number(item.sequence) === Number(row.sequence)
+    );
+    if (index >= 0) data.game_playback_events[index] = row;
+    else data.game_playback_events.push(row);
+    return { changes: 1 };
+  }
+  if (lower.startsWith('select * from game_playback_events')) {
+    return data.game_playback_events
+      .filter((row) => row.game_id === values[0])
+      .sort((a, b) => Number(a.sequence) - Number(b.sequence));
+  }
   if (lower.startsWith('insert into game_players')) {
     if (!data.games.some((row) => row.id === values[0])) {
       throw new Error('FOREIGN KEY constraint failed');
@@ -376,7 +404,10 @@ function runJsonQuery(db: JsonDb, sql: string, args: unknown[], mode: string): u
   if (lower.startsWith('select audio_resources_json from games where id != ?')) {
     return data.games.filter((row) => String(row.id) !== String(values[0])).map((row) => ({ audio_resources_json: row.audio_resources_json || '[]' }));
   }
-  if (lower.startsWith('delete from games')) return deleteWhere(data.games, (row) => row.id === values[0]);
+  if (lower.startsWith('delete from games')) {
+    deleteWhere(data.game_playback_events, (row) => row.game_id === values[0]);
+    return deleteWhere(data.games, (row) => row.id === values[0]);
+  }
   if (lower.includes('select game_type as gametype, count(*) as count from games group by game_type')) {
     const counts: Record<string, number> = {};
     data.games.forEach((row) => { const key = String(row.game_type || 'werewolf'); counts[key] = (counts[key] || 0) + 1; });
@@ -419,6 +450,7 @@ class JsonDb {
   isJsonFallback = true;
   filePath: string;
   data: JsonDbData;
+  transactionDepth = 0;
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -435,9 +467,19 @@ class JsonDb {
 
   transaction(fn: (...args: unknown[]) => unknown): (...args: unknown[]) => unknown {
     return (...args: unknown[]) => {
-      const result = fn(...args);
-      this.save();
-      return result;
+      const snapshot = JSON.parse(JSON.stringify(this.data)) as JsonDbData;
+      this.transactionDepth += 1;
+      try {
+        const result = fn(...args);
+        this.transactionDepth -= 1;
+        if (this.transactionDepth === 0) this.save();
+        return result;
+      } catch (error) {
+        this.data = snapshot;
+        this.transactionDepth -= 1;
+        if (this.transactionDepth === 0) this.save();
+        throw error;
+      }
     };
   }
 
@@ -466,7 +508,7 @@ class JsonStatement {
 
   run(...args: unknown[]): RunResult {
     const result = (runJsonQuery(this.db, this.sql, args, 'run') as RunResult) || { changes: 0 };
-    this.db.save();
+    if (this.db.transactionDepth === 0) this.db.save();
     return result;
   }
 }

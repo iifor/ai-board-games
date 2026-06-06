@@ -5,6 +5,7 @@ import type { GameSession, SessionEvent } from './session';
 interface SenderOptions {
   prefetchCount?: number;
   phaseLookahead?: number;
+  onPrepared?: (event: SessionEvent) => void;
 }
 
 interface PreparedSender {
@@ -12,13 +13,18 @@ interface PreparedSender {
   getAudioResources: () => string[];
   flush: () => Promise<void>;
   send: (event: SessionEvent) => Promise<void>;
+  sendPrepared: (event: SessionEvent) => Promise<void>;
+  prepare: (event: SessionEvent) => Promise<SessionEvent>;
 }
 
 function createPreparedSender(
   session: GameSession,
   options: SenderOptions = {},
 ): PreparedSender {
-  const displayQueue = createDisplayQueue(session, { prefetchCount: options.prefetchCount });
+  const displayQueue = createDisplayQueue(session, {
+    prefetchCount: options.prefetchCount,
+    onPrepared: options.onPrepared,
+  });
 
   async function enqueue(event: SessionEvent): Promise<void> {
     try {
@@ -49,6 +55,12 @@ function createPreparedSender(
         if (isSessionCancelled(error)) return;
         throw error;
       }
+    },
+    async sendPrepared(event: SessionEvent): Promise<void> {
+      await displayQueue.sendPrepared(event);
+    },
+    prepare(event: SessionEvent): Promise<SessionEvent> {
+      return displayQueue.prepare(event);
     },
   };
 }

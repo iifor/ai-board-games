@@ -240,6 +240,19 @@ Shadow audit 接入方式：
 
 ## WebSocket 协议与数据流
 
+### 狼人杀统一播放事件管线
+
+狼人杀实时播放和新对局回放共用
+`PlaybackEventSource -> PlaybackPipeline -> DisplayQueue -> WebSocket`：
+
+- 实时 EventBus 事件经现有视角投影后进入 `PlaybackPipeline`。
+- 展示事件完成旁白和媒体准备后、发送 ACK 前转换为 `PlaybackEvent`。
+- 对局完成时，游戏快照与完整播放事件在同一事务中保存。
+- 新对局回放按序发送已保存的最终展示载荷，不重新生成文案或音频。
+- 每次实时播放或回放仍使用独立 WebSocket 连接和独立 ACK 序列。
+- 播放事件绑定原始 `clientViewMode`，回放不能切换为其他视角。
+- 没有播放事件记录的旧对局继续由 `replay.ts` 根据快照重建。
+
 前端首包：
 
 ```ts

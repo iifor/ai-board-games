@@ -7,6 +7,8 @@ import type { GameRow } from '../../types/database';
 import type { GameListFilters } from './repository';
 import * as upload from '../upload';
 import { recordCompletedGameMemories } from '../player-memory';
+import { deletePlaybackEvents, replacePlaybackEvents } from '../game-socket/playbackRepository';
+import type { PlaybackEvent } from '@ai-presenter/shared/types/playbackTypes';
 
 interface SaveGameInput {
   id: string;
@@ -25,6 +27,7 @@ interface SaveGameInput {
   audienceSession?: unknown;
   fallbackAudit?: unknown[];
   audioResources?: unknown[];
+  playbackEvents?: PlaybackEvent[];
   createdAt?: string;
 }
 
@@ -64,6 +67,7 @@ function saveGameRecord(game: SaveGameInput): GameSummary[] {
         repo.insertGamePlayer(row.id, p.sourcePlayerId || p.playerId || p.id || 0, toJson(p));
       });
     }
+    replacePlaybackEvents(row.id, game.playbackEvents || []);
     recordCompletedGameMemories(game);
   });
   tx();
@@ -98,7 +102,11 @@ function deleteGame(id: string): { ok: boolean } {
       }
     });
   }
-  repo.deleteGameById(id);
+  const tx = getDb().transaction(() => {
+    deletePlaybackEvents(id);
+    repo.deleteGameById(id);
+  });
+  tx();
   return { ok: true };
 }
 

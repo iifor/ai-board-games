@@ -2,6 +2,8 @@ import { getGame } from '../games';
 import { listPlayers } from '../players';
 import { getWerewolfModeConfig } from '../werewolf-config';
 import { createPreparedSender } from './sender';
+import { createPlaybackPipeline, createStoredPlaybackSource } from './playback';
+import { listPlaybackEvents } from './playbackRepository';
 import { isSessionCancelled } from './session';
 import type { GameSession } from './session';
 import type { PreparedSender } from './sender';
@@ -207,6 +209,24 @@ async function replayGameSession(
   if (!game) throw new Error('历史对局不存在。');
   if (normalizeGameType(game.gameType || game.type) !== gameType)
     throw new Error('历史对局类型与当前游戏不匹配。');
+  if (gameType === 'werewolf') {
+    const storedEvents = listPlaybackEvents(replayGameId);
+    if (storedEvents.length) {
+      const storedViewMode = storedEvents[0].viewMode || 'god';
+      const requestedViewMode = getRequestedReplayViewMode(options.replayView);
+      if (requestedViewMode && requestedViewMode !== storedViewMode) {
+        throw new Error(`该回放绑定原始视角：${storedViewMode}，不支持切换视角。`);
+      }
+      const pipeline = createPlaybackPipeline(session, {
+        viewMode: storedViewMode,
+        prefetchCount: 2,
+        capture: false,
+      });
+      await pipeline.play(createStoredPlaybackSource(storedEvents));
+      session.close();
+      return;
+    }
+  }
   const replayGame = enrichReplayPlayers(normalizeReplayGame(game));
   const sender = createPreparedSender(
     session,
@@ -247,6 +267,12 @@ async function replayGameSession(
     game: replayProjection ? projectWerewolfGame(replayGame as any, replayProjection) : replayGame,
   });
   session.close();
+}
+
+function getRequestedReplayViewMode(value?: Record<string, unknown>): string {
+  if (!value) return '';
+  const mode = value.clientViewMode || value.viewMode || value.mode;
+  return typeof mode === 'string' ? mode : '';
 }
 
 // --- Normalization ---
