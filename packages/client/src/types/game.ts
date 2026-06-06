@@ -59,6 +59,7 @@ export interface GameEvent {
   shot?: { from: string; target: string };
   selfDestruct?: { playerId?: string | number; text?: string; day?: number };
   seerCheck?: { target: string; result?: string };
+  witchAction?: { use: boolean; target?: string | null; reason?: string };
   sheriffCandidateIds?: number[];
   playerId?: string;
   thinking?: string;

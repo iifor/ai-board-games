@@ -97,6 +97,31 @@ function extractEventRound(event: GameEvent): WerewolfRound | null {
     if (hasOwn(event, 'exile')) patch.exile = (event.exile || null) as WerewolfRound['exile'];
   }
 
+  if (event.type === 'wolf-vote') {
+    patch.night = {
+      ...(baseRound.night || {}),
+      ...(hasOwn(event, 'wolfTarget') ? { wolfTarget: event.wolfTarget == null ? undefined : String(event.wolfTarget) } : {}),
+      ...(hasOwn(event, 'wolfChoices') ? { wolfChoices: event.wolfChoices as Record<string, string> } : {}),
+      ...(hasOwn(event, 'wolfVoteTally') ? { wolfVoteTally: event.wolfVoteTally as Record<string, number> } : {}),
+    };
+  }
+
+  if (event.type === 'seer-check' && event.seerCheck) {
+    patch.night = {
+      ...(baseRound.night || {}),
+      seerCheck: event.seerCheck,
+    };
+  }
+
+  if (event.type === 'witch-action' && event.witchAction) {
+    patch.night = {
+      ...(baseRound.night || {}),
+      witchPoisonTarget: event.witchAction.use && event.witchAction.target != null
+        ? String(event.witchAction.target)
+        : undefined,
+    };
+  }
+
   if (event.type.startsWith('sheriff-')) {
     const election = readRecord(event, 'election') || readRecord(event, 'sheriffElection');
     if (election) patch.sheriffElection = election as WerewolfRound['sheriffElection'];

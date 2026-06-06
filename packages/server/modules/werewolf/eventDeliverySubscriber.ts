@@ -7,6 +7,7 @@
  */
 
 import type { GameEvent } from '@ai-presenter/shared/types/gameEvent';
+import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import type { WerewolfEventBus } from './eventBus';
 
 type DeliveryCallback = (event: Record<string, unknown>) => void | Promise<void>;
@@ -30,6 +31,7 @@ export class EventDeliverySubscriber {
   start(): void {
     this.unsubscribe = this.eventBus.subscribeAll(async (event: GameEvent) => {
       try {
+        if (event.channel === CHANNEL_TYPES.SYSTEM) return;
         const flatEvent = this.toFlatEvent(event);
         await Promise.resolve(this.deliver(flatEvent));
       } catch (error) {
@@ -122,6 +124,11 @@ export class EventDeliverySubscriber {
     if (payload.sheriffId !== undefined) flat.sheriffId = payload.sheriffId;
     if (payload.sheriffTransfer !== undefined) flat.sheriffTransfer = payload.sheriffTransfer;
     if (payload.transfer !== undefined) flat.sheriffTransfer = payload.transfer;
+    if (payload.wolfTarget !== undefined) flat.wolfTarget = payload.wolfTarget;
+    if (payload.wolfChoices !== undefined) flat.wolfChoices = payload.wolfChoices;
+    if (payload.wolfVoteTally !== undefined) flat.wolfVoteTally = payload.wolfVoteTally;
+    if (payload.seerCheck !== undefined) flat.seerCheck = payload.seerCheck;
+    if (payload.witchAction !== undefined) flat.witchAction = payload.witchAction;
 
     if (hasSpeech) {
       flat.speech = {

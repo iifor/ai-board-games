@@ -90,7 +90,8 @@ const ACTION_LABELS: Record<string, string> = {
   sheriff_vote: '警长竞选投票',
   sheriff_runoff_speech: '警长复投发言',
   sheriff_runoff_vote: '警长复投投票',
-  sheriff_resolve: '警长竞选结算'
+  sheriff_resolve: '警长竞选结算',
+  sheriff_speech_direction: '警长决定发言方向'
 };
 
 // ---- 阶段/动作消息 ----

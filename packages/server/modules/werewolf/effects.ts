@@ -1,5 +1,5 @@
 import { WEREWOLF_EFFECT_TYPES } from '@ai-presenter/shared/types/workflowTypes';
-import { eliminate, countTargets, topExile } from './winCheck';
+import { eliminate, countTargets, topExile, checkWolfVictory } from './winCheck';
 import type { WerewolfAgent } from './winCheck';
 import { hasRoleAction } from './utils';
 
@@ -18,18 +18,25 @@ interface Round {
   night: Night;
   nightRevealed?: boolean;
   publicSummary?: string;
-  votes?: Record<string, number>;
+  votes?: Record<string, number | null>;
   voteTally?: Record<string, number>;
   sheriffId?: number | null;
   exile?: { id: number; reason: string } | null;
   idiotReveal?: { id: number; reason: string } | null;
   hunterShot?: { from: number; target: number; reason?: string } | null;
+  winnerLock?: {
+    winner: string | null;
+    winReason: string;
+    sourceFaction?: string;
+    sourceAction?: string;
+  };
   [key: string]: unknown;
 }
 
 interface ModeConfig {
   sheriff?: { voteWeight?: number };
   idiot?: { surviveExileOnce?: boolean; losesVoteAfterReveal?: boolean };
+  winCondition?: string;
   [key: string]: unknown;
 }
 
@@ -38,11 +45,13 @@ interface Effect {
   target?: number;
   reason?: string;
   source?: number;
+  sourceFaction?: string;
+  sourceAction?: string;
 }
 
 interface NightEffectsResult {
   effects: Effect[];
-  deaths: Array<{ id: number; reason: string }>;
+  deaths: Array<{ id: number; reason: string; sourceFaction?: string; sourceAction?: string }>;
 }
 
 interface ExileEffectsResult {
@@ -50,22 +59,35 @@ interface ExileEffectsResult {
   exile: { id: number; reason: string } | null;
 }
 
-function resolveNightEffects(agents: WerewolfAgent[], round: Round): NightEffectsResult {
+function resolveNightEffects(agents: WerewolfAgent[], round: Round, modeConfig: ModeConfig = {}): NightEffectsResult {
   const effects: Effect[] = [];
   const night = round.night || {};
-  if (night.wolfTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.KILL, target: night.wolfTarget, reason: '狼人袭击' });
+  if (night.wolfTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.KILL, target: night.wolfTarget, reason: '狼人袭击', sourceFaction: 'wolves', sourceAction: 'wolf_kill' });
   if (night.guardTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.PROTECT, target: night.guardTarget });
   if (night.witchSave && night.witchSaveTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.SAVE, target: night.witchSaveTarget });
   if (night.witchPoisonTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.POISON, target: night.witchPoisonTarget, reason: '女巫毒杀' });
 
   const protectedTarget = night.guardTarget;
   const savedTarget = night.witchSave ? night.witchSaveTarget : null;
-  const deaths: Array<{ id: number; reason: string }> = [];
+  const deaths: Array<{ id: number; reason: string; sourceFaction?: string; sourceAction?: string }> = [];
   if (night.wolfTarget && Number(night.wolfTarget) !== Number(protectedTarget) && Number(night.wolfTarget) !== Number(savedTarget)) {
-    deaths.push({ id: night.wolfTarget, reason: '狼人袭击' });
+    deaths.push({ id: night.wolfTarget, reason: '狼人袭击', sourceFaction: 'wolves', sourceAction: 'wolf_kill' });
   }
   if (night.witchPoisonTarget && !deaths.some((death) => Number(death.id) === Number(night.witchPoisonTarget))) {
-    deaths.push({ id: night.witchPoisonTarget, reason: '女巫毒杀' });
+    deaths.push({ id: night.witchPoisonTarget, reason: '女巫毒杀', sourceFaction: 'good', sourceAction: 'witch_poison' });
+  }
+  const wolfDeath = deaths.find((death) => death.sourceFaction === 'wolves');
+  if (wolfDeath && !round.winnerLock?.winner) {
+    const afterWolfKill = agents.map((agent) => ({ ...agent }));
+    eliminate(afterWolfKill, wolfDeath.id, round.day, wolfDeath.reason);
+    const wolfWin = checkWolfVictory(afterWolfKill, round.day, modeConfig);
+    if (wolfWin.winner === 'wolves') {
+      round.winnerLock = {
+        ...wolfWin,
+        sourceFaction: 'wolves',
+        sourceAction: wolfDeath.sourceAction || 'wolf_kill',
+      };
+    }
   }
   night.deaths = deaths;
   for (const death of deaths) eliminate(agents, death.id, round.day, death.reason);

@@ -9,7 +9,14 @@ import {
 import type { ActionWindow } from '../actionWindows';
 import { createRuntime, ensureRound, syncRuntimeState, serializeWerewolfState } from '../runtime';
 import type { Runtime } from '../runtime';
-import { applyActionResults, applySelfDestruct, getActorsForStep, getTargetIds, hasSelfDestruct } from '../reducers';
+import {
+  applyActionResults,
+  applySelfDestruct,
+  getActorsForStep,
+  getTargetIds,
+  getWitchActionEligibility,
+  hasSelfDestruct,
+} from '../reducers';
 import type { ActionResult as ReducerActionResult, Runtime as ReducerRuntime, Round as ReducerRound, Step as ReducerStep } from '../reducers';
 import { shouldSkipSheriffAction } from '../sheriffWorkflow';
 import { ensureWolfTeamContext } from '../wolfTeam';
@@ -24,6 +31,8 @@ import { getSeatNumber } from '../utils';
 import { recordWerewolfInteractionFeedback } from '../interactionFeedbackTrace';
 import { canUseWerewolfActionEngineBridge, runWerewolfActionEngineBridge } from '../actionEngineBridge';
 import type { WerewolfActionEngineShadowAudit } from '../actionEngineBridge';
+import { resolveWinAfterDeaths } from '../winCheck';
+import type { WerewolfAgent } from '../winCheck';
 
 /** 已有独立睁眼事件的夜晚行动 — phase-start 不再重复发布 */
 const NIGHT_WAKE_ACTIONS = new Set([
@@ -73,6 +82,19 @@ function createActionWindowHandler() {
       }
       if (step.config.actionType?.startsWith('sheriff_') && shouldSkipSheriffAction(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound, step.config.actionType)) {
         return skipAction(match, step, runtime);
+      }
+      if (step.config.actionType === 'witch_save' || step.config.actionType === 'witch_poison') {
+        const eligibility = getWitchActionEligibility(
+          runtime as unknown as ReducerRuntime,
+          round as unknown as ReducerRound,
+          step.config.actionType,
+        );
+        if (eligibility.skipReason) {
+          return skipAction(match, step, runtime, {
+            reason: eligibility.skipReason,
+            systemOnly: true,
+          });
+        }
       }
       const actors = getActorsForStep(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, round as unknown as ReducerRound);
       if (!actors.length) return skipAction(match, step, runtime);
@@ -134,8 +156,18 @@ function createActionWindowHandler() {
       // 添加阶段结果和阶段结束事件（预言家、女巫、守卫等）
       if (hasActionPhase(step.config.actionType || '')) {
         const phaseConfig = getActionPhaseConfig(step.config.actionType!);
-        const phaseContext = buildPhaseContext(step.config.actionType!, partialResults, round);
+        const completedRound = getRoundFromState(nextState as Record<string, unknown>, step.config.day || 1) || round;
+        const phaseContext = buildPhaseContext(step.config.actionType!, partialResults, completedRound);
         const phaseMessages = phaseConfig?.buildMessages(step.config.day || 1, phaseContext);
+        publishScopedPhaseResultEvent(
+          match,
+          runtime,
+          step,
+          nextState as Record<string, unknown>,
+          phaseMessages?.result || actionResolvedMessage(step.config.actionType, step.config.day),
+          phaseContext,
+          resolvedChannel,
+        );
 
         // 阶段结果事件
         if (phaseMessages?.result) {
@@ -148,7 +180,6 @@ function createActionWindowHandler() {
             { actionType: step.config.actionType, ...phaseContext },
             resolvedChannel
           ));
-          publishScopedPhaseResultEvent(runtime, step, phaseMessages.result, phaseContext, resolvedChannel);
         }
 
         // 阶段结束事件（请闭眼）- 只在消息非空时生成
@@ -170,7 +201,8 @@ function createActionWindowHandler() {
       if (hasActionPhase(step.config.actionType || '')) {
         const endMsg = (() => {
           const pc = getActionPhaseConfig(step.config.actionType!);
-          const pctx = buildPhaseContext(step.config.actionType!, partialResults, round);
+          const completedRound = getRoundFromState(nextState as Record<string, unknown>, step.config.day || 1) || round;
+          const pctx = buildPhaseContext(step.config.actionType!, partialResults, completedRound);
           const pmsgs = pc?.buildMessages(step.config.day || 1, pctx);
           return pmsgs ? pmsgs.end : phaseEndMessage(step.config.actionType, step.config.day);
         })();
@@ -210,7 +242,18 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
   round: Record<string, unknown>;
   state: StepState;
 }): HandlerResult {
-  const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
+  const winResult = resolveWinAfterDeaths(
+    runtime.agents as WerewolfAgent[],
+    round as never,
+    step.config.day || 1,
+    runtime.modeConfig as Record<string, unknown> || {},
+  );
+  const nextState = markStepComplete({
+    ...syncRuntimeState(runtime),
+    currentStep: step.id,
+    currentActionWindow: null,
+    ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}),
+  }, step.id);
   resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
   const selfDestruct = (round as { selfDestruct?: Record<string, unknown> }).selfDestruct || {};
   const actorId = Number(selfDestruct.playerId || 0);
@@ -224,23 +267,27 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
     return builder.buildSelfDestruct({ playerId: actorId, text });
   });
 
+  const events: unknown[] = [createWerewolfEvent(
+    match,
+    step,
+    nextState as unknown as Record<string, unknown>,
+    'werewolf_self_destruct',
+    `狼人自爆：${getSeatNumber(actorId, runtime.agents)}号玩家出局，白天流程中止。`,
+    {
+      actionType: 'self_destruct',
+      actorId,
+      selfDestruct,
+      speech: { playerId: actorId, text, phase: 'day', day: step.config.day }
+    },
+    { channel: CHANNEL_TYPES.PUBLIC }
+  )];
+  if (winResult.winner) {
+    events.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
+  }
   return {
     status: 'COMPLETED',
     state: nextState,
-    events: [createWerewolfEvent(
-      match,
-      step,
-      nextState as unknown as Record<string, unknown>,
-      'werewolf_self_destruct',
-      `狼人自爆：${getSeatNumber(actorId, runtime.agents)}号玩家出局，白天流程中止。`,
-      {
-        actionType: 'self_destruct',
-        actorId,
-        selfDestruct,
-        speech: { playerId: actorId, text, phase: 'day', day: step.config.day }
-      },
-      { channel: CHANNEL_TYPES.PUBLIC }
-    )]
+    events,
   };
 }
 
@@ -272,8 +319,41 @@ function createActionEngineShadowAuditEvent(
   };
 }
 
-function skipAction(match: Match, step: Step, runtime: Runtime): HandlerResult {
+function skipAction(
+  match: Match,
+  step: Step,
+  runtime: Runtime,
+  options: { reason?: string; systemOnly?: boolean } = {},
+): HandlerResult {
   const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id }, step.id);
+  const skipReason = options.reason || 'no_actors_or_condition';
+  if (options.systemOnly) {
+    publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+      builder.setStep(step.id);
+      builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+      builder.setDay(step.config.day || 1);
+      return builder.build('action-skipped', {
+        actionType: step.config.actionType,
+        skipReason,
+      }, CHANNEL_TYPES.SYSTEM);
+    });
+    return {
+      status: 'COMPLETED',
+      state: nextState,
+      events: [{
+        ...createWerewolfEvent(
+          match,
+          step,
+          nextState as unknown as Record<string, unknown>,
+          'werewolf_action_skipped',
+          actionSkippedMessage(step.config.actionType, step.config.day),
+          { actionType: step.config.actionType, skipReason },
+          { channel: CHANNEL_TYPES.SYSTEM },
+        ),
+        visibility: 'system',
+      }],
+    };
+  }
   const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
 
   // Phase 4: 双写 action-skipped 到 EventBus
@@ -283,14 +363,14 @@ function skipAction(match: Match, step: Step, runtime: Runtime): HandlerResult {
     builder.setDay(step.config.day || 1);
     return builder.build('action-skipped', {
       actionType: step.config.actionType,
-      skipReason: 'no_actors_or_condition',
+      skipReason,
     }, channel, scopeKey);
   });
 
   return {
     status: 'COMPLETED',
     state: nextState,
-    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_skipped', actionSkippedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType }, { channel, scopeKey })]
+    events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_skipped', actionSkippedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType, skipReason }, { channel, scopeKey })]
   };
 }
 
@@ -340,7 +420,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
   });
 
   // 警长类行动：发布 sheriff-start 事件供 C 端展示举手图标
-  if (step.config.actionType?.startsWith('sheriff_')) {
+  if (step.config.actionType?.startsWith('sheriff_') && step.config.actionType !== 'sheriff_speech_direction') {
     publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
       builder.setStep(step.id);
       builder.setPhase('day');
@@ -429,10 +509,23 @@ function buildPhaseContext(actionType: string, results: ReducerActionResult[], r
   const night = (round as { night?: Record<string, unknown> }).night || {};
   const context: Record<string, unknown> = {};
 
+  if (actionType === 'wolf_vote') {
+    context.wolfTarget = night.wolfTarget || null;
+    context.wolfChoices = night.wolfChoices || {};
+    context.wolfVoteTally = night.wolfVoteTally || {};
+  }
+
   if (actionType === 'seer_check' && results.length > 0) {
     const result = results[0];
-    context.seerResult = result?.payload?.result || result?.payload?.faction || '未知';
-    context.target = result?.payload?.target;
+    const seerCheck = night.seerCheck && typeof night.seerCheck === 'object'
+      ? night.seerCheck as Record<string, unknown>
+      : {};
+    context.seerResult = seerCheck.result || result?.payload?.result || result?.payload?.faction || '未知';
+    context.target = seerCheck.target || result?.payload?.target;
+    context.seerCheck = {
+      target: context.target,
+      result: context.seerResult,
+    };
   }
 
   if (actionType === 'witch_save') {
@@ -442,8 +535,15 @@ function buildPhaseContext(actionType: string, results: ReducerActionResult[], r
   }
 
   if (actionType === 'witch_poison') {
-    context.witchPoisonUsed = results.length > 0;
-    context.target = results.length > 0 ? results[0]?.payload?.target : null;
+    const payload = results[0]?.payload;
+    context.witchPoisonUsed = payload?.use === true;
+    context.target = payload?.use === true ? payload?.target || null : null;
+    context.witchPoisonReason = typeof payload?.reason === 'string' ? payload.reason.trim() : '';
+    context.witchAction = {
+      use: context.witchPoisonUsed,
+      target: context.target,
+      reason: context.witchPoisonReason,
+    };
   }
 
   if (actionType === 'guard_protect') {
@@ -455,30 +555,53 @@ function buildPhaseContext(actionType: string, results: ReducerActionResult[], r
 }
 
 function publishScopedPhaseResultEvent(
+  match: Match,
   runtime: Runtime,
   step: Step,
+  state: Record<string, unknown>,
   message: string,
   phaseContext: Record<string, unknown>,
   channelInfo: ReturnType<typeof resolveActionChannel>,
 ): void {
-  if (step.config.actionType !== 'seer_check') return;
+  const eventType = step.config.actionType === 'wolf_vote'
+    ? 'wolf-vote'
+    : step.config.actionType === 'seer_check'
+      ? 'seer-check'
+      : step.config.actionType === 'witch_poison'
+        ? 'witch-action'
+      : null;
+  if (!eventType) return;
+  const snapshot = serializeWerewolfState(match, state);
   publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
     builder.setStep(step.id);
     builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
     builder.setDay(step.config.day || 1);
     return builder.build(
-      'seer-check',
+      eventType,
       {
         phase: step.config.phase || 'night',
         actionType: step.config.actionType,
         message,
         ...phaseContext,
+        ...(eventType === 'seer-check' ? { seerCheck: phaseContext.seerCheck } : {}),
+        ...(eventType === 'witch-action' ? { witchAction: phaseContext.witchAction } : {}),
       },
       channelInfo.channel,
       channelInfo.scopeKey,
       { actionType: step.config.actionType, message },
     );
-  });
+  }, snapshot);
+}
+
+function getRoundFromState(state: Record<string, unknown>, day: number): Record<string, unknown> | null {
+  const rounds = state.rounds;
+  if (!Array.isArray(rounds)) return null;
+  const matchingRound = [...rounds].reverse().find((round) => (
+    Boolean(round && typeof round === 'object' && Number((round as { day?: unknown }).day) === day)
+  ));
+  return matchingRound && typeof matchingRound === 'object'
+    ? matchingRound as Record<string, unknown>
+    : null;
 }
 
 function cloneActionWindow(window: ActionWindow): Record<string, unknown> {

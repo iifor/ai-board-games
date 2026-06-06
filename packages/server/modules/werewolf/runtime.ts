@@ -399,13 +399,18 @@ function serializeWerewolfState(match: Match, state: WerewolfState): Record<stri
     host: state.host,
     werewolfMode: modeDetail,
     players: ((state.players || []) as Array<Record<string, unknown> & { roleConfig?: unknown; sourcePlayerId?: unknown }>).map(({ roleConfig, ...player }) => player).sort((a, b) => Number(a.id) - Number(b.id)),
-    rounds: state.rounds || [],
+    rounds: (state.rounds || []).map(stripInternalRoundState),
     winner,
     winReason: state.winReason || '',
     fallbackAudit: state.fallbackAudit || [],
     currentActionWindow: state.currentActionWindow || null,
     createdAt: match.createdAt || new Date().toISOString()
   };
+}
+
+function stripInternalRoundState(round: Record<string, unknown>): Record<string, unknown> {
+  const { winnerLock: _winnerLock, ...visible } = round;
+  return visible;
 }
 
 function ensureRound(state: WerewolfState, day: number): Record<string, unknown> {

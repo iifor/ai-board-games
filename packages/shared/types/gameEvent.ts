@@ -171,6 +171,33 @@ export interface SerializedNight {
   deaths: Array<{ id: number; reason: string }>;
 }
 
+export interface WolfVoteCompletedPayload {
+  actionType: 'wolf_vote';
+  message: string;
+  wolfTarget: number | null;
+  wolfChoices: Record<string, unknown>;
+  wolfVoteTally: Record<string, number>;
+}
+
+export interface SeerCheckCompletedPayload {
+  actionType: 'seer_check';
+  message: string;
+  seerCheck: {
+    target: number | string | null;
+    result: string;
+  };
+}
+
+export interface WitchActionCompletedPayload {
+  actionType: 'witch_poison';
+  message: string;
+  witchAction: {
+    use: boolean;
+    target: number | string | null;
+    reason: string;
+  };
+}
+
 // ============================================================
 // 播报信息
 // ============================================================

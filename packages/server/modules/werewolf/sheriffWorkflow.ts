@@ -20,6 +20,15 @@ interface SheriffElection {
   result: string;
 }
 
+interface SheriffBadgeDisposition {
+  action: 'transfer' | 'tear';
+  from: number;
+  to?: number;
+  day: number;
+  phase: string;
+  reason?: string;
+}
+
 function shouldRunSheriffElection(runtime: Runtime, round: Round): boolean {
   const sheriff = (runtime.modeConfig?.sheriff || {}) as Record<string, unknown>;
   return Number(round.day) === 1 && sheriff.enabled !== false && sheriff.firstDayElection !== false;
@@ -49,6 +58,11 @@ function ensureSheriffElection(round: Round): SheriffElection {
 }
 
 function getSheriffActorsForAction(runtime: Runtime, round: Round, actionType: string): Agent[] {
+  if (actionType === 'sheriff_speech_direction') {
+    const sheriffId = resolveActiveSheriffId(runtime, round);
+    const sheriff = runtime.agents.find((agent) => agent.alive && Number(agent.id) === Number(sheriffId));
+    return sheriff ? [sheriff] : [];
+  }
   if (!shouldRunSheriffElection(runtime, round)) return [];
   const alive = sortBySeat(runtime.agents.filter((agent) => agent.alive));
   const election = ensureSheriffElection(round);
@@ -68,6 +82,7 @@ function getSheriffActorsForAction(runtime: Runtime, round: Round, actionType: s
 }
 
 function getSheriffTargetIds(round: Round, actionType: string): number[] {
+  if (actionType === 'sheriff_speech_direction') return [];
   const election = ensureSheriffElection(round);
   if (actionType === 'sheriff_vote') return election.candidates;
   if (actionType === 'sheriff_runoff_vote') return election.runoffCandidateIds;
@@ -75,6 +90,10 @@ function getSheriffTargetIds(round: Round, actionType: string): number[] {
 }
 
 function applySheriffActionResults(runtime: Runtime, round: Round, actionType: string, results: ActionResult[]): void {
+  if (actionType === 'sheriff_speech_direction') {
+    applySheriffSpeechDirection(runtime, round, results);
+    return;
+  }
   const election = ensureSheriffElection(round);
   if (actionType === 'sheriff_signup') applySignup(round, election, results);
   if (actionType === 'sheriff_speech') applySpeech(election, results, false);
@@ -126,6 +145,10 @@ function isSheriffResolveReady(round: Round): boolean {
 }
 
 function shouldSkipSheriffAction(runtime: Runtime, round: Round, actionType: string): boolean {
+  if (actionType === 'sheriff_speech_direction') {
+    const sheriffId = resolveActiveSheriffId(runtime, round);
+    return !runtime.agents.some((agent) => agent.alive && Number(agent.id) === Number(sheriffId));
+  }
   if (!shouldRunSheriffElection(runtime, round)) return true;
   const election = ensureSheriffElection(round);
   if (actionType === 'sheriff_speech') return !election.signedUpIds.length;
@@ -134,6 +157,78 @@ function shouldSkipSheriffAction(runtime: Runtime, round: Round, actionType: str
   if (actionType === 'sheriff_runoff_speech') return getTopCandidateIds(election.tally).length <= 1;
   if (actionType === 'sheriff_runoff_vote') return election.runoffCandidateIds.length <= 1;
   return false;
+}
+
+function findPendingSheriffBadgeDisposition(runtime: Runtime, round: Round): Agent | null {
+  const sheriffId = resolveActiveSheriffId(runtime, round);
+  if (!sheriffId) return null;
+  const sheriff = runtime.agents.find((agent) => Number(agent.id) === sheriffId);
+  if (!sheriff || sheriff.alive !== false) return null;
+  const transfers = Array.isArray(round.sheriffTransfers) ? round.sheriffTransfers : [];
+  const alreadyHandled = transfers.some((transfer) => (
+    Number((transfer as { from?: unknown }).from) === sheriffId
+  ));
+  return alreadyHandled ? null : sheriff;
+}
+
+function applySheriffBadgeDisposition(
+  runtime: Runtime,
+  round: Round,
+  sheriff: Agent,
+  payload: Record<string, unknown>,
+): SheriffBadgeDisposition {
+  const aliveTargets = runtime.agents.filter((agent) => agent.alive && Number(agent.id) !== Number(sheriff.id));
+  const requestedTarget = Number(payload.target);
+  const validTarget = aliveTargets.find((agent) => Number(agent.id) === requestedTarget);
+  const action = payload.action === 'transfer' && validTarget ? 'transfer' : 'tear';
+  const disposition: SheriffBadgeDisposition = {
+    action,
+    from: Number(sheriff.id),
+    ...(action === 'transfer' ? { to: Number(validTarget!.id) } : {}),
+    day: Number(round.day || 1),
+    phase: String(round.phase || 'death'),
+    reason: typeof payload.reason === 'string' ? payload.reason : undefined,
+  };
+  round.sheriffTransfers = [...(Array.isArray(round.sheriffTransfers) ? round.sheriffTransfers : []), disposition];
+  round.sheriffId = action === 'transfer' ? disposition.to || null : null;
+  round.sheriffBadge = { status: action === 'transfer' ? 'held' : 'torn' };
+  runtime.agents.forEach((agent) => {
+    agent.sheriffId = Number(agent.id) === Number(round.sheriffId) ? round.sheriffId : null;
+  });
+  return disposition;
+}
+
+function resolveActiveSheriffId(runtime: Runtime, currentRound: Round): number | null {
+  const rounds = Array.isArray((runtime as unknown as { state?: { rounds?: Round[] } }).state?.rounds)
+    ? (runtime as unknown as { state: { rounds: Round[] } }).state.rounds
+    : [];
+  const ordered = [...rounds.filter((round) => round !== currentRound), currentRound];
+  for (let index = ordered.length - 1; index >= 0; index -= 1) {
+    const round = ordered[index];
+    const transfers = Array.isArray(round.sheriffTransfers) ? round.sheriffTransfers : [];
+    const latest = transfers[transfers.length - 1] as SheriffBadgeDisposition | undefined;
+    if (latest?.action === 'tear') return null;
+    if (latest?.action === 'transfer' && latest.to) return Number(latest.to);
+    if (round.sheriffBadge?.status === 'torn') return null;
+    if (round.sheriffId) return Number(round.sheriffId);
+    if (round.sheriffElection?.sheriffId) return Number(round.sheriffElection.sheriffId);
+  }
+  return null;
+}
+
+function applySheriffSpeechDirection(runtime: Runtime, round: Round, results: ActionResult[]): void {
+  const sheriffId = resolveActiveSheriffId(runtime, round);
+  if (!sheriffId) return;
+  const requested = String(results[0]?.payload?.direction || '');
+  const direction = requested === 'clockwise' || requested === 'counterclockwise'
+    ? requested
+    : Math.random() < 0.5 ? 'clockwise' : 'counterclockwise';
+  round.daySpeech = {
+    source: 'sheriff',
+    sheriffId,
+    direction,
+    reason: typeof results[0]?.payload?.reason === 'string' ? results[0].payload.reason : '',
+  };
 }
 
 function applySignup(round: Round, election: SheriffElection, results: ActionResult[]): void {
@@ -196,7 +291,10 @@ export {
   applySheriffActionResults,
   resolveSheriffElection,
   isSheriffResolveReady,
-  shouldSkipSheriffAction
+  shouldSkipSheriffAction,
+  findPendingSheriffBadgeDisposition,
+  applySheriffBadgeDisposition,
+  resolveActiveSheriffId,
 };
 
-export type { SheriffElection };
+export type { SheriffElection, SheriffBadgeDisposition };

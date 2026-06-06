@@ -56,7 +56,58 @@ test('werewolf prompt context includes public exile result and dead player statu
   assert.match(prompt, /2号被放逐出局/);
   assert.match(prompt, /已出局玩家：2号/);
   assert.match(prompt, /第1天放逐投票/);
+  assert.match(prompt, /1号投2号、3号投2号/);
   assert.match(prompt, /第1晚死亡：3号/);
+});
+
+test('latest completed day votes remain public to every role after entering a new round', () => {
+  const wolf = player(1, 'werewolf', 'wolves');
+  const villager = player(2, 'villager', 'good');
+  const seer = player(3, 'seer', 'good');
+  const players = [wolf, villager, seer];
+  players.forEach((actor) => {
+    actor.playerAgent = {
+      messages: [
+        { role: 'system', content: 'opening' },
+        { role: 'user', content: 'previous task' },
+        { role: 'assistant', content: 'previous response' },
+      ],
+    };
+  });
+  const rounds = [
+    {
+      day: 1,
+      night: {},
+      votes: { 3: 1, 1: 2, 2: null },
+      voteTally: { 2: 1, 1: 1 },
+      exile: null,
+    },
+    {
+      day: 2,
+      night: {
+        wolfSpeeches: [{ playerId: 1, text: '仅狼队可见的夜聊。' }],
+      },
+      speeches: [],
+    },
+  ];
+  const voteLine = '第1天放逐投票：1号投2号、2号弃票、3号投1号。';
+  const tallyLine = '第1天放逐票型：1号1票、2号1票。';
+
+  const prompts = players.map((actor) => buildWerewolfActionPrompt({
+    runtime: runtime(players, rounds) as never,
+    round: rounds[1] as never,
+    actor: actor as never,
+    actionType: actor === wolf ? 'wolf_vote' : 'day_speech',
+  }));
+
+  prompts.forEach((prompt) => {
+    assert.match(prompt, new RegExp(voteLine));
+    assert.match(prompt, new RegExp(tallyLine));
+    assert.equal(prompt.split(voteLine).length - 1, 1);
+  });
+  assert.match(prompts[0], /仅狼队可见的夜聊/);
+  assert.doesNotMatch(prompts[1], /仅狼队可见的夜聊/);
+  assert.doesNotMatch(prompts[2], /仅狼队可见的夜聊/);
 });
 
 test('werewolf prompt context keeps seer checks private to seer', () => {
@@ -82,6 +133,40 @@ test('werewolf prompt context keeps seer checks private to seer', () => {
   assert.match(seerPrompt, /第1晚查验1号，结果：狼人/);
   assert.doesNotMatch(villagerPrompt, /预言家查验记录/);
   assert.doesNotMatch(villagerPrompt, /结果：狼人/);
+});
+
+test('witch poison prompt does not reveal the current wolf target', () => {
+  const witch = player(3, 'witch', 'good', { usedAntidote: true, usedPoison: false });
+  const players = [
+    player(1, 'werewolf', 'wolves'),
+    player(2, 'villager', 'good'),
+    witch,
+  ];
+  const round = {
+    day: 2,
+    phase: 'night',
+    night: { wolfTarget: 2, deaths: [] },
+  };
+  const ctx = runtime(players, [round]);
+
+  const savePrompt = buildWerewolfActionPrompt({
+    runtime: ctx as never,
+    round: round as never,
+    actor: witch as never,
+    actionType: 'witch_save',
+    taskInstruction: '决定是否使用解药。',
+  });
+  const poisonPrompt = buildWerewolfActionPrompt({
+    runtime: ctx as never,
+    round: round as never,
+    actor: witch as never,
+    actionType: 'witch_poison',
+    taskInstruction: '决定是否使用毒药。',
+    validTargetIds: [1, 2],
+  });
+
+  assert.match(savePrompt, /今晚狼刀目标：2号/);
+  assert.doesNotMatch(poisonPrompt, /今晚狼刀目标/);
 });
 
 test('werewolf prompt context shows wolf teammate live and eliminated status only to wolves', () => {

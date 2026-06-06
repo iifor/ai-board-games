@@ -21,6 +21,7 @@ interface PhaseContext {
   seerResult?: string | null;
   witchSaveUsed?: boolean;
   witchPoisonUsed?: boolean;
+  witchPoisonReason?: string | null;
   guardTarget?: number | string | null;
 }
 
@@ -68,9 +69,11 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
   witch_poison: {
     actionType: 'witch_poison',
     roleName: '女巫',
-    buildMessages: () => ({
+    buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `你有一瓶毒药，你要用吗？`,
-      result: '',
+      result: context?.witchPoisonUsed
+        ? context.witchPoisonReason?.trim() || `女巫毒了${context.target || '?'}号`
+        : ``,
       end: `女巫请闭眼。`,
     }),
   },

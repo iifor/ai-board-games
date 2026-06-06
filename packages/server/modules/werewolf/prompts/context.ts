@@ -30,7 +30,7 @@ interface PromptRound {
   };
   nightRevealed?: boolean;
   speeches?: Array<Record<string, unknown>>;
-  votes?: Record<string, number>;
+  votes?: Record<string, number | null>;
   voteTally?: Record<string, number>;
   exile?: { id: number; reason?: string } | null;
   idiotReveal?: { id: number; reason?: string } | null;
@@ -125,6 +125,13 @@ function buildPublicFacts(state: PromptState, agents: PromptAgent[], includeHist
   for (const round of visibleRounds) {
     lines.push(...formatRoundFacts(round, agents));
   }
+  if (!includeHistory) {
+    const currentRound = visibleRounds[0];
+    const latestVoteRound = [...rounds].reverse().find(hasDayVotes);
+    if (latestVoteRound && Number(latestVoteRound.day) !== Number(currentRound?.day)) {
+      lines.push(...formatDayVoteFacts(latestVoteRound, agents));
+    }
+  }
   return lines.filter(Boolean).join('\n') || '暂无公开事实。';
 }
 
@@ -166,7 +173,7 @@ function buildRecentContext(rounds: PromptRound[], agents: PromptAgent[], actor:
 
 function buildDefaultOutputContract(actionType: string, validTargetIds?: number[]): string {
   if (actionType.includes('speech')) {
-    return `只输出自然语言发言，建议不超过 ${WEREWOLF.DAY_SPEECH_CHAR_LIMIT} 字。`;
+    return `只输出自然语言发言，不超过 ${WEREWOLF.DAY_SPEECH_CHAR_LIMIT} 字。`;
   }
   if (validTargetIds?.length) {
     return `只返回标准 JSON 对象，不要输出 Markdown 或解释。目标必须从这些座位号中选择：${validTargetIds.join('、')}。`;
@@ -190,11 +197,24 @@ function formatRoundFacts(round: PromptRound, agents: PromptAgent[]): string[] {
   if (round.selfDestruct?.playerId) {
     lines.push(`第${day}天自爆：${getSeatNumber(Number(round.selfDestruct.playerId), agents)}号狼人自爆，白天流程中止。`);
   }
-  if (round.votes && Object.keys(round.votes).length) lines.push(`第${day}天放逐投票：${formatVotes(round.votes, agents)}。`);
-  if (round.voteTally && Object.keys(round.voteTally).length) lines.push(`第${day}天放逐票型：${formatTally(round.voteTally, agents)}。`);
+  lines.push(...formatDayVoteFacts(round, agents));
   const electionFacts = formatSheriffElectionFacts(day, round.sheriffElection, agents);
   if (electionFacts) lines.push(electionFacts);
   return lines;
+}
+
+function formatDayVoteFacts(round: PromptRound, agents: PromptAgent[]): string[] {
+  const day = Number(round.day || 0);
+  const lines: string[] = [];
+  if (hasDayVotes(round)) lines.push(`第${day}天放逐投票：${formatVotes(round.votes!, agents)}。`);
+  if (round.voteTally && Object.keys(round.voteTally).length) {
+    lines.push(`第${day}天放逐票型：${formatTally(round.voteTally, agents)}。`);
+  }
+  return lines;
+}
+
+function hasDayVotes(round: PromptRound | undefined): boolean {
+  return Boolean(round?.votes && Object.keys(round.votes).length);
 }
 
 function formatPlayerStatus(agents: PromptAgent[]): string {
@@ -230,17 +250,26 @@ function formatSheriffElectionFacts(day: number, election: Record<string, unknow
   const parts: string[] = [];
   if (Array.isArray(election.signedUpIds) && election.signedUpIds.length) parts.push(`上警：${formatIds(election.signedUpIds as number[], agents)}`);
   if (Array.isArray(election.withdrawnIds) && election.withdrawnIds.length) parts.push(`退水：${formatIds(election.withdrawnIds as number[], agents)}`);
-  if (election.votes && Object.keys(election.votes as Record<string, number>).length) parts.push(`警长投票：${formatVotes(election.votes as Record<string, number>, agents)}`);
-  if (election.runoffVotes && Object.keys(election.runoffVotes as Record<string, number>).length) parts.push(`警长复投：${formatVotes(election.runoffVotes as Record<string, number>, agents)}`);
+  if (election.votes && Object.keys(election.votes as Record<string, number | null>).length) parts.push(`警长投票：${formatVotes(election.votes as Record<string, number | null>, agents)}`);
+  if (election.runoffVotes && Object.keys(election.runoffVotes as Record<string, number | null>).length) parts.push(`警长复投：${formatVotes(election.runoffVotes as Record<string, number | null>, agents)}`);
   return parts.length ? `第${day}天警长流程：${parts.join('；')}。` : '';
 }
 
-function formatVotes(votes: Record<string, number>, agents: PromptAgent[]): string {
-  return Object.entries(votes).map(([from, to]) => `${getSeatNumber(Number(from), agents)}号->${getSeatNumber(Number(to), agents)}号`).join('、');
+function formatVotes(votes: Record<string, number | null>, agents: PromptAgent[]): string {
+  return Object.entries(votes)
+    .sort(([left], [right]) => getSeatNumber(Number(left), agents) - getSeatNumber(Number(right), agents))
+    .map(([from, to]) => {
+      const voter = `${getSeatNumber(Number(from), agents)}号`;
+      return to == null ? `${voter}弃票` : `${voter}投${getSeatNumber(Number(to), agents)}号`;
+    })
+    .join('、');
 }
 
 function formatTally(tally: Record<string, number>, agents: PromptAgent[]): string {
-  return Object.entries(tally).map(([target, count]) => `${getSeatNumber(Number(target), agents)}号${count}票`).join('、');
+  return Object.entries(tally)
+    .sort(([left], [right]) => getSeatNumber(Number(left), agents) - getSeatNumber(Number(right), agents))
+    .map(([target, count]) => `${getSeatNumber(Number(target), agents)}号${count}票`)
+    .join('、');
 }
 
 function formatIds(ids: number[], agents: PromptAgent[]): string {

@@ -162,9 +162,11 @@ werewolf workflow step
 
 - 解药是否还在。
 - 毒药是否还在。
-- 当晚是否存在狼刀目标。
+- 仅在解药未使用且进入 `witch_save` 行动时可见当晚狼刀目标。
 - 自己是否选择救人。
 - 自己是否选择毒人。
+
+解药已使用后不再创建 `witch_save` prompt。毒药仍在时可以继续创建独立的 `witch_poison` prompt，但该 prompt 不得包含 `wolfTarget`、当晚死亡玩家或可推导刀口的描述；两瓶药均耗尽或女巫已出局时不再发起女巫夜间 LLM 调用。
 
 守卫可见：
 
@@ -311,6 +313,7 @@ werewolf workflow step
 - 白天放逐结果必须同步给所有后续行动 prompt。
 - 警徽信息不能只在确认时出现，后续 prompt 和展示状态都要保留。
 - 投票结果应进入公开事实，后续发言和投票 prompt 应能引用。
+- 最近一次已完成的白天放逐投票属于持续公开事实。进入下一天后，所有合法玩家的后续 prompt 仍需列出每位投票玩家的目标；`null` 目标明确显示为“X号弃票”，并按投票玩家座位号排序。
 - 已出局玩家不能进入合法目标列表。
 - 私密角色结果不能出现在 public `werewolf_phase_result` 或 audience display event 中。
 - 私密夜间行动 reason 不能进入 public/audience display event。
@@ -334,3 +337,7 @@ werewolf workflow step
 - `guard_protect` 的 Engine Core payload 允许目标为空；空守通过 schema 校验，但不创建 `protect` effect。
 - 每次结构化 LLM 调用只保留一份输出契约和一份合法目标列表。`taskInstruction` 只描述任务，`outputContract` 负责 JSON schema、示例和合法目标。
 - 当 action prompt 已由 `buildWerewolfPromptBundle()` 提供完整契约时，调用方必须设置 `promptHasContract`，避免 `BasePlayerAgent` 再次追加通用 JSON-only 文案或目标列表。
+- `witch_poison` 使用毒药时必须返回简短 `reason`。该原因只允许进入女巫或上帝视角的私密完成事件；缺失时播报“女巫毒了 X 号”，未使用时播报“女巫没有使用毒药”。
+- `witch_save` 的刀口上下文仅在解药可用时生成；解药耗尽、平安夜或女巫不可行动时对应 step 静默跳过，不生成替代 prompt。
+- `sheriff_badge_disposition` 允许死亡警长作为 actor，输出 `{"action":"transfer","target":座位号,"reason":"..."}` 或 `{"action":"tear","target":null,"reason":"..."}`；输出非法或调用失败时由规则层撕毁警徽。
+- `sheriff_speech_direction` 由当前存活警长执行，输出 `{"direction":"clockwise|counterclockwise","reason":"简短原因"}`。非法输出或调用失败时由规则层随机选择方向；警长固定最后发言。

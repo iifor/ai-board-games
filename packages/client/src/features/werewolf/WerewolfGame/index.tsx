@@ -355,8 +355,14 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       setSeerCheckTarget(event.seerCheck?.target || null);
       return;
     }
+    if (event.type === 'wolf-vote') {
+      setNightActionType(event.type);
+      setNightActionActorIds([]);
+      setSeerCheckTarget(null);
+      return;
+    }
     if (event.type === 'witch-action') {
-      setNightActionType((current) => current.includes('poison') ? 'witch-poison-action' : 'witch-antidote-action');
+      setNightActionType(event.actionType === 'witch_poison' || event.witchAction ? 'witch-poison-action' : 'witch-antidote-action');
       setSeerCheckTarget(null);
       return;
     }
@@ -436,7 +442,17 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   }
 
   function mapWorkflowEventType(workflowEvent: string): string {
-    if (['wolf-wake', 'wolf-leader', 'seer-wake', 'guard-wake', 'witch-antidote', 'witch-poison'].includes(workflowEvent)) {
+    if ([
+      'wolf-wake',
+      'wolf-leader',
+      'wolf-vote',
+      'seer-wake',
+      'seer-check',
+      'guard-wake',
+      'witch-antidote',
+      'witch-poison',
+      'witch-action',
+    ].includes(workflowEvent)) {
       return workflowEvent;
     }
     return '';

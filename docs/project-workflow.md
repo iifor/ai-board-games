@@ -168,6 +168,14 @@ flowchart TD
 狼队刀口 event 是 `scope: wolves`，只表达狼队内部目标选择，不公开给普通观众，也不直接造成死亡。
 女巫相关 event 仍是 `scope: witch`，不会公开给普通观众；公开死亡结算仍由现有夜间结算流程处理。
 
+女巫夜间行动资格按药瓶独立计算：
+
+- `witch_save` 仅在女巫存活、解药未使用且当晚存在狼刀目标时打开；只有此时女巫 prompt 和私密展示事件才能携带刀口。
+- 解药已使用或平安夜时，解药 step 直接完成，不创建 action window，也不产生 C 端唤醒、结果或跳过展示。
+- `witch_poison` 只依赖女巫存活、毒药未使用及 `onePotionPerNight` 限制，不因解药耗尽而失效，且其提示不得携带 `wolfTarget`。
+- 两瓶药均耗尽或女巫已出局时，两个固定 workflow step 都静默跳过；跳过原因只写入 `channel: system` 的审计事件。
+- `EventDeliverySubscriber` 不向实时播放回调交付 system channel，确保内部跳过和审计不会进入精确回放事件。
+
 夜间死亡结算已新增旁路 resolver：
 
 - `night_resolution` effect -> `night_resolved` public event，只公开 `day/deaths/message`。
@@ -320,7 +328,7 @@ pnpm run test:workflow
 
 - `seer_check`：`scope: seer`，记录查验目标和阵营结果。
 - `guard_protect`：`scope: guard`，记录守护目标。
-- `witch_save`：`scope: witch`，记录是否使用解药、救人目标和狼刀目标。
+- `witch_save`：`scope: witch`，仅在解药可用时记录是否使用解药、救人目标和狼刀目标。
 - `witch_poison`：`scope: witch`，记录是否使用毒药和毒杀目标。
 - `hunter_shot`：`public`，记录开枪目标和触发原因。
 
@@ -342,9 +350,11 @@ pnpm run test:workflow
 
 狼人杀 AI 使用“完整开局一次 + 持久会话 + 动态增量上下文”。每次行动由 `prompts/context.ts` 生成 prompt bundle，包含 `systemRules / publicFacts / privateKnowledge / recentContext / taskInstruction / outputContract`，再通过普通 `askText / askJson / askVoteTarget` 写入当前玩家会话。会话按 `werewolf + matchId + sourcePlayerId` 保存到 `memory_snapshots`，裁剪后保留开局 system、结构化摘要和最近 12 组原始对话。
 
-公开事实必须从完整 `state.rounds` 聚合，而不是只看当前 round。后续任意发言、投票、夜间行动 prompt 都应同步夜晚死亡、白天放逐出局、白痴翻牌、猎人开枪、警长结果、警徽流转、上一轮投票结果、当前存活/已出局名单。白天放逐后，下一晚和下一天 prompt 必须包含 `X号被放逐出局`，并且该玩家不能再出现在合法投票目标中。
+公开事实必须从完整 `state.rounds` 聚合，而不是只看当前 round。后续任意发言、投票、夜间行动 prompt 都应同步夜晚死亡、白天放逐出局、白痴翻牌、猎人开枪、警长结果、警徽流转、最近一次已完成的白天放逐票型、当前存活/已出局名单。放逐票型需要列出每位玩家投给谁，弃票显示为“X号弃票”；进入下一天后仍对所有合法玩家可见。白天放逐后，该玩家不能再出现在合法投票目标中。
 
 私密信息只进入对应玩家的 prompt：狼人看到狼队友座位号和存活/已出局状态，预言家只看到自己的 `seerChecks`，女巫只看到自己的用药状态，守卫只看到自己的守护状态。非对应角色不得收到这些私密反馈。
+
+女巫刀口属于有条件的私密信息：仅构建可执行的 `witch_save` prompt 时注入。解药已使用后，即使毒药仍在，后续 `witch_poison` prompt 也只能包含药品状态和合法毒杀目标，不得读取或描述当晚狼刀目标。
 
 狼人杀和辩论赛会在开局 prompt 中注入当前参赛玩家的跨局聚合画像。画像按 `gameType + ownerPlayerId + subjectPlayerId` 隔离，只学习公开行为、比赛结果和赛后公开身份；不保存狼聊、查验、用药等局中私密过程。至少共同参赛两局后才达到首版注入阈值；每名对手最多两条特征，单条约 100 字，总长度硬限制约 1200 字，并明确标注为历史印象而非本局身份判断。
 
@@ -354,4 +364,18 @@ pnpm run test:workflow
 
 - `vote-result` 必须保留 `votes/tally/exile`，并尽量携带结算后的 `game` 和最新 `round`，用于 C 端展示玩家投票箭头/角标和放逐结果。
 - 警长事件必须保留 `sheriffElection/sheriffId/sheriffTransfer`，用于 C 端持续展示警徽、警长候选人和警徽流转。
+- `wolf-vote` 完成事件携带动作后快照及 `wolfTarget/wolfChoices/wolfVoteTally`，保持 `scope: wolves`。
+- `seer-check` 完成事件携带动作后快照及 `seerCheck: { target, result }`，保持 `scope: seer`。
+- `witch-action` 毒药完成事件携带动作后快照及 `witchAction: { use, target, reason }`，保持 `scope: witch`；`use` 仅在严格等于 `true` 时视为用毒。
 - 这些字段属于展示状态，不改变 HTTP API 或数据库；C 端会与本地已知 `game.rounds` 做合并，而不是直接覆盖完整状态。
+
+死亡结算按“死亡技能 -> 警徽处置 -> 胜负检查”继续执行。死亡警长通过 `sheriff_badge_disposition` 行动窗决定移交或撕毁；AI 失败、非法目标或无存活目标时降级为撕毁。处置会更新 `sheriffId/sheriffBadge/sheriffTransfers`，并发布公开的 `sheriff-badge-transfer` 或 `sheriff-badge-tear`，同一死亡警长只处理一次。
+
+白天正式发言前执行 `sheriff_speech_direction`：
+
+- 当前有效警长存活时，由警长选择 `clockwise/counterclockwise`，从该方向的下一名存活玩家开始，警长最后发言。
+- 警长方向非法或 AI 失败时随机降级，并将结果写入 `round.daySpeech`。
+- 无警长且有夜间死亡时，以最后播报的死者为基准，从顺时针后置位开始；平安夜随机起点并顺时针发言。
+- 当前警长从历史回合和 `sheriffTransfers` 解析，支持跨天及警徽移交。
+
+所有实际出局入口在死亡技能和警徽流结束后统一调用 `resolveWinAfterDeaths`。夜间有效狼人击杀会先基于“只应用该狼人击杀后的中间阵容”检查狼人胜利；若已屠边或满足当前模式的狼人胜利条件，则在当前 round 写入内部 `winnerLock`。同夜毒药、猎人开枪和警徽流继续执行，但最终胜负不得覆盖该狼人锁定结果。被守护或解药抵消的狼刀不会建立锁定。`winnerLock` 仅用于服务端工作流，不进入 C 端快照。

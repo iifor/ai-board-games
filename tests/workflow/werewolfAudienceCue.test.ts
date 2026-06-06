@@ -41,3 +41,27 @@ test('audience cue is preserved as flat socket event with text', async () => {
     once: true
   });
 });
+
+test('system events are not delivered to the playback callback', async () => {
+  const bus = new WerewolfEventBus();
+  const delivered: Array<Record<string, unknown>> = [];
+  const subscriber = createEventDeliverySubscriber(bus, (event) => {
+    delivered.push(event);
+  });
+  subscriber.start();
+
+  const builder = createGameEventBuilder('m-system-filter');
+  const event = builder
+    .setStep('witch_save_2')
+    .setPhase('night')
+    .setDay(2)
+    .build('action-skipped', {
+      actionType: 'witch_save',
+      skipReason: 'antidote_depleted',
+    }, 'system');
+
+  await bus.publish(event);
+  subscriber.stop();
+
+  assert.deepEqual(delivered, []);
+});

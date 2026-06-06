@@ -13,7 +13,8 @@ import { getAliveActorsByAction } from './actionWindows';
 import {
   applySheriffActionResults,
   getSheriffActorsForAction,
-  getSheriffTargetIds
+  getSheriffTargetIds,
+  resolveActiveSheriffId
 } from './sheriffWorkflow';
 import { ensureWolfTeamContext } from './wolfTeam';
 
@@ -60,7 +61,7 @@ interface Round {
   sheriffElection?: Record<string, unknown> | null;
   sheriffBadge?: { status: string };
   speeches?: Array<Record<string, unknown>>;
-  votes?: Record<string, number>;
+  votes?: Record<string, number | null>;
   voteTally?: Record<string, number>;
   exile?: { id: number; reason: string } | null;
   idiotReveal?: { id: number; reason: string } | null;
@@ -103,6 +104,19 @@ interface ActionResult {
     [key: string]: unknown;
   };
   [key: string]: unknown;
+}
+
+type WitchActionType = 'witch_save' | 'witch_poison';
+type WitchActionSkipReason =
+  | 'witch_unavailable'
+  | 'antidote_depleted'
+  | 'poison_depleted'
+  | 'no_wolf_target'
+  | 'one_potion_per_night';
+
+interface WitchActionEligibility {
+  actor: Agent | null;
+  skipReason: WitchActionSkipReason | null;
 }
 
 function applyActionResults(runtime: Runtime, step: Step, results: ActionResult[]): void {
@@ -196,7 +210,7 @@ function applyWitchSave(runtime: Runtime, round: Round, results: ActionResult[])
 function applyWitchPoison(runtime: Runtime, round: Round, results: ActionResult[]): void {
   const result = results[0]?.payload;
   const witch = runtime.agents.find((agent) => Number(agent.id) === Number(results[0]?.actorId));
-  if (!result?.use || !result.target) return;
+  if (result?.use !== true || !result.target) return;
   round.night.witchPoisonTarget = result.target as number;
   if (witch) witch.usedPoison = true;
 }
@@ -222,9 +236,10 @@ function applyDaySpeech(round: Round, results: ActionResult[], agents?: Agent[])
 function applyDayVote(runtime: Runtime, round: Round, results: ActionResult[]): void {
   round.votes = {};
   for (const result of results) {
-    round.votes![result.actorId] = result.payload.target!;
+    const target = result.payload.target ?? null;
+    round.votes![result.actorId] = target;
     const actor = runtime.agents.find((agent) => Number(agent.id) === Number(result.actorId));
-    if (actor) actor.votes!.push({ day: round.day, target: result.payload.target });
+    if (actor) actor.votes!.push({ day: round.day, target });
   }
 }
 
@@ -244,18 +259,20 @@ function buildDaySpeechOrder(runtime: Runtime, round: Round): Agent[] {
       .filter(Boolean) as Agent[];
   }
 
-  const sheriffId = round.sheriffId ? Number(round.sheriffId) : null;
+  const sheriffId = resolveActiveSheriffId(runtime, round);
 
   // 优先级 A：有警长 → 警长指定顺时针/逆时针发言
   if (sheriffId && alive.some((a) => Number(a.id) === sheriffId)) {
     const daySpeech = round.daySpeech as Record<string, unknown> | undefined;
-    const direction = String(daySpeech?.direction || 'clockwise');
+    const direction = daySpeech?.direction === 'counterclockwise' ? 'counterclockwise' : 'clockwise';
     const ordered = getSheriffSpeechOrder(alive, sheriffId, direction);
+    const startPlayerId = ordered[0]?.id;
     // 写入 round.daySpeech 供前端和 AI 记忆使用
     round.daySpeech = {
       source: 'sheriff',
       direction,
       sheriffId,
+      startPlayerId,
       playerIds: ordered.map((a) => Number(a.id)),
     };
     return ordered as Agent[];
@@ -267,7 +284,7 @@ function buildDaySpeechOrder(runtime: Runtime, round: Round): Agent[] {
     const startId = getNextAliveId(alive, deathId, 'clockwise') ?? alive[0].id;
     const ordered = rotateFromSeat(alive, startId, 'clockwise') as Agent[];
     round.daySpeech = {
-      source: 'death',
+      source: 'night-death',
       direction: 'clockwise',
       startPlayerId: startId,
       deathId,
@@ -310,17 +327,39 @@ function getActorsForStep(runtime: Runtime, step: Step, round: Round): Agent[] {
   }
   if (actionType === 'seer_check') return actors('inspectFaction').slice(0, 1);
   if (actionType === 'guard_protect') return actors('guard').slice(0, 1);
-  if (actionType === 'witch_save') return round.night?.wolfTarget ? actors('save').slice(0, 1) : [];
-  if (actionType === 'witch_poison') {
-    const witch = actors('poison').find((agent) => !agent.usedPoison);
-    const modeConfig = runtime.modeConfig as Record<string, unknown> | undefined;
-    const witchConfig = modeConfig?.witch as Record<string, unknown> | undefined;
-    return witch && !(witchConfig?.onePotionPerNight && round.night?.witchSave) ? [witch] : [];
+  if (actionType === 'witch_save' || actionType === 'witch_poison') {
+    const eligibility = getWitchActionEligibility(runtime, round, actionType);
+    return eligibility.actor ? [eligibility.actor] : [];
   }
   if (actionType === 'day_speech') return buildDaySpeechOrder(runtime, round);
   if (actionType === 'day_vote') return sortBySeat(runtime.agents.filter((agent) => agent.alive && agent.canVote));
   if (actionType?.startsWith('sheriff_')) return getSheriffActorsForAction(runtime, round, actionType);
   return [];
+}
+
+function getWitchActionEligibility(
+  runtime: Runtime,
+  round: Round,
+  actionType: WitchActionType,
+): WitchActionEligibility {
+  const action = actionType === 'witch_save' ? 'save' : 'poison';
+  const candidates = getAliveActorsByAction(runtime, action) as unknown as Agent[];
+  if (!candidates.length) return { actor: null, skipReason: 'witch_unavailable' };
+
+  if (actionType === 'witch_save') {
+    const actor = candidates.find((candidate) => !candidate.usedAntidote) || null;
+    if (!actor) return { actor: null, skipReason: 'antidote_depleted' };
+    if (!round.night?.wolfTarget) return { actor: null, skipReason: 'no_wolf_target' };
+    return { actor, skipReason: null };
+  }
+
+  const actor = candidates.find((candidate) => !candidate.usedPoison) || null;
+  if (!actor) return { actor: null, skipReason: 'poison_depleted' };
+  const witchConfig = runtime.modeConfig?.witch as Record<string, unknown> | undefined;
+  if (witchConfig?.onePotionPerNight && round.night?.witchSave) {
+    return { actor: null, skipReason: 'one_potion_per_night' };
+  }
+  return { actor, skipReason: null };
 }
 
 function getTargetIds(runtime: Runtime, step: Step): number[] {
@@ -366,10 +405,20 @@ function ensureRound(state: State, day: number): Round {
 export {
   applyActionResults,
   getActorsForStep,
+  getWitchActionEligibility,
   getTargetIds,
   findPendingHunter,
   applySelfDestruct,
   hasSelfDestruct
 };
 
-export type { ActionResult, Agent, Round, Runtime, Step };
+export type {
+  ActionResult,
+  Agent,
+  Round,
+  Runtime,
+  Step,
+  WitchActionEligibility,
+  WitchActionSkipReason,
+  WitchActionType,
+};

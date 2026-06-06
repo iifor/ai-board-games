@@ -323,9 +323,12 @@ export function getWerewolfNightActionBadges(round: WerewolfRound | null, player
   const badges: NightBadge[] = [];
 
   const wolfVoteTarget = night.wolfChoices?.[player.id];
-  if (wolfVoteTarget && (player.faction === 'wolves' || player.role === 'werewolf')) {
-    if (nightActionType === 'wolf-wake' || nightActionType === 'wolf-leader') {
+  if (player.faction === 'wolves' || player.role === 'werewolf') {
+    if (wolfVoteTarget && (nightActionType === 'wolf-wake' || nightActionType === 'wolf-leader')) {
       badges.push(createNightTargetBadge('wolf', wolfVoteTarget, players, { titlePrefix: '夜投' }));
+    }
+    if (night.wolfTarget && nightActionType === 'wolf-vote') {
+      badges.push(createNightTargetBadge('wolf', night.wolfTarget, players, { prefix: '刀', titlePrefix: '刀口' }));
     }
   }
   if (player.role === 'seer' && night.seerCheck?.target) {
@@ -363,7 +366,7 @@ export function getNightActionPlayerIds(eventType: string, players: Player[] = [
     'witch-poison-action': 'witch'
   };
 
-  if (eventType === 'wolf-wake' || eventType === 'wolf-leader') {
+  if (eventType === 'wolf-wake' || eventType === 'wolf-leader' || eventType === 'wolf-vote') {
     return players
       .filter((player) => player.alive && (player.faction === 'wolves' || player.role === 'werewolf'))
       .map((player) => Number(player.id))

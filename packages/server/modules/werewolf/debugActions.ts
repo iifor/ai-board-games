@@ -52,12 +52,20 @@ function runDebugWerewolfAction(runtime: DebugRuntime, round: DebugRound, actor:
   if (actionType === 'sheriff_vote') return { target: firstSheriffTarget(round, alive, actor) };
   if (actionType === 'sheriff_runoff_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
   if (actionType === 'sheriff_runoff_vote') return { target: firstSheriffTarget(round, alive, actor, 'runoffCandidateIds') };
+  if (actionType === 'sheriff_speech_direction') return { direction: 'clockwise', reason: 'debug-direction' };
   return {};
 }
 
 function runDebugHunterAction(runtime: DebugRuntime, actor: DebugAgent): Record<string, unknown> {
   const alive = (runtime.agents || []).filter((agent) => agent.alive !== false && Number(agent.id) !== Number(actor.id));
   return { target: alive[0]?.id || null };
+}
+
+function runDebugSheriffBadgeAction(runtime: DebugRuntime, actor: DebugAgent): Record<string, unknown> {
+  const target = (runtime.agents || []).find((agent) => agent.alive !== false && Number(agent.id) !== Number(actor.id));
+  return target
+    ? { action: 'transfer', target: target.id, reason: 'debug-transfer' }
+    : { action: 'tear', target: null, reason: 'no-valid-target' };
 }
 
 function debugSpeech(actor: DebugAgent, agents?: DebugAgent[]): string {
@@ -82,6 +90,6 @@ export {
   isWerewolfDebugMode,
   runDebugWerewolfAction,
   runDebugHunterAction,
+  runDebugSheriffBadgeAction,
   debugSpeech
 };
-

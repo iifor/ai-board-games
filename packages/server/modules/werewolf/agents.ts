@@ -124,7 +124,7 @@ interface Round {
   sheriffTransfers: Array<Record<string, unknown>>;
   daySpeech: Record<string, unknown> | null;
   speeches: Array<Record<string, unknown>>;
-  votes: Record<string, number>;
+  votes: Record<string, number | null>;
   voteTally: Record<string, number>;
   exile: { id: number; reason: string } | null;
   idiotReveal: { id: number; reason: string } | null;
@@ -306,7 +306,8 @@ function publicHost(host: Record<string, unknown> = {}): PublicHost {
 }
 
 function publicRound(round: Round): Round {
-  return { ...round, night: publicNight(round.night, !round.nightRevealed) };
+  const { winnerLock: _winnerLock, ...visible } = round as Round & { winnerLock?: unknown };
+  return { ...visible, night: publicNight(round.night, !round.nightRevealed) } as Round;
 }
 
 function publicNight(night: Night, hideDeaths: boolean = false): Night {

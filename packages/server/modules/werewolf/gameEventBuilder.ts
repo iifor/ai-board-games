@@ -273,7 +273,7 @@ export class GameEventBuilder {
 
   // 投票结果事件
   buildVoteResult(
-    votes: Record<string, number>,
+    votes: Record<string, number | null>,
     tally: Record<string, number>,
     exile: { id: number; reason?: string } | null,
     message: string
@@ -380,19 +380,23 @@ export class GameEventBuilder {
   }
 
   // 警徽事件
-  buildSheriffBadgeTransfer(transfer: Record<string, unknown>): GameEvent<Record<string, unknown>> {
+  buildSheriffBadgeTransfer(transfer: Record<string, unknown>, message: string): GameEvent<Record<string, unknown>> {
     return this.build(
       'sheriff-badge-transfer',
-      { sheriffTransfer: transfer },
-      CHANNEL_TYPES.PUBLIC
+      { sheriffTransfer: transfer, message },
+      CHANNEL_TYPES.PUBLIC,
+      undefined,
+      { message }
     );
   }
 
-  buildSheriffBadgeTear(transfer: Record<string, unknown>): GameEvent<Record<string, unknown>> {
+  buildSheriffBadgeTear(transfer: Record<string, unknown>, message: string): GameEvent<Record<string, unknown>> {
     return this.build(
       'sheriff-badge-tear',
-      { sheriffTransfer: transfer },
-      CHANNEL_TYPES.PUBLIC
+      { sheriffTransfer: transfer, message },
+      CHANNEL_TYPES.PUBLIC,
+      undefined,
+      { message }
     );
   }
 

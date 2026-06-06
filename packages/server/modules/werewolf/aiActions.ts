@@ -19,7 +19,7 @@ import { topTarget } from './winCheck';
 import { rotateFromSeat, getSeatNumber } from './utils';
 import { getAliveActorsByAction } from './actionWindows';
 import { ensureWolfTeamContext } from './wolfTeam';
-import { isWerewolfDebugMode, runDebugHunterAction, runDebugWerewolfAction } from './debugActions';
+import { isWerewolfDebugMode, runDebugHunterAction, runDebugSheriffBadgeAction, runDebugWerewolfAction } from './debugActions';
 import { resolveActionChannel } from '@ai-presenter/shared/utils/channelResolution';
 import { serializeWerewolfState } from './runtime';
 
@@ -79,6 +79,7 @@ async function runWerewolfAiAction(runtime: Runtime, round: Round, actor: Agent,
   if (actionType === 'sheriff_vote') return runSheriffVoteAction(runtime, round, actor, taskTargetIds(runtime, round, 'sheriff_vote'));
   if (actionType === 'sheriff_runoff_speech') return runSheriffSpeechAction(runtime, round, actor, true);
   if (actionType === 'sheriff_runoff_vote') return runSheriffVoteAction(runtime, round, actor, taskTargetIds(runtime, round, 'sheriff_runoff_vote'));
+  if (actionType === 'sheriff_speech_direction') return runSheriffSpeechDirectionAction(runtime, round, actor);
   throw Object.assign(new Error(`Unsupported werewolf action: ${actionType}`), { severity: 'high' });
 }
 
@@ -167,6 +168,59 @@ async function runHunterAiTask({ match, step, task }: { match: Match; step: Step
       payload: { actionType: 'hunter_shot', actorId: actor.id, target: null, reason: 'ai-failed' }
     };
   }
+}
+
+async function runSheriffBadgeAiTask({ match, step, task }: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
+  const runtime: Runtime = createRuntime(repo.getMatch(match.id) || match);
+  const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
+  if (!actor) throw Object.assign(new Error(`Sheriff not found: ${task.playerId}`), { severity: 'high' });
+  const aliveTargets = runtime.agents
+    .filter((agent) => agent.alive && Number(agent.id) !== Number(actor.id))
+    .map((agent) => Number(agent.id));
+  if (!aliveTargets.length) {
+    return sheriffBadgeResult(actor.id, { action: 'tear', target: null, reason: 'no-valid-target' });
+  }
+  if (isWerewolfDebugMode(runtime)) {
+    return sheriffBadgeResult(actor.id, runDebugSheriffBadgeAction(runtime, actor));
+  }
+  try {
+    const round = ensureRound(runtime.state, step.config.day || 1);
+    const result = await askJson(actor, buildActionPrompt(
+      runtime,
+      round,
+      actor,
+      'sheriff_badge_disposition',
+      '你已经死亡。请决定将警徽移交给一名存活玩家，或撕毁警徽。',
+      [
+        '只返回标准 JSON 对象。',
+        `可移交目标：${aliveTargets.join('、')}。`,
+        '移交：{"action":"transfer","target":2,"reason":"简短原因"}。',
+        '撕毁：{"action":"tear","target":null,"reason":"简短原因"}。',
+      ].join('\n'),
+      aliveTargets,
+    ), { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled });
+    const target = Number(result?.target);
+    const validTransfer = result?.action === 'transfer' && aliveTargets.includes(target);
+    return sheriffBadgeResult(actor.id, validTransfer
+      ? { action: 'transfer', target, reason: result?.reason }
+      : { action: 'tear', target: null, reason: result?.reason || 'invalid-output' });
+  } catch {
+    return sheriffBadgeResult(actor.id, { action: 'tear', target: null, reason: 'ai-failed' });
+  }
+}
+
+function sheriffBadgeResult(actorId: number, payload: Record<string, unknown>): ActionResult {
+  return {
+    eventType: 'werewolf_action_submitted',
+    rawOutput: payload,
+    payload: { actionType: 'sheriff_badge_disposition', actorId, ...payload },
+  };
+}
+
+async function runDeathActionAiTask(input: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
+  return input.task.action === 'sheriff_badge_disposition'
+    ? runSheriffBadgeAiTask(input)
+    : runHunterAiTask(input);
 }
 
 function validateActionWindowAiResult({ result }: { result: { payload?: { actionType?: string; actorId?: unknown } } }): void {
@@ -293,6 +347,12 @@ async function runWolfVoteAction(runtime: Runtime, round: Round, actor: Agent, a
     promptHasContract: true,
   });
   return { target }; // null = 弃票
+}
+
+function validateDeathActionAiResult({ result }: { result: { payload?: { actorId?: unknown; actionType?: unknown } } }): void {
+  if (!result?.payload?.actorId || !result.payload.actionType) {
+    throw Object.assign(new Error('Death action result is invalid'), { severity: 'high' });
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -461,6 +521,31 @@ async function runSheriffVoteAction(runtime: Runtime, round: Round, actor: Agent
     promptHasContract: true,
   });
   return { target }; // null = 弃票
+}
+
+async function runSheriffSpeechDirectionAction(runtime: Runtime, round: Round, actor: Agent): Promise<Record<string, unknown>> {
+  try {
+    const prompt = buildActionPrompt(
+      runtime,
+      round,
+      actor,
+      'sheriff_speech_direction',
+      '你是当前警长。请选择本轮白天发言按顺时针或逆时针进行；你将在最后发言。',
+      '只返回标准 JSON：{"direction":"clockwise","reason":"简短原因"} 或 {"direction":"counterclockwise","reason":"简短原因"}。'
+    );
+    const parsed = await askJson(actor, prompt, {
+      maxTokens: 80,
+      skillId: 'sheriff_speech_direction',
+      phase: 'day',
+      promptHasContract: true,
+    });
+    const direction = parsed?.direction === 'clockwise' || parsed?.direction === 'counterclockwise'
+      ? parsed.direction
+      : Math.random() < 0.5 ? 'clockwise' : 'counterclockwise';
+    return { direction, reason: typeof parsed?.reason === 'string' ? parsed.reason : '' };
+  } catch {
+    return { direction: Math.random() < 0.5 ? 'clockwise' : 'counterclockwise', reason: 'ai-failed' };
+  }
 }
 
 // ============================================================
@@ -678,6 +763,9 @@ export {
   runWerewolfAiAction,
   runActionWindowAiTask,
   runHunterAiTask,
+  runSheriffBadgeAiTask,
+  runDeathActionAiTask,
   validateActionWindowAiResult,
-  validateHunterAiResult
+  validateHunterAiResult,
+  validateDeathActionAiResult,
 };

@@ -145,6 +145,84 @@ test('night resolve shadow audit is emitted when hunter window pauses resolution
   }
 });
 
+test('wolf kill priority stays locked when dead last god hunter shoots the last wolf', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+    const state = createState();
+    state.modeConfig = { ...(state.modeConfig as Record<string, unknown>), winCondition: 'side' };
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill'], { roleConfig: { id: 'werewolf', faction: 'wolves', roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+      player(2, 'hunter', 'good', ['shootOnDeath'], { roleConfig: { id: 'hunter', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'shootOnDeath' }] } } }),
+      player(3, 'villager', 'good', [], { roleConfig: { id: 'villager', faction: 'good', roleType: 'villager', rule: { actions: [] } } }),
+    ];
+    state.rounds[0].night.wolfTarget = 2;
+    const match = { id: 'm-wolf-priority', config: { players: state.players }, createdAt: 'now' };
+    const step = { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } };
+    const handler = createNightResolveHandler();
+
+    const opened = handler.execute({ match, step, state } as never);
+    assert.equal(opened.state?.rounds[0].winnerLock?.winner, 'wolves');
+    assert.equal(opened.events?.[0].payload.game.rounds[0].winnerLock, undefined);
+    tasks.push(...(opened.tasks || []));
+    tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 2, result: { payload: { target: 1 } } };
+    const completed = handler.execute({ match, step, state: opened.state } as never);
+
+    assert.equal(completed.status, 'COMPLETED');
+    assert.equal(completed.state?.winner, 'wolves');
+    assert.equal(completed.state?.players.find((item: Record<string, unknown>) => Number(item.id) === 1).alive, false);
+    assert.equal((completed.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_game_completed').length, 1);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('hunter shooting the last wolf gives good victory when wolf kill did not complete a side', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+    const state = createState();
+    state.modeConfig = { ...(state.modeConfig as Record<string, unknown>), winCondition: 'side' };
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill'], { roleConfig: { id: 'werewolf', faction: 'wolves', roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+      player(2, 'hunter', 'good', ['shootOnDeath'], { roleConfig: { id: 'hunter', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'shootOnDeath' }] } } }),
+      player(3, 'seer', 'good', ['inspectFaction'], { roleConfig: { id: 'seer', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'inspectFaction' }] } } }),
+      player(4, 'villager', 'good', [], { roleConfig: { id: 'villager', faction: 'good', roleType: 'villager', rule: { actions: [] } } }),
+    ];
+    state.rounds[0].night.wolfTarget = 2;
+    const match = { id: 'm-hunter-good-win', config: { players: state.players }, createdAt: 'now' };
+    const step = { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } };
+    const handler = createNightResolveHandler();
+
+    const opened = handler.execute({ match, step, state } as never);
+    tasks.push(...(opened.tasks || []));
+    tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 2, result: { payload: { target: 1 } } };
+    const completed = handler.execute({ match, step, state: opened.state } as never);
+
+    assert.equal(completed.status, 'COMPLETED');
+    assert.equal(completed.state?.winner, 'good');
+    assert.equal((completed.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_game_completed').length, 1);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
 test('wolf speech window opens all wolves but queues speakers in leader order before vote', () => {
   const original = snapshotRepo(repo);
   const tasks: Array<Record<string, unknown>> = [];
@@ -279,12 +357,13 @@ test('human pending action submission lets werewolf action window continue', () 
     assert.equal(waiting.status, 'WAITING');
     pendingActions.forEach((action) => {
       action.status = 'submitted';
-      action.payload = { target: 2 };
+      action.payload = { target: Number(action.playerId) === 3 ? null : 2 };
     });
 
     const completed = handler.execute({ match, step, state: waiting.state } as never);
     assert.equal(completed.status, 'COMPLETED');
     assert.equal(completed.state?.rounds[0].votes[1], 2);
+    assert.equal(completed.state?.rounds[0].votes[3], null);
     assert.equal(completed.events?.[0].type, 'werewolf_action_submitted');
   } finally {
     patchRepo(repo, original);
@@ -330,6 +409,125 @@ test('witch close eyes is emitted only after poison phase', () => {
     const closeEvents = (poisonCompleted.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_phase_end');
     assert.equal(closeEvents.length, 1);
     assert.equal((closeEvents[0] as Record<string, unknown>).payload.message, '女巫请闭眼。');
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('depleted antidote skips privately while remaining poison still opens', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect,
+    });
+
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'witch', 'good', ['save', 'poison'], { usedAntidote: true, usedPoison: false }),
+      player(3, 'villager', 'good', []),
+    ];
+    state.rounds[0].night.wolfTarget = 3;
+    const match = { id: 'm-witch-antidote-depleted', config: { players: state.players }, createdAt: 'now' };
+    const handler = createActionWindowHandler();
+
+    const saveResult = handler.execute({
+      match,
+      step: { id: 'witch_save_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'witch_save', optional: true } },
+      state,
+    } as never);
+    assert.equal(saveResult.status, 'COMPLETED');
+    assert.equal(saveResult.events?.length, 1);
+    assert.equal(saveResult.events?.[0].channel, 'system');
+    assert.equal(saveResult.events?.[0].visibility, 'system');
+    assert.equal(saveResult.events?.[0].payload.skipReason, 'antidote_depleted');
+    assert.equal(tasks.length, 0);
+
+    const poisonResult = handler.execute({
+      match,
+      step: { id: 'witch_poison_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'witch_poison', optional: true } },
+      state: saveResult.state,
+    } as never);
+    assert.equal(poisonResult.status, 'WAITING');
+    assert.equal(poisonResult.tasks?.length, 1);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('witch stages silently skip when both potions are depleted or witch is dead', () => {
+  for (const patch of [
+    { usedAntidote: true, usedPoison: true },
+    { usedAntidote: false, usedPoison: false, alive: false },
+  ]) {
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'witch', 'good', ['save', 'poison'], patch),
+      player(3, 'villager', 'good', []),
+    ];
+    state.rounds[0].night.wolfTarget = 3;
+    const match = { id: `m-witch-silent-${patch.alive === false ? 'dead' : 'empty'}`, config: { players: state.players }, createdAt: 'now' };
+    const handler = createActionWindowHandler();
+
+    let current = state;
+    for (const actionType of ['witch_save', 'witch_poison']) {
+      const result = handler.execute({
+        match,
+        step: { id: `${actionType}_1`, type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType, optional: true } },
+        state: current,
+      } as never);
+      assert.equal(result.status, 'COMPLETED');
+      assert.equal(result.events?.length, 1);
+      assert.equal(result.events?.[0].channel, 'system');
+      assert.equal(result.events?.[0].visibility, 'system');
+      current = result.state as Record<string, unknown>;
+    }
+  }
+});
+
+test('peaceful night skips antidote privately but keeps poison available', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect,
+    });
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'witch', 'good', ['save', 'poison']),
+      player(3, 'villager', 'good', []),
+    ];
+    const match = { id: 'm-witch-peaceful', config: { players: state.players }, createdAt: 'now' };
+    const handler = createActionWindowHandler();
+
+    const saveResult = handler.execute({
+      match,
+      step: { id: 'witch_save_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'witch_save', optional: true } },
+      state,
+    } as never);
+    assert.equal(saveResult.events?.[0].payload.skipReason, 'no_wolf_target');
+    assert.equal(saveResult.events?.[0].channel, 'system');
+
+    const poisonResult = handler.execute({
+      match,
+      step: { id: 'witch_poison_1', type: 'werewolf.action_window', config: { day: 1, phase: 'night', actionType: 'witch_poison', optional: true } },
+      state: saveResult.state,
+    } as never);
+    assert.equal(poisonResult.status, 'WAITING');
+    assert.equal(poisonResult.tasks?.length, 1);
   } finally {
     patchRepo(repo, original);
   }

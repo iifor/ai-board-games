@@ -140,3 +140,15 @@ pnpm run test:migration
 - 常量优先放入 `packages/shared/constants`，除非只服务单个模块。
 - 修改共享类型时，需要同步检查 client、admin、server 的引用和测试。
 - 不允许用大量 `any` 或 `as any` 掩盖协议不清晰问题；确需使用时必须说明原因。
+
+狼人杀夜间完成事件在 `types/gameEvent.ts` 定义稳定 payload：
+
+- `WolfVoteCompletedPayload`：`wolfTarget/wolfChoices/wolfVoteTally`。
+- `SeerCheckCompletedPayload`：`seerCheck: { target, result }`。
+- `WitchActionCompletedPayload`：`witchAction: { use, target, reason }`。
+
+这些类型描述展示事件字段，不改变 REST API 或 WebSocket 连接协议。
+
+狼人杀新增内部行动 `sheriff_speech_direction`，结果为 `{ direction: 'clockwise' | 'counterclockwise', reason?: string }`。狼人击杀胜利锁定属于服务端 round 内部状态，不属于共享展示协议，也不得写入回放播放载荷。
+
+女巫药品耗尽和角色不可行动产生的 `action-skipped` 属于 `channel: system` 的内部审计事件，不进入共享播放事件或 C 端回放载荷。公开 `WitchActionCompletedPayload` 保持不变；`usedAntidote/usedPoison` 仍是服务端判断药品库存的状态来源。

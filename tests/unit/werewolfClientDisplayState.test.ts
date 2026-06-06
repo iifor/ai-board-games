@@ -83,3 +83,68 @@ test('werewolf event delivery flattens vote-result payload for C-end display', (
   assert.deepEqual(flat.tally, { 2: 2 });
   assert.deepEqual(flat.exile, { id: 2, reason: 'exile' });
 });
+
+test('werewolf event delivery flattens private night completion payloads', () => {
+  const subscriber = new EventDeliverySubscriber({ subscribeAll: () => () => {} } as never, () => {});
+  const toFlatEvent = (subscriber as unknown as { toFlatEvent: (event: unknown) => Record<string, unknown> }).toFlatEvent.bind(subscriber);
+  const metadata = { matchId: 'm1', stepId: 'night', day: 1, phase: 'night', sequence: 1 };
+  const presentation = { speakableText: '', displayText: '', displayMode: 'badge', uiHint: '', suppressSpeech: true };
+
+  const wolf = toFlatEvent({
+    type: 'wolf-vote',
+    channel: 'scope',
+    scopeKey: 'wolves',
+    payload: { actionType: 'wolf_vote', wolfTarget: 4, wolfChoices: { 1: 4 }, wolfVoteTally: { 4: 1 } },
+    metadata,
+    presentation,
+  });
+  assert.equal(wolf.wolfTarget, 4);
+  assert.deepEqual(wolf.wolfChoices, { 1: 4 });
+  assert.deepEqual(wolf.wolfVoteTally, { 4: 1 });
+
+  const seer = toFlatEvent({
+    type: 'seer-check',
+    channel: 'scope',
+    scopeKey: 'seer',
+    payload: { actionType: 'seer_check', seerCheck: { target: 1, result: '狼人' } },
+    metadata,
+    presentation,
+  });
+  assert.deepEqual(seer.seerCheck, { target: 1, result: '狼人' });
+
+  const witch = toFlatEvent({
+    type: 'witch-action',
+    channel: 'scope',
+    scopeKey: 'witch',
+    payload: { actionType: 'witch_poison', witchAction: { use: false, target: null, reason: '' } },
+    metadata,
+    presentation,
+  });
+  assert.deepEqual(witch.witchAction, { use: false, target: null, reason: '' });
+});
+
+test('werewolf client display state merges night completion patches', () => {
+  const game = { id: 'g1', rounds: [{ day: 1, phase: 'night', night: {} }] };
+  const wolf = mergeWerewolfEventIntoGame(game, {
+    type: 'wolf-vote',
+    metadata: { day: 1, phase: 'night' },
+    wolfTarget: 4,
+    wolfChoices: { 1: 4 },
+    wolfVoteTally: { 4: 1 },
+  });
+  assert.equal(wolf.rounds?.[0].night?.wolfTarget, '4');
+
+  const seer = mergeWerewolfEventIntoGame(wolf, {
+    type: 'seer-check',
+    metadata: { day: 1, phase: 'night' },
+    seerCheck: { target: '1', result: '狼人' },
+  });
+  assert.deepEqual(seer.rounds?.[0].night?.seerCheck, { target: '1', result: '狼人' });
+
+  const witch = mergeWerewolfEventIntoGame(seer, {
+    type: 'witch-action',
+    metadata: { day: 1, phase: 'night' },
+    witchAction: { use: false, target: null, reason: '' },
+  });
+  assert.equal(witch.rounds?.[0].night?.witchPoisonTarget, undefined);
+});

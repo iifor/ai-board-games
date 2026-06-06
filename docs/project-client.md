@@ -175,3 +175,6 @@ pnpm run check:client
 - `mergeWerewolfEventIntoGame` 保留已知玩家、round、警徽、警长竞选和投票字段，只用新事件覆盖明确携带的字段。
 - `resolveActiveSheriffId` 会从当前 round 和历史 rounds 反查有效警徽，避免进入后续夜晚或下一天后警徽图标消失。
 - `vote-result` 事件即使没有完整 `game` snapshot，也会用顶层 `votes/tally/exile` patch 到对应 day 的 round，供座位投票角标展示。
+- `wolf-vote/seer-check/witch-action` 会把顶层完成字段合并到当前夜晚；完成事件不能按 `actionType` 回退为睁眼态。
+- 狼人座位在授权视角显示最终“刀 X 号”，预言家座位显示“查 X 号 / 好人或狼人”，女巫座位显示“毒 X 号”或“不毒”。
+- `sheriff-badge-transfer/tear` 继续复用 `sheriffTransfer` 合并逻辑，移交后移动警徽，撕毁后清除警徽。

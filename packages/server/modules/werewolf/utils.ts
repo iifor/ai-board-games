@@ -60,7 +60,7 @@ interface SheriffElection {
   signedUpIds?: number[];
   speeches?: Array<{ playerId: number; text: string }>;
   withdrawnIds?: number[];
-  votes?: Record<string, number>;
+  votes?: Record<string, number | null>;
   runoffSpeeches?: Array<{ playerId: number; text: string }>;
   runoffVotes?: Record<string, number>;
   tally?: Record<string, number>;
@@ -105,7 +105,7 @@ interface Round {
   daySpeech?: DaySpeech | null;
   sheriffElection?: SheriffElection | null;
   speeches?: Speech[];
-  votes?: Record<string, number>;
+  votes?: Record<string, number | null>;
   lastWords?: LastWords[];
   nightRevealed?: boolean;
   [key: string]: unknown;
@@ -160,8 +160,13 @@ function rotateFromSeat<T extends SeatItem>(items: T[], startId: number, directi
 
 function getNextAliveId(alive: SeatItem[], afterId: number, direction: string = 'clockwise'): number | undefined {
   const sorted = sortBySeat(alive);
-  const rotated = rotateFromSeat(sorted, afterId, direction);
-  return rotated[1]?.id ?? sorted[0]?.id;
+  if (!sorted.length) return undefined;
+  if (direction === 'counterclockwise') {
+    return [...sorted].reverse().find((item) => Number(item.id) < Number(afterId))?.id
+      ?? sorted[sorted.length - 1]?.id;
+  }
+  return sorted.find((item) => Number(item.id) > Number(afterId))?.id
+    ?? sorted[0]?.id;
 }
 
 function getClockStartId(alive: Array<{ id: number }>): number {
@@ -400,9 +405,12 @@ function formatIds(ids: number[] = [], agents?: Array<{ id: number }>): string {
   return ids.map((id) => `${getSeatNumber(id, agents)}号`).join('、') || '无';
 }
 
-function formatVotes(votes: Record<string, number> = {}, agents?: Array<{ id: number }>): string {
+function formatVotes(votes: Record<string, number | null> = {}, agents?: Array<{ id: number }>): string {
   return Object.entries(votes)
-    .map(([playerId, target]) => `${getSeatNumber(playerId, agents)}号投${getSeatNumber(target, agents)}号`)
+    .sort(([left], [right]) => getSeatNumber(left, agents) - getSeatNumber(right, agents))
+    .map(([playerId, target]) => target == null
+      ? `${getSeatNumber(playerId, agents)}号弃票`
+      : `${getSeatNumber(playerId, agents)}号投${getSeatNumber(target, agents)}号`)
     .join('、') || '无';
 }
 
