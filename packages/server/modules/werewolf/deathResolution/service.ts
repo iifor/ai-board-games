@@ -1,9 +1,10 @@
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
+import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { recordWorkflowEffects } from '../../workflow-engine/effects';
 import { syncRuntimeState } from '../runtime';
 import { createWerewolfEvent, markStepComplete } from '../handlers/common';
 import { effectResolvedMessage } from '../messages';
-import { resolveWinAfterDeaths } from '../winCheck';
+import { resolveWinAfterDeathsDetailed } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
 import { advanceHunterStage } from './hunterStage';
 import { advanceSheriffBadgeStage } from './sheriffBadgeStage';
@@ -64,12 +65,13 @@ function recordInitialEffects(context: DeathResolutionContext, effects: Array<Re
 
 function finalizeDeathResolution(context: DeathResolutionContext): HandlerResult {
   const day = context.step.config.day || Number(context.round.day) || 1;
-  const winResult = resolveWinAfterDeaths(
+  const resolution = resolveWinAfterDeathsDetailed(
     context.runtime.agents as WerewolfAgent[],
     context.round as never,
     day,
     context.runtime.modeConfig as Record<string, unknown> || {},
   );
+  const winResult = resolution.result;
   context.checkpoint.finalized = true;
   const nextState = markStepComplete({
     ...syncRuntimeState(context.runtime),
@@ -78,6 +80,28 @@ function finalizeDeathResolution(context: DeathResolutionContext): HandlerResult
     ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}),
   }, context.step.id);
   const events = [...context.events];
+  if (resolution.rejectedLock) {
+    events.push({
+      ...createWerewolfEvent(
+        context.match,
+        context.step,
+        nextState as unknown as Record<string, unknown>,
+        'werewolf_winner_lock_rejected',
+        'winner lock rejected',
+        {
+          reason: resolution.rejectedLock.reason,
+          winnerLock: resolution.rejectedLock.winnerLock,
+          currentRoster: resolution.rejectedLock.currentRoster,
+          winCondition: resolution.rejectedLock.winCondition,
+        },
+        {
+          channel: CHANNEL_TYPES.SYSTEM,
+          idempotencyKey: `${context.match.id}:${context.step.id}:winner_lock_rejected`,
+        },
+      ),
+      visibility: 'system',
+    });
+  }
   events.push(createWerewolfEvent(
     context.match,
     context.step,
@@ -104,7 +128,12 @@ function finalizeDeathResolution(context: DeathResolutionContext): HandlerResult
       },
     ));
   }
-  return { status: 'COMPLETED', state: nextState, events };
+  return {
+    status: 'COMPLETED',
+    state: nextState,
+    events,
+    ...(winResult.winner ? { matchStatus: MATCH_STATUS.COMPLETED } : {}),
+  };
 }
 
 function mergeWaiting(context: DeathResolutionContext, result: HandlerResult): HandlerResult {

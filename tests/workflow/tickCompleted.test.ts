@@ -45,6 +45,8 @@ test('tick honors step handler matchStatus completed before workflow is exhauste
         getMatch: () => match,
         getLatestSnapshot: () => null,
         listEvents: () => [],
+        listEventsAfter: () => [],
+        shouldCreateSnapshot: () => true,
         commitWorkflowChange: ({ events: nextEvents = [], matchPatch = null }: { events?: Array<Record<string, unknown>>; matchPatch?: Record<string, unknown> | null }) => {
           events.push(...nextEvents);
           if (matchPatch) {

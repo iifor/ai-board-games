@@ -56,6 +56,7 @@ function createApp(): express.Application {
 
   registerDebateWorkflow();
   seedData();
+  workflowEngine.initializeWorkflowMaintenance();
 
   app.use(express.json({ limit: '8mb' }));
   app.use(responseFormatter);

@@ -25,9 +25,14 @@ function createWerewolfSteps(): WorkflowStep[] {
     steps.push({ id: `guard_protect_${day}`, type: 'werewolf.action_window', name: `守卫守护`, config: { day, phase: 'night', actionType: 'guard_protect', optional: true } });
     steps.push({ id: `witch_save_${day}`, type: 'werewolf.action_window', name: `女巫解药`, config: { day, phase: 'night', actionType: 'witch_save', optional: true } });
     steps.push({ id: `witch_poison_${day}`, type: 'werewolf.action_window', name: `女巫毒药`, config: { day, phase: 'night', actionType: 'witch_poison', optional: true } });
-    steps.push({ id: `night_resolve_${day}`, type: 'werewolf.night_resolve', name: `结算`, config: { day, phase: 'night' } });
-    steps.push({ id: `day_start_${day}`, type: 'werewolf.day_start', name: `开始`, config: { day, phase: 'day' } });
-    if (day === 1) addSheriffSteps(steps, day);
+    if (day === 1) {
+      steps.push({ id: `day_start_${day}`, type: 'werewolf.day_start', name: `开始`, config: { day, phase: 'day' } });
+      addSheriffSteps(steps, day);
+      steps.push({ id: `night_resolve_${day}`, type: 'werewolf.night_resolve', name: `结算`, config: { day, phase: 'night' } });
+    } else {
+      steps.push({ id: `night_resolve_${day}`, type: 'werewolf.night_resolve', name: `结算`, config: { day, phase: 'night' } });
+      steps.push({ id: `day_start_${day}`, type: 'werewolf.day_start', name: `开始`, config: { day, phase: 'day' } });
+    }
     steps.push({ id: `sheriff_speech_direction_${day}`, type: 'werewolf.action_window', name: `警长决定发言方向`, config: { day, phase: 'day', actionType: 'sheriff_speech_direction' } });
     steps.push({ id: `day_speech_${day}`, type: 'werewolf.action_window', name: `发言`, config: { day, phase: 'day', actionType: 'day_speech', ordered: true } });
     steps.push({ id: `day_vote_${day}`, type: 'werewolf.action_window', name: `投票`, config: { day, phase: 'day', actionType: 'day_vote' } });

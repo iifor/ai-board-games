@@ -8,6 +8,7 @@ import { getWorkflow } from './workflowRegistry';
 import { createId, nowIso, toJson } from './utils';
 import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import type { Match, AiTask } from '../../types/workflow';
+import { cleanupTerminalDebugMatches } from './debugRetention';
 
 const MAX_AI_ATTEMPTS = 2;
 
@@ -71,11 +72,11 @@ function createWorkflowMatch({ workflowId, gameType, config, initialState, match
       idempotencyKey: `${id}:created`,
     }],
   });
-  return tickMatch(id);
+  return afterTick(tickMatch(id));
 }
 
 function wakeTick(matchId: string): Match {
-  return tickMatch(matchId);
+  return afterTick(tickMatch(matchId));
 }
 
 async function drainAiTasks(matchId: string, options: DrainOptions = {}): Promise<{ processed: number; match: Match | null }> {
@@ -129,7 +130,40 @@ function completeAiTask(taskId: string, result: AiTaskResult | Record<string, un
       visibility: 'system',
     }],
   });
-  return wakeTick(task.matchId);
+  try {
+    return wakeTick(task.matchId);
+  } catch (error) {
+    return pauseAfterSuccessfulAiAdvanceFailure(task, error);
+  }
+}
+
+function pauseAfterSuccessfulAiAdvanceFailure(task: AiTask, error: unknown): Match {
+  const message = error instanceof Error ? error.message : String(error);
+  const failure = {
+    message,
+    taskId: task.id,
+    severity: 'high',
+    stage: 'wake_tick_after_ai_success',
+  };
+  const result = repo.commitWorkflowChange({
+    matchId: task.matchId,
+    events: [{
+      stepId: task.stepId,
+      playerId: task.playerId,
+      type: 'workflow_advance_failed',
+      payload: failure,
+      visibility: 'system',
+      idempotencyKey: `${task.id}:workflow-advance-failed`,
+    }],
+    matchPatch: {
+      status: MATCH_STATUS.PAUSED_DEBUG,
+      error_json: toJson(failure),
+    },
+    snapshot: true,
+  });
+  console.error('[workflow-engine] AI result persisted but workflow advance failed', failure);
+  maybeCleanupTerminalDebugMatch(result.match);
+  return result.match;
 }
 
 function failAiTask(taskId: string, error: AiTaskError = {}): Match | AiTask {
@@ -157,7 +191,12 @@ function failAiTask(taskId: string, error: AiTaskError = {}): Match | AiTask {
       : null,
     snapshot: shouldPause,
   });
-  return shouldPause ? repo.getMatch(task.matchId)! : repo.getAiTask(task.id) as AiTask;
+  if (shouldPause) {
+    const match = repo.getMatch(task.matchId)!;
+    maybeCleanupTerminalDebugMatch(match);
+    return match;
+  }
+  return repo.getAiTask(task.id) as AiTask;
 }
 
 function retryAiTask(taskId: string): Match {
@@ -277,6 +316,21 @@ function markOutboxSent(id: number): void {
   return repo.markOutboxSent(id);
 }
 
+function initializeWorkflowMaintenance(): void {
+  cleanupTerminalDebugMatches();
+}
+
+function afterTick(match: Match): Match {
+  maybeCleanupTerminalDebugMatch(match);
+  return match;
+}
+
+function maybeCleanupTerminalDebugMatch(match: Match | null): void {
+  if (!match?.config?.debugMode) return;
+  if (!TERMINAL_STATUSES.includes(match.status)) return;
+  cleanupTerminalDebugMatches();
+}
+
 export {
   createWorkflowMatch,
   wakeTick,
@@ -296,4 +350,5 @@ export {
   listPendingOutbox,
   listOutboxMessages,
   markOutboxSent,
+  initializeWorkflowMaintenance,
 };

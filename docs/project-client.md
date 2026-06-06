@@ -180,3 +180,8 @@ pnpm run check:client
 - 女巫选择不使用毒药时仍消费 `witch-action` 并展示“不毒”，但该事件没有旁白、TTS 或语音 ACK；实时与精确回放使用相同最终载荷。
 - `last-words` 和 `exile-words` 继续复用现有 testimony UI。首夜遗言和放逐遗言由服务端决定资格与顺序，C 端不自行推导。
 - `sheriff-badge-transfer/tear` 继续复用 `sheriffTransfer` 合并逻辑，移交后移动警徽，撕毁后清除警徽。
+## 狼人杀首日播放与异常状态
+
+- 首日播放顺序为警长结果、夜死公布、死亡技能/警徽、首夜遗言、胜负结果；遗言继续使用现有 `last-words` 展示和语音 ACK 队列。
+- 女巫当夜已使用解药时，毒药阶段由服务端静默跳过，C 端不会收到额外行动或跳过展示。
+- 服务端 match 为 `failed` 或 `paused_debug` 时，Socket 只发送现有 `error` 事件，不发送 `workflow-completed`。C 端保留错误状态，不展示比赛结束结果。

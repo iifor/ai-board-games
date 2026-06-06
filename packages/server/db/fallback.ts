@@ -16,6 +16,15 @@ interface JsonDbData {
   app_settings: Record<string, unknown>[];
   memory_snapshots: Record<string, unknown>[];
   player_game_memories: Record<string, unknown>[];
+  matches: Record<string, unknown>[];
+  match_snapshots: Record<string, unknown>[];
+  workflow_events: Record<string, unknown>[];
+  ai_tasks: Record<string, unknown>[];
+  pending_actions: Record<string, unknown>[];
+  outbox_messages: Record<string, unknown>[];
+  action_window_epochs: Record<string, unknown>[];
+  workflow_effects: Record<string, unknown>[];
+  workflow_interrupts: Record<string, unknown>[];
 }
 
 interface RunResult {
@@ -46,7 +55,16 @@ function readJsonDb(filePath: string): JsonDbData {
     game_player_selections: [],
     app_settings: [],
     memory_snapshots: [],
-    player_game_memories: []
+    player_game_memories: [],
+    matches: [],
+    match_snapshots: [],
+    workflow_events: [],
+    ai_tasks: [],
+    pending_actions: [],
+    outbox_messages: [],
+    action_window_epochs: [],
+    workflow_effects: [],
+    workflow_interrupts: []
   };
   try {
     if (!fs.existsSync(filePath)) return empty;
@@ -194,6 +212,142 @@ function runJsonQuery(db: JsonDb, sql: string, args: unknown[], mode: string): u
   const data = db.data;
 
   if (lower.startsWith('pragma table_info')) return [];
+  if (lower.startsWith('insert into matches')) {
+    return upsertJsonRow(data.matches, values[0] as Record<string, unknown>, 'id');
+  }
+  if (lower.startsWith('select * from matches')) {
+    let rows = [...data.matches];
+    if (lower.includes('where id = ?')) rows = rows.filter((row) => row.id === values[0]);
+    if (lower.includes("where status in ('completed', 'failed', 'paused_debug')")) {
+      rows = rows.filter((row) => ['completed', 'failed', 'paused_debug'].includes(String(row.status)));
+    }
+    rows.sort((a, b) =>
+      String(b.created_at || '').localeCompare(String(a.created_at || ''))
+      || String(b.id || '').localeCompare(String(a.id || ''))
+    );
+    return mode === 'get' ? rows[0] : rows;
+  }
+  if (lower.startsWith('select id, config_json, created_at from matches')) {
+    return data.matches
+      .filter((row) => ['completed', 'failed', 'paused_debug'].includes(String(row.status)))
+      .sort((a, b) =>
+        String(b.created_at || '').localeCompare(String(a.created_at || ''))
+        || String(b.id || '').localeCompare(String(a.id || ''))
+      )
+      .map((row) => ({
+        id: row.id,
+        config_json: row.config_json,
+        created_at: row.created_at,
+      }));
+  }
+  if (lower.startsWith('update matches set')) {
+    const patch = values[0] as Record<string, unknown>;
+    const row = data.matches.find((item) => item.id === patch.id);
+    if (row) Object.assign(row, patch, { updated_at: patch.updated_at || now() });
+    return { changes: row ? 1 : 0 };
+  }
+  if (lower.startsWith('delete from matches where id = ?')) {
+    const matchId = values[0];
+    for (const rows of [
+      data.match_snapshots,
+      data.workflow_events,
+      data.ai_tasks,
+      data.pending_actions,
+      data.outbox_messages,
+      data.action_window_epochs,
+      data.workflow_effects,
+      data.workflow_interrupts,
+    ]) {
+      deleteWhere(rows, (row) => row.match_id === matchId);
+    }
+    return deleteWhere(data.matches, (row) => row.id === matchId);
+  }
+  if (lower.includes('select coalesce(max(seq), 0)')) {
+    const seq = Math.max(
+      0,
+      ...data.workflow_events
+        .filter((row) => row.match_id === values[0])
+        .map((row) => Number(row.seq) || 0),
+    );
+    return { seq: lower.includes('+ 1') ? seq + 1 : seq };
+  }
+  if (lower.startsWith('select count(*) as count from workflow_events')) {
+    const count = data.workflow_events.filter((row) =>
+      row.match_id === values[0]
+      && (!lower.includes('seq > ?') || Number(row.seq) > Number(values[1]))
+    ).length;
+    return { count };
+  }
+  if (lower.startsWith('insert or ignore into workflow_events')) {
+    const input = values[0] as Record<string, unknown>;
+    const duplicate = data.workflow_events.find((row) =>
+      row.match_id === input.match_id
+      && (
+        Number(row.seq) === Number(input.seq)
+        || (input.idempotency_key && row.idempotency_key === input.idempotency_key)
+      )
+    );
+    if (duplicate) return { changes: 0, lastInsertRowid: duplicate.id };
+    const row = withAutoId(data.workflow_events, input);
+    data.workflow_events.push(row);
+    return { changes: 1, lastInsertRowid: row.id };
+  }
+  if (lower.startsWith('select * from workflow_events')) {
+    let rows = data.workflow_events.filter((row) => row.match_id === values[0]);
+    if (lower.includes('idempotency_key = ?')) rows = rows.filter((row) => row.idempotency_key === values[1]);
+    if (lower.includes('seq = ?')) rows = rows.filter((row) => Number(row.seq) === Number(values[1]));
+    if (lower.includes('seq > ?')) rows = rows.filter((row) => Number(row.seq) > Number(values[1]));
+    rows.sort((a, b) => Number(a.seq) - Number(b.seq));
+    return mode === 'get' ? rows[0] : rows;
+  }
+  if (lower.startsWith('insert or ignore into outbox_messages')) {
+    const duplicate = data.outbox_messages.find((row) =>
+      row.match_id === values[0] && Number(row.event_seq) === Number(values[1])
+    );
+    if (duplicate) return { changes: 0, lastInsertRowid: duplicate.id };
+    const row = withAutoId(data.outbox_messages, {
+      match_id: values[0],
+      event_seq: values[1],
+      status: 'pending',
+      payload_json: values[2],
+      created_at: values[3],
+      updated_at: values[4],
+    });
+    data.outbox_messages.push(row);
+    return { changes: 1, lastInsertRowid: row.id };
+  }
+  if (lower.startsWith('insert into match_snapshots')) {
+    const row = withAutoId(data.match_snapshots, {
+      match_id: values[0],
+      version: values[1],
+      status: values[2],
+      current_step_index: values[3],
+      last_event_seq: values[4],
+      state_json: values[5],
+      blockers_json: values[6],
+      created_at: values[7],
+    });
+    data.match_snapshots.push(row);
+    return { changes: 1, lastInsertRowid: row.id };
+  }
+  if (lower.startsWith('select * from match_snapshots')) {
+    const rows = data.match_snapshots
+      .filter((row) => row.match_id === values[0])
+      .sort((a, b) => Number(b.version) - Number(a.version) || Number(b.id) - Number(a.id));
+    const limit = Number(values[1] || (lower.includes('limit 1') ? 1 : rows.length));
+    const selected = rows.slice(0, limit);
+    return mode === 'get' ? selected[0] : selected;
+  }
+  if (lower.startsWith('select id from match_snapshots')) {
+    return data.match_snapshots
+      .filter((row) => row.match_id === values[0])
+      .sort((a, b) => Number(b.version) - Number(a.version) || Number(b.id) - Number(a.id))
+      .map((row) => ({ id: row.id }));
+  }
+  if (lower.startsWith('delete from match_snapshots where id in')) {
+    const ids = new Set(values.map(Number));
+    return deleteWhere(data.match_snapshots, (row) => ids.has(Number(row.id)));
+  }
   if (lower.includes('select count(*) as count from skins')) {
     return { count: lower.includes('where enabled = 1') ? data.skins.filter((row) => Number(row.enabled) === 1).length : data.skins.length };
   }

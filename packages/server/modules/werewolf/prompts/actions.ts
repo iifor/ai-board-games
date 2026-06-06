@@ -66,7 +66,7 @@ export function buildSaveActionPrompt(victimId: number, isSelf: boolean, canSelf
     isSelf && canSelfSave ? '首夜允许自救。' : '不允许自救。',
     isSelf
       ? '是否使用解药自救？自救不要求 reason。只返回标准 JSON 对象：{"use":true} 或 {"use":false,"reason":null}。'
-      : '是否使用解药救人？如果使用解药，reason 必须填写简短原因。只返回标准 JSON 对象：{"use":true,"reason":"简短原因"} 或 {"use":false,"reason":null}。'
+      : '是否使用解药救人？reason 可以填写简短原因。只返回标准 JSON 对象：{"use":true,"reason":"简短原因"}。'
   ].filter(Boolean);
   return lines.join('\n\n');
 }
@@ -74,11 +74,10 @@ export function buildSaveActionPrompt(victimId: number, isSelf: boolean, canSelf
 /** 女巫毒药 */
 export function buildPoisonActionPrompt(validIds: number[]): string {
   return [
-    '你还有毒药。请选择是否使用毒药；使用毒药时必须填写 reason 简短说明原因。',
+    '你还有毒药。请选择是否使用毒药；可以填写 reason 简短说明原因。',
     `可选目标座位号：${validIds.join('、') || '无'}`,
     '只返回标准 JSON 对象，不要输出 Markdown、解释或多余文本。',
-    '使用毒药示例：{"use":true,"targetSeat":2,"reason":"简短原因"}。',
-    '不用毒药示例：{"use":false,"targetSeat":null,"reason":null}。'
+    '示例：{"use":true,"targetSeat":2,"reason":"简短原因"}。'
   ].join('\n\n');
 }
 
@@ -87,7 +86,7 @@ export function buildHunterShootActionPrompt(validIds: number[] = []): string {
   return [
     '你是猎人，已出局。请选择是否开枪带走一名玩家。',
     `可选目标座位号：${validIds.join('、')}。`,
-    '开枪时必须填写 reason 简短说明原因。',
+    '开枪时可以填写 reason 简短说明原因。',
     '只返回标准 JSON 对象，例如 {"targetSeat":2,"reason":"简短原因"}；不开枪返回 {"targetSeat":null,"reason":"不开枪原因"}。'
   ].join('\n');
 }

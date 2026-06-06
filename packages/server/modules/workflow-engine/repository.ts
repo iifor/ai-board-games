@@ -1,7 +1,7 @@
 import { getDb } from '../../db';
+import { performance } from 'perf_hooks';
 import type {
   MatchRow,
-  MatchSnapshotRow,
   WorkflowEventRow,
   PendingActionRow,
   AiTaskRow,
@@ -28,11 +28,19 @@ import {
   rowToEvent,
   rowToTask,
   rowToPendingAction,
-  rowToSnapshot,
   rowToActionWindowEpoch,
   rowToWorkflowEffect,
   rowToWorkflowInterrupt,
 } from './utils';
+import {
+  createPersistenceTiming,
+  measureStage,
+  addStageDuration,
+  addBytes,
+  finishPersistenceTiming,
+} from './persistenceTiming';
+import type { PersistenceTiming } from './persistenceTiming';
+import * as snapshotRepo from './snapshotRepository';
 
 interface MatchCreateRow {
   id: string;
@@ -70,6 +78,11 @@ interface CommitChangeInput {
   events?: EventInput[];
   matchPatch?: Record<string, unknown> | null;
   snapshot?: boolean;
+  timing?: {
+    correlationId: string;
+    operation?: string;
+    debugMode?: boolean;
+  };
 }
 
 interface CommitChangeResult {
@@ -174,7 +187,11 @@ function getMatch(matchId: string): Match | null {
   return publicMatch(getMatchRow(matchId));
 }
 
-function updateMatch(matchId: string, patch: Record<string, unknown>): void {
+function updateMatch(
+  matchId: string,
+  patch: Record<string, unknown>,
+  timing?: PersistenceTiming,
+): void {
   const sets: string[] = [];
   const params: Record<string, unknown> = { id: matchId, updated_at: nowIso() };
   for (const [key, value] of Object.entries(patch)) {
@@ -183,7 +200,9 @@ function updateMatch(matchId: string, patch: Record<string, unknown>): void {
     params[key] = value;
   }
   sets.push('updated_at = @updated_at');
-  getDb().prepare(`UPDATE matches SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  const run = () => getDb().prepare(`UPDATE matches SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  if (timing) measureStage(timing, 'matchUpdateMs', run);
+  else run();
 }
 
 function nextEventSeq(matchId: string): number {
@@ -191,7 +210,7 @@ function nextEventSeq(matchId: string): number {
   return Number(row?.seq || 1);
 }
 
-function appendEvent(event: EventInput): WorkflowEventRow {
+function appendEvent(event: EventInput, timing?: PersistenceTiming): WorkflowEventRow {
   if (event.idempotencyKey) {
     const existing = getDb().prepare('SELECT * FROM workflow_events WHERE match_id = ? AND idempotency_key = ?')
       .get(event.matchId, event.idempotencyKey) as WorkflowEventRow | undefined;
@@ -199,7 +218,11 @@ function appendEvent(event: EventInput): WorkflowEventRow {
   }
   const seq = event.seq || nextEventSeq(event.matchId);
   const channel = event.channel || (event.visibility === 'public' ? 'public' : event.visibility === 'system' ? 'system' : 'scope');
-  const result = getDb().prepare(`
+  const payloadJson = timing
+    ? measureStage(timing, 'eventSerializeMs', () => toJson(event.payload || {}))
+    : toJson(event.payload || {});
+  if (timing) addBytes(timing, 'eventPayloadBytes', payloadJson);
+  const executeInsert = () => getDb().prepare(`
     INSERT OR IGNORE INTO workflow_events (
       match_id, seq, type, step_id, player_id, payload_json, visibility,
       channel, scope_key, visible_to_player_ids_json, idempotency_key, created_at
@@ -214,7 +237,7 @@ function appendEvent(event: EventInput): WorkflowEventRow {
     type: event.type,
     step_id: event.stepId || null,
     player_id: event.playerId == null ? null : String(event.playerId),
-    payload_json: toJson(event.payload || {}),
+    payload_json: payloadJson,
     visibility: event.visibility || 'public',
     channel,
     scope_key: event.scopeKey || null,
@@ -222,6 +245,9 @@ function appendEvent(event: EventInput): WorkflowEventRow {
     idempotency_key: event.idempotencyKey || null,
     created_at: event.createdAt || nowIso(),
   });
+  const result = timing
+    ? measureStage(timing, 'eventWriteMs', executeInsert)
+    : executeInsert();
   if (result.changes > 0) {
     return getDb().prepare('SELECT * FROM workflow_events WHERE match_id = ? AND seq = ?').get(event.matchId, seq) as WorkflowEventRow;
   }
@@ -241,28 +267,82 @@ function listEventsAfter(matchId: string, afterSeq: number = 0): WorkflowEvent[]
   return (getDb().prepare('SELECT * FROM workflow_events WHERE match_id = ? AND seq > ? ORDER BY seq ASC').all(matchId, Number(afterSeq) || 0) as WorkflowEventRow[]).map(rowToEvent).filter((e): e is WorkflowEvent => e !== null);
 }
 
-function insertOutbox(matchId: string, eventRow: WorkflowEventRow | null): void {
+function insertOutbox(
+  matchId: string,
+  eventRow: WorkflowEventRow | null,
+  timing?: PersistenceTiming,
+): void {
   if (!eventRow) return;
   if (eventRow.visibility === 'system') return;
-  getDb().prepare(`
+  const payloadJson = timing
+    ? measureStage(timing, 'outboxSerializeMs', () => toJson(rowToEvent(eventRow)))
+    : toJson(rowToEvent(eventRow));
+  if (timing) addBytes(timing, 'outboxPayloadBytes', payloadJson);
+  const run = () => getDb().prepare(`
     INSERT OR IGNORE INTO outbox_messages (match_id, event_seq, status, payload_json, created_at, updated_at)
     VALUES (?, ?, 'pending', ?, ?, ?)
-  `).run(matchId, eventRow.seq, toJson(rowToEvent(eventRow)), nowIso(), nowIso());
+  `).run(matchId, eventRow.seq, payloadJson, nowIso(), nowIso());
+  if (timing) measureStage(timing, 'outboxWriteMs', run);
+  else run();
 }
 
 function commitWorkflowChange(input: CommitChangeInput): CommitChangeResult {
-  return getDb().transaction(() => {
-    const rows: WorkflowEvent[] = [];
-    for (const event of input.events || []) {
-      const eventRow = appendEvent({ matchId: input.matchId, ...event });
-      insertOutbox(input.matchId, eventRow);
-      rows.push(rowToEvent(eventRow)!);
+  const debugMode = input.timing?.debugMode
+    ?? Boolean(getMatch(input.matchId)?.config?.debugMode);
+  const timing = createPersistenceTiming(
+    input.timing?.correlationId || `${input.matchId}:${Date.now()}`,
+    input.matchId,
+    input.timing?.operation || 'commitWorkflowChange',
+    debugMode,
+  );
+  let transactionCallbackEndedAt = 0;
+  const transactionStartedAt = performance.now();
+  const execute = getDb().transaction(() => {
+    try {
+      const rows: WorkflowEvent[] = [];
+      for (const event of input.events || []) {
+        const eventRow = measureStage(timing, 'eventPersistTotalMs', () =>
+          appendEvent({ matchId: input.matchId, ...event }, timing)
+        );
+        measureStage(timing, 'outboxPersistTotalMs', () =>
+          insertOutbox(input.matchId, eventRow, timing)
+        );
+        rows.push(rowToEvent(eventRow)!);
+      }
+      if (input.matchPatch) updateMatch(input.matchId, input.matchPatch, timing);
+      const match = measureStage(timing, 'matchReadMs', () => getMatch(input.matchId)!);
+      if (input.snapshot && match) {
+        measureStage(timing, 'snapshotPersistTotalMs', () => upsertSnapshot(match, timing));
+      }
+      return { match, events: rows };
+    } finally {
+      transactionCallbackEndedAt = performance.now();
     }
-    if (input.matchPatch) updateMatch(input.matchId, input.matchPatch);
-    const match = getMatch(input.matchId)!;
-    if (input.snapshot && match) upsertSnapshot(match);
-    return { match, events: rows };
-  })() as CommitChangeResult;
+  });
+  try {
+    const result = execute() as CommitChangeResult;
+    const transactionReturnedAt = performance.now();
+    addStageDuration(
+      timing,
+      'transactionCommitMs',
+      Math.max(0, transactionReturnedAt - transactionCallbackEndedAt),
+    );
+    addStageDuration(timing, 'transactionTotalMs', transactionReturnedAt - transactionStartedAt);
+    finishPersistenceTiming(timing, {
+      eventCount: input.events?.length || 0,
+      snapshotWritten: Boolean(input.snapshot),
+    });
+    return result;
+  } catch (error) {
+    const transactionReturnedAt = performance.now();
+    addStageDuration(timing, 'transactionTotalMs', transactionReturnedAt - transactionStartedAt);
+    finishPersistenceTiming(timing, {
+      eventCount: input.events?.length || 0,
+      snapshotWritten: false,
+      error: (error as Error).message,
+    });
+    throw error;
+  }
 }
 
 function listPendingOutbox(matchId: string): OutboxRow[] {
@@ -279,13 +359,15 @@ function listOutboxMessages(matchId: string, limit: number = 200): OutboxRow[] {
 function markOutboxSent(id: number): void {
   getDb().prepare('UPDATE outbox_messages SET status = ?, updated_at = ? WHERE id = ?').run('sent', nowIso(), id);
 }
-
-function upsertSnapshot(match: Match): void {
-  getDb().prepare(`
-    INSERT INTO match_snapshots (match_id, version, status, current_step_index, state_json, blockers_json, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(match.id, match.version, match.status, match.currentStepIndex, toJson(match.state), toJson(match.blockers || []), nowIso());
-}
+const {
+  upsertSnapshot,
+  listSnapshots,
+  getLatestSnapshot,
+  getMaxEventSeq,
+  countEventsAfter,
+  shouldCreateSnapshot,
+  pruneSnapshots,
+} = snapshotRepo;
 
 function createAiTask(task: AiTaskCreateInput): void {
   getDb().prepare(`
@@ -437,16 +519,6 @@ function expirePendingActions(matchId: string, stepId: string | null = null): nu
   return (getDb().prepare(sql).run(...params) as { changes: number }).changes;
 }
 
-function listSnapshots(matchId: string, limit: number = 20): MatchSnapshot[] {
-  return (getDb().prepare('SELECT * FROM match_snapshots WHERE match_id = ? ORDER BY version DESC, id DESC LIMIT ?')
-    .all(matchId, Number(limit) || 20) as MatchSnapshotRow[])
-    .map(rowToSnapshot).filter((s): s is MatchSnapshot => s !== null);
-}
-
-function getLatestSnapshot(matchId: string): MatchSnapshot | null {
-  return rowToSnapshot(getDb().prepare('SELECT * FROM match_snapshots WHERE match_id = ? ORDER BY version DESC, id DESC LIMIT 1')
-    .get(matchId) as MatchSnapshotRow | undefined);
-}
 
 function upsertActionWindowEpoch(epoch: ActionWindowEpochInput): ActionWindowEpoch | null {
   getDb().prepare(`
@@ -647,6 +719,10 @@ export {
   expirePendingActions,
   listSnapshots,
   getLatestSnapshot,
+  getMaxEventSeq,
+  countEventsAfter,
+  shouldCreateSnapshot,
+  pruneSnapshots,
   upsertActionWindowEpoch,
   getActionWindowEpoch,
   listActionWindowEpochs,

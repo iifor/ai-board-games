@@ -87,6 +87,7 @@ interface MatchSnapshot {
   version: number;
   status: string;
   currentStepIndex: number;
+  lastEventSeq?: number;
   state: Record<string, unknown>;
   blockers: StepBlocker[];
   createdAt: string;

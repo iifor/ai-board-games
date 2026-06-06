@@ -195,6 +195,14 @@ C 端 REST 路由挂载到 `/api/toc`，主要能力包括：
 
 `player_game_memories` 使用 `(game_type, owner_player_id, subject_player_id)` 唯一键，玩家标识使用稳定的 `sourcePlayerId`。比赛记录与长期画像在同一保存事务内更新，避免对局已落库但画像更新失败时返回假成功。
 
+Workflow 快照使用 `match_snapshots.last_event_seq` 记录事件水位，恢复时只读取水位
+之后的事件。事件状态变化保存轻量路径 patch，`matches.state_json` 继续作为最新运行
+状态和恢复校验来源。快照按 match 保留最近 3 个；调试终态 match 自动保留最近
+20 局并依赖外键级联清理关联 workflow 数据。
+
+调试 workflow 的持久化耗时直接输出结构化服务端日志，不写入 observability 或
+workflow 表，避免性能测量再次产生数据库写入放大。超过 500ms 的记录使用 warning。
+
 记忆管理 API：
 
 - `GET /api/admin/player-memories/stats`

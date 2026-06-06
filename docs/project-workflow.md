@@ -100,6 +100,25 @@ packages/server/modules/
 - `outbox_messages` 保存待推送给前端的消息。
 - `match_snapshots` 保存状态快照。
 
+### Workflow 持久化性能与恢复
+
+- 调试 match 的 `tickMatch` 与 `commitWorkflowChange` 会输出结构化
+  `workflow-persistence-timing` 日志，使用同一 `correlationId` 关联一次推进。
+- 日志拆分状态恢复、handler、JSON 序列化、event/outbox/match/snapshot 写入、
+  事务总耗时及 `transactionCommitMs`，并记录数据库/WAL 文件大小变化。
+  `transactionCommitMs` 表示同步事务回调结束到事务返回的综合 COMMIT/WAL/fsync
+  时间，不是操作系统级单独 fsync 指标。
+- `workflow_events` 不再为每个事件保存完整 `projectedState`。状态变化使用内部
+  `statePatch`，由 `set` 和 `remove` 路径操作组成；数组整体替换。
+- `match_snapshots.last_event_seq` 是恢复水位。新快照只重放
+  `seq > last_event_seq` 的事件；旧快照没有水位时继续按时间戳兼容恢复。
+- 恢复结果会与 `matches.state_json` 对比。不一致时输出
+  `workflow-projection-mismatch` 审计日志并采用最新 match 状态。
+- 等待点、终态或距上次快照累计 10 个事件时创建快照；每个 match 仅保留最近
+  3 个快照。
+- `debugMode` 终态 match 仅保留最近 20 局。服务启动和调试对局进入终态时清理，
+  `running/waiting` match 不删除，也不会自动执行阻塞式 `VACUUM`。
+
 推进模型：
 
 ```mermaid
@@ -396,3 +415,12 @@ pnpm run test:workflow
 胜负判断只使用当前实际存活阵容：狼人全灭时好人胜利；`side` 为平民或神职任一边归零，`gods` 为神职归零，`villagers` 为平民归零，`all` 为所有好人归零。取消天亮票权比较和放逐后“下一刀必胜”推演；旧 `single` 配置读取时映射为 `side`。
 
 存活阵容由统一评估器分类并统计狼人、神职、平民和好人总数。标准 `roleType` 优先；历史快照缺失或异常时，按角色 ID、阵营和角色技能降级分类，猎人、女巫、预言家、守卫和白痴均计入神职，任何存活好人都必须归入神职或平民。狼刀优先锁定会保存触发瞬间的阵容统计和胜利模式，死亡链最终阶段只接受能够由该统计重新验证的狼人胜利锁；缺少阵容证据的旧锁不再直接结束尚未完成的对局。
+
+狼人胜利锁的来源、阵容格式及胜利条件必须在死亡链最终阶段复验。复验失败或缺少触发阵容时忽略该锁，回退到当前完整存活阵容判断，并写入 `werewolf_winner_lock_rejected` system 审计事件；该事件不进入 C 端播放或精确回放。只有实际击杀当时仍存活目标的狼刀可以创建优先锁。
+## 狼人杀首日结算与异常终止约定
+
+- 女巫“一晚一药”是服务端固定规则，不依赖模式配置。任一药在当夜有效使用后，另一药阶段不创建 AI task、pending action 或展示事件；reducer 与 effect 层会再次拒绝恢复任务或伪造提交。
+- 第 1 天固定顺序为：夜间行动、`day_start`、警长竞选、`sheriff_resolve`、`night_resolve_1`、白天发言。首夜死亡在 `night_resolve_1` 前不应用，因此死者仍完整参与警长竞选。
+- `night_resolve_1` 按“公布夜死、猎人技能、警徽处置、首夜遗言、胜负判定”推进。内部 `nightResultPublished` 检查点确保恢复时不重复公布，检查点不会进入 C 端快照或精确回放载荷。
+- 猎人死亡技能的公开 action type 仍为 `hunter_shot`，内部 task 与 action-window epoch 使用 `hunter_shot:<actorId>`，连续猎人不会共享 epoch；旧 `hunter_shot` 窗口仍可恢复。
+- AI 结果成功落盘后若后续 `wakeTick` 失败，任务保持 `succeeded`，match 转为 `paused_debug` 并记录 `workflow_advance_failed`。狼人杀 runner 只接受 `completed`，`failed/paused_debug/waiting` 均抛错，由 socket 发送 `error`，不得发送 `workflow-completed` 或保存假完成对局。

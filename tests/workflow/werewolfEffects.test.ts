@@ -6,6 +6,7 @@ import {
   checkWin,
   getAliveRosterStats,
   resolveWinAfterDeaths,
+  resolveWinAfterDeathsDetailed,
 } from '../../packages/server/modules/werewolf/winCheck';
 import {
   applyLastWordsResults,
@@ -33,7 +34,7 @@ function agent(id: number, roleActions: string[] = [], patch: Record<string, unk
   } as TestAgent;
 }
 
-test('night effects respect guard and witch save, then apply poison', () => {
+test('night effects reject poison when antidote was used in the same night', () => {
   const agents = [agent(1, [], { faction: 'wolves' }), agent(2), agent(3), agent(4)];
   const round = createRound(1);
   round.night.wolfTarget = 2;
@@ -44,9 +45,9 @@ test('night effects respect guard and witch save, then apply poison', () => {
 
   const result = resolveNightEffects(agents as never, round as never);
 
-  assert.deepEqual(result.deaths, [{ id: 3, reason: '女巫毒杀', sourceFaction: 'good', sourceAction: 'witch_poison' }]);
+  assert.deepEqual(result.deaths, []);
   assert.equal(agents.find((item) => item.id === 2)?.alive, true);
-  assert.equal(agents.find((item) => item.id === 3)?.alive, false);
+  assert.equal(agents.find((item) => item.id === 3)?.alive, true);
   assert.equal(round.nightRevealed, true);
 });
 
@@ -84,6 +85,20 @@ test('blocked wolf kill does not lock victory before poison kills the last wolf'
   assert.equal(round.winnerLock, undefined);
   assert.equal(agents[0].alive, false);
   assert.equal(agents[1].alive, true);
+});
+
+test('wolf kill against an already dead target does not create a winner lock', () => {
+  const agents = [
+    agent(1, [], { faction: 'wolves', roleConfig: { roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+    agent(2, [], { alive: false, roleConfig: { roleType: 'god', rule: { actions: [{ action: 'inspectFaction' }] } } }),
+    agent(3, [], { roleConfig: { roleType: 'villager', rule: { actions: [] } } }),
+  ];
+  const round = createRound(1);
+  round.night.wolfTarget = 2;
+
+  resolveNightEffects(agents as never, round as never, { winCondition: 'side' });
+
+  assert.equal(round.winnerLock, undefined);
 });
 
 test('exile resolves idiot survival before elimination', () => {
@@ -176,7 +191,32 @@ test('unverifiable legacy wolf winner lock cannot end the game early', () => {
     sourceAction: 'wolf_kill',
   };
 
+  const resolution = resolveWinAfterDeathsDetailed(roster as never, round as never, 1, { winCondition: 'side' });
+  assert.equal(resolution.result.winner, null);
+  assert.equal(resolution.rejectedLock?.reason, 'missing_trigger_roster');
   assert.equal(resolveWinAfterDeaths(roster as never, round as never, 1, { winCondition: 'side' }).winner, null);
+});
+
+test('winner lock whose trigger roster did not win is rejected', () => {
+  const roster = [
+    agent(1, ['kill'], { role: 'werewolf', faction: 'wolves', roleConfig: { roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+    agent(2, ['inspectFaction'], { role: 'seer', roleConfig: { roleType: 'god', rule: { actions: [{ action: 'inspectFaction' }] } } }),
+    agent(3, ['surviveExileOnce'], { role: 'idiot', roleConfig: { roleType: 'god', rule: { actions: [{ action: 'surviveExileOnce' }] } } }),
+    agent(4, [], { role: 'villager', roleConfig: { roleType: 'villager', rule: { actions: [] } } }),
+  ];
+  const round = createRound(1);
+  (round as Record<string, unknown>).winnerLock = {
+    winner: 'wolves',
+    winReason: 'invalid lock',
+    sourceFaction: 'wolves',
+    sourceAction: 'wolf_kill',
+    winCondition: 'side',
+    triggerRoster: { wolves: 1, gods: 2, villagers: 1, good: 3 },
+  };
+
+  const resolution = resolveWinAfterDeathsDetailed(roster as never, round as never, 1, { winCondition: 'side' });
+  assert.equal(resolution.result.winner, null);
+  assert.equal(resolution.rejectedLock?.reason, 'trigger_roster_not_winning');
 });
 
 test('last words queue preserves first-night death order and excludes later nights', () => {

@@ -74,7 +74,8 @@ function resolveNightEffects(agents: WerewolfAgent[], round: Round, modeConfig: 
   if (night.wolfTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.KILL, target: night.wolfTarget, reason: '狼人袭击', sourceFaction: 'wolves', sourceAction: 'wolf_kill' });
   if (night.guardTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.PROTECT, target: night.guardTarget });
   if (night.witchSave && night.witchSaveTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.SAVE, target: night.witchSaveTarget });
-  if (night.witchPoisonTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.POISON, target: night.witchPoisonTarget, reason: '女巫毒杀' });
+  const validPoisonTarget = night.witchSave ? null : night.witchPoisonTarget;
+  if (validPoisonTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.POISON, target: validPoisonTarget, reason: '女巫毒杀' });
 
   const protectedTarget = night.guardTarget;
   const savedTarget = night.witchSave ? night.witchSaveTarget : null;
@@ -82,11 +83,14 @@ function resolveNightEffects(agents: WerewolfAgent[], round: Round, modeConfig: 
   if (night.wolfTarget && Number(night.wolfTarget) !== Number(protectedTarget) && Number(night.wolfTarget) !== Number(savedTarget)) {
     deaths.push({ id: night.wolfTarget, reason: '狼人袭击', sourceFaction: 'wolves', sourceAction: 'wolf_kill' });
   }
-  if (night.witchPoisonTarget && !deaths.some((death) => Number(death.id) === Number(night.witchPoisonTarget))) {
-    deaths.push({ id: night.witchPoisonTarget, reason: '女巫毒杀', sourceFaction: 'good', sourceAction: 'witch_poison' });
+  if (validPoisonTarget && !deaths.some((death) => Number(death.id) === Number(validPoisonTarget))) {
+    deaths.push({ id: validPoisonTarget, reason: '女巫毒杀', sourceFaction: 'good', sourceAction: 'witch_poison' });
   }
   const wolfDeath = deaths.find((death) => death.sourceFaction === 'wolves');
-  if (wolfDeath && !round.winnerLock?.winner) {
+  const wolfVictim = wolfDeath
+    ? agents.find((agent) => Number(agent.id) === Number(wolfDeath.id))
+    : null;
+  if (wolfDeath && wolfVictim?.alive && !round.winnerLock?.winner) {
     const afterWolfKill = agents.map((agent) => ({ ...agent }));
     eliminate(afterWolfKill, wolfDeath.id, round.day, wolfDeath.reason);
     const wolfWin = checkWolfVictory(afterWolfKill, round.day, modeConfig);

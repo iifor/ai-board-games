@@ -53,6 +53,15 @@ async function processClaimedAiTask(taskId: string): Promise<AiTask | null> {
     service.completeAiTask(task.id, result);
   } catch (error: unknown) {
     const err = error as Error & { severity?: string };
+    const persistedTask = repo.getAiTask(task.id);
+    if (persistedTask?.status === 'succeeded') {
+      console.error('[workflow-engine] workflow advance failed after AI task success', {
+        taskId: task.id,
+        matchId: task.matchId,
+        message: err.message,
+      });
+      return persistedTask;
+    }
     service.failAiTask(task.id, { message: err.message, severity: err.severity || 'medium' });
   }
   return repo.getAiTask(taskId);

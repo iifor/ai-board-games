@@ -40,6 +40,24 @@ interface AliveRosterStats {
   good: number;
 }
 
+type WinnerLockRejectionReason =
+  | 'invalid_source'
+  | 'missing_trigger_roster'
+  | 'invalid_trigger_roster'
+  | 'trigger_roster_not_winning';
+
+interface WinnerLockRejection {
+  reason: WinnerLockRejectionReason;
+  winnerLock: NonNullable<Round['winnerLock']>;
+  currentRoster: AliveRosterStats;
+  winCondition: WinCondition;
+}
+
+interface WinResolution {
+  result: WinResult;
+  rejectedLock?: WinnerLockRejection;
+}
+
 interface Round {
   day: number;
   night?: Night;
@@ -130,30 +148,69 @@ function resolveWinAfterDeaths(
   day: number,
   modeConfig: ModeConfig = {},
 ): WinResult {
+  return resolveWinAfterDeathsDetailed(agents, round, day, modeConfig).result;
+}
+
+function resolveWinAfterDeathsDetailed(
+  agents: WerewolfAgent[],
+  round: Round,
+  day: number,
+  modeConfig: ModeConfig = {},
+): WinResolution {
   const winnerLock = round.winnerLock;
-  if (
-    winnerLock?.winner === 'wolves'
-    && winnerLock.sourceFaction === 'wolves'
-    && winnerLock.triggerRoster
-  ) {
-    const lockedResult = checkWolfVictoryFromRoster(
-      winnerLock.triggerRoster,
-      day,
-      winnerLock.winCondition || normalizeWinCondition(modeConfig.winCondition),
-    );
-    if (lockedResult.winner === 'wolves') {
+  const currentRoster = getAliveRosterStats(agents);
+  const winCondition = winnerLock?.winCondition || normalizeWinCondition(modeConfig.winCondition);
+  if (winnerLock?.winner === 'wolves') {
+    const rejectionReason = getWinnerLockRejectionReason(winnerLock);
+    if (rejectionReason) {
       return {
-        winner: 'wolves',
-        winReason: winnerLock.winReason || lockedResult.winReason,
+        result: checkWin(agents, day, modeConfig),
+        rejectedLock: { reason: rejectionReason, winnerLock, currentRoster, winCondition },
       };
     }
+    const lockedResult = checkWolfVictoryFromRoster(winnerLock.triggerRoster!, day, winCondition);
+    if (lockedResult.winner === 'wolves') {
+      return {
+        result: {
+          winner: 'wolves',
+          winReason: winnerLock.winReason || lockedResult.winReason,
+        },
+      };
+    }
+    return {
+      result: checkWin(agents, day, modeConfig),
+      rejectedLock: {
+        reason: 'trigger_roster_not_winning',
+        winnerLock,
+        currentRoster,
+        winCondition,
+      },
+    };
   } else if (winnerLock?.winner && winnerLock.winner !== 'wolves') {
     return {
-      winner: winnerLock.winner,
-      winReason: winnerLock.winReason,
+      result: {
+        winner: winnerLock.winner,
+        winReason: winnerLock.winReason,
+      },
     };
   }
-  return checkWin(agents, day, modeConfig);
+  return { result: checkWin(agents, day, modeConfig) };
+}
+
+function getWinnerLockRejectionReason(
+  winnerLock: NonNullable<Round['winnerLock']>,
+): WinnerLockRejectionReason | null {
+  if (winnerLock.sourceFaction !== 'wolves') return 'invalid_source';
+  if (!winnerLock.triggerRoster) return 'missing_trigger_roster';
+  if (!isAliveRosterStats(winnerLock.triggerRoster)) return 'invalid_trigger_roster';
+  return null;
+}
+
+function isAliveRosterStats(value: AliveRosterStats): boolean {
+  return ['wolves', 'gods', 'villagers', 'good'].every((key) => {
+    const count = value[key as keyof AliveRosterStats];
+    return Number.isInteger(count) && count >= 0;
+  }) && value.good === value.gods + value.villagers;
 }
 
 function normalizeWinCondition(value: unknown): WinCondition {
@@ -261,6 +318,7 @@ export {
   checkWin,
   checkWolfVictory,
   resolveWinAfterDeaths,
+  resolveWinAfterDeathsDetailed,
   getAliveVotePower,
   topTarget,
   topExile,
@@ -281,4 +339,7 @@ export type {
   NightDeath,
   AliveRosterStats,
   WinCondition,
+  WinResolution,
+  WinnerLockRejection,
+  WinnerLockRejectionReason,
 };

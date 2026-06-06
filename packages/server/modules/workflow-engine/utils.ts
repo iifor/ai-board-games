@@ -137,6 +137,7 @@ function rowToSnapshot(row: MatchSnapshotRow | null | undefined): MatchSnapshot 
     version: row.version,
     status: row.status,
     currentStepIndex: row.current_step_index,
+    lastEventSeq: row.last_event_seq == null ? undefined : Number(row.last_event_seq),
     state: parseJson<Record<string, unknown>>(row.state_json, {}),
     blockers: parseJson(row.blockers_json, []),
     createdAt: row.created_at,

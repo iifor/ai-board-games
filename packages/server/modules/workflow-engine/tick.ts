@@ -1,12 +1,23 @@
 import { getDb } from '../../db';
+import { performance } from 'perf_hooks';
 import * as repo from './repository';
 import { getWorkflow, getStepHandler } from './workflowRegistry';
 import { evaluateCondition } from './condition';
-import { hydrateMatchFromEventStore, withProjectedState } from './projection';
+import { hydrateMatchFromEventStore } from './projection';
+import { buildStateTransitionEvents } from './stateTransition';
+import { resolveBlockers } from './blockerResolution';
 import type { ConditionContext } from './condition';
-import { MATCH_STATUS, BLOCKER_TYPES, BLOCKER_STATUS } from '@ai-presenter/shared/types/workflowTypes';
+import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { toJson } from './utils';
-import type { Match, StepBlocker, AiTask, PendingAction } from '../../types/workflow';
+import {
+  createPersistenceTiming,
+  measureStage,
+  addStageDuration,
+  addBytes,
+  finishPersistenceTiming,
+} from './persistenceTiming';
+import type { PersistenceTiming } from './persistenceTiming';
+import type { Match, StepBlocker } from '../../types/workflow';
 import type { Workflow, WorkflowStep, StepHandlerExecuteResult } from './workflowRegistry';
 
 interface TickBudget {
@@ -28,10 +39,21 @@ const TERMINAL_STATUSES: string[] = [MATCH_STATUS.COMPLETED, MATCH_STATUS.FAILED
 function tickMatch(matchId: string, budget: TickBudget = {}): Match {
   const limits = { ...DEFAULT_BUDGET, ...budget };
   const started = Date.now();
-  return getDb().transaction(() => {
+  const correlationId = `${matchId}:tick:${started}`;
+  let timing: PersistenceTiming | null = null;
+  let transactionCallbackEndedAt = 0;
+  let summary: Record<string, unknown> = {};
+  const execute = getDb().transaction(() => {
+    try {
     let match = repo.getMatch(matchId);
     if (!match) throw new Error(`Match not found: ${matchId}`);
-    match = hydrateMatchFromEventStore(match);
+    timing = createPersistenceTiming(
+      correlationId,
+      matchId,
+      'tickMatch',
+      Boolean(match.config?.debugMode),
+    );
+    match = measureStage(timing, 'hydrateStateMs', () => hydrateMatchFromEventStore(match!));
     if (TERMINAL_STATUSES.includes(match.status)) return match;
 
     const workflow = getWorkflow(match.workflowId);
@@ -49,9 +71,10 @@ function tickMatch(matchId: string, budget: TickBudget = {}): Match {
           matchId,
           events: [{
             type: 'match_completed',
-            payload: { state },
+            payload: {},
             idempotencyKey: `${matchId}:match_completed`,
           }],
+          timing: { correlationId, operation: 'matchCompleted', debugMode: Boolean(match.config?.debugMode) },
         });
         break;
       }
@@ -73,6 +96,7 @@ function tickMatch(matchId: string, budget: TickBudget = {}): Match {
             payload: { step },
             idempotencyKey: `${matchId}:${step.id}:skipped`,
           }],
+          timing: { correlationId, operation: 'stepSkipped', debugMode: Boolean(match.config?.debugMode) },
         });
         currentStepIndex += 1;
         stepsProcessed += 1;
@@ -80,22 +104,58 @@ function tickMatch(matchId: string, budget: TickBudget = {}): Match {
       }
 
       const handler = getStepHandler(match.workflowId, step.type);
-      const result: StepHandlerExecuteResult = handler.execute({ match: match as unknown as Record<string, unknown>, workflow, step, state });
+      const previousState = measureStage(
+        timing,
+        'statePatchBaselineCloneMs',
+        () => structuredClone(state),
+      );
+      const result: StepHandlerExecuteResult = measureStage(
+        timing,
+        'handlerExecuteMs',
+        () => handler.execute({
+          match: match as unknown as Record<string, unknown>,
+          workflow,
+          step,
+          state,
+        }),
+      );
       if (result.status === 'FAILED') {
         status = MATCH_STATUS.FAILED;
-        repo.updateMatch(matchId, {
-          status,
-          error_json: toJson(result.error || { message: 'Step failed' }),
-          state_json: toJson(state),
-          blockers_json: toJson([]),
+        const failedStateJson = measureStage(timing, 'stateSerializeMs', () => toJson(state));
+        const failedBlockersJson = measureStage(timing, 'blockersSerializeMs', () => toJson([]));
+        const { match: failedMatch } = repo.commitWorkflowChange({
+          matchId,
+          matchPatch: {
+            status,
+            error_json: toJson(result.error || { message: 'Step failed' }),
+            state_json: failedStateJson,
+            blockers_json: failedBlockersJson,
+          },
+          snapshot: true,
+          timing: {
+            correlationId,
+            operation: 'tickFailedCommit',
+            debugMode: Boolean(match.config?.debugMode),
+          },
         });
-        return repo.getMatch(matchId)!;
+        summary = { status, stepsProcessed, snapshotWritten: true };
+        return failedMatch;
       }
 
       state = result.state || state;
-      if (result.events?.length) repo.commitWorkflowChange({
+      const projectedEvents = buildStateTransitionEvents({
         matchId,
-        events: result.events.map((event) => ({ stepId: step.id, ...withProjectedState(event, state) }) as repo.EventInput),
+        stepId: step.id,
+        matchVersion: Number(match.version || 0),
+        currentStepIndex,
+        previousState,
+        nextState: state,
+        result,
+      });
+      if (projectedEvents.length) repo.commitWorkflowChange({
+        matchId,
+        events: projectedEvents,
+        timing: { correlationId, operation: 'stepEvents', debugMode: Boolean(match.config?.debugMode) },
       });
       if (result.tasks?.length) {
         for (const task of result.tasks) repo.createAiTask(task as never);
@@ -124,41 +184,59 @@ function tickMatch(matchId: string, budget: TickBudget = {}): Match {
     }
 
     const version = Number(match.version || 0) + 1;
+    const stateJson = measureStage(timing, 'stateSerializeMs', () => toJson(state));
+    const blockersJson = measureStage(timing, 'blockersSerializeMs', () => toJson(blockers));
+    addBytes(timing, 'matchStateBytes', stateJson);
+    addBytes(timing, 'matchBlockersBytes', blockersJson);
+    const snapshot = repo.shouldCreateSnapshot(matchId, status);
     const { match: updated } = repo.commitWorkflowChange({
       matchId,
       matchPatch: {
         status,
         current_step_index: currentStepIndex,
         version,
-        state_json: toJson(state),
-        blockers_json: toJson(blockers),
+        state_json: stateJson,
+        blockers_json: blockersJson,
         completed_at: status === MATCH_STATUS.COMPLETED ? new Date().toISOString() : match.completedAt || null,
       },
-      snapshot: true,
+      snapshot,
+      timing: { correlationId, operation: 'tickFinalCommit', debugMode: Boolean(match.config?.debugMode) },
     });
+    summary = {
+      status,
+      stepsProcessed,
+      snapshotWritten: snapshot,
+      elapsedWallMs: Date.now() - started,
+    };
     return updated;
-  })() as Match;
-}
-
-function resolveBlockers(matchId: string, blockers: StepBlocker[]): StepBlocker[] {
-  const tasks = new Map(repo.listAiTasks(matchId).map((task: AiTask) => [task.id, task]));
-  const actions = new Map(repo.listPendingActions(matchId).map((action: PendingAction) => [action.id, action]));
-  return blockers.map((blocker: StepBlocker) => {
-    if (blocker.type === BLOCKER_TYPES.AI_TASK && blocker.taskId) {
-      const task = tasks.get(blocker.taskId);
-      if (task?.status === 'succeeded') return { ...blocker, status: BLOCKER_STATUS.COMPLETED };
-      if (task?.status === 'failed') return { ...blocker, status: BLOCKER_STATUS.FAILED };
-      if (task?.status === 'cancelled') return { ...blocker, status: BLOCKER_STATUS.CANCELLED };
+    } finally {
+      transactionCallbackEndedAt = performance.now();
     }
-    if (blocker.type === BLOCKER_TYPES.HUMAN_ACTION && blocker.actionId) {
-      const action = actions.get(blocker.actionId);
-      if (action?.status === 'submitted') return { ...blocker, status: BLOCKER_STATUS.COMPLETED };
-      if (action?.status === 'expired') return { ...blocker, status: BLOCKER_STATUS.EXPIRED };
-      if (action?.status === 'cancelled') return { ...blocker, status: BLOCKER_STATUS.CANCELLED };
-      if (action?.status === 'failed') return { ...blocker, status: BLOCKER_STATUS.FAILED };
-    }
-    return { ...blocker, status: blocker.status || BLOCKER_STATUS.PENDING };
   });
+  const transactionStartedAt = performance.now();
+  try {
+    const result = execute() as Match;
+    if (timing) {
+      const transactionReturnedAt = performance.now();
+      addStageDuration(
+        timing,
+        'transactionCommitMs',
+        Math.max(0, transactionReturnedAt - transactionCallbackEndedAt),
+      );
+      addStageDuration(timing, 'transactionTotalMs', transactionReturnedAt - transactionStartedAt);
+      finishPersistenceTiming(timing, summary);
+    }
+    return result;
+  } catch (error) {
+    if (timing) {
+      addStageDuration(timing, 'transactionTotalMs', performance.now() - transactionStartedAt);
+      finishPersistenceTiming(timing, {
+        ...summary,
+        error: (error as Error).message,
+      });
+    }
+    throw error;
+  }
 }
 
 export { tickMatch, resolveBlockers };

@@ -1,4 +1,5 @@
 import * as repo from './repository';
+import { applyStatePatch, createStatePatch, deepEqual, isStatePatch } from './statePatch';
 import type { Match, MatchSnapshot, StepBlocker, WorkflowEvent } from '../../types/workflow';
 
 interface ProjectedPayload {
@@ -15,16 +16,37 @@ function hydrateMatchFromEventStore(match: Match): Match {
   const snapshot = repo.getLatestSnapshot(match.id);
   if (!snapshot) return match;
   const events = eventsAfterSnapshot(match.id, snapshot);
-  return events.reduce(applyProjectionEvent, {
+  const hydrated = events.reduce(applyProjectionEvent, {
     ...match,
     status: snapshot.status || match.status,
     currentStepIndex: Number(snapshot.currentStepIndex ?? match.currentStepIndex),
     state: snapshot.state || {},
     blockers: snapshot.blockers || [],
   });
+  if (!deepEqual(hydrated.state, match.state)) {
+    console.warn(JSON.stringify({
+      type: 'workflow-projection-mismatch',
+      matchId: match.id,
+      snapshotId: snapshot.id,
+      lastEventSeq: snapshot.lastEventSeq || null,
+      replayedEventCount: events.length,
+      resolution: 'matches.state_json',
+    }));
+    return {
+      ...hydrated,
+      status: match.status,
+      currentStepIndex: match.currentStepIndex,
+      state: match.state,
+      blockers: match.blockers,
+    };
+  }
+  return hydrated;
 }
 
 function eventsAfterSnapshot(matchId: string, snapshot: MatchSnapshot): WorkflowEvent[] {
+  if (snapshot.lastEventSeq != null) {
+    return repo.listEventsAfter(matchId, snapshot.lastEventSeq);
+  }
   return repo.listEvents(matchId).filter((event) => {
     if (!snapshot.createdAt) return true;
     return String(event.createdAt || '') > String(snapshot.createdAt);
@@ -36,7 +58,10 @@ function applyProjectionEvent(match: Match, event: WorkflowEvent): Match {
   let state = match.state || {};
   if (payload.projectedState && typeof payload.projectedState === 'object') {
     state = payload.projectedState;
+  } else if (isStatePatch(payload.statePatch)) {
+    state = applyStatePatch(state, payload.statePatch);
   } else if (payload.statePatch && typeof payload.statePatch === 'object') {
+    // Legacy shallow statePatch compatibility.
     state = { ...state, ...payload.statePatch };
   } else if (event.type === 'match_completed' && payload.state && typeof payload.state === 'object') {
     state = payload.state;
@@ -52,16 +77,24 @@ function applyProjectionEvent(match: Match, event: WorkflowEvent): Match {
   };
 }
 
-function withProjectedState<T extends { payload?: unknown }>(
+function withStatePatch<T extends { payload?: unknown }>(
   event: T,
-  state: Record<string, unknown>,
+  previousState: Record<string, unknown>,
+  nextState: Record<string, unknown>,
+  projection: {
+    currentStepIndex?: number;
+    blockers?: StepBlocker[];
+    status?: string;
+  } = {},
 ): T {
   const payload = normalizePayload(event.payload);
+  const statePatch = createStatePatch(previousState, nextState);
   return {
     ...event,
     payload: {
       ...payload,
-      projectedState: state,
+      ...(statePatch ? { statePatch } : {}),
+      ...projection,
     },
   };
 }
@@ -72,5 +105,7 @@ function normalizePayload(payload: unknown): ProjectedPayload {
 
 export {
   hydrateMatchFromEventStore,
-  withProjectedState,
+  withStatePatch,
+  applyProjectionEvent,
+  eventsAfterSnapshot,
 };

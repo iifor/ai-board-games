@@ -76,7 +76,7 @@ function buildSheriffResultMessage(round: RoundWithSheriff = {}, _modeConfig: Re
 const ACTION_LABELS: Record<string, string> = {
   wolf_kill: '狼人袭击',
   wolf_speech: '狼队战术部署',
-  wolf_vote: '狼人刀口投票',
+  wolf_vote: '狼刀投票',
   seer_check: '预言家查验',
   guard_protect: '守卫守护',
   witch_save: '女巫解药',
@@ -84,12 +84,12 @@ const ACTION_LABELS: Record<string, string> = {
   day_speech: '白天发言',
   day_vote: '白天投票',
   hunter_shot: '猎人开枪',
-  sheriff_signup: '警长竞选报名',
-  sheriff_speech: '警上竞选发言',
-  sheriff_withdraw: '警上退水',
-  sheriff_vote: '警长竞选投票',
-  sheriff_runoff_speech: '警长复投发言',
-  sheriff_runoff_vote: '警长复投投票',
+  sheriff_signup: '警长竞选',
+  sheriff_speech: '竞选发言',
+  sheriff_withdraw: '退水环节',
+  sheriff_vote: '警长投票',
+  sheriff_runoff_speech: '警上复选',
+  sheriff_runoff_vote: '警长复投',
   sheriff_resolve: '警长竞选结算',
   sheriff_speech_direction: '警长决定发言方向'
 };
@@ -181,8 +181,8 @@ function roundPrefix(day?: number): string {
 }
 
 function buildWerewolfRuleIntro(modeConfig: Record<string, unknown> = {}): string {
-  const description = String(modeConfig.description);
-  if (description) return `${description}`;
+  // const description = String(modeConfig.description);
+  // if (description) return `${description}`;
   return '游戏准备中...';
 }
 

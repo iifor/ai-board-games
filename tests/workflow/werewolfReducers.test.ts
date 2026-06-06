@@ -84,8 +84,8 @@ test('reducers apply role action payloads to round and actors', () => {
   assert.equal(ctx.agents[2].lastGuardTarget, 2);
   assert.equal(round.night.witchSaveTarget, 2);
   assert.equal(ctx.agents[3].usedAntidote, true);
-  assert.equal(round.night.witchPoisonTarget, 5);
-  assert.equal(ctx.agents[3].usedPoison, true);
+  assert.equal(round.night.witchPoisonTarget, null);
+  assert.equal(Boolean(ctx.agents[3].usedPoison), false);
 });
 
 test('witch poison requires strict true and uses reason-aware narration', () => {
@@ -292,6 +292,18 @@ test('workflow places sheriff direction immediately before day speech every day'
   }
 });
 
+test('first night resolves only after sheriff election and before day speech', () => {
+  const steps = createWerewolfSteps();
+  const dayStart = steps.findIndex((step) => step.id === 'day_start_1');
+  const sheriffResolve = steps.findIndex((step) => step.id === 'sheriff_resolve_1');
+  const nightResolve = steps.findIndex((step) => step.id === 'night_resolve_1');
+  const daySpeech = steps.findIndex((step) => step.id === 'day_speech_1');
+
+  assert.ok(dayStart < sheriffResolve);
+  assert.ok(sheriffResolve < nightResolve);
+  assert.ok(nightResolve < daySpeech);
+});
+
 test('reducers select actors and pending hunter', () => {
   const ctx = runtime();
   const round = ctx.state.rounds[0];
@@ -329,16 +341,34 @@ test('witch night eligibility keeps antidote knowledge separate from poison acce
   assert.equal(getWitchActionEligibility(ctx as never, round as never, 'witch_poison').skipReason, 'witch_unavailable');
 });
 
-test('witch poison respects one potion per night after antidote use', () => {
+test('witch poison always respects one potion per night after antidote use', () => {
   const ctx = runtime();
   const round = ctx.state.rounds[0];
-  ctx.modeConfig.witch = { onePotionPerNight: true };
   round.night.witchSave = true;
 
   assert.equal(
     getWitchActionEligibility(ctx as never, round as never, 'witch_poison').skipReason,
     'one_potion_per_night',
   );
+});
+
+test('witch antidote rejects restored poison use from the same night', () => {
+  const ctx = runtime();
+  const round = ctx.state.rounds[0];
+  round.night.wolfTarget = 5;
+  round.night.witchPoisonTarget = 2;
+
+  assert.equal(
+    getWitchActionEligibility(ctx as never, round as never, 'witch_save').skipReason,
+    'one_potion_per_night',
+  );
+  applyActionResults(
+    ctx as never,
+    { config: { day: 1, actionType: 'witch_save' } } as never,
+    [{ actorId: 4, payload: { use: true, target: 5 } }],
+  );
+  assert.equal(round.night.witchSave, false);
+  assert.equal(Boolean(ctx.agents[3].usedAntidote), false);
 });
 
 test('reducers select night actors with workflow action aliases', () => {

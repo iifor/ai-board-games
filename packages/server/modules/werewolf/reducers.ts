@@ -201,7 +201,7 @@ function applyGuardProtect(runtime: Runtime, round: Round, results: ActionResult
 function applyWitchSave(runtime: Runtime, round: Round, results: ActionResult[]): void {
   const result = results[0]?.payload;
   const witch = runtime.agents.find((agent) => Number(agent.id) === Number(results[0]?.actorId));
-  if (!result?.use || !round.night.wolfTarget) return;
+  if (round.night?.witchPoisonTarget || !result?.use || !round.night.wolfTarget) return;
   round.night.witchSave = true;
   round.night.witchSaveTarget = round.night.wolfTarget;
   if (witch) witch.usedAntidote = true;
@@ -210,7 +210,7 @@ function applyWitchSave(runtime: Runtime, round: Round, results: ActionResult[])
 function applyWitchPoison(runtime: Runtime, round: Round, results: ActionResult[]): void {
   const result = results[0]?.payload;
   const witch = runtime.agents.find((agent) => Number(agent.id) === Number(results[0]?.actorId));
-  if (result?.use !== true || !result.target) return;
+  if (round.night?.witchSave || result?.use !== true || !result.target) return;
   round.night.witchPoisonTarget = result.target as number;
   if (witch) witch.usedPoison = true;
 }
@@ -349,14 +349,16 @@ function getWitchActionEligibility(
   if (actionType === 'witch_save') {
     const actor = candidates.find((candidate) => !candidate.usedAntidote) || null;
     if (!actor) return { actor: null, skipReason: 'antidote_depleted' };
+    if (round.night?.witchPoisonTarget) {
+      return { actor: null, skipReason: 'one_potion_per_night' };
+    }
     if (!round.night?.wolfTarget) return { actor: null, skipReason: 'no_wolf_target' };
     return { actor, skipReason: null };
   }
 
   const actor = candidates.find((candidate) => !candidate.usedPoison) || null;
   if (!actor) return { actor: null, skipReason: 'poison_depleted' };
-  const witchConfig = runtime.modeConfig?.witch as Record<string, unknown> | undefined;
-  if (witchConfig?.onePotionPerNight && round.night?.witchSave) {
+  if (round.night?.witchSave) {
     return { actor: null, skipReason: 'one_potion_per_night' };
   }
   return { actor, skipReason: null };

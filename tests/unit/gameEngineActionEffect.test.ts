@@ -468,7 +468,7 @@ test('Werewolf night_resolution keeps guarded wolf target alive and hides privat
   assert.equal(channelSystem.canAccess(auditEvent, { type: 'system' }), true);
 });
 
-test('Werewolf night_resolution respects witch save and applies poison death', async () => {
+test('Werewolf night_resolution rejects poison when witch save is active', async () => {
   const store = new MemoryMatchStateStore();
   store.addMatch(createMatch({
     state: {
@@ -497,18 +497,15 @@ test('Werewolf night_resolution respects witch save and applies poison death', a
 
   await engine.resolveEffects('match-test');
   const publicEvent = store.listEvents('match-test').find((event) => event.type === 'night_resolved')!;
-  assert.deepEqual(publicEvent.payload.deaths, [{ id: 3, reason: '女巫毒杀' }]);
+  assert.deepEqual(publicEvent.payload.deaths, []);
 
   const projected = store.loadMatch('match-test')?.state as {
     rounds?: Array<{ night?: { deaths?: Array<{ id: number; reason: string }> } }>;
     players?: Array<{ id: number; alive?: boolean; deathDay?: number; deathReason?: string }>;
   };
-  assert.deepEqual(projected.rounds?.[0]?.night?.deaths, [{ id: 3, reason: '女巫毒杀' }]);
+  assert.deepEqual(projected.rounds?.[0]?.night?.deaths, []);
   assert.equal(projected.players?.find((player) => player.id === 2)?.alive, true);
-  const poisoned = projected.players?.find((player) => player.id === 3);
-  assert.equal(poisoned?.alive, false);
-  assert.equal(poisoned?.deathDay, 1);
-  assert.equal(poisoned?.deathReason, '女巫毒杀');
+  assert.equal(projected.players?.find((player) => player.id === 3)?.alive, true);
 });
 
 test('Werewolf night_resolution deduplicates wolf kill and poison on same target', async () => {

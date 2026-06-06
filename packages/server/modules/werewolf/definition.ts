@@ -95,7 +95,7 @@ function createWerewolfEffectsFromAction(
   if (action.actionType === 'seer_check') return [createInspectEffect(action, day)];
   if (action.actionType === 'guard_protect') return createProtectEffects(action, day);
   if (action.actionType === 'witch_save') return createSaveEffects(action, day, context);
-  if (action.actionType === 'witch_poison') return createPoisonEffects(action, day);
+  if (action.actionType === 'witch_poison') return createPoisonEffects(action, day, context);
   return [];
 }
 
@@ -175,6 +175,7 @@ function createSaveEffects(
   day: number,
   context: Partial<CreateEffectsContext>,
 ): WorkflowEffect[] {
+  if (getNightNumber(context.state || {}, day, 'witchPoisonTarget')) return [];
   if (action.payload.use !== true) return [];
   const target = getNightNumber(context.state || {}, day, 'wolfTarget');
   if (!target) return [];
@@ -201,7 +202,12 @@ function createSaveEffect(action: DomainAction, day: number, target: number): Wo
   };
 }
 
-function createPoisonEffects(action: DomainAction, day: number): WorkflowEffect[] {
+function createPoisonEffects(
+  action: DomainAction,
+  day: number,
+  context: Partial<CreateEffectsContext>,
+): WorkflowEffect[] {
+  if (getNightBoolean(context.state || {}, day, 'witchSave')) return [];
   if (action.payload.use !== true) return [];
   const target = toPositiveNumber(action.payload.target);
   if (!target) return [];
@@ -439,6 +445,14 @@ function getNightNumber(state: Record<string, unknown>, day: number, key: string
   const night = round?.night;
   if (!night || typeof night !== 'object' || Array.isArray(night)) return null;
   return toPositiveNumber((night as Record<string, unknown>)[key]);
+}
+
+function getNightBoolean(state: Record<string, unknown>, day: number, key: string): boolean {
+  const rounds = Array.isArray(state.rounds) ? state.rounds as Record<string, unknown>[] : [];
+  const round = rounds.find((item) => Number(item.day) === day);
+  const night = round?.night;
+  if (!night || typeof night !== 'object' || Array.isArray(night)) return false;
+  return (night as Record<string, unknown>)[key] === true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

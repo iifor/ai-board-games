@@ -1,5 +1,6 @@
 import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
-import { checkWin } from '../winCheck';
+import { checkWin, getAliveRosterStats } from '../winCheck';
+import type { WerewolfAgent } from '../winCheck';
 import { createRuntime, syncRuntimeState } from '../runtime';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
@@ -52,11 +53,11 @@ function createFinalizeHandler() {
   return {
     execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
       if (isDone(state, step.id)) return completed(state, step.id);
-      const aliveWolves = ((state.players || []) as Array<{ alive?: boolean; faction?: string }>).filter((agent) => agent.alive && agent.faction === 'wolves').length;
+      const roster = getAliveRosterStats((state.players || []) as WerewolfAgent[]);
       const nextState = markStepComplete({
         ...state,
         currentStep: step.id,
-        winner: state.winner || (aliveWolves ? 'wolves' : 'good'),
+        winner: state.winner || (roster.wolves ? 'wolves' : 'good'),
         winReason: state.winReason || 'max days reached'
       }, step.id);
       return {

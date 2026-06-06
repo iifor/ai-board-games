@@ -35,6 +35,7 @@ interface ActionWindow {
   day?: number;
   phase?: string;
   actionType: string;
+  epochActionType?: string;
   actorIds: number[];
   targetIds: number[];
   optional: boolean;
@@ -53,17 +54,19 @@ interface Runtime {
   [key: string]: unknown;
 }
 
-function buildActionWindow({ match, step, state, actionType, actors, targetIds = [], optional = false }: {
+function buildActionWindow({ match, step, state, actionType, epochActionType, actors, targetIds = [], optional = false }: {
   match: Match;
   step: Step;
   state: Record<string, unknown>;
   actionType: string;
+  epochActionType?: string;
   actors: Agent[];
   targetIds?: number[];
   optional?: boolean;
 }): ActionWindow {
   const actorList: Agent[] = step.config.ordered ? (actors || []) : sortBySeat(actors || []);
-  const epochId = `${match.id}:${step.id}:${actionType}`;
+  const epochKey = epochActionType || actionType;
+  const epochId = `${match.id}:${step.id}:${epochKey}`;
   const window: ActionWindow = {
     id: epochId,
     matchId: match.id,
@@ -71,6 +74,7 @@ function buildActionWindow({ match, step, state, actionType, actors, targetIds =
     day: step.config.day,
     phase: step.config.phase,
     actionType,
+    epochActionType: epochKey,
     actorIds: actorList.map((actor: Agent) => actor.id),
     targetIds,
     optional,
@@ -82,7 +86,7 @@ function buildActionWindow({ match, step, state, actionType, actors, targetIds =
     id: epochId,
     matchId: match.id,
     stepId: step.id,
-    actionType,
+    actionType: epochKey,
     status: ACTION_WINDOW_STATUS.OPEN,
     window: window as Record<string, unknown>
   });
@@ -183,11 +187,12 @@ function allActionWorkSucceeded(matchId: string, stepId: string, actionType: str
 }
 
 function resolveActionWindow(matchId: string, stepId: string, actionType: string, window?: ActionWindow | null): void {
+  const epochActionType = window?.epochActionType || actionType;
   repo.upsertActionWindowEpoch({
-    id: window?.id || `${matchId}:${stepId}:${actionType}`,
+    id: window?.id || `${matchId}:${stepId}:${epochActionType}`,
     matchId,
     stepId,
-    actionType,
+    actionType: epochActionType,
     status: ACTION_WINDOW_STATUS.RESOLVED,
     window: (window || {}) as Record<string, unknown>
   });

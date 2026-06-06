@@ -23,6 +23,7 @@ interface DeathResolutionCheckpoint {
   initialEffectsApplied: boolean;
   initialEffects: Array<Record<string, unknown>>;
   initialDeathIds: number[];
+  nightResultPublished: boolean;
   resultPublished: boolean;
   shadowAudited: boolean;
   completedHunterIds: number[];
@@ -57,6 +58,7 @@ interface HandlerResult {
   blockers?: unknown[];
   tasks?: unknown[];
   pendingActions?: unknown[];
+  matchStatus?: string;
 }
 
 type StageResult =
@@ -70,6 +72,10 @@ function ensureDeathResolutionCheckpoint(
   source: DeathResolutionCheckpoint['source'],
 ): DeathResolutionCheckpoint {
   if (round.deathResolution?.stepId === step.id && round.deathResolution.source === source) {
+    if (typeof round.deathResolution.nightResultPublished !== 'boolean') {
+      round.deathResolution.nightResultPublished = source === 'night'
+        && round.deathResolution.initialEffectsApplied;
+    }
     return round.deathResolution;
   }
   const legacyApplied = source === 'night'
@@ -84,6 +90,7 @@ function ensureDeathResolutionCheckpoint(
     initialEffectsApplied: legacyApplied,
     initialEffects: [],
     initialDeathIds: legacyDeathIds,
+    nightResultPublished: source === 'night' && legacyApplied,
     resultPublished: source === 'exile' && Boolean(round.exile),
     shadowAudited: source === 'night' && legacyApplied,
     completedHunterIds: [],

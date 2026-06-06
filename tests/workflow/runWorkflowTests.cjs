@@ -16,7 +16,10 @@ const testFiles = [
   'werewolfPresentation.test.ts',
   'debateSpeechEvents.test.ts',
   'eventProjection.test.ts',
-  'tickCompleted.test.ts'
+  'workflowPersistence.test.ts',
+  'tickCompleted.test.ts',
+  'aiTaskCompletion.test.ts',
+  'werewolfWorkflowStatus.test.ts'
 ].map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];

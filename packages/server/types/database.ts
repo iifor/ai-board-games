@@ -191,6 +191,7 @@ interface MatchSnapshotRow {
   version: number;
   status: string;
   current_step_index: number;
+  last_event_seq: number | null;
   state_json: string;
   blockers_json: string;
   created_at: string;

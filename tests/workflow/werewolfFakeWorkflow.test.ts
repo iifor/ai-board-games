@@ -186,6 +186,63 @@ test('night death of one god does not complete the game while other gods survive
   }
 });
 
+test('debug death chain rejects invalid wolf lock while seer idiot and villager survive', () => {
+  const original = snapshotRepo(repo);
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => task,
+      listPendingActions: () => [],
+      listAiTasks: () => [],
+      createWorkflowEffect: (effect: never) => effect,
+    });
+    const state = createState();
+    state.debugMode = true;
+    state.modeConfig = { ...(state.modeConfig as Record<string, unknown>), winCondition: 'side' };
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill'], { roleConfig: { id: 'werewolf', faction: 'wolves', roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+      player(2, 'witch', 'good', ['save', 'poison'], { alive: false, deathDay: 2, deathReason: '狼人袭击', roleConfig: { id: 'witch', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'save' }, { action: 'poison' }] } } }),
+      player(3, 'hunter', 'good', ['shootOnDeath'], { alive: false, deathDay: 2, deathReason: '女巫毒杀', hunterShotUsed: true, roleConfig: { id: 'hunter', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'shootOnDeath' }] } } }),
+      player(4, 'seer', 'good', ['inspectFaction'], { roleConfig: { id: 'seer', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'inspectFaction' }] } } }),
+      player(5, 'idiot', 'good', ['surviveExileOnce'], { roleConfig: { id: 'idiot', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'surviveExileOnce' }] } } }),
+      player(6, 'villager', 'good', [], { roleConfig: { id: 'villager', faction: 'good', roleType: 'villager', rule: { actions: [] } } }),
+    ];
+    const round = createRound(2) as Record<string, unknown>;
+    (round.night as { deaths: Array<{ id: number; reason: string }> }).deaths = [
+      { id: 2, reason: '狼人袭击' },
+      { id: 3, reason: '女巫毒杀' },
+    ];
+    round.nightRevealed = true;
+    round.winnerLock = {
+      winner: 'wolves',
+      winReason: 'invalid debug lock',
+      sourceFaction: 'wolves',
+      sourceAction: 'wolf_kill',
+      winCondition: 'side',
+      triggerRoster: { wolves: 1, gods: 2, villagers: 1, good: 3 },
+    };
+    state.rounds = [round];
+    const match = { id: 'm-debug-invalid-lock', config: { players: state.players, debugMode: true }, createdAt: 'now' };
+    const step = { id: 'night_resolve_2', type: 'werewolf.night_resolve', config: { day: 2, phase: 'night' } };
+
+    const completed = createNightResolveHandler().execute({ match, step, state } as never);
+    const audit = (completed.events || []).find(
+      (event: Record<string, unknown>) => event.type === 'werewolf_winner_lock_rejected',
+    ) as Record<string, unknown> | undefined;
+
+    assert.equal(completed.status, 'COMPLETED');
+    assert.equal(completed.matchStatus, undefined);
+    assert.equal(completed.state?.winner, null);
+    assert.equal((completed.events || []).some((event: Record<string, unknown>) => event.type === 'werewolf_game_completed'), false);
+    assert.equal(audit?.channel, 'system');
+    assert.equal(audit?.visibility, 'system');
+    assert.equal((audit?.payload as Record<string, unknown>)?.reason, 'trigger_roster_not_winning');
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
 test('wolf kill priority stays locked when dead last god hunter shoots the last wolf', () => {
   const original = snapshotRepo(repo);
   const tasks: Array<Record<string, unknown>> = [];
@@ -271,9 +328,13 @@ test('hunter shooting the last wolf gives good victory when wolf kill did not co
 test('chained hunters use actor-scoped action windows', () => {
   const original = snapshotRepo(repo);
   const tasks: Array<Record<string, unknown>> = [];
+  const epochs: Array<Record<string, unknown>> = [];
   try {
     patchRepo(repo, {
-      upsertActionWindowEpoch: (epoch: never) => epoch,
+      upsertActionWindowEpoch: (epoch: never) => {
+        epochs.push({ ...epoch });
+        return epoch;
+      },
       listEvents: () => [],
       createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
       listPendingActions: () => [],
@@ -296,6 +357,8 @@ test('chained hunters use actor-scoped action windows', () => {
     tasks.push(...(first.tasks || []));
     assert.equal(tasks[0].action, 'hunter_shot:2');
     assert.equal(first.state?.currentActionWindow?.actionType, 'hunter_shot');
+    assert.equal(first.state?.currentActionWindow?.epochActionType, 'hunter_shot:2');
+    assert.equal(epochs[0]?.actionType, 'hunter_shot:2');
     tasks[0] = { ...tasks[0], status: 'succeeded', result: { payload: { target: 3 } } };
 
     const second = handler.execute({ match, step, state: first.state } as never);
@@ -303,6 +366,9 @@ test('chained hunters use actor-scoped action windows', () => {
     const secondHunterTask = tasks.find((task) => task.action === 'hunter_shot:3');
     assert.equal(second.status, 'WAITING');
     assert.equal(secondHunterTask?.playerId, 3);
+    assert.equal(second.state?.currentActionWindow?.actionType, 'hunter_shot');
+    assert.equal(second.state?.currentActionWindow?.epochActionType, 'hunter_shot:3');
+    assert.equal(epochs.some((epoch) => epoch.actionType === 'hunter_shot:3'), true);
   } finally {
     patchRepo(repo, original);
   }
@@ -377,6 +443,51 @@ test('exile result is not republished while last words are waiting', async () =>
     handler.execute({ match, step, state: waiting.state } as never);
     await flushMatchEventPublishes(matchId);
     assert.equal(delivered.filter((event) => event.type === 'vote-result').length, 1);
+  } finally {
+    unsubscribe();
+    unregisterMatchInfra(matchId);
+    patchRepo(repo, original);
+  }
+});
+
+test('first-night result is published once before public last words', async () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  const delivered: Array<Record<string, unknown>> = [];
+  const matchId = 'm-first-night-order';
+  const eventBus = createEventBusWithDefaults();
+  const unsubscribe = eventBus.subscribeAll((event) => delivered.push(event as unknown as Record<string, unknown>));
+  registerMatchInfra(matchId, eventBus, createGameEventBuilder(matchId));
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect,
+    });
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'villager', 'good', []),
+      player(3, 'seer', 'good', ['inspectFaction']),
+    ];
+    state.rounds[0].night.wolfTarget = 2;
+    const match = { id: matchId, config: { players: state.players }, createdAt: 'now' };
+    const step = { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } };
+    const handler = createNightResolveHandler();
+
+    const waiting = handler.execute({ match, step, state } as never);
+    completeLastWordsWindow(handler, match, step, waiting, tasks);
+    await flushMatchEventPublishes(matchId);
+
+    const nightResultIndexes = delivered
+      .map((event, index) => event.type === 'night-result' ? index : -1)
+      .filter((index) => index >= 0);
+    const lastWordsIndex = delivered.findIndex((event) => event.type === 'last-words');
+    assert.deepEqual(nightResultIndexes.length, 1);
+    assert.ok(nightResultIndexes[0] < lastWordsIndex);
   } finally {
     unsubscribe();
     unregisterMatchInfra(matchId);
@@ -631,6 +742,55 @@ test('depleted antidote skips privately while remaining poison still opens', () 
     } as never);
     assert.equal(poisonResult.status, 'WAITING');
     assert.equal(poisonResult.tasks?.length, 1);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('using antidote always skips poison without creating work', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  const epochs: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => {
+        epochs.push({ ...epoch });
+        return epoch;
+      },
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect,
+    });
+
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'witch', 'good', ['save', 'poison']),
+      player(3, 'villager', 'good', []),
+    ];
+    state.rounds[0].night.wolfTarget = 3;
+    state.rounds[0].night.witchSave = true;
+    state.rounds[0].night.witchSaveTarget = 3;
+    const handler = createActionWindowHandler();
+    const result = handler.execute({
+      match: { id: 'm-witch-one-potion', config: { players: state.players }, createdAt: 'now' },
+      step: {
+        id: 'witch_poison_1',
+        type: 'werewolf.action_window',
+        config: { day: 1, phase: 'night', actionType: 'witch_poison', optional: true },
+      },
+      state,
+    } as never);
+
+    assert.equal(result.status, 'COMPLETED');
+    assert.equal(result.tasks?.length || 0, 0);
+    assert.equal(result.pendingActions?.length || 0, 0);
+    assert.equal(tasks.length, 0);
+    assert.equal(epochs.length, 0);
+    assert.equal(result.events?.[0].payload.skipReason, 'one_potion_per_night');
+    assert.equal(result.events?.[0].channel, 'system');
   } finally {
     patchRepo(repo, original);
   }

@@ -81,7 +81,8 @@ function resolveEngineNightResolution(state: Record<string, unknown>, day: numbe
   if (input.wolfTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.KILL, target: input.wolfTarget, reason: '狼人袭击' });
   if (input.guardTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.PROTECT, target: input.guardTarget });
   if (input.witchSave && input.witchSaveTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.SAVE, target: input.witchSaveTarget });
-  if (input.witchPoisonTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.POISON, target: input.witchPoisonTarget, reason: '女巫毒杀' });
+  const validPoisonTarget = input.witchSave ? null : input.witchPoisonTarget;
+  if (validPoisonTarget) effects.push({ type: WEREWOLF_EFFECT_TYPES.POISON, target: validPoisonTarget, reason: '女巫毒杀' });
 
   const savedTarget = input.witchSave ? input.witchSaveTarget : null;
   const deaths: NightDeath[] = [];
@@ -92,8 +93,8 @@ function resolveEngineNightResolution(state: Record<string, unknown>, day: numbe
   ) {
     deaths.push({ id: input.wolfTarget, reason: '狼人袭击' });
   }
-  if (input.witchPoisonTarget && !deaths.some((death) => Number(death.id) === Number(input.witchPoisonTarget))) {
-    deaths.push({ id: input.witchPoisonTarget, reason: '女巫毒杀' });
+  if (validPoisonTarget && !deaths.some((death) => Number(death.id) === Number(validPoisonTarget))) {
+    deaths.push({ id: validPoisonTarget, reason: '女巫毒杀' });
   }
 
   return {

@@ -131,6 +131,15 @@ pnpm run test:migration
 | reducer、effects、action window、事件投影、游戏流程 | `pnpm run test:workflow` |
 | shared 类型消费、基础工具、event bus、socket session、skill emitter | `pnpm run test:unit` |
 | 数据库迁移、事件映射、历史兼容 | `pnpm run test:migration` |
+
+Workflow 内部 `StatePatch` 使用路径操作表达状态增量：
+
+- `set: Array<{ path: string[]; value: unknown }>` 设置或替换字段。
+- `remove: string[][]` 删除字段。
+- 数组不使用索引增量，统一整体替换。
+
+`MatchSnapshot.lastEventSeq` 为可选字段，用于兼容没有事件水位的历史快照。该类型
+属于服务端 workflow 恢复协议，不改变 REST、WebSocket 或游戏回放公开载荷。
 | 跨包类型或导出调整 | `pnpm run check`，必要时追加相关测试 |
 
 ## 扩展点与注意事项
@@ -156,3 +165,8 @@ pnpm run test:migration
 展示事件的 `presentation.requiresAck` 用于区分需要等待语音播放的事件与纯 UI 状态事件。女巫“不毒”的 `witch-action` 设置 `requiresAck: false`、空 `speakableText` 和 `suppressSpeech: true`，事件仍进入 `PlaybackEvent` 持久化，但不注入连接态 `ackId`。
 
 `last_words` 是服务端内部死亡行动，允许已死亡玩家作为 actor；公开协议继续使用既有 `last-words`、`exile-words`。内部 `pendingLastWords` 和 `winnerLock` 不属于共享快照或回放载荷。狼人杀模式 `winCondition` 的正式值为 `side/gods/villagers/all`，旧 `single` 仅作为输入兼容并归一化为 `side`。
+## 狼人杀内部兼容约定
+
+- 本次修复不改变公开 REST、WebSocket 或 `GameEvent` 类型。
+- 猎人窗口仍对外使用 `hunter_shot`；`hunter_shot:<actorId>` 仅作为服务端 AI task 与 action-window epoch 的内部键。
+- `nightResultPublished` 仅属于服务端死亡链检查点，序列化、视角投影和精确回放载荷必须移除。

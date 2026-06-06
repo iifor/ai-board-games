@@ -16,6 +16,7 @@ export {
   getDebugState,
   listPendingOutbox,
   markOutboxSent,
+  initializeWorkflowMaintenance,
 } from './service';
 
 export * as repository from './repository';

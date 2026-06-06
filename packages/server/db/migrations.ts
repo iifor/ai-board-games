@@ -204,6 +204,7 @@ function migrate(db: Database | JsonDb): void {
       version INTEGER NOT NULL,
       status TEXT NOT NULL,
       current_step_index INTEGER NOT NULL,
+      last_event_seq INTEGER,
       state_json TEXT NOT NULL,
       blockers_json TEXT NOT NULL DEFAULT '[]',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -389,6 +390,7 @@ function migrate(db: Database | JsonDb): void {
   ensureColumn(db, 'models', 'thinking_enabled', "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, 'ai_tasks', 'worker_id', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'ai_tasks', 'claimed_at', 'TEXT');
+  ensureColumn(db, 'match_snapshots', 'last_event_seq', 'INTEGER');
 
   // Channel + Scope model migration
   ensureColumn(db, 'workflow_events', 'channel', "TEXT NOT NULL DEFAULT 'public'");

@@ -68,6 +68,7 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
     }
     const finalMatch = workflowService.getDebugState(match.id as string)?.match || match;
     await flushMatchEventPublishes(match.id as string);
+    assertWerewolfWorkflowCompleted(finalMatch as Record<string, unknown>);
     if (trace) { markTraceComplete(trace); /* flushTrace 推迟到 runSession 中 saveGameRecord 之后 */ }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = serializeWerewolfState(finalMatch as any, (finalMatch as Record<string, unknown>).state as import('./runtime').WerewolfState);
@@ -89,11 +90,22 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
   }
 }
 
+function assertWerewolfWorkflowCompleted(match: Record<string, unknown>): void {
+  const status = String(match.status || 'unknown');
+  if (status === 'completed') return;
+  const matchError = match.error && typeof match.error === 'object'
+    ? match.error as Record<string, unknown>
+    : {};
+  const detail = String(matchError.message || 'workflow stopped before completion');
+  throw new Error(`狼人杀工作流异常停止（${status}）：${detail}`);
+}
+
 export {
   WEREWOLF_WORKFLOW_ID,
   werewolfWorkflow,
   registerWerewolfWorkflow,
   createWerewolfWorkflowMatch,
   runWerewolfWorkflow,
+  assertWerewolfWorkflowCompleted,
   serializeWerewolfState
 };

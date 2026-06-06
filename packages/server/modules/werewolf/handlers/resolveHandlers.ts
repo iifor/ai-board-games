@@ -57,7 +57,6 @@ function createNightResolveHandler() {
         events: [],
       };
       let shadowAuditEvent: unknown | null = null;
-
       if (!checkpoint.initialEffectsApplied) {
         const day = step.config.day || Number(round.day) || 1;
         const stateBeforeLegacy = cloneRecord(runtime.state as unknown as Record<string, unknown>);
@@ -80,12 +79,12 @@ function createNightResolveHandler() {
       } else {
         enqueueNightLastWords(round, checkpoint.initialDeathIds);
       }
-
       context.state = {
         ...syncRuntimeState(runtime),
         currentStep: step.id,
         currentActionWindow: state.currentActionWindow || null,
       };
+      publishFirstNightResultOnce(context);
       const result = advanceDeathResolution(context);
       if (shadowAuditEvent) result.events = [...(result.events || []), shadowAuditEvent];
       if (result.status === 'COMPLETED') {
@@ -113,7 +112,6 @@ function createExileResolveHandler() {
         checkpoint,
         events: [],
       };
-
       if (!checkpoint.initialEffectsApplied) {
         const resolved = resolveExileEffects(runtime.agents as never, round as never, runtime.modeConfig as never);
         checkpoint.initialDeathIds = resolved.exile ? [Number(resolved.exile.id)] : [];
@@ -122,7 +120,6 @@ function createExileResolveHandler() {
       } else {
         enqueueExileLastWords(round, checkpoint.initialDeathIds[0]);
       }
-
       context.state = {
         ...syncRuntimeState(runtime),
         currentStep: step.id,
@@ -154,7 +151,18 @@ function publishExileResultOnce(context: DeathResolutionContext): void {
     );
   }, serializeWerewolfState(context.match, context.state as unknown as Record<string, unknown>));
 }
-
+function publishFirstNightResultOnce(context: DeathResolutionContext): void {
+  if (Number(context.step.config.day) !== 1 || context.checkpoint.nightResultPublished) return;
+  context.checkpoint.nightResultPublished = true;
+  const deaths = (context.round.night as { deaths?: Array<{ id: number; reason: string }> } | undefined)?.deaths || [];
+  const message = deaths.length
+    ? `昨晚${deaths.map((death) => `${getSeatNumber(death.id, context.runtime.agents)}号玩家`).join('、')}死亡`
+    : '昨晚是平安夜';
+  publishGameEvent(context.runtime.eventBus, context.runtime.gameEventBuilder, (builder) => {
+    builder.setStep(context.step.id).setPhase('day').setDay(1);
+    return builder.buildNightResult(deaths, message);
+  }, serializeWerewolfState(context.match, context.state as unknown as Record<string, unknown>));
+}
 function createSheriffResolveHandler() {
   return {
     execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
@@ -169,14 +177,6 @@ function createSheriffResolveHandler() {
         currentStep: step.id,
         currentActionWindow: null,
       }, step.id);
-      const nightDeaths = (round as { night?: { deaths?: Array<{ id: number; reason: string }> } }).night?.deaths || [];
-      const deathMessage = nightDeaths.length
-        ? `昨晚${nightDeaths.map((death) => `${getSeatNumber(death.id, runtime.agents)}号玩家`).join('、')}死亡`
-        : '昨晚是平安夜';
-      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
-        builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
-        return builder.buildNightResult(nightDeaths, deathMessage);
-      });
       return {
         status: 'COMPLETED',
         state: nextState,

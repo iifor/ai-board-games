@@ -27,6 +27,7 @@ import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage, ph
 import { hasActionPhase, getActionPhaseConfig } from '../actionPhases';
 import { resolveActionChannel } from './actionChannel';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
+import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { getSeatNumber } from '../utils';
 import { recordWerewolfInteractionFeedback } from '../interactionFeedbackTrace';
 import { canUseWerewolfActionEngineBridge, runWerewolfActionEngineBridge } from '../actionEngineBridge';
@@ -288,6 +289,7 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
     status: 'COMPLETED',
     state: nextState,
     events,
+    ...(winResult.winner ? { matchStatus: MATCH_STATUS.COMPLETED } : {}),
   };
 }
 
