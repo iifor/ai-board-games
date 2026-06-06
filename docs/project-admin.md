@@ -101,6 +101,8 @@ packages/admin/
 - `VoiceManager`：音色配置。
 - `WerewolfRoleManager`：狼人杀角色管理。
 - `WerewolfModeManager`：狼人杀模式和角色配置。
+
+狼人杀模式的 `winCondition` 只允许 `side/gods/villagers/all`，分别对应屠边、屠神、屠民和屠城。历史 `single` 数据由服务端读取时兼容映射为 `side`，管理端不再提交 `single`。
 - `SkinManager`：皮肤资源管理。
 - `TraceExplorer`：AI trace、span、LLM 调用、agent 决策查看。
 - `WorkflowDebugConsole`：工作流调试控制台，包含 match 事件、任务、pending action、effect、interrupt，以及狼人杀夜间结算 Shadow Audit 汇总。

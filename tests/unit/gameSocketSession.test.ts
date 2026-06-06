@@ -139,6 +139,33 @@ test('PreparedSender classifies C-end workflow events as display events', () => 
   assert.equal(isImmediateEvent({ type: 'error', message: 'failed' }), true);
 });
 
+test('PreparedSender sends no-poison display without audio ack', async () => {
+  const sent: SentPayload[] = [];
+  const session = createImmediateSession(sent);
+  const sender = createPreparedSender(session as never);
+
+  await sender.send({
+    type: 'workflow-event',
+    workflowEvent: 'witch-action',
+    actionType: 'witch_poison',
+    witchAction: { use: false, target: null, reason: '' },
+    presentation: {
+      speakableText: '',
+      displayText: '女巫没有使用毒药',
+      displayMode: 'status',
+      uiHint: 'witch-poison-result',
+      suppressSpeech: true,
+      requiresAck: false,
+    },
+  });
+
+  assert.equal(sent.length, 1);
+  assert.equal('ackId' in sent[0], false);
+  assert.equal(sent[0].presentation?.displayText, '女巫没有使用毒药');
+  assert.equal(sent[0].subtitle, undefined);
+  assert.equal(sent[0].audioUrl, undefined);
+});
+
 test('PlaybackPipeline replays exact prepared payloads without ack ids', async () => {
   const liveSent: SentPayload[] = [];
   const live = createPlaybackPipeline(createImmediateSession(liveSent) as never, {

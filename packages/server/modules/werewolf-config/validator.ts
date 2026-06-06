@@ -25,7 +25,7 @@ const upsertModeSchema = z.object({
     firstDayElection: z.boolean().optional(),
     voteWeight: z.number().optional()
   }).optional(),
-  winCondition: z.enum(['side', 'single']).optional(),
+  winCondition: z.enum(['side', 'gods', 'villagers', 'all']).optional(),
   enabled: z.boolean().optional(),
   sortOrder: z.number().optional()
 });

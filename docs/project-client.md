@@ -177,4 +177,6 @@ pnpm run check:client
 - `vote-result` 事件即使没有完整 `game` snapshot，也会用顶层 `votes/tally/exile` patch 到对应 day 的 round，供座位投票角标展示。
 - `wolf-vote/seer-check/witch-action` 会把顶层完成字段合并到当前夜晚；完成事件不能按 `actionType` 回退为睁眼态。
 - 狼人座位在授权视角显示最终“刀 X 号”，预言家座位显示“查 X 号 / 好人或狼人”，女巫座位显示“毒 X 号”或“不毒”。
+- 女巫选择不使用毒药时仍消费 `witch-action` 并展示“不毒”，但该事件没有旁白、TTS 或语音 ACK；实时与精确回放使用相同最终载荷。
+- `last-words` 和 `exile-words` 继续复用现有 testimony UI。首夜遗言和放逐遗言由服务端决定资格与顺序，C 端不自行推导。
 - `sheriff-badge-transfer/tear` 继续复用 `sheriffTransfer` 合并逻辑，移交后移动警徽，撕毁后清除警徽。

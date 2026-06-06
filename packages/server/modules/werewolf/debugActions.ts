@@ -71,7 +71,7 @@ function runDebugSheriffBadgeAction(runtime: DebugRuntime, actor: DebugAgent): R
 function debugSpeech(actor: DebugAgent, agents?: DebugAgent[]): string {
   const sorted = (agents || []).slice().sort((a, b) => Number(a.id) - Number(b.id));
   const seatNumber = sorted.findIndex((a) => Number(a.id) === Number(actor.id)) + 1 || Number(actor.id) || '';
-  return `我是${seatNumber}号，${actor.faction === 'wolves' ? '狼人' : '好人'}，调试发言`;
+  return `${seatNumber}号发言`;
 }
 
 function firstTarget(alive: DebugAgent[], actor: DebugAgent, predicate: (agent: DebugAgent) => boolean): number | null {

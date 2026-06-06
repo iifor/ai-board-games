@@ -176,7 +176,7 @@ export function getImportPromptRule(gameType: string): string | undefined {
 
 export function getImportPromptFlowRequirements(gameType: string): string {
   const common = [
-    '- 所有玩家发言 text 建议 80-180 个中文字符，关键总结/评委点评/遗言/结算说明建议 120-240 个中文字符。',
+    '- 所有玩家发言 text 不超过 80-180 个中文字符，关键总结/评委点评/遗言/结算说明不超过 120-240 个中文字符。',
     '- thinking 如提供，控制在 30-80 个中文字符，只写该角色当下判断，不泄露非本角色应知道的信息。',
     '- 流程必须按真实游戏顺序推进，事件数量要足够支撑胜负、MVP、阵营立场或最终结论。'
   ];
@@ -219,7 +219,7 @@ export function buildImportGenerationPrompt(gameType: string, players: Array<{ i
     '1. 只输出 JSON，不要输出 Markdown、解释或代码块。',
     '2. 必须使用下面玩家池中的真实 id 和昵称，不要虚构玩家。',
     '3. 每位玩家的发言要符合其人格，流程要完整，结果要自洽。',
-    '4. 每条发言建议包含 playerId、text；如果有思考过程，可额外提供 thinking 字段。',
+    '4. 每条发言包含 playerId、text；如果有思考过程，可额外提供 thinking 字段。',
     '5. 时间、胜负、MVP/关键角色等结果必须能从流程中看出原因。',
     '',
     '游戏规则与目标结构：',

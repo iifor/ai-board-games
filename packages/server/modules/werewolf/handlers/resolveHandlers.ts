@@ -1,112 +1,196 @@
+import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
+import { resolveExileEffects, resolveNightEffects } from '../effects';
 import {
-  buildActionWindow,
-  createActionBlockers,
-  hasOpenWork,
-  collectActionResults,
-  allActionWorkSucceeded,
-  resolveActionWindow
-} from '../actionWindows';
-import type { ActionWindow } from '../actionWindows';
-import { applyHunterShot, resolveExileEffects, resolveNightEffects } from '../effects';
-import { createRuntime, ensureRound, syncRuntimeState, serializeWerewolfState } from '../runtime';
-import type { Runtime } from '../runtime';
-import { findPendingHunter } from '../reducers';
-import type { Agent as ReducerAgent, Round as ReducerRound } from '../reducers';
+  createRuntime,
+  ensureRound,
+  serializeWerewolfState,
+  syncRuntimeState,
+} from '../runtime';
 import {
-  applySheriffBadgeDisposition,
-  findPendingSheriffBadgeDisposition,
   isSheriffResolveReady,
   resolveSheriffElection,
   shouldRunSheriffElection,
 } from '../sheriffWorkflow';
 import { runDeathActionAiTask, validateDeathActionAiResult } from '../aiActions';
-import { createWerewolfEvent, publishGameEvent, completed, isDone, markStepComplete } from './common';
+import {
+  completed,
+  createWerewolfEvent,
+  isDone,
+  markStepComplete,
+  publishGameEvent,
+} from './common';
 import type { StepState } from './common';
-import { recordWorkflowEffects } from '../../workflow-engine/effects';
-import { actionRequestedMessage, actionResolvedMessage, effectResolvedMessage } from '../messages';
+import { actionResolvedMessage } from '../messages';
 import { getActiveTrace, recordSnapshot } from '../../observability/tracer';
-import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
-import { resolveWinAfterDeaths } from '../winCheck';
-import type { WerewolfAgent } from '../winCheck';
-import { buildSheriffBadgeMessage, getSeatNumber } from '../utils';
+import { getSeatNumber } from '../utils';
 import { auditNightResolutionShadow } from '../engineNightResolutionAudit';
 import type { NightResolutionShadowAudit } from '../engineNightResolutionAudit';
-import { recordWerewolfInteractionFeedback } from '../interactionFeedbackTrace';
-
-interface Match {
-  id: string;
-  [key: string]: unknown;
-}
-
-interface Step {
-  id: string;
-  config: {
-    day?: number;
-    phase?: string;
-    actionType?: string;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
-
-interface HandlerResult {
-  status: string;
-  state: StepState;
-  events?: unknown[];
-  blockers?: unknown[];
-  tasks?: unknown[];
-  pendingActions?: unknown[];
-}
-
+import {
+  enqueueExileLastWords,
+  enqueueNightLastWords,
+} from '../lastWordsWorkflow';
+import {
+  advanceDeathResolution,
+  recordInitialEffects,
+} from '../deathResolution/service';
+import { ensureDeathResolutionCheckpoint } from '../deathResolution/types';
+import type {
+  DeathResolutionContext,
+  HandlerResult,
+  Match,
+  Step,
+} from '../deathResolution/types';
 function createNightResolveHandler() {
   return {
     execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
       const runtime = createRuntime(match, state);
+      const round = ensureRound(runtime.state, step.config.day!) as DeathResolutionContext['round'];
+      const checkpoint = ensureDeathResolutionCheckpoint(round, step, 'night');
+      const context: DeathResolutionContext = {
+        match,
+        step,
+        state,
+        runtime,
+        round,
+        checkpoint,
+        events: [],
+      };
+      let shadowAuditEvent: unknown | null = null;
+
+      if (!checkpoint.initialEffectsApplied) {
+        const day = step.config.day || Number(round.day) || 1;
+        const stateBeforeLegacy = cloneRecord(runtime.state as unknown as Record<string, unknown>);
+        const resolved = resolveNightEffects(runtime.agents as never, round as never, runtime.modeConfig as never);
+        checkpoint.initialDeathIds = resolved.deaths.map((death) => Number(death.id));
+        recordInitialEffects(context, resolved.effects as unknown as Array<Record<string, unknown>>);
+        enqueueNightLastWords(round, checkpoint.initialDeathIds);
+        if (!checkpoint.shadowAudited) {
+          const audit = auditNightResolutionShadow({
+            stateBeforeLegacy,
+            day,
+            legacy: {
+              effects: resolved.effects as unknown as Array<Record<string, unknown>>,
+              deaths: resolved.deaths,
+            },
+          });
+          shadowAuditEvent = createNightResolutionShadowAuditEvent(match, step, stateBeforeLegacy, audit);
+          checkpoint.shadowAudited = true;
+        }
+      } else {
+        enqueueNightLastWords(round, checkpoint.initialDeathIds);
+      }
+
+      context.state = {
+        ...syncRuntimeState(runtime),
+        currentStep: step.id,
+        currentActionWindow: state.currentActionWindow || null,
+      };
+      const result = advanceDeathResolution(context);
+      if (shadowAuditEvent) result.events = [...(result.events || []), shadowAuditEvent];
+      if (result.status === 'COMPLETED') {
+        recordGameSnapshotIfTrace(match.id, runtime as unknown as Record<string, unknown>, 'night_resolve');
+      }
+      return result;
+    },
+    runAiTask: runDeathActionAiTask,
+    validateAiResult: validateDeathActionAiResult,
+  };
+}
+function createExileResolveHandler() {
+  return {
+    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+      if (isDone(state, step.id) || state.winner) return completed(state, step.id);
+      const runtime = createRuntime(match, state);
+      const round = ensureRound(runtime.state, step.config.day!) as DeathResolutionContext['round'];
+      const checkpoint = ensureDeathResolutionCheckpoint(round, step, 'exile');
+      const context: DeathResolutionContext = {
+        match,
+        step,
+        state,
+        runtime,
+        round,
+        checkpoint,
+        events: [],
+      };
+
+      if (!checkpoint.initialEffectsApplied) {
+        const resolved = resolveExileEffects(runtime.agents as never, round as never, runtime.modeConfig as never);
+        checkpoint.initialDeathIds = resolved.exile ? [Number(resolved.exile.id)] : [];
+        recordInitialEffects(context, resolved.effects as unknown as Array<Record<string, unknown>>);
+        enqueueExileLastWords(round, resolved.exile?.id);
+      } else {
+        enqueueExileLastWords(round, checkpoint.initialDeathIds[0]);
+      }
+
+      context.state = {
+        ...syncRuntimeState(runtime),
+        currentStep: step.id,
+        currentActionWindow: state.currentActionWindow || null,
+      };
+      publishExileResultOnce(context);
+      const result = advanceDeathResolution(context);
+      if (result.status === 'COMPLETED') {
+        recordGameSnapshotIfTrace(match.id, runtime as unknown as Record<string, unknown>, 'exile_resolve');
+      }
+      return result;
+    },
+    runAiTask: runDeathActionAiTask,
+    validateAiResult: validateDeathActionAiResult,
+  };
+}
+function publishExileResultOnce(context: DeathResolutionContext): void {
+  if (context.checkpoint.resultPublished) return;
+  context.checkpoint.resultPublished = true;
+  const exile = context.round.exile;
+  if (!exile) return;
+  publishGameEvent(context.runtime.eventBus, context.runtime.gameEventBuilder, (builder) => {
+    builder.setStep(context.step.id).setPhase('day').setDay(context.step.config.day || 1);
+    return builder.buildVoteResult(
+      (context.round.votes as Record<string, number | null> | undefined) || {},
+      (context.round.voteTally as Record<string, number> | undefined) || {},
+      exile,
+      `${getSeatNumber(exile.id, context.runtime.agents)}号玩家被放逐`,
+    );
+  }, serializeWerewolfState(context.match, context.state as unknown as Record<string, unknown>));
+}
+
+function createSheriffResolveHandler() {
+  return {
+    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+      if (isDone(state, step.id) || state.winner) return completed(state, step.id);
+      const runtime = createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!);
-      const day = step.config.day || Number(round.day) || 1;
-      const stateBeforeLegacy = cloneRecord(runtime.state as unknown as Record<string, unknown>);
-      const resolved = resolveNightEffects(runtime.agents as never, round as never, runtime.modeConfig as never);
-      const shadowAudit = auditNightResolutionShadow({
-        stateBeforeLegacy,
-        day,
-        legacy: {
-          effects: resolved.effects as unknown as Array<Record<string, unknown>>,
-          deaths: resolved.deaths,
-        },
+      if (shouldRunSheriffElection(runtime as never, round as never) && isSheriffResolveReady(round as never)) {
+        resolveSheriffElection(runtime as never, round as never);
+      }
+      const nextState = markStepComplete({
+        ...syncRuntimeState(runtime),
+        currentStep: step.id,
+        currentActionWindow: null,
+      }, step.id);
+      const nightDeaths = (round as { night?: { deaths?: Array<{ id: number; reason: string }> } }).night?.deaths || [];
+      const deathMessage = nightDeaths.length
+        ? `昨晚${nightDeaths.map((death) => `${getSeatNumber(death.id, runtime.agents)}号玩家`).join('、')}死亡`
+        : '昨晚是平安夜';
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
+        return builder.buildNightResult(nightDeaths, deathMessage);
       });
-      const shadowAuditEvent = createNightResolutionShadowAuditEvent(match, step, stateBeforeLegacy, shadowAudit);
-      const hunter = findPendingHunter(runtime.agents as unknown as ReducerAgent[], round as unknown as ReducerRound, resolved.deaths);
-      if (hunter) {
-        const resolutionState = { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null };
-        return appendHandlerEvents(createHunterWindow({ match, step, state: resolutionState, runtime, round, hunter }), [shadowAuditEvent]);
-      }
-      const sheriff = findPendingSheriffBadgeDisposition(runtime as never, round as never);
-      if (sheriff) {
-        const resolutionState = { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null };
-        return appendHandlerEvents(createSheriffBadgeWindow({ match, step, state: resolutionState, runtime, round, sheriff }), [shadowAuditEvent]);
-      }
-      const winResult = runtime.agents?.length
-        ? resolveWinAfterDeaths(runtime.agents as WerewolfAgent[], round as never, day, runtime.modeConfig as Record<string, unknown> || {})
-        : { winner: null, winReason: '' } as { winner: string | null; winReason: string };
-      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}) }, step.id);
-      recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: resolved.effects as unknown as Record<string, unknown>[] });
-
-      const outEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('night', step.config.day), { effects: resolved.effects }, { channel: CHANNEL_TYPES.PUBLIC })];
-      if (winResult.winner) {
-        outEvents.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
-      }
-      outEvents.push(shadowAuditEvent);
-
-      recordGameSnapshotIfTrace(match.id, runtime as unknown as Record<string, unknown>, 'night_resolve');
       return {
         status: 'COMPLETED',
         state: nextState,
-        events: outEvents
+        events: [createWerewolfEvent(
+          match,
+          step,
+          nextState as unknown as Record<string, unknown>,
+          'werewolf_effect_resolved',
+          actionResolvedMessage('sheriff_resolve', step.config.day),
+          { sheriffElection: round.sheriffElection, sheriffId: round.sheriffId },
+          { channel: CHANNEL_TYPES.PUBLIC },
+        )],
       };
     },
-    runAiTask: runDeathActionAiTask,
-    validateAiResult: validateDeathActionAiResult
   };
 }
 
@@ -131,363 +215,12 @@ function createNightResolutionShadowAuditEvent(
         mismatches: audit.mismatches,
         error: audit.error,
       },
-      { channel: CHANNEL_TYPES.SYSTEM },
+      {
+        channel: CHANNEL_TYPES.SYSTEM,
+        idempotencyKey: `${match.id}:${step.id}:night_resolution_shadow`,
+      },
     ),
     visibility: 'system',
-  };
-}
-
-function appendHandlerEvents(result: HandlerResult, events: unknown[]): HandlerResult {
-  return {
-    ...result,
-    events: [...(result.events || []), ...events],
-  };
-}
-
-function createExileResolveHandler() {
-  return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
-      if (isDone(state, step.id) || state.winner) return completed(state, step.id);
-      const runtime = createRuntime(match, state);
-      const round = ensureRound(runtime.state, step.config.day!);
-      const resolved = resolveExileEffects(runtime.agents as never, round as never, runtime.modeConfig as never);
-      const hunter = findPendingHunter(runtime.agents as unknown as ReducerAgent[], round as unknown as ReducerRound, resolved.exile ? [resolved.exile] : []);
-      if (hunter) {
-        const resolutionState = { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null };
-        return createHunterWindow({ match, step, state: resolutionState, runtime, round, hunter });
-      }
-      const sheriff = findPendingSheriffBadgeDisposition(runtime as never, round as never);
-      if (sheriff) {
-        const resolutionState = { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null };
-        return createSheriffBadgeWindow({ match, step, state: resolutionState, runtime, round, sheriff });
-      }
-      const winResult = runtime.agents?.length
-        ? resolveWinAfterDeaths(
-          runtime.agents as WerewolfAgent[],
-          round as never,
-          step.config.day || 1,
-          runtime.modeConfig as Record<string, unknown> || {},
-          { includePostExile: true },
-        )
-        : { winner: null, winReason: '' } as { winner: string | null; winReason: string };
-      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}) }, step.id);
-      recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: resolved.effects as unknown as Record<string, unknown>[] });
-
-      // EventBus: 发布放逐结果
-      if (resolved.exile) {
-        publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
-          builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
-          return builder.buildVoteResult(
-            (round as { votes?: Record<string, number | null> }).votes || {},
-            (round as { voteTally?: Record<string, number> }).voteTally || {},
-            resolved.exile,
-            `${getSeatNumber(resolved.exile.id, runtime.agents)}号玩家被放逐`,
-          );
-        }, serializeWerewolfState(match, nextState as unknown as Record<string, unknown>));
-      }
-
-      const outEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', effectResolvedMessage('day', step.config.day), { effects: resolved.effects }, { channel: CHANNEL_TYPES.PUBLIC })];
-      if (winResult.winner) {
-        outEvents.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
-      }
-
-      recordGameSnapshotIfTrace(match.id, runtime as unknown as Record<string, unknown>, 'exile_resolve');
-      return {
-        status: 'COMPLETED',
-        state: nextState,
-        events: outEvents
-      };
-    },
-    runAiTask: runDeathActionAiTask,
-    validateAiResult: validateDeathActionAiResult
-  };
-}
-
-function createHunterWindow({ match, step, state, runtime, round, hunter }: {
-  match: Match;
-  step: Step;
-  state: StepState;
-  runtime: Runtime;
-  round: Record<string, unknown>;
-  hunter: unknown;
-}): HandlerResult {
-  const actionType = 'hunter_shot';
-  if (!hasOpenWork(match.id, step.id, actionType)) {
-    const window = buildActionWindow({
-      match,
-      step: { ...step, config: { ...step.config, actionType } },
-      state: state as unknown as Record<string, unknown>,
-      actionType,
-      actors: [hunter] as Parameters<typeof buildActionWindow>[0]['actors'],
-      targetIds: (runtime.agents || []).filter((agent) => agent.alive).map((agent) => agent.id),
-      optional: false
-    });
-    const work = createActionBlockers({ match, step, window, actors: [hunter] as Parameters<typeof createActionBlockers>[0]['actors'], promptContext: { day: (round as { day?: number }).day, actionType, round } });
-    return {
-      status: 'WAITING',
-      state: { ...state, currentStep: step.id, currentActionWindow: window },
-      blockers: work.blockers,
-      tasks: work.tasks,
-      pendingActions: work.pendingActions,
-      events: [createWerewolfEvent(match, step, state as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(actionType, (round as { day?: number }).day), { actionType, actionWindow: window }, { channel: CHANNEL_TYPES.PUBLIC })]
-    };
-  }
-  if (!allActionWorkSucceeded(match.id, step.id, actionType, 1)) {
-    const window = state.currentActionWindow || { id: `${match.id}:${step.id}:${actionType}` };
-    const work = createActionBlockers({ match, step, window: window as Parameters<typeof createActionBlockers>[0]['window'], actors: [hunter] as Parameters<typeof createActionBlockers>[0]['actors'], promptContext: { day: (round as { day?: number }).day, actionType, round } });
-    return { status: 'WAITING', state: { ...state, currentStep: step.id }, blockers: work.blockers };
-  }
-  const result = collectActionResults(match.id, step.id, actionType)[0];
-  const effect = applyHunterShot(runtime.agents as never, round as never, { from: (hunter as { id: number }).id, target: Number(result?.payload?.target), reason: (round as { phase?: string }).phase });
-  recordWerewolfInteractionFeedback({
-    matchId: match.id,
-    actionType,
-    actorId: (hunter as { id: number }).id,
-    payload: {
-      ...(result?.payload || {}),
-      target: effect ? result?.payload?.target : null,
-      reason: (round as { phase?: string }).phase,
-    } as Record<string, unknown>,
-    round,
-    day: (round as { day?: number }).day,
-    phase: (round as { phase?: string }).phase || step.config.phase,
-    reason: (round as { phase?: string }).phase || null,
-  });
-  resolveActionWindow(match.id, step.id, actionType, state.currentActionWindow as unknown as ActionWindow);
-  if (effect) recordWorkflowEffects({ matchId: match.id, stepId: step.id, effects: [effect as unknown as Record<string, unknown>] });
-  const stateAfterShot = { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null };
-  const nextHunter = findPendingDeathHunter(runtime, round);
-  if (nextHunter) {
-    const chained = createHunterWindow({ match, step, state: stateAfterShot, runtime, round, hunter: nextHunter });
-    return appendHandlerEvents(chained, [createHunterResolvedEvent(match, step, stateAfterShot, round, actionType, effect)]);
-  }
-  const sheriff = findPendingSheriffBadgeDisposition(runtime as never, round as never);
-  if (sheriff) {
-    const chained = createSheriffBadgeWindow({ match, step, state: stateAfterShot, runtime, round, sheriff });
-    return appendHandlerEvents(chained, [createHunterResolvedEvent(match, step, stateAfterShot, round, actionType, effect)]);
-  }
-  const day = step.config.day || Number((round as { day?: number }).day) || 1;
-  const winResult = resolveWinAfterDeaths(
-    runtime.agents as WerewolfAgent[],
-    round as never,
-    day,
-    runtime.modeConfig as Record<string, unknown> || {},
-    { includePostExile: step.config.phase === 'day' },
-  );
-  const nextState = markStepComplete({
-    ...stateAfterShot,
-    ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}),
-  }, step.id);
-  const events: unknown[] = [createHunterResolvedEvent(match, step, nextState, round, actionType, effect)];
-  if (winResult.winner) {
-    events.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
-  }
-  return {
-    status: 'COMPLETED',
-    state: nextState,
-    events,
-  };
-}
-
-function findPendingDeathHunter(runtime: Runtime, round: Record<string, unknown>): unknown | null {
-  const day = Number((round as { day?: number }).day);
-  const deaths = (runtime.agents || [])
-    .filter((agent) => !agent.alive && Number(agent.deathDay) === day)
-    .map((agent) => ({ id: Number(agent.id), reason: String(agent.deathReason || 'death') }));
-  return findPendingHunter(runtime.agents as unknown as ReducerAgent[], round as unknown as ReducerRound, deaths);
-}
-
-function createHunterResolvedEvent(
-  match: Match,
-  step: Step,
-  state: StepState,
-  round: Record<string, unknown>,
-  actionType: string,
-  effect: unknown,
-): unknown {
-  return createWerewolfEvent(
-    match,
-    step,
-    state as unknown as Record<string, unknown>,
-    'werewolf_effect_resolved',
-    actionResolvedMessage(actionType, (round as { day?: number }).day),
-    { actionType, effects: effect ? [effect] : [] },
-    { channel: CHANNEL_TYPES.PUBLIC },
-  );
-}
-
-function createSheriffBadgeWindow({ match, step, state, runtime, round, sheriff }: {
-  match: Match;
-  step: Step;
-  state: StepState;
-  runtime: Runtime;
-  round: Record<string, unknown>;
-  sheriff: unknown;
-}): HandlerResult {
-  const actionType = 'sheriff_badge_disposition';
-  const targetIds = (runtime.agents || [])
-    .filter((agent) => agent.alive && Number(agent.id) !== Number((sheriff as { id: number }).id))
-    .map((agent) => Number(agent.id));
-  if (!targetIds.length) {
-    return completeSheriffBadgeDisposition({
-      match,
-      step,
-      state,
-      runtime,
-      round,
-      sheriff,
-      payload: { action: 'tear', target: null, reason: 'no-valid-target' },
-    });
-  }
-  if (!hasOpenWork(match.id, step.id, actionType)) {
-    const actionStep = { ...step, config: { ...step.config, actionType } };
-    const window = buildActionWindow({
-      match,
-      step: actionStep,
-      state: state as unknown as Record<string, unknown>,
-      actionType,
-      actors: [sheriff] as Parameters<typeof buildActionWindow>[0]['actors'],
-      targetIds,
-      optional: false,
-    });
-    const work = createActionBlockers({
-      match,
-      step: actionStep,
-      window,
-      actors: [sheriff] as Parameters<typeof createActionBlockers>[0]['actors'],
-      promptContext: { day: (round as { day?: number }).day, actionType, round },
-    });
-    return {
-      status: 'WAITING',
-      state: { ...state, currentStep: step.id, currentActionWindow: window },
-      blockers: work.blockers,
-      tasks: work.tasks,
-      pendingActions: work.pendingActions,
-      events: [createWerewolfEvent(
-        match,
-        step,
-        state as unknown as Record<string, unknown>,
-        'werewolf_action_requested',
-        actionRequestedMessage(actionType, (round as { day?: number }).day),
-        { actionType, actionWindow: window },
-        { channel: CHANNEL_TYPES.PUBLIC },
-      )],
-    };
-  }
-  if (!allActionWorkSucceeded(match.id, step.id, actionType, 1)) {
-    const window = state.currentActionWindow || { id: `${match.id}:${step.id}:${actionType}` };
-    const work = createActionBlockers({
-      match,
-      step: { ...step, config: { ...step.config, actionType } },
-      window: window as Parameters<typeof createActionBlockers>[0]['window'],
-      actors: [sheriff] as Parameters<typeof createActionBlockers>[0]['actors'],
-      promptContext: { day: (round as { day?: number }).day, actionType, round },
-    });
-    return { status: 'WAITING', state: { ...state, currentStep: step.id }, blockers: work.blockers };
-  }
-  const result = collectActionResults(match.id, step.id, actionType)[0];
-  return completeSheriffBadgeDisposition({
-    match,
-    step,
-    state,
-    runtime,
-    round,
-    sheriff,
-    payload: result?.payload || {},
-  });
-}
-
-function completeSheriffBadgeDisposition({ match, step, state, runtime, round, sheriff, payload }: {
-  match: Match;
-  step: Step;
-  state: StepState;
-  runtime: Runtime;
-  round: Record<string, unknown>;
-  sheriff: unknown;
-  payload: Record<string, unknown>;
-}): HandlerResult {
-  const actionType = 'sheriff_badge_disposition';
-  const transfer = applySheriffBadgeDisposition(runtime as never, round as never, sheriff as never, payload);
-  const message = buildSheriffBadgeMessage(transfer, runtime.agents);
-  const day = step.config.day || Number((round as { day?: number }).day) || 1;
-  const winResult = runtime.agents?.length
-    ? resolveWinAfterDeaths(
-      runtime.agents as WerewolfAgent[],
-      round as never,
-      day,
-      runtime.modeConfig as Record<string, unknown> || {},
-      { includePostExile: step.config.phase === 'day' },
-    )
-    : { winner: null, winReason: '' };
-  const nextState = markStepComplete({
-    ...syncRuntimeState(runtime),
-    currentStep: step.id,
-    currentActionWindow: null,
-    ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}),
-  }, step.id);
-  if (hasOpenWork(match.id, step.id, actionType)) {
-    resolveActionWindow(match.id, step.id, actionType, state.currentActionWindow as unknown as ActionWindow);
-  }
-  publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
-    builder.setStep(step.id).setPhase((step.config.phase as 'night' | 'day') || 'day').setDay(step.config.day || 1);
-    return transfer.action === 'transfer'
-      ? builder.buildSheriffBadgeTransfer({ ...transfer }, message)
-      : builder.buildSheriffBadgeTear({ ...transfer }, message);
-  }, serializeWerewolfState(match, nextState as unknown as Record<string, unknown>));
-  const events: unknown[] = [createWerewolfEvent(
-    match,
-    step,
-    nextState as unknown as Record<string, unknown>,
-    transfer.action === 'transfer' ? 'werewolf_sheriff_badge_transfer' : 'werewolf_sheriff_badge_tear',
-    message,
-    { actionType, sheriffTransfer: transfer },
-    { channel: CHANNEL_TYPES.PUBLIC },
-  )];
-  if (winResult.winner) {
-    events.push(createWerewolfEvent(
-      match,
-      step,
-      nextState as unknown as Record<string, unknown>,
-      'werewolf_game_completed',
-      winResult.winReason,
-      { winner: winResult.winner },
-      { channel: CHANNEL_TYPES.PUBLIC },
-    ));
-  }
-  return {
-    status: 'COMPLETED',
-    state: nextState,
-    events,
-  };
-}
-
-function createSheriffResolveHandler() {
-  return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
-      if (isDone(state, step.id) || state.winner) return completed(state, step.id);
-      const runtime = createRuntime(match, state);
-      const round = ensureRound(runtime.state, step.config.day!);
-      if (shouldRunSheriffElection(runtime as never, round as never) && isSheriffResolveReady(round as never)) {
-        resolveSheriffElection(runtime as never, round as never);
-      }
-      const nextState = markStepComplete({ ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: null }, step.id);
-
-      // Day 1 警长竞选完成后播报死亡结果
-      const nightDeaths = (round as { night?: { deaths?: Array<{ id: number; reason: string }> } }).night?.deaths || [];
-      const deathMessage = nightDeaths.length
-        ? `昨晚${nightDeaths.map((d) => `${getSeatNumber(d.id, runtime.agents)}号玩家`).join('、')}死亡`
-        : '昨晚是平安夜';
-      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
-        builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
-        return builder.buildNightResult(nightDeaths, deathMessage);
-      });
-
-      return {
-        status: 'COMPLETED',
-        state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_effect_resolved', actionResolvedMessage('sheriff_resolve', step.config.day), { sheriffElection: round.sheriffElection, sheriffId: round.sheriffId }, { channel: CHANNEL_TYPES.PUBLIC })]
-      };
-    }
   };
 }
 
@@ -495,10 +228,14 @@ function recordGameSnapshotIfTrace(matchId: string, runtime: Record<string, unkn
   try {
     const trace = getActiveTrace(matchId);
     if (!trace) return;
-    const { serializeWerewolfState } = require('../runtime');
-    const snapshot = serializeWerewolfState({ id: matchId }, runtime as Record<string, unknown>);
-    recordSnapshot(trace, checkpoint, snapshot, { day: (runtime.rounds as Array<Record<string, unknown>> | undefined)?.length || undefined, phase: (runtime as Record<string, unknown>).phase as string || undefined });
-  } catch { /* best-effort */ }
+    const snapshot = serializeWerewolfState({ id: matchId }, runtime);
+    recordSnapshot(trace, checkpoint, snapshot, {
+      day: (runtime.rounds as Array<Record<string, unknown>> | undefined)?.length || undefined,
+      phase: runtime.phase as string || undefined,
+    });
+  } catch {
+    // Trace snapshots are best-effort and must not block game resolution.
+  }
 }
 
 function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
@@ -509,6 +246,4 @@ export {
   createNightResolveHandler,
   createExileResolveHandler,
   createSheriffResolveHandler,
-  createHunterWindow,
-  createSheriffBadgeWindow,
 };

@@ -26,7 +26,7 @@ function createWerewolfEvent(
   workflowEvent: string,
   message: string,
   extra: Record<string, unknown> = {},
-  options: { channel?: ChannelType; scopeKey?: string } = {}
+  options: { channel?: ChannelType; scopeKey?: string; idempotencyKey?: string } = {}
 ): WerewolfEvent {
   const basePayload = {
     stepId: step.id,
@@ -49,7 +49,7 @@ function createWerewolfEvent(
       scopeKey: guarded.scopeKey,
       channelInvariantIssues: guarded.invariantIssues,
     },
-    idempotencyKey: `${match.id}:${step.id}:${workflowEvent}`,
+    idempotencyKey: options.idempotencyKey || `${match.id}:${step.id}:${workflowEvent}`,
     channel: guarded.channel,
     scopeKey: guarded.scopeKey
   };

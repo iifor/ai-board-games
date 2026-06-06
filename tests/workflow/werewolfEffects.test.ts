@@ -2,6 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRound } from '../../packages/server/modules/werewolf/agents';
 import { resolveNightEffects, resolveExileEffects, applyHunterShot } from '../../packages/server/modules/werewolf/effects';
+import {
+  checkWin,
+  getAliveRosterStats,
+  resolveWinAfterDeaths,
+} from '../../packages/server/modules/werewolf/winCheck';
+import {
+  applyLastWordsResults,
+  enqueueExileLastWords,
+  enqueueNightLastWords,
+  getPendingLastWords,
+} from '../../packages/server/modules/werewolf/lastWordsWorkflow';
+import { normalizeWerewolfWinCondition } from '../../packages/server/modules/werewolf-config/utils';
 
 interface TestAgent {
   id: number;
@@ -104,4 +116,89 @@ test('hunter shot marks hunter used and eliminates target', () => {
   assert.equal(agents[0].hunterShotUsed, true);
   assert.equal(agents[1].alive, false);
   assert.deepEqual(round.hunterShot, { from: 1, target: 2, reason: 'exile' });
+});
+
+test('win checks use the current alive roster for all supported modes', () => {
+  const roster = [
+    agent(1, ['kill'], { faction: 'wolves', roleConfig: { roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+    agent(2, [], { roleConfig: { roleType: 'villager', rule: { actions: [] } } }),
+    agent(3, ['inspectFaction'], { roleConfig: { roleType: 'god', rule: { actions: [{ action: 'inspectFaction' }] } } }),
+  ];
+
+  assert.equal(checkWin(roster.map((item) => ({ ...item, alive: item.id !== 2 })) as never, 1, { winCondition: 'side' }).winner, 'wolves');
+  assert.equal(checkWin(roster.map((item) => ({ ...item, alive: item.id !== 3 })) as never, 1, { winCondition: 'gods' }).winner, 'wolves');
+  assert.equal(checkWin(roster.map((item) => ({ ...item, alive: item.id !== 2 })) as never, 1, { winCondition: 'villagers' }).winner, 'wolves');
+  assert.equal(checkWin(roster.map((item) => ({ ...item, alive: item.id === 1 })) as never, 1, { winCondition: 'all' }).winner, 'wolves');
+  assert.equal(checkWin(roster.map((item) => ({ ...item, alive: item.id !== 3 })) as never, 1, { winCondition: 'all' }).winner, null);
+  assert.equal(checkWin(roster.map((item) => ({ ...item, alive: item.id !== 1 })) as never, 1, { winCondition: 'side' }).winner, 'good');
+  assert.equal(checkWin(roster.map((item) => ({ ...item, alive: item.id !== 2 })) as never, 1, { winCondition: 'single' }).winner, 'wolves');
+  assert.equal(normalizeWerewolfWinCondition('single'), 'side');
+  assert.equal(normalizeWerewolfWinCondition('gods'), 'gods');
+  assert.equal(normalizeWerewolfWinCondition('villagers'), 'villagers');
+  assert.equal(normalizeWerewolfWinCondition('all'), 'all');
+});
+
+test('single hunter or witch death does not eliminate the god side', () => {
+  const roster = [
+    agent(1, ['kill'], { role: 'werewolf', faction: 'wolves', roleConfig: { roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+    agent(2, ['poison'], { role: 'witch', alive: false, roleConfig: { roleType: 'witch', rule: { actions: [{ action: 'poison' }] } } }),
+    agent(3, ['inspectFaction'], { role: 'seer', roleConfig: undefined }),
+    agent(4, ['shootOnDeath'], { role: 'hunter', roleConfig: { rule: { actions: [{ action: 'shootOnDeath' }] } } }),
+    agent(5, [], { role: 'villager', roleConfig: undefined }),
+  ];
+
+  assert.deepEqual(getAliveRosterStats(roster as never), {
+    wolves: 1,
+    gods: 2,
+    villagers: 1,
+    good: 3,
+  });
+  assert.equal(checkWin(roster as never, 1, { winCondition: 'side' }).winner, null);
+
+  roster[3].alive = false;
+  assert.equal(checkWin(roster as never, 1, { winCondition: 'side' }).winner, null);
+  roster[2].alive = false;
+  assert.equal(checkWin(roster as never, 1, { winCondition: 'side' }).winner, 'wolves');
+});
+
+test('unverifiable legacy wolf winner lock cannot end the game early', () => {
+  const roster = [
+    agent(1, ['kill'], { role: 'werewolf', faction: 'wolves', roleConfig: { roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+    agent(2, ['poison'], { role: 'witch', alive: false, roleConfig: { roleType: 'god', rule: { actions: [{ action: 'poison' }] } } }),
+    agent(3, ['inspectFaction'], { role: 'seer', roleConfig: { roleType: 'god', rule: { actions: [{ action: 'inspectFaction' }] } } }),
+    agent(4, [], { role: 'villager', roleConfig: { roleType: 'villager', rule: { actions: [] } } }),
+  ];
+  const round = createRound(1);
+  (round as Record<string, unknown>).winnerLock = {
+    winner: 'wolves',
+    winReason: 'legacy invalid lock',
+    sourceFaction: 'wolves',
+    sourceAction: 'wolf_kill',
+  };
+
+  assert.equal(resolveWinAfterDeaths(roster as never, round as never, 1, { winCondition: 'side' }).winner, null);
+});
+
+test('last words queue preserves first-night death order and excludes later nights', () => {
+  const round = createRound(1);
+  enqueueNightLastWords(round, [2, 3, 2]);
+  enqueueNightLastWords(round, [4]);
+  assert.deepEqual(getPendingLastWords(round), [
+    { playerId: 2, source: 'night' },
+    { playerId: 3, source: 'night' },
+    { playerId: 4, source: 'night' },
+  ]);
+
+  const records = applyLastWordsResults(round, [
+    { actorId: 4, payload: { text: 'four' } },
+    { actorId: 2, payload: { text: 'two' } },
+    { actorId: 3, payload: { text: 'three' } },
+  ]);
+  assert.deepEqual(records.map((item) => item.playerId), [2, 3, 4]);
+
+  const laterRound = createRound(2);
+  enqueueNightLastWords(laterRound, [2]);
+  assert.deepEqual(getPendingLastWords(laterRound), []);
+  enqueueExileLastWords(laterRound, 3);
+  assert.deepEqual(getPendingLastWords(laterRound), [{ playerId: 3, source: 'exile' }]);
 });

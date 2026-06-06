@@ -2,8 +2,6 @@ import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
 import { createWerewolfEvent, publishGameEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
 import { buildWerewolfRuleIntro, phaseStartedMessage } from '../messages';
-import { checkDawnBindVote } from '../winCheck';
-import type { WerewolfAgent } from '../winCheck';
 import { getSeatNumber } from '../utils';
 
 interface Match {
@@ -63,11 +61,6 @@ function createDayStartHandler() {
       const message = phaseStartedMessage('day', step.config.day);
 
       // 规则 4：天亮绑票判定
-      const dawnResult = checkDawnBindVote(runtime.agents as WerewolfAgent[], step.config.day || 1);
-      if (dawnResult.winner) {
-        nextState.winner = dawnResult.winner;
-        nextState.winReason = dawnResult.winReason;
-      }
 
       // EventBus: 发布 day-start 到客户端
       publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
@@ -87,15 +80,10 @@ function createDayStartHandler() {
         });
       }
 
-      const outEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_phase_changed', message)];
-      if (dawnResult.winner) {
-        outEvents.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', dawnResult.winReason, { winner: dawnResult.winner }, {}));
-      }
-
       return {
         status: 'COMPLETED',
         state: markStepComplete({ ...nextState, currentStep: step.id }, step.id) as StepState,
-        events: outEvents
+        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_phase_changed', message)]
       };
     }
   };

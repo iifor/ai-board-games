@@ -35,7 +35,9 @@ function normalizeWerewolfRoleType(value: unknown): string {
 }
 
 function normalizeWerewolfWinCondition(value: unknown): string {
-  return value === 'single' ? 'single' : 'side';
+  if (value === 'single') return 'side';
+  if (value === 'gods' || value === 'villagers' || value === 'all') return value;
+  return 'side';
 }
 
 interface WerewolfRuleAction {

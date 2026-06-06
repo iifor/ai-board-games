@@ -52,7 +52,7 @@ function createDebateSkills(): Skill[] {
         const parsed = await (actor as unknown as { playerAgent: { askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null> } }).playerAgent.askJson([
           '请点评双方表现，并给出胜负倾向。',
           '公开赛况已通过上文增量同步。',
-          `只返回JSON对象：{"winner":"pro","text":"建议${PHASE_LIMITS.judges}字以内点评"}，winner 只能是 pro/con/draw。`,
+          `只返回JSON对象：{"winner":"pro","text":"${PHASE_LIMITS.judges}字以内点评"}，winner 只能是 pro/con/draw。`,
         ].join('\n\n'), {
           maxTokens: Math.ceil(PHASE_LIMITS.judges * 2.5),
           fallback: { winner: 'draw', text: '双方都有亮点，正方结构完整，反方反击积极，胜负取决于评判标准。' },
@@ -126,7 +126,7 @@ async function askDebateText(
   const limit = phase.limit || 200;
   const prompt = [
     `当前环节：${phase.name}`,
-    `建议字数：${limit}字以内（弱约束，超出也正常输出）`,
+    `字数：${limit}字以内`,
     '公开赛况：已通过上文增量同步；如果没有同步内容，则比赛刚开始。',
     instruction,
   ].join('\n\n');

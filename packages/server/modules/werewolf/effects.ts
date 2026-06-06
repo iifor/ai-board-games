@@ -1,6 +1,13 @@
 import { WEREWOLF_EFFECT_TYPES } from '@ai-presenter/shared/types/workflowTypes';
-import { eliminate, countTargets, topExile, checkWolfVictory } from './winCheck';
-import type { WerewolfAgent } from './winCheck';
+import {
+  eliminate,
+  countTargets,
+  topExile,
+  checkWolfVictory,
+  getAliveRosterStats,
+  normalizeWinCondition,
+} from './winCheck';
+import type { AliveRosterStats, WerewolfAgent, WinCondition } from './winCheck';
 import { hasRoleAction } from './utils';
 
 interface Night {
@@ -29,6 +36,8 @@ interface Round {
     winReason: string;
     sourceFaction?: string;
     sourceAction?: string;
+    winCondition?: WinCondition;
+    triggerRoster?: AliveRosterStats;
   };
   [key: string]: unknown;
 }
@@ -86,6 +95,8 @@ function resolveNightEffects(agents: WerewolfAgent[], round: Round, modeConfig: 
         ...wolfWin,
         sourceFaction: 'wolves',
         sourceAction: wolfDeath.sourceAction || 'wolf_kill',
+        winCondition: normalizeWinCondition(modeConfig.winCondition),
+        triggerRoster: getAliveRosterStats(afterWolfKill),
       };
     }
   }

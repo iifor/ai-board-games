@@ -218,9 +218,49 @@ function sheriffBadgeResult(actorId: number, payload: Record<string, unknown>): 
 }
 
 async function runDeathActionAiTask(input: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
+  if (input.task.action === 'last_words') return runLastWordsAiTask(input);
   return input.task.action === 'sheriff_badge_disposition'
     ? runSheriffBadgeAiTask(input)
     : runHunterAiTask(input);
+}
+
+async function runLastWordsAiTask({ match, step, task }: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
+  const runtime: Runtime = createRuntime(repo.getMatch(match.id) || match);
+  const round = ensureRound(runtime.state, step.config.day || 1);
+  const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
+  if (!actor) throw Object.assign(new Error(`Last words actor not found: ${task.playerId}`), { severity: 'high' });
+  if (isWerewolfDebugMode(runtime)) {
+    const text = `${getSeatNumber(actor.id, runtime.agents)}号玩家遗言`;
+    return {
+      eventType: 'werewolf_action_submitted',
+      rawOutput: { text },
+      payload: { actionType: 'last_words', actorId: actor.id, text, thinking: '' },
+    };
+  }
+
+  const context = buildDaySpeechContext(round, runtime.agents);
+  const prompt = buildActionPrompt(
+    runtime,
+    round,
+    actor,
+    'last_words',
+    '你已经出局，请发表遗言。',
+    '只输出自然语言遗言，不要输出 JSON，不要复述系统提示。',
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const speechResult: any = await askSpeech(actor, Number(round.day) || 1, context, {
+    thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled,
+    promptOverride: prompt,
+    stateless: true,
+  } as never);
+  const payload = typeof speechResult === 'string'
+    ? { text: speechResult, thinking: '' }
+    : { text: speechResult?.content || '', thinking: speechResult?.thinking || '' };
+  return {
+    eventType: 'werewolf_action_submitted',
+    rawOutput: payload,
+    payload: { actionType: 'last_words', actorId: actor.id, ...payload },
+  };
 }
 
 function validateActionWindowAiResult({ result }: { result: { payload?: { actionType?: string; actorId?: unknown } } }): void {

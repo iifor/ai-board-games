@@ -162,7 +162,11 @@ function createDisplayQueue(
         const prepared = await item.prepared;
         collectPreparedAudioResources(prepared, audioResources);
         options.onPrepared?.(prepared as unknown as SessionEvent);
-        await session.sendAndWait(prepared as unknown as Record<string, unknown>);
+        if (prepared.presentation?.requiresAck === false) {
+          session.send(prepared as unknown as Record<string, unknown>);
+        } else {
+          await session.sendAndWait(prepared as unknown as Record<string, unknown>);
+        }
         item.resolve();
       } catch (error) {
         item.reject(error as Error);

@@ -8,14 +8,14 @@ test('debug werewolf speech uses fixed faction text without player agent', () =>
   const villager = runtime.agents[0];
 
   assert.equal(isWerewolfDebugMode({ state: { debugMode: true }, config: {} }), true);
-  assert.equal(debugSpeech(wolf), '我是2号，狼人，调试发言');
-  assert.equal(debugSpeech(villager), '我是1号，好人，调试发言');
+  assert.equal(debugSpeech(wolf), '2号发言');
+  assert.equal(debugSpeech(villager), '1号发言');
   assert.deepEqual(runDebugWerewolfAction(runtime, createRound(), wolf, 'day_speech'), {
-    text: '我是2号，狼人，调试发言',
+    text: '2号发言',
     thinking: ''
   });
   assert.deepEqual(runDebugWerewolfAction(runtime, createRound(), wolf, 'wolf_speech'), {
-    speech: '我是2号，狼人，调试发言',
+    speech: '2号发言',
     thinking: ''
   });
 });
@@ -29,7 +29,7 @@ test('debug werewolf actions choose deterministic legal payloads', () => {
   assert.deepEqual(runDebugWerewolfAction(runtime, round, wolf, 'wolf_vote'), { target: 1 });
   assert.deepEqual(runDebugWerewolfAction(runtime, round, wolf, 'wolf_kill'), {
     target: 1,
-    speech: '我是2号，狼人，调试发言',
+    speech: '2号发言',
     thinking: ''
   });
   assert.deepEqual(runDebugWerewolfAction(runtime, round, villager, 'seer_check'), { target: 2, result: '狼人' });

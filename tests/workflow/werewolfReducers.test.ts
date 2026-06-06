@@ -100,7 +100,7 @@ test('witch poison requires strict true and uses reason-aware narration', () => 
   const phase = getActionPhaseConfig('witch_poison');
   assert.equal(phase?.buildMessages(1, { witchPoisonUsed: true, target: 5, witchPoisonReason: '判断5号是狼人' }).result, '判断5号是狼人');
   assert.equal(phase?.buildMessages(1, { witchPoisonUsed: true, target: 5 }).result, '女巫毒了5号');
-  assert.equal(phase?.buildMessages(1, { witchPoisonUsed: false }).result, '女巫没有使用毒药');
+  assert.equal(phase?.buildMessages(1, { witchPoisonUsed: false }).result, '');
 });
 
 test('sheriff badge disposition transfers, tears, and does not repeat', () => {
@@ -176,6 +176,60 @@ test('inherited sheriff decides direction on later day', () => {
 
   const directionActors = getActorsForStep(ctx as never, { config: { day: 2, actionType: 'sheriff_speech_direction' } } as never, day2 as never);
   assert.deepEqual(directionActors.map((item: TestAgent) => item.id), [3]);
+});
+
+test('withdrawn sheriff candidates cannot vote in initial or runoff ballots', () => {
+  const round = createRound(1);
+  round.phase = 'day';
+  round.sheriffElection = {
+    signedUpIds: [1, 2, 3],
+    speechOrder: [],
+    speeches: [],
+    withdrawnIds: [3],
+    candidates: [1, 2],
+    voters: [],
+    votes: {},
+    tally: {},
+    runoffCandidateIds: [1, 2],
+    runoffSpeechOrder: [],
+    runoffSpeeches: [],
+    runoffVotes: {},
+    runoffTally: {},
+    sheriffId: null,
+    result: 'pending',
+  };
+  const ctx = {
+    agents: [actor(1, 'good'), actor(2, 'good'), actor(3, 'good'), actor(4, 'good')],
+    modeConfig: { sheriff: { enabled: true, firstDayElection: true } },
+    state: { rounds: [round] },
+  };
+
+  assert.deepEqual(
+    getActorsForStep(ctx as never, { config: { day: 1, actionType: 'sheriff_vote' } } as never, round as never)
+      .map((item: TestAgent) => item.id),
+    [4],
+  );
+  assert.deepEqual(
+    getActorsForStep(ctx as never, { config: { day: 1, actionType: 'sheriff_runoff_vote' } } as never, round as never)
+      .map((item: TestAgent) => item.id),
+    [4],
+  );
+
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'sheriff_vote' } } as never, [
+    { actorId: 3, payload: { target: 1 } },
+    { actorId: 4, payload: { target: 2 } },
+  ]);
+  assert.deepEqual(round.sheriffElection.voters, [4]);
+  assert.deepEqual(round.sheriffElection.votes, { 4: 2 });
+  assert.deepEqual(round.sheriffElection.tally, { 2: 1 });
+
+  round.sheriffElection.runoffCandidateIds = [1, 2];
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'sheriff_runoff_vote' } } as never, [
+    { actorId: 3, payload: { target: 1 } },
+    { actorId: 4, payload: { target: 1 } },
+  ]);
+  assert.deepEqual(round.sheriffElection.runoffVotes, { 4: 1 });
+  assert.deepEqual(round.sheriffElection.runoffTally, { 1: 1 });
 });
 
 test('speech starts clockwise after the last announced death when there is no sheriff', () => {

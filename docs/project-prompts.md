@@ -337,7 +337,8 @@ werewolf workflow step
 - `guard_protect` 的 Engine Core payload 允许目标为空；空守通过 schema 校验，但不创建 `protect` effect。
 - 每次结构化 LLM 调用只保留一份输出契约和一份合法目标列表。`taskInstruction` 只描述任务，`outputContract` 负责 JSON schema、示例和合法目标。
 - 当 action prompt 已由 `buildWerewolfPromptBundle()` 提供完整契约时，调用方必须设置 `promptHasContract`，避免 `BasePlayerAgent` 再次追加通用 JSON-only 文案或目标列表。
-- `witch_poison` 使用毒药时必须返回简短 `reason`。该原因只允许进入女巫或上帝视角的私密完成事件；缺失时播报“女巫毒了 X 号”，未使用时播报“女巫没有使用毒药”。
+- `witch_poison` 使用毒药时必须返回简短 `reason`。该原因只允许进入女巫或上帝视角的私密完成事件；缺失时播报“女巫毒了 X 号”。未使用时只展示“女巫没有使用毒药/不毒”，不得生成旁白或 TTS。
 - `witch_save` 的刀口上下文仅在解药可用时生成；解药耗尽、平安夜或女巫不可行动时对应 step 静默跳过，不生成替代 prompt。
 - `sheriff_badge_disposition` 允许死亡警长作为 actor，输出 `{"action":"transfer","target":座位号,"reason":"..."}` 或 `{"action":"tear","target":null,"reason":"..."}`；输出非法或调用失败时由规则层撕毁警徽。
 - `sheriff_speech_direction` 由当前存活警长执行，输出 `{"direction":"clockwise|counterclockwise","reason":"简短原因"}`。非法输出或调用失败时由规则层随机选择方向；警长固定最后发言。
+- `last_words` 允许已死亡玩家作为 actor，使用一次性自然语言发言 prompt，不要求 JSON。服务端负责首夜/放逐资格和顺序，prompt 不得让模型自行判断自己是否有遗言权。

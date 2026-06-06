@@ -1,10 +1,12 @@
 interface RoleConfig {
+  id?: string;
   roleType?: string;
   [key: string]: unknown;
 }
 
 interface WerewolfAgent {
   id: number;
+  role?: string;
   alive: boolean;
   faction: string;
   canVote: boolean;
@@ -24,12 +26,28 @@ interface Night {
   [key: string]: unknown;
 }
 
+interface WinResult {
+  winner: string | null;
+  winReason: string;
+}
+
+type WinCondition = 'side' | 'gods' | 'villagers' | 'all';
+
+interface AliveRosterStats {
+  wolves: number;
+  gods: number;
+  villagers: number;
+  good: number;
+}
+
 interface Round {
   day: number;
   night?: Night;
   winnerLock?: WinResult & {
     sourceFaction?: string;
     sourceAction?: string;
+    winCondition?: WinCondition;
+    triggerRoster?: AliveRosterStats;
   };
   [key: string]: unknown;
 }
@@ -47,23 +65,13 @@ interface ModeConfig {
   [key: string]: unknown;
 }
 
-interface WinCheckOptions {
-  checkWolfVoteLock?: boolean;
-  sheriffId?: number | null;
-}
-
-interface WinResult {
-  winner: string | null;
-  winReason: string;
-}
-
 interface VotePower {
   wolves: number;
   good: number;
 }
 
 function eliminate(agents: WerewolfAgent[], id: number, day: number, reason: string): void {
-  const target = agents.find((agent) => agent.id === id);
+  const target = agents.find((agent) => Number(agent.id) === Number(id));
   if (!target || !target.alive) return;
   target.alive = false;
   target.deathDay = day;
@@ -77,37 +85,42 @@ function applyNightDeaths(agents: WerewolfAgent[], round: Round): void {
 }
 
 function shouldRunFirstDaySheriffElection(round: Round, modeConfig: ModeConfig): boolean {
-  return round.day === 1 && Boolean(modeConfig.sheriff?.enabled) && modeConfig.sheriff?.firstDayElection !== false;
+  return round.day === 1
+    && Boolean(modeConfig.sheriff?.enabled)
+    && modeConfig.sheriff?.firstDayElection !== false;
 }
 
-function checkWin(agents: WerewolfAgent[], day: number, modeConfig: ModeConfig = {}, options: WinCheckOptions = {}): WinResult {
-  const cfg = modeConfig || {};
-  const aliveWolves = agents.filter((agent) => agent.alive && agent.faction === 'wolves').length;
-  if (aliveWolves === 0) return { winner: 'good', winReason: `第 ${day} 天，狼人全部出局，好人阵营胜利。` };
-  if (options.checkWolfVoteLock) {
-    const votePower = getAliveVotePower(agents, options.sheriffId, cfg.sheriff?.voteWeight);
-    if (votePower.wolves >= votePower.good) {
-      return { winner: 'wolves', winReason: '狼人通过绑票获胜。' };
-    }
+function checkWin(agents: WerewolfAgent[], day: number, modeConfig: ModeConfig = {}): WinResult {
+  const roster = getAliveRosterStats(agents);
+  if (roster.wolves === 0) {
+    return { winner: 'good', winReason: `第 ${day} 天，狼人全部出局，好人阵营胜利。` };
   }
-  return checkWolfVictory(agents, day, cfg);
+  return checkWolfVictoryFromRoster(roster, day, normalizeWinCondition(modeConfig.winCondition));
 }
 
 function checkWolfVictory(agents: WerewolfAgent[], day: number, modeConfig: ModeConfig = {}): WinResult {
-  const aliveWolves = agents.filter((agent) => agent.alive && agent.faction === 'wolves').length;
-  if (aliveWolves === 0) return { winner: null, winReason: '' };
-  const aliveGood = agents.filter((agent) => agent.alive && agent.faction !== 'wolves');
-  const aliveVillagers = aliveGood.filter((agent) => getRoleType(agent) === 'villager').length;
-  const aliveGods = aliveGood.filter((agent) => getRoleType(agent) === 'god').length;
-  const winCondition = modeConfig.winCondition || 'side';
-  // 屠城局：所有好人出局或狼人数 >= 好人数 → 狼人胜
-  if (winCondition === 'all') {
-    if (aliveGood.length === 0) return { winner: 'wolves', winReason: `第 ${day} 天，所有好人出局，狼人阵营胜利。` };
-    if (aliveWolves >= aliveGood.length) return { winner: 'wolves', winReason: `第 ${day} 天，狼人数量达到或超过好人，狼人阵营胜利。` };
+  return checkWolfVictoryFromRoster(
+    getAliveRosterStats(agents),
+    day,
+    normalizeWinCondition(modeConfig.winCondition),
+  );
+}
+
+function checkWolfVictoryFromRoster(
+  roster: AliveRosterStats,
+  day: number,
+  winCondition: WinCondition,
+): WinResult {
+  if (roster.wolves === 0) return { winner: null, winReason: '' };
+  if (winCondition === 'all' && roster.good === 0) {
+    return { winner: 'wolves', winReason: `第 ${day} 天，所有好人出局，狼人阵营胜利。` };
   }
-  // 屠边局：所有平民或所有神职出局 → 狼人胜
-  if ((winCondition === 'side' || winCondition === 'villagers') && aliveVillagers === 0) return { winner: 'wolves', winReason: `第 ${day} 天，所有平民出局，狼人阵营胜利。` };
-  if ((winCondition === 'side' || winCondition === 'gods') && aliveGods === 0) return { winner: 'wolves', winReason: `第 ${day} 天，所有神职出局，狼人阵营胜利。` };
+  if ((winCondition === 'side' || winCondition === 'villagers') && roster.villagers === 0) {
+    return { winner: 'wolves', winReason: `第 ${day} 天，所有平民出局，狼人阵营胜利。` };
+  }
+  if ((winCondition === 'side' || winCondition === 'gods') && roster.gods === 0) {
+    return { winner: 'wolves', winReason: `第 ${day} 天，所有神职出局，狼人阵营胜利。` };
+  }
   return { winner: null, winReason: '' };
 }
 
@@ -116,53 +129,44 @@ function resolveWinAfterDeaths(
   round: Round,
   day: number,
   modeConfig: ModeConfig = {},
-  options: { includePostExile?: boolean } = {},
 ): WinResult {
-  if (round.winnerLock?.winner) {
+  const winnerLock = round.winnerLock;
+  if (
+    winnerLock?.winner === 'wolves'
+    && winnerLock.sourceFaction === 'wolves'
+    && winnerLock.triggerRoster
+  ) {
+    const lockedResult = checkWolfVictoryFromRoster(
+      winnerLock.triggerRoster,
+      day,
+      winnerLock.winCondition || normalizeWinCondition(modeConfig.winCondition),
+    );
+    if (lockedResult.winner === 'wolves') {
+      return {
+        winner: 'wolves',
+        winReason: winnerLock.winReason || lockedResult.winReason,
+      };
+    }
+  } else if (winnerLock?.winner && winnerLock.winner !== 'wolves') {
     return {
-      winner: round.winnerLock.winner,
-      winReason: round.winnerLock.winReason,
+      winner: winnerLock.winner,
+      winReason: winnerLock.winReason,
     };
   }
-  const result = checkWin(agents, day, modeConfig, {});
-  if (result.winner || !options.includePostExile) return result;
-  return checkPostExileWin(agents, day);
+  return checkWin(agents, day, modeConfig);
 }
 
-/** 规则 4：天亮绑票判定 — 狼人数 >= 好人数 → 狼人绑票胜 */
-function checkDawnBindVote(agents: WerewolfAgent[], day: number): WinResult {
-  const aliveWolves = agents.filter((agent) => agent.alive && agent.faction === 'wolves').length;
-  const aliveGood = agents.filter((agent) => agent.alive && agent.faction !== 'wolves').length;
-  if (aliveWolves > 0 && aliveWolves >= aliveGood) {
-    return { winner: 'wolves', winReason: `狼人绑票胜利。` };
-  }
-  return { winner: null, winReason: '' };
+function normalizeWinCondition(value: unknown): WinCondition {
+  if (value === 'single') return 'side';
+  if (value === 'gods' || value === 'villagers' || value === 'all') return value;
+  return 'side';
 }
 
-/** 规则 5：放逐后预判 — 好人数 === 狼人数 + 1 且无女巫毒药 → 狼人必胜 */
-function checkPostExileWin(agents: WerewolfAgent[], day: number): WinResult {
-  if (!Array.isArray(agents)) return { winner: null, winReason: '' };
-  const aliveWolves = agents.filter((agent) => agent?.alive && agent?.faction === 'wolves').length;
-  const aliveGood = agents.filter((agent) => agent?.alive && agent?.faction !== 'wolves');
-  if (aliveWolves === 0) return { winner: null, winReason: '' };
-
-  // 好人数 === 狼人数 + 1 → 夜间刀一人后天亮绑票
-  if (aliveGood.length !== aliveWolves + 1) return { winner: null, winReason: '' };
-
-  // 检查女巫是否还有毒药可用
-  const witchAlive = aliveGood.find((agent) => {
-    const actions = (agent?.roleConfig as Record<string, unknown> | undefined)?.rule
-      ? ((agent?.roleConfig as Record<string, unknown>).rule as { actions?: Array<{ action: string }> })?.actions
-      : undefined;
-    return Array.isArray(actions) && actions.some((a) => a?.action === 'poison');
-  });
-  const witchHasPoison = witchAlive && !(witchAlive as WerewolfAgent).usedPoison;
-  if (witchHasPoison) return { winner: null, winReason: '' };
-
-  return { winner: 'wolves', winReason: `第 ${day} 天放逐结束，狼人夜间刀一人即可绑票，狼人阵营胜利。` };
-}
-
-function getAliveVotePower(agents: WerewolfAgent[], sheriffId: number | null = null, sheriffWeight: number = 1): VotePower {
+function getAliveVotePower(
+  agents: WerewolfAgent[],
+  sheriffId: number | null = null,
+  sheriffWeight: number = 1,
+): VotePower {
   return agents
     .filter((agent) => agent.alive && agent.canVote)
     .reduce((totals, agent) => {
@@ -189,10 +193,14 @@ function topExile(tally: Record<string, number>): number | null {
   return Number(entries[0][0]);
 }
 
-function countTargets(votes: Record<string, number | null> | null | undefined, sheriffId: number | null = null, sheriffWeight: number = 1): Record<string, number> {
+function countTargets(
+  votes: Record<string, number | null> | null | undefined,
+  sheriffId: number | null = null,
+  sheriffWeight: number = 1,
+): Record<string, number> {
   const counts: Record<string, number> = {};
   Object.entries(votes || {}).forEach(([voterId, id]) => {
-    if (id == null || Number.isNaN(Number(id))) return; // 跳过 null/NaN 目标（弃票/AI 失败）
+    if (id == null || Number.isNaN(Number(id))) return;
     counts[id] = (counts[id] || 0) + (Number(voterId) === Number(sheriffId) ? sheriffWeight : 1);
   });
   return counts;
@@ -203,26 +211,64 @@ function hasLastWords(agents: WerewolfAgent[], modeConfig: ModeConfig): boolean 
   return deaths <= (modeConfig.lastWordsLimit ?? Infinity);
 }
 
-/** 神职类技能 — 拥有其中之一的非狼人角色即为神职 */
 const GOD_ACTIONS = new Set([
-  'inspectFaction', 'guard', 'save', 'poison', 'shootOnDeath', 'surviveExileOnce',
+  'inspectFaction',
+  'guard',
+  'save',
+  'poison',
+  'shootOnDeath',
+  'surviveExileOnce',
 ]);
+
+const GOD_ROLE_IDS = new Set(['seer', 'witch', 'hunter', 'guard', 'idiot']);
+const VILLAGER_ROLE_IDS = new Set(['villager']);
+const WOLF_ROLE_IDS = new Set(['werewolf', 'wolf']);
 
 function getRoleType(agent: WerewolfAgent | null | undefined): string {
   if (!agent) return 'villager';
-  if (agent.roleConfig?.roleType) return String(agent.roleConfig.roleType);
   if (agent.faction === 'wolves') return 'wolf';
-  // 根据角色的技能列表推断：有神职技能 → god，否则 villager
+  const configuredType = String(agent.roleConfig?.roleType || '').trim().toLowerCase();
+  if (configuredType === 'god' || configuredType === 'villager' || configuredType === 'wolf') {
+    return configuredType;
+  }
+  const roleId = String(agent.role || agent.roleConfig?.id || configuredType).trim().toLowerCase();
+  if (WOLF_ROLE_IDS.has(roleId)) return 'wolf';
+  if (GOD_ROLE_IDS.has(roleId)) return 'god';
+  if (VILLAGER_ROLE_IDS.has(roleId)) return 'villager';
   const actions = (agent.roleConfig?.rule as { actions?: Array<{ action: string }> } | undefined)?.actions || [];
-  return actions.some((a) => GOD_ACTIONS.has(a.action)) ? 'god' : 'villager';
+  return actions.some((action) => GOD_ACTIONS.has(action.action)) ? 'god' : 'villager';
+}
+
+function getAliveRosterStats(agents: WerewolfAgent[]): AliveRosterStats {
+  return agents.filter((agent) => agent.alive).reduce<AliveRosterStats>((stats, agent) => {
+    const roleType = getRoleType(agent);
+    if (roleType === 'wolf') stats.wolves += 1;
+    else if (roleType === 'god') {
+      stats.gods += 1;
+      stats.good += 1;
+    } else {
+      stats.villagers += 1;
+      stats.good += 1;
+    }
+    return stats;
+  }, { wolves: 0, gods: 0, villagers: 0, good: 0 });
 }
 
 export {
-  eliminate, applyNightDeaths, shouldRunFirstDaySheriffElection,
-  checkWin, checkDawnBindVote, checkPostExileWin,
-  checkWolfVictory, resolveWinAfterDeaths,
-  getAliveVotePower, topTarget, topExile, countTargets,
-  hasLastWords, getRoleType
+  eliminate,
+  applyNightDeaths,
+  shouldRunFirstDaySheriffElection,
+  checkWin,
+  checkWolfVictory,
+  resolveWinAfterDeaths,
+  getAliveVotePower,
+  topTarget,
+  topExile,
+  countTargets,
+  hasLastWords,
+  getRoleType,
+  getAliveRosterStats,
+  normalizeWinCondition,
 };
 
 export type {
@@ -232,5 +278,7 @@ export type {
   ModeConfig,
   WinResult,
   VotePower,
-  NightDeath
+  NightDeath,
+  AliveRosterStats,
+  WinCondition,
 };

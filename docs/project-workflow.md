@@ -378,4 +378,21 @@ pnpm run test:workflow
 - 无警长且有夜间死亡时，以最后播报的死者为基准，从顺时针后置位开始；平安夜随机起点并顺时针发言。
 - 当前警长从历史回合和 `sheriffTransfers` 解析，支持跨天及警徽移交。
 
-所有实际出局入口在死亡技能和警徽流结束后统一调用 `resolveWinAfterDeaths`。夜间有效狼人击杀会先基于“只应用该狼人击杀后的中间阵容”检查狼人胜利；若已屠边或满足当前模式的狼人胜利条件，则在当前 round 写入内部 `winnerLock`。同夜毒药、猎人开枪和警徽流继续执行，但最终胜负不得覆盖该狼人锁定结果。被守护或解药抵消的狼刀不会建立锁定。`winnerLock` 仅用于服务端工作流，不进入 C 端快照。
+所有实际出局入口按“死亡技能 -> 警徽处置 -> 遗言 -> 胜负检查”执行。夜间有效狼人击杀会先基于“只应用该狼人击杀后的中间阵容”检查狼人胜利；若已满足当前模式的狼人胜利条件，则在当前 round 写入内部 `winnerLock`。同夜毒药、猎人开枪、警徽流和遗言继续执行，但最终胜负不得覆盖该狼人锁定结果。被守护或解药抵消的狼刀不会建立锁定。`winnerLock` 仅用于服务端工作流，不进入 C 端快照。
+
+死亡链编排位于 `packages/server/modules/werewolf/deathResolution/`：
+
+- `service.ts` 统一循环推进猎人、警徽、遗言和胜负阶段；各阶段只返回 `waiting/advanced/idle`，不得互相递归调用。
+- `hunterStage.ts`、`sheriffBadgeStage.ts`、`lastWordsStage.ts` 分别管理对应 action window 和结果落盘。
+- `types.ts` 定义内部上下文与 `round.deathResolution` 检查点。检查点记录来源、step、初始 effect、已完成 actor 和最终状态，序列化及视角投影时移除。
+- 旧状态没有检查点时，根据 `nightRevealed/exile/idiotReveal/currentActionWindow` 恢复，不重复应用初始死亡效果。
+- 多猎人使用 actor 级内部工作键隔离 AI task/pending action，但公开 action window 和事件仍保持 `hunter_shot`。
+- workflow 事件按猎人 actor、死亡警长、遗言来源与玩家设置幂等键；初始 effect 使用稳定 ID。放逐 `vote-result` 由检查点保证恢复执行时不重复发布，比赛结束事件按 step 去重。
+
+警长投票资格由服务端在 actor 选择和结果落盘两层校验。首投排除当前候选人与 `withdrawnIds`，复投排除复投候选人与 `withdrawnIds`；旧 pending action 或伪造提交不会进入 `voters/votes/tally`。
+
+遗言使用内部 `last_words` 有序 action window。白天只有实际被放逐者发表 `exile-words`，白痴翻牌、平票和放逐后猎人带走者不创建放逐遗言。第 1 夜所有实际死亡玩家按死亡发生顺序发表 `last-words`，包括毒杀与猎人连锁带走；第 2 夜起不创建夜死遗言。内部 `pendingLastWords` 只用于断点恢复，序列化和视角投影时移除。
+
+胜负判断只使用当前实际存活阵容：狼人全灭时好人胜利；`side` 为平民或神职任一边归零，`gods` 为神职归零，`villagers` 为平民归零，`all` 为所有好人归零。取消天亮票权比较和放逐后“下一刀必胜”推演；旧 `single` 配置读取时映射为 `side`。
+
+存活阵容由统一评估器分类并统计狼人、神职、平民和好人总数。标准 `roleType` 优先；历史快照缺失或异常时，按角色 ID、阵营和角色技能降级分类，猎人、女巫、预言家、守卫和白痴均计入神职，任何存活好人都必须归入神职或平民。狼刀优先锁定会保存触发瞬间的阵容统计和胜利模式，死亡链最终阶段只接受能够由该统计重新验证的狼人胜利锁；缺少阵容证据的旧锁不再直接结束尚未完成的对局。

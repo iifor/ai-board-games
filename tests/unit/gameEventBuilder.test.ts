@@ -223,3 +223,20 @@ test('GameEventBuilder - 频道路由', () => {
   const speechEvent = builder.buildActionRequested('day_speech', [1, 2, 3]);
   assert.equal(speechEvent.channel, 'public');
 });
+
+test('GameEventBuilder - 女巫不毒仅展示且无需 ACK', () => {
+  const event = createGameEventBuilder('match-witch')
+    .setStep('witch_poison_1')
+    .setPhase('night')
+    .setDay(1)
+    .build('witch-action', {
+      actionType: 'witch_poison',
+      message: '',
+      witchAction: { use: false, target: null, reason: '' },
+    }, 'scope', 'witch', { actionType: 'witch_poison' });
+
+  assert.equal(event.presentation.displayText, '女巫没有使用毒药');
+  assert.equal(event.presentation.speakableText, '');
+  assert.equal(event.presentation.suppressSpeech, true);
+  assert.equal(event.presentation.requiresAck, false);
+});

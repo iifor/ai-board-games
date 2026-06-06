@@ -89,20 +89,22 @@ function buildActionWindow({ match, step, state, actionType, actors, targetIds =
   return window;
 }
 
-function createActionBlockers({ match, step, window, actors, promptContext = {} }: {
+function createActionBlockers({ match, step, window, actors, promptContext = {}, taskActionType }: {
   match: Match;
   step: Step;
   window: ActionWindow;
   actors: Agent[];
   promptContext?: Record<string, unknown>;
+  taskActionType?: string;
 }) {
-  const activeActors = selectActorsForWindow(match.id, step.id, window, actors);
+  const workActionType = taskActionType || window.actionType;
+  const activeActors = selectActorsForWindow(match.id, step.id, window, actors, workActionType);
   const blockers: Record<string, unknown>[] = [];
   const tasks: Record<string, unknown>[] = [];
   const pendingActions: Record<string, unknown>[] = [];
   for (const actor of activeActors || []) {
     const actorType = resolveActorType(actor);
-    const taskKey = `${window.actionType}:${actor.id}`;
+    const taskKey = `${workActionType}:${actor.id}`;
     const id = stableTaskId(match.id, step.id, taskKey);
     if (actorType === 'human') {
       pendingActions.push({
@@ -112,7 +114,7 @@ function createActionBlockers({ match, step, window, actors, promptContext = {} 
         epochId: window.id,
         playerId: actor.id,
         actorType,
-        actionType: window.actionType,
+        actionType: workActionType,
         status: 'pending',
         payload: { window, promptContext },
         idempotencyKey: taskKey
@@ -133,7 +135,7 @@ function createActionBlockers({ match, step, window, actors, promptContext = {} 
       epochId: window.id,
       playerId: actor.id,
       taskKey,
-      action: window.actionType,
+      action: workActionType,
       status: 'queued',
       prompt: { window, actorId: actor.id },
       promptContextSnapshot: promptContext,
@@ -191,9 +193,9 @@ function resolveActionWindow(matchId: string, stepId: string, actionType: string
   });
 }
 
-function selectActorsForWindow(matchId: string, stepId: string, window: ActionWindow, actors: Agent[]): Agent[] {
+function selectActorsForWindow(matchId: string, stepId: string, window: ActionWindow, actors: Agent[], taskActionType: string = window.actionType): Agent[] {
   if (window.orderMode !== 'ordered') return actors || [];
-  const completed = collectActionResults(matchId, stepId, window.actionType).length;
+  const completed = collectActionResults(matchId, stepId, taskActionType).length;
   const orderedActors = Array.isArray(window.actorIds) && window.actorIds.length
     ? window.actorIds
         .map((id) => (actors || []).find((actor) => Number(actor.id) === Number(id)))

@@ -96,7 +96,8 @@ export class GameEventBuilder {
       stepId: this.stepId,
       phase: this.phase,
       message: options.message || String(payload.message || ''),
-      speechText: options.speechText || ''
+      speechText: options.speechText || '',
+      actionUsed: readActionUsed(payload),
     });
 
     return {
@@ -104,7 +105,8 @@ export class GameEventBuilder {
       displayText: result.displayText,
       displayMode: result.displayMode as Presentation['displayMode'],
       uiHint: result.uiHint,
-      suppressSpeech: result.suppressSpeech
+      suppressSpeech: result.suppressSpeech,
+      requiresAck: result.requiresAck,
     };
   }
 
@@ -426,6 +428,13 @@ export class GameEventBuilder {
       CHANNEL_TYPES.PUBLIC
     );
   }
+}
+
+function readActionUsed(payload: Record<string, unknown>): boolean | undefined {
+  const witchAction = payload.witchAction;
+  if (!witchAction || typeof witchAction !== 'object') return undefined;
+  const use = (witchAction as { use?: unknown }).use;
+  return typeof use === 'boolean' ? use : undefined;
 }
 
 // ============================================================

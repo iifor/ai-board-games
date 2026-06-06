@@ -51,3 +51,17 @@ test('werewolf presentation preserves player performance text', () => {
   assert.equal(selfDestruct.speakableText, '我自爆，今晚见。');
   assert.equal(selfDestruct.uiHint, 'self-destruct');
 });
+
+test('werewolf presentation keeps skipped poison visible without speech or ack', () => {
+  const result = resolveWerewolfPresentation({
+    workflowEvent: 'witch-action',
+    eventType: 'witch-action',
+    actionType: 'witch_poison',
+    actionUsed: false,
+  });
+
+  assert.equal(result.displayText, '女巫没有使用毒药');
+  assert.equal(result.speakableText, '');
+  assert.equal(result.suppressSpeech, true);
+  assert.equal(result.requiresAck, false);
+});

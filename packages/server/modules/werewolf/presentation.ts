@@ -4,6 +4,7 @@ interface WerewolfPresentation {
   displayMode: string;
   uiHint: string;
   suppressSpeech: boolean;
+  requiresAck?: boolean;
 }
 
 interface PresentationInput {
@@ -14,6 +15,7 @@ interface PresentationInput {
   phase?: string;
   message?: string;
   speechText?: string;
+  actionUsed?: boolean;
 }
 
 const SILENT_ACTIONS = new Set([
@@ -34,6 +36,9 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
   const message = String(input.message || '');
   const speechText = String(input.speechText || '');
 
+  if (eventType === 'witch-action' && actionType === 'witch_poison' && input.actionUsed === false) {
+    return silent('女巫没有使用毒药', 'status', 'witch-poison-result', false);
+  }
   if (eventType === 'speech' || actionType === 'day_speech') {
     return speak(speechText || message, '玩家发言', 'speech', 'player-speech');
   }
@@ -106,13 +111,19 @@ function speak(speakableText: string, displayText: string, displayMode: string, 
   };
 }
 
-function silent(displayText: string, displayMode: string, uiHint: string): WerewolfPresentation {
+function silent(
+  displayText: string,
+  displayMode: string,
+  uiHint: string,
+  requiresAck: boolean = true,
+): WerewolfPresentation {
   return {
     speakableText: '',
     displayText,
     displayMode,
     uiHint,
-    suppressSpeech: true
+    suppressSpeech: true,
+    requiresAck,
   };
 }
 

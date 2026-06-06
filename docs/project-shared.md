@@ -152,3 +152,7 @@ pnpm run test:migration
 狼人杀新增内部行动 `sheriff_speech_direction`，结果为 `{ direction: 'clockwise' | 'counterclockwise', reason?: string }`。狼人击杀胜利锁定属于服务端 round 内部状态，不属于共享展示协议，也不得写入回放播放载荷。
 
 女巫药品耗尽和角色不可行动产生的 `action-skipped` 属于 `channel: system` 的内部审计事件，不进入共享播放事件或 C 端回放载荷。公开 `WitchActionCompletedPayload` 保持不变；`usedAntidote/usedPoison` 仍是服务端判断药品库存的状态来源。
+
+展示事件的 `presentation.requiresAck` 用于区分需要等待语音播放的事件与纯 UI 状态事件。女巫“不毒”的 `witch-action` 设置 `requiresAck: false`、空 `speakableText` 和 `suppressSpeech: true`，事件仍进入 `PlaybackEvent` 持久化，但不注入连接态 `ackId`。
+
+`last_words` 是服务端内部死亡行动，允许已死亡玩家作为 actor；公开协议继续使用既有 `last-words`、`exile-words`。内部 `pendingLastWords` 和 `winnerLock` 不属于共享快照或回放载荷。狼人杀模式 `winCondition` 的正式值为 `side/gods/villagers/all`，旧 `single` 仅作为输入兼容并归一化为 `side`。

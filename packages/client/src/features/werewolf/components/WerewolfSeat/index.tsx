@@ -4,6 +4,7 @@ import { classNames } from '../../../../utils/classNames';
 import { getPlayerModelName } from '../../../../utils/player';
 import { ROLE_NAMES } from '../../constants';
 import type { Player, NightBadge } from '../../../../types';
+import { WerewolfNightActionBadge } from '../WerewolfNightActionBadge';
 import './index.css';
 
 interface WerewolfSeatProps {
@@ -63,18 +64,10 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadge
         {nightActionBadges.length > 0 && (
           <div className="werewolf-night-action-badges">
             {nightActionBadges.map((badge, badgeIndex) => (
-              <span
-                className={classNames('werewolf-night-action-badge', badge.kind, badge.theme?.className)}
-                style={badge.theme?.style as React.CSSProperties}
-                title={badge.title}
+              <WerewolfNightActionBadge
+                badge={badge}
                 key={`${badge.kind}-${badge.target || badge.label || badgeIndex}`}
-              >
-                {/* {getNightBadgeIcon(badge.kind, 30, '#fff1a1')} */}
-                {badge.prefix && <b>{badge.prefix}</b>}
-                {badge.target && <b>{badge.targetLabel || `${badge.target}号`}</b>}
-                {!badge.target && badge.label && <b>{badge.label}</b>}
-                {badge.result && <em>{badge.result}</em>}
-              </span>
+              />
             ))}
           </div>
         )}
@@ -89,10 +82,3 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadge
     </article>
   );
 }
-
-// function getNightBadgeIcon(kind: string, size: number = 13, color: string = '#fff'): React.ReactElement {
-//   if (kind === 'wolf') return <Swords size={size} color={color} />;
-//   if (kind === 'guard') return <Shield size={size} color={color} />;
-//   if (kind === 'seer') return <Eye size={size} color={color} />;
-//   return <FlaskConical size={size} color={color} />;
-// }

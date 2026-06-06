@@ -306,7 +306,12 @@ function publicHost(host: Record<string, unknown> = {}): PublicHost {
 }
 
 function publicRound(round: Round): Round {
-  const { winnerLock: _winnerLock, ...visible } = round as Round & { winnerLock?: unknown };
+  const {
+    winnerLock: _winnerLock,
+    pendingLastWords: _pendingLastWords,
+    deathResolution: _deathResolution,
+    ...visible
+  } = round as Round & { winnerLock?: unknown; pendingLastWords?: unknown; deathResolution?: unknown };
   return { ...visible, night: publicNight(round.night, !round.nightRevealed) } as Round;
 }
 

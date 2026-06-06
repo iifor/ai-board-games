@@ -409,7 +409,12 @@ function serializeWerewolfState(match: Match, state: WerewolfState): Record<stri
 }
 
 function stripInternalRoundState(round: Record<string, unknown>): Record<string, unknown> {
-  const { winnerLock: _winnerLock, ...visible } = round;
+  const {
+    winnerLock: _winnerLock,
+    pendingLastWords: _pendingLastWords,
+    deathResolution: _deathResolution,
+    ...visible
+  } = round;
   return visible;
 }
 

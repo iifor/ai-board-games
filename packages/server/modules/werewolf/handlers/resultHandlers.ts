@@ -31,7 +31,7 @@ function createCheckWinHandler() {
       if (isDone(state, step.id)) return completed(state, step.id);
       if (state.winner) return { status: 'COMPLETED', state: markStepComplete({ ...state, currentStep: step.id }, step.id) };
       const runtime = createRuntime(match, state);
-      const result = checkWin(runtime.agents, step.config.day || 1, runtime.modeConfig, {});
+      const result = checkWin(runtime.agents, step.config.day || 1, runtime.modeConfig);
       const nextState = markStepComplete({
         ...syncRuntimeState(runtime),
         currentStep: step.id,

@@ -71,12 +71,20 @@ function getSheriffActorsForAction(runtime: Runtime, round: Round, actionType: s
   if (actionType === 'sheriff_withdraw') return byIds(alive, election.signedUpIds);
   if (actionType === 'sheriff_vote') {
     if (!election.candidates.length) return [];
-    return alive.filter((agent) => agent.canVote && !election.candidates.includes(Number(agent.id)));
+    return alive.filter((agent) => (
+      agent.canVote
+      && !election.candidates.includes(Number(agent.id))
+      && !election.withdrawnIds.includes(Number(agent.id))
+    ));
   }
   if (actionType === 'sheriff_runoff_speech') return byIds(alive, election.runoffCandidateIds);
   if (actionType === 'sheriff_runoff_vote') {
     if (election.runoffCandidateIds.length <= 1) return [];
-    return alive.filter((agent) => agent.canVote && !election.runoffCandidateIds.includes(Number(agent.id)));
+    return alive.filter((agent) => (
+      agent.canVote
+      && !election.runoffCandidateIds.includes(Number(agent.id))
+      && !election.withdrawnIds.includes(Number(agent.id))
+    ));
   }
   return [];
 }
@@ -98,9 +106,13 @@ function applySheriffActionResults(runtime: Runtime, round: Round, actionType: s
   if (actionType === 'sheriff_signup') applySignup(round, election, results);
   if (actionType === 'sheriff_speech') applySpeech(election, results, false);
   if (actionType === 'sheriff_withdraw') applyWithdraw(election, results);
-  if (actionType === 'sheriff_vote') applyVote(election, results, false);
+  if (actionType === 'sheriff_vote') {
+    applyVote(election, results, false, getEligibleSheriffVoterIds(runtime, round, false));
+  }
   if (actionType === 'sheriff_runoff_speech') applySpeech(election, results, true);
-  if (actionType === 'sheriff_runoff_vote') applyVote(election, results, true);
+  if (actionType === 'sheriff_runoff_vote') {
+    applyVote(election, results, true, getEligibleSheriffVoterIds(runtime, round, true));
+  }
   if (actionType === 'sheriff_resolve') resolveSheriffElection(runtime, round);
 }
 
@@ -261,9 +273,16 @@ function applyWithdraw(election: SheriffElection, results: ActionResult[]): void
   election.result = election.candidates.length ? 'pending' : 'withdrawn';
 }
 
-function applyVote(election: SheriffElection, results: ActionResult[], runoff: boolean): void {
+function applyVote(
+  election: SheriffElection,
+  results: ActionResult[],
+  runoff: boolean,
+  eligibleVoterIds: number[],
+): void {
+  const eligible = new Set(eligibleVoterIds.map(Number));
+  const legalResults = results.filter((result) => eligible.has(Number(result.actorId)));
   const votes: Record<string, number> = {};
-  for (const result of results) {
+  for (const result of legalResults) {
     if (result.payload.target != null) votes[result.actorId] = Number(result.payload.target);
   }
   if (runoff) {
@@ -271,11 +290,16 @@ function applyVote(election: SheriffElection, results: ActionResult[], runoff: b
     election.runoffTally = countTargets(votes);
     return;
   }
-  election.voters = results.map((result) => result.actorId);
+  election.voters = legalResults.map((result) => result.actorId);
   election.votes = votes;
   election.tally = countTargets(votes);
   const topIds = getTopCandidateIds(election.tally);
   election.runoffCandidateIds = topIds.length > 1 ? topIds : [];
+}
+
+function getEligibleSheriffVoterIds(runtime: Runtime, round: Round, runoff: boolean): number[] {
+  const actionType = runoff ? 'sheriff_runoff_vote' : 'sheriff_vote';
+  return getSheriffActorsForAction(runtime, round, actionType).map((agent) => Number(agent.id));
 }
 
 function byIds(agents: Agent[], ids: number[]): Agent[] {

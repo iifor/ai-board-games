@@ -52,7 +52,7 @@ export async function askSpeech(
     `第 ${day} 天白天发言。`,
     `公开赛况：\n${context || '暂无公开信息。'}`,
     `你的状态：${agent.alive ? '存活' : '已出局'}；身份：${getRoleLabel(agent as Record<string, unknown>)}`,
-    `请发表自然语言发言，建议不超过 ${limit} 字。`
+    `请发表自然语言发言，不超过 ${limit} 字。`
   ].join('\n\n');
   const apiOpts = { maxTokens: Math.ceil(limit * 2.5), limit };
 
@@ -99,7 +99,7 @@ export async function askWolfNightSpeech(
     `第 ${day} 夜狼人行动。${title}`,
     contextLine,
     historySection,
-    `可以选择不发言；发言时请只输出狼队战术发言，建议不超过 ${limit} 字。`
+    `可以选择不发言；发言时请只输出狼队战术发言，不超过 ${limit} 字。`
   ].filter(Boolean).join('\n\n');
   const apiOpts = { maxTokens: Math.ceil(limit * 2.5), limit };
 
@@ -135,7 +135,7 @@ export async function askSheriffSpeech(
   const prompt = options.promptOverride || [
     `第${day}天${title}。`,
     `公开赛况：\n${context || '暂无公开信息。'}`,
-    `你的身份：${getRoleLabel(agent as Record<string, unknown>)}。请发表警长竞选发言，建议不超过 ${limit} 字。`
+    `你的身份：${getRoleLabel(agent as Record<string, unknown>)}。请发表警长竞选发言，不超过 ${limit} 字。`
   ].join('\n\n');
   const apiOpts = { maxTokens: Math.ceil(limit * 2.5), limit };
 

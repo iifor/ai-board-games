@@ -4,7 +4,7 @@ import * as repo from '../../packages/server/modules/workflow-engine/repository'
 import { createActionWindowHandler } from '../../packages/server/modules/werewolf/handlers/actionWindowHandler';
 import { createNightResolveHandler, createExileResolveHandler, createSheriffResolveHandler } from '../../packages/server/modules/werewolf/handlers/resolveHandlers';
 import { createRound } from '../../packages/server/modules/werewolf/agents';
-import { createInitialWerewolfState, createRuntime, flushMatchEventPublishes, registerMatchInfra, unregisterMatchInfra } from '../../packages/server/modules/werewolf/runtime';
+import { createInitialWerewolfState, createRuntime, flushMatchEventPublishes, registerMatchInfra, serializeWerewolfState, unregisterMatchInfra } from '../../packages/server/modules/werewolf/runtime';
 import { createEventBusWithDefaults } from '../../packages/server/modules/werewolf/eventBus';
 import { createGameEventBuilder } from '../../packages/server/modules/werewolf/gameEventBuilder';
 import { buildWerewolfActionPrompt } from '../../packages/server/modules/werewolf/prompts/context';
@@ -75,17 +75,16 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
     assert.equal(actionAuditEvent?.channel, 'system');
     assert.equal((actionAuditEvent?.payload as Record<string, unknown> | undefined)?.status, 'matched');
 
-    const nightResolved = createNightResolveHandler().execute({
+    const nightStep = { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } };
+    const nightHandler = createNightResolveHandler();
+    const nightWaiting = nightHandler.execute({
       match,
-      step: { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } },
+      step: nightStep,
       state: completed.state
     } as never);
+    const nightResolved = completeLastWordsWindow(nightHandler, match, nightStep, nightWaiting, tasks);
     assert.equal(nightResolved.status, 'COMPLETED');
-    assert.equal(nightResolved.events?.[0].type, 'werewolf_effect_resolved');
-    const auditEvent = (nightResolved.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_night_resolution_shadow_audited') as Record<string, unknown> | undefined;
-    assert.equal(auditEvent?.channel, 'system');
-    assert.equal(auditEvent?.visibility, 'system');
-    assert.equal((auditEvent?.payload as Record<string, unknown> | undefined)?.status, 'matched');
+    assert.equal(nightResolved.state?.rounds[0].lastWords[0].playerId, 2);
     assert.equal(effects.length, 1);
     assert.equal(nightResolved.state?.players.find((player: Record<string, unknown>) => Number(player.id) === 2).alive, false);
 
@@ -93,13 +92,17 @@ test('fake werewolf action window opens, completes, and night resolve emits effe
       ...nightResolved.state,
       rounds: [{ ...nightResolved.state?.rounds[0], votes: { 1: 3, 3: 3 } }]
     };
-    const exileResolved = createExileResolveHandler().execute({
+    const exileStep = { id: 'exile_resolve_1', type: 'werewolf.exile_resolve', config: { day: 1, phase: 'day' } };
+    const exileHandler = createExileResolveHandler();
+    const exileWaiting = exileHandler.execute({
       match,
-      step: { id: 'exile_resolve_1', type: 'werewolf.exile_resolve', config: { day: 1, phase: 'day' } },
+      step: exileStep,
       state: dayVotedState
     } as never);
+    const exileResolved = completeLastWordsWindow(exileHandler, match, exileStep, exileWaiting, tasks);
     assert.equal(exileResolved.status, 'COMPLETED');
     assert.equal(exileResolved.state?.rounds[0].exile.id, 3);
+    assert.equal(exileResolved.state?.rounds[0].lastWords.at(-1).playerId, 3);
   } finally {
     patchRepo(repo, original);
   }
@@ -145,6 +148,44 @@ test('night resolve shadow audit is emitted when hunter window pauses resolution
   }
 });
 
+test('night death of one god does not complete the game while other gods survive', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect,
+    });
+    const state = createState();
+    state.modeConfig = { ...(state.modeConfig as Record<string, unknown>), winCondition: 'side' };
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill'], { roleConfig: { id: 'werewolf', faction: 'wolves', roleType: 'wolf', rule: { actions: [{ action: 'kill' }] } } }),
+      player(2, 'witch', 'good', ['save', 'poison'], { roleConfig: { id: 'witch', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'save' }, { action: 'poison' }] } } }),
+      player(3, 'seer', 'good', ['inspectFaction'], { roleConfig: { id: 'seer', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'inspectFaction' }] } } }),
+      player(4, 'hunter', 'good', ['shootOnDeath'], { roleConfig: { id: 'hunter', faction: 'good', roleType: 'god', rule: { actions: [{ action: 'shootOnDeath' }] } } }),
+      player(5, 'villager', 'good', [], { roleConfig: { id: 'villager', faction: 'good', roleType: 'villager', rule: { actions: [] } } }),
+    ];
+    state.rounds[0].night.wolfTarget = 2;
+    const match = { id: 'm-one-god-death', config: { players: state.players }, createdAt: 'now' };
+    const step = { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } };
+    const handler = createNightResolveHandler();
+
+    const waiting = handler.execute({ match, step, state } as never);
+    const completed = completeLastWordsWindow(handler, match, step, waiting, tasks);
+
+    assert.equal(completed.status, 'COMPLETED');
+    assert.equal(completed.state?.winner, null);
+    assert.equal(completed.state?.players.find((item: Record<string, unknown>) => Number(item.id) === 2).alive, false);
+    assert.equal((completed.events || []).some((event: Record<string, unknown>) => event.type === 'werewolf_game_completed'), false);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
 test('wolf kill priority stays locked when dead last god hunter shoots the last wolf', () => {
   const original = snapshotRepo(repo);
   const tasks: Array<Record<string, unknown>> = [];
@@ -174,12 +215,15 @@ test('wolf kill priority stays locked when dead last god hunter shoots the last 
     assert.equal(opened.events?.[0].payload.game.rounds[0].winnerLock, undefined);
     tasks.push(...(opened.tasks || []));
     tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 2, result: { payload: { target: 1 } } };
-    const completed = handler.execute({ match, step, state: opened.state } as never);
+    const afterHunter = handler.execute({ match, step, state: opened.state } as never);
+    const completed = completeLastWordsWindow(handler, match, step, afterHunter, tasks);
 
     assert.equal(completed.status, 'COMPLETED');
     assert.equal(completed.state?.winner, 'wolves');
     assert.equal(completed.state?.players.find((item: Record<string, unknown>) => Number(item.id) === 1).alive, false);
     assert.equal((completed.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_game_completed').length, 1);
+    assert.ok(completed.events?.findIndex((event: Record<string, unknown>) => event.type === 'werewolf_last_words')
+      < completed.events?.findIndex((event: Record<string, unknown>) => event.type === 'werewolf_game_completed'));
   } finally {
     patchRepo(repo, original);
   }
@@ -213,7 +257,8 @@ test('hunter shooting the last wolf gives good victory when wolf kill did not co
     const opened = handler.execute({ match, step, state } as never);
     tasks.push(...(opened.tasks || []));
     tasks[0] = { ...tasks[0], status: 'succeeded', playerId: 2, result: { payload: { target: 1 } } };
-    const completed = handler.execute({ match, step, state: opened.state } as never);
+    const afterHunter = handler.execute({ match, step, state: opened.state } as never);
+    const completed = completeLastWordsWindow(handler, match, step, afterHunter, tasks);
 
     assert.equal(completed.status, 'COMPLETED');
     assert.equal(completed.state?.winner, 'good');
@@ -221,6 +266,136 @@ test('hunter shooting the last wolf gives good victory when wolf kill did not co
   } finally {
     patchRepo(repo, original);
   }
+});
+
+test('chained hunters use actor-scoped action windows', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect,
+    });
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'hunter', 'good', ['shootOnDeath']),
+      player(3, 'hunter', 'good', ['shootOnDeath']),
+      player(4, 'villager', 'good', []),
+    ];
+    state.rounds[0].night.wolfTarget = 2;
+    const match = { id: 'm-chained-hunters', config: { players: state.players }, createdAt: 'now' };
+    const step = { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } };
+    const handler = createNightResolveHandler();
+
+    const first = handler.execute({ match, step, state } as never);
+    tasks.push(...(first.tasks || []));
+    assert.equal(tasks[0].action, 'hunter_shot:2');
+    assert.equal(first.state?.currentActionWindow?.actionType, 'hunter_shot');
+    tasks[0] = { ...tasks[0], status: 'succeeded', result: { payload: { target: 3 } } };
+
+    const second = handler.execute({ match, step, state: first.state } as never);
+    tasks.push(...((second.tasks as Array<Record<string, unknown>> | undefined) || []));
+    const secondHunterTask = tasks.find((task) => task.action === 'hunter_shot:3');
+    assert.equal(second.status, 'WAITING');
+    assert.equal(secondHunterTask?.playerId, 3);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('multiple last words keep distinct workflow idempotency keys', () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect,
+    });
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'villager', 'good', []),
+      player(3, 'seer', 'good', ['inspectFaction']),
+      player(4, 'villager', 'good', []),
+    ];
+    state.rounds[0].night.wolfTarget = 2;
+    state.rounds[0].night.witchPoisonTarget = 3;
+    const match = { id: 'm-last-words-keys', config: { players: state.players }, createdAt: 'now' };
+    const step = { id: 'night_resolve_1', type: 'werewolf.night_resolve', config: { day: 1, phase: 'night' } };
+    const handler = createNightResolveHandler();
+
+    const waiting = handler.execute({ match, step, state } as never);
+    const completed = completeLastWordsWindow(handler, match, step, waiting, tasks);
+    const wordEvents = (completed.events as Array<Record<string, unknown>>)
+      .filter((event) => event.type === 'werewolf_last_words');
+    assert.equal(wordEvents.length, 2);
+    assert.equal(new Set(wordEvents.map((event) => event.idempotencyKey)).size, 2);
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
+test('exile result is not republished while last words are waiting', async () => {
+  const original = snapshotRepo(repo);
+  const tasks: Array<Record<string, unknown>> = [];
+  const delivered: Array<Record<string, unknown>> = [];
+  const matchId = 'm-exile-idempotency';
+  const eventBus = createEventBusWithDefaults();
+  const unsubscribe = eventBus.subscribeAll((event) => delivered.push(event as unknown as Record<string, unknown>));
+  registerMatchInfra(matchId, eventBus, createGameEventBuilder(matchId));
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: (task: never) => { tasks.push({ ...task, status: task.status || 'queued', result: null }); },
+      listPendingActions: () => [],
+      listAiTasks: () => tasks as never,
+      createWorkflowEffect: (effect: never) => effect,
+    });
+    const state = createState();
+    state.players = [
+      player(1, 'werewolf', 'wolves', ['kill']),
+      player(2, 'villager', 'good', []),
+      player(3, 'seer', 'good', ['inspectFaction']),
+    ];
+    state.rounds[0].phase = 'day';
+    state.rounds[0].votes = { 1: 2, 3: 2 };
+    const match = { id: matchId, config: { players: state.players }, createdAt: 'now' };
+    const step = { id: 'exile_resolve_1', type: 'werewolf.exile_resolve', config: { day: 1, phase: 'day' } };
+    const handler = createExileResolveHandler();
+
+    const waiting = handler.execute({ match, step, state } as never);
+    handler.execute({ match, step, state: waiting.state } as never);
+    await flushMatchEventPublishes(matchId);
+    assert.equal(delivered.filter((event) => event.type === 'vote-result').length, 1);
+  } finally {
+    unsubscribe();
+    unregisterMatchInfra(matchId);
+    patchRepo(repo, original);
+  }
+});
+
+test('death resolution checkpoint stays out of serialized game state', () => {
+  const state = createState();
+  state.rounds[0].deathResolution = {
+    stepId: 'night_resolve_1',
+    source: 'night',
+    initialEffectsApplied: true,
+  };
+  const serialized = serializeWerewolfState(
+    { id: 'm-checkpoint-hidden', config: { players: state.players }, createdAt: 'now' },
+    state,
+  );
+  assert.equal((serialized.rounds[0] as Record<string, unknown>).deathResolution, undefined);
 });
 
 test('wolf speech window opens all wolves but queues speakers in leader order before vote', () => {
@@ -763,7 +938,8 @@ test('first day sheriff election windows resolve a human election', () => {
       2: { target: 1 },
       3: { target: 1 }
     }, pendingActions);
-    assert.deepEqual(current.rounds[0].sheriffElection.tally, { 1: 2 });
+    assert.deepEqual(current.rounds[0].sheriffElection.voters, [3]);
+    assert.deepEqual(current.rounds[0].sheriffElection.tally, { 1: 1 });
 
     const resolved = createSheriffResolveHandler().execute({
       match,
@@ -794,6 +970,37 @@ function createState(): Record<string, unknown> {
     winner: null,
     winReason: ''
   };
+}
+
+function completeLastWordsWindow(
+  handler: { execute(input: Record<string, unknown>): Record<string, unknown> },
+  match: Record<string, unknown>,
+  step: Record<string, unknown>,
+  initial: Record<string, unknown>,
+  tasks: Array<Record<string, unknown>>,
+): Record<string, unknown> {
+  let result = initial;
+  while (result.status === 'WAITING' && (result.state as Record<string, unknown>)?.currentActionWindow) {
+    const window = (result.state as { currentActionWindow?: { actionType?: string } }).currentActionWindow;
+    if (window?.actionType !== 'last_words') return result;
+    tasks.push(...((result.tasks as Array<Record<string, unknown>> | undefined) || []));
+    for (let index = 0; index < tasks.length; index += 1) {
+      if (tasks[index].action !== 'last_words' || tasks[index].status === 'succeeded') continue;
+      tasks[index] = {
+        ...tasks[index],
+        status: 'succeeded',
+        result: { payload: { text: `${tasks[index].playerId}号遗言`, thinking: '' } },
+      };
+    }
+    result = handler.execute({ match, step, state: result.state });
+  }
+  if (result.status === 'WAITING') {
+    throw new Error(`last words window did not complete: ${JSON.stringify({
+      window: (result.state as { currentActionWindow?: unknown })?.currentActionWindow,
+      tasks: tasks.map((task) => ({ action: task.action, playerId: task.playerId, status: task.status })),
+    })}`);
+  }
+  return result;
 }
 
 function player(id: number, role: string, faction: string, actions: string[], patch: Record<string, unknown> = {}): Record<string, unknown> {

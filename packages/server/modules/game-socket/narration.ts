@@ -82,6 +82,7 @@ interface NarrationEvent {
   presentation?: {
     speakableText?: string;
     suppressSpeech?: boolean;
+    requiresAck?: boolean;
   };
   game?: GameData;
   speech?: SpeechData;

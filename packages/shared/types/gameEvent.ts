@@ -208,6 +208,7 @@ export interface Presentation {
   displayMode: 'speech' | 'status' | 'badge' | 'silent';
   uiHint: string;
   suppressSpeech: boolean;
+  requiresAck?: boolean;
 }
 
 export interface AudienceCue {
