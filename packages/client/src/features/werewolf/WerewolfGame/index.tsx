@@ -50,6 +50,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   const [nightActionActorIds, setNightActionActorIds] = useState<number[]>([]);
   const [seerCheckTarget, setSeerCheckTarget] = useState<string | null>(null);
   const [sheriffCandidateIds, setSheriffCandidateIds] = useState<number[]>([]);
+  const [hunterShotFromId, setHunterShotFromId] = useState<number | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [modeDialogOpen, setModeDialogOpen] = useState(false);
   const [werewolfModes, setWerewolfModes] = useState<WerewolfMode[]>([]);
@@ -201,6 +202,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     setNightActionActorIds([]);
     setSeerCheckTarget(null);
     setSheriffCandidateIds([]);
+    setHunterShotFromId(null);
     setSelectedPlayer(null);
     setVisibleRolePlayerId(null);
     setStatus('idle');
@@ -348,6 +350,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       setNightActionType('');
       setNightActionActorIds([]);
       setSeerCheckTarget(null);
+      setHunterShotFromId(null);
       return;
     }
     if (event.type === 'seer-check') {
@@ -372,10 +375,25 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       setSeerCheckTarget(null);
       return;
     }
+    if (event.type === 'hunter-shot') {
+      const fromId = Number(event.shot?.from) || null;
+      if (fromId) {
+        setHunterShotFromId(fromId);
+        new Audio('/resources/public/gun.wav').play().catch(() => {});
+      }
+      return;
+    }
+    if (event.type === 'night-result') {
+      setNightActionType('');
+      setNightActionActorIds([]);
+      setSeerCheckTarget(null);
+      setHunterShotFromId(null);
+    }
     if (event.type === 'done' || event.type === 'game') {
       setNightActionType('');
       setNightActionActorIds([]);
       setSeerCheckTarget(null);
+      setHunterShotFromId(null);
     }
   }
 
@@ -561,6 +579,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
           nightActionType={nightActionType}
           seerCheckTarget={seerCheckTarget}
           sheriffCandidateIds={sheriffCandidateIds}
+          hunterShotFromId={hunterShotFromId}
           activeSpeech={activeSpeech}
           showRoles={showRoles}
           visibleRolePlayerId={visibleRolePlayerId}

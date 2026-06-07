@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import type { NightBadge } from '../../../../types';
 import { classNames } from '../../../../utils/classNames';
 
@@ -21,17 +22,29 @@ export function WerewolfNightActionBadge({ badge }: WerewolfNightActionBadgeProp
 function renderNightActionBadgeContent(badge: NightBadge): ReactNode {
   switch (badge.kind) {
     case 'wolf':
-    case 'guard':
+      // 狼人刀口：只展示座位号
+      return <b>{badge.targetLabel}</b>;
+
     case 'antidote':
+      // 女巫解药：用了解药 → ✅ 图标，不用 → ❌ 图标
+      return badge.use
+        ? <CheckCircle2 size={32} />
+        : <XCircle size={32} />;
+
     case 'poison':
-      return renderActionTarget(badge);
+      // 女巫毒药：用了 → 展示目标序号，不用 → ❌ 图标
+      return badge.use
+        ? <b>{badge.targetLabel}</b>
+        : <XCircle size={32} />;
+
     case 'seer':
-      return (
-        <>
-          {renderActionTarget(badge)}
-          {badge.result && <em>{badge.result}</em>}
-        </>
-      );
+      // 预言家：只展示查验座位号，C端不展示狼人/好人结果
+      return <b>{badge.targetLabel}</b>;
+
+    case 'guard':
+      // 守卫：展示守护目标
+      return <b>{badge.targetLabel}</b>;
+
     default:
       return renderActionTarget(badge);
   }

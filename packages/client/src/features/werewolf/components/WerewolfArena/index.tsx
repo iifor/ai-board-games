@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { XCircle } from 'lucide-react';
 import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
 import { formatWerewolfSeatLabel, getGameStats, getPhaseTitle, getRoundResult, getWerewolfActionTarget, getWerewolfNightActionBadges, getWerewolfSeatNumber, resolveActiveSheriffId, shouldShowWerewolfActionTargets } from '../../utils';
 import { WerewolfBrandPanel } from '../WerewolfBrandPanel';
@@ -20,6 +21,7 @@ interface WerewolfArenaProps {
   nightActionType: string;
   seerCheckTarget: string | null;
   sheriffCandidateIds: number[];
+  hunterShotFromId?: number | null;
   activeSpeech: SpeechState | null;
   showRoles: boolean;
   visibleRolePlayerId: string | number | null;
@@ -37,6 +39,7 @@ export function WerewolfArena({
   nightActionType,
   seerCheckTarget,
   sheriffCandidateIds,
+  hunterShotFromId = null,
   activeSpeech,
   showRoles,
   visibleRolePlayerId,
@@ -81,6 +84,8 @@ export function WerewolfArena({
                 seerInspectionTarget={nightActive && player.role === 'seer' ? seerCheckTarget : null}
                 isSheriff={Number(activeSheriffId) === Number(player.id)}
                 isSheriffCandidate={sheriffCandidates.has(Number(player.id))}
+                nightActionType={nightActionType}
+                roleActionOverlay={getRoleActionOverlay(player, nightActionType, hunterShotFromId, currentRound, nightActors)}
                 showRoles={showRoles}
                 visibleRolePlayerId={visibleRolePlayerId}
                 currentSpeakerId={currentSpeakerId}
@@ -115,6 +120,45 @@ export function WerewolfArena({
       />
     </section>
   );
+}
+
+function getRoleActionOverlay(
+  player: Player,
+  nightActionType: string,
+  hunterShotFromId: number | null,
+  currentRound: WerewolfRound | null,
+  nightActors: Set<number>
+): React.ReactNode {
+  const pid = Number(player.id);
+
+  // 猎人开枪：覆盖 gun.gif（独立事件触发，可能发生在白天）
+  if (hunterShotFromId === pid) return <img className="werewolf-role-action-overlay" src="/resources/public/gun.gif" alt="" aria-hidden="true" />;
+  // 白痴翻牌：覆盖 idiotReveal.jpg（轮次数据驱动，发生在白天）
+  if (currentRound?.idiotReveal && Number(currentRound.idiotReveal.id) === pid) return <img className="werewolf-role-action-overlay" src="/resources/public/idiotReveal.jpg" alt="" aria-hidden="true" />;
+
+  // 以下夜间行动覆盖仅在夜晚阶段 + 玩家是当前夜间行动者时展示
+  // 用 phase 做兜底：workflow-event 会绕过 updateNightActionType，导致 nightActionType 白天不清理
+  if (currentRound?.phase !== 'night') return null;
+  if (!nightActors.has(pid)) return null;
+
+  // 女巫解药：使用 → antidote.gif，不用且行动完成 → X 图标
+  if ((nightActionType === 'witch-antidote' || nightActionType === 'witch-antidote-action') && player.role === 'witch') {
+    const used = currentRound?.night?.witchSave;
+    if (used === false) return <XCircle className="werewolf-role-action-overlay werewolf-role-action-x" />;
+    return <img className="werewolf-role-action-overlay" src="/resources/public/antidote.gif" alt="" aria-hidden="true" />;
+  }
+
+  // 女巫毒药：使用 → poison.gif，不用且行动完成 → X 图标
+  if ((nightActionType === 'witch-poison' || nightActionType === 'witch-poison-action') && player.role === 'witch') {
+    const used = currentRound?.night?.witchPoisonTarget;
+    if (!used && nightActionType === 'witch-poison-action') return <XCircle className="werewolf-role-action-overlay werewolf-role-action-x" />;
+    return <img className="werewolf-role-action-overlay" src="/resources/public/poison.gif" alt="" aria-hidden="true" />;
+  }
+
+  if (nightActionType === 'seer-wake' && player.role === 'seer') return <img className="werewolf-role-action-overlay" src="/resources/public/seer-wake.jpg" alt="" aria-hidden="true" />;
+  if ((nightActionType === 'wolf-wake' || nightActionType === 'wolf-vote') && (player.role === 'werewolf' || player.faction === 'wolves')) return <img className="werewolf-role-action-overlay" src="/resources/public/werewolf.gif" alt="" aria-hidden="true" />;
+
+  return null;
 }
 
 function getVisibleSheriffCandidates(round: WerewolfRound | null, eventCandidateIds: number[] = []): Set<number> {

@@ -16,13 +16,15 @@ interface WerewolfSeatProps {
   seerInspectionTarget: string | null;
   isSheriff: boolean;
   isSheriffCandidate: boolean;
+  nightActionType?: string;
+  roleActionOverlay?: React.ReactNode;
   showRoles: boolean;
   visibleRolePlayerId: string | number | null;
   currentSpeakerId: string | null;
   onPlayerSelect: (player: Player) => void;
 }
 
-export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadges = [], isNightActor, seerInspectionTarget: _seerInspectionTarget, isSheriff, isSheriffCandidate, showRoles, visibleRolePlayerId: _visibleRolePlayerId, currentSpeakerId, onPlayerSelect }: WerewolfSeatProps) {
+export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadges = [], isNightActor, seerInspectionTarget: _seerInspectionTarget, isSheriff, isSheriffCandidate, nightActionType: _nightActionType, roleActionOverlay = null, showRoles, visibleRolePlayerId: _visibleRolePlayerId, currentSpeakerId, onPlayerSelect }: WerewolfSeatProps) {
   const isSpeaking = Number(currentSpeakerId) === Number(player.id);
   const seatNumber = Number(seatIndex) + 1;
   const roleText = ROLE_NAMES[player.roleLabel || ''] || player.roleLabel || ROLE_NAMES[player.role || ''] || '';
@@ -50,6 +52,7 @@ export function WerewolfSeat({ player, seatIndex, actionTarget, nightActionBadge
         aria-label={`查看${seatNumber}号玩家信息`}
       >
         {!player.avatar && (player.nickname || player.name || `${player.id}`).slice(0, 1)}
+        {roleActionOverlay}
         <span className="werewolf-seat-number">{seatNumber}</span>
         {isSheriffCandidate && (
           <span className="werewolf-sheriff-candidate-badge" title="警长竞选" aria-label="举手">

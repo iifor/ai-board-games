@@ -323,6 +323,22 @@
   line-height: 1;
 }
 
+.werewolf-role-action-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.werewolf-role-action-x {
+  color: #ff4444;
+  background: rgba(0, 0, 0, 0.55);
+}
+
 .werewolf-night-action-badges {
   position: absolute;
   z-index: 7;

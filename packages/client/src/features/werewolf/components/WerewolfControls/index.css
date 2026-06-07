@@ -4,17 +4,17 @@
   top: 30px;
   right: 54px;
   display: flex;
-  gap: 24px;
+  gap: 12px;
 }
 
 .werewolf-controls button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 5px;
   min-width: 0;
-  height: 58px;
-  padding: 0 28px;
+  height: 40px;
+  padding: 0 12px;
   border: 1px solid rgba(197, 180, 255, 0.42);
   border-radius: 999px;
   color: #ded5ff;
