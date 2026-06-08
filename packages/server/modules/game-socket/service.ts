@@ -195,10 +195,11 @@ async function runSession(
   const config = getRequestConfig(mode, playerIds, safeGameType, options);
 
   const viewMode = String((config as Record<string, unknown>).clientViewMode || 'god');
-  const playbackPipeline = safeGameType === 'werewolf'
+  const playbackPipeline = (safeGameType === 'werewolf' || safeGameType === 'debate')
     ? createPlaybackPipeline(session, {
         viewMode,
-        prefetchCount: 2,
+        prefetchCount: safeGameType === 'werewolf' ? 2 : undefined,
+        phaseLookahead: safeGameType === 'debate' ? 1 : undefined,
         capture: true,
       })
     : null;
@@ -216,6 +217,12 @@ async function runSession(
     game = (await runner(config, {
       onEvent: (event: Record<string, unknown>) => {
         if (liveSource) {
+          if (safeGameType !== 'werewolf') {
+            liveSource.push(event);
+            return;
+          }
+          // 过滤 system channel / visibility 事件，不推送到 C 端
+          if (event.channel === 'system' || event.visibility === 'system') return;
           if (viewMode === 'player' && event.game) {
             liveProjectionContext = createProjectionContext(
               event.game as Record<string, unknown>,
@@ -278,7 +285,7 @@ async function runSession(
           normalizeSelectedPlayerIds(config.selectedPlayerIds),
         ),
         audioResources,
-        playbackEvents: safeGameType === 'werewolf' ? playbackEvents : [],
+        playbackEvents: playbackEvents,
       } as unknown as SaveGameInput);
     } catch (error) {
       const err = error as Error;

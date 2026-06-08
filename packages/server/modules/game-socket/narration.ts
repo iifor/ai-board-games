@@ -134,8 +134,12 @@ function getWerewolfNarration(event: NarrationEvent): string {
   if (event.type === 'vote-result') return event.message || '白天投票结果公布';
   if (event.type === 'last-words' || event.type === 'exile-words')
     return event.testimony?.text || '';
+  if ((event.workflowEvent === 'last-words' || event.workflowEvent === 'exile-words'))
+    return event.testimony?.text || event.speech?.text || '';
   if (event.type === 'hunter-shot')
-    return `猎人发动技能，${event.shot?.from}号带走${event.shot?.target}号。`;
+    return `猎人开枪带走${event.shot?.target}号。`;
+  if (event.type === 'idiot-reveal')
+    return event.message || '白痴翻牌';
   if (event.type === 'game') {
     const winner = event.game?.winner === 'wolves' ? '狼人阵营胜利' : '好人阵营胜利';
     return `游戏结束。${winner}。${event.game?.winReason || ''}`;

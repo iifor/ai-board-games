@@ -284,7 +284,10 @@ export function getWerewolfFlowLabel(event: GameEvent | null | undefined): strin
     'seer-wake': '预言家查验',
     'guard-wake': '守卫守护',
     'witch-antidote': '女巫解药',
-    'witch-poison': '女巫毒药'
+    'witch-poison': '女巫毒药',
+    'day-speech': '白天发言',
+    'day-vote': '放逐投票',
+    'vote-result': '投票结果',
   };
   return labels[event?.type || ''] || '';
 }
@@ -411,7 +414,8 @@ function createNightTargetBadge(kind: string, target: string, players: Player[],
 }
 
 function hasCompletedWitchAntidoteAction(nightActionType: string): boolean {
-  return ['witch-antidote-action', 'witch-poison', 'witch-poison-action'].includes(nightActionType);
+  // 只在解药行动完成阶段展示"不救"badge，毒药阶段不展示解药相关信息
+  return nightActionType === 'witch-antidote-action';
 }
 
 function getSeerCheckTheme(result?: string): NightBadgeTheme {

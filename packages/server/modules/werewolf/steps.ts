@@ -32,7 +32,7 @@ function createWerewolfSteps(): WorkflowStep[] {
     steps.push({ id: `night_resolve_${day}`, type: 'werewolf.night_resolve', name: '公布并结算夜死', config: { day, phase: 'day' } });
     steps.push({ id: `sheriff_speech_direction_${day}`, type: 'werewolf.action_window', name: '警长决定发言方向', config: { day, phase: 'day', actionType: 'sheriff_speech_direction' } });
     steps.push({ id: `day_speech_${day}`, type: 'werewolf.action_window', name: '白天发言', config: { day, phase: 'day', actionType: 'day_speech', ordered: true } });
-    steps.push({ id: `day_vote_${day}`, type: 'werewolf.action_window', name: '放逐投票', config: { day, phase: 'day', actionType: 'day_vote' } });
+    steps.push({ id: `day_vote_${day}`, type: 'werewolf.action_window', name: '放逐投票', config: { day, phase: 'day', actionType: 'day_vote', ordered: true } });
     steps.push({ id: `exile_resolve_${day}`, type: 'werewolf.exile_resolve', name: '放逐结算', config: { day, phase: 'day' } });
     steps.push({ id: `check_win_${day}`, type: 'werewolf.check_win', name: '胜负检查', config: { day } });
   }

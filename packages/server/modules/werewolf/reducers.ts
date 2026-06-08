@@ -223,7 +223,7 @@ function applyDaySpeech(round: Round, results: ActionResult[], agents?: Agent[])
     day: round.day,
     thinking: result.payload.thinking || ''
   }));
-  const selfDestruct = results.find((result) => result.payload.selfDestruct || result.payload.intent === 'selfDestruct');
+  const selfDestruct = results.find((result) => result.payload.selfDestruct === true);
   if (selfDestruct && !round.selfDestruct) {
     round.selfDestruct = {
       playerId: selfDestruct.actorId,
@@ -317,7 +317,8 @@ function resolveRecentDeathId(round: Round): number | null {
 
 function getActorsForStep(runtime: Runtime, step: Step, round: Round): Agent[] {
   const actionType = step.config.actionType;
-  if (round.selfDestruct && (actionType === 'day_speech' || actionType === 'day_vote')) return [];
+  if (round.selfDestruct && Number(round.selfDestruct.day) === Number(round.day)
+    && (actionType === 'day_speech' || actionType === 'day_vote')) return [];
   const actors = (action: string): Agent[] => getAliveActorsByAction(runtime, action) as unknown as Agent[];
   if (actionType === 'wolf_kill') return actors('kill');
   if (actionType === 'wolf_speech' || actionType === 'wolf_vote') {

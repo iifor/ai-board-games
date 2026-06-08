@@ -63,19 +63,26 @@ export class EventDeliverySubscriber {
 
   private toFlatEvent(event: GameEvent): Record<string, unknown> {
     const payload = event.payload as Record<string, unknown>;
-    // 发言 + 警长类事件保留原始 type，不包装为 workflow-event
+    // 发言 + 警长 + 遗言类事件保留原始 type，不包装为 workflow-event
     const isSpeech =
       event.type === 'speech' ||
       event.type === 'wolf-speech' ||
       event.type === 'self-destruct';
+    const isTestimony =
+      event.type === 'last-words' || event.type === 'exile-words';
     const isSheriff = event.type.startsWith('sheriff-');
-    const keepOriginalType = isSpeech || isSheriff;
+    const isHunterShot = event.type === 'hunter-shot';
+    const isIdiotReveal = event.type === 'idiot-reveal';
+    const keepOriginalType = isSpeech || isSheriff || isTestimony || isHunterShot || isIdiotReveal;
 
     // action-submitted 事件的 speech 嵌套在 payload.speech 中
     const nestedSpeech = payload.speech as Record<string, unknown> | undefined;
+    const nestedTestimony = payload.testimony as Record<string, unknown> | undefined;
     const hasSpeech = isSpeech
       || payload.playerId !== undefined
       || (nestedSpeech && typeof nestedSpeech === 'object' && (nestedSpeech.playerId || nestedSpeech.text));
+    const hasTestimony = isTestimony
+      || (nestedTestimony && typeof nestedTestimony === 'object' && (nestedTestimony.playerId || nestedTestimony.text));
 
     const flat: Record<string, unknown> = {
       type: keepOriginalType ? event.type : 'workflow-event',
@@ -130,8 +137,16 @@ export class EventDeliverySubscriber {
     if (payload.wolfVoteTally !== undefined) flat.wolfVoteTally = payload.wolfVoteTally;
     if (payload.seerCheck !== undefined) flat.seerCheck = payload.seerCheck;
     if (payload.witchAction !== undefined) flat.witchAction = payload.witchAction;
+    if (payload.idiotReveal !== undefined) flat.idiotReveal = payload.idiotReveal;
 
-    if (hasSpeech) {
+    if (hasTestimony) {
+      flat.speech = {
+        playerId: nestedTestimony?.playerId || payload.playerId || payload.actorId,
+        text: (nestedTestimony?.text || payload.text || '') as string,
+        thinking: (nestedTestimony?.thinking || payload.thinking || '') as string,
+      };
+      flat.testimony = payload.testimony;
+    } else if (hasSpeech) {
       flat.speech = {
         playerId: nestedSpeech?.playerId || payload.playerId || payload.actorId,
         text: (nestedSpeech?.text || payload.text || '') as string,
@@ -149,6 +164,20 @@ export class EventDeliverySubscriber {
 
     if (payload.targetId !== undefined) {
       flat.targetId = payload.targetId;
+    }
+
+    // 从 effects 数组提取猎人开枪 shot 数据（前端 UI 动画和音效需要）
+    if (Array.isArray(payload.effects)) {
+      const hunterEffect = (payload.effects as Array<Record<string, unknown>>).find(
+        (e) => e && typeof e === 'object' && e.type === 'hunter_shot',
+      );
+      if (hunterEffect) {
+        flat.shot = { from: hunterEffect.from, target: hunterEffect.target };
+      }
+    }
+    // EventBus 路径：直接从 payload 提取 shot（hunter-shot 事件自带）
+    if (!flat.shot && payload.shot) {
+      flat.shot = payload.shot;
     }
 
     return flat;

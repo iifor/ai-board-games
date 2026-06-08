@@ -26,16 +26,14 @@ function renderNightActionBadgeContent(badge: NightBadge): ReactNode {
       return <b>{badge.targetLabel}</b>;
 
     case 'antidote':
-      // 女巫解药：用了解药 → ✅ 图标，不用 → ❌ 图标
       return badge.use
-        ? <CheckCircle2 size={32} />
-        : <XCircle size={32} />;
+        ? '救'
+        : '不救';
 
     case 'poison':
-      // 女巫毒药：用了 → 展示目标序号，不用 → ❌ 图标
       return badge.use
         ? <b>{badge.targetLabel}</b>
-        : <XCircle size={32} />;
+        : '不毒';
 
     case 'seer':
       // 预言家：只展示查验座位号，C端不展示狼人/好人结果

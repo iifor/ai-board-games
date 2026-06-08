@@ -52,6 +52,10 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
     return speak(speechText || message || '狼人自爆。', '狼人自爆', 'speech', 'self-destruct');
   }
 
+  if (eventType === 'last-words' || eventType === 'exile-words') {
+    return speak(speechText || message, '玩家遗言', 'speech', 'last-words');
+  }
+
   if (isNightStart(input.stepId, message)) return speak('天黑请闭眼', '天黑请闭眼', 'status', 'night-start');
   if (isDayStart(input.stepId, message)) return speak('天亮了', '天亮了', 'status', 'day-start');
 
@@ -95,6 +99,10 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
   }
 
   if (workflowEvent === 'werewolf_effect_resolved') {
+    // 猎人开枪：生成公开旁白和展示文本
+    if (actionType === 'hunter_shot' && message) {
+      return speak(message, message, 'status', 'hunter-shot');
+    }
     return silent(publicResolveText(input.stepId, message), 'status', 'effect-resolved');
   }
 

@@ -66,6 +66,9 @@ export type GameEventType =
   | 'last-words'
   | 'exile-words'
   | 'death-announced'
+  | 'hunter-shot'
+  | 'idiot-reveal'
+  | 'vote-update'
 
   // 效果事件
   | 'effect-applied'

@@ -209,23 +209,24 @@ async function replayGameSession(
   if (!game) throw new Error('历史对局不存在。');
   if (normalizeGameType(game.gameType || game.type) !== gameType)
     throw new Error('历史对局类型与当前游戏不匹配。');
-  if (gameType === 'werewolf') {
-    const storedEvents = listPlaybackEvents(replayGameId);
-    if (storedEvents.length) {
+  const storedEvents = listPlaybackEvents(replayGameId);
+  if (storedEvents.length) {
+    if (gameType === 'werewolf') {
       const storedViewMode = storedEvents[0].viewMode || 'god';
       const requestedViewMode = getRequestedReplayViewMode(options.replayView);
       if (requestedViewMode && requestedViewMode !== storedViewMode) {
         throw new Error(`该回放绑定原始视角：${storedViewMode}，不支持切换视角。`);
       }
-      const pipeline = createPlaybackPipeline(session, {
-        viewMode: storedViewMode,
-        prefetchCount: 2,
-        capture: false,
-      });
-      await pipeline.play(createStoredPlaybackSource(storedEvents));
-      session.close();
-      return;
     }
+    const pipeline = createPlaybackPipeline(session, {
+      viewMode: storedEvents[0].viewMode || 'god',
+      prefetchCount: gameType === 'werewolf' ? 2 : undefined,
+      phaseLookahead: gameType === 'debate' ? 1 : undefined,
+      capture: false,
+    });
+    await pipeline.play(createStoredPlaybackSource(storedEvents));
+    session.close();
+    return;
   }
   const replayGame = enrichReplayPlayers(normalizeReplayGame(game));
   const sender = createPreparedSender(

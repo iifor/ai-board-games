@@ -78,7 +78,8 @@ function createActionWindowHandler() {
         runtime.gameEventBuilder.setGame(snapshot as unknown as Parameters<typeof runtime.gameEventBuilder.setGame>[0]);
       }
       const round = ensureRound(runtime.state, step.config.day!);
-      if (hasSelfDestruct(round as unknown as ReducerRound) && step.config.actionType === 'day_vote') {
+      if (hasSelfDestruct(round as unknown as ReducerRound) && step.config.actionType === 'day_vote'
+        && Number((round as { selfDestruct?: { day?: number } }).selfDestruct?.day) === Number(step.config.day)) {
         return skipAction(match, step, runtime);
       }
       if (step.config.actionType?.startsWith('sheriff_') && shouldSkipSheriffAction(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound, step.config.actionType)) {
@@ -108,6 +109,16 @@ function createActionWindowHandler() {
       const partialApplied = shouldApplyPartialResults(step) && partialResults.length > 0;
       if (partialApplied) {
         applyActionResults(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, partialResults);
+        // 放逐投票：每次投票后实时推送游戏状态到 C 端，使投票信息逐步展示
+        if (step.config.actionType === 'day_vote') {
+          publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+            builder.setStep(step.id).setPhase('day').setDay(step.config.day || 1);
+            return builder.build('vote-update', {
+              votes: (round as Record<string, unknown>).votes || {},
+              voteTally: (round as Record<string, unknown>).voteTally || {},
+            });
+          }, serializeWerewolfState(match, syncRuntimeState(runtime) as unknown as Record<string, unknown>));
+        }
         if (hasSelfDestruct(round as unknown as ReducerRound)) {
           applySelfDestruct(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound);
           return completeSelfDestructWindow({ match, step, runtime, round, state });
@@ -233,7 +244,7 @@ function createActionWindowHandler() {
 }
 
 function shouldApplyPartialResults(step: Step): boolean {
-  return Boolean(step.config.ordered && (step.config.actionType === 'wolf_speech' || step.config.actionType === 'day_speech'));
+  return Boolean(step.config.ordered && (step.config.actionType === 'wolf_speech' || step.config.actionType === 'day_speech' || step.config.actionType === 'day_vote'));
 }
 
 function completeSelfDestructWindow({ match, step, runtime, round, state }: {

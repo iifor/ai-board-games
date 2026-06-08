@@ -10,7 +10,7 @@ const WEREWOLF_NIGHT_PROMPTS: Record<string, string> = {
   seerWake: '预言家请睁眼。请选择要查验的玩家。',
   guardWake: '守卫请睁眼。请选择要守护的玩家。',
   witchAntidote: '女巫请睁眼。今晚它倒牌，你要救吗？',
-  witchPoison: '你有一瓶毒药，你要用吗？'
+  witchPoison: '女巫请睁眼。你有一瓶毒药，你要用吗？'
 } as const;
 
 const WEREWOLF_NIGHT_PROMPT_KEYS: Record<string, string> = {
@@ -105,6 +105,8 @@ function phaseStartedMessage(phase: string | undefined, _day: number | undefined
 function actionRequestedMessage(actionType?: string, day?: number): string {
   if (actionType === 'wolf_speech') return '狼人请睁眼';
   if (actionType === 'wolf_vote') return '狼人请投票';
+  if (actionType === 'day_vote') return '请选择白天放逐玩家';
+  if (actionType === 'day_speech') return '请开始发言';
   return `${roundPrefix(day)}${actionLabel(actionType)}`;
 }
 
@@ -131,10 +133,12 @@ function actionLabel(actionType?: string): string {
 const PHASE_START_MESSAGES: Record<string, string> = {
   seer_check: '预言家请睁眼，请选择查验的目标。',
   witch_save: '女巫请睁眼。',
-  witch_poison: '你有一瓶毒药，你要用吗？',
+  witch_poison: '女巫请睁眼。你有一瓶毒药，你要用吗？',
   guard_protect: '守卫请睁眼，请选择今晚守护的目标。',
   wolf_speech: '狼人请睁眼',
   wolf_vote: '请选择今晚目标',
+  day_vote: '请选择白天放逐玩家',
+  day_speech: '请开始发言',
 };
 
 function phaseStartMessage(actionType?: string, day?: number): string {

@@ -380,6 +380,8 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       if (fromId) {
         setHunterShotFromId(fromId);
         new Audio('/resources/public/gun.wav').play().catch(() => {});
+        // 3 秒后清除 gun.gif 覆盖层
+        setTimeout(() => setHunterShotFromId((prev) => prev === fromId ? null : prev), 3000);
       }
       return;
     }
@@ -405,15 +407,51 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
 
     // 处理阶段事件
     const workflowEvent = String(event.workflowEvent || '');
+    // 新夜晚开始（无 actionType 的纯 phase-start）：清除上一阶段的夜间行动状态
+    if (workflowEvent === 'phase-start' && !actionType) {
+      setNightActionType('');
+      setNightActionActorIds([]);
+      setSeerCheckTarget(null);
+      return;
+    }
     if (workflowEvent.startsWith('werewolf_phase_')) {
       mapActionTypeToNightAction(actionType, actorIds);
       return;
     }
 
-    if (actionType === 'wolf_speech' || actionType === 'wolf_vote' || actionType === 'wolf_kill') {
+    if (actionType === 'wolf_speech' || actionType === 'wolf_kill') {
       setNightActionType('wolf-wake');
       setNightActionActorIds(actorIds);
       setSeerCheckTarget(null);
+      return;
+    }
+    if (actionType === 'wolf_vote') {
+      if (workflowEvent === 'werewolf_action_submitted') {
+        // 狼人投票完成 → 闭眼，清除 GIF
+        setNightActionType('');
+        setNightActionActorIds([]);
+        setSeerCheckTarget(null);
+      } else {
+        setNightActionType('wolf-vote');
+        setNightActionActorIds(actorIds);
+        setSeerCheckTarget(null);
+      }
+      return;
+    }
+    // 预言家查验结果：主持人播报时展示 gif
+    if (workflowEvent === 'seer-check') {
+      setNightActionType('seer-check');
+      setNightActionActorIds(actorIds);
+      setSeerCheckTarget(null);
+      return;
+    }
+    // 猎人开枪：触发前端 gun.gif 动画和枪声音效
+    if (actionType === 'hunter_shot') {
+      const fromId = Number((event.shot as { from?: number } | undefined)?.from) || null;
+      if (fromId) {
+        setHunterShotFromId(fromId);
+        new Audio('/resources/public/gun.wav').play().catch(() => {});
+      }
       return;
     }
     if (actionType) {
@@ -424,12 +462,17 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
   }
 
   function mapActionTypeToNightAction(actionType: string, actorIds: number[]): void {
-    if (actionType === 'wolf_speech' || actionType === 'wolf_vote' || actionType === 'wolf_kill') {
+    if (actionType === 'wolf_speech' || actionType === 'wolf_kill') {
       setNightActionType('wolf-wake');
       setNightActionActorIds(actorIds);
       setSeerCheckTarget(null);
+    } else if (actionType === 'wolf_vote') {
+      setNightActionType('wolf-vote');
+      setNightActionActorIds(actorIds);
+      setSeerCheckTarget(null);
     } else if (actionType === 'seer_check') {
-      setNightActionType('seer-wake');
+      // 预言家查验阶段：睁眼 + 选择目标 → 不显示 GIF，等结果出来后再显示
+      setNightActionType('');
       setNightActionActorIds(actorIds);
       setSeerCheckTarget(null);
     } else if (actionType === 'guard_protect') {
@@ -470,6 +513,11 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       'witch-antidote',
       'witch-poison',
       'witch-action',
+      'last-words',
+      'exile-words',
+      'hunter-shot',
+      'idiot-reveal',
+      'vote-result',
     ].includes(workflowEvent)) {
       return workflowEvent;
     }
@@ -482,6 +530,9 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     if (actionType === 'guard_protect') return 'guard-wake';
     if (actionType === 'witch_save') return 'witch-antidote';
     if (actionType === 'witch_poison') return 'witch-poison';
+    if (actionType === 'hunter_shot') return 'hunter-shot';
+    if (actionType === 'day_vote') return 'day-vote';
+    if (actionType === 'day_speech') return 'day-speech';
     return '';
   }
 

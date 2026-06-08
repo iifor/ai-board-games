@@ -30,42 +30,61 @@ function isWerewolfDebugMode(runtime: { state?: Record<string, unknown>; config?
 function runDebugWerewolfAction(runtime: DebugRuntime, round: DebugRound, actor: DebugAgent, actionType: string): Record<string, unknown> {
   const alive = (runtime.agents || []).filter((agent) => agent.alive !== false);
   if (actionType === 'wolf_kill') {
-    return { target: firstTarget(alive, actor, (agent) => agent.faction !== 'wolves'), speech: debugSpeech(actor, runtime.agents), thinking: '' };
+    return { target: randomTarget(alive, actor, (agent) => agent.faction !== 'wolves'), speech: debugSpeech(actor, runtime.agents), thinking: '' };
   }
   if (actionType === 'wolf_speech') return { speech: debugSpeech(actor, runtime.agents), thinking: '' };
-  if (actionType === 'wolf_vote') return { target: firstTarget(alive, actor, (agent) => agent.faction !== 'wolves') };
+  if (actionType === 'wolf_vote') return { target: randomTarget(alive, actor, (agent) => agent.faction !== 'wolves') };
   if (actionType === 'seer_check') {
-    const target = firstTarget(alive, actor, (agent) => Number(agent.id) !== Number(actor.id));
+    const target = randomTarget(alive, actor);
     const targetAgent = alive.find((agent) => Number(agent.id) === Number(target));
     return { target, result: targetAgent?.faction === 'wolves' ? '狼人' : '好人' };
   }
   if (actionType === 'guard_protect') {
-    return { target: firstTarget(alive, actor, (agent) => Number(agent.id) !== Number(actor.lastGuardTarget)) };
+    return { target: randomTarget(alive, actor, (agent) => Number(agent.id) !== Number(actor.lastGuardTarget)) };
   }
-  if (actionType === 'witch_save') return { use: false };
-  if (actionType === 'witch_poison') return { use: false, target: null };
+  if (actionType === 'witch_save') {
+    const wolfTarget = round.night?.wolfTarget;
+    if (wolfTarget != null && alive.some((agent) => Number(agent.id) === Number(wolfTarget))) {
+      return { use: true, reason: 'debug-auto-save' };
+    }
+    return { use: false };
+  }
+  if (actionType === 'witch_poison') {
+    const candidates = alive.filter((agent) => Number(agent.id) !== Number(actor.id));
+    if (!candidates.length) return { use: false, target: null };
+    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    return { use: true, target: target.id ?? null, targetSeat: target.id ?? null, reason: 'debug-random' };
+  }
   if (actionType === 'day_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
-  if (actionType === 'day_vote') return { target: firstTarget(alive, actor, (agent) => Number(agent.id) !== Number(actor.id)) };
-  if (actionType === 'sheriff_signup') return { run: false };
+  if (actionType === 'day_vote') return { target: randomTarget(alive, actor) };
+  if (actionType === 'sheriff_signup') return { run: Math.random() < 0.5 };
   if (actionType === 'sheriff_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
   if (actionType === 'sheriff_withdraw') return { withdraw: false };
-  if (actionType === 'sheriff_vote') return { target: firstSheriffTarget(round, alive, actor) };
+  if (actionType === 'sheriff_vote') return { target: randomSheriffTarget(round, alive, actor) };
   if (actionType === 'sheriff_runoff_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
-  if (actionType === 'sheriff_runoff_vote') return { target: firstSheriffTarget(round, alive, actor, 'runoffCandidateIds') };
-  if (actionType === 'sheriff_speech_direction') return { direction: 'clockwise', reason: 'debug-direction' };
+  if (actionType === 'sheriff_runoff_vote') return { target: randomSheriffTarget(round, alive, actor, 'runoffCandidateIds') };
+  if (actionType === 'sheriff_speech_direction') {
+    const dir = Math.random() < 0.5 ? 'clockwise' : 'counterclockwise';
+    return { direction: dir, reason: 'debug-random' };
+  }
   return {};
 }
 
 function runDebugHunterAction(runtime: DebugRuntime, actor: DebugAgent): Record<string, unknown> {
   const alive = (runtime.agents || []).filter((agent) => agent.alive !== false && Number(agent.id) !== Number(actor.id));
-  return { target: alive[0]?.id || null };
+  if (!alive.length) return { target: null };
+  const target = alive[Math.floor(Math.random() * alive.length)];
+  return { target: target?.id ?? null };
 }
 
 function runDebugSheriffBadgeAction(runtime: DebugRuntime, actor: DebugAgent): Record<string, unknown> {
-  const target = (runtime.agents || []).find((agent) => agent.alive !== false && Number(agent.id) !== Number(actor.id));
-  return target
+  const candidates = (runtime.agents || []).filter((agent) => agent.alive !== false && Number(agent.id) !== Number(actor.id));
+  if (!candidates.length) return { action: 'tear', target: null, reason: 'no-valid-target' };
+  const target = candidates[Math.floor(Math.random() * candidates.length)];
+  // 50% 概率移交，50% 概率撕毁
+  return Math.random() < 0.5
     ? { action: 'transfer', target: target.id, reason: 'debug-transfer' }
-    : { action: 'tear', target: null, reason: 'no-valid-target' };
+    : { action: 'tear', target: null, reason: 'debug-tear' };
 }
 
 function debugSpeech(actor: DebugAgent, agents?: DebugAgent[]): string {
@@ -74,16 +93,41 @@ function debugSpeech(actor: DebugAgent, agents?: DebugAgent[]): string {
   return `${seatNumber}号发言`;
 }
 
-function firstTarget(alive: DebugAgent[], actor: DebugAgent, predicate: (agent: DebugAgent) => boolean): number | null {
-  const target = alive.find(predicate) || alive.find((agent) => Number(agent.id) !== Number(actor.id)) || alive[0];
-  return target?.id || null;
+/** 从候选列表中随机选取一名目标，排除 actor 自身，可附加 predicate 过滤 */
+function randomTarget(
+  candidates: DebugAgent[],
+  actor: DebugAgent,
+  predicate?: (agent: DebugAgent) => boolean,
+): number | null {
+  const filtered = candidates.filter((agent) => {
+    if (Number(agent.id) === Number(actor.id)) return false;
+    if (predicate && !predicate(agent)) return false;
+    return true;
+  });
+  if (!filtered.length) {
+    // 回退：只排除自身
+    const fallback = candidates.filter((agent) => Number(agent.id) !== Number(actor.id));
+    if (!fallback.length) return null;
+    return fallback[Math.floor(Math.random() * fallback.length)].id ?? null;
+  }
+  return filtered[Math.floor(Math.random() * filtered.length)].id ?? null;
 }
 
-function firstSheriffTarget(round: DebugRound, alive: DebugAgent[], actor: DebugAgent, key: 'candidates' | 'runoffCandidateIds' = 'candidates'): number | null {
+/** 从警长候选人列表中随机选取目标 */
+function randomSheriffTarget(
+  round: DebugRound,
+  alive: DebugAgent[],
+  actor: DebugAgent,
+  key: 'candidates' | 'runoffCandidateIds' = 'candidates',
+): number | null {
   const election = round.sheriffElection || {};
-  const ids = Array.isArray(election[key]) ? election[key] as number[] : [];
-  const target = ids.find((id) => Number(id) !== Number(actor.id)) || ids[0];
-  return target || firstTarget(alive, actor, (agent) => Number(agent.id) !== Number(actor.id));
+  const ids = Array.isArray(election[key]) ? (election[key] as number[]) : [];
+  const validIds = ids.filter((id) => Number(id) !== Number(actor.id));
+  if (validIds.length) {
+    return validIds[Math.floor(Math.random() * validIds.length)] ?? null;
+  }
+  // 回退到随机存活非己玩家
+  return randomTarget(alive, actor);
 }
 
 export {

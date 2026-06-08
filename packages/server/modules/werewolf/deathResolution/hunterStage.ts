@@ -11,7 +11,7 @@ import { applyHunterShot } from '../effects';
 import { findPendingHunter } from '../reducers';
 import type { Agent as ReducerAgent, Round as ReducerRound } from '../reducers';
 import { syncRuntimeState } from '../runtime';
-import { createWerewolfEvent } from '../handlers/common';
+import { createWerewolfEvent, publishGameEvent } from '../handlers/common';
 import { actionRequestedMessage, actionResolvedMessage } from '../messages';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import { recordWorkflowEffects } from '../../workflow-engine/effects';
@@ -146,6 +146,17 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
       }],
     });
   }
+  // 发布猎人开枪事件到 EventBus（实时推送管道，供 C 端 gun.gif + gun.wav）
+  publishGameEvent(context.runtime.eventBus, context.runtime.gameEventBuilder, (builder) => {
+    builder.setStep(context.step.id);
+    builder.setPhase((context.step.config.phase as 'night' | 'day') || 'day');
+    builder.setDay(context.round.day || 1);
+    const shotMessage = `${actorId}号猎人开枪带走${target}号。`;
+    return builder.build('hunter-shot', {
+      shot: { from: actorId, target },
+      message: shotMessage,
+    });
+  });
   appendUnique(context.checkpoint.completedHunterIds, actorId);
   context.state = {
     ...syncRuntimeState(context.runtime),

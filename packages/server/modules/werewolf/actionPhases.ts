@@ -70,7 +70,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     actionType: 'witch_poison',
     roleName: '女巫',
     buildMessages: (_day: number, context?: PhaseContext) => ({
-      start: `你有一瓶毒药，你要用吗？`,
+      start: `女巫请睁眼。你有一瓶毒药，你要用吗？`,
       result: context?.witchPoisonUsed
         ? context.witchPoisonReason?.trim() || `女巫毒了${context.target || '?'}号`
         : ``,
@@ -86,6 +86,24 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
         ? `守卫守护了${context.guardTarget}号。`
         : `守卫选择空守。`,
       end: `守卫请闭眼。`,
+    }),
+  },
+  day_speech: {
+    actionType: 'day_speech',
+    roleName: '所有玩家',
+    buildMessages: () => ({
+      start: '请开始发言',
+      result: '',
+      end: '发言结束',
+    }),
+  },
+  day_vote: {
+    actionType: 'day_vote',
+    roleName: '所有玩家',
+    buildMessages: () => ({
+      start: '请选择白天放逐玩家',
+      result: '',
+      end: '投票结束',
     }),
   },
 };

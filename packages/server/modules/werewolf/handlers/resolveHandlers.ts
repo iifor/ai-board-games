@@ -117,6 +117,20 @@ function createExileResolveHandler() {
         checkpoint.initialDeathIds = resolved.exile ? [Number(resolved.exile.id)] : [];
         recordInitialEffects(context, resolved.effects as unknown as Array<Record<string, unknown>>);
         enqueueExileLastWords(round, resolved.exile?.id);
+        // 白痴翻牌：发布播报事件到 EventBus（携带 game snapshot 供 C 端更新 round.idiotReveal）
+        if (round.idiotReveal) {
+          const snapshot = serializeWerewolfState(context.match, syncRuntimeState(runtime));
+          publishGameEvent(context.runtime.eventBus, context.runtime.gameEventBuilder, (builder) => {
+            builder.setStep(context.step.id);
+            builder.setPhase('day');
+            builder.setDay(context.step.config.day || 1);
+            return builder.build('idiot-reveal', {
+              playerId: round.idiotReveal.id,
+              idiotReveal: { id: round.idiotReveal.id },
+              message: `${getSeatNumber(Number(round.idiotReveal.id), context.runtime.agents)}号白痴翻牌`,
+            });
+          }, snapshot);
+        }
       } else {
         enqueueExileLastWords(round, checkpoint.initialDeathIds[0]);
       }
@@ -147,7 +161,7 @@ function publishExileResultOnce(context: DeathResolutionContext): void {
       (context.round.votes as Record<string, number | null> | undefined) || {},
       (context.round.voteTally as Record<string, number> | undefined) || {},
       exile,
-      `${getSeatNumber(exile.id, context.runtime.agents)}号玩家被放逐`,
+      `${getSeatNumber(exile.id, context.runtime.agents)}号玩家被放逐，请发表遗言`,
     );
   }, serializeWerewolfState(context.match, context.state as unknown as Record<string, unknown>));
 }

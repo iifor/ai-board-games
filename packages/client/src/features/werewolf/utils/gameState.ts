@@ -137,6 +137,10 @@ function extractEventRound(event: GameEvent): WerewolfRound | null {
     }
   }
 
+  if (event.type === 'idiot-reveal' && event.idiotReveal) {
+    patch.idiotReveal = event.idiotReveal as WerewolfRound['idiotReveal'];
+  }
+
   return Object.keys(patch).length > 0 ? patch : null;
 }
 
