@@ -39,6 +39,10 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
   if (eventType === 'witch-action' && actionType === 'witch_poison' && input.actionUsed === false) {
     return silent('女巫没有使用毒药', 'status', 'witch-poison-result', false);
   }
+  // phase-end：白天环节结束不语音播报（发言结束/投票结束）—— 必须在 speech 之前检查
+  if (eventType === 'phase-end' && (actionType === 'day_speech' || actionType === 'day_vote')) {
+    return silent(message || actionDisplayText(actionType, '结束'), 'status', `${actionType}-end`);
+  }
   if (eventType === 'speech' || actionType === 'day_speech') {
     return speak(speechText || message, '玩家发言', 'speech', 'player-speech');
   }
@@ -50,6 +54,10 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
   }
   if (eventType === 'self-destruct' || workflowEvent === 'werewolf_self_destruct') {
     return speak(speechText || message || '狼人自爆。', '狼人自爆', 'speech', 'self-destruct');
+  }
+  // wolf-vote 结果事件静默（仅展示刀口数据，不播报"夜间刀口完成"）
+  if (eventType === 'wolf-vote') {
+    return silent(message || '狼队投票完成', 'badge', 'wolf-vote-result');
   }
 
   if (eventType === 'last-words' || eventType === 'exile-words') {
