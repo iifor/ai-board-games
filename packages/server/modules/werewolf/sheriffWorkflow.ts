@@ -1,5 +1,5 @@
 import { countTargets } from './winCheck';
-import { getTopCandidateIds, sortBySeat } from './utils';
+import { getTopCandidateIds, shuffle, sortBySeat } from './utils';
 import type { ActionResult, Agent, Round, Runtime } from './reducers';
 
 interface SheriffElection {
@@ -67,7 +67,7 @@ function getSheriffActorsForAction(runtime: Runtime, round: Round, actionType: s
   const alive = sortBySeat(runtime.agents.filter((agent) => agent.alive));
   const election = ensureSheriffElection(round);
   if (actionType === 'sheriff_signup') return alive;
-  if (actionType === 'sheriff_speech') return byIds(alive, election.signedUpIds);
+  if (actionType === 'sheriff_speech') return shuffle(byIds(alive, election.signedUpIds));
   if (actionType === 'sheriff_withdraw') return byIds(alive, election.signedUpIds);
   if (actionType === 'sheriff_vote') {
     if (!election.candidates.length) return [];
@@ -77,7 +77,7 @@ function getSheriffActorsForAction(runtime: Runtime, round: Round, actionType: s
       && !election.withdrawnIds.includes(Number(agent.id))
     ));
   }
-  if (actionType === 'sheriff_runoff_speech') return byIds(alive, election.runoffCandidateIds);
+  if (actionType === 'sheriff_runoff_speech') return shuffle(byIds(alive, election.runoffCandidateIds));
   if (actionType === 'sheriff_runoff_vote') {
     if (election.runoffCandidateIds.length <= 1) return [];
     return alive.filter((agent) => (

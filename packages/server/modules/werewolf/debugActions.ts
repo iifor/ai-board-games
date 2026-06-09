@@ -45,11 +45,12 @@ function runDebugWerewolfAction(runtime: DebugRuntime, round: DebugRound, actor:
   if (actionType === 'witch_save') {
     const wolfTarget = round.night?.wolfTarget;
     if (wolfTarget != null && alive.some((agent) => Number(agent.id) === Number(wolfTarget))) {
-      return { use: true, reason: 'debug-auto-save' };
+      return { use: Math.random() < 0.8, reason: 'debug-auto-save' };
     }
     return { use: false };
   }
   if (actionType === 'witch_poison') {
+    if (Math.random() >= 0.8) return { use: false, target: null };
     const candidates = alive.filter((agent) => Number(agent.id) !== Number(actor.id));
     if (!candidates.length) return { use: false, target: null };
     const target = candidates[Math.floor(Math.random() * candidates.length)];

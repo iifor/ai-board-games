@@ -39,7 +39,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     actionType: 'wolf_vote',
     roleName: '狼人',
     buildMessages: () => ({
-      start: `请选择今晚目标`,
+      start: `选择今晚刀口`,
       result: '',
       end: `狼人请闭眼`,
     }),
@@ -50,7 +50,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `预言家请睁眼，请选择查验的目标`,
       result: context?.seerResult
-        ? `${context.target || '?'}号玩家的查验结果是：${context.seerResult}`
+        ? `${context.target || '?'}号玩家的身份是：${context.seerResult}`
         : '',
       end: `预言家请闭眼`,
     }),

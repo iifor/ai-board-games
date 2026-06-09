@@ -97,13 +97,35 @@ interface NarrationEvent {
 
 function getNarration(event: NarrationEvent): string {
   if (event.presentation?.suppressSpeech) return '';
+  // 状态事件（行动完成/阶段结束）不播报，必须在 speakableText 之前检查
+  if (isWerewolfStatusEvent(event)) return '';
   if (event.presentation?.speakableText) return event.presentation.speakableText;
   if (event.game?.type === 'werewolf') return getWerewolfNarration(event);
   if (event.game?.type === 'debate') return getDebateNarration(event);
   return event.message || '';
 }
 
+/** 行动完成 / 阶段结束：仅状态提示，不播报 */
+function isWerewolfStatusEvent(event: NarrationEvent): boolean {
+  const wf = String(event.workflowEvent || '');
+  const evType = String(event.type || '');
+  // 行动完成（xxx完成）—— EventBus(action-submitted) + legacy(werewolf_action_submitted)
+  if (wf === 'werewolf_action_submitted' || wf === 'action-submitted') return true;
+  if (evType === 'werewolf_action_submitted' || evType === 'action-submitted') return true;
+  // 阶段结束：夜间闭眼类保留，白天环节结束不播报 —— EventBus(phase-end) + legacy(werewolf_phase_end)
+  if (wf === 'werewolf_phase_end' || wf === 'phase-end'
+      || evType === 'werewolf_phase_end' || evType === 'phase-end') {
+    const at = String((event as Record<string, unknown>).actionType || '');
+    if (at === 'wolf_vote' || at === 'wolf_speech') return false; // 狼人请闭眼 保留
+    if (at === 'seer_check' || at === 'guard_protect' || at === 'witch_poison') return false; // 角色闭眼 保留
+    return true; // 白天环节（发言结束/投票结束 等）不播报
+  }
+  return false;
+}
+
 function getWerewolfNarration(event: NarrationEvent): string {
+  // 行动完成 / 阶段结束：仅状态提示，不播报
+  if (isWerewolfStatusEvent(event)) return '';
   if (event.type === 'players') return '';
   if (event.type === 'phase-start') return event.message || '天黑请闭眼';
   if (event.type === 'wolf-wake') return event.message || getWerewolfNightPrompt('wolf-wake');
@@ -152,14 +174,17 @@ function getSheriffVoteNarration(round: RoundData = {}, runoff: boolean): string
   const tally = runoff ? election.runoffTally : election.tally;
   const entries = Object.entries(tally || {}).sort((a, b) => Number(b[1]) - Number(a[1]));
   if (!entries.length)
-    return runoff ? '警长复投未产生有效票型。' : '警长竞选投票未产生有效票型。';
+    return '未产生有效票型，本局没有警长';
   const topCount = Number(entries[0][1]);
   const topIds = entries
     .filter(([, count]) => Number(count) === topCount)
     .map(([id]) => Number(id));
-  if (topIds.length > 1)
-    return `${runoff ? '警长复投' : '警长竞选投票'}平票：${topIds.map((id) => `${id}号`).join('、')}。`;
-  return `${runoff ? '警长复投' : '警长竞选投票'}最高票为${topIds[0]}号。`;
+  if (topIds.length > 1) {
+    return runoff
+      ? '未产生有效票型，本局没有警长'
+      : `${topIds.map((id) => `${id}号`).join('和')}票数相同，进行警长复选`;
+  }
+  return `${topIds[0]}号当选警长`;
 }
 
 function getSeerCheckNarration(check: SeerCheckData = {}): string {
@@ -168,16 +193,9 @@ function getSeerCheckNarration(check: SeerCheckData = {}): string {
 }
 
 function getWerewolfSpeechOrderNarration(round: RoundData = {}): string {
-  if (round.daySpeech?.source === 'sheriff') {
-    if (round.daySpeech.anchorPlayerId) {
-      return `警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，从${round.daySpeech.startPlayerId}号开始发言`;
-    }
-    return `警长决定${round.daySpeech.direction === 'counterclockwise' ? '逆时针' : '顺时针'}发言，${round.daySpeech.startPlayerId}号发言`;
-  }
-  if (round.daySpeech?.source === 'night-death') {
-    return `从${round.daySpeech.startPlayerId}号开始发言。`;
-  }
-  return round.daySpeech?.startPlayerId ? `从${round.daySpeech.startPlayerId}号开始发言` : '';
+  // 复用 announcements 中的统一逻辑
+  const { buildDaySpeechOrderAnnouncement } = require('../werewolf/prompts/announcements');
+  return buildDaySpeechOrderAnnouncement(round as Record<string, unknown>) || '';
 }
 
 function getSheriffBadgeNarration(transfer: SheriffTransferData = {}): string {
@@ -231,5 +249,6 @@ export {
   getWerewolfSpeechOrderNarration,
   getSheriffBadgeNarration,
   getDebatePlayerLabel,
+  isWerewolfStatusEvent,
 };
 export type { NarrationEvent };

@@ -10,4 +10,5 @@ export {
   phaseStartMessage,
   phaseResultMessage,
   phaseEndMessage,
+  buildDaySpeechOrderAnnouncement,
 } from './prompts/announcements';

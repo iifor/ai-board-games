@@ -1,7 +1,7 @@
 import { getVoicePackage } from '../voices';
 import { isServerTtsVoice, prepareVoiceAudio } from '../tts';
 import { stripSpeechParentheses } from '../../services/text/playableText';
-import { getNarration } from './narration';
+import { getNarration, isWerewolfStatusEvent } from './narration';
 import { getActiveTrace, recordEvent } from '../observability';
 import type { NarrationEvent } from './narration';
 import type { VoicePackage } from '../../types/api';
@@ -87,7 +87,12 @@ function cloneEvent(event: NarrationEvent): NarrationEvent {
 }
 
 function withNarration(event: NarrationEvent): NarrationEvent {
-  return { ...event, narration: getNarration(event) };
+  const narration = getNarration(event);
+  // 状态事件：同时清除 message，防止前端 extractNarration fallback 读出文本
+  if (!narration && isWerewolfStatusEvent(event)) {
+    return { ...event, narration: '', message: '' };
+  }
+  return { ...event, narration };
 }
 
 async function prepareEventMedia(event: NarrationEvent): Promise<MediaEvent> {
@@ -194,7 +199,9 @@ function getPlayableEventText(event: NarrationEvent): string {
   if (event.speech?.text) return String(event.speech.text).trim();
   if (event.testimony?.text) return String(event.testimony.text).trim();
   if (event.testimony?.testimony) return String(event.testimony.testimony).trim();
-  return String(event.narration || event.message || '').trim();
+  // event.narration 已由 getNarration() 统一处理，不再 fallback 到 event.message
+  // 避免 status event（isWerewolfStatusEvent 返回 ''）被 message 中的文本绕过
+  return String(event.narration || '').trim();
 }
 
 function withPlayableDetails(event: NarrationEvent, fullText: string): MediaEvent {

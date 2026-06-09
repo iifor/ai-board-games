@@ -23,7 +23,7 @@ import { ensureWolfTeamContext } from '../wolfTeam';
 import { runActionWindowAiTask, validateActionWindowAiResult } from '../aiActions';
 import { createWerewolfEvent, publishGameEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
-import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage, phaseStartMessage, phaseResultMessage, phaseEndMessage } from '../messages';
+import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage, phaseStartMessage, phaseResultMessage, phaseEndMessage, buildDaySpeechOrderAnnouncement } from '../messages';
 import { hasActionPhase, getActionPhaseConfig } from '../actionPhases';
 import { resolveActionChannel } from './actionChannel';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
@@ -482,12 +482,17 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
 
   // 添加阶段开始事件（预言家、女巫、守卫等）
   if (hasActionPhase(step.config.actionType || '')) {
+    // 白天发言：根据发言顺序生成动态播报，而非固定"请开始发言"
+    const phaseStartMsg = step.config.actionType === 'day_speech'
+      ? buildDaySpeechOrderAnnouncement(round) || phaseStartMessage(step.config.actionType, step.config.day)
+      : phaseStartMessage(step.config.actionType, step.config.day);
+
     events.push(createWerewolfEvent(
       match,
       step,
       nextState as unknown as Record<string, unknown>,
       'werewolf_phase_start',
-      phaseStartMessage(step.config.actionType, step.config.day),
+      phaseStartMsg,
       { actionType: step.config.actionType },
       { channel: CHANNEL_TYPES.PUBLIC }
     ));
@@ -502,7 +507,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
         return builder.build('phase-start', {
           phase: step.config.phase || 'night',
           actionType: step.config.actionType,
-          message: phaseStartMessage(step.config.actionType, step.config.day),
+          message: phaseStartMsg,
         });
       });
     }
