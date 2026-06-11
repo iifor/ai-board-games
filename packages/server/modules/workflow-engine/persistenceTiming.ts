@@ -80,7 +80,7 @@ function finishPersistenceTiming(
   };
   const serialized = JSON.stringify(payload);
   if (totalMs >= SLOW_PERSISTENCE_MS) console.warn(serialized);
-  else console.info(serialized);
+  // else console.info(serialized);
 }
 
 function readDatabaseFileSizes(): DatabaseFileSizes {

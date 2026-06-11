@@ -1,4 +1,4 @@
-import { callOpenAIChat, callModelChatWithThinking, parseJsonObject } from '../llm';
+import { callOpenAIChat, callModelChatWithThinking, parseJsonObject, LLM_THINKING_MAX_TOKENS_CAP } from '../llm';
 import { AgentSkillRegistry, AgentSkill } from './skillRegistry';
 import { FallbackEntry } from './fallbackAudit';
 import { getActiveTrace, recordEvent } from '../observability';
@@ -130,7 +130,12 @@ class BasePlayerAgent {
     }
     try {
       const reply = await this.call(prompt, options.maxTokens || 800);
-      return normalizeText(reply, limit);
+      const text = normalizeText(reply, limit);
+      if (!text) {
+        this.recordError(options.skillId || 'player-text', 'empty-response', options);
+        return null;
+      }
+      return text;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.recordError(options.skillId || 'player-text', err.message, options);
@@ -146,7 +151,12 @@ class BasePlayerAgent {
     }
     try {
       const reply = await this.callOnce(options.messages || this.buildOneShotMessages(prompt), options.maxTokens || 800);
-      return normalizeText(reply, limit);
+      const text = normalizeText(reply, limit);
+      if (!text) {
+        this.recordError(options.skillId || 'player-text', 'empty-response', options);
+        return null;
+      }
+      return text;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.recordError(options.skillId || 'player-text', err.message, options);
@@ -363,8 +373,17 @@ class BasePlayerAgent {
       return null;
     }
     try {
-      const { content, thinking } = await this.callWithThinking(prompt, options.maxTokens || 800);
-      return { content: normalizeText(content, limit), thinking };
+      // thinking 模式下限制 maxTokens 上限，避免 reasoning 消耗全部 token 预算导致 content 为空
+      const maxTokens = this.thinkingEnabled
+        ? Math.min(options.maxTokens || 800, LLM_THINKING_MAX_TOKENS_CAP)
+        : (options.maxTokens || 800);
+      const { content, thinking } = await this.callWithThinking(prompt, maxTokens);
+      const text = normalizeText(content, limit);
+      if (!text) {
+        this.recordError(options.skillId || 'player-text', 'empty-response', options);
+        return null;
+      }
+      return { content: text, thinking };
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.recordError(options.skillId || 'player-text', err.message, options);
@@ -379,6 +398,10 @@ class BasePlayerAgent {
       return null;
     }
     try {
+      // thinking 模式下限制 maxTokens 上限，避免 reasoning 消耗全部 token 预算导致 content 为空
+      const maxTokens = this.thinkingEnabled
+        ? Math.min(options.maxTokens || 800, LLM_THINKING_MAX_TOKENS_CAP)
+        : (options.maxTokens || 800);
       const result = await callModelChatWithThinking({
         apiKey: this.player.apiKey!,
         baseUrl: this.player.baseUrl,
@@ -387,13 +410,18 @@ class BasePlayerAgent {
         apiFormat: this.player.apiFormat,
         temperature: this.player.temperature,
         messages: options.messages || this.buildOneShotMessages(prompt),
-        maxTokens: options.maxTokens || 800,
+        maxTokens,
         _gameId: this.gameId,
         _playerId: this.player.id,
         _playerRole: this.resolveRole(this.player),
         _playerFaction: this.resolveFaction(this.player)
       });
-      return { content: normalizeText(result.content, limit), thinking: result.thinking };
+      const text = normalizeText(result.content, limit);
+      if (!text) {
+        this.recordError(options.skillId || 'player-text', 'empty-response', options);
+        return null;
+      }
+      return { content: text, thinking: result.thinking };
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.recordError(options.skillId || 'player-text', err.message, options);

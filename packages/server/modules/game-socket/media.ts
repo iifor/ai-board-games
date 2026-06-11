@@ -6,7 +6,7 @@ import { getActiveTrace, recordEvent } from '../observability';
 import type { NarrationEvent } from './narration';
 import type { VoicePackage } from '../../types/api';
 
-const TTS_PREPARE_TIMEOUT_MS = 8000;
+const TTS_PREPARE_TIMEOUT_MS = 15000;
 
 interface SpeechData {
   text?: string;

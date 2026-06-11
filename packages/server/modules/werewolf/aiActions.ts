@@ -432,6 +432,11 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
     }
   }
 
+  // 发言为空时的兜底占位，避免空内容进入前端播放
+  if (!speechText.trim()) {
+    speechText = '（沉默）';
+  }
+
   const result: Record<string, unknown> = { text: speechText, thinking: thinkingText };
 
   // 狼人自爆检查
@@ -515,10 +520,11 @@ async function runSheriffSpeechAction(runtime: Runtime, round: Round, actor: Age
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result: any = await askSheriffSpeech(actor, round.day, '公开信息已通过上下文同步。', runoff, { thinking: actor.thinkingEnabled && actor.playerAgent.thinkingEnabled, promptOverride: prompt });
   if (result) {
-    if (typeof result === 'string') return { text: result, thinking: '' };
-    return { text: result.content || '', thinking: result.thinking || '' };
+    if (typeof result === 'string') return { text: result || '（沉默）', thinking: '' };
+    const text = result.content || '';
+    return { text: text || '（沉默）', thinking: result.thinking || '' };
   }
-  return { text: '', thinking: '' };
+  return { text: '（沉默）', thinking: '' };
 }
 
 async function runSheriffWithdrawAction(runtime: Runtime, round: Round, actor: Agent): Promise<Record<string, unknown>> {

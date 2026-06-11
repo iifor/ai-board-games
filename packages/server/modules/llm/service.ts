@@ -1,5 +1,6 @@
 import { getFetchFailureHint, normalizeBaseUrl } from './utils';
 import { extractTokenUsage } from '../observability/pricing';
+import { LLM_REQUEST_TIMEOUT_MS } from './constants';
 
 // Observability: lazy-loaded to avoid circular deps
 let _obs: unknown = null;
@@ -111,6 +112,11 @@ async function callOpenAIChatRaw({
   const endpoint = `${normalizeBaseUrl(baseUrl, 'https://api.openai.com/v1', 'Base URL').replace(/\/$/, '')}/chat/completions`;
   let response: Response;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(
+    new Error(`LLM request timeout after ${LLM_REQUEST_TIMEOUT_MS}ms`)
+  ), LLM_REQUEST_TIMEOUT_MS);
+
   try {
     response = await fetch(endpoint, {
       method: 'POST',
@@ -123,7 +129,8 @@ async function callOpenAIChatRaw({
         messages,
         temperature,
         max_tokens: maxTokens
-      })
+      }),
+      signal: controller.signal,
     });
   } catch (error) {
     const latencyMs = Date.now() - _startedAt;
@@ -133,6 +140,8 @@ async function callOpenAIChatRaw({
       obs!.endSpan(span, 'error', {}, error);
     }
     throw new Error(`[${provider}:${model}] ${getFetchFailureHint(error, endpoint)}`);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!response.ok) {
@@ -282,6 +291,11 @@ async function callAnthropicChatRaw({
     }));
   let response: Response;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(
+    new Error(`LLM request timeout after ${LLM_REQUEST_TIMEOUT_MS}ms`)
+  ), LLM_REQUEST_TIMEOUT_MS);
+
   try {
     response = await fetch(endpoint, {
       method: 'POST',
@@ -296,7 +310,8 @@ async function callAnthropicChatRaw({
         messages: conversation.length ? conversation : [{ role: 'user', content: 'ping' }],
         temperature,
         max_tokens: maxTokens
-      })
+      }),
+      signal: controller.signal,
     });
   } catch (error) {
     const latencyMs = Date.now() - _startedAt;
@@ -306,6 +321,8 @@ async function callAnthropicChatRaw({
       obs!.endSpan(span, 'error', {}, error);
     }
     throw new Error(`[${provider}:${model}] ${getFetchFailureHint(error, endpoint)}`);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!response.ok) {
