@@ -20,6 +20,7 @@ interface PresentationInput {
 
 const SILENT_ACTIONS = new Set([
   'wolf_vote',
+  'mvp_vote',
 ]);
 
 const PHASE_ACTION_TYPES = new Set([
@@ -35,6 +36,19 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
   const eventType = String(input.eventType || '');
   const message = String(input.message || '');
   const speechText = String(input.speechText || '');
+
+  if (eventType === 'mvp-vote') {
+    return silent(message, 'badge', 'mvp-vote', false);
+  }
+  if (eventType === 'mvp-start') {
+    return speak(message, message, 'status', 'mvp-start');
+  }
+  if (eventType === 'mvp-result') {
+    return speak(message, message, 'status', 'mvp-result');
+  }
+  if (eventType === 'speech' && actionType === 'postgame_speech') {
+    return speak(speechText || message, '赛后感言', 'speech', 'postgame-speech');
+  }
 
   if (eventType === 'witch-action' && actionType === 'witch_poison' && input.actionUsed === false) {
     return silent('女巫没有使用毒药', 'status', 'witch-poison-result', false);
@@ -150,7 +164,7 @@ function inferActionType(stepId?: string): string {
     'wolf_speech', 'wolf_vote', 'seer_check', 'guard_protect', 'witch_save',
     'witch_poison', 'day_speech', 'day_vote', 'sheriff_signup',
     'sheriff_speech', 'sheriff_withdraw', 'sheriff_vote',
-    'sheriff_runoff_speech', 'sheriff_runoff_vote'
+    'sheriff_runoff_speech', 'sheriff_runoff_vote', 'mvp_vote', 'postgame_speech'
   ];
   return known.find((action) => id.startsWith(action)) || '';
 }
@@ -170,7 +184,9 @@ function actionDisplayText(actionType: string, suffix: string): string {
     seer_check: '预言家查验',
     guard_protect: '守卫守护',
     witch_save: '女巫解药',
-    witch_poison: '女巫毒药'
+    witch_poison: '女巫毒药',
+    mvp_vote: 'MVP投票',
+    postgame_speech: '赛后感言',
   };
   return `${labels[actionType] || '夜间行动'}${suffix}`;
 }

@@ -22,6 +22,14 @@ interface TestimonyData {
 interface SeerCheckData {
   target?: string;
   result?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+interface RoleActionData {
+  target?: string;
+  use?: boolean;
+  reason?: string;
   [key: string]: unknown;
 }
 
@@ -88,6 +96,9 @@ interface NarrationEvent {
   speech?: SpeechData;
   testimony?: TestimonyData;
   seerCheck?: SeerCheckData;
+  guardAction?: RoleActionData;
+  witchAction?: RoleActionData;
+  reason?: string;
   sheriffTransfer?: SheriffTransferData;
   shot?: ShotData;
   phase?: PhaseData;
@@ -134,8 +145,10 @@ function getWerewolfNarration(event: NarrationEvent): string {
   if (event.type === 'seer-wake') return event.message || getWerewolfNightPrompt('seer-wake');
   if (event.type === 'seer-check') return getSeerCheckNarration(event.seerCheck);
   if (event.type === 'guard-wake') return event.message || getWerewolfNightPrompt('guard-wake');
+  if (event.type === 'guard-action') return event.message || getGuardActionNarration(event.guardAction);
   if (event.type === 'witch-antidote') return event.message || getWerewolfNightPrompt('witch-antidote');
   if (event.type === 'witch-poison') return event.message || getWerewolfNightPrompt('witch-poison');
+  if (event.type === 'witch-action') return event.message || getWitchActionNarration(event.witchAction);
   if (event.type === 'night-result') return event.message || '夜晚行动结算完毕';
   if (event.type === 'day-start') return event.message || '天亮了';
   if (event.type === 'sheriff-start') return event.message || buildSheriffStartMessage(event.round);
@@ -154,12 +167,14 @@ function getWerewolfNarration(event: NarrationEvent): string {
   if (event.type === 'speech') return event.speech?.text || '';
   if (event.type === 'self-destruct') return event.speech?.text || event.message || '狼人自爆。';
   if (event.type === 'vote-result') return event.message || '白天投票结果公布';
+  if (event.type === 'mvp-start') return event.message || '现在进行MVP评选，请评选本局MVP。';
+  if (event.type === 'mvp-result') return event.message || 'MVP评选结果公布。';
   if (event.type === 'last-words' || event.type === 'exile-words')
     return event.testimony?.text || '';
   if ((event.workflowEvent === 'last-words' || event.workflowEvent === 'exile-words'))
     return event.testimony?.text || event.speech?.text || '';
   if (event.type === 'hunter-shot')
-    return `猎人开枪带走${event.shot?.target}号。`;
+    return event.message || `猎人开枪带走${event.shot?.target}号。`;
   if (event.type === 'idiot-reveal')
     return event.message || '白痴翻牌';
   if (event.type === 'game') {
@@ -189,7 +204,22 @@ function getSheriffVoteNarration(round: RoundData = {}, runoff: boolean): string
 
 function getSeerCheckNarration(check: SeerCheckData = {}): string {
   if (!check?.target) return '';
-  return `他的身份是${check.result || '未知'}。预言家请闭眼。`;
+  return withReason(`${check.target}号玩家的身份是：${check.result || '未知'}`, check.reason);
+}
+
+function getGuardActionNarration(action: RoleActionData = {}): string {
+  if (!action.target) return '守卫选择空守。';
+  return withReason(`守卫守护了${action.target}号`, action.reason);
+}
+
+function getWitchActionNarration(action: RoleActionData = {}): string {
+  if (!action.use || !action.target) return '';
+  return withReason(`女巫对${action.target}号使用了药剂`, action.reason);
+}
+
+function withReason(result: string, reason?: string): string {
+  const normalized = String(reason || '').trim();
+  return normalized ? `${result}。${normalized}` : `${result}。`;
 }
 
 function getWerewolfSpeechOrderNarration(round: RoundData = {}): string {

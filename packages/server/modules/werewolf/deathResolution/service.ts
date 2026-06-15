@@ -1,5 +1,4 @@
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
-import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { recordWorkflowEffects } from '../../workflow-engine/effects';
 import { syncRuntimeState } from '../runtime';
 import { createWerewolfEvent, markStepComplete } from '../handlers/common';
@@ -18,6 +17,7 @@ import type {
   DeathResolutionContext,
   HandlerResult,
 } from './types';
+import { WEREWOLF_POSTGAME_DAYBREAK_STEP_ID } from '../postgame';
 
 function advanceDeathResolution(context: DeathResolutionContext): HandlerResult {
   for (let index = 0; index < 64; index += 1) {
@@ -133,12 +133,12 @@ function finalizeDeathResolution(context: DeathResolutionContext): HandlerResult
       context.match,
       context.step,
       nextState as unknown as Record<string, unknown>,
-      'werewolf_game_completed',
+      'werewolf_game_result',
       winResult.winReason,
       { winner: winResult.winner },
       {
         channel: CHANNEL_TYPES.PUBLIC,
-        idempotencyKey: `${context.match.id}:${context.step.id}:werewolf_game_completed`,
+        idempotencyKey: `${context.match.id}:${context.step.id}:werewolf_game_result`,
       },
     ));
   }
@@ -146,7 +146,7 @@ function finalizeDeathResolution(context: DeathResolutionContext): HandlerResult
     status: 'COMPLETED',
     state: nextState,
     events,
-    ...(winResult.winner ? { matchStatus: MATCH_STATUS.COMPLETED } : {}),
+    ...(winResult.winner ? { nextStepId: WEREWOLF_POSTGAME_DAYBREAK_STEP_ID } : {}),
   };
 }
 

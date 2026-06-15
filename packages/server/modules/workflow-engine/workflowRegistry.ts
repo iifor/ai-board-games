@@ -27,6 +27,7 @@ interface StepHandlerExecuteResult {
   pendingActions?: Array<Record<string, unknown>>;
   blockers?: Array<Record<string, unknown>>;
   matchStatus?: string;
+  nextStepId?: string;
   error?: Record<string, unknown>;
 }
 

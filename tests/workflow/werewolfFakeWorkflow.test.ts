@@ -285,9 +285,10 @@ test('wolf kill priority stays locked when dead last god hunter shoots the last 
     assert.equal(completed.status, 'COMPLETED');
     assert.equal(completed.state?.winner, 'wolves');
     assert.equal(completed.state?.players.find((item: Record<string, unknown>) => Number(item.id) === 1).alive, false);
-    assert.equal((completed.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_game_completed').length, 1);
+    assert.equal((completed.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_game_result').length, 1);
+    assert.equal(completed.nextStepId, 'postgame_mvp_vote');
     assert.ok(completed.events?.findIndex((event: Record<string, unknown>) => event.type === 'werewolf_last_words')
-      < completed.events?.findIndex((event: Record<string, unknown>) => event.type === 'werewolf_game_completed'));
+      < completed.events?.findIndex((event: Record<string, unknown>) => event.type === 'werewolf_game_result'));
   } finally {
     patchRepo(repo, original);
   }
@@ -333,7 +334,8 @@ test('hunter shooting the last wolf gives good victory when wolf kill did not co
 
     assert.equal(completed.status, 'COMPLETED');
     assert.equal(completed.state?.winner, 'good');
-    assert.equal((completed.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_game_completed').length, 1);
+    assert.equal((completed.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_game_result').length, 1);
+    assert.equal(completed.nextStepId, 'postgame_mvp_vote');
   } finally {
     patchRepo(repo, original);
   }
@@ -677,6 +679,57 @@ test('human pending action submission lets werewolf action window continue', () 
   }
 });
 
+test('dead player stale pending vote is ignored and cannot satisfy the action window', () => {
+  const original = snapshotRepo(repo);
+  const pendingActions: Array<Record<string, unknown>> = [];
+  try {
+    patchRepo(repo, {
+      upsertActionWindowEpoch: (epoch: never) => epoch,
+      listEvents: () => [],
+      createAiTask: () => undefined,
+      listAiTasks: () => [],
+      listPendingActions: () => pendingActions as never,
+      createWorkflowEffect: (effect: never) => effect
+    });
+
+    const state = createState();
+    state.players = state.players!.map((player: Record<string, unknown>) => ({
+      ...player,
+      actorType: 'human',
+      alive: true,
+      canVote: true,
+    }));
+    const match = { id: 'm-dead-voter', config: { players: state.players }, createdAt: 'now' };
+    const step = { id: 'day_vote_1', type: 'werewolf.action_window', config: { day: 1, phase: 'day', actionType: 'day_vote' } };
+    const handler = createActionWindowHandler();
+
+    const opened = handler.execute({ match, step, state } as never);
+    pendingActions.push(...(opened.pendingActions || []).map((action: Record<string, unknown>) => ({
+      ...action,
+      status: 'submitted',
+      payload: { target: 2 },
+    })));
+
+    const deadPlayerId = Number(pendingActions[0].playerId);
+    const resumedState = {
+      ...opened.state,
+      players: opened.state.players!.map((player: Record<string, unknown>) => (
+        Number(player.id) === deadPlayerId ? { ...player, alive: false, canVote: false } : player
+      )),
+    };
+
+    const completed = handler.execute({ match, step, state: resumedState } as never);
+    assert.equal(completed.status, 'COMPLETED');
+    assert.equal(completed.state?.rounds[0].votes[deadPlayerId], undefined);
+    assert.equal(
+      Object.keys(completed.state?.rounds[0].votes || {}).length,
+      resumedState.players.filter((player: Record<string, unknown>) => player.alive && player.canVote !== false).length,
+    );
+  } finally {
+    patchRepo(repo, original);
+  }
+});
+
 test('witch close eyes is emitted only after poison phase', () => {
   const original = snapshotRepo(repo);
   const tasks: Array<Record<string, unknown>> = [];
@@ -894,26 +947,26 @@ test('private night action phase results are scoped and not public', () => {
     {
       actionType: 'seer_check',
       actor: player(4, 'seer', 'good', ['inspectFaction']),
-      payload: { target: 2, result: '好人' },
+      payload: { target: 2, result: '好人', reason: '验证中置位' },
       scopeKey: 'seer',
     },
     {
       actionType: 'guard_protect',
       actor: player(5, 'guard', 'good', ['guard']),
-      payload: { target: 2 },
+      payload: { target: 2, reason: '保护关键位' },
       scopeKey: 'guard',
     },
     {
       actionType: 'witch_save',
       actor: player(6, 'witch', 'good', ['save', 'poison']),
-      payload: { use: true, target: 2 },
+      payload: { use: true, target: 2, reason: '救关键位' },
       scopeKey: 'witch',
       wolfTarget: 2,
     },
     {
       actionType: 'witch_poison',
       actor: player(6, 'witch', 'good', ['save', 'poison']),
-      payload: { use: true, target: 2 },
+      payload: { use: true, target: 2, reason: '怀疑是狼' },
       scopeKey: 'witch',
     },
   ];
@@ -960,6 +1013,7 @@ test('private night action phase results are scoped and not public', () => {
         assert.equal(resultEvent.scopeKey, item.scopeKey, item.actionType);
         assert.equal((resultEvent.payload as Record<string, unknown> | undefined)?.channel, 'scope', item.actionType);
         assert.equal((resultEvent.payload as Record<string, unknown> | undefined)?.scopeKey, item.scopeKey, item.actionType);
+        assert.match(String((resultEvent.payload as Record<string, unknown> | undefined)?.message || ''), /原因：/);
       }
       const auditEvent = (completed.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_action_engine_shadow_audited') as Record<string, unknown> | undefined;
       assert.equal(auditEvent?.channel, 'system', item.actionType);
@@ -1060,7 +1114,7 @@ test('seer check phase result is published to EventBus as scoped seer feedback',
       ...tasks[0],
       status: 'succeeded',
       playerId: 4,
-      result: { payload: { target: 2, result: '好人' } }
+      result: { payload: { target: 2, result: '好人', reason: '验证中置位' } }
     };
 
     const completed = handler.execute({ match, step, state: opened.state } as never);
@@ -1071,6 +1125,11 @@ test('seer check phase result is published to EventBus as scoped seer feedback',
     assert.equal(seerEvent?.channel, 'scope');
     assert.equal(seerEvent?.scopeKey, 'seer');
     assert.match(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), /2号玩家的查验结果是：好人/);
+    assert.match(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), /原因：验证中置位/);
+    assert.equal(
+      ((seerEvent?.payload as Record<string, unknown> | undefined)?.seerCheck as Record<string, unknown> | undefined)?.reason,
+      '验证中置位',
+    );
   } finally {
     unsubscribe();
     unregisterMatchInfra(matchId);

@@ -226,6 +226,35 @@ test('werewolf prompt context never exposes wolf chat to non-wolves', () => {
   assert.match(villagerPrompt, /公开发言/);
 });
 
+test('day speech prompt includes sheriff and runoff speeches exactly once', () => {
+  const players = [player(1, 'seer', 'good'), player(12, 'villager', 'good')];
+  const round = {
+    day: 1,
+    night: {},
+    sheriffElection: {
+      speeches: [{ playerId: 1, text: '我是预言家，竞选警长。' }],
+      runoffSpeeches: [{ playerId: 1, text: '复投请支持我。' }],
+    },
+    speeches: [],
+  };
+  const prompt = buildWerewolfActionPrompt({
+    runtime: runtime(players, [round]) as never,
+    round: round as never,
+    actor: players[1] as never,
+    actionType: 'day_speech',
+  });
+
+  assert.match(prompt, /警上发言：1号：我是预言家，竞选警长。/);
+  assert.match(prompt, /警长复投发言：1号：复投请支持我。/);
+  assert.equal(countMatches(prompt, '我是预言家，竞选警长。'), 1);
+});
+
+test('hunter prompt does not request or describe a reason', () => {
+  const prompt = buildHunterShootActionPrompt([2, 3]);
+  assert.doesNotMatch(prompt, /reason|原因/);
+  assert.match(prompt, /\{"targetSeat":2\}/);
+});
+
 test('public prompt hides death reasons and ignores duplicated public summary', () => {
   const players = [
     player(1, 'werewolf', 'wolves'),
@@ -520,7 +549,7 @@ test('sheriff vote prompt only lists candidates', async () => {
   assert.doesNotMatch(captured.prompt || '', /可选目标座位号：1、2、3/);
 });
 
-test('role decision prompts require reason except hunter shot', async () => {
+test('divine role decision prompts accept optional normalized reasons', async () => {
   const skills = createWerewolfSkills();
   const byAction = new Map(skills.map((skill) => [skill.action, skill]));
   const captures: string[] = [];
@@ -538,25 +567,33 @@ test('role decision prompts require reason except hunter shot', async () => {
         : { use: true, reason: '救关键位置。' };
     },
   });
+  const guard = agent(5, 'guard', 'good', {
+    askJson: async (promptText: string) => {
+      captures.push(promptText);
+      return { targetSeat: 2, reason: '  保护发言关键位。  ' };
+    },
+  });
   const hunter = agent(4, 'hunter', 'good', {
     askJson: async (promptText: string) => {
       captures.push(promptText);
       return { targetSeat: 2, reason: '带走最像狼的位置。' };
     },
   });
-  const alive = [seer, agent(2, 'villager', 'good'), witch, hunter];
+  const alive = [seer, agent(2, 'villager', 'good'), witch, hunter, guard];
 
   const seerResult = await byAction.get('inspectFaction')!.execute({ actor: seer, alive, agents: alive, promptContext: '上下文' } as never) as Record<string, unknown>;
   const saveResult = await byAction.get('save')!.execute({ actor: witch, victim: alive[1], round: { day: 1 }, modeConfig: {}, promptContext: '上下文' } as never) as Record<string, unknown>;
   const poisonResult = await byAction.get('poison')!.execute({ actor: witch, alive, promptContext: '上下文' } as never) as Record<string, unknown>;
   const hunterResult = await byAction.get('shootOnDeath')!.execute({ actor: hunter, agents: alive, promptContext: '上下文' } as never) as Record<string, unknown>;
+  const guardResult = await byAction.get('guard')!.execute({ actor: guard, alive, promptContext: '上下文' } as never) as Record<string, unknown>;
 
   assert.equal(seerResult.reason, '验中置位。');
   assert.equal(saveResult.reason, '救关键位置。');
   assert.equal(poisonResult.reason, '怀疑是狼。');
   assert.equal(hunterResult.reason, undefined);
+  assert.equal(guardResult.reason, '保护发言关键位。');
   assert.ok(
-    captures.some((promptText) => /预言家夜晚行动/.test(promptText) && /reason/.test(promptText) && /可选目标座位号：2、3、4/.test(promptText)),
+    captures.some((promptText) => /预言家夜晚行动/.test(promptText) && /reason/.test(promptText) && /可选目标座位号：2、3、4、5/.test(promptText)),
     `seer prompt missing contract: ${JSON.stringify(captures)}`,
   );
   assert.ok(
@@ -564,12 +601,16 @@ test('role decision prompts require reason except hunter shot', async () => {
     `antidote prompt missing reason: ${JSON.stringify(captures)}`,
   );
   assert.ok(
-    captures.some((promptText) => /毒药/.test(promptText) && /reason/.test(promptText) && /可选目标座位号：1、2、4/.test(promptText)),
+    captures.some((promptText) => /毒药/.test(promptText) && /reason/.test(promptText) && /可选目标座位号：1、2、4、5/.test(promptText)),
     `poison prompt missing reason: ${JSON.stringify(captures)}`,
+  );
+  assert.ok(
+    captures.some((promptText) => /守卫夜晚行动/.test(promptText) && /reason 可选/.test(promptText)),
+    `guard prompt missing optional reason: ${JSON.stringify(captures)}`,
   );
   const hunterPrompt = buildHunterShootActionPrompt([1, 2, 3]);
   assert.match(hunterPrompt, /"targetSeat":2/);
-  assert.doesNotMatch(hunterPrompt, /"reason"/);
+  assert.doesNotMatch(hunterPrompt, /"reason"|原因/);
   assert.match(hunterPrompt, /可选目标座位号：1、2、3/);
 });
 

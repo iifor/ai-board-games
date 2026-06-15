@@ -300,6 +300,14 @@ werewolf workflow step
 - skill decision：记录 skillId、actor、结果。
 - `werewolf_interaction_feedback`：记录预言家查验、女巫用药、守卫守护、猎人开枪等反馈。
 
+Trace 详情同时保存本局参与者快照，使用
+`seatId/sourcePlayerId/nickname` 区分游戏座位号与玩家资源主键。管理端不得用
+`seatId` 直接查询全局玩家表昵称。旧 Trace 优先从关联 match 状态恢复该映射，
+无法恢复时再使用 LLM 与 Agent 决策记录中的座位号并集。
+
+白天发言的 `recentContext` 必须包含已完成的警上竞选发言、警长复投发言和当前
+白天已公开发言。调用方显式传入该上下文，避免构建后未写入 Prompt Bundle。
+
 示例：预言家查验后，trace 应同时能看到：
 
 - `werewolf_interaction_feedback`：`seer_check`、actor、target、result、channel、scopeKey。
@@ -318,6 +326,7 @@ werewolf workflow step
 - 私密角色结果不能出现在 public `werewolf_phase_result` 或 audience display event 中。
 - 私密夜间行动 reason 不能进入 public/audience display event。
 - 同一份 prompt 内不能重复塞入完整夜聊记录或警上发言记录。
+- 猎人开枪只输出目标，不要求 `reason`；技能原因由猎人此前遗言自行表达。
 
 ## 后续优化建议
 
@@ -342,3 +351,4 @@ werewolf workflow step
 - `sheriff_badge_disposition` 允许死亡警长作为 actor，输出 `{"action":"transfer","target":座位号,"reason":"..."}` 或 `{"action":"tear","target":null,"reason":"..."}`；输出非法或调用失败时由规则层撕毁警徽。
 - `sheriff_speech_direction` 由当前存活警长执行，输出 `{"direction":"clockwise|counterclockwise","reason":"简短原因"}`。非法输出或调用失败时由规则层随机选择方向；警长固定最后发言。
 - `last_words` 允许已死亡玩家作为 actor，使用一次性自然语言发言 prompt，不要求 JSON。服务端负责首夜/放逐资格和顺序，prompt 不得让模型自行判断自己是否有遗言权。
+- `postgame_speech` 使用结构化决定：发言返回 `{"speak":true,"text":"..."}`，跳过返回 `{"speak":false,"text":null}`。模型调用失败、非法 JSON、空文本均按跳过处理，不生成兜底感言。

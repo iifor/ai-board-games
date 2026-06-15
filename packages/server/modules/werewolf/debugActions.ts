@@ -58,6 +58,11 @@ function runDebugWerewolfAction(runtime: DebugRuntime, round: DebugRound, actor:
   }
   if (actionType === 'day_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
   if (actionType === 'day_vote') return { target: randomTarget(alive, actor) };
+  if (actionType === 'mvp_vote') return { target: randomTarget(runtime.agents, actor) };
+  if (actionType === 'postgame_speech') {
+    if (Math.random() < 0.2) return { speak: false, text: '', thinking: '' };
+    return { speak: true, text: `${debugSpeech(actor, runtime.agents)}，这局大家都辛苦了。`, thinking: '' };
+  }
   if (actionType === 'sheriff_signup') return { run: Math.random() < 0.5 };
   if (actionType === 'sheriff_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
   if (actionType === 'sheriff_withdraw') return { withdraw: false };

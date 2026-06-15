@@ -71,24 +71,51 @@ test('reducers aggregate wolf kill choices and target ids', () => {
 
 test('reducers apply role action payloads to round and actors', () => {
   const ctx = runtime();
-  applyActionResults(ctx as never, { config: { day: 1, actionType: 'seer_check' } } as never, [{ actorId: 2, payload: { target: 1, result: 'wolf' } }]);
-  applyActionResults(ctx as never, { config: { day: 1, actionType: 'guard_protect' } } as never, [{ actorId: 3, payload: { target: 2 } }]);
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'seer_check' } } as never, [{ actorId: 2, payload: { target: 1, result: 'wolf', reason: '确认前置位' } }]);
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'guard_protect' } } as never, [{ actorId: 3, payload: { target: 2, reason: '保护预言家' } }]);
   ctx.state.rounds[0].night.wolfTarget = 2;
-  applyActionResults(ctx as never, { config: { day: 1, actionType: 'witch_save' } } as never, [{ actorId: 4, payload: { use: true } }]);
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'witch_save' } } as never, [{ actorId: 4, payload: { use: true, reason: '保住关键神职' } }]);
   applyActionResults(ctx as never, { config: { day: 1, actionType: 'witch_poison' } } as never, [{ actorId: 4, payload: { use: true, target: 5 } }]);
 
   const round = ctx.state.rounds[0];
-  assert.deepEqual(round.night.seerCheck, { target: 1, result: 'wolf' });
+  assert.deepEqual(round.night.seerCheck, { target: 1, result: 'wolf', reason: '确认前置位' });
   assert.equal(ctx.agents[1].seerChecks.length, 1);
   assert.equal(round.night.guardTarget, 2);
+  assert.equal(round.night.guardReason, '保护预言家');
   assert.equal(ctx.agents[2].lastGuardTarget, 2);
   assert.equal(round.night.witchSaveTarget, 2);
+  assert.equal(round.night.witchSaveReason, '保住关键神职');
   assert.equal(ctx.agents[3].usedAntidote, true);
   assert.equal(round.night.witchPoisonTarget, null);
   assert.equal(Boolean(ctx.agents[3].usedPoison), false);
 });
 
-test('witch poison requires strict true and uses reason-aware narration', () => {
+test('dead players cannot contribute wolf or day votes', () => {
+  const ctx = runtime();
+  ctx.agents[0].faction = 'wolves';
+  ctx.agents[0].roleConfig = { rule: { actions: [{ action: 'kill' }] } };
+  ctx.agents[1].faction = 'wolves';
+  ctx.agents[1].roleConfig = { rule: { actions: [{ action: 'kill' }] } };
+  ctx.agents[1].alive = false;
+
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'wolf_vote' } } as never, [
+    { actorId: ctx.agents[0].id, payload: { target: 5 } },
+    { actorId: ctx.agents[1].id, payload: { target: 4 } },
+  ]);
+
+  assert.deepEqual(ctx.state.rounds[0].night.wolfChoices, { [ctx.agents[0].id]: 5 });
+  assert.deepEqual(ctx.state.rounds[0].night.wolfVoteTally, { 5: 1 });
+
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'day_vote' } } as never, [
+    { actorId: ctx.agents[0].id, payload: { target: 5 } },
+    { actorId: ctx.agents[1].id, payload: { target: 4 } },
+  ]);
+
+  assert.deepEqual(ctx.state.rounds[0].votes, { [ctx.agents[0].id]: 5 });
+  assert.equal(ctx.agents[1].votes.length, 0);
+});
+
+test('divine action narration appends reasons only for effective actions', () => {
   const ctx = runtime();
   applyActionResults(
     ctx as never,
@@ -98,9 +125,17 @@ test('witch poison requires strict true and uses reason-aware narration', () => 
   assert.equal(ctx.state.rounds[0].night.witchPoisonTarget, null);
 
   const phase = getActionPhaseConfig('witch_poison');
-  assert.equal(phase?.buildMessages(1, { witchPoisonUsed: true, target: 5, witchPoisonReason: '判断5号是狼人' }).result, '判断5号是狼人');
-  assert.equal(phase?.buildMessages(1, { witchPoisonUsed: true, target: 5 }).result, '女巫毒了5号');
+  assert.equal(phase?.buildMessages(1, { witchPoisonUsed: true, target: 5, reason: '判断5号是狼人' }).result, '女巫毒了5号。判断5号是狼人');
+  assert.equal(phase?.buildMessages(1, { witchPoisonUsed: true, target: 5 }).result, '女巫毒了5号。');
   assert.equal(phase?.buildMessages(1, { witchPoisonUsed: false }).result, '');
+  assert.equal(
+    getActionPhaseConfig('guard_protect')?.buildMessages(1, { guardTarget: 2, reason: '保护关键位' }).result,
+    '守卫守护了2号。保护关键位',
+  );
+  assert.equal(
+    getActionPhaseConfig('seer_check')?.buildMessages(1, { target: 3, seerResult: '好人', reason: '验证发言' }).result,
+    '3号玩家的身份是：好人。验证发言',
+  );
 });
 
 test('sheriff badge disposition transfers, tears, and does not repeat', () => {
@@ -290,6 +325,38 @@ test('workflow places sheriff direction immediately before day speech every day'
     const speechIndex = steps.findIndex((step) => step.id === `day_speech_${day}`);
     assert.equal(directionIndex + 1, speechIndex);
   }
+});
+
+test('postgame actions include dead players and put MVP last', () => {
+  const round = createRound(1);
+  const ctx = {
+    agents: [
+      actor(1, 'good', [], { alive: false }),
+      actor(2, 'wolves'),
+      actor(3, 'good', [], { alive: false }),
+    ],
+    modeConfig: {},
+    state: { rounds: [round], mvp: { id: 1 } },
+  };
+
+  const voters = getActorsForStep(ctx as never, { config: { actionType: 'mvp_vote' } } as never, round as never);
+  const speakers = getActorsForStep(ctx as never, { config: { actionType: 'postgame_speech' } } as never, round as never);
+  assert.deepEqual(voters.map((item: TestAgent) => item.id), [1, 2, 3]);
+  assert.deepEqual(speakers.map((item: TestAgent) => item.id), [2, 3, 1]);
+
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'mvp_vote' } } as never, [
+    { actorId: 1, payload: { target: 2 } },
+    { actorId: 2, payload: { target: 2 } },
+    { actorId: 3, payload: { target: 1 } },
+  ]);
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'postgame_speech' } } as never, [
+    { actorId: 1, payload: { speak: true, text: '感谢大家。' } },
+    { actorId: 2, payload: { speak: false, text: '不应保存' } },
+  ]);
+
+  assert.deepEqual((ctx.state as Record<string, unknown>).mvpVotes, { 1: 2, 3: 1 });
+  assert.equal(((ctx.state as Record<string, unknown>).postgameSpeeches as Record<string, { text: string }>)['1'].text, '感谢大家。');
+  assert.equal(((ctx.state as Record<string, unknown>).postgameSpeeches as Record<string, { text: string }>)['2'], undefined);
 });
 
 test('first night resolves only after sheriff election and before day speech', () => {

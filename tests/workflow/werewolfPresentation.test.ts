@@ -65,3 +65,43 @@ test('werewolf presentation keeps skipped poison visible without speech or ack',
   assert.equal(result.suppressSpeech, true);
   assert.equal(result.requiresAck, false);
 });
+
+test('werewolf presentation speaks divine action result with reason', () => {
+  const presentation = resolveWerewolfPresentation({
+    workflowEvent: 'werewolf_phase_result',
+    eventType: 'guard-action',
+    actionType: 'guard_protect',
+    message: '守卫守护了2号。保护关键位',
+  });
+
+  assert.equal(presentation.speakableText, '守卫守护了2号。保护关键位');
+  assert.equal(presentation.suppressSpeech, false);
+});
+
+test('werewolf presentation keeps MVP ballots silent and announces the result', () => {
+  const start = resolveWerewolfPresentation({
+    eventType: 'mvp-start',
+    message: '现在进行MVP评选，请评选本局MVP。',
+  });
+  const ballot = resolveWerewolfPresentation({
+    eventType: 'mvp-vote',
+    actionType: 'mvp_vote',
+    message: '1号投给3号',
+  });
+  const result = resolveWerewolfPresentation({
+    eventType: 'mvp-result',
+    message: '本场MVP是3号玩家，获得4票。',
+  });
+  const speech = resolveWerewolfPresentation({
+    eventType: 'speech',
+    actionType: 'postgame_speech',
+    speechText: '感谢大家，这局很精彩。',
+  });
+
+  assert.equal(ballot.suppressSpeech, true);
+  assert.equal(start.speakableText, '现在进行MVP评选，请评选本局MVP。');
+  assert.equal(ballot.speakableText, '');
+  assert.equal(result.speakableText, '本场MVP是3号玩家，获得4票。');
+  assert.equal(speech.speakableText, '感谢大家，这局很精彩。');
+  assert.equal(speech.uiHint, 'postgame-speech');
+});

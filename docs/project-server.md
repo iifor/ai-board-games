@@ -113,6 +113,13 @@ WebSocket：
 `game_id + sequence` 排序，包含协议版本、原始视角、事件载荷和媒体引用；
 删除 `games` 记录时同步清理。游戏快照和播放事件必须在同一事务中写入。
 
+终局持久化由 `game-socket/service.ts` 在 workflow 已完成后触发。服务端先冻结在线
+播放已准备的事件前缀，再离线补齐未发送事件和 `workflow-completed`，随后调用
+`saveGameRecord`。该事务同时写入游戏快照、玩家快照、精确回放事件和跨局长期记忆；
+事务提交后才发送完成事件，因此 C 端在终局播放期间断线不会丢失正式对局。
+同一游戏 ID 使用替换式保存，长期记忆使用 `lastGameId` 防重，断线恢复或重复完成
+不会产生重复历史记录和重复记忆累计。保存异常向 socket 返回错误，不发送完成事件。
+
 ### Express 与中间件
 
 - `createApp()`：创建应用、挂载路由、托管静态资源。
@@ -209,6 +216,14 @@ workflow 表，避免性能测量再次产生数据库写入放大。超过 500m
 - `POST /api/admin/player-memories/clear`，请求体 `gameType` 仅允许 `werewolf`、`debate`、`all`
 
 清除操作只删除跨局长期画像，不删除进行中的 `memory_snapshots`、历史比赛、Trace 或玩家基础人格。
+
+`game_traces.participants_json` 保存本局座位与玩家资源映射，元素包含
+`seatId/sourcePlayerId/nickname`。Trace 详情 API 返回解析后的 `participants`；
+历史记录可通过 root span 的 `game.id` 从 `matches.state_json` 兼容恢复。
+
+LLM HTTP 调用对超时、连接失败、HTTP `429` 和 `5xx` 最多自动重试一次，使用短
+退避。每次尝试分别记录 LLM span/record；鉴权、参数等确定性 `4xx` 不重试，
+JSON 和目标校验仍由 Agent 层处理。
 
 ## 配置与部署
 

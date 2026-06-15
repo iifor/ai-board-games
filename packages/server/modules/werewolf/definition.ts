@@ -144,6 +144,7 @@ function createInspectEffect(action: DomainAction, day: number): WorkflowEffect 
       day,
       target,
       result: action.payload.result || 'unknown',
+      decisionReason: normalizeDecisionReason(action.payload.reason),
     },
   };
 }
@@ -166,6 +167,7 @@ function createProtectEffects(action: DomainAction, day: number): WorkflowEffect
       actorId: action.actorId,
       day,
       target,
+      decisionReason: normalizeDecisionReason(action.payload.reason),
     },
   }];
 }
@@ -198,6 +200,7 @@ function createSaveEffect(action: DomainAction, day: number, target: number): Wo
       actorId: action.actorId,
       day,
       target,
+      decisionReason: normalizeDecisionReason(action.payload.reason),
     },
   };
 }
@@ -231,6 +234,7 @@ function createPoisonEffect(action: DomainAction, day: number, target: number): 
       day,
       target,
       reason: '女巫毒杀',
+      decisionReason: normalizeDecisionReason(action.payload.reason),
     },
   };
 }
@@ -277,6 +281,7 @@ function createInspectResolver() {
           day: effect.payload.day,
           target: effect.payload.target,
           result: effect.payload.result || 'unknown',
+          reason: effect.payload.decisionReason || null,
         },
       }];
     },
@@ -300,6 +305,7 @@ function createProtectResolver() {
           actorId: effect.payload.actorId,
           day: effect.payload.day,
           target: effect.payload.target,
+          reason: effect.payload.decisionReason || null,
         },
       }];
     },
@@ -323,6 +329,7 @@ function createSaveResolver() {
           actorId: effect.payload.actorId,
           day: effect.payload.day,
           target: effect.payload.target,
+          reason: effect.payload.decisionReason || null,
         },
       }];
     },
@@ -347,6 +354,7 @@ function createPoisonResolver() {
           day: effect.payload.day,
           target: effect.payload.target,
           reason: effect.payload.reason || '女巫毒杀',
+          decisionReason: effect.payload.decisionReason || null,
         },
       }];
     },
@@ -388,15 +396,18 @@ function projectWerewolfStateFromEvent(
 
   if (event.type === 'seer_checked') {
     const result = String(event.payload.result || 'unknown');
-    night.seerCheck = { target, result };
+    const reason = normalizeDecisionReason(event.payload.reason);
+    night.seerCheck = { target, result, ...(reason ? { reason } : {}) };
     upsertPlayerRecord(next, actorId, (player) => {
       const checks = Array.isArray(player.seerChecks) ? player.seerChecks as Record<string, unknown>[] : [];
-      player.seerChecks = upsertByDay(checks, day, { day, target, result });
+      player.seerChecks = upsertByDay(checks, day, { day, target, result, ...(reason ? { reason } : {}) });
     });
   }
 
   if (event.type === 'guard_protected') {
     night.guardTarget = target;
+    const reason = normalizeDecisionReason(event.payload.reason);
+    if (reason) night.guardReason = reason;
     upsertPlayerRecord(next, actorId, (player) => {
       player.lastGuardTarget = target;
     });
@@ -405,6 +416,8 @@ function projectWerewolfStateFromEvent(
   if (event.type === 'witch_saved') {
     night.witchSave = true;
     night.witchSaveTarget = target;
+    const reason = normalizeDecisionReason(event.payload.reason);
+    if (reason) night.witchSaveReason = reason;
     upsertPlayerRecord(next, actorId, (player) => {
       player.usedAntidote = true;
     });
@@ -412,12 +425,19 @@ function projectWerewolfStateFromEvent(
 
   if (event.type === 'witch_poisoned') {
     night.witchPoisonTarget = target;
+    const reason = normalizeDecisionReason(event.payload.decisionReason);
+    if (reason) night.witchPoisonReason = reason;
     upsertPlayerRecord(next, actorId, (player) => {
       player.usedPoison = true;
     });
   }
 
   return next;
+}
+
+function normalizeDecisionReason(value: unknown): string | null {
+  const reason = String(value || '').trim().slice(0, 80);
+  return reason || null;
 }
 
 function getStatePlayers(state: Record<string, unknown>): Array<Record<string, unknown> & { id: number }> {

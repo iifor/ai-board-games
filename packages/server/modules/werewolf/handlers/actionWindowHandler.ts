@@ -3,7 +3,6 @@ import {
   createActionBlockers,
   hasOpenWork,
   collectActionResults,
-  allActionWorkSucceeded,
   resolveActionWindow
 } from '../actionWindows';
 import type { ActionWindow } from '../actionWindows';
@@ -27,13 +26,13 @@ import { actionRequestedMessage, actionResolvedMessage, actionSkippedMessage, ph
 import { hasActionPhase, getActionPhaseConfig } from '../actionPhases';
 import { resolveActionChannel } from './actionChannel';
 import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
-import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { getSeatNumber } from '../utils';
 import { recordWerewolfInteractionFeedback } from '../interactionFeedbackTrace';
 import { canUseWerewolfActionEngineBridge, runWerewolfActionEngineBridge } from '../actionEngineBridge';
 import type { WerewolfActionEngineShadowAudit } from '../actionEngineBridge';
 import { resolveWinAfterDeaths } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
+import { WEREWOLF_POSTGAME_DAYBREAK_STEP_ID } from '../postgame';
 
 /** 已有独立睁眼事件的夜晚行动 — phase-start 不再重复发布 */
 const NIGHT_WAKE_ACTIONS = new Set([
@@ -65,19 +64,22 @@ interface HandlerResult {
   blockers?: unknown[];
   tasks?: unknown[];
   pendingActions?: unknown[];
+  nextStepId?: string;
 }
 
 function createActionWindowHandler() {
   return {
     execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
-      if (isDone(state, step.id) || state.winner) return completed(state, step.id);
+      const isPostgameAction = step.config.actionType === 'mvp_vote' || step.config.actionType === 'postgame_speech';
+      if (isDone(state, step.id) || (state.winner && !isPostgameAction)) return completed(state, step.id);
       const runtime = createRuntime(match, state);
       // Phase 4 fix: 将游戏状态快照注入 builder，使后续事件携带 game.players
       if (runtime.gameEventBuilder) {
         const snapshot = serializeWerewolfState(match, state as unknown as Record<string, unknown>);
         runtime.gameEventBuilder.setGame(snapshot as unknown as Parameters<typeof runtime.gameEventBuilder.setGame>[0]);
       }
-      const round = ensureRound(runtime.state, step.config.day!);
+      const actionDay = resolveActionDay(state, step);
+      const round = ensureRound(runtime.state, actionDay);
       if (hasSelfDestruct(round as unknown as ReducerRound) && step.config.actionType === 'day_vote'
         && Number((round as { selfDestruct?: { day?: number } }).selfDestruct?.day) === Number(step.config.day)) {
         return skipAction(match, step, runtime);
@@ -105,7 +107,14 @@ function createActionWindowHandler() {
         return openActionWindow({ match, step, state, runtime, round, actors });
       }
 
-      const partialResults = collectActionResults(match.id, step.id, step.config.actionType!) as unknown as ReducerActionResult[];
+      const eligibleActorIds = new Set(actors.map((actor) => Number(actor.id)));
+      const partialResults = (collectActionResults(
+        match.id,
+        step.id,
+        step.config.actionType!,
+      ) as unknown as ReducerActionResult[]).filter((result) => (
+        eligibleActorIds.has(Number(result.actorId))
+      ));
       const partialApplied = shouldApplyPartialResults(step) && partialResults.length > 0;
       if (partialApplied) {
         applyActionResults(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, partialResults);
@@ -119,13 +128,16 @@ function createActionWindowHandler() {
             });
           }, serializeWerewolfState(match, syncRuntimeState(runtime) as unknown as Record<string, unknown>));
         }
+        if (step.config.actionType === 'mvp_vote') {
+          publishMvpVotes(match, step, runtime, partialResults, state);
+        }
         if (hasSelfDestruct(round as unknown as ReducerRound)) {
           applySelfDestruct(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound);
           return completeSelfDestructWindow({ match, step, runtime, round, state });
         }
       }
 
-      if (!allActionWorkSucceeded(match.id, step.id, step.config.actionType!, actors.length)) {
+      if (partialResults.length < actors.length) {
         return waitForActionWindow({ match, step, state: partialApplied ? { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: state.currentActionWindow } : state, round, actors });
       }
 
@@ -244,7 +256,13 @@ function createActionWindowHandler() {
 }
 
 function shouldApplyPartialResults(step: Step): boolean {
-  return Boolean(step.config.ordered && (step.config.actionType === 'wolf_speech' || step.config.actionType === 'day_speech' || step.config.actionType === 'day_vote'));
+  return Boolean(step.config.ordered && (
+    step.config.actionType === 'wolf_speech'
+    || step.config.actionType === 'day_speech'
+    || step.config.actionType === 'day_vote'
+    || step.config.actionType === 'mvp_vote'
+    || step.config.actionType === 'postgame_speech'
+  ));
 }
 
 function completeSelfDestructWindow({ match, step, runtime, round, state }: {
@@ -294,14 +312,44 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
     { channel: CHANNEL_TYPES.PUBLIC }
   )];
   if (winResult.winner) {
-    events.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
+    events.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_result', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
   }
   return {
     status: 'COMPLETED',
     state: nextState,
     events,
-    ...(winResult.winner ? { matchStatus: MATCH_STATUS.COMPLETED } : {}),
+    ...(winResult.winner ? { nextStepId: WEREWOLF_POSTGAME_DAYBREAK_STEP_ID } : {}),
   };
+}
+
+function resolveActionDay(state: StepState, step: Step): number {
+  if (step.config.day) return step.config.day;
+  const rounds = Array.isArray(state.rounds) ? state.rounds as Array<{ day?: unknown }> : [];
+  return Math.max(1, ...rounds.map((round) => Number(round.day) || 0));
+}
+
+function publishMvpVotes(
+  match: Match,
+  step: Step,
+  runtime: Runtime,
+  results: ReducerActionResult[],
+  previousState: StepState,
+): void {
+  const previousVotes = (previousState.mvpVotes || {}) as Record<string, unknown>;
+  const newVotes = results.filter((result) => previousVotes[String(result.actorId)] === undefined);
+  for (const result of newVotes) {
+    const targetId = Number(result.payload.target);
+    if (!targetId || targetId === Number(result.actorId)) continue;
+    const message = `${getSeatNumber(result.actorId, runtime.agents)}号投给${getSeatNumber(targetId, runtime.agents)}号`;
+    publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+      builder.setStep(step.id).setPhase('postgame').setDay(resolveActionDay(runtime.state as StepState, step));
+      return builder.build('mvp-vote', {
+        voterId: result.actorId,
+        targetId,
+        message,
+      }, CHANNEL_TYPES.PUBLIC, undefined, { actionType: 'mvp_vote', message });
+    }, serializeWerewolfState(match, syncRuntimeState(runtime) as unknown as Record<string, unknown>));
+  }
 }
 
 function createActionEngineShadowAuditEvent(
@@ -343,7 +391,7 @@ function skipAction(
   if (options.systemOnly) {
     publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
       builder.setStep(step.id);
-      builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+      builder.setPhase((step.config.phase as 'night' | 'day' | 'postgame') || 'night');
       builder.setDay(step.config.day || 1);
       return builder.build('action-skipped', {
         actionType: step.config.actionType,
@@ -372,7 +420,7 @@ function skipAction(
   // Phase 4: 双写 action-skipped 到 EventBus
   publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
     builder.setStep(step.id);
-    builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+    builder.setPhase((step.config.phase as 'night' | 'day' | 'postgame') || 'night');
     builder.setDay(step.config.day || 1);
     return builder.build('action-skipped', {
       actionType: step.config.actionType,
@@ -423,7 +471,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
   // Phase 4: 双写 action-requested 到 EventBus
   publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
     builder.setStep(step.id);
-    builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+    builder.setPhase((step.config.phase as 'night' | 'day' | 'postgame') || 'night');
     builder.setDay(step.config.day || 1);
     return builder.buildActionRequested(
       step.config.actionType || '',
@@ -502,7 +550,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
     if (!hasDedicatedWake) {
       publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
         builder.setStep(step.id);
-        builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+        builder.setPhase((step.config.phase as 'night' | 'day' | 'postgame') || 'night');
         builder.setDay(step.config.day || 1);
         return builder.build('phase-start', {
           phase: step.config.phase || 'night',
@@ -535,38 +583,61 @@ function buildPhaseContext(actionType: string, results: ReducerActionResult[], r
 
   if (actionType === 'seer_check' && results.length > 0) {
     const result = results[0];
+    context.actorId = result.actorId;
     const seerCheck = night.seerCheck && typeof night.seerCheck === 'object'
       ? night.seerCheck as Record<string, unknown>
       : {};
     context.seerResult = seerCheck.result || result?.payload?.result || result?.payload?.faction || '未知';
     context.target = seerCheck.target || result?.payload?.target;
+    const normalizedReason = normalizeReason(result?.payload?.reason);
     context.seerCheck = {
       target: context.target,
       result: context.seerResult,
+      reason: normalizedReason,
     };
+    context.reason = normalizedReason;
   }
 
   if (actionType === 'witch_save') {
+    context.actorId = results[0]?.actorId;
     context.wolfTarget = night.wolfTarget || null;
     context.witchSaveUsed = results.length > 0 && results[0]?.payload?.use === true;
-    context.target = results.length > 0 ? results[0]?.payload?.target : null;
+    context.target = context.witchSaveUsed
+      ? night.witchSaveTarget || night.wolfTarget || null
+      : null;
+    context.reason = context.witchSaveUsed
+      ? normalizeReason(results[0]?.payload?.reason)
+      : null;
+    context.witchAction = {
+      use: context.witchSaveUsed,
+      target: context.target,
+      reason: context.reason,
+    };
   }
 
   if (actionType === 'witch_poison') {
     const payload = results[0]?.payload;
+    context.actorId = results[0]?.actorId;
     context.witchPoisonUsed = payload?.use === true;
     context.target = payload?.use === true ? payload?.target || null : null;
-    context.witchPoisonReason = typeof payload?.reason === 'string' ? payload.reason.trim() : '';
+    context.reason = context.witchPoisonUsed ? normalizeReason(payload?.reason) : null;
     context.witchAction = {
       use: context.witchPoisonUsed,
       target: context.target,
-      reason: context.witchPoisonReason,
+      reason: context.reason,
     };
   }
 
   if (actionType === 'guard_protect') {
     context.guardTarget = results.length > 0 ? results[0]?.payload?.target : null;
     context.target = context.guardTarget;
+    context.reason = context.guardTarget
+      ? normalizeReason(results[0]?.payload?.reason)
+      : null;
+    context.guardAction = {
+      target: context.guardTarget,
+      reason: context.reason,
+    };
   }
 
   return context;
@@ -585,14 +656,22 @@ function publishScopedPhaseResultEvent(
     ? 'wolf-vote'
     : step.config.actionType === 'seer_check'
       ? 'seer-check'
-      : step.config.actionType === 'witch_poison'
+      : step.config.actionType === 'guard_protect'
+        ? 'guard-action'
+      : step.config.actionType === 'witch_save' || step.config.actionType === 'witch_poison'
         ? 'witch-action'
       : null;
   if (!eventType) return;
   const snapshot = serializeWerewolfState(match, state);
+  const actorId = Number(phaseContext.actorId || 0);
+  const shouldUsePlayerVoice = (
+    eventType === 'seer-check'
+    || (eventType === 'witch-action'
+      && (phaseContext.witchAction as { use?: boolean } | undefined)?.use === true)
+  ) && actorId > 0 && Boolean(message);
   publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
     builder.setStep(step.id);
-    builder.setPhase((step.config.phase as 'night' | 'day') || 'night');
+    builder.setPhase((step.config.phase as 'night' | 'day' | 'postgame') || 'night');
     builder.setDay(step.config.day || 1);
     return builder.build(
       eventType,
@@ -602,13 +681,20 @@ function publishScopedPhaseResultEvent(
         message,
         ...phaseContext,
         ...(eventType === 'seer-check' ? { seerCheck: phaseContext.seerCheck } : {}),
+        ...(eventType === 'guard-action' ? { guardAction: phaseContext.guardAction } : {}),
         ...(eventType === 'witch-action' ? { witchAction: phaseContext.witchAction } : {}),
+        ...(shouldUsePlayerVoice ? { speech: { playerId: actorId, text: message } } : {}),
       },
       channelInfo.channel,
       channelInfo.scopeKey,
       { actionType: step.config.actionType, message },
     );
   }, snapshot);
+}
+
+function normalizeReason(value: unknown): string | null {
+  const reason = String(value || '').trim().slice(0, 80);
+  return reason || null;
 }
 
 function getRoundFromState(state: Record<string, unknown>, day: number): Record<string, unknown> | null {

@@ -60,7 +60,12 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
 
   const match = createWerewolfWorkflowMatch(config, matchId);
   const isDebug = Boolean(config.debugMode);
-  const trace = isDebug ? null : createTraceContext(match.id as string, 'werewolf', String(config.werewolfMode || 'workflow'));
+  const trace = isDebug ? null : createTraceContext(
+    match.id as string,
+    'werewolf',
+    String(config.werewolfMode || 'workflow'),
+    (statePlayers(match) || []) as Array<Record<string, unknown>>,
+  );
   try {
     while (true) {
       const { processed, match: current } = await workflowService.drainAiTasks(match.id as string, { maxTasks: 1 });
@@ -88,6 +93,11 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
     }
     unregisterMatchInfra(match.id as string);
   }
+}
+
+function statePlayers(match: Record<string, unknown>): unknown[] {
+  const state = match.state as { players?: unknown[] } | undefined;
+  return Array.isArray(state?.players) ? state.players : [];
 }
 
 function assertWerewolfWorkflowCompleted(match: Record<string, unknown>): void {

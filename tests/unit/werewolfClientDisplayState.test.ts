@@ -124,11 +124,26 @@ test('werewolf event delivery flattens private night completion payloads', () =>
     type: 'seer-check',
     channel: 'scope',
     scopeKey: 'seer',
-    payload: { actionType: 'seer_check', seerCheck: { target: 1, result: '狼人' } },
+    payload: {
+      actionType: 'seer_check',
+      seerCheck: { target: 1, result: '狼人', reason: '验证前置位' },
+      speech: { playerId: 3, text: '1号玩家的身份是：狼人。验证前置位' },
+    },
     metadata,
     presentation,
   });
-  assert.deepEqual(seer.seerCheck, { target: 1, result: '狼人' });
+  assert.deepEqual(seer.seerCheck, { target: 1, result: '狼人', reason: '验证前置位' });
+  assert.deepEqual(seer.speech, { playerId: 3, text: '1号玩家的身份是：狼人。验证前置位', thinking: '' });
+
+  const guard = toFlatEvent({
+    type: 'guard-action',
+    channel: 'scope',
+    scopeKey: 'guard',
+    payload: { actionType: 'guard_protect', guardAction: { target: 2, reason: '保护关键位' } },
+    metadata,
+    presentation,
+  });
+  assert.deepEqual(guard.guardAction, { target: 2, reason: '保护关键位' });
 
   const witch = toFlatEvent({
     type: 'witch-action',
@@ -155,12 +170,32 @@ test('werewolf client display state merges night completion patches', () => {
   const seer = mergeWerewolfEventIntoGame(wolf, {
     type: 'seer-check',
     metadata: { day: 1, phase: 'night' },
-    seerCheck: { target: '1', result: '狼人' },
+    seerCheck: { target: '1', result: '狼人', reason: '验证前置位' },
   });
-  assert.deepEqual(seer.rounds?.[0].night?.seerCheck, { target: '1', result: '狼人' });
+  assert.deepEqual(seer.rounds?.[0].night?.seerCheck, { target: '1', result: '狼人', reason: '验证前置位' });
 
-  const witch = mergeWerewolfEventIntoGame(seer, {
+  const guard = mergeWerewolfEventIntoGame(seer, {
+    type: 'guard-action',
+    actionType: 'guard_protect',
+    metadata: { day: 1, phase: 'night' },
+    guardAction: { target: '2', reason: '保护关键位' },
+  });
+  assert.equal(guard.rounds?.[0].night?.guardTarget, '2');
+  assert.equal(guard.rounds?.[0].night?.guardReason, '保护关键位');
+
+  const save = mergeWerewolfEventIntoGame(guard, {
     type: 'witch-action',
+    actionType: 'witch_save',
+    metadata: { day: 1, phase: 'night' },
+    witchAction: { use: true, target: '3', reason: '救关键位' },
+  });
+  assert.equal(save.rounds?.[0].night?.witchSaveTarget, '3');
+  assert.equal(save.rounds?.[0].night?.witchSaveReason, '救关键位');
+  assert.equal(save.rounds?.[0].night?.witchPoisonTarget, undefined);
+
+  const witch = mergeWerewolfEventIntoGame(save, {
+    type: 'witch-action',
+    actionType: 'witch_poison',
     metadata: { day: 1, phase: 'night' },
     witchAction: { use: false, target: null, reason: '' },
   });

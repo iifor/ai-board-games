@@ -23,11 +23,14 @@ export interface WerewolfNight {
   wolfSharedInfo?: string;
   wolfTarget?: string;
   wolfChoices?: Record<string, string>;
-  seerCheck?: { target: string; result?: string };
+  seerCheck?: { target: string; result?: string; reason?: string | null };
   guardTarget?: string;
+  guardReason?: string | null;
   witchSaveTarget?: string;
+  witchSaveReason?: string | null;
   witchSave?: boolean;
   witchPoisonTarget?: string;
+  witchPoisonReason?: string | null;
 }
 
 export interface SheriffElection {

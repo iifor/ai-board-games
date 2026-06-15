@@ -7,6 +7,7 @@ import {
   createLivePlaybackSource,
   createPlaybackPipeline,
   createStoredPlaybackSource,
+  preparePlaybackEvents,
   toPlaybackEvent,
 } from '../../packages/server/modules/game-socket/playback';
 
@@ -216,6 +217,34 @@ test('PlaybackEvent strips ack ids and records media references', () => {
   assert.deepEqual(event.media, [{ url: '/audio/test.mp3', mimeType: 'audio/mpeg' }]);
 });
 
+test('PlaybackPipeline freezes the live prefix and prepares the unsent suffix offline', async () => {
+  const pipeline = createPlaybackPipeline(createImmediateSession([]) as never, {
+    viewMode: 'god',
+    capture: true,
+  });
+  const first = createSilentWorkflowEvent('first');
+  const second = createSilentWorkflowEvent('second');
+  const completed = createSilentWorkflowEvent('workflow-completed');
+
+  await pipeline.prepare(first);
+  const prefix = pipeline.freezeCapture();
+  await pipeline.prepare(second);
+
+  const suffix = await preparePlaybackEvents(
+    [second, completed],
+    'god',
+    prefix.length + 1,
+  );
+  const stored = [...prefix, ...suffix];
+
+  assert.deepEqual(stored.map((event) => event.sequence), [1, 2, 3]);
+  assert.deepEqual(
+    stored.map((event) => event.payload.marker),
+    ['first', 'second', 'workflow-completed'],
+  );
+  assert.equal(pipeline.getEvents().length, 1);
+});
+
 function createImmediateSession(sent: SentPayload[]) {
   return {
     send(payload: Record<string, unknown>) {
@@ -228,6 +257,19 @@ function createImmediateSession(sent: SentPayload[]) {
     close() {},
     setPaused() {},
     skipCurrentPhase() {},
+  };
+}
+
+function createSilentWorkflowEvent(marker: string) {
+  return {
+    type: marker === 'workflow-completed' ? marker : 'workflow-event',
+    workflowEvent: marker,
+    marker,
+    message: '',
+    presentation: {
+      suppressSpeech: true,
+      requiresAck: false,
+    },
   };
 }
 

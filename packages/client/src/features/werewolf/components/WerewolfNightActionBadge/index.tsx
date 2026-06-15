@@ -1,5 +1,4 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { CheckCircle2, XCircle } from 'lucide-react';
 import type { NightBadge } from '../../../../types';
 import { classNames } from '../../../../utils/classNames';
 

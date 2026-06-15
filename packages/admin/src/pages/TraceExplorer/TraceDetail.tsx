@@ -63,10 +63,27 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
 
   const handleRefresh = () => fetchAll(true);
 
-  const playerIds = [...new Set((decisions || []).map((d) => d.player_id).filter(Boolean) as number[])].sort((a, b) => a - b);
+  const participantMap = new Map((trace?.participants || []).map((player) => [player.seatId, player]));
+  const playerIds = trace?.participants?.length
+    ? trace.participants.map((player) => player.seatId).sort((a, b) => a - b)
+    : [...new Set([
+        ...(llmCalls || []).map((call) => call.player_id),
+        ...(decisions || []).map((decision) => decision.player_id),
+      ].filter(Boolean) as number[])].sort((a, b) => a - b);
+  const getTracePlayerLabel = (playerId: number | undefined | null): string => {
+    if (!playerId) return '';
+    const participant = participantMap.get(playerId);
+    return participant
+      ? `${participant.seatId}号-${participant.nickname}`
+      : getPlayerLabel(playerId);
+  };
+  const getTraceNickname = (playerId: number | undefined | null): string => {
+    if (!playerId) return '';
+    return participantMap.get(playerId)?.nickname || getNickname(playerId);
+  };
   const tokenSummary = getTraceTokenSummary(llmCalls);
   const relations = buildTraceRelations({ spans, llmCalls, decisions, events });
-  const timelineRows = buildTraceTimeline({ spans, llmCalls, decisions, events, getNickname });
+  const timelineRows = buildTraceTimeline({ spans, llmCalls, decisions, events, getNickname: getTraceNickname });
 
   // Reverse for newest-first display
   const reversedTimeline = [...timelineRows].reverse();
@@ -101,7 +118,7 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
   const tabItems = [
     {
       key: 'overview', label: '概览',
-      children: <TraceOverview trace={trace!} tokenSummary={tokenSummary} playerIds={playerIds} onOpenPlayer={goPlayerTrace} getPlayerLabel={getPlayerLabel} />
+      children: <TraceOverview trace={trace!} tokenSummary={tokenSummary} playerIds={playerIds} onOpenPlayer={goPlayerTrace} getPlayerLabel={getTracePlayerLabel} />
     },
     {
       key: 'spans', label: `Span 层级 (${spans.length})`,
@@ -127,7 +144,7 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
               onClick={() => setDetailDrawer({ type: 'llm', record: call })}
             >
               <Space wrap>
-                {call.player_id && <Tag color="cyan">{getPlayerLabel(call.player_id)}</Tag>}
+                {call.player_id && <Tag color="cyan">{getTracePlayerLabel(call.player_id)}</Tag>}
                 <Tag color={call.status === 'error' ? 'red' : 'blue'}>{translateProvider(call.provider)}</Tag>
                 <Text strong>{translateModelName(call.model)}</Text>
                 <Text type="secondary">{call.latency_ms}ms</Text>
@@ -153,7 +170,7 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
               onClick={() => setDetailDrawer({ type: 'decision', record: dec })}
             >
               <Space wrap>
-                {dec.player_id && <Tag color="cyan">{getPlayerLabel(dec.player_id)}</Tag>}
+                {dec.player_id && <Tag color="cyan">{getTracePlayerLabel(dec.player_id)}</Tag>}
                 <Tag color="purple">{translateDecisionType(dec.decision_type)}</Tag>
                 {dec.player_role && <Tag color="blue">{dec.player_role}</Tag>}
                 {dec.phase && <Tag>{dec.phase}</Tag>}
@@ -208,7 +225,7 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
               const data = (typeof record.event_json === 'string' ? (() => { try { return JSON.parse(record.event_json) as Record<string, unknown>; } catch { return null; } })() : (record.event_json as Record<string, unknown> || null)) as Record<string, unknown> | null;
               const inner = (data?.event as Record<string, unknown> | undefined);
               const actorId = (inner?.actorId ?? data?.actorId) as number | undefined;
-              return actorId != null ? <Tag color="cyan">{getPlayerLabel(Number(actorId))}</Tag> : <Text type="secondary">-</Text>;
+              return actorId != null ? <Tag color="cyan">{getTracePlayerLabel(Number(actorId))}</Tag> : <Text type="secondary">-</Text>;
             }},
             { title: 'Phase', dataIndex: 'phase', key: 'phase', width: 80 },
             { title: '时间', dataIndex: 'received_at', key: 'received_at', width: 180, render: (t: string) => t ? new Date(t).toLocaleString() : '-' }
@@ -261,7 +278,7 @@ export function TraceDetail({ traceId, embedded = false, onClose }: TraceDetailP
         relations={relations}
         onClose={() => setDetailDrawer(null)}
         onOpenDetail={setDetailDrawer}
-        getNickname={getPlayerLabel}
+        getNickname={getTracePlayerLabel}
       />
     </div>
   );

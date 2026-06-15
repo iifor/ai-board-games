@@ -77,7 +77,7 @@ interface LlmRecord {
   errorMessage?: string;
 }
 
-async function callOpenAIChatRaw({
+async function callOpenAIChatRawAttempt({
   apiKey,
   baseUrl = 'https://api.openai.com/v1',
   provider = 'openai',
@@ -92,7 +92,7 @@ async function callOpenAIChatRaw({
   _playerFaction
 }: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] }): Promise<LlmRawResult> {
   if (apiFormat === 'anthropic-compatible') {
-    return callAnthropicChatRaw({ apiKey, baseUrl, provider, model, messages, temperature, maxTokens, _gameId, _playerId, _playerRole, _playerFaction });
+    return callAnthropicChatRawAttempt({ apiKey, baseUrl, provider, model, messages, temperature, maxTokens, _gameId, _playerId, _playerRole, _playerFaction });
   }
 
   const obs = _getObs();
@@ -139,7 +139,7 @@ async function callOpenAIChatRaw({
       span.addEvent('gen_ai.user.message', { content: JSON.stringify(messages || []) });
       obs!.endSpan(span, 'error', {}, error);
     }
-    throw new Error(`[${provider}:${model}] ${getFetchFailureHint(error, endpoint)}`);
+    throw retryableError(`[${provider}:${model}] ${getFetchFailureHint(error, endpoint)}`);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -153,7 +153,11 @@ async function callOpenAIChatRaw({
       span.addEvent('gen_ai.user.message', { content: JSON.stringify(messages || []) });
       obs!.endSpan(span, 'error', {}, new Error(errMsg));
     }
-    throw new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
+    const error = new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
+    if (response.status === 429 || response.status >= 500) {
+      (error as RetryableLlmError).retryable = true;
+    }
+    throw error;
   }
 
   const data = await response.json() as Record<string, unknown>;
@@ -253,7 +257,7 @@ async function callOpenAIChat(options: LlmCallOptions & { apiKey: string; model:
   return content;
 }
 
-async function callAnthropicChatRaw({
+async function callAnthropicChatRawAttempt({
   apiKey,
   baseUrl = 'https://api.anthropic.com/v1',
   provider = 'anthropic',
@@ -320,7 +324,7 @@ async function callAnthropicChatRaw({
       span.addEvent('gen_ai.user.message', { content: JSON.stringify(messages || []) });
       obs!.endSpan(span, 'error', {}, error);
     }
-    throw new Error(`[${provider}:${model}] ${getFetchFailureHint(error, endpoint)}`);
+    throw retryableError(`[${provider}:${model}] ${getFetchFailureHint(error, endpoint)}`);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -334,7 +338,11 @@ async function callAnthropicChatRaw({
       span.addEvent('gen_ai.user.message', { content: JSON.stringify(messages || []) });
       obs!.endSpan(span, 'error', {}, new Error(errMsg));
     }
-    throw new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
+    const error = new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
+    if (response.status === 429 || response.status >= 500) {
+      (error as RetryableLlmError).retryable = true;
+    }
+    throw error;
   }
 
   const data = await response.json() as Record<string, unknown>;
@@ -380,6 +388,38 @@ async function callAnthropicChatRaw({
   }
 
   return { content, thinking };
+}
+
+interface RetryableLlmError extends Error {
+  retryable?: boolean;
+}
+
+function retryableError(message: string): RetryableLlmError {
+  const error = new Error(message) as RetryableLlmError;
+  error.retryable = true;
+  return error;
+}
+
+async function withSingleTransientRetry<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    if (!(error as RetryableLlmError)?.retryable) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return call();
+  }
+}
+
+async function callOpenAIChatRaw(
+  options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] },
+): Promise<LlmRawResult> {
+  return withSingleTransientRetry(() => callOpenAIChatRawAttempt(options));
+}
+
+async function callAnthropicChatRaw(
+  options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] },
+): Promise<LlmRawResult> {
+  return withSingleTransientRetry(() => callAnthropicChatRawAttempt(options));
 }
 
 async function callAnthropicChat(options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] }): Promise<string> {

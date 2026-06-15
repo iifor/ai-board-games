@@ -48,11 +48,14 @@ interface WerewolfNight {
   wolfChoices?: Record<string, unknown>;
   wolfVoteTally?: Record<string, number>;
   wolfTieBreak?: unknown;
-  seerCheck?: { target?: string; result?: string; [key: string]: unknown } | null;
+  seerCheck?: { target?: string; result?: string; reason?: string | null; [key: string]: unknown } | null;
   witchSave?: boolean;
   witchSaveTarget?: number | string | null;
+  witchSaveReason?: string | null;
   witchPoisonTarget?: number | string | null;
+  witchPoisonReason?: string | null;
   guardTarget?: number | string | null;
+  guardReason?: string | null;
   deaths?: Array<{ id?: number | string; playerId?: number | string; reason?: string; deathReason?: string }>;
   [key: string]: unknown;
 }
@@ -112,6 +115,7 @@ interface ExileData {
 
 interface HunterShotData {
   target?: number | string;
+  reason?: string | null;
   [key: string]: unknown;
 }
 
@@ -172,6 +176,8 @@ interface ReplayGame {
   winner?: string | null;
   winReason?: string;
   mvp?: unknown;
+  mvpVoteTally?: Record<string, number>;
+  postgameSpeeches?: Record<string, SpeechData>;
   topic?: unknown;
   players?: ReplayPlayer[];
   rounds?: WerewolfRound[];
@@ -468,6 +474,17 @@ function buildWerewolfReplayPlaybackEvents(game: ReplayGame): Record<string, unk
         game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds),
       });
     }
+    if (sourceRound.hunterShot?.from && sourceRound.hunterShot?.target) {
+      const hunterText = `我选择开枪带走${sourceRound.hunterShot.target}号。`;
+      events.push({
+        type: 'hunter-shot',
+        phaseKey: dayPhaseKey,
+        shot: { from: sourceRound.hunterShot.from, target: sourceRound.hunterShot.target },
+        message: hunterText,
+        speech: { playerId: sourceRound.hunterShot.from, text: hunterText },
+        game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds),
+      });
+    }
 
     if (sourceRound.daySpeech) {
       nightRound.daySpeech = sourceRound.daySpeech;
@@ -521,6 +538,40 @@ function buildWerewolfReplayPlaybackEvents(game: ReplayGame): Record<string, unk
     }
   }
   if (game.winner) {
+    const finalRound = visibleRounds[visibleRounds.length - 1];
+    if (finalRound) finalRound.phase = 'day';
+    const postgamePhaseKey = `werewolf-postgame-${finalRound?.day || 1}`;
+    events.push({
+      type: 'day-start',
+      phaseKey: postgamePhaseKey,
+      message: '天亮了',
+      round: finalRound,
+      game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds),
+    });
+    events.push({
+      type: 'mvp-start',
+      phaseKey: postgamePhaseKey,
+      message: '现在进行MVP评选，请评选本局MVP。',
+      game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds),
+    });
+    if (game.mvp) {
+      events.push({
+        type: 'mvp-result',
+        phaseKey: postgamePhaseKey,
+        mvp: game.mvp,
+        message: buildReplayMvpMessage(game),
+        game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds, true),
+      });
+    }
+    for (const speech of getReplayPostgameSpeeches(game)) {
+      events.push({
+        type: 'speech',
+        actionType: 'postgame_speech',
+        phaseKey: postgamePhaseKey,
+        speech,
+        game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds, true),
+      });
+    }
     events.push({
       type: 'game',
       game: createWerewolfReplaySnapshot(game, replayPlayers, visibleRounds, true),
@@ -755,7 +806,19 @@ function appendWerewolfNightPlaybackEvents(
         game,
         replayPlayers,
         visibleRounds,
-        { seerCheck: night.seerCheck },
+        {
+          actionType: 'seer_check',
+          seerCheck: night.seerCheck,
+          reason: night.seerCheck.reason || null,
+          speech: buildRoleSpeech(replayPlayers, 'seer', withReplayReason(
+            `${night.seerCheck.target}号玩家的身份是：${night.seerCheck.result || '未知'}`,
+            night.seerCheck.reason,
+          )),
+          message: withReplayReason(
+            `${night.seerCheck.target}号玩家的身份是：${night.seerCheck.result || '未知'}`,
+            night.seerCheck.reason,
+          ),
+        },
       );
     }
   }
@@ -771,6 +834,7 @@ function appendWerewolfNightPlaybackEvents(
       { message: getWerewolfNightPrompt('guard-wake') },
     );
     visibleRound.night!.guardTarget = night.guardTarget || null;
+    visibleRound.night!.guardReason = night.guardTarget ? night.guardReason || null : null;
     pushWerewolfPlaybackEvent(
       events,
       'guard-action',
@@ -779,6 +843,16 @@ function appendWerewolfNightPlaybackEvents(
       game,
       replayPlayers,
       visibleRounds,
+      {
+        actionType: 'guard_protect',
+        guardAction: {
+          target: night.guardTarget || null,
+          reason: night.guardTarget ? night.guardReason || null : null,
+        },
+        message: night.guardTarget
+          ? withReplayReason(`守卫守护了${night.guardTarget}号`, night.guardReason)
+          : '守卫选择空守。',
+      },
     );
   }
   if (configuredActions.has('save')) {
@@ -795,6 +869,7 @@ function appendWerewolfNightPlaybackEvents(
     visibleRound.night!.witchSave = Boolean(night.witchSave);
     visibleRound.night!.witchSaveTarget =
       night.witchSaveTarget || (night.witchSave ? night.wolfTarget : null);
+    visibleRound.night!.witchSaveReason = night.witchSave ? night.witchSaveReason || null : null;
     pushWerewolfPlaybackEvent(
       events,
       'witch-action',
@@ -803,6 +878,26 @@ function appendWerewolfNightPlaybackEvents(
       game,
       replayPlayers,
       visibleRounds,
+      {
+        actionType: 'witch_save',
+        witchAction: {
+          use: Boolean(night.witchSave),
+          target: night.witchSave
+            ? night.witchSaveTarget || night.wolfTarget || null
+            : null,
+          reason: night.witchSave ? night.witchSaveReason || null : null,
+        },
+        ...(night.witchSave ? {
+          speech: buildRoleSpeech(replayPlayers, 'witch', withReplayReason(
+            night.witchSaveReason,
+          )),
+        } : {}),
+        message: night.witchSave
+          ? withReplayReason(
+              night.witchSaveReason,
+            )
+          : '',
+      },
     );
   }
   if (configuredActions.has('poison')) {
@@ -817,6 +912,7 @@ function appendWerewolfNightPlaybackEvents(
       { message: getWerewolfNightPrompt('witch-poison') },
     );
     visibleRound.night!.witchPoisonTarget = night.witchPoisonTarget || null;
+    visibleRound.night!.witchPoisonReason = night.witchPoisonTarget ? night.witchPoisonReason || null : null;
     pushWerewolfPlaybackEvent(
       events,
       'witch-action',
@@ -825,8 +921,55 @@ function appendWerewolfNightPlaybackEvents(
       game,
       replayPlayers,
       visibleRounds,
+      {
+        actionType: 'witch_poison',
+        witchAction: {
+          use: Boolean(night.witchPoisonTarget),
+          target: night.witchPoisonTarget || null,
+          reason: night.witchPoisonTarget ? night.witchPoisonReason || null : null,
+        },
+        ...(night.witchPoisonTarget ? {
+          speech: buildRoleSpeech(
+            replayPlayers,
+            'witch',
+            withReplayReason(night.witchPoisonReason),
+          ),
+        } : {}),
+        message: night.witchPoisonTarget
+          ? withReplayReason(night.witchPoisonReason)
+          : '',
+      },
     );
   }
+}
+
+function buildRoleSpeech(players: ReplayPlayer[], role: string, text: string): SpeechData | undefined {
+  const player = players.find((item) => item.role === role);
+  return player?.id != null ? { playerId: player.id, text } : undefined;
+}
+
+function buildReplayMvpMessage(game: ReplayGame): string {
+  const mvp = game.mvp as { id?: number; nickname?: string; name?: string } | null;
+  if (!mvp) return '本场没有产生MVP。';
+  const count = game.mvpVoteTally?.[String(mvp.id)] || 0;
+  return `本场MVP是${mvp.id}号${mvp.nickname || mvp.name || '玩家'}，获得${count}票。`;
+}
+
+function getReplayPostgameSpeeches(game: ReplayGame): SpeechData[] {
+  const speeches = Object.values(game.postgameSpeeches || {});
+  const mvpId = Number((game.mvp as { id?: unknown } | null)?.id || 0);
+  return speeches.sort((left, right) => {
+    const leftId = Number(left.playerId || 0);
+    const rightId = Number(right.playerId || 0);
+    if (leftId === mvpId) return 1;
+    if (rightId === mvpId) return -1;
+    return leftId - rightId;
+  });
+}
+
+function withReplayReason(result: string, reason?: string | null): string {
+  const normalized = String(reason || '').trim();
+  return normalized ? `${result}。原因：${normalized}` : `${result}。`;
 }
 
 function getWerewolfReplayNightActions(game: ReplayGame = {}): Set<string> {
@@ -1016,8 +1159,11 @@ function createWerewolfVisibleNight(night: WerewolfNight = {}): WerewolfNight {
     witchSave: Boolean(night.witchSave),
     witchSaveTarget:
       night.witchSaveTarget || (night.witchSave ? night.wolfTarget : null),
+    ...(night.witchSaveReason ? { witchSaveReason: night.witchSaveReason } : {}),
     witchPoisonTarget: night.witchPoisonTarget || null,
+    ...(night.witchPoisonReason ? { witchPoisonReason: night.witchPoisonReason } : {}),
     guardTarget: night.guardTarget || null,
+    ...(night.guardReason ? { guardReason: night.guardReason } : {}),
     deaths: night.deaths || [],
   };
 }

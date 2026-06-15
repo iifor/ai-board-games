@@ -73,7 +73,9 @@ export class EventDeliverySubscriber {
     const isSheriff = event.type.startsWith('sheriff-');
     const isHunterShot = event.type === 'hunter-shot';
     const isIdiotReveal = event.type === 'idiot-reveal';
-    const keepOriginalType = isSpeech || isSheriff || isTestimony || isHunterShot || isIdiotReveal;
+    const isPostgame = event.type === 'mvp-start' || event.type === 'mvp-vote' || event.type === 'mvp-result';
+    const isPostgameDaybreak = event.type === 'day-start' && event.metadata.stepId === 'postgame_daybreak';
+    const keepOriginalType = isSpeech || isSheriff || isTestimony || isHunterShot || isIdiotReveal || isPostgame || isPostgameDaybreak;
 
     // action-submitted 事件的 speech 嵌套在 payload.speech 中
     const nestedSpeech = payload.speech as Record<string, unknown> | undefined;
@@ -136,8 +138,13 @@ export class EventDeliverySubscriber {
     if (payload.wolfChoices !== undefined) flat.wolfChoices = payload.wolfChoices;
     if (payload.wolfVoteTally !== undefined) flat.wolfVoteTally = payload.wolfVoteTally;
     if (payload.seerCheck !== undefined) flat.seerCheck = payload.seerCheck;
+    if (payload.guardAction !== undefined) flat.guardAction = payload.guardAction;
     if (payload.witchAction !== undefined) flat.witchAction = payload.witchAction;
+    if (payload.reason !== undefined) flat.reason = payload.reason;
     if (payload.idiotReveal !== undefined) flat.idiotReveal = payload.idiotReveal;
+    if (payload.voterId !== undefined) flat.voterId = payload.voterId;
+    if (payload.targetId !== undefined) flat.targetId = payload.targetId;
+    if (payload.mvp !== undefined) flat.mvp = payload.mvp;
 
     if (hasTestimony) {
       flat.speech = {

@@ -50,6 +50,9 @@ export type GameEventType =
   | 'day-start'
   | 'speech-order'
   | 'vote-result'
+  | 'mvp-vote'
+  | 'mvp-start'
+  | 'mvp-result'
 
   // 警长事件
   | 'sheriff-start'
@@ -107,6 +110,10 @@ export interface SerializedGameState {
   rounds: SerializedRound[];
   winner: string | null;
   winReason: string;
+  mvp?: SerializedPlayer | null;
+  mvpVotes?: Record<string, number>;
+  mvpVoteTally?: Record<string, number>;
+  postgameSpeeches?: Record<string, PostgameSpeech>;
   fallbackAudit: unknown[];
   currentActionWindow: Record<string, unknown> | null;
   createdAt: string;
@@ -166,11 +173,14 @@ export interface SerializedNight {
   wolfChoices: Record<string, unknown>;
   wolfVoteTally: Record<string, number>;
   wolfTieBreak: Record<string, unknown> | null;
-  seerCheck: Record<string, unknown> | null;
+  seerCheck: { target?: number | string | null; result?: string; reason?: string | null } | null;
   witchSave: boolean;
   witchSaveTarget: number | null;
+  witchSaveReason?: string | null;
   witchPoisonTarget: number | null;
+  witchPoisonReason?: string | null;
   guardTarget: number | null;
+  guardReason?: string | null;
   deaths: Array<{ id: number; reason: string }>;
 }
 
@@ -188,16 +198,46 @@ export interface SeerCheckCompletedPayload {
   seerCheck: {
     target: number | string | null;
     result: string;
+    reason?: string | null;
+  };
+  speech?: {
+    playerId: number;
+    text: string;
+  };
+}
+
+export interface GuardActionCompletedPayload {
+  actionType: 'guard_protect';
+  message: string;
+  guardAction: {
+    target: number | string | null;
+    reason?: string | null;
   };
 }
 
 export interface WitchActionCompletedPayload {
-  actionType: 'witch_poison';
+  actionType: 'witch_save' | 'witch_poison';
   message: string;
   witchAction: {
     use: boolean;
     target: number | string | null;
-    reason: string;
+    reason?: string | null;
+  };
+  speech?: {
+    playerId: number;
+    text: string;
+  };
+}
+
+export interface HunterShotPayload {
+  shot: {
+    from: number | string;
+    target: number | string;
+  };
+  message: string;
+  speech: {
+    playerId: number;
+    text: string;
   };
 }
 
@@ -229,7 +269,7 @@ export interface AudienceCue {
 export interface EventMetadata {
   matchId: string;
   stepId: string;
-  phase: 'night' | 'day';
+  phase: 'night' | 'day' | 'postgame';
   day: number;
   timestamp: string;
   sequence: number;
@@ -272,7 +312,7 @@ export interface GameEvent<T = unknown> {
 // ============================================================
 
 export interface PhaseStartPayload {
-  phase: 'night' | 'day';
+  phase: 'night' | 'day' | 'postgame';
   message: string;
 }
 
@@ -301,10 +341,19 @@ export interface ActionSubmittedPayload {
 export interface SpeechPayload {
   playerId: number;
   text: string;
+  actionType?: string;
   thinking?: string;
   fullText?: string;
   side?: string;
   speakerLabel?: string;
+  phase?: 'night' | 'day' | 'postgame';
+}
+
+export interface PostgameSpeech {
+  playerId: number;
+  text: string;
+  thinking?: string;
+  phase: 'postgame';
 }
 
 export interface WolfSpeechPayload extends SpeechPayload {

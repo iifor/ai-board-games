@@ -293,7 +293,15 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
       setActiveThinking(null);
       setActiveAudienceCue(null);
       const speakerLabel = formatWerewolfSeatLabel(event.speech.playerId, (event.game?.players || displayGame.players || []) as Player[]);
-      setStreamMessage(event.type === 'wolf-speech' ? `${speakerLabel}狼队战术部署` : event.type === 'self-destruct' ? `${speakerLabel}狼人自爆` : `${speakerLabel}正在发言`);
+      setStreamMessage(
+        event.type === 'wolf-speech'
+          ? `${speakerLabel}狼队战术部署`
+          : event.type === 'self-destruct'
+            ? `${speakerLabel}狼人自爆`
+            : event.actionType === 'postgame_speech'
+              ? `${speakerLabel}发表赛后感言`
+              : `${speakerLabel}正在发言`
+      );
       setActiveSpeech({
         id: '',
         playerId: event.speech.playerId,
@@ -541,13 +549,15 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     // 优先读顶层 actionType（EventBus 路径），回退到 legacy event.payload 路径
     const actionType = String(event.actionType || '');
     const isWolfSpeech = actionType === 'wolf_speech' || actionType === 'wolf_kill';
-    const isDaySpeech = actionType === 'day_speech';
+    const isDaySpeech = actionType === 'day_speech' || actionType === 'postgame_speech';
     if (!isWolfSpeech && !isDaySpeech) return;
 
     setActiveThinking(null);
     const speakerLabel = formatWerewolfSeatLabel(event.speech.playerId, (event.game?.players || displayGame.players || []) as Player[]);
     if (isWolfSpeech) {
       setStreamMessage(`${speakerLabel} 狼队战术部署`);
+    } else if (actionType === 'postgame_speech') {
+      setStreamMessage(`${speakerLabel} 发表赛后感言`);
     } else if (isDaySpeech) {
       setStreamMessage(`${speakerLabel} 发言中`);
     }

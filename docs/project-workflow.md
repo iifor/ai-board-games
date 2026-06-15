@@ -277,6 +277,13 @@ Shadow audit 接入方式：
 - 对局完成时，游戏快照与完整播放事件在同一事务中保存。
 - 新对局回放按序发送已保存的最终展示载荷，不重新生成文案或音频。
 - 每次实时播放或回放仍使用独立 WebSocket 连接和独立 ACK 序列。
+- 正式对局以服务端 workflow 返回 `completed` 为保存条件，不等待 C 端看完终局播放或完成 ACK。
+- workflow 完成后冻结已准备的实时播放前缀，并离线准备尚未发送的终局事件及
+  `workflow-completed` 事件；完整序列与游戏、玩家映射和长期记忆在同一事务提交。
+- 数据库提交成功后才允许发送 `workflow-completed`。终局播放期间断线不影响保存；
+  保存失败发送错误且不得发送假完成事件。
+- `failed`、`paused_debug`、`waiting` 状态不会返回可保存结果；调试模式继续只保留
+  观测数据，不写正式游戏记录。
 - 播放事件绑定原始 `clientViewMode`，回放不能切换为其他视角。
 - 没有播放事件记录的旧对局继续由 `replay.ts` 根据快照重建。
 
@@ -359,6 +366,8 @@ pnpm run test:workflow
 
 狼人杀夜间 action window 已接入 Engine Core bridge。`wolf_vote / wolf_kill / seer_check / guard_protect / witch_save / witch_poison` 完成后，状态写入优先复用 `GameDefinition.createEffectsFromAction`、effect resolver 和 `projectState`。由于当前 workflow handler 仍是同步接口，bridge 以同步方式调用狼人杀 definition/resolver；真实 `GameEngine.submitAction()/resolveEffects()` 的异步 API 暂不直接在 handler 内调用，避免与 `tick` 外层 workflow event commit 产生双写竞争。
 
+决策型神职技能支持可选 `reason`：预言家查验、守卫守护、女巫实际用药和猎人实际开枪会在合法行动生效后保留最多 80 字的原因。原因附加在技能结果旁白中，不拆分新事件；缺少原因、空守、不用药、不开枪、非法目标或 AI 失败时不播报原因。预言家、守卫、女巫结果继续使用各自 `scope` channel，仅上帝视角或对应角色视角可见；猎人开枪及其原因使用公开事件。白痴翻牌是规则自动效果，不生成决策原因。
+
 每次 bridge 执行都会生成 `werewolf_action_engine_shadow_audited` system event，对比 legacy reducer 与 Engine Core 投影的关键夜间字段。`matched` 表示新旧一致；`mismatched` 只记录差异，不阻断对局；`audit_failed` 会 fallback 到 legacy reducer。
 
 狼队 AI 的私密系统提示会包含狼队友座位号和状态，例如 `2号（狼人，存活）`、`3号（狼人，已出局）`。该信息只进入狼队玩家自己的 LLM prompt，用于夜间协作和白天发言推理；已出局狼队友必须被标识为已出局，避免 AI 继续把其当作可参与夜间决策的存活队友。
@@ -384,8 +393,10 @@ pnpm run test:workflow
 - `vote-result` 必须保留 `votes/tally/exile`，并尽量携带结算后的 `game` 和最新 `round`，用于 C 端展示玩家投票箭头/角标和放逐结果。
 - 警长事件必须保留 `sheriffElection/sheriffId/sheriffBadge/sheriffTransfer`，用于 C 端持续展示警徽、警长候选人和警徽流转。
 - `wolf-vote` 完成事件携带动作后快照及 `wolfTarget/wolfChoices/wolfVoteTally`，保持 `scope: wolves`。
-- `seer-check` 完成事件携带动作后快照及 `seerCheck: { target, result }`，保持 `scope: seer`。
-- `witch-action` 毒药完成事件携带动作后快照及 `witchAction: { use, target, reason }`，保持 `scope: witch`；`use` 仅在严格等于 `true` 时视为用毒。
+- `seer-check` 完成事件携带动作后快照及 `seerCheck: { target, result, reason? }`，保持 `scope: seer`。
+- `guard-action` 完成事件携带 `guardAction: { target, reason? }`，保持 `scope: guard`。
+- `witch-action` 解药或毒药完成事件携带动作后快照及 `witchAction: { use, target, reason? }`，保持 `scope: witch`；`use` 仅在严格等于 `true` 时视为用药。
+- `hunter-shot` 可选携带公开 `reason`。
 - 这些字段属于展示状态，不改变 HTTP API 或数据库；C 端会与本地已知 `game.rounds` 做合并，而不是直接覆盖完整状态。
 
 死亡警长通过 `sheriff_badge_disposition` 行动窗决定移交或撕毁；AI 失败、非法目标或无存活目标时降级为撕毁。警徽窗口只在进入白天并公布夜死后创建。处置会更新 `sheriffId/sheriffBadge/sheriffTransfers`，并发布公开的 `sheriff-badge-transfer` 或 `sheriff-badge-tear`，同一死亡警长只处理一次。
@@ -410,6 +421,8 @@ pnpm run test:workflow
 
 警长投票资格由服务端在 actor 选择和结果落盘两层校验。首投排除当前候选人与 `withdrawnIds`，复投排除复投候选人与 `withdrawnIds`；旧 pending action 或伪造提交不会进入 `voters/votes/tally`。
 
+所有投票资格都以结果落盘时的当前存活状态为准。死亡狼人不能进入 `wolfChoices/wolfVoteTally`，死亡玩家或失票玩家不能进入白天 `votes`，即使恢复任务、旧 pending action 或伪造结果仍携带其投票也必须忽略；警长投票继续叠加候选人、退水和复投资格校验。
+
 遗言使用内部 `last_words` 有序 action window。白天只有实际被放逐者发表 `exile-words`，白痴翻牌、平票和放逐后猎人带走者不创建放逐遗言。第 1 夜所有实际死亡玩家按死亡发生顺序发表 `last-words`，包括毒杀与猎人连锁带走；第 2 夜起不创建夜死遗言。内部 `pendingLastWords` 只用于断点恢复，序列化和视角投影时移除。
 
 胜负判断首先使用当前实际存活阵容：狼人全灭时好人胜利；`side` 为平民或神职任一边归零，`gods` 为神职归零，`villagers` 为平民归零，`all` 为所有好人归零。白天死亡队列和警徽流完成后追加有效票权判断：存活且可投票者计 1 票，当前警长使用 `sheriff.voteWeight`，失票白痴和死者计 0；仅当狼人票权严格大于好人票权时狼人胜利，相等继续。夜间不做票权判胜。旧 `single` 配置读取时映射为 `side`。
@@ -425,3 +438,18 @@ pnpm run test:workflow
 - `night_resolve_1` 按“公布夜死、死者 A 遗言/技能/警徽、死者 B 遗言/技能/警徽、胜负判定”推进；技能新死者追加队尾并获得同样的首夜流程。
 - 猎人死亡技能的公开 action type 仍为 `hunter_shot`，内部 task 与 action-window epoch 使用 `hunter_shot:<actorId>`，连续猎人不会共享 epoch；旧 `hunter_shot` 窗口仍可恢复。
 - AI 结果成功落盘后若后续 `wakeTick` 失败，任务保持 `succeeded`，match 转为 `paused_debug` 并记录 `workflow_advance_failed`。狼人杀 runner 只接受 `completed`，`failed/paused_debug/waiting` 均抛错，由 socket 发送 `error`，不得发送 `workflow-completed` 或保存假完成对局。
+## 狼人杀赛后流程
+
+- 狼人杀的胜负判定与比赛完成分离：夜死、放逐、猎人连锁、自爆、白天胜负检查和最大天数结算只锁定 `winner/winReason`，随后通过工作流 `nextStepId` 跳到统一赛后阶段。
+- 赛后步骤固定为 `postgame_daybreak` → `postgame_mvp_intro` →
+  `postgame_mvp_vote` → `postgame_mvp_result` → `postgame_speech` →
+  `finalize`。胜负锁定后先把最后一轮切换为白天并播报“天亮了”，再由主持人
+  播报“现在进行MVP评选，请评选本局MVP。”；最终感言完成后才将 match 标记为
+  `completed`。
+- `mvp_vote` 与 `postgame_speech` 复用 `werewolf.action_window`。所有玩家包含已死亡玩家参与；MVP 禁止自投，失败或非法结果按弃权处理。赛后感言允许玩家返回跳过决定；跳过或调用失败时不保存感言、不生成字幕和语音事件，工作流直接推进到下一位玩家。
+- MVP 按有效票数选出；平票时优先胜方玩家，再按座位号升序；无人有效投票时使用胜方最低座位号兜底。
+- MVP 逐票通过公开静默事件 `mvp-vote` 展示，`mvp-result` 由主持人播报。赛后感言通过公开 `speech` 事件播放，顺序为非 MVP 座位序加 MVP 收尾。
+- 预言家查验和女巫实际用药结果通过 `speech.playerId` 使用对应玩家音色播报；
+  不用药保持静默。猎人开枪使用猎人音色播报“我选择开枪带走 X 号”，不播报
+  技能原因。实时与旧对局重建回放遵循相同约定。
+- 工作流处理器可返回 `nextStepId`，引擎会持久化目标 step index；目标不存在时直接失败，避免静默进入错误流程。

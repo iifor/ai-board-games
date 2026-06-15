@@ -35,7 +35,8 @@ function createRouter(): Router {
       const trace = db.findTraceById(id);
       if (!trace) return res.status(404).json({ code: 'NOT_FOUND', message: 'Trace not found' });
       const spans = db.findSpansByTrace(id);
-      res.json(success({ ...trace, spans }));
+      const participants = db.resolveTraceParticipants(id);
+      res.json(success({ ...trace, participants, spans }));
     } catch (err) { next(err); }
   });
 

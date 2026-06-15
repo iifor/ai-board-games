@@ -213,7 +213,12 @@ const activeTraces = new Map<string, TraceContext>();
 // Safe because only one game runs at a time (sequential Node.js event loop).
 let _rootCtx: Context = context.active();
 
-function createTraceContext(gameId: string, gameType: string, gameMode: string): TraceContext {
+function createTraceContext(
+  gameId: string,
+  gameType: string,
+  gameMode: string,
+  participants: Array<Record<string, unknown>> = [],
+): TraceContext {
   ensureOtel();
   const rootSpan = otelTracer!.startSpan('game-root', {
     kind: SpanKind.SERVER,
@@ -242,6 +247,11 @@ function createTraceContext(gameId: string, gameType: string, gameMode: string):
     created_at: startedAt,
     completed_at: null,
     duration_ms: null,
+    participants_json: JSON.stringify(participants.map((player) => ({
+      seatId: Number(player.seatNumber || player.id),
+      sourcePlayerId: Number(player.sourcePlayerId || player.id),
+      nickname: String(player.nickname || player.name || `${player.seatNumber || player.id}号`),
+    }))),
   });
 
   const ctx: TraceContext = {

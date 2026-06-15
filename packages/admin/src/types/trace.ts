@@ -9,6 +9,13 @@ export interface Trace {
   created_at: string;
   error_message?: string;
   spans?: Span[];
+  participants?: TraceParticipant[];
+}
+
+export interface TraceParticipant {
+  seatId: number;
+  sourcePlayerId: number;
+  nickname: string;
 }
 
 export interface Span {

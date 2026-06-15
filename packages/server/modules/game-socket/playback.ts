@@ -23,6 +23,7 @@ interface PlaybackPipeline {
   play: (source: PlaybackEventSource) => Promise<void>;
   playLive: (source: PlaybackEventSource<SessionEvent>) => Promise<void>;
   flush: () => Promise<void>;
+  freezeCapture: () => PlaybackEvent[];
   getEvents: () => PlaybackEvent[];
   getAudioResources: () => string[];
 }
@@ -37,15 +38,17 @@ function createPlaybackPipeline(
   options: PlaybackPipelineOptions,
 ): PlaybackPipeline {
   const captured: PlaybackEvent[] = [];
+  let captureEnabled = options.capture !== false;
   let nextSequence = 1;
   const sender = createPreparedSender(session, {
     prefetchCount: options.prefetchCount,
     phaseLookahead: options.phaseLookahead,
-    onPrepared: options.capture === false ? undefined : capture,
+    onPrepared: capture,
   });
 
   function capture(payload: SessionEvent): PlaybackEvent {
     const event = toPlaybackEvent(payload, options.viewMode, nextSequence);
+    if (!captureEnabled) return event;
     nextSequence += 1;
     captured.push(event);
     return event;
@@ -77,8 +80,40 @@ function createPlaybackPipeline(
     play,
     playLive,
     flush: sender.flush,
+    freezeCapture: () => {
+      captureEnabled = false;
+      return captured.map(clonePlaybackEvent);
+    },
     getEvents: () => captured.map(clonePlaybackEvent),
     getAudioResources: sender.getAudioResources,
+  };
+}
+
+async function preparePlaybackEvents(
+  events: readonly SessionEvent[],
+  viewMode: string,
+  startSequence = 1,
+): Promise<PlaybackEvent[]> {
+  const preparedSession = createPreparationSession();
+  const sender = createPreparedSender(preparedSession);
+  const prepared: PlaybackEvent[] = [];
+
+  for (const [index, event] of events.entries()) {
+    const payload = await sender.prepare(event);
+    prepared.push(toPlaybackEvent(payload, viewMode, startSequence + index));
+  }
+
+  return prepared;
+}
+
+function createPreparationSession(): GameSession {
+  return {
+    send() {},
+    async sendAndWait() {},
+    resolveAck() {},
+    close() {},
+    setPaused() {},
+    skipCurrentPhase() {},
   };
 }
 
@@ -171,6 +206,7 @@ export {
   createPlaybackPipeline,
   createLivePlaybackSource,
   createStoredPlaybackSource,
+  preparePlaybackEvents,
   toPlaybackEvent,
 };
 export type { PlaybackPipeline, PlaybackPipelineOptions, LivePlaybackEventSource };

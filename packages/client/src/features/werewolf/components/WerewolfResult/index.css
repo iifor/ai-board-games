@@ -33,3 +33,55 @@
   font-size: 14px;
   line-height: 1.4;
 }
+
+.werewolf-result-mvp {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(187, 171, 255, 0.25);
+}
+
+.werewolf-result-mvp span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f7d875;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.werewolf-result-mvp b {
+  color: #fff;
+  font-size: 17px;
+}
+
+.werewolf-result-mvp small {
+  color: rgba(240, 245, 255, 0.72);
+}
+
+.werewolf-result-votes {
+  margin-top: 10px;
+  color: rgba(240, 245, 255, 0.76);
+  font-size: 12px;
+  text-align: left;
+}
+
+.werewolf-result-votes summary {
+  cursor: pointer;
+  text-align: center;
+}
+
+.werewolf-result-votes ul {
+  max-height: 112px;
+  margin: 8px 0 0;
+  padding: 8px 12px 8px 30px;
+  overflow: auto;
+  border-radius: 6px;
+  background: rgba(3, 6, 24, 0.36);
+}
+
+.werewolf-result-votes li + li {
+  margin-top: 4px;
+}

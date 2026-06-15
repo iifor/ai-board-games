@@ -37,7 +37,7 @@ import { resolveActionChannel as resolveChannel } from '@ai-presenter/shared/uti
 export class GameEventBuilder {
   private matchId: string;
   private stepId: string = '';
-  private phase: 'night' | 'day' = 'night';
+  private phase: 'night' | 'day' | 'postgame' = 'night';
   private day: number = 1;
   private sequence: number = 0;
   private game: SerializedGameState | null = null;
@@ -52,7 +52,7 @@ export class GameEventBuilder {
     return this;
   }
 
-  setPhase(phase: 'night' | 'day'): this {
+  setPhase(phase: 'night' | 'day' | 'postgame'): this {
     this.phase = phase;
     return this;
   }
@@ -213,7 +213,7 @@ export class GameEventBuilder {
       speech,
       CHANNEL_TYPES.PUBLIC,
       undefined,
-      { speechText: speech.text }
+      { actionType: speech.actionType, speechText: speech.text }
     );
   }
 

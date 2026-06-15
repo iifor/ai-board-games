@@ -14,6 +14,7 @@ interface GameTraceRow {
   created_at: string;
   completed_at: string | null;
   duration_ms: number | null;
+  participants_json: string;
 }
 
 interface TraceSpanRow {
@@ -111,6 +112,7 @@ interface InsertTraceInput {
   created_at: string;
   completed_at: string | null;
   duration_ms: number | null;
+  participants_json: string;
 }
 
 interface UpdateTraceInput {
@@ -218,8 +220,8 @@ interface InsertSnapshotInput {
 function insertTrace(row: InsertTraceInput): void {
   const db = getDb();
   db.prepare(`
-    INSERT INTO game_traces (id, game_type, game_mode, status, llm_call_count, agent_decision_count, event_count, error_message, created_at, completed_at, duration_ms)
-    VALUES (@id, @game_type, @game_mode, @status, @llm_call_count, @agent_decision_count, @event_count, @error_message, @created_at, @completed_at, @duration_ms)
+    INSERT INTO game_traces (id, game_type, game_mode, status, llm_call_count, agent_decision_count, event_count, error_message, created_at, completed_at, duration_ms, participants_json)
+    VALUES (@id, @game_type, @game_mode, @status, @llm_call_count, @agent_decision_count, @event_count, @error_message, @created_at, @completed_at, @duration_ms, @participants_json)
   `).run(row);
 }
 
@@ -249,6 +251,81 @@ function findTraces({ gameType, status, limit = 50, offset = 0 }: FindTracesPara
 function findTraceById(id: string): GameTraceRow | undefined {
   const db = getDb();
   return db.prepare('SELECT * FROM game_traces WHERE id = @id').get({ id }) as GameTraceRow | undefined;
+}
+
+interface TraceParticipant {
+  seatId: number;
+  sourcePlayerId: number;
+  nickname: string;
+}
+
+function resolveTraceParticipants(traceId: string): TraceParticipant[] {
+  const db = getDb();
+  const trace = findTraceById(traceId);
+  const stored = parseParticipants(trace?.participants_json);
+  if (stored.length) return stored;
+
+  const rootSpan = db.prepare(`
+    SELECT attributes_json FROM trace_spans
+    WHERE trace_id = @traceId AND span_name = 'game-root'
+    ORDER BY created_at ASC LIMIT 1
+  `).get({ traceId }) as { attributes_json?: string } | undefined;
+  const gameId = readGameId(rootSpan?.attributes_json);
+  if (gameId) {
+    const match = db.prepare('SELECT state_json FROM matches WHERE id = @gameId').get({ gameId }) as { state_json?: string } | undefined;
+    const participants = readParticipantsFromState(match?.state_json);
+    if (participants.length) return participants;
+  }
+
+  const ids = db.prepare(`
+    SELECT player_id FROM llm_records WHERE trace_id = @traceId AND player_id IS NOT NULL
+    UNION
+    SELECT player_id FROM agent_decisions WHERE trace_id = @traceId
+    ORDER BY player_id
+  `).all({ traceId }) as Array<{ player_id: number }>;
+  return ids.map(({ player_id }) => ({
+    seatId: Number(player_id),
+    sourcePlayerId: Number(player_id),
+    nickname: `${player_id}号`,
+  }));
+}
+
+function parseParticipants(value: string | undefined): TraceParticipant[] {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed.filter(isTraceParticipant) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readGameId(value: string | undefined): string {
+  try {
+    const parsed = JSON.parse(value || '{}') as Record<string, unknown>;
+    return String(parsed['game.id'] || '');
+  } catch {
+    return '';
+  }
+}
+
+function readParticipantsFromState(value: string | undefined): TraceParticipant[] {
+  try {
+    const state = JSON.parse(value || '{}') as { players?: Array<Record<string, unknown>> };
+    return (state.players || []).map((player) => ({
+      seatId: Number(player.seatNumber || player.id),
+      sourcePlayerId: Number(player.sourcePlayerId || player.id),
+      nickname: String(player.nickname || player.name || `${player.seatNumber || player.id}号`),
+    })).filter(isTraceParticipant);
+  } catch {
+    return [];
+  }
+}
+
+function isTraceParticipant(value: unknown): value is TraceParticipant {
+  const participant = value as Partial<TraceParticipant>;
+  return Number.isFinite(Number(participant?.seatId))
+    && Number.isFinite(Number(participant?.sourcePlayerId))
+    && Boolean(participant?.nickname);
 }
 
 function deleteTrace(id: string): void {
@@ -377,10 +454,13 @@ export type {
   AgentDecisionRow,
   GameEventRow,
   StateSnapshotRow,
+  TraceParticipant,
 };
 
 export {
   insertTrace, updateTraceStatus, findTraces, findTraceById, deleteTrace, deleteOldTraces,
+  resolveTraceParticipants,
+  readParticipantsFromState,
   insertSpan, updateSpan, findSpansByTrace,
   insertLlmRecord, findLlmRecordsByTrace, findLlmRecordsByPlayer,
   insertDecision, findDecisionsByTrace, findDecisionsByPlayer,

@@ -108,7 +108,7 @@ function createWerewolfSkills() {
           promptHasContract: hasOutputContract(prompt),
         });
         const target = parseTargetSeat(parsed);
-        if (!target || !valid.includes(target)) return { target: null, result: 'unknown', reason: normalizeReason(parsed?.reason) };
+        if (!target || !valid.includes(target)) return { target: null, result: 'unknown', reason: null };
         const targetAgent = agents?.find((agent) => agent.id === target);
         return { target, result: targetAgent?.faction === 'wolves' ? '狼人' : '好人', reason: normalizeReason(parsed?.reason) };
       }
@@ -118,14 +118,17 @@ function createWerewolfSkills() {
       prompt: SKILL_DESCRIPTIONS.guard,
       async execute({ actor, alive, promptContext }: SkillContext): Promise<SkillResult> {
         const valid = alive.map((agent) => agent.id).filter((id) => id !== actor.lastGuardTarget);
-        const prompt = withPromptContext(promptContext, buildGuardActionPrompt(), 'guard_protect');
-        const target = await askVoteTarget(actor, prompt, valid, {
+        const prompt = withPromptContext(promptContext, buildGuardActionPrompt(valid), 'guard_protect');
+        const parsed = await askJson(actor, prompt, {
+          maxTokens: 100,
           skillId: 'guard',
           phase: 'night',
-          allowNull: true,
           promptHasContract: hasOutputContract(prompt),
         });
-        return { target };
+        const target = parseTargetSeat(parsed);
+        return target && valid.includes(target)
+          ? { target, reason: normalizeReason(parsed?.reason) }
+          : { target: null, reason: null };
       }
     },
     {
@@ -144,7 +147,7 @@ function createWerewolfSkills() {
         });
         // AI 失败 → 不使用解药（保守）
         const use = parsed?.use === true;
-        return { use, reason: use && victim!.id !== actor.id ? normalizeReason(parsed?.reason) : null };
+        return { use, reason: use ? normalizeReason(parsed?.reason) : null };
       }
     },
     {
@@ -248,7 +251,7 @@ function parseTargetSeat(parsed: Record<string, unknown> | null | undefined): nu
 }
 
 function normalizeReason(value: unknown): string | null {
-  const reason = String(value || '').trim();
+  const reason = String(value || '').trim().slice(0, 80);
   return reason || null;
 }
 

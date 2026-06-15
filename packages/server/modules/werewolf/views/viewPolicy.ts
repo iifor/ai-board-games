@@ -54,8 +54,11 @@ interface NightData {
   seerCheck?: unknown;
   witchSave?: boolean;
   witchSaveTarget?: number | null;
+  witchSaveReason?: string | null;
   witchPoisonTarget?: number | null;
+  witchPoisonReason?: string | null;
   guardTarget?: number | null;
+  guardReason?: string | null;
   deaths?: Array<{ id: number; reason: string }>;
 }
 
@@ -249,8 +252,17 @@ function projectNight(night: NightData, round: Round = {}, context: ProjectionCo
     witchSaveTarget: viewerRoleId === 'witch'
       ? night.witchSaveTarget || (night.witchSave ? night.wolfTarget : null)
       : null,
+    ...(viewerRoleId === 'witch' && night.witchSaveReason
+      ? { witchSaveReason: night.witchSaveReason }
+      : {}),
     witchPoisonTarget: viewerRoleId === 'witch' ? night.witchPoisonTarget || null : null,
+    ...(viewerRoleId === 'witch' && night.witchPoisonReason
+      ? { witchPoisonReason: night.witchPoisonReason }
+      : {}),
     guardTarget: viewerRoleId === 'guard' ? night.guardTarget || null : null,
+    ...(viewerRoleId === 'guard' && night.guardReason
+      ? { guardReason: night.guardReason }
+      : {}),
     deaths: round.nightRevealed ? night.deaths || [] : []
   };
 }
@@ -267,8 +279,11 @@ function cloneNight(night: NightData, round: Round = {}): NightData {
     seerCheck: night.seerCheck || null,
     witchSave: Boolean(night.witchSave),
     witchSaveTarget: night.witchSaveTarget || (night.witchSave ? night.wolfTarget : null),
+    ...(night.witchSaveReason ? { witchSaveReason: night.witchSaveReason } : {}),
     witchPoisonTarget: night.witchPoisonTarget || null,
+    ...(night.witchPoisonReason ? { witchPoisonReason: night.witchPoisonReason } : {}),
     guardTarget: night.guardTarget || null,
+    ...(night.guardReason ? { guardReason: night.guardReason } : {}),
     deaths: round.nightRevealed ? night.deaths || [] : []
   };
 }

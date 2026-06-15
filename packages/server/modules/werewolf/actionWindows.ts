@@ -200,7 +200,10 @@ function resolveActionWindow(matchId: string, stepId: string, actionType: string
 
 function selectActorsForWindow(matchId: string, stepId: string, window: ActionWindow, actors: Agent[], taskActionType: string = window.actionType): Agent[] {
   if (window.orderMode !== 'ordered') return actors || [];
-  const completed = collectActionResults(matchId, stepId, taskActionType).length;
+  const eligibleIds = new Set((actors || []).map((actor) => Number(actor.id)));
+  const completed = collectActionResults(matchId, stepId, taskActionType)
+    .filter((result) => eligibleIds.has(Number(result.actorId)))
+    .length;
   const orderedActors = Array.isArray(window.actorIds) && window.actorIds.length
     ? window.actorIds
         .map((id) => (actors || []).find((actor) => Number(actor.id) === Number(id)))
@@ -223,7 +226,7 @@ function resolveActorType(actor: Agent): string {
 }
 
 function resolveVisibility(actionType: string): string {
-  if (actionType === 'day_speech' || actionType === 'day_vote') return 'public';
+  if (actionType === 'day_speech' || actionType === 'day_vote' || actionType === 'mvp_vote' || actionType === 'postgame_speech') return 'public';
   if (actionType?.startsWith('sheriff_')) return 'public';
   return 'private';
 }

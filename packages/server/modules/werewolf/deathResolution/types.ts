@@ -71,6 +71,7 @@ interface HandlerResult {
   tasks?: unknown[];
   pendingActions?: unknown[];
   matchStatus?: string;
+  nextStepId?: string;
 }
 
 type StageResult =

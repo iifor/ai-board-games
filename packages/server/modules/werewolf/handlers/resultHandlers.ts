@@ -1,10 +1,10 @@
-import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { checkDayWin, getAliveRosterStats } from '../winCheck';
 import type { WerewolfAgent } from '../winCheck';
 import { createRuntime, ensureRound, syncRuntimeState } from '../runtime';
 import { resolveActiveSheriffId } from '../sheriffWorkflow';
 import { createWerewolfEvent, completed, isDone, markStepComplete } from './common';
 import type { StepState } from './common';
+import { WEREWOLF_POSTGAME_DAYBREAK_STEP_ID } from '../postgame';
 
 interface Match {
   id: string;
@@ -25,13 +25,20 @@ interface HandlerResult {
   state: StepState;
   events?: unknown[];
   matchStatus?: string;
+  nextStepId?: string;
 }
 
 function createCheckWinHandler() {
   return {
     execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
       if (isDone(state, step.id)) return completed(state, step.id);
-      if (state.winner) return { status: 'COMPLETED', state: markStepComplete({ ...state, currentStep: step.id }, step.id) };
+      if (state.winner) {
+        return {
+          status: 'COMPLETED',
+          state: markStepComplete({ ...state, currentStep: step.id }, step.id),
+          nextStepId: WEREWOLF_POSTGAME_DAYBREAK_STEP_ID,
+        };
+      }
       const runtime = createRuntime(match, state);
       const day = step.config.day || 1;
       const round = ensureRound(runtime.state, day);
@@ -49,9 +56,16 @@ function createCheckWinHandler() {
       }, step.id);
       return {
         status: 'COMPLETED',
-        matchStatus: result.winner ? MATCH_STATUS.COMPLETED : undefined,
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, result.winner ? 'werewolf_game_completed' : 'werewolf_phase_changed', result.winner ? 'winner decided' : 'game continues')]
+        events: [createWerewolfEvent(
+          match,
+          step,
+          nextState as unknown as Record<string, unknown>,
+          result.winner ? 'werewolf_game_result' : 'werewolf_phase_changed',
+          result.winner ? result.winReason : 'game continues',
+          result.winner ? { winner: result.winner } : {},
+        )],
+        ...(result.winner ? { nextStepId: WEREWOLF_POSTGAME_DAYBREAK_STEP_ID } : {}),
       };
     }
   };
@@ -70,9 +84,16 @@ function createFinalizeHandler() {
       }, step.id);
       return {
         status: 'COMPLETED',
-        matchStatus: MATCH_STATUS.COMPLETED,
         state: nextState,
-        events: [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_completed', 'game completed')]
+        nextStepId: WEREWOLF_POSTGAME_DAYBREAK_STEP_ID,
+        events: [createWerewolfEvent(
+          match,
+          step,
+          nextState as unknown as Record<string, unknown>,
+          'werewolf_game_result',
+          nextState.winReason as string,
+          { winner: nextState.winner },
+        )],
       };
     }
   };

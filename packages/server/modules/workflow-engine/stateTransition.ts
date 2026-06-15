@@ -8,6 +8,7 @@ interface StateTransitionInput {
   stepId: string;
   matchVersion: number;
   currentStepIndex: number;
+  nextStepIndex?: number;
   previousState: Record<string, unknown>;
   nextState: Record<string, unknown>;
   result: StepHandlerExecuteResult;
@@ -18,7 +19,7 @@ function buildStateTransitionEvents(input: StateTransitionInput): EventInput[] {
     currentStepIndex:
       input.result.status === 'WAITING'
         ? input.currentStepIndex
-        : input.currentStepIndex + 1,
+        : input.nextStepIndex ?? input.currentStepIndex + 1,
     status:
       input.result.status === 'WAITING'
         ? MATCH_STATUS.WAITING

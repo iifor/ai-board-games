@@ -14,6 +14,9 @@ export interface GameState {
   winner?: string | null;
   winReason?: string;
   mvp?: Player | null;
+  mvpVotes?: Record<string, number>;
+  mvpVoteTally?: Record<string, number>;
+  postgameSpeeches?: Record<string, PostgameSpeech>;
   shareReport?: DebateShareReport;
   event?: { name?: string; background?: string };
   config?: { subtitleMaxChars?: number };
@@ -25,8 +28,16 @@ export interface GameState {
   [key: string]: unknown;
 }
 
+export interface PostgameSpeech {
+  playerId: number;
+  text: string;
+  thinking?: string;
+  phase: 'postgame';
+}
+
 export interface GameEvent {
   type: string;
+  actionType?: string;
   ackId?: number | string;
   text?: string;
   narration?: string;
@@ -57,9 +68,14 @@ export interface GameEvent {
   phase?: string | { speeches?: unknown[]; stageSummary?: string };
   round?: WerewolfRound;
   shot?: { from: string; target: string };
+  reason?: string | null;
   selfDestruct?: { playerId?: string | number; text?: string; day?: number };
-  seerCheck?: { target: string; result?: string };
-  witchAction?: { use: boolean; target?: string | null; reason?: string };
+  seerCheck?: { target: string; result?: string; reason?: string | null };
+  guardAction?: { target?: string | null; reason?: string | null };
+  witchAction?: { use: boolean; target?: string | null; reason?: string | null };
+  voterId?: number;
+  targetId?: number;
+  mvp?: Player | null;
   sheriffCandidateIds?: number[];
   playerId?: string;
   thinking?: string;

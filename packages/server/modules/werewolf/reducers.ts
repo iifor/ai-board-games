@@ -17,6 +17,7 @@ import {
   resolveActiveSheriffId
 } from './sheriffWorkflow';
 import { ensureWolfTeamContext } from './wolfTeam';
+import { resolvePostgameSpeechOrder } from './postgameRules';
 
 interface Agent {
   id: number;
@@ -44,11 +45,14 @@ interface Night {
   wolfSharedInfo?: string;
   wolfLeaderId?: number | null;
   wolfSpeechOrder?: number[];
-  seerCheck?: { target: number; result: string } | null;
+  seerCheck?: { target: number; result: string; reason?: string | null } | null;
   guardTarget?: number | null;
+  guardReason?: string | null;
   witchSave?: boolean;
   witchSaveTarget?: number | null;
+  witchSaveReason?: string | null;
   witchPoisonTarget?: number | null;
+  witchPoisonReason?: string | null;
   deaths?: Array<{ id: number; reason: string }>;
   [key: string]: unknown;
 }
@@ -131,7 +135,37 @@ function applyActionResults(runtime: Runtime, step: Step, results: ActionResult[
   if (actionType === 'witch_poison') applyWitchPoison(runtime, round, results);
   if (actionType === 'day_speech') applyDaySpeech(round, results, runtime.agents);
   if (actionType === 'day_vote') applyDayVote(runtime, round, results);
+  if (actionType === 'mvp_vote') applyMvpVotes(runtime, results);
+  if (actionType === 'postgame_speech') applyPostgameSpeeches(runtime, results);
   if (actionType?.startsWith('sheriff_')) applySheriffActionResults(runtime, round, actionType, results);
+}
+
+function applyMvpVotes(runtime: Runtime, results: ActionResult[]): void {
+  const playerIds = new Set(runtime.agents.map((agent) => Number(agent.id)));
+  const votes = { ...((runtime.state.mvpVotes || {}) as Record<string, number>) };
+  for (const result of results) {
+    const voterId = Number(result.actorId);
+    const targetId = Number(result.payload.target);
+    if (!playerIds.has(voterId) || !playerIds.has(targetId) || voterId === targetId) continue;
+    votes[String(voterId)] = targetId;
+  }
+  runtime.state.mvpVotes = votes;
+}
+
+function applyPostgameSpeeches(runtime: Runtime, results: ActionResult[]): void {
+  const speeches = { ...((runtime.state.postgameSpeeches || {}) as Record<string, Record<string, unknown>>) };
+  for (const result of results) {
+    if (result.payload.speak !== true) continue;
+    const text = String(result.payload.text || result.payload.speech || '').trim();
+    if (!text) continue;
+    speeches[String(result.actorId)] = {
+      playerId: result.actorId,
+      text,
+      thinking: String(result.payload.thinking || ''),
+      phase: 'postgame',
+    };
+  }
+  runtime.state.postgameSpeeches = speeches;
 }
 
 function applyWolfSpeech(runtime: Runtime, round: Round, results: ActionResult[]): void {
@@ -152,7 +186,7 @@ function applyWolfSpeech(runtime: Runtime, round: Round, results: ActionResult[]
 
 function applyWolfVote(runtime: Runtime, round: Round, results: ActionResult[]): void {
   round.night.wolfChoices = {};
-  for (const result of results) {
+  for (const result of filterEligibleWolfVotes(runtime, results)) {
     round.night.wolfChoices[result.actorId] = result.payload.target!;
   }
   round.night.wolfVoteTally = countTargets(round.night.wolfChoices);
@@ -164,7 +198,7 @@ function applyWolfVote(runtime: Runtime, round: Round, results: ActionResult[]):
 function applyWolfKill(runtime: Runtime, round: Round, results: ActionResult[]): void {
   round.night.wolfChoices = {};
   round.night.wolfSpeeches = round.night.wolfSpeeches || [];
-  for (const result of results) {
+  for (const result of filterEligibleWolfVotes(runtime, results)) {
     round.night.wolfChoices![result.actorId] = result.payload.target!;
     if (result.payload.speech) {
       (round.night.wolfSpeeches as Array<Record<string, unknown>>).push({
@@ -186,7 +220,12 @@ function applySeerCheck(runtime: Runtime, round: Round, results: ActionResult[])
   const result = results[0]?.payload;
   const seer = runtime.agents.find((agent) => Number(agent.id) === Number(results[0]?.actorId));
   if (!result) return;
-  round.night.seerCheck = { target: result.target as number, result: result.result as string };
+  const reason = normalizeReason(result.reason);
+  round.night.seerCheck = {
+    target: result.target as number,
+    result: result.result as string,
+    ...(reason ? { reason } : {}),
+  };
   if (seer) seer.seerChecks!.push(round.night.seerCheck as Record<string, unknown>);
 }
 
@@ -195,6 +234,8 @@ function applyGuardProtect(runtime: Runtime, round: Round, results: ActionResult
   const guard = runtime.agents.find((agent) => Number(agent.id) === Number(results[0]?.actorId));
   if (!result?.target) return;
   round.night.guardTarget = result.target as number;
+  const reason = normalizeReason(result.reason);
+  if (reason) round.night.guardReason = reason;
   if (guard) guard.lastGuardTarget = result.target as number;
 }
 
@@ -204,6 +245,8 @@ function applyWitchSave(runtime: Runtime, round: Round, results: ActionResult[])
   if (round.night?.witchPoisonTarget || !result?.use || !round.night.wolfTarget) return;
   round.night.witchSave = true;
   round.night.witchSaveTarget = round.night.wolfTarget;
+  const reason = normalizeReason(result.reason);
+  if (reason) round.night.witchSaveReason = reason;
   if (witch) witch.usedAntidote = true;
 }
 
@@ -212,6 +255,8 @@ function applyWitchPoison(runtime: Runtime, round: Round, results: ActionResult[
   const witch = runtime.agents.find((agent) => Number(agent.id) === Number(results[0]?.actorId));
   if (round.night?.witchSave || result?.use !== true || !result.target) return;
   round.night.witchPoisonTarget = result.target as number;
+  const reason = normalizeReason(result.reason);
+  if (reason) round.night.witchPoisonReason = reason;
   if (witch) witch.usedPoison = true;
 }
 
@@ -236,11 +281,19 @@ function applyDaySpeech(round: Round, results: ActionResult[], agents?: Agent[])
 function applyDayVote(runtime: Runtime, round: Round, results: ActionResult[]): void {
   round.votes = {};
   for (const result of results) {
+    const actor = runtime.agents.find((agent) => Number(agent.id) === Number(result.actorId));
+    if (!actor?.alive || actor.canVote === false) continue;
     const target = result.payload.target ?? null;
     round.votes![result.actorId] = target;
-    const actor = runtime.agents.find((agent) => Number(agent.id) === Number(result.actorId));
-    if (actor) actor.votes!.push({ day: round.day, target });
+    actor.votes!.push({ day: round.day, target });
   }
+}
+
+function filterEligibleWolfVotes(runtime: Runtime, results: ActionResult[]): ActionResult[] {
+  const eligibleIds = new Set(
+    getAliveActorsByAction(runtime, 'kill').map((agent) => Number(agent.id)),
+  );
+  return results.filter((result) => eligibleIds.has(Number(result.actorId)));
 }
 
 // ============================================================
@@ -334,6 +387,11 @@ function getActorsForStep(runtime: Runtime, step: Step, round: Round): Agent[] {
   }
   if (actionType === 'day_speech') return buildDaySpeechOrder(runtime, round);
   if (actionType === 'day_vote') return sortBySeat(runtime.agents.filter((agent) => agent.alive && agent.canVote));
+  if (actionType === 'mvp_vote') return sortBySeat(runtime.agents);
+  if (actionType === 'postgame_speech') {
+    const mvp = runtime.state.mvp as { id?: unknown } | null | undefined;
+    return resolvePostgameSpeechOrder(runtime.agents, mvp?.id) as Agent[];
+  }
   if (actionType?.startsWith('sheriff_')) return getSheriffActorsForAction(runtime, round, actionType);
   return [];
 }
@@ -369,6 +427,8 @@ function getTargetIds(runtime: Runtime, step: Step): number[] {
   const alive = runtime.agents.filter((agent) => agent.alive);
   if (step.config.actionType === 'wolf_kill' || step.config.actionType === 'wolf_vote') return alive.filter((agent) => agent.faction !== 'wolves').map((agent) => agent.id);
   if (step.config.actionType === 'wolf_speech') return [];
+  if (step.config.actionType === 'mvp_vote') return runtime.agents.map((agent) => agent.id);
+  if (step.config.actionType === 'postgame_speech') return [];
   if (step.config.actionType?.startsWith('sheriff_')) {
     const round = ensureRound(runtime.state, step.config.day);
     return getSheriffTargetIds(round, step.config.actionType);
@@ -409,6 +469,11 @@ function ensureRound(state: State, day: number): Round {
     state.rounds = [...(state.rounds || []), round];
   }
   return round;
+}
+
+function normalizeReason(value: unknown): string | null {
+  const reason = String(value || '').trim().slice(0, 80);
+  return reason || null;
 }
 
 export {

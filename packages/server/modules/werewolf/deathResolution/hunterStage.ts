@@ -123,7 +123,7 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
     payload: {
       ...(result?.payload || {}),
       target: effect ? target : null,
-      reason: context.round.phase,
+      reason: null,
     },
     round: context.round,
     day: context.round.day,
@@ -146,17 +146,20 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
       }],
     });
   }
-  // 发布猎人开枪事件到 EventBus（实时推送管道，供 C 端 gun.gif + gun.wav）
-  publishGameEvent(context.runtime.eventBus, context.runtime.gameEventBuilder, (builder) => {
-    builder.setStep(context.step.id);
-    builder.setPhase((context.step.config.phase as 'night' | 'day') || 'day');
-    builder.setDay(context.round.day || 1);
-    const shotMessage = `${actorId}号猎人开枪带走${target}号。`;
-    return builder.build('hunter-shot', {
-      shot: { from: actorId, target },
-      message: shotMessage,
+  if (effect) {
+    // 发布猎人开枪事件到 EventBus（实时推送管道，供 C 端 gun.gif + gun.wav）
+    publishGameEvent(context.runtime.eventBus, context.runtime.gameEventBuilder, (builder) => {
+      builder.setStep(context.step.id);
+      builder.setPhase((context.step.config.phase as 'night' | 'day') || 'day');
+      builder.setDay(context.round.day || 1);
+      const shotMessage = `我选择开枪带走${target}号。`;
+      return builder.build('hunter-shot', {
+        shot: { from: actorId, target },
+        message: shotMessage,
+        speech: { playerId: actorId, text: shotMessage },
+      });
     });
-  });
+  }
   appendUnique(context.checkpoint.completedHunterIds, actorId);
   context.state = {
     ...syncRuntimeState(context.runtime),

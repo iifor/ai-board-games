@@ -18,10 +18,14 @@ const testFiles = [
   'werewolfChannelGuard.test.ts',
   'werewolfInteractionFeedbackTrace.test.ts',
   'werewolfActionEngineBridge.test.ts',
+  'werewolfPromptRecentContext.test.ts',
   'werewolfPromptContext.test.ts',
   'playerMemory.test.ts',
   'werewolfClientDisplayState.test.ts',
-  'nightResolutionAuditViewModel.test.ts'
+  'llmRetry.test.ts',
+  'traceParticipants.test.ts',
+  'nightResolutionAuditViewModel.test.ts',
+  'werewolfPostgameRules.test.ts'
 ].map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];

@@ -156,6 +156,15 @@ function buildRecentContext(rounds: PromptRound[], agents: PromptAgent[], actor:
   const current = rounds[rounds.length - 1];
   if (!current) return '';
   const entries: string[] = [];
+  const election = current.sheriffElection;
+  const sheriffSpeeches = Array.isArray(election?.speeches) ? election.speeches : [];
+  const runoffSpeeches = Array.isArray(election?.runoffSpeeches) ? election.runoffSpeeches : [];
+  sheriffSpeeches.forEach((speech) => {
+    entries.push(`警上发言：${formatPlayerRef(speech.playerId, agents)}：${speech.text || ''}`);
+  });
+  runoffSpeeches.forEach((speech) => {
+    entries.push(`警长复投发言：${formatPlayerRef(speech.playerId, agents)}：${speech.text || ''}`);
+  });
   if (actor.faction === 'wolves') {
     const wolfSpeeches = current.night?.wolfSpeeches || [];
     wolfSpeeches.slice(-4).forEach((speech) => {

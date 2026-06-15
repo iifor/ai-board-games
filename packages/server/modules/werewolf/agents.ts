@@ -105,11 +105,14 @@ interface Night {
   wolfChoices: Record<string, number>;
   wolfVoteTally: Record<string, number>;
   wolfTieBreak: number | null;
-  seerCheck: { target: number; result: string } | null;
+  seerCheck: { target: number; result: string; reason?: string | null } | null;
   witchSave: boolean;
   witchSaveTarget: number | null;
+  witchSaveReason?: string | null;
   witchPoisonTarget: number | null;
+  witchPoisonReason?: string | null;
   guardTarget: number | null;
+  guardReason?: string | null;
   wolfStrategy: string;
   deaths: Array<{ id: number; reason: string }>;
 }
@@ -323,8 +326,11 @@ function publicNight(night: Night, hideDeaths: boolean = false): Night {
     wolfTieBreak: night.wolfTieBreak || null, seerCheck: night.seerCheck || null,
     witchSave: Boolean(night.witchSave),
     witchSaveTarget: night.witchSaveTarget || (night.witchSave ? night.wolfTarget : null),
+    ...(night.witchSaveReason ? { witchSaveReason: night.witchSaveReason } : {}),
     witchPoisonTarget: night.witchPoisonTarget || null,
+    ...(night.witchPoisonReason ? { witchPoisonReason: night.witchPoisonReason } : {}),
     guardTarget: night.guardTarget || null,
+    ...(night.guardReason ? { guardReason: night.guardReason } : {}),
     wolfStrategy: night.wolfStrategy || '',
     deaths: hideDeaths ? [] : night.deaths || []
   };

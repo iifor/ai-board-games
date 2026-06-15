@@ -526,6 +526,7 @@ function migrate(db: Database | JsonDb): void {
     CREATE INDEX IF NOT EXISTS idx_snapshots_trace ON state_snapshots(trace_id);
     CREATE INDEX IF NOT EXISTS idx_snapshots_checkpoint ON state_snapshots(trace_id, checkpoint);
   `);
+  ensureColumn(db, 'game_traces', 'participants_json', "TEXT NOT NULL DEFAULT '[]'");
 }
 
 function migrateLegacyModelProviders(db: Database): void {

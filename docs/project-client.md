@@ -175,9 +175,11 @@ pnpm run check:client
 - `mergeWerewolfEventIntoGame` 保留已知玩家、round、警徽、警长竞选和投票字段，只用新事件覆盖明确携带的字段。
 - `resolveActiveSheriffId` 会从当前 round 和历史 rounds 反查有效警徽，避免进入后续夜晚或下一天后警徽图标消失。
 - `vote-result` 事件即使没有完整 `game` snapshot，也会用顶层 `votes/tally/exile` patch 到对应 day 的 round，供座位投票角标展示。
-- `wolf-vote/seer-check/witch-action` 会把顶层完成字段合并到当前夜晚；完成事件不能按 `actionType` 回退为睁眼态。
+- `wolf-vote/seer-check/guard-action/witch-action` 会把顶层完成字段合并到当前夜晚；女巫解药与毒药必须按 `actionType` 分流，完成事件不能回退为睁眼态。
 - 狼人座位在授权视角显示最终“刀 X 号”，预言家座位显示“查 X 号 / 好人或狼人”，女巫座位显示“毒 X 号”或“不毒”。
 - 女巫选择不使用毒药时仍消费 `witch-action` 并展示“不毒”，但该事件没有旁白、TTS 或语音 ACK；实时与精确回放使用相同最终载荷。
+- 预言家、守卫、女巫的有效技能结果带有可选原因时，C 端直接播放服务端生成的 `presentation.speakableText`；原因不单独排队，不读取或播报模型 thinking。夜间原因沿用事件 scope 视角权限，猎人开枪原因随公开 `hunter-shot` 播报。
+- 新对局精确回放保存最终播报文本；没有精确播放事件的旧对局从夜间快照中的可选原因重建相同结果旁白。
 - `last-words` 和 `exile-words` 继续复用现有 testimony UI。首夜遗言和放逐遗言由服务端决定资格与顺序，C 端不自行推导。
 - `sheriff-result`、`sheriff-badge-transfer/tear` 是公开系统播报。事件携带最新 `sheriffId/sheriffBadge`；当选后显示警徽，移交后移动警徽，撕毁后清除警徽。
 ## 狼人杀首日播放与异常状态
@@ -185,3 +187,16 @@ pnpm run check:client
 - 首日播放顺序为警长结果、夜死公布，然后逐人播放“遗言 -> 死亡技能 -> 警徽决定”，最后播放胜负结果；遗言继续使用现有 `last-words` 展示和语音 ACK 队列。
 - 女巫当夜已使用解药时，毒药阶段由服务端静默跳过，C 端不会收到额外行动或跳过展示。
 - 服务端 match 为 `failed` 或 `paused_debug` 时，Socket 只发送现有 `error` 事件，不发送 `workflow-completed`。C 端保留错误状态，不展示比赛结束结果。
+## 狼人杀赛后展示
+
+- `WerewolfResult` 在胜负锁定后显示获胜阵营和原因，并随状态更新展示 MVP、公开身份、票数与逐票记录。
+- `mvp-vote` 仅更新展示，不进入语音播放；`mvp-result` 使用主持人 `presentation.speakableText`。
+- `postgame_speech` 复用既有 `speech`、玩家音色、字幕、ACK 与精确回放管线，不新增播放器或 WebSocket 消息。
+## 狼人杀终局与技能语音
+
+- 技能结果事件携带 `speech.playerId` 时，C 端按该玩家的 `voicePackageId` 播放；
+  未携带玩家发言信息的阶段提示继续使用主持人音色。
+- 游戏胜负锁定后会收到 `day-start`，最终 round 保持 `phase: day`，终局界面不得
+  回退为天黑状态。
+- 赛后播放顺序为天亮、`mvp-start` 主持人口播、静默 MVP 逐票、`mvp-result`
+  主持人公布、玩家 `postgame_speech`。

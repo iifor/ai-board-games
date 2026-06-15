@@ -113,13 +113,37 @@ function extractEventRound(event: GameEvent): WerewolfRound | null {
     };
   }
 
-  if (event.type === 'witch-action' && event.witchAction) {
+  if (event.type === 'guard-action' && event.guardAction) {
     patch.night = {
       ...(baseRound.night || {}),
-      witchPoisonTarget: event.witchAction.use && event.witchAction.target != null
-        ? String(event.witchAction.target)
-        : undefined,
+      guardTarget: event.guardAction.target == null ? undefined : String(event.guardAction.target),
+      ...(event.guardAction.reason ? { guardReason: event.guardAction.reason } : {}),
     };
+  }
+
+  if (event.type === 'witch-action' && event.witchAction) {
+    if (event.actionType === 'witch_save') {
+      patch.night = {
+        ...(baseRound.night || {}),
+        witchSave: event.witchAction.use === true,
+        witchSaveTarget: event.witchAction.use && event.witchAction.target != null
+          ? String(event.witchAction.target)
+          : undefined,
+        ...(event.witchAction.use && event.witchAction.reason
+          ? { witchSaveReason: event.witchAction.reason }
+          : {}),
+      };
+    } else {
+      patch.night = {
+        ...(baseRound.night || {}),
+        witchPoisonTarget: event.witchAction.use && event.witchAction.target != null
+          ? String(event.witchAction.target)
+          : undefined,
+        ...(event.witchAction.use && event.witchAction.reason
+          ? { witchPoisonReason: event.witchAction.reason }
+          : {}),
+      };
+    }
   }
 
   if (event.type.startsWith('sheriff-')) {

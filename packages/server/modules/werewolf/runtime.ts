@@ -402,6 +402,10 @@ function serializeWerewolfState(match: Match, state: WerewolfState): Record<stri
     rounds: (state.rounds || []).map(stripInternalRoundState),
     winner,
     winReason: state.winReason || '',
+    mvp: state.mvp || null,
+    mvpVotes: state.mvpVotes || {},
+    mvpVoteTally: state.mvpVoteTally || {},
+    postgameSpeeches: state.postgameSpeeches || {},
     fallbackAudit: state.fallbackAudit || [],
     currentActionWindow: state.currentActionWindow || null,
     createdAt: match.createdAt || new Date().toISOString()

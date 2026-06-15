@@ -1,10 +1,14 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { getDb } from '../../db';
 import { createSession, isSessionCancelled, parseMessage } from './session';
-import { createPreparedSender } from './sender';
-import { createLivePlaybackSource, createPlaybackPipeline } from './playback';
+import { createPreparedSender, isDisplayEvent } from './sender';
+import {
+  createLivePlaybackSource,
+  createPlaybackPipeline,
+  preparePlaybackEvents,
+} from './playback';
 import { replayGameSession } from './replay';
-import type { GameSession } from './session';
+import type { GameSession, SessionEvent } from './session';
 import { getAiConfig } from '../../config';
 import { runAiDebate } from '../../aiDebateRunner';
 import { runWerewolfWorkflow } from '../werewolf';
@@ -208,6 +212,13 @@ async function runSession(
   const livePlayback = playbackPipeline && liveSource
     ? playbackPipeline.playLive(liveSource)
     : null;
+  const livePlaybackResult = livePlayback
+    ? livePlayback.then(
+        () => ({ error: null as unknown }),
+        (error: unknown) => ({ error }),
+      )
+    : null;
+  const playbackSourceEvents: SessionEvent[] = [];
   let liveProjectionContext: ProjectionContext | null = null;
 
   const runner = getRunner(safeGameType);
@@ -218,6 +229,7 @@ async function runSession(
       onEvent: (event: Record<string, unknown>) => {
         if (liveSource) {
           if (safeGameType !== 'werewolf') {
+            if (isDisplayEvent(event)) playbackSourceEvents.push(event);
             liveSource.push(event);
             return;
           }
@@ -241,7 +253,10 @@ async function runSession(
                 liveProjectionContext || { mode: 'player' },
               ) as Record<string, unknown> | null
             : event;
-          if (projected) liveSource.push(projected);
+          if (projected) {
+            if (isDisplayEvent(projected)) playbackSourceEvents.push(projected);
+            liveSource.push(projected);
+          }
         }
         else return sender.enqueue(event);
       },
@@ -251,12 +266,9 @@ async function runSession(
   } finally {
     liveSource?.close();
   }
-  if (livePlayback) await livePlayback;
   if (runnerError) throw runnerError;
   if (!game) throw new Error('游戏流程未返回对局结果。');
-  await sender.flush();
-
-  const completedEvent = {
+  const completedEvent: SessionEvent = {
     type:
       safeGameType === 'debate' || safeGameType === 'werewolf'
         ? 'workflow-completed'
@@ -267,13 +279,26 @@ async function runSession(
         ? projectWerewolfGame(game, createProjectionContext(game))
         : game,
   };
+  const capturedPlaybackEvents = playbackPipeline
+    ? playbackPipeline.freezeCapture()
+    : [];
+  const missingPlaybackEvents = playbackPipeline
+    ? await preparePlaybackEvents(
+        [
+          ...playbackSourceEvents.slice(capturedPlaybackEvents.length),
+          completedEvent,
+        ],
+        viewMode,
+        capturedPlaybackEvents.length + 1,
+      )
+    : [];
+  const playbackEvents = [...capturedPlaybackEvents, ...missingPlaybackEvents];
   const preparedCompletedEvent = playbackPipeline
-    ? await playbackPipeline.prepare(completedEvent)
+    ? playbackEvents[playbackEvents.length - 1] || null
     : null;
 
   // 调试模式不保存数据库，只保留 AI 观测数据
   if (!(config as Record<string, unknown>).debugMode) {
-    const playbackEvents = playbackPipeline?.getEvents() || [];
     const audioResources = playbackPipeline
       ? collectPlaybackAudioResources(playbackEvents)
       : sender.getAudioResources();
@@ -303,8 +328,19 @@ async function runSession(
   const sessionTrace = getActiveTrace((game as Record<string, unknown>)?.id as string || '');
   if (sessionTrace) { flushTrace(sessionTrace); }
 
+  if (livePlaybackResult) {
+    const { error } = await livePlaybackResult;
+    if (error && !isSessionCancelled(error)) throw error;
+  } else {
+    await sender.flush();
+  }
+
   if (preparedCompletedEvent && playbackPipeline) {
-    await playbackPipeline.sendPrepared(preparedCompletedEvent);
+    try {
+      await playbackPipeline.sendPrepared(preparedCompletedEvent);
+    } catch (error) {
+      if (!isSessionCancelled(error)) throw error;
+    }
   } else {
     await sender.send(completedEvent);
   }

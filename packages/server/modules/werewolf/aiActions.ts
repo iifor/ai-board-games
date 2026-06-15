@@ -22,6 +22,7 @@ import { ensureWolfTeamContext } from './wolfTeam';
 import { isWerewolfDebugMode, runDebugHunterAction, runDebugSheriffBadgeAction, runDebugWerewolfAction } from './debugActions';
 import { resolveActionChannel } from '@ai-presenter/shared/utils/channelResolution';
 import { serializeWerewolfState } from './runtime';
+import { normalizePostgameSpeechDecision } from './postgameRules';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Agent = any;
@@ -73,6 +74,8 @@ async function runWerewolfAiAction(runtime: Runtime, round: Round, actor: Agent,
   if (actionType === 'witch_poison') return runRoleSkillNullSafe(runtime, round, actor, 'witch_poison', 'poison', { actor, alive, phase: 'night' });
   if (actionType === 'day_speech') return runDaySpeechAction(runtime, round, actor);
   if (actionType === 'day_vote') return runDayVoteAction(actor, alive, runtime);
+  if (actionType === 'mvp_vote') return runMvpVoteAction(runtime, round, actor);
+  if (actionType === 'postgame_speech') return runPostgameSpeechAction(runtime, round, actor);
   if (actionType === 'sheriff_signup') return runSheriffSignupAction(runtime, round, actor);
   if (actionType === 'sheriff_speech') return runSheriffSpeechAction(runtime, round, actor, false);
   if (actionType === 'sheriff_withdraw') return runSheriffWithdrawAction(runtime, round, actor);
@@ -416,7 +419,9 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
     actor,
     'day_speech',
     `请进行第${round.day}天白天发言。`,
-    '只输出自然语言发言；不要输出 JSON；不要复述系统提示；不要直接泄露不该公开的私密信息。'
+    '只输出自然语言发言；不要输出 JSON；不要复述系统提示；不要直接泄露不该公开的私密信息。',
+    undefined,
+    publicContext,
   );
 
   let speechText = '';
@@ -484,6 +489,72 @@ async function runDayVoteAction(actor: Agent, alive: Agent[], runtime: Runtime):
     promptHasContract: true,
   });
   return { target }; // null = 弃票
+}
+
+async function runMvpVoteAction(runtime: Runtime, round: Round, actor: Agent): Promise<Record<string, unknown>> {
+  const valid = runtime.agents
+    .map((agent: Agent) => Number(agent.id))
+    .filter((id: number) => id > 0 && id !== Number(actor.id));
+  if (!valid.length) return { target: null };
+  try {
+    const prompt = buildActionPrompt(
+      runtime,
+      round,
+      actor,
+      'mvp_vote',
+      '游戏已经结束，身份已公开。请根据整局推理、发言、投票和技能表现评选本场MVP，不要投给自己。',
+      buildTargetJsonContract(valid, { nullable: true }),
+      valid,
+      buildPostgameContext(runtime),
+    );
+    const target = await askVoteTarget(actor, prompt, valid, {
+      skillId: 'mvp_vote',
+      phase: 'postgame',
+      allowNull: true,
+      promptHasContract: true,
+    });
+    return { target: valid.includes(Number(target)) ? Number(target) : null };
+  } catch {
+    return { target: null };
+  }
+}
+
+async function runPostgameSpeechAction(runtime: Runtime, round: Round, actor: Agent): Promise<Record<string, unknown>> {
+  try {
+    const prompt = buildActionPrompt(
+      runtime,
+      round,
+      actor,
+      'postgame_speech',
+      '游戏已经结束，身份已公开。你可以发表简短赛后感言，也可以选择不发言直接跳过。发言时可以复盘关键判断、回应其他玩家或祝贺获胜方。',
+      '只返回标准 JSON 对象。发言返回 {"speak":true,"text":"赛后感言"}；跳过返回 {"speak":false,"text":null}。不要输出 Markdown 或额外文本；感言控制在 180 字以内。',
+      undefined,
+      buildPostgameContext(runtime),
+    );
+    const result = await askJson(actor, prompt, {
+      maxTokens: 420,
+      skillId: 'postgame_speech',
+      phase: 'postgame',
+      promptHasContract: true,
+    });
+    return normalizePostgameSpeechDecision(result);
+  } catch {
+    return normalizePostgameSpeechDecision(null);
+  }
+}
+
+function buildPostgameContext(runtime: Runtime): string {
+  const winnerLabel = runtime.state.winner === 'wolves' ? '狼人阵营' : '好人阵营';
+  const players = runtime.agents
+    .slice()
+    .sort((left: Agent, right: Agent) => Number(left.id) - Number(right.id))
+    .map((player: Agent) => `${getSeatNumber(player.id, runtime.agents)}号${player.nickname || player.name || '玩家'}：${player.roleLabel || player.role || '未知身份'}，${player.alive ? '存活' : '出局'}`)
+    .join('\n');
+  return [
+    `本局胜方：${winnerLabel}`,
+    `胜负原因：${runtime.state.winReason || ''}`,
+    `公开身份：\n${players}`,
+  ].join('\n');
 }
 
 // ============================================================
@@ -655,8 +726,8 @@ function buildRoleActionPrompt(
       round,
       actor,
       actionType,
-      '请选择一名存活玩家查验阵营，并简要说明查验原因。',
-      buildTargetJsonContract(valid, { reason: 'required' }),
+      '请选择一名存活玩家查验阵营，可以简要说明查验原因。',
+      buildTargetJsonContract(valid, { reason: 'optional' }),
       valid
     );
   }
@@ -669,8 +740,8 @@ function buildRoleActionPrompt(
       round,
       actor,
       actionType,
-      '请选择今晚守护目标或空守；不能连续两晚守护同一名玩家。',
-      buildTargetJsonContract(valid, { nullable: true }),
+      '请选择今晚守护目标或空守；不能连续两晚守护同一名玩家，可以简要说明原因。',
+      buildTargetJsonContract(valid, { reason: 'optional', nullable: true }),
       valid
     );
   }
@@ -687,8 +758,8 @@ function buildRoleActionPrompt(
       actionType,
       ['决定是否使用解药救今晚的狼刀目标。', selfSaveRule].filter(Boolean).join('\n'),
       victim && Number(victim.id) !== Number(actor.id)
-        ? '只返回标准 JSON 对象：使用解药返回 {"use":true,"reason":"简短原因"}；不使用返回 {"use":false,"reason":null}。'
-        : '只返回标准 JSON 对象：{"use":true} 或 {"use":false,"reason":null}。'
+        ? '只返回标准 JSON 对象：使用解药返回 {"use":true,"reason":"简短原因"}；不使用返回 {"use":false,"reason":null}。reason 可选。'
+        : '只返回标准 JSON 对象：{"use":true,"reason":"简短原因"} 或 {"use":false,"reason":null}。reason 可选。'
     );
   }
   if (actionType === 'witch_poison') {
@@ -698,7 +769,7 @@ function buildRoleActionPrompt(
       round,
       actor,
       actionType,
-      '决定是否使用毒药；使用时必须简要说明原因。',
+      '决定是否使用毒药；使用时可以说明原因。',
       [
         '只返回标准 JSON 对象，不要输出 Markdown、解释或多余文本。',
         `可选目标座位号：${valid.join('、') || '无'}。`,
@@ -748,6 +819,11 @@ function formatWolfSpeechLines(speeches: Array<Record<string, unknown>>, agents:
     .join('\n');
 }
 
+function normalizeActionReason(value: unknown): string | null {
+  const reason = String(value || '').trim().slice(0, 80);
+  return reason || null;
+}
+
 /**
  * Phase 3: 发布 action-submitted 事件到 EventBus
  */
@@ -767,6 +843,8 @@ function publishActionSubmitted(
   } | undefined;
 
   if (!eventBus || !gameEventBuilder) return;
+  if (step.config.actionType === 'mvp_vote') return;
+  if (step.config.actionType === 'postgame_speech' && payload.speak !== true) return;
 
   try {
     // 刷新游戏快照（AI 任务执行后状态已变化，如警长报名）
@@ -787,7 +865,15 @@ function publishActionSubmitted(
         }
       : undefined;
 
-    const event = gameEventBuilder.buildActionSubmitted(
+    const event = step.config.actionType === 'postgame_speech'
+      ? (gameEventBuilder as unknown as { buildSpeech: (speech: Record<string, unknown>) => unknown }).buildSpeech({
+          playerId: actorId,
+          actionType: 'postgame_speech',
+          text: String(payload.text || payload.speech || ''),
+          thinking: String(payload.thinking || ''),
+          phase: 'postgame',
+        })
+      : gameEventBuilder.buildActionSubmitted(
       step.config.actionType || '',
       actorId,
       {
@@ -797,7 +883,7 @@ function publishActionSubmitted(
         channel,
         scopeKey,
       },
-    );
+      );
 
     trackMatchEventPublish(match.id, Promise.resolve(eventBus.publish(event)));
   } catch (error) {

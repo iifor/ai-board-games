@@ -198,9 +198,12 @@ function snapshotNightActionState(state: Record<string, unknown>, day?: number):
       wolfStrategy: night.wolfStrategy || '',
       seerCheck: night.seerCheck || null,
       guardTarget: night.guardTarget || null,
+      guardReason: night.guardReason || null,
       witchSave: Boolean(night.witchSave),
       witchSaveTarget: night.witchSaveTarget || null,
+      witchSaveReason: night.witchSaveReason || null,
       witchPoisonTarget: night.witchPoisonTarget || null,
+      witchPoisonReason: night.witchPoisonReason || null,
     },
     players: players.map((player) => ({
       id: player.id,
@@ -218,6 +221,7 @@ function normalizeSeerChecks(value: unknown): Array<Record<string, unknown>> {
     return {
       target: record.target ?? null,
       result: record.result ?? null,
+      reason: record.reason ?? null,
     };
   });
 }

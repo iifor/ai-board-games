@@ -143,11 +143,21 @@ function tickMatch(matchId: string, budget: TickBudget = {}): Match {
       }
 
       state = result.state || state;
+      const requestedStepIndex = result.nextStepId
+        ? workflow.steps.findIndex((candidate) => candidate.id === result.nextStepId)
+        : -1;
+      if (result.nextStepId && requestedStepIndex < 0) {
+        throw new Error(`Workflow step not found: ${result.nextStepId}`);
+      }
+      const nextStepIndex = requestedStepIndex >= 0
+        ? requestedStepIndex
+        : currentStepIndex + 1;
       const projectedEvents = buildStateTransitionEvents({
         matchId,
         stepId: step.id,
         matchVersion: Number(match.version || 0),
         currentStepIndex,
+        nextStepIndex,
         previousState,
         nextState: state,
         result,
@@ -179,7 +189,7 @@ function tickMatch(matchId: string, budget: TickBudget = {}): Match {
         break;
       }
 
-      currentStepIndex += 1;
+      currentStepIndex = nextStepIndex;
       stepsProcessed += 1;
     }
 

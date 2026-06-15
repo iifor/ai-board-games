@@ -19,9 +19,9 @@ interface PhaseContext {
   wolfTarget?: number | string | null;
   target?: number | string | null;
   seerResult?: string | null;
+  reason?: string | null;
   witchSaveUsed?: boolean;
   witchPoisonUsed?: boolean;
-  witchPoisonReason?: string | null;
   guardTarget?: number | string | null;
 }
 
@@ -50,7 +50,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `预言家请睁眼，请选择查验的目标`,
       result: context?.seerResult
-        ? `${context.target || '?'}号玩家的身份是：${context.seerResult}`
+        ? withReason(`${context.target || '?'}号玩家的身份是：${context.seerResult}`, context.reason)
         : '',
       end: `预言家请闭眼`,
     }),
@@ -58,10 +58,10 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
   witch_save: {
     actionType: 'witch_save',
     roleName: '女巫',
-    buildMessages: (_day: number, context: Record<string, unknown> = {}) => ({
+    buildMessages: (_day: number, context: PhaseContext = {}) => ({
       start: `女巫请睁眼。`,
       result: context.witchSaveUsed
-        ? `女巫使用了解药，救了${context.target || context.wolfTarget || '?'}号玩家`
+        ? withReason(`女巫使用了解药，救了${context.target || context.wolfTarget || '?'}号玩家`, context.reason)
         : `女巫没有使用解药`,
       end: '',  // 女巫在毒药阶段后才闭眼
     }),
@@ -72,7 +72,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `女巫请睁眼。你有一瓶毒药，你要用吗？`,
       result: context?.witchPoisonUsed
-        ? context.witchPoisonReason?.trim() || `女巫毒了${context.target || '?'}号`
+        ? withReason(context.reason)
         : ``,
       end: `女巫请闭眼。`,
     }),
@@ -83,7 +83,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `守卫请睁眼，请选择今晚守护的目标。`,
       result: context?.guardTarget
-        ? `守卫守护了${context.guardTarget}号。`
+        ? withReason(`守卫守护了${context.guardTarget}号`, context.reason)
         : `守卫选择空守。`,
       end: `守卫请闭眼。`,
     }),
@@ -107,6 +107,11 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     }),
   },
 };
+
+function withReason(result: string, reason?: string | null): string {
+  const normalized = String(reason || '').trim();
+  return normalized ? `${result}。${normalized}` : `${result}。`;
+}
 
 /**
  * 获取行动阶段配置
