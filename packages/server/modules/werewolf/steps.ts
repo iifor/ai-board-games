@@ -37,13 +37,25 @@ function createWerewolfSteps(): WorkflowStep[] {
     steps.push({ id: `check_win_${day}`, type: 'werewolf.check_win', name: '胜负检查', config: { day } });
   }
   steps.push({ id: 'force_result', type: 'werewolf.finalize', name: '锁定最终结果', config: {} });
+  steps.push({ id: 'postgame_reset', type: 'werewolf.postgame_reset', name: '游戏结束与状态重置', config: { phase: 'day' } });
   steps.push({ id: 'postgame_daybreak', type: 'werewolf.postgame_daybreak', name: '赛后天亮', config: { phase: 'day' } });
   steps.push({ id: 'postgame_mvp_intro', type: 'werewolf.postgame_mvp_intro', name: 'MVP评选开场', config: { phase: 'postgame' } });
   steps.push({ id: 'postgame_mvp_vote', type: 'werewolf.action_window', name: 'MVP评选', config: { phase: 'postgame', actionType: 'mvp_vote', ordered: true } });
   steps.push({ id: 'postgame_mvp_result', type: 'werewolf.mvp_result', name: '公布MVP', config: { phase: 'postgame' } });
   steps.push({ id: 'postgame_speech', type: 'werewolf.action_window', name: '赛后感言', config: { phase: 'postgame', actionType: 'postgame_speech', ordered: true } });
   steps.push({ id: 'finalize', type: 'werewolf.complete', name: '结束游戏', config: { phase: 'postgame' } });
-  return steps;
+  return insertSelfDestructResolveSteps(steps);
+}
+
+function insertSelfDestructResolveSteps(steps: WorkflowStep[]): WorkflowStep[] {
+  return steps.flatMap((step) => {
+    if (step.config.actionType !== 'day_speech' || !step.config.day) return [step];
+    const day = step.config.day;
+    return [
+      step,
+      { id: `self_destruct_resolve_${day}`, type: 'werewolf.self_destruct_resolve', name: '自爆结算', config: { day, phase: 'day' } },
+    ];
+  });
 }
 
 function addSheriffSteps(steps: WorkflowStep[], day: number): void {

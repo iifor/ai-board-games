@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createRound } from '../../packages/server/modules/werewolf/agents';
 import {
   applyActionResults,
+  applySelfDestruct,
   findPendingHunter,
   getActorsForStep,
   getTargetIds,
@@ -327,6 +328,17 @@ test('workflow places sheriff direction immediately before day speech every day'
   }
 });
 
+test('workflow resolves self destruct after day speech before vote', () => {
+  const steps = createWerewolfSteps();
+  for (const day of [1, 2]) {
+    const speechIndex = steps.findIndex((step) => step.id === `day_speech_${day}`);
+    const selfDestructIndex = steps.findIndex((step) => step.id === `self_destruct_resolve_${day}`);
+    const voteIndex = steps.findIndex((step) => step.id === `day_vote_${day}`);
+    assert.equal(selfDestructIndex, speechIndex + 1);
+    assert.equal(voteIndex, selfDestructIndex + 1);
+  }
+});
+
 test('postgame actions include dead players and put MVP last', () => {
   const round = createRound(1);
   const ctx = {
@@ -485,4 +497,47 @@ test('wolf team context shares wolves and prefers high identity leader', () => {
   assert.deepEqual(context.wolfSpeechOrder, [2, 3, 1]);
   assert.match(context.wolfSharedInfo, /狼队成员/);
   assert.equal(wolfLeaderPriority(ctx.agents[1] as never), 100);
+});
+
+test('white wolf king self destruct records and kills a valid target', () => {
+  const round = createRound(1);
+  const whiteWolfKing = actor(1, 'wolves', ['kill'], {
+    role: 'white_wolf_king',
+    roleConfig: {
+      id: 'white_wolf_king',
+      name: '白狼王',
+      rule: { actions: [{ action: 'kill' }, { action: 'selfDestruct' }] },
+    },
+  });
+  const target = actor(2, 'good', ['shootOnDeath']);
+  const ctx = {
+    agents: [whiteWolfKing, target, actor(3, 'good')],
+    modeConfig: { sheriff: {}, winCondition: 'side' },
+    state: { rounds: [round] },
+  };
+
+  applyActionResults(ctx as never, { config: { day: 1, actionType: 'day_speech' } } as never, [
+    {
+      actorId: 1,
+      payload: {
+        text: '我选择自爆带走2号。',
+        selfDestruct: true,
+        selfDestructText: '白狼王自爆。',
+        target: 2,
+      },
+    },
+  ]);
+  applySelfDestruct(ctx as never, round as never);
+
+  assert.deepEqual(round.selfDestruct, {
+    playerId: 1,
+    text: '白狼王自爆。',
+    day: 1,
+    targetId: 2,
+  });
+  assert.equal(ctx.agents[0].alive, false);
+  assert.equal(ctx.agents[0].deathReason, 'self_destruct');
+  assert.equal(ctx.agents[1].alive, false);
+  assert.equal(ctx.agents[1].deathReason, 'white_wolf_king_self_destruct');
+  assert.equal(findPendingHunter(ctx.agents as never, round as never, [{ id: 2 }] as never)?.id, 2);
 });

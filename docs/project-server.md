@@ -257,3 +257,10 @@ pnpm run check:server
 - 敏感信息不得写入代码或返回前端。
 - API 错误必须交给统一错误处理，不允许静默 catch。
 - 修改 API、数据库表、配置或模块边界时，同步更新 `docs/project-server.md` 和相关文档。
+## Werewolf 12-player expansion
+
+- Default werewolf seed data now includes role `white_wolf_king` and mode `white-wolf-king-guard-12`.
+- `guard-12` remains the mode id for `预女猎守（12人）`; only the default name and description are normalized to the 4 wolf, 4 villager, seer, witch, hunter and guard lineup.
+- Startup seed upserts default werewolf roles and modes even when the database already contains data, so existing local databases can receive new default roles/modes without a new table.
+- White wolf king self-destruct target validation and death application live under `packages/server/modules/werewolf`. The frontend/admin only consume resulting events and snapshots.
+- No database table was added for this expansion. The change extends existing role, mode, workflow event and playback payload structures.

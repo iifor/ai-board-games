@@ -364,6 +364,7 @@ export interface WolfSpeechPayload extends SpeechPayload {
 export interface SelfDestructPayload {
   playerId: number;
   text: string;
+  targetId?: number | null;
   speech?: {
     playerId: number;
     text: string;

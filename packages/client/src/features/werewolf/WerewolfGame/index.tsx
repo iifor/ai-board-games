@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { fetchAiPlayers, fetchWerewolfModes } from '../../../services/gameService';
 import { useSpeechQueue } from '../../../hooks/useSpeechQueue';
 import { useGameSocketSession } from '../../../hooks/useGameSocketSession';
+import { GameBroadcastHud } from '../../../components/GameBroadcastHud';
 import { WerewolfArena } from '../components/WerewolfArena';
 import { WerewolfControls } from '../components/WerewolfControls';
 import { ThinkingModal } from '../../../components/common/ThinkingModal';
@@ -11,6 +12,7 @@ import bgWerewolf from '../../../asserts/werewolf.png';
 import { EMPTY_WEREWOLF } from '../constants';
 import { useWerewolfSpeechPlayback } from '../hooks/useWerewolfSpeechPlayback';
 import { resolveAudienceCue, type AudienceCueResolution } from '../utils/audienceCue';
+import { classNames } from '../../../utils/classNames';
 import {
   buildEventLogEntry,
   getNightActionPlayerIds,
@@ -25,12 +27,33 @@ import {
   toggleWerewolfPlayerId,
   mergeWerewolfEventIntoGame
 } from '../utils';
-import type { GameState, GameEvent, GameStatus, Player, WerewolfMode, EventLogEntry, SpeechState } from '../../../types';
+import type { GameState, GameEvent, GameStatus, Player, WerewolfMode, WerewolfRound, EventLogEntry, SpeechState } from '../../../types';
 import './index.css';
 
 interface WerewolfGameProps {
   replayGameId?: string;
   onReturnToSelect: () => void;
+  variant?: 'classic' | 'v2';
+  renderArena?: (props: WerewolfGameArenaProps) => ReactNode;
+}
+
+export interface WerewolfGameArenaProps {
+  game: GameState;
+  mode: WerewolfMode | null;
+  currentRound: WerewolfRound | null;
+  currentSpeakerId: string | null;
+  nightActionPlayerIds: number[];
+  nightActionType: string;
+  seerCheckTarget: string | null;
+  sheriffCandidateIds: number[];
+  hunterShotFromId: number | null;
+  activeSpeech: SpeechState | null;
+  eventLog: EventLogEntry[];
+  showRoles: boolean;
+  visibleRolePlayerId: string | number | null;
+  streamMessage: string;
+  onShowRolesChange: (value: boolean | ((prev: boolean) => boolean)) => void;
+  onPlayerSelect: (player: Player | null) => void;
 }
 
 interface ActiveThinking {
@@ -38,11 +61,11 @@ interface ActiveThinking {
   thinking: string;
 }
 
-export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGameProps) {
+export function WerewolfGame({ replayGameId = '', onReturnToSelect, variant = 'classic', renderArena }: WerewolfGameProps) {
   const [game, setGame] = useState<GameState>(EMPTY_WEREWOLF);
   const [status, setStatus] = useState<GameStatus>('idle');
   const [streamMessage, setStreamMessage] = useState('等待开局');
-  const [, setEventLog] = useState<EventLogEntry[]>([]);
+  const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
   const [activeSpeech, setActiveSpeech] = useState<SpeechState | null>(null);
   const [activeThinking, setActiveThinking] = useState<ActiveThinking | null>(null);
   const [activeAudienceCue, setActiveAudienceCue] = useState<AudienceCueResolution | null>(null);
@@ -604,8 +627,36 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
     onReturnToSelect();
   }
 
+  const arenaProps: WerewolfGameArenaProps = {
+    game: displayGame,
+    mode: werewolfMode,
+    currentRound,
+    currentSpeakerId,
+    nightActionPlayerIds,
+    nightActionType,
+    seerCheckTarget,
+    sheriffCandidateIds,
+    hunterShotFromId,
+    activeSpeech,
+    eventLog,
+    showRoles,
+    visibleRolePlayerId,
+    streamMessage,
+    onShowRolesChange: setShowRoles,
+    onPlayerSelect: setSelectedPlayer
+  };
+
   return (
-    <main className="game-shell werewolf-shell real-mode" style={{ '--bg-werewolf': `url(${bgWerewolf})` } as React.CSSProperties}>
+    <main className={classNames('game-shell werewolf-shell real-mode', variant === 'v2' && 'werewolf-shell--v2')} style={{ '--bg-werewolf': `url(${bgWerewolf})` } as React.CSSProperties}>
+      {variant === 'v2' && (
+        <GameBroadcastHud
+          title="AI 狼人杀"
+          subtitle={werewolfMode?.name || 'Werewolf Night Arena'}
+          tone="werewolf"
+          status={streamMessage}
+        />
+      )}
+
       <WerewolfControls
         autoPlay={autoPlay}
         startDisabled={!canStartNextGame}
@@ -630,23 +681,25 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect }: WerewolfGa
             <strong>{streamMessage || '等待开局'}</strong>
           </div>
         </section>
+      ) : renderArena ? (
+        renderArena(arenaProps)
       ) : (
         <WerewolfArena
-          game={displayGame}
-          mode={werewolfMode}
-          currentRound={currentRound}
-          currentSpeakerId={currentSpeakerId}
-          nightActionPlayerIds={nightActionPlayerIds}
-          nightActionType={nightActionType}
-          seerCheckTarget={seerCheckTarget}
-          sheriffCandidateIds={sheriffCandidateIds}
-          hunterShotFromId={hunterShotFromId}
-          activeSpeech={activeSpeech}
-          showRoles={showRoles}
-          visibleRolePlayerId={visibleRolePlayerId}
-          streamMessage={streamMessage}
-          onShowRolesChange={setShowRoles}
-          onPlayerSelect={setSelectedPlayer}
+          game={arenaProps.game}
+          mode={arenaProps.mode}
+          currentRound={arenaProps.currentRound}
+          currentSpeakerId={arenaProps.currentSpeakerId}
+          nightActionPlayerIds={arenaProps.nightActionPlayerIds}
+          nightActionType={arenaProps.nightActionType}
+          seerCheckTarget={arenaProps.seerCheckTarget}
+          sheriffCandidateIds={arenaProps.sheriffCandidateIds}
+          hunterShotFromId={arenaProps.hunterShotFromId}
+          activeSpeech={arenaProps.activeSpeech}
+          showRoles={arenaProps.showRoles}
+          visibleRolePlayerId={arenaProps.visibleRolePlayerId}
+          streamMessage={arenaProps.streamMessage}
+          onShowRolesChange={arenaProps.onShowRolesChange}
+          onPlayerSelect={arenaProps.onPlayerSelect}
         />
       )}
 

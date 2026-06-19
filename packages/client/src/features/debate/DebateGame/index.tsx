@@ -3,6 +3,7 @@ import { fetchAiHealth } from '../../../services/gameService';
 import { useSpeechQueue } from '../../../hooks/useSpeechQueue';
 import { useGameSocketSession } from '../../../hooks/useGameSocketSession';
 import { PlayerDetailModal } from '../../../components/common/PlayerDetailModal';
+import { GameBroadcastHud } from '../../../components/GameBroadcastHud';
 import { DebateArena } from '../components/DebateArena';
 import { DebateControls } from '../components/DebateControls';
 import { ThinkingModal } from '../../../components/common/ThinkingModal';
@@ -22,15 +23,17 @@ import {
   getDebateNarration
 } from '../utils';
 import { EMPTY_DEBATE, DEFAULT_DEBATE_TOPIC } from '../constants';
+import { classNames } from '../../../utils/classNames';
 import './index.css';
 import type { GameState, GameEvent, GameStatus, SpeechState, Player, DebateTopic, DebateTeamDraft } from '../../../types';
 
 interface DebateGameProps {
   replayGameId?: string;
   onReturnToSelect: () => void;
+  variant?: 'classic' | 'v2';
 }
 
-export function DebateGame({ replayGameId = '', onReturnToSelect }: DebateGameProps) {
+export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'classic' }: DebateGameProps) {
   const [game, setGame] = useState<GameState>(EMPTY_DEBATE);
   const [status, setStatus] = useState<GameStatus>('idle');
   const [streamMessage, setStreamMessage] = useState('真实模式已就绪，点击开始后调用 AI。');
@@ -246,7 +249,16 @@ export function DebateGame({ replayGameId = '', onReturnToSelect }: DebateGamePr
   }
 
   return (
-    <main className="game-shell debate-shell real-mode" style={{ '--bg-debate': `url(${bgDebate})` } as React.CSSProperties}>
+    <main className={classNames('game-shell debate-shell real-mode', variant === 'v2' && 'debate-shell--v2')} style={{ '--bg-debate': `url(${bgDebate})` } as React.CSSProperties}>
+      {variant === 'v2' && (
+        <GameBroadcastHud
+          title="AI Debate"
+          subtitle="Debate League / Live Match"
+          tone="debate"
+          status={streamMessage}
+        />
+      )}
+
       <DebateControls
         autoPlay={autoPlay}
         onReturn={returnToSelect}

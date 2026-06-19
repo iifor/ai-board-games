@@ -69,7 +69,7 @@ export interface GameEvent {
   round?: WerewolfRound;
   shot?: { from: string; target: string };
   reason?: string | null;
-  selfDestruct?: { playerId?: string | number; text?: string; day?: number };
+  selfDestruct?: { playerId?: string | number; text?: string; day?: number; targetId?: string | number | null };
   seerCheck?: { target: string; result?: string; reason?: string | null };
   guardAction?: { target?: string | null; reason?: string | null };
   witchAction?: { use: boolean; target?: string | null; reason?: string | null };

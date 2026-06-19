@@ -27,7 +27,7 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
   const activeStepIndex = getActiveStageIndex(currentPhase, phaseSteps);
   const currentTitle = isIdle ? '等待开局' : getStageTitle(currentPhase);
   return (
-    <>
+    <section className="debate-arena" aria-label="辩论赛竞技场">
       <DebateSide
         title="正方"
         position={game.topic?.proPosition}
@@ -89,6 +89,6 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
         className="speech-subtitle--debate"
         getSpeakerLabel={(speech, players) => speech?.playerId ? getDebatePlayerLabel(players, speech.playerId) : '主持人'}
       />
-    </>
+    </section>
   );
 }

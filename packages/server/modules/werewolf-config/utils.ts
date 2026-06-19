@@ -19,6 +19,7 @@ const EXECUTABLE_WEREWOLF_ACTIONS = new Set([
   'save', 'witch_save',
   'poison', 'witch_poison',
   'guard', 'guard_protect',
+  'selfDestruct',
   'shootOnDeath', 'surviveExileOnce', 'voteOnly', 'speakOnly'
 ]);
 

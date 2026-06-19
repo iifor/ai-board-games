@@ -3,6 +3,8 @@ interface DebugAgent {
   alive?: boolean;
   faction?: string;
   role?: string;
+  roleLabel?: string;
+  roleConfig?: { id?: string; name?: string; [key: string]: unknown };
   usedPoison?: boolean;
   lastGuardTarget?: number | null;
   [key: string]: unknown;
@@ -40,7 +42,8 @@ function runDebugWerewolfAction(runtime: DebugRuntime, round: DebugRound, actor:
     return { target, result: targetAgent?.faction === 'wolves' ? '狼人' : '好人' };
   }
   if (actionType === 'guard_protect') {
-    return { target: randomTarget(alive, actor, (agent) => Number(agent.id) !== Number(actor.lastGuardTarget)) };
+    const target = randomTarget(alive, actor, (agent) => Number(agent.id) !== Number(actor.lastGuardTarget));
+    return { target, reason: target ? `debug-守${target}号` : 'debug-空守' };
   }
   if (actionType === 'witch_save') {
     const wolfTarget = round.night?.wolfTarget;
@@ -56,7 +59,20 @@ function runDebugWerewolfAction(runtime: DebugRuntime, round: DebugRound, actor:
     const target = candidates[Math.floor(Math.random() * candidates.length)];
     return { use: true, target: target.id ?? null, targetSeat: target.id ?? null, reason: 'debug-random' };
   }
-  if (actionType === 'day_speech') return { text: debugSpeech(actor, runtime.agents), thinking: '' };
+  if (actionType === 'day_speech') {
+    const result: Record<string, unknown> = { text: debugSpeech(actor, runtime.agents), thinking: '' };
+    // 白狼王自爆检查：30% 概率触发自爆
+    if (actor.faction === 'wolves' && isWhiteWolfKing(actor) && Math.random() < 0.3) {
+      const validTargets = alive.filter((agent) => Number(agent.id) !== Number(actor.id));
+      if (validTargets.length) {
+        const target = validTargets[Math.floor(Math.random() * validTargets.length)];
+        result.selfDestruct = true;
+        result.target = target.id ?? null;
+        result.selfDestructText = `${getSeatNumber(actor.id, runtime.agents)}号白狼王自爆，带走${getSeatNumber(target.id, runtime.agents)}号玩家。`;
+      }
+    }
+    return result;
+  }
   if (actionType === 'day_vote') return { target: randomTarget(alive, actor) };
   if (actionType === 'mvp_vote') return { target: randomTarget(runtime.agents, actor) };
   if (actionType === 'postgame_speech') {
@@ -93,10 +109,40 @@ function runDebugSheriffBadgeAction(runtime: DebugRuntime, actor: DebugAgent): R
     : { action: 'tear', target: null, reason: 'debug-tear' };
 }
 
+/** 白狼王自爆调试行动：随机决定是否自爆，白狼王可带走一名非狼玩家 */
+function runDebugSelfDestructAction(runtime: DebugRuntime, actor: DebugAgent): Record<string, unknown> {
+  if (actor.faction !== 'wolves' || actor.alive === false) return { use: false, text: '', target: null };
+  const canTakeTarget = isWhiteWolfKing(actor);
+  const alive = (runtime.agents || []).filter((agent) => agent.alive !== false && Number(agent.id) !== Number(actor.id));
+  const validTargets = canTakeTarget ? alive.filter((agent) => agent.faction !== 'wolves') : [];
+  const use = Math.random() < 0.5;
+  if (!use) return { use: false, text: '', target: null };
+  const target = validTargets.length ? validTargets[Math.floor(Math.random() * validTargets.length)] : null;
+  return {
+    use: true,
+    text: `${getSeatNumber(actor.id, runtime.agents)}号白狼王自爆。`,
+    target: target?.id ?? null,
+  };
+}
+
 function debugSpeech(actor: DebugAgent, agents?: DebugAgent[]): string {
   const sorted = (agents || []).slice().sort((a, b) => Number(a.id) - Number(b.id));
   const seatNumber = sorted.findIndex((a) => Number(a.id) === Number(actor.id)) + 1 || Number(actor.id) || '';
   return `${seatNumber}号发言`;
+}
+
+/** 判断是否为白狼王 */
+function isWhiteWolfKing(actor: DebugAgent): boolean {
+  const roleId = String(actor.role || actor.roleConfig?.id || '').toLowerCase();
+  const roleName = String(actor.roleLabel || actor.roleConfig?.name || '').toLowerCase();
+  return roleId === 'white_wolf_king' || roleName.includes('白狼王') || roleName.includes('white wolf king');
+}
+
+/** 获取座位号（按 id 排序后的序号） */
+function getSeatNumber(id: number, agents?: DebugAgent[]): number {
+  const sorted = (agents || []).slice().sort((a, b) => Number(a.id) - Number(b.id));
+  const idx = sorted.findIndex((a) => Number(a.id) === Number(id));
+  return idx >= 0 ? idx + 1 : Number(id);
 }
 
 /** 从候选列表中随机选取一名目标，排除 actor 自身，可附加 predicate 过滤 */
@@ -141,5 +187,6 @@ export {
   runDebugWerewolfAction,
   runDebugHunterAction,
   runDebugSheriffBadgeAction,
+  runDebugSelfDestructAction,
   debugSpeech
 };

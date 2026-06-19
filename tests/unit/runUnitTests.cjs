@@ -26,6 +26,7 @@ const testFiles = [
   'traceParticipants.test.ts',
   'nightResolutionAuditViewModel.test.ts',
   'werewolfPostgameRules.test.ts'
+  ,'werewolfDefaultConfig.test.ts'
 ].map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];

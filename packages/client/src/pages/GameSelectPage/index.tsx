@@ -110,10 +110,6 @@ export function GameSelectPage({ onStartDebate, onStartWerewolf, onReplayGame }:
               </button>
               <div className="game-entry-actions">
                 <span>{selectedIds.length} / {GAME_RULES[game.key].label}</span>
-                <button type="button" onClick={() => openEditor(game.key)}>
-                  <UsersRound size={18} />
-                  选择玩家
-                </button>
               </div>
               {isEditing && (
                 <GamePlayerEditor

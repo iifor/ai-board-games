@@ -13,6 +13,9 @@ import {
 interface SkillAgent {
   id: number;
   faction?: string;
+  role?: string;
+  roleLabel?: string;
+  roleConfig?: { id?: string; name?: string; [key: string]: unknown };
   usedAntidote?: boolean;
   usedPoison?: boolean;
   lastGuardTarget?: number | null;
@@ -194,11 +197,15 @@ function createWerewolfSkills() {
     {
       action: 'selfDestruct',
       prompt: SKILL_DESCRIPTIONS.selfDestruct,
-      async execute({ actor, phase, publicContext, speechText, promptContext }: SkillContext): Promise<SkillResult> {
+      async execute({ actor, alive, phase, publicContext, speechText, promptContext }: SkillContext): Promise<SkillResult> {
         if (actor.faction !== 'wolves' || actor.alive === false || phase !== 'day') return { use: false };
+        const canTakeTarget = isWhiteWolfKing(actor);
+        const valid = canTakeTarget
+          ? alive.filter((agent) => agent.id !== actor.id).map((agent) => agent.id)
+          : [];
         const prompt = withPromptContext(
           promptContext,
-          buildSelfDestructActionPrompt(promptContext ? '' : (publicContext || ''), speechText || ''),
+          buildSelfDestructActionPrompt(promptContext ? '' : (publicContext || ''), speechText || '', valid),
           'self_destruct'
         );
         const parsed = await askJson(actor, prompt, {
@@ -210,7 +217,8 @@ function createWerewolfSkills() {
         // AI 失败 → 不自爆（保守）
         if (!parsed) return { use: false, text: '' };
         const text = String(parsed.text || '').trim();
-        return { use: Boolean(parsed.use), text };
+        const target = canTakeTarget ? parseTargetSeat(parsed) : null;
+        return { use: Boolean(parsed.use), text, target: target && valid.includes(target) ? target : null };
       }
     },
     {
@@ -253,6 +261,12 @@ function parseTargetSeat(parsed: Record<string, unknown> | null | undefined): nu
 function normalizeReason(value: unknown): string | null {
   const reason = String(value || '').trim().slice(0, 80);
   return reason || null;
+}
+
+function isWhiteWolfKing(actor: SkillAgent): boolean {
+  const roleId = String(actor.role || actor.roleConfig?.id || '').toLowerCase();
+  const roleName = String(actor.roleLabel || actor.roleConfig?.name || '').toLowerCase();
+  return roleId === 'white_wolf_king' || roleName.includes('白狼王') || roleName.includes('white wolf king');
 }
 
 export { createWerewolfSkillRegistry, createWerewolfSkills };

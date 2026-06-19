@@ -36,6 +36,7 @@ function shouldHaveLastWords(
   item: DeathQueueItem,
 ): boolean {
   if (context.checkpoint.source === 'night') return Number(context.round.day) === 1;
+  if (context.checkpoint.source === 'self_destruct') return item.initialDeath;
   return item.initialDeath && context.checkpoint.initialDeathIds.some(
     (playerId) => Number(playerId) === Number(item.playerId),
   );

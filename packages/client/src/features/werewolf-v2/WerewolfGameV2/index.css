@@ -1,0 +1,104 @@
+.werewolf-shell--v2 {
+  overflow: hidden;
+  color: #f4f7ff;
+  background:
+    linear-gradient(90deg, rgba(2, 5, 15, 0.95), rgba(5, 9, 27, 0.36) 22%, rgba(5, 9, 27, 0.36) 78%, rgba(2, 5, 15, 0.95)),
+    radial-gradient(circle at 50% 42%, rgba(54, 123, 255, 0.28), transparent 34%),
+    radial-gradient(circle at 52% 58%, rgba(129, 72, 255, 0.25), transparent 38%),
+    var(--bg-werewolf) center / cover no-repeat,
+    #030716;
+}
+
+.werewolf-shell--v2::before,
+.werewolf-shell--v2::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.werewolf-shell--v2::before {
+  background:
+    linear-gradient(rgba(97, 142, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(97, 142, 255, 0.045) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(180deg, transparent, black 12%, black 82%, transparent);
+}
+
+.werewolf-shell--v2::after {
+  background:
+    radial-gradient(ellipse at 50% 48%, transparent 0 48%, rgba(0, 0, 0, 0.42) 76%, rgba(0, 0, 0, 0.78) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 28%, rgba(0, 0, 0, 0.36));
+}
+
+.werewolf-shell--v2 .game-broadcast-hud {
+  top: 18px;
+  z-index: 80;
+  width: min(760px, calc(100vw - 620px));
+  min-height: 54px;
+}
+
+.werewolf-shell--v2 .werewolf-controls {
+  position: fixed;
+  z-index: 82;
+  top: 18px;
+  right: clamp(16px, 2vw, 32px);
+  gap: 8px;
+  height: 54px;
+  padding: 6px;
+  border: 1px solid rgba(118, 143, 220, 0.28);
+  border-radius: 8px;
+  background: rgba(7, 11, 30, 0.76);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34), inset 0 0 22px rgba(71, 112, 255, 0.08);
+  backdrop-filter: blur(16px);
+}
+
+.werewolf-shell--v2 .werewolf-controls button {
+  height: 40px;
+  min-width: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(125, 151, 229, 0.24);
+  border-radius: 8px;
+  color: rgba(239, 244, 255, 0.88);
+  background: rgba(16, 24, 58, 0.78);
+  box-shadow: none;
+  font-size: 14px;
+}
+
+.werewolf-shell--v2 .werewolf-controls span {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.werewolf-shell--v2 .werewolf-controls button:first-child,
+.werewolf-shell--v2 .werewolf-controls button.skip-active:not(:disabled) {
+  border-color: rgba(255, 97, 111, 0.54);
+  color: #ffd9df;
+  background: linear-gradient(180deg, rgba(90, 28, 45, 0.92), rgba(42, 14, 28, 0.92));
+}
+
+.werewolf-shell--v2 .werewolf-idle-stage {
+  z-index: 4;
+}
+
+@media (max-width: 1280px) {
+  .werewolf-shell--v2 .game-broadcast-hud {
+    left: 50%;
+    width: min(560px, calc(100vw - 420px));
+  }
+}
+
+@media (max-width: 900px) {
+  .werewolf-shell--v2 .game-broadcast-hud {
+    left: 14px;
+    width: calc(100vw - 28px);
+    transform: none;
+  }
+
+  .werewolf-shell--v2 .werewolf-controls {
+    top: auto;
+    right: 14px;
+    bottom: 14px;
+  }
+}

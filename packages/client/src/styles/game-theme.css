@@ -1,0 +1,65 @@
+:root {
+  --game-surface: rgba(2, 8, 22, 0.9);
+  --game-surface-strong: rgba(3, 10, 27, 0.98);
+  --game-surface-soft: rgba(11, 26, 58, 0.78);
+  --game-line: rgba(169, 206, 255, 0.38);
+  --game-line-strong: rgba(217, 230, 255, 0.68);
+  --game-text: #f5f8ff;
+  --game-muted: rgba(221, 232, 255, 0.68);
+  --game-dim: rgba(180, 198, 230, 0.52);
+  --game-gold: #ffd76a;
+  --game-gold-soft: rgba(255, 215, 106, 0.24);
+  --game-blue: #42c8ff;
+  --game-blue-soft: rgba(22, 136, 255, 0.32);
+  --game-red: #ff4f66;
+  --game-red-soft: rgba(255, 44, 75, 0.3);
+  --game-violet: #b68cff;
+  --game-violet-soft: rgba(133, 86, 255, 0.34);
+  --game-green: #72f0a4;
+  --game-radius: 8px;
+  --game-shadow: 0 30px 80px rgba(0, 0, 0, 0.58);
+  --game-inner-glow: inset 0 0 34px rgba(120, 175, 255, 0.16);
+  --game-hud-bg: linear-gradient(90deg, transparent, rgba(4, 14, 34, 0.92) 18%, rgba(18, 29, 52, 0.96) 50%, rgba(4, 14, 34, 0.92) 82%, transparent);
+}
+
+.game-glass-panel {
+  border: 1px solid var(--game-line);
+  border-radius: var(--game-radius);
+  background:
+    linear-gradient(180deg, rgba(18, 32, 58, 0.74), rgba(5, 13, 30, 0.84)),
+    var(--game-surface);
+  box-shadow: var(--game-shadow), var(--game-inner-glow);
+  backdrop-filter: blur(12px);
+}
+
+.game-broadcast-grid {
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(120, 170, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 170, 255, 0.03) 1px, transparent 1px);
+  background-size: 72px 72px, 92px 92px;
+  mask-image: radial-gradient(circle at 50% 45%, black, transparent 78%);
+}
+
+.game-hud-label {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.game-control-rail {
+  border: 1px solid rgba(188, 210, 255, 0.22);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(16, 31, 59, 0.82), rgba(4, 11, 25, 0.72)),
+    rgba(4, 10, 23, 0.68);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.26), inset 0 0 20px rgba(116, 160, 255, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.game-primary-button {
+  border-color: rgba(244, 207, 114, 0.78) !important;
+  color: #fff4c8 !important;
+  background:
+    linear-gradient(180deg, rgba(116, 79, 22, 0.92), rgba(48, 31, 8, 0.92)) !important;
+  box-shadow: 0 0 20px rgba(244, 207, 114, 0.22), inset 0 0 16px rgba(244, 207, 114, 0.1) !important;
+}

@@ -19,7 +19,7 @@ interface Step {
 
 interface DeathResolutionCheckpoint {
   stepId: string;
-  source: 'night' | 'exile';
+  source: 'night' | 'exile' | 'self_destruct';
   initialEffectsApplied: boolean;
   initialEffects: Array<Record<string, unknown>>;
   initialDeathIds: number[];
@@ -95,10 +95,14 @@ function ensureDeathResolutionCheckpoint(
   }
   const legacyApplied = source === 'night'
     ? Boolean(round.nightRevealed)
-    : Boolean(round.exile || round.idiotReveal);
+    : source === 'self_destruct'
+      ? false
+      : Boolean(round.exile || round.idiotReveal);
   const legacyDeathIds = source === 'night'
     ? (((round.night as { deaths?: Array<{ id: number }> } | undefined)?.deaths || []).map((death) => Number(death.id)))
-    : (round.exile?.id ? [Number(round.exile.id)] : []);
+    : source === 'self_destruct'
+      ? resolveSelfDestructDeathIds(round)
+      : (round.exile?.id ? [Number(round.exile.id)] : []);
   round.deathResolution = {
     stepId: step.id,
     source,
@@ -116,6 +120,12 @@ function ensureDeathResolutionCheckpoint(
     finalized: false,
   };
   return round.deathResolution;
+}
+
+function resolveSelfDestructDeathIds(round: DeathResolutionRound): number[] {
+  const selfDestruct = round.selfDestruct as { playerId?: unknown; targetId?: unknown } | null | undefined;
+  return [Number(selfDestruct?.playerId), Number(selfDestruct?.targetId)]
+    .filter((id, index, ids) => id > 0 && ids.indexOf(id) === index);
 }
 
 function appendUnique(values: number[], value: number): void {

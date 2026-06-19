@@ -51,7 +51,10 @@ function getEventSummary(event: GameEvent): string {
   }
   if (event.type === 'self-destruct') {
     const players = event.game?.players || [];
-    return `${formatWerewolfSeatLabel(event.speech?.playerId || event.selfDestruct?.playerId || '', players)}狼人自爆，白天流程中止。`;
+    const actorId = event.speech?.playerId || event.selfDestruct?.playerId || event.playerId || '';
+    const targetId = event.selfDestruct?.targetId || event.targetId;
+    const targetText = targetId ? `，带走 ${formatWerewolfSeatLabel(targetId, players)}` : '';
+    return `${formatWerewolfSeatLabel(actorId, players)}白狼王自爆${targetText}，白天流程中止。`;
   }
   if (event.type === 'sheriff-result') {
     const players = event.game?.players || [];
@@ -471,6 +474,7 @@ export function getRoleDescription(player: Player, roleVisible: boolean): string
   if (!roleVisible) return '玩家视角下，本局仅公开一名随机玩家身份；该玩家身份暂时隐藏。';
   const role = ROLE_NAMES[player.roleLabel || ''] || player.roleLabel || ROLE_NAMES[player.role || ''] || '未知身份';
   const descriptions: Record<string, string> = {
+    white_wolf_king: '狼人阵营，夜晚参与狼队刀人，白天发言阶段可自爆并带走一名存活玩家。',
     werewolf: '狼人阵营，夜晚参与击杀，白天需要伪装好人、引导票型并保护狼队友。',
     seer: '好人阵营神职，夜晚可以查验一名玩家阵营，白天需要谨慎传递信息。',
     witch: '好人阵营神职，拥有一次解药和一次毒药，需要根据夜晚死亡信息判断用药。',

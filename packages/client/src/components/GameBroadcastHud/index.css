@@ -1,0 +1,106 @@
+.game-broadcast-hud {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 78;
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto minmax(180px, 1.2fr);
+  align-items: center;
+  gap: 16px;
+  width: min(860px, calc(100vw - 32px));
+  min-height: 58px;
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 215, 106, 0.38);
+  border-radius: 999px;
+  color: var(--game-text);
+  background: var(--game-hud-bg);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36), inset 0 0 22px rgba(255, 215, 106, 0.1);
+  backdrop-filter: blur(16px);
+}
+
+.game-broadcast-hud__identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding-left: 8px;
+}
+
+.game-broadcast-hud__identity span {
+  color: var(--game-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.game-broadcast-hud__identity strong {
+  overflow: hidden;
+  color: #fff5cf;
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-broadcast-hud__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  min-width: 86px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 215, 106, 0.44);
+  border-radius: 999px;
+  color: #fff4c4;
+  background: rgba(22, 12, 4, 0.64);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.game-broadcast-hud__live span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--game-green);
+  box-shadow: 0 0 16px rgba(114, 240, 164, 0.78);
+}
+
+.game-broadcast-hud p {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: rgba(237, 244, 255, 0.84);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-broadcast-hud--debate {
+  border-color: rgba(255, 215, 106, 0.42);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36), 0 0 34px rgba(45, 164, 255, 0.16), inset 0 0 22px rgba(255, 215, 106, 0.1);
+}
+
+.game-broadcast-hud--werewolf {
+  border-color: rgba(202, 173, 255, 0.42);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38), 0 0 34px rgba(154, 104, 255, 0.2), inset 0 0 22px rgba(255, 215, 106, 0.08);
+}
+
+@media (max-width: 760px) {
+  .game-broadcast-hud {
+    display: none;
+    grid-template-columns: 1fr auto;
+    min-height: 64px;
+    border-radius: 18px;
+  }
+
+  .game-broadcast-hud p {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}

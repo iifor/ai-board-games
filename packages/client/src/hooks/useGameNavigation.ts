@@ -1,6 +1,7 @@
 import { useClientRouter, buildGamePath } from '../router/clientRouter';
 
 const PLAYER_SELECTION_STORAGE_KEY = 'ai-boardgame:selected-player-ids';
+type GameRouteVersion = 'v1' | 'v2';
 
 export function useGameNavigation() {
   const { route, navigate } = useClientRouter();
@@ -10,12 +11,12 @@ export function useGameNavigation() {
     navigate('/games');
   }
 
-  function startGame(gameKey: string, playerIds: number[], gameId: string = '') {
+  function startGame(gameKey: string, playerIds: number[], gameId: string = '', version: GameRouteVersion = 'v1') {
     const cleanIds = playerIds.map(Number).filter(Boolean);
     const stored = readStoredSelections();
     stored[gameKey] = cleanIds;
     window.sessionStorage.setItem(PLAYER_SELECTION_STORAGE_KEY, JSON.stringify(stored));
-    navigate(buildGamePath(gameKey, { gameId }));
+    navigate(buildGamePath(gameKey, { gameId, version }));
   }
 
   return { route, navigate, replayGameId, openSelectPage, startGame };

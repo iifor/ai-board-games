@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Route } from '../types';
 
 const GAME_PATHS = new Set(['debate', 'werewolf']);
+type GameRouteVersion = 'v1' | 'v2';
 
 interface LocationState {
   pathname: string;
@@ -29,11 +30,12 @@ export function useClientRouter() {
   return { route, navigate };
 }
 
-export function buildGamePath(gameKey: string, options: { gameId?: string } = {}): string {
+export function buildGamePath(gameKey: string, options: { gameId?: string; version?: GameRouteVersion } = {}): string {
   const searchParams = new URLSearchParams();
   if (options.gameId) searchParams.set('gameId', options.gameId);
   const params = searchParams.toString() ? `?${searchParams.toString()}` : '';
-  return `/games/${gameKey}${params}`;
+  const basePath = options.version === 'v2' ? `/game/v2/${gameKey}` : `/games/${gameKey}`;
+  return `${basePath}${params}`;
 }
 
 export function getRouteGameId(route: Route): string {
@@ -52,8 +54,12 @@ function parseClientRoute(locationState: LocationState): Route {
   const segments = pathname.split('/').filter(Boolean);
   const searchParams = new URLSearchParams(locationState.search);
 
+  if (segments[0] === 'game' && segments[1] === 'v2' && GAME_PATHS.has(segments[2])) {
+    return { name: 'game', gameKey: segments[2], version: 'v2', searchParams };
+  }
+
   if (segments[0] === 'games' && GAME_PATHS.has(segments[1])) {
-    return { name: 'game', gameKey: segments[1], searchParams };
+    return { name: 'game', gameKey: segments[1], version: 'v1', searchParams };
   }
 
   if (segments[0] === 'home') return { name: 'home', searchParams };

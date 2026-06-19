@@ -150,6 +150,57 @@ function createExileResolveHandler() {
     validateAiResult: validateDeathActionAiResult,
   };
 }
+
+function createSelfDestructResolveHandler() {
+  return {
+    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+      if (isDone(state, step.id) || state.winner) return completed(state, step.id);
+      const runtime = createRuntime(match, state);
+      const round = ensureRound(runtime.state, step.config.day!) as DeathResolutionContext['round'];
+      const selfDestruct = round.selfDestruct as { playerId?: unknown; targetId?: unknown } | null | undefined;
+      if (!selfDestruct?.playerId) {
+        return {
+          status: 'COMPLETED',
+          state: markStepComplete({
+            ...syncRuntimeState(runtime),
+            currentStep: step.id,
+            currentActionWindow: null,
+          }, step.id),
+          events: [],
+        };
+      }
+      const checkpoint = ensureDeathResolutionCheckpoint(round, step, 'self_destruct');
+      const context: DeathResolutionContext = {
+        match,
+        step,
+        state,
+        runtime,
+        round,
+        checkpoint,
+        events: [],
+      };
+      if (!checkpoint.initialEffectsApplied) {
+        const actorId = Number(selfDestruct.playerId);
+        const targetId = Number(selfDestruct.targetId);
+        checkpoint.initialDeathIds = [actorId, targetId].filter((id, index, ids) => id > 0 && ids.indexOf(id) === index);
+        recordInitialEffects(context, checkpoint.initialDeathIds.map((id) => ({
+          type: id === actorId ? 'self_destruct' : 'white_wolf_king_self_destruct',
+          source: actorId,
+          target: id,
+          reason: id === actorId ? 'self_destruct' : 'white_wolf_king_self_destruct',
+        })));
+      }
+      context.state = {
+        ...syncRuntimeState(runtime),
+        currentStep: step.id,
+        currentActionWindow: state.currentActionWindow || null,
+      };
+      return advanceDeathResolution(context);
+    },
+    runAiTask: runDeathActionAiTask,
+    validateAiResult: validateDeathActionAiResult,
+  };
+}
 function publishExileResultOnce(context: DeathResolutionContext): void {
   if (context.checkpoint.resultPublished) return;
   context.checkpoint.resultPublished = true;
@@ -270,5 +321,6 @@ function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
 export {
   createNightResolveHandler,
   createExileResolveHandler,
+  createSelfDestructResolveHandler,
   createSheriffResolveHandler,
 };

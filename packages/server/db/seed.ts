@@ -124,10 +124,35 @@ const DEFAULT_WEREWOLF_MODES = [
     winCondition: 'side',
     sortOrder: 2,
     enabled: true
+  },
+  {
+    id: 'white-wolf-king-guard-12',
+    name: '白狼王守卫（12人）',
+    description: '3狼人、1白狼王、预言家、女巫、猎人、守卫、4村民。',
+    roles: [
+      { roleId: 'werewolf', count: 3 },
+      { roleId: 'white_wolf_king', count: 1 },
+      { roleId: 'seer', count: 1 },
+      { roleId: 'witch', count: 1 },
+      { roleId: 'hunter', count: 1 },
+      { roleId: 'guard', count: 1 },
+      { roleId: 'villager', count: 4 }
+    ],
+    sheriff: { enabled: true, firstDayElection: true, voteWeight: 1.5 },
+    winCondition: 'side',
+    sortOrder: 3,
+    enabled: true
   }
 ];
 
+const guard12Mode = DEFAULT_WEREWOLF_MODES.find((mode) => mode.id === 'guard-12');
+if (guard12Mode) {
+  guard12Mode.name = '预女猎守（12人）';
+  guard12Mode.description = '4狼人、预言家、女巫、猎人、守卫、4村民。';
+}
+
 const DEFAULT_WEREWOLF_ROLES = [
+  { id: 'white_wolf_king', name: '白狼王', faction: 'wolves', roleType: 'wolf', responsibility: '夜晚参与狼队刀人，白天可自爆并带走一名存活玩家。', ability: '白天发言阶段可自爆带走一名非自己的存活玩家。', keyInfo: '属于狼人阵营，计入狼人胜负。', playStyleAdvice: '在暴露身份、打断关键归票或带走核心神职时使用自爆。', rule: { actions: [{ trigger: 'night', action: 'kill', targetRule: 'non-wolf', group: 'wolves' }, { trigger: 'day', action: 'selfDestruct', targetRule: 'alive-not-self' }] }, sortOrder: 2 },
   { id: 'werewolf', name: '狼人', faction: 'wolves', roleType: 'wolf', responsibility: '夜晚参与击杀，白天伪装好人并引导票型。', ability: '夜晚选择击杀目标。', keyInfo: '知道其他狼人同伴。', playStyleAdvice: '夜晚优先统一刀口，白天避免暴露视角，适度站边和制造抗推位。', rule: { actions: [{ trigger: 'night', action: 'kill', targetRule: 'non-wolf', group: 'wolves' }] }, sortOrder: 1 },
   { id: 'seer', name: '预言家', faction: 'good', roleType: 'god', responsibility: '通过查验帮助好人阵营找出狼人。', ability: '每晚查验一名玩家阵营。', keyInfo: '查验结果只对自己可见。', playStyleAdvice: '根据场上压力决定是否跳身份，优先用查验结果建立可信发言链。', rule: { actions: [{ trigger: 'night', action: 'inspectFaction', targetRule: 'alive-not-self' }] }, sortOrder: 2 },
   { id: 'witch', name: '女巫', faction: 'good', roleType: 'god', responsibility: '根据夜晚刀口决定是否使用解药或毒药。', ability: '一瓶解药、一瓶毒药，各只能使用一次。', keyInfo: '首夜可自救；默认一晚只能用一瓶药。', playStyleAdvice: '解药保关键身份，毒药谨慎出手；白天可用药瓶压力观察玩家反应。', rule: { actions: [{ trigger: 'night', action: 'save', limit: 'once' }, { trigger: 'night', action: 'poison', limit: 'once' }] }, sortOrder: 3 },
@@ -137,7 +162,7 @@ const DEFAULT_WEREWOLF_ROLES = [
   { id: 'villager', name: '村民', faction: 'good', roleType: 'villager', responsibility: '依靠发言、票型和死亡信息找出狼人。', ability: '白天发言和投票。', keyInfo: '没有夜晚技能。', playStyleAdvice: '围绕发言逻辑、票型和死亡信息找狼，不要过度认身份，优先保留清晰怀疑链。', rule: { actions: [{ trigger: 'day', action: 'speakOnly' }, { trigger: 'vote', action: 'voteOnly' }] }, sortOrder: 7 }
 ];
 
-const EXECUTABLE_WEREWOLF_ACTIONS = new Set(['kill', 'inspectFaction', 'save', 'poison', 'guard', 'shootOnDeath', 'surviveExileOnce', 'voteOnly', 'speakOnly']);
+const EXECUTABLE_WEREWOLF_ACTIONS = new Set(['kill', 'inspectFaction', 'save', 'poison', 'guard', 'selfDestruct', 'shootOnDeath', 'surviveExileOnce', 'voteOnly', 'speakOnly']);
 
 export {
   DEFAULT_PLAYERS,

@@ -30,9 +30,6 @@ import { getSeatNumber } from '../utils';
 import { recordWerewolfInteractionFeedback } from '../interactionFeedbackTrace';
 import { canUseWerewolfActionEngineBridge, runWerewolfActionEngineBridge } from '../actionEngineBridge';
 import type { WerewolfActionEngineShadowAudit } from '../actionEngineBridge';
-import { resolveWinAfterDeaths } from '../winCheck';
-import type { WerewolfAgent } from '../winCheck';
-import { WEREWOLF_POSTGAME_DAYBREAK_STEP_ID } from '../postgame';
 
 /** 已有独立睁眼事件的夜晚行动 — phase-start 不再重复发布 */
 const NIGHT_WAKE_ACTIONS = new Set([
@@ -272,21 +269,15 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
   round: Record<string, unknown>;
   state: StepState;
 }): HandlerResult {
-  const winResult = resolveWinAfterDeaths(
-    runtime.agents as WerewolfAgent[],
-    round as never,
-    step.config.day || 1,
-    runtime.modeConfig as Record<string, unknown> || {},
-  );
   const nextState = markStepComplete({
     ...syncRuntimeState(runtime),
     currentStep: step.id,
     currentActionWindow: null,
-    ...(winResult.winner ? { winner: winResult.winner, winReason: winResult.winReason } : {}),
   }, step.id);
   resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
   const selfDestruct = (round as { selfDestruct?: Record<string, unknown> }).selfDestruct || {};
   const actorId = Number(selfDestruct.playerId || 0);
+  const targetId = Number(selfDestruct.targetId || 0) || null;
   const text = String(selfDestruct.text || `${actorId ? getSeatNumber(actorId, runtime.agents) : '狼人'}号狼人自爆。`);
 
   // Phase 4: 双写 self-destruct 到 EventBus
@@ -294,7 +285,7 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
     builder.setStep(step.id);
     builder.setPhase('day');
     builder.setDay(step.config.day || 1);
-    return builder.buildSelfDestruct({ playerId: actorId, text });
+    return builder.buildSelfDestruct({ playerId: actorId, text, targetId });
   });
 
   const events: unknown[] = [createWerewolfEvent(
@@ -306,19 +297,17 @@ function completeSelfDestructWindow({ match, step, runtime, round, state }: {
     {
       actionType: 'self_destruct',
       actorId,
+      targetId,
       selfDestruct,
       speech: { playerId: actorId, text, phase: 'day', day: step.config.day }
     },
     { channel: CHANNEL_TYPES.PUBLIC }
   )];
-  if (winResult.winner) {
-    events.push(createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_game_result', winResult.winReason, { winner: winResult.winner }, { channel: CHANNEL_TYPES.PUBLIC }));
-  }
   return {
     status: 'COMPLETED',
     state: nextState,
     events,
-    ...(winResult.winner ? { nextStepId: WEREWOLF_POSTGAME_DAYBREAK_STEP_ID } : {}),
+    nextStepId: `self_destruct_resolve_${step.config.day || 1}`,
   };
 }
 

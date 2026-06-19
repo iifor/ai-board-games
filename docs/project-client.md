@@ -66,7 +66,7 @@ packages/client/
     │   └── clientRouter.ts
     ├── services/
     │   └── gameService.ts
-    ├── styles/
+    ├── styles/                  # 全局样式、游戏布局、C 端赛事视觉变量
     ├── types/
     └── utils/
 ```
@@ -80,6 +80,7 @@ packages/client/
 - 服务层：`services/gameService.ts` 封装 REST 和 WebSocket。
 - hooks 层：封装导航、WebSocket session、语音播放、字幕队列。
 - 通用组件：弹窗、导航、状态视图、字幕等可复用 UI。
+- 样式层：`styles/game-theme.css` 提供 C 端狼人杀和辩论赛共用的沉浸竞技视觉变量，具体组件 CSS 只负责各玩法布局和状态表达。
 
 路由规则：
 
@@ -200,3 +201,24 @@ pnpm run check:client
   回退为天黑状态。
 - 赛后播放顺序为天亮、`mvp-start` 主持人口播、静默 MVP 逐票、`mvp-result`
   主持人公布、玩家 `postgame_speech`。
+## C 端 v2 赛事皮肤路由
+
+- `/game/v2/debate`：辩论赛统一 C 端赛事皮肤入口。
+- `/game/v2/werewolf`：狼人杀统一 C 端赛事皮肤入口。
+- `/games/debate`、`/games/werewolf`：继续作为 v1 回退入口保留。
+- 游戏选择页默认进入 `/game/v2/*`；历史回放仍使用 `gameId` 查询参数，例如 `/game/v2/debate?gameId=xxx`。
+- `features/debate-v2`、`features/werewolf-v2` 只负责 v2 展示入口和 scoped 样式，复用现有 `features/debate`、`features/werewolf` 游戏容器、WebSocket、语音、字幕、弹窗、服务请求和工具函数。
+- `components/GameBroadcastHud` 是 v2 共用赛事 HUD；`styles/game-theme.css` 是 v2 共用视觉 token 入口。
+- v2 皮肤样式必须限定在 `.debate-shell--v2`、`.werewolf-shell--v2` 或 v2 模块 CSS 中，避免污染旧 `/games/*` 路由。
+
+## Werewolf v2 专用 Arena 边界
+
+- `/game/v2/werewolf` 不再仅对 v1 `WerewolfArena` 做 CSS 换肤；`features/werewolf-v2/components/WerewolfArenaV2` 承载房间式三栏竞技桌游组合层。
+- v2 组合层包含左侧角色/状态/进程、中间横向玩家卡环形舞台、右侧发言记录、底部发言安全区；业务状态、WebSocket、语音、回放、弹窗和玩家选择仍复用 `features/werewolf/WerewolfGame` 控制器。
+- v2 样式必须限定在 `features/werewolf-v2` 与 `.werewolf-shell--v2`，旧 `/games/werewolf` 继续使用 v1 展示。
+## Werewolf 12-player expansion
+
+- C-side werewolf role display recognizes `white_wolf_king` as `白狼王`.
+- `self-destruct` display events may carry `targetId`; the client renders both the self-destruct actor and the carried target when present.
+- C-side must not decide whether the target is legal, whether a player dies, whether hunter/sheriff follow-up triggers, or whether the game has ended. It only consumes server events and merged game state.
+- Real-time play and history replay continue to consume the same final display payloads; no separate replay-only white wolf king rule path should be introduced.

@@ -449,6 +449,7 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
     try {
       const selfDestruct = await executeSkillWithTrace(runtime.skillRegistry, 'selfDestruct', {
         actor,
+        alive: runtime.agents.filter((agent: Agent) => agent.alive),
         phase: 'day',
         publicContext,
         promptContext: prompt,
@@ -459,6 +460,7 @@ async function runDaySpeechAction(runtime: Runtime, round: Round, actor: Agent):
       if ((selfDestruct as { use?: boolean } | null)?.use) {
         result.intent = 'selfDestruct';
         result.selfDestruct = true;
+        result.target = (selfDestruct as { target?: number | null }).target ?? null;
         result.selfDestructText = String((selfDestruct as { text?: string }).text || `${getSeatNumber(actor.id, runtime.agents)}号狼人自爆。`);
       }
     } catch {

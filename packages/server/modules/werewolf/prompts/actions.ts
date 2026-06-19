@@ -95,8 +95,15 @@ export function buildHunterShootActionPrompt(validIds: number[] = []): string {
 }
 
 /** 狼人自爆 */
-export function buildSelfDestructActionPrompt(publicContext: string, speechText: string): string {
+export function buildSelfDestructActionPrompt(publicContext: string, speechText: string, validTargetIds: number[] = []): string {
+  const targetInstruction = validTargetIds.length
+    ? [
+        `白狼王自爆时必须选择 1 名当前存活且非自己的玩家带走，可选目标：${validTargetIds.join('、')}。`,
+        '白狼王自爆示例：{"use":true,"text":"自爆发言","targetSeat":2}。'
+      ].join('\n')
+    : '普通狼人自爆不带人，targetSeat 必须为 null。';
   return [
+    targetInstruction,
     '你是狼人，当前处于白天公开流程。你可以选择是否发动自爆。',
     '自爆效果：你立即出局，本轮白天发言/投票中止，流程进入后续胜负检查或夜晚。',
     publicContext ? `当前公开信息：\n${publicContext}` : '',

@@ -441,11 +441,14 @@ pnpm run test:workflow
 ## 狼人杀赛后流程
 
 - 狼人杀的胜负判定与比赛完成分离：夜死、放逐、猎人连锁、自爆、白天胜负检查和最大天数结算只锁定 `winner/winReason`，随后通过工作流 `nextStepId` 跳到统一赛后阶段。
-- 赛后步骤固定为 `postgame_daybreak` → `postgame_mvp_intro` →
+- 赛后步骤固定为 `postgame_reset` → `postgame_daybreak` → `postgame_mvp_intro` →
   `postgame_mvp_vote` → `postgame_mvp_result` → `postgame_speech` →
-  `finalize`。胜负锁定后先把最后一轮切换为白天并播报“天亮了”，再由主持人
-  播报“现在进行MVP评选，请评选本局MVP。”；最终感言完成后才将 match 标记为
-  `completed`。
+  `finalize`。胜负锁定后先宣布”游戏结束”并重置所有玩家为存活状态（纯展示用途，
+  不影响胜负结果），再切换为白天并播报”天亮了”，再由主持人播报”现在进行MVP评选，
+  请评选本局MVP。”；最终感言完成后才将 match 标记为 `completed`。
+- `postgame_reset` 将所有 agent 的 `alive` 设为 `true`、`canVote` 设为 `true`，
+  并通过 `syncRuntimeState` 同步到 `state.players`，使 C 端展示中所有玩家恢复为
+  存活状态。发布公开 `game-end` 事件，携带 `winner` 和 `winReason`。
 - `mvp_vote` 与 `postgame_speech` 复用 `werewolf.action_window`。所有玩家包含已死亡玩家参与；MVP 禁止自投，失败或非法结果按弃权处理。赛后感言允许玩家返回跳过决定；跳过或调用失败时不保存感言、不生成字幕和语音事件，工作流直接推进到下一位玩家。
 - MVP 按有效票数选出；平票时优先胜方玩家，再按座位号升序；无人有效投票时使用胜方最低座位号兜底。
 - MVP 逐票通过公开静默事件 `mvp-vote` 展示，`mvp-result` 由主持人播报。赛后感言通过公开 `speech` 事件播放，顺序为非 MVP 座位序加 MVP 收尾。
@@ -453,3 +456,12 @@ pnpm run test:workflow
   不用药保持静默。猎人开枪使用猎人音色播报“我选择开枪带走 X 号”，不播报
   技能原因。实时与旧对局重建回放遵循相同约定。
 - 工作流处理器可返回 `nextStepId`，引擎会持久化目标 step index；目标不存在时直接失败，避免静默进入错误流程。
+## Werewolf 12-player expansion
+
+- `guard-12` is the official mode id for `预女猎守（12人）`: 4 werewolves, 4 villagers, seer, witch, hunter and guard. It is not duplicated under a second mode id.
+- `white-wolf-king-guard-12` adds `白狼王守卫（12人）`: 3 normal werewolves, 1 white wolf king, 4 villagers, seer, witch, hunter and guard.
+- White wolf king is a wolf-side role. At night it participates in wolf chat, wolf vote and wolf kill resolution as a wolf member.
+- Daytime white wolf king self-destruct is resolved by the workflow step `self_destruct_resolve_${day}`, inserted immediately after `day_speech_${day}` and before normal day vote.
+- Self-destruct stops the rest of the current day speech and exile vote. The actor dies with source `self_destruct`; a valid carried target dies with source `white_wolf_king_self_destruct`.
+- Self-destruct deaths enter the shared death resolution pipeline. Last words, hunter shot, sheriff badge disposition, win check, postgame transition, real-time playback and history replay must all consume the same final event/state semantics.
+- The public `self-destruct` event may include `targetId`. The client displays it, but the server remains the only authority for target legality, death, skills and win result.

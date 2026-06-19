@@ -1,0 +1,101 @@
+.werewolf-v2-bottom-speech {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  z-index: 48;
+  display: grid;
+  width: min(760px, calc(100% - 36px));
+  min-height: 112px;
+  grid-template-columns: minmax(0, 1fr) 170px 34px;
+  gap: 18px;
+  align-items: center;
+  padding: 18px 18px 18px 24px;
+  border: 1px solid rgba(68, 151, 255, 0.42);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 86% 42%, rgba(135, 79, 255, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(12, 25, 62, 0.88), rgba(5, 9, 28, 0.94));
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.48), inset 0 0 26px rgba(76, 134, 255, 0.11);
+  backdrop-filter: blur(18px);
+  transform: translateX(-50%);
+}
+
+.werewolf-v2-bottom-speech__copy {
+  min-width: 0;
+}
+
+.werewolf-v2-bottom-speech__copy span {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: #d9d1ff;
+  background: rgba(104, 78, 255, 0.26);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.werewolf-v2-bottom-speech__copy p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 12px 0 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: #f4f7ff;
+  font-size: clamp(17px, 1.35vw, 23px);
+  font-weight: 850;
+  line-height: 1.55;
+}
+
+.werewolf-v2-bottom-speech__wave {
+  display: flex;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.werewolf-v2-bottom-speech__wave i {
+  display: block;
+  width: 4px;
+  height: calc(12px + (var(--bar-index) % 5) * 7px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #c08cff, #557dff);
+  box-shadow: 0 0 12px rgba(147, 91, 255, 0.55);
+  opacity: 0.9;
+  animation: werewolf-v2-wave 1.25s ease-in-out infinite;
+  animation-delay: calc(var(--bar-index) * -70ms);
+}
+
+.werewolf-v2-bottom-speech button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(117, 154, 255, 0.32);
+  border-radius: 8px;
+  color: #dce6ff;
+  background: rgba(24, 43, 88, 0.8);
+}
+
+@keyframes werewolf-v2-wave {
+  50% {
+    transform: scaleY(0.45);
+    opacity: 0.48;
+  }
+}
+
+@media (max-width: 760px) {
+  .werewolf-v2-bottom-speech {
+    min-height: 112px;
+    grid-template-columns: minmax(0, 1fr) 34px;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .werewolf-v2-bottom-speech__wave {
+    display: none;
+  }
+}

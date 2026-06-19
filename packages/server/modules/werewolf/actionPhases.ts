@@ -61,7 +61,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context: PhaseContext = {}) => ({
       start: `女巫请睁眼。`,
       result: context.witchSaveUsed
-        ? withReason(`女巫使用了解药，救了${context.target || context.wolfTarget || '?'}号玩家`, context.reason)
+        ? withReason(context.reason)
         : `女巫没有使用解药`,
       end: '',  // 女巫在毒药阶段后才闭眼
     }),
@@ -83,7 +83,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `守卫请睁眼，请选择今晚守护的目标。`,
       result: context?.guardTarget
-        ? withReason(`守卫守护了${context.guardTarget}号`, context.reason)
+        ? withReason(context.reason)
         : `守卫选择空守。`,
       end: `守卫请闭眼。`,
     }),

@@ -138,3 +138,9 @@ pnpm run check:admin
 - 新增通用后台组件放入 `src/components` 或 `src/components/shared`。
 - API 调用集中到 `services/adminApi.ts`，页面不要散落 fetch 细节。
 - 页面只负责表单、交互、状态展示和调用 API；核心业务规则留在服务端。
+## Werewolf 12-player expansion
+
+- B-side werewolf role and mode management consume server-provided defaults, so `white_wolf_king` and `white-wolf-king-guard-12` should appear after seed upsert.
+- Mode details for `guard-12` should show `预女猎守（12人）` with 12 players and the 4 wolf, 4 villager, seer, witch, hunter and guard lineup.
+- Mode details for `white-wolf-king-guard-12` should show 12 players and the 3 normal wolf, 1 white wolf king, 4 villager, seer, witch, hunter and guard lineup.
+- History/debug views should display `self-destruct` events with `targetId` when supplied, but must not implement independent death-chain or win-condition rules.

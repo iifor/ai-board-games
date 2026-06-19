@@ -8,6 +8,49 @@ import { selectWerewolfMvp } from './postgameRules';
 
 const WEREWOLF_POSTGAME_DAYBREAK_STEP_ID = 'postgame_daybreak';
 
+function createPostgameResetHandler() {
+  return {
+    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+      if (isDone(state, step.id)) return { status: 'COMPLETED', state };
+      const runtime = createRuntime(match, state);
+
+      // 重置所有玩家为存活状态（纯展示用途，不影响胜负结果）
+      for (const agent of runtime.agents) {
+        agent.alive = true;
+        agent.canVote = true;
+      }
+      const nextState = markStepComplete({
+        ...syncRuntimeState(runtime),
+        currentStep: step.id,
+      }, step.id);
+
+      // 发布游戏结束事件
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id).setPhase('day').setDay(resolveLastDay(nextState));
+        return builder.build('game-end', {
+          message: '游戏结束，所有玩家身份公开。',
+          winner: nextState.winner,
+          winReason: nextState.winReason,
+        }, CHANNEL_TYPES.PUBLIC, undefined, { message: '游戏结束' });
+      }, serializeWerewolfState(match, nextState as Record<string, unknown>));
+
+      return {
+        status: 'COMPLETED',
+        state: nextState,
+        events: [createWerewolfEvent(
+          match,
+          step,
+          nextState as Record<string, unknown>,
+          'werewolf_game_end',
+          '游戏结束，所有玩家身份公开。',
+          { winner: nextState.winner, winReason: nextState.winReason },
+          { channel: CHANNEL_TYPES.PUBLIC },
+        )],
+      };
+    },
+  };
+}
+
 function createPostgameDaybreakHandler() {
   return {
     execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
@@ -184,6 +227,7 @@ function toPublicMvp(player: PlayerRecord): PlayerRecord {
 
 export {
   WEREWOLF_POSTGAME_DAYBREAK_STEP_ID,
+  createPostgameResetHandler,
   createPostgameDaybreakHandler,
   createPostgameMvpIntroHandler,
   createMvpResultHandler,

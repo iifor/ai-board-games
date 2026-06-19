@@ -17,6 +17,7 @@ export const EMPTY_WEREWOLF: GameState = {
 };
 
 export const ROLE_NAMES: Record<string, string> = {
+  white_wolf_king: '白狼王',
   werewolf: '狼人',
   seer: '预言家',
   witch: '女巫',
@@ -27,6 +28,7 @@ export const ROLE_NAMES: Record<string, string> = {
 };
 
 export const ROLE_ICON: Record<string, React.ReactElement> = {
+  white_wolf_king: <Swords size={18} />,
   werewolf: <Swords size={18} />,
   seer: <Eye size={18} />,
   witch: <FlaskConical size={18} />,

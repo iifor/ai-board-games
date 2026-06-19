@@ -70,7 +70,7 @@ interface Round {
   exile?: { id: number; reason: string } | null;
   idiotReveal?: { id: number; reason: string } | null;
   lastWords?: Array<Record<string, unknown>>;
-  selfDestruct?: { playerId: number; text: string; day: number } | null;
+  selfDestruct?: { playerId: number; text: string; day: number; targetId?: number | null } | null;
   [key: string]: unknown;
 }
 
@@ -270,10 +270,12 @@ function applyDaySpeech(round: Round, results: ActionResult[], agents?: Agent[])
   }));
   const selfDestruct = results.find((result) => result.payload.selfDestruct === true);
   if (selfDestruct && !round.selfDestruct) {
+    const targetId = resolveSelfDestructTarget(selfDestruct.payload, selfDestruct.actorId, agents);
     round.selfDestruct = {
       playerId: selfDestruct.actorId,
       text: String(selfDestruct.payload.selfDestructText || selfDestruct.payload.text || `${getSeatNumber(selfDestruct.actorId, agents)}号狼人自爆。`),
-      day: round.day
+      day: round.day,
+      ...(targetId ? { targetId } : {})
     };
   }
 }
@@ -454,7 +456,15 @@ function findPendingHunter(
 
 function applySelfDestruct(runtime: Runtime, round: Round): void {
   if (!round.selfDestruct?.playerId) return;
-  eliminate(runtime.agents as never, Number(round.selfDestruct.playerId), round.day, 'self_destruct');
+  const actorId = Number(round.selfDestruct.playerId);
+  eliminate(runtime.agents as never, actorId, round.day, 'self_destruct');
+  const targetId = resolveSelfDestructTarget({ target: round.selfDestruct.targetId }, actorId, runtime.agents);
+  if (targetId) {
+    round.selfDestruct.targetId = targetId;
+    eliminate(runtime.agents as never, targetId, round.day, 'white_wolf_king_self_destruct');
+  } else {
+    round.selfDestruct.targetId = null;
+  }
   round.publicSummary = `第${round.day}天，${getSeatNumber(round.selfDestruct.playerId, runtime.agents)}号狼人自爆，白天流程中止。`;
 }
 
@@ -474,6 +484,26 @@ function ensureRound(state: State, day: number): Round {
 function normalizeReason(value: unknown): string | null {
   const reason = String(value || '').trim().slice(0, 80);
   return reason || null;
+}
+
+function resolveSelfDestructTarget(
+  payload: Record<string, unknown>,
+  actorId: number,
+  agents: Agent[] = [],
+): number | null {
+  const actor = agents.find((agent) => Number(agent.id) === Number(actorId));
+  if (!isWhiteWolfKing(actor)) return null;
+  const targetId = Number(payload.targetId ?? payload.target);
+  if (!Number.isFinite(targetId) || targetId <= 0 || Number(targetId) === Number(actorId)) return null;
+  const target = agents.find((agent) => Number(agent.id) === Number(targetId));
+  return target?.alive ? Number(target.id) : null;
+}
+
+function isWhiteWolfKing(agent: Agent | undefined): boolean {
+  if (!agent) return false;
+  const roleId = String(agent.role || agent.roleConfig?.id || '').toLowerCase();
+  const roleName = String(agent.roleLabel || agent.roleConfig?.name || '').toLowerCase();
+  return roleId === 'white_wolf_king' || roleName.includes('白狼王') || roleName.includes('white wolf king');
 }
 
 export {

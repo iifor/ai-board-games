@@ -187,3 +187,9 @@ Workflow 内部 `StatePatch` 使用路径操作表达状态增量：
 - `seer-check`、实际用药的 `witch-action` 和 `hunter-shot` 可携带
   `speech: { playerId, text }`，表示使用该玩家音色播放。
 - `hunter-shot` 不再传递公开技能原因；历史快照中的原因字段只做兼容读取。
+## Werewolf 12-player expansion
+
+- `SelfDestructPayload` may include `targetId?: number | null` for white wolf king self-destruct target display.
+- `PlaybackEvent`/game event consumers should treat `self-destruct` as one shared event semantic for real-time play and history replay.
+- This expansion does not change WebSocket start/control/ack message shapes and does not add a public REST API.
+- White wolf king death sources such as `self_destruct` and `white_wolf_king_self_destruct` are server workflow semantics; shared payloads only expose fields required by display clients.

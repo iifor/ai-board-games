@@ -39,14 +39,9 @@ function seedData(): void {
   }
   voices.seedMissingAzureVoices();
   voices.seedMissingMimoVoices();
-  if ((db.prepare('SELECT COUNT(*) AS count FROM werewolf_roles').get() as { count: number }).count === 0) {
-    const { DEFAULT_WEREWOLF_ROLES } = require('./db/seed');
-    DEFAULT_WEREWOLF_ROLES.forEach((r: Record<string, unknown>) => werewolfConfig.upsertWerewolfRole(r));
-  }
-  if ((db.prepare('SELECT COUNT(*) AS count FROM werewolf_modes').get() as { count: number }).count === 0) {
-    const { DEFAULT_WEREWOLF_MODES } = require('./db/seed');
-    DEFAULT_WEREWOLF_MODES.forEach((m: Record<string, unknown>) => werewolfConfig.upsertWerewolfMode(m));
-  }
+  const { DEFAULT_WEREWOLF_ROLES, DEFAULT_WEREWOLF_MODES } = require('./db/seed');
+  DEFAULT_WEREWOLF_ROLES.forEach((r: Record<string, unknown>) => werewolfConfig.upsertWerewolfRole(r));
+  DEFAULT_WEREWOLF_MODES.forEach((m: Record<string, unknown>) => werewolfConfig.upsertWerewolfMode(m));
 }
 
 function createApp(): express.Application {
