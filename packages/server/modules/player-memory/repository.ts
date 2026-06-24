@@ -17,7 +17,7 @@ function findMemories(gameType: string, ownerPlayerId: number, subjectPlayerIds:
   return getDb().prepare(`
     SELECT * FROM player_game_memories
     WHERE game_type = ? AND owner_player_id = ? AND subject_player_id IN (${placeholders})
-    ORDER BY games_played DESC, familiarity_score DESC, updated_at DESC
+    ORDER BY games_played DESC, updated_at DESC
   `).all(gameType, ownerPlayerId, ...subjectPlayerIds) as PlayerGameMemoryRow[];
 }
 

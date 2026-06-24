@@ -4,6 +4,7 @@ import type {
   EngineDefinitionSummary,
   EngineResult,
   GameDefinition,
+  GameRuntimeRunContext,
   WorkflowEffect,
 } from '@ai-presenter/shared/types/gameEngine';
 import { ActionWindowManager } from '../action-window/actionWindowManager';
@@ -82,6 +83,23 @@ class GameEngine {
   tick(matchId: string) {
     assertCanTick(this.store.loadMatch(matchId));
     return this.workflowRuntime.tick(matchId);
+  }
+
+  /**
+   * 使用 definition 的自定义 runtime 创建并运行游戏。
+   * 如果 definition 没有 runtime，抛出错误。
+   */
+  async runGame(
+    gameType: string,
+    input: { matchId?: string; config?: Record<string, unknown>; initialState?: Record<string, unknown> },
+    context?: GameRuntimeRunContext,
+  ): Promise<Record<string, unknown>> {
+    const definition = this.requireDefinition(gameType);
+    if (!definition.runtime) {
+      throw new Error(`GameDefinition "${gameType}" does not have a runtime. Use createMatch() + tick() instead.`);
+    }
+    const match = definition.runtime.createMatch(input);
+    return definition.runtime.run(match.id, context);
   }
 
   async submitAction(action: DomainAction): Promise<EngineResult<{ action: DomainAction; effects: WorkflowEffect[] }>> {

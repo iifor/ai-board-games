@@ -18,6 +18,7 @@ import * as observability from './modules/observability';
 import * as workflowEngine from './modules/workflow-engine';
 import * as playerMemory from './modules/player-memory';
 import { registerDebateWorkflow } from './modules/debate';
+import { authRouter, authMiddleware, seedAdminUser } from './modules/auth';
 
 // Game module
 import * as gameSocket from './modules/game-socket';
@@ -42,6 +43,7 @@ function seedData(): void {
   const { DEFAULT_WEREWOLF_ROLES, DEFAULT_WEREWOLF_MODES } = require('./db/seed');
   DEFAULT_WEREWOLF_ROLES.forEach((r: Record<string, unknown>) => werewolfConfig.upsertWerewolfRole(r));
   DEFAULT_WEREWOLF_MODES.forEach((m: Record<string, unknown>) => werewolfConfig.upsertWerewolfMode(m));
+  seedAdminUser(db);
 }
 
 function createApp(): express.Application {
@@ -56,19 +58,22 @@ function createApp(): express.Application {
   app.use(express.json({ limit: '8mb' }));
   app.use(responseFormatter);
 
-  // Admin API routes
-  app.use('/api/admin', upload.router);
-  app.use('/api/admin', skins.router);
-  app.use('/api/admin', players.router);
-  app.use('/api/admin', modelProviders.router);
-  app.use('/api/admin', models.router);
-  app.use('/api/admin', voices.router);
-  app.use('/api/admin', werewolfConfig.router);
-  app.use('/api/admin', games.router);
-  app.use('/api/admin', settings.router);
-  app.use('/api/admin', observability.router);
-  app.use('/api/admin', workflowEngine.router);
-  app.use('/api/admin', playerMemory.router);
+  // Auth routes (public — no auth required)
+  app.use('/api/admin/auth', authRouter);
+
+  // Admin API routes (protected by JWT auth)
+  app.use('/api/admin', authMiddleware, upload.router);
+  app.use('/api/admin', authMiddleware, skins.router);
+  app.use('/api/admin', authMiddleware, players.router);
+  app.use('/api/admin', authMiddleware, modelProviders.router);
+  app.use('/api/admin', authMiddleware, models.router);
+  app.use('/api/admin', authMiddleware, voices.router);
+  app.use('/api/admin', authMiddleware, werewolfConfig.router);
+  app.use('/api/admin', authMiddleware, games.router);
+  app.use('/api/admin', authMiddleware, settings.router);
+  app.use('/api/admin', authMiddleware, observability.router);
+  app.use('/api/admin', authMiddleware, workflowEngine.router);
+  app.use('/api/admin', authMiddleware, playerMemory.router);
 
   // Game API routes
   app.use('/api/toc', gameSocket.router);

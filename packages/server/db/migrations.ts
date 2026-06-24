@@ -398,6 +398,19 @@ function migrate(db: Database | JsonDb): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_workflow_events_channel ON workflow_events(match_id, channel)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_workflow_events_scope ON workflow_events(match_id, channel, scope_key)');
 
+  // Admin users table (B端登录认证)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   migrateLegacyModelProviders(db);
 
   // Fix null/empty/consensus game types

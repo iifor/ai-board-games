@@ -1,4 +1,4 @@
-import { Card, Descriptions, Drawer, Space, Tag, Typography } from 'antd';
+import { Card, Descriptions, Drawer, Space, Typography } from 'antd';
 import type { PlayerMemoryRecord } from '../../services/adminApi';
 
 const { Text } = Typography;
@@ -21,10 +21,6 @@ export function MemoryDetailDrawer({ record, onClose }: MemoryDetailDrawerProps)
   const subjectLabel =
     record.subjectNickname || record.subjectName || `玩家${record.subjectPlayerId}`;
 
-  const traitEntries = Object.entries(record.traits).filter(
-    ([key, value]) => key !== 'lastGameId' && typeof value === 'number' && value > 0,
-  );
-
   return (
     <Drawer
       width={560}
@@ -42,21 +38,15 @@ export function MemoryDetailDrawer({ record, onClose }: MemoryDetailDrawerProps)
           <Descriptions.Item label="画像所有者">{ownerLabel}</Descriptions.Item>
           <Descriptions.Item label="画像主体">{subjectLabel}</Descriptions.Item>
           <Descriptions.Item label="交手局数">{record.gamesPlayed}</Descriptions.Item>
-          <Descriptions.Item label="熟悉度评分">{record.familiarityScore}</Descriptions.Item>
-          <Descriptions.Item label="最近摘要">{record.recentSummary || '-'}</Descriptions.Item>
           <Descriptions.Item label="创建于">{formatTime(record.createdAt)}</Descriptions.Item>
           <Descriptions.Item label="更新于">{formatTime(record.updatedAt)}</Descriptions.Item>
         </Descriptions>
 
-        <Card size="small" title="画像特征 (traits)">
-          {traitEntries.length === 0 ? (
-            <Text type="secondary">暂无特征数据</Text>
+        <Card size="small" title="画像摘要">
+          {record.summary ? (
+            <Text>{record.summary}</Text>
           ) : (
-            <Space wrap>
-              {traitEntries.map(([key, value]) => (
-                <Tag key={key}>{key}: {value}</Tag>
-              ))}
-            </Space>
+            <Text type="secondary">暂无画像数据</Text>
           )}
         </Card>
       </Space>

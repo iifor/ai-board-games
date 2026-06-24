@@ -1,20 +1,26 @@
+/**
+ * 辩论赛直接执行路径（DebateGameAgent）
+ *
+ * 提供非 workflow 模式的辩论赛执行：直接调用 phases，事件通过回调推送。
+ * 共享逻辑（agent 创建）已提取到 helpers.ts。
+ */
+
 import { createTraceContext, flushTrace, markTraceComplete, markTraceError, recordDecision, recordEvent, recordSnapshot } from '../observability';
 import type { TraceContext } from '../observability/tracer';
 import { BaseGameAgent, createFallbackAudit } from '../agent-core';
 import type { FallbackEvent as AgentFallbackEvent } from '../agent-core/fallbackAudit';
 import { createDebateSkillRegistry } from './skillRegistry';
 import { createDebateRoleSkillRegistry } from './roleSkills';
-import { DebateAgent } from './playerAgent';
 import { PHASES, TOPICS } from './constants';
-import { buildSystemPrompt } from './prompts';
 import type { Topic } from './prompts';
-import { buildAgentHash, choose, getConfiguredDebateSetup, normalizeTopic, serializeGame } from './utils';
+import { choose, normalizeTopic, serializeGame } from './utils';
 import type { DebatePlayer, DebatePhase, DebateHost, DebateConfig, SerializedGame } from './utils';
 import {
   runStrategyPhase, runOpeningPhase, runCrossfirePhase, runFreePhase,
   runClosingPhase, runAwardPhases, runPostgamePhase,
 } from './phases';
 import type { PhaseContext } from './phases';
+import { createDebateAgents } from './helpers';
 
 interface GameOptions {
   onEvent?: (event: Record<string, unknown>) => void;
@@ -52,7 +58,7 @@ class DebateGameAgent extends BaseGameAgent {
       gameType: 'debate',
       onRecord: (event: AgentFallbackEvent) => this.recordFallback(event),
     });
-    this.agents = createDebateAgents(config, this.topic, this.fallbackAudit, this.gameId, this.roleSkillRegistry);
+    this.agents = createDebateAgents(config, this.topic, this.fallbackAudit, this.gameId, this.roleSkillRegistry, { sessionPersistence: false });
     this.phases = [];
     this.host = config.host || null;
     this.winner = null;
@@ -137,47 +143,9 @@ class DebateGameAgent extends BaseGameAgent {
   }
 }
 
-function createDebateAgents(
-  config: DebateConfig,
-  topic: Topic,
-  fallbackAudit: ReturnType<typeof createFallbackAudit>,
-  gameId: string,
-  roleSkillRegistry: ReturnType<typeof createDebateRoleSkillRegistry> | null = null,
-): DebatePlayer[] {
-  const setup = getConfiguredDebateSetup(config);
-  return setup.players.map((player, index) => {
-    const side = index < 4 ? 'pro' : index < 8 ? 'con' : 'judge';
-    const debateRole = side === 'judge'
-      ? 'judge'
-      : Number(player.id) === Number(side === 'pro' ? setup.proCaptainId : setup.conCaptainId)
-        ? 'captain'
-        : 'debater';
-    const agent: DebatePlayer = {
-      ...player,
-      side: side as 'pro' | 'con' | 'judge',
-      sideIndex: side === 'judge' ? null : index % 4,
-      debateRole: debateRole as 'captain' | 'debater' | 'judge',
-      sideLabel: side === 'pro' ? '正方' : side === 'con' ? '反方' : '评委席',
-      debateRoleLabel: debateRole === 'captain' ? '队长' : debateRole === 'judge' ? '评委' : '选手',
-      speeches: [],
-      messages: [],
-    };
-    agent.baseSystemPrompt = buildSystemPrompt(agent, topic, PHASES[0]);
-    agent.baseSystemPromptHash = buildAgentHash(agent.baseSystemPrompt as string);
-    const playerAgent = new DebateAgent(agent, agent.baseSystemPrompt as string, {
-      onError: (entry: Record<string, unknown>) => fallbackAudit.record(entry as unknown as Parameters<typeof fallbackAudit.record>[0]),
-      gameId,
-    });
-    agent.playerAgent = playerAgent as unknown as DebatePlayer['playerAgent'];
-    roleSkillRegistry?.applyToPlayer(playerAgent as never, debateRole);
-    agent.messages = (playerAgent as unknown as { messages: DebatePlayer['messages'] }).messages;
-    return agent;
-  });
-}
-
 async function runDebateGame(config: DebateConfig, options: GameOptions = {}): Promise<SerializedGame> {
   const agent = new DebateGameAgent(config, options);
   return agent.run();
 }
 
-export { DebateGameAgent, runDebateGame, createDebateAgents };
+export { DebateGameAgent, runDebateGame };

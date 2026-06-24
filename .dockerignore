@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm-cache/
+
+# Build artifacts
+dist/
+
+# Database
+data/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.cursor/
+.codex/
+.claude/
+.codegraph/
+.agents/
+
+# Logs
+logs/
+*.log
+
+# Docker
+docker-compose.yml
+Dockerfile
+nginx/
+
+# Environment (sensitive)
+.env
+
+# OS files
+Thumbs.db
+Desktop.ini

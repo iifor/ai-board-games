@@ -286,7 +286,7 @@ test('wolf kill priority stays locked when dead last god hunter shoots the last 
     assert.equal(completed.state?.winner, 'wolves');
     assert.equal(completed.state?.players.find((item: Record<string, unknown>) => Number(item.id) === 1).alive, false);
     assert.equal((completed.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_game_result').length, 1);
-    assert.equal(completed.nextStepId, 'postgame_mvp_vote');
+    assert.equal(completed.nextStepId, 'postgame_daybreak');
     assert.ok(completed.events?.findIndex((event: Record<string, unknown>) => event.type === 'werewolf_last_words')
       < completed.events?.findIndex((event: Record<string, unknown>) => event.type === 'werewolf_game_result'));
   } finally {
@@ -335,7 +335,7 @@ test('hunter shooting the last wolf gives good victory when wolf kill did not co
     assert.equal(completed.status, 'COMPLETED');
     assert.equal(completed.state?.winner, 'good');
     assert.equal((completed.events || []).filter((event: Record<string, unknown>) => event.type === 'werewolf_game_result').length, 1);
-    assert.equal(completed.nextStepId, 'postgame_mvp_vote');
+    assert.equal(completed.nextStepId, 'postgame_daybreak');
   } finally {
     patchRepo(repo, original);
   }
@@ -1013,7 +1013,7 @@ test('private night action phase results are scoped and not public', () => {
         assert.equal(resultEvent.scopeKey, item.scopeKey, item.actionType);
         assert.equal((resultEvent.payload as Record<string, unknown> | undefined)?.channel, 'scope', item.actionType);
         assert.equal((resultEvent.payload as Record<string, unknown> | undefined)?.scopeKey, item.scopeKey, item.actionType);
-        assert.match(String((resultEvent.payload as Record<string, unknown> | undefined)?.message || ''), /原因：/);
+        assert.match(String((resultEvent.payload as Record<string, unknown> | undefined)?.message || ''), /。/);
       }
       const auditEvent = (completed.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_action_engine_shadow_audited') as Record<string, unknown> | undefined;
       assert.equal(auditEvent?.channel, 'system', item.actionType);
@@ -1124,8 +1124,8 @@ test('seer check phase result is published to EventBus as scoped seer feedback',
     const seerEvent = delivered.find((event) => event.type === 'seer-check');
     assert.equal(seerEvent?.channel, 'scope');
     assert.equal(seerEvent?.scopeKey, 'seer');
-    assert.match(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), /2号玩家的查验结果是：好人/);
-    assert.match(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), /原因：验证中置位/);
+    assert.match(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), /2号玩家的身份是：好人/);
+    assert.match(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), /。验证中置位/);
     assert.equal(
       ((seerEvent?.payload as Record<string, unknown> | undefined)?.seerCheck as Record<string, unknown> | undefined)?.reason,
       '验证中置位',

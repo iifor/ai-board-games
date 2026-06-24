@@ -17,4 +17,14 @@ function setDefaultHostPlayerId(playerId: unknown): { defaultHostPlayerId: numbe
   return getAppSettings();
 }
 
-export { getAppSettings, setDefaultHostPlayerId };
+function getSpectatorMode(): boolean {
+  return parseJson<boolean>(repo.getSettingValue(SETTING_KEYS.SPECTATOR_MODE), false);
+}
+
+function setSpectatorMode(enabled: unknown): { spectatorMode: boolean } {
+  const value = Boolean(enabled);
+  repo.upsertSetting(SETTING_KEYS.SPECTATOR_MODE, toJson(value));
+  return { spectatorMode: value };
+}
+
+export { getAppSettings, setDefaultHostPlayerId, getSpectatorMode, setSpectatorMode };

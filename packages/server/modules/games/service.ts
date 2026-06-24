@@ -68,9 +68,14 @@ function saveGameRecord(game: SaveGameInput): GameSummary[] {
       });
     }
     replacePlaybackEvents(row.id, game.playbackEvents || []);
-    recordCompletedGameMemories(game);
   });
   tx();
+
+  // 异步生成记忆（LLM 调用），不阻塞对局保存
+  recordCompletedGameMemories(game).catch((error: unknown) => {
+    console.error('[saveGameRecord] 生成玩家记忆失败:', (error as Error).message);
+  });
+
   return listGames();
 }
 

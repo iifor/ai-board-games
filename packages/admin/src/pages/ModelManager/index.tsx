@@ -82,7 +82,7 @@ export function ModelManager() {
     <>
       <Card
         title={`${provider?.name || '供应商'}模型列表`}
-        extra={<Space><Button onClick={() => navigate('/models/providers')}>返回供应商</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => setEditing({} as Model)}>新增模型</Button></Space>}
+        extra={<Space><Button onClick={() => navigate('/system/models/providers')}>返回供应商</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => setEditing({} as Model)}>新增模型</Button></Space>}
       >
         {provider && (
           <Descriptions size="small" bordered column={2}>

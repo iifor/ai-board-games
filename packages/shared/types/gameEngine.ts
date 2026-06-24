@@ -142,6 +142,15 @@ interface SkillDefinition {
   visibility?: GameEngineChannel;
 }
 
+interface GameRuntimeRunContext {
+  onEvent?: (event: Record<string, unknown>) => void;
+}
+
+interface GameRuntime {
+  createMatch(input: { matchId?: string; config?: Record<string, unknown>; initialState?: Record<string, unknown> }): { id: string; [key: string]: unknown };
+  run(matchId: string, context?: GameRuntimeRunContext): Promise<Record<string, unknown>>;
+}
+
 interface GameDefinition {
   gameType: string;
   version: string;
@@ -152,6 +161,7 @@ interface GameDefinition {
   effectResolvers?: EffectResolver[];
   projectState?: ProjectStateFromEvent;
   channelPolicy?: ChannelPolicy;
+  runtime?: GameRuntime;
   metadata?: Record<string, unknown>;
 }
 
@@ -204,6 +214,8 @@ export type {
   StateProjectionContext,
   ProjectStateFromEvent,
   SkillDefinition,
+  GameRuntimeRunContext,
+  GameRuntime,
   GameDefinition,
   InvariantIssue,
   EngineDefinitionSummary,

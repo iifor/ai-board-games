@@ -69,8 +69,8 @@ export function buildSaveActionPrompt(victimId: number, isSelf: boolean, canSelf
     `今晚狼刀目标是 ${victimId} 号。你还有解药。`,
     isSelf && canSelfSave ? '首夜允许自救。' : '不允许自救。',
     isSelf
-      ? '是否使用解药自救？只返回标准 JSON 对象：{"use":true,"reason":""} 或 {"use":false,"reason":null}。reason 可选。'
-      : '是否使用解药救人？只返回标准 JSON 对象：{"use":true,"reason":"我选择救x号，原因是..."} 或 {"use":false,"reason":null}。reason 可选。'
+      ? '是否使用解药自救？只返回标准 JSON 对象：{"use":true,"reason":""} 或 {"use":false,"reason":null}。reason 可以填写简短原因；不行动时可为 null。'
+      : '是否使用解药救人？只返回标准 JSON 对象：{"use":true,"reason":"我选择救x号，原因是..."} 或 {"use":false,"reason":null}。reason 可以填写简短原因；不行动时可为 null。'
   ].filter(Boolean);
   return lines.join('\n\n');
 }

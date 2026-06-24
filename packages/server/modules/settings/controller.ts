@@ -11,4 +11,13 @@ function setDefaultHost(req: Request, res: Response): void {
   res.json(formatSuccess(service.setDefaultHostPlayerId(body.defaultHostPlayerId ?? body.playerId)));
 }
 
-export { getSettings, setDefaultHost };
+function getSpectatorMode(_req: Request, res: Response): void {
+  res.json(formatSuccess({ spectatorMode: service.getSpectatorMode() }));
+}
+
+function setSpectatorMode(req: Request, res: Response): void {
+  const body = req.body as Record<string, unknown>;
+  res.json(formatSuccess(service.setSpectatorMode(body.enabled)));
+}
+
+export { getSettings, setDefaultHost, getSpectatorMode, setSpectatorMode };

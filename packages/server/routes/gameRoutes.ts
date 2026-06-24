@@ -8,6 +8,7 @@ import { listSkins } from '../modules/skins';
 import { listWerewolfModes } from '../modules/werewolf-config';
 import { isServerTtsVoice, synthesizeVoiceMedia, synthesizeVoicePreview } from '../modules/tts';
 import { AppError, ErrorCodes } from '../utils/errors';
+import { getSpectatorMode } from '../modules/settings/service';
 
 const router = express.Router();
 
@@ -56,6 +57,10 @@ router.get('/health', (_request: Request, response: Response) => {
       voicePackageId: player.voicePackageId
     }))
   });
+});
+
+router.get('/spectator-mode', (_request: Request, response: Response) => {
+  response.json({ spectatorMode: getSpectatorMode() });
 });
 
 router.post('/voice/synthesize', async (request: Request, response: Response, next: NextFunction) => {

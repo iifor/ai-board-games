@@ -10,8 +10,8 @@ import {
 import { replayGameSession } from './replay';
 import type { GameSession, SessionEvent } from './session';
 import { getAiConfig } from '../../config';
-import { runAiDebate } from '../../aiDebateRunner';
-import { runWerewolfWorkflow } from '../werewolf';
+import { runDebateViaEngine } from '../debate-runner';
+import { runWerewolfViaEngine } from '../werewolf-runner';
 import { getWerewolfModeConfig } from '../werewolf-config';
 import { buildWerewolfRuleIntro } from '../werewolf/messages';
 import {
@@ -21,6 +21,7 @@ import {
 } from '../werewolf/views/viewPolicy';
 import type { ProjectionContext } from '../werewolf/views/viewPolicy';
 import { getActiveTrace, recordEvent, markTraceError, flushTrace } from '../observability';
+import { getSpectatorMode } from '../settings/service';
 
 // games is TS — import directly
 import { saveGameRecord } from '../games';
@@ -148,6 +149,11 @@ function attachGameSocket(server: import('http').Server): void {
       }
 
       if (message.type === 'start') {
+        // 观战模式拦截：在消息入口处第一时间拒绝，非回放请求不允许启动新游戏
+        if (!message.replayGameId && getSpectatorMode()) {
+          session.send({ type: 'error', message: '当前处于观战模式，无法开始新游戏。请联系管理员关闭观战模式。' });
+          return;
+        }
         runSession(
           session,
           message.mode || 'real',
@@ -194,6 +200,11 @@ async function runSession(
   if (mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
   if (options.replayGameId) {
     await replayGameSession(session, safeGameType, options.replayGameId, { replayView: options.replayView });
+    return;
+  }
+  // Spectator mode check (defense-in-depth, 入口层已有前置检查)
+  if (getSpectatorMode()) {
+    session.send({ type: 'error', message: '当前处于观战模式，无法开始新游戏。请联系管理员关闭观战模式。' });
     return;
   }
   const config = getRequestConfig(mode, playerIds, safeGameType, options);
@@ -377,8 +388,8 @@ function normalizeGameType(gameType?: string): string {
 }
 
 function getRunner(gameType: string): (config: unknown, options: unknown) => Promise<unknown> {
-  if (gameType === 'debate') return runAiDebate;
-  return runWerewolfWorkflow;
+  if (gameType === 'debate') return runDebateViaEngine as (config: unknown, options: unknown) => Promise<unknown>;
+  return runWerewolfViaEngine as (config: unknown, options: unknown) => Promise<unknown>;
 }
 
 function getStartMessage(gameType: string): string {

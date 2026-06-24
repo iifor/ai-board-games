@@ -1,7 +1,7 @@
 import type { SelectOption } from '../types/api';
 import type { Player, Skin, VoicePackage } from '../types/entities';
 
-export const GAME_LABELS: Record<string, string> = { debate: '辩论赛', werewolf: '狼人杀', consensus: '共识迷雾' };
+export const GAME_LABELS: Record<string, string> = { debate: '辩论赛', werewolf: '狼人杀' };
 export const DEBATE_ROLE_LABELS: string[] = ['一辩', '二辩', '三辩', '四辩'];
 
 export const TITLES: Record<string, string> = {
@@ -10,13 +10,12 @@ export const TITLES: Record<string, string> = {
   '/werewolf/history': '狼人杀 / 对局历史',
   '/werewolf/roles': '狼人杀 / 角色管理',
   '/werewolf/modes': '狼人杀 / 模式选择',
-  '/consensus/history': '共识迷雾 / 对局历史',
-  '/consensus/skins': '共识迷雾 / 皮肤管理',
-  '/players': '玩家管理',
-  '/models': '模型管理',
-  '/models/providers': '模型管理 / 供应商列表',
-  '/models/providers/:id': '模型管理 / 供应商模型',
-  '/voices': '语音管理',
+  '/system/public-settings': '系统设置 / 公共设置',
+  '/system/players': '系统设置 / 玩家管理',
+  '/system/voices': '系统设置 / 语音管理',
+  '/system/models': '系统设置 / 模型管理',
+  '/system/models/providers': '系统设置 / 模型管理',
+  '/system/models/providers/:id': '系统设置 / 供应商模型',
   '/traces': 'AI 对局观测',
   '/traces/:id': 'AI 对局观测 / Trace 详情',
   '/traces/:id/player/:playerId': 'AI 对局观测 / 玩家分析'

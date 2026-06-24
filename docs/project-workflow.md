@@ -38,7 +38,7 @@ packages/server/modules/
 │   └── controller.ts
 ├── game-engine/
 │   ├── engine/             # GameEngine、definition registry、invariant checker
-│   ├── workflow/           # workflow-engine facade
+│   ├── workflow/           # WorkflowRuntime（workflow-engine 包装）
 │   ├── action-window/      # ActionWindow 生命周期和提交校验
 │   ├── agent/              # AgentRuntime contract
 │   ├── skill/              # SkillRegistry contract
@@ -46,9 +46,14 @@ packages/server/modules/
 │   ├── event/              # DomainEvent EventBus
 │   ├── channel/            # ChannelSystem 可见性校验
 │   └── state/              # MatchStateStore 与 SQLite adapter
+├── engine-registry.ts      # GameEngine 单例 + 游戏注册
+├── debate-runner.ts        # 辩论赛 GameEngine runner
+├── werewolf-runner.ts      # 狼人杀 GameEngine runner
 ├── debate/
 │   ├── workflow.ts
 │   ├── service.ts
+│   ├── definition.ts       # DebateGameDefinition
+│   ├── helpers.ts          # 共享函数（agent 创建、序列化、投票等）
 │   ├── phases.ts
 │   ├── skillRegistry.ts
 │   ├── roleSkills.ts
@@ -165,16 +170,31 @@ flowchart TD
 
 ### game-engine
 
-`game-engine` 是通用 AI 玩家游戏引擎骨架，当前作为 `workflow-engine` 之上的内部 facade 使用，暂不替换现有狼人杀和辩论赛主流程。
+`game-engine` 是所有游戏的统一入口。辩论赛和狼人杀都通过 `GameEngine` 创建对局和推进执行。
 
-- `GameEngine`：注册 `GameDefinition`、创建 match、tick、提交 action、解析 pending effect，并提供 `getDebugState(matchId)`。
-- `WorkflowRuntime`：包装现有 `workflow-engine` 创建和推进能力，避免第一阶段重写 tick。
+- `GameEngine`：注册 `GameDefinition`、创建 match、tick、提交 action、解析 pending effect、运行自定义 runtime，并提供 `getDebugState(matchId)`。
+- `GameDefinitionRegistry`：按 `gameType@version` 注册和查询游戏定义。
+- `WorkflowRuntime`：包装现有 `workflow-engine` 创建和推进能力。
 - `ActionWindowManager`：校验 ActionWindow 是否存在、是否打开、actor/actionType 是否合法。
 - `EffectQueue`：把合法 `DomainAction` 转为 `WorkflowEffect` 并写入队列。
 - `EffectResolutionService`：通过 resolver 把 effect 结算为 `DomainEvent`，再按游戏定义的 `projectState` 投影回 match state。
 - `ChannelSystem`：校验所有 `DomainEvent` 必须声明 channel，`scope` event 必须声明 `scopeKey`。
 - `InvariantChecker`：聚合 debug state 中的 channel、effect lifecycle、重复 idempotencyKey 等不变量问题。
 - `MatchStateStore`：隔离 core 与 SQLite 细节，SQLite adapter 复用现有 `matches`、`pending_actions`、`workflow_effects`、`workflow_events`。
+
+#### 游戏注册与运行入口
+
+`engine-registry.ts` 提供 `getGameEngine()` 单例，首次调用时自动注册所有已实现的 `GameDefinition`：
+
+- 辩论赛：`createDebateGameDefinition()`（`debate/definition.ts`）
+- 狼人杀：`createWerewolfGameDefinition()`（`werewolf/definition.ts`）
+
+游戏运行入口：
+
+- `debate-runner.ts`：`runDebateViaEngine()` — 通过 `engine.createMatch()` 创建对局，`drainAiTasks()` 循环推进。
+- `werewolf-runner.ts`：`runWerewolfViaEngine()` — 通过 `engine.createMatch()` 创建对局，设置 EventBus 基础设施，`drainAiTasks()` 循环推进。
+
+`game-socket/service.ts` 的 `getRunner()` 分发到这两个 runner。
 
 当前狼人杀 adapter 只迁移低风险动作：
 

@@ -151,8 +151,10 @@ export function DebateTopicDialog({
         return;
       }
       const data = await response.json();
-      if (data?.debateTeams) {
-        const dt = data.debateTeams;
+      // responseFormatter 会包装为 { code, message, data: { debateTeams } }
+      const teams = data?.data?.debateTeams || data?.debateTeams;
+      if (teams) {
+        const dt = teams;
         onTeamsChange(normalizeDebateTeamDraft({
           proIds: dt.proIds || [],
           conIds: dt.conIds || [],

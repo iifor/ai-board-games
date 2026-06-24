@@ -1,22 +1,29 @@
 import {
   App as AntApp,
   Layout,
-  Menu
+  Menu,
+  Button,
+  Dropdown,
+  Space
 } from 'antd';
 import {
   DashboardOutlined,
   DatabaseOutlined,
   ExperimentOutlined,
   EyeOutlined,
+  LogoutOutlined,
   PartitionOutlined,
   RobotOutlined,
-  SkinOutlined,
+  SettingOutlined,
   SoundOutlined,
   TeamOutlined,
   TrophyOutlined
 } from '@ant-design/icons';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { normalizePath } from '../../utils/adminHelpers';
+import { getToken, clearToken } from '../../services/adminApi';
+import { Login } from '../../pages/Login';
 import { Dashboard } from '../../pages/Dashboard';
 import { GameHistory } from '../../pages/GameHistory';
 import { PlayerManager } from '../../pages/PlayerManager';
@@ -25,7 +32,7 @@ import { ModelProviderManager } from '../../pages/ModelProviderManager';
 import { VoiceManager } from '../../pages/VoiceManager';
 import { WerewolfRoleManager } from '../../pages/WerewolfRoleManager';
 import { WerewolfModeManager } from '../../pages/WerewolfModeManager';
-import { SkinManager } from '../../pages/SkinManager';
+import { PublicSettings } from '../../pages/PublicSettings';
 import { TraceExplorer } from '../../pages/TraceExplorer';
 import { TraceDetail } from '../../pages/TraceExplorer/TraceDetail';
 import { AgentTraceView } from '../../pages/TraceExplorer/AgentTraceView';
@@ -54,22 +61,16 @@ const MENU_ITEMS: ItemType[] = [
     ]
   },
   {
-    key: '/consensus',
-    icon: <SkinOutlined />,
-    label: '共识迷雾',
+    key: '/system',
+    icon: <SettingOutlined />,
+    label: '系统设置',
     children: [
-      { key: '/consensus/history', label: '对局历史' },
-      { key: '/consensus/skins', label: '皮肤管理' }
+      { key: '/system/public-settings', label: '公共设置' },
+      { key: '/system/players', label: '玩家管理' },
+      { key: '/system/voices', label: '语音管理' },
+      { key: '/system/models', label: '模型管理' }
     ]
   },
-  { key: '/players', icon: <TeamOutlined />, label: '玩家管理' },
-  {
-    key: '/models',
-    icon: <RobotOutlined />,
-    label: '模型管理',
-    children: [{ key: '/models/providers', label: '供应商列表' }]
-  },
-  { key: '/voices', icon: <SoundOutlined />, label: '语音管理' },
   { key: '/traces', icon: <EyeOutlined />, label: 'AI 观测' },
   { key: '/memories', icon: <DatabaseOutlined />, label: '记忆管理' },
   { key: '/workflow-debug', icon: <PartitionOutlined />, label: '工作流调试' }
@@ -84,12 +85,21 @@ export function AdminPage() {
     </AntApp>
   );
 }
-
 function AdminShell() {
   const location = useLocation();
   const navigate = useNavigate();
+  const isLoginPage = location.pathname === '/login';
+
+  if (isLoginPage) {
+    return <Login />;
+  }
+
+  if (!getToken()) {
+    return <Login />;
+  }
+
   const activePath = normalizePath(location.pathname);
-  const modelMenuPath = activePath.startsWith('/models/providers/') ? '/models/providers' : activePath;
+  const modelMenuPath = activePath.startsWith('/system/models/providers/') ? '/system/models' : activePath;
 
   return (
     <Layout className="admin-layout">
@@ -101,27 +111,36 @@ function AdminShell() {
           theme="dark"
           mode="inline"
           selectedKeys={[modelMenuPath]}
-          defaultOpenKeys={['/debate', '/werewolf', '/consensus', '/models']}
+          defaultOpenKeys={['/debate', '/werewolf', '/system']}
           items={MENU_ITEMS}
           onClick={({ key }) => navigate(key)}
         />
       </Sider>
       <Layout className="admin-main">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '0 24px', height: 48, background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
+          <Button
+            type="text"
+            icon={<LogoutOutlined />}
+            onClick={() => { clearToken(); window.location.hash = '#/login'; }}
+          >
+            退出登录
+          </Button>
+        </div>
         <Content className="admin-content">
           <Routes>
+            <Route path="/login" element={<Login />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/debate/history" element={<GameHistory gameType="debate" />} />
             <Route path="/werewolf/history" element={<GameHistory gameType="werewolf" />} />
             <Route path="/werewolf/roles" element={<WerewolfRoleManager />} />
             <Route path="/werewolf/modes" element={<WerewolfModeManager />} />
-            <Route path="/consensus/history" element={<GameHistory gameType="consensus" />} />
-            <Route path="/consensus/skins" element={<SkinManager />} />
-            <Route path="/players" element={<PlayerManager />} />
-            <Route path="/models" element={<Navigate to="/models/providers" replace />} />
-            <Route path="/models/providers" element={<ModelProviderManager />} />
-            <Route path="/models/providers/:providerId" element={<ModelManager />} />
-            <Route path="/voices" element={<VoiceManager />} />
+            <Route path="/system/public-settings" element={<PublicSettings />} />
+            <Route path="/system/players" element={<PlayerManager />} />
+            <Route path="/system/voices" element={<VoiceManager />} />
+            <Route path="/system/models" element={<Navigate to="/system/models/providers" replace />} />
+            <Route path="/system/models/providers" element={<ModelProviderManager />} />
+            <Route path="/system/models/providers/:providerId" element={<ModelManager />} />
             <Route path="/traces" element={<TraceExplorer />} />
             <Route path="/traces/:id" element={<TraceDetail />} />
             <Route path="/traces/:id/player/:playerId" element={<AgentTraceView />} />

@@ -1,19 +1,23 @@
 import * as repo from './repository';
 import {
-  RELATIONSHIP_ENTRY_CHAR_LIMIT,
+  SUMMARY_CHAR_LIMIT,
+  OBSERVATION_CHAR_LIMIT,
   RELATIONSHIP_PROMPT_CHAR_LIMIT,
+  MEMORY_INJECTION_THRESHOLD,
   SESSION_RECENT_MESSAGE_LIMIT,
   SESSION_SUMMARY_CHAR_LIMIT,
   SUPPORTED_MEMORY_GAME_TYPES,
 } from './constants';
 import type {
   ChatMessage,
+  MemoryData,
   MemoryStats,
-  MemoryTraits,
   PlayerGameMemory,
   PaginatedMemories,
   SessionSnapshot,
 } from './types';
+import { callModelChat } from '../llm';
+import { getAiConfig } from '../../config';
 
 interface Participant {
   id?: number;
@@ -37,6 +41,10 @@ interface CompletedGame {
   rounds?: unknown[];
 }
 
+// ============================================================
+// 跨局玩家画像（长期记忆）
+// ============================================================
+
 function getPlayerGameMemories(gameType: string, ownerPlayerId: number, participantIds: number[]): PlayerGameMemory[] {
   return repo.findMemories(gameType, ownerPlayerId, participantIds.filter((id) => id !== ownerPlayerId))
     .map((row) => ({
@@ -44,9 +52,7 @@ function getPlayerGameMemories(gameType: string, ownerPlayerId: number, particip
       ownerPlayerId: row.owner_player_id,
       subjectPlayerId: row.subject_player_id,
       gamesPlayed: row.games_played,
-      familiarityScore: row.familiarity_score,
-      traits: parseJson<MemoryTraits>(row.traits_json, {}),
-      recentSummary: row.recent_summary,
+      summary: row.recent_summary,
       updatedAt: row.updated_at,
     }));
 }
@@ -58,13 +64,12 @@ function formatRelationshipMemoryForPrompt(
 ): string {
   const participantIds = participants.map(resolvePlayerId).filter((id): id is number => Boolean(id));
   const memories = getPlayerGameMemories(gameType, ownerPlayerId, participantIds);
-  return formatRelationshipMemoryList(memories, participants, gameType);
+  return formatRelationshipMemoryList(memories, participants);
 }
 
 function formatRelationshipMemoryList(
   memories: PlayerGameMemory[],
   participants: Participant[],
-  gameType = memories[0]?.gameType || 'werewolf',
 ): string {
   const byId = new Map(participants.map((player) => [resolvePlayerId(player), player]));
   const header = [
@@ -73,21 +78,18 @@ function formatRelationshipMemoryList(
   ];
   const lines: string[] = [];
   let used = header.join('\n').length + 1;
-  const rankedMemories = [...memories].sort((left, right) =>
-    right.gamesPlayed - left.gamesPlayed
-    || right.familiarityScore - left.familiarityScore
-    || right.updatedAt.localeCompare(left.updatedAt)
-    || left.subjectPlayerId - right.subjectPlayerId
-  );
+  const rankedMemories = [...memories]
+    .filter((m) => m.gamesPlayed >= MEMORY_INJECTION_THRESHOLD && m.summary)
+    .sort((left, right) =>
+      right.gamesPlayed - left.gamesPlayed
+      || right.updatedAt.localeCompare(left.updatedAt)
+      || left.subjectPlayerId - right.subjectPlayerId
+    );
   for (const memory of rankedMemories) {
-    if (memory.gamesPlayed < 2 || memory.familiarityScore < 2) continue;
     const subject = byId.get(memory.subjectPlayerId);
     if (!subject) continue;
     const name = subject?.nickname || subject?.name || `玩家${memory.subjectPlayerId}`;
-    const traits = describeTraits(gameType, memory.traits).slice(0, 1);
-    const detail = [traits.join('；'), memory.recentSummary].filter(Boolean).join('；');
-    if (!detail) continue;
-    const line = `- ${name}：共同参与${memory.gamesPlayed}局。${detail}`.slice(0, RELATIONSHIP_ENTRY_CHAR_LIMIT);
+    const line = `- ${name}（${memory.gamesPlayed}局）：${memory.summary}`.slice(0, 200);
     if (used + line.length > RELATIONSHIP_PROMPT_CHAR_LIMIT) break;
     lines.push(line);
     used += line.length;
@@ -96,36 +98,190 @@ function formatRelationshipMemoryList(
   return [...header, ...lines].join('\n');
 }
 
-function recordCompletedGameMemories(game: CompletedGame): void {
+async function recordCompletedGameMemories(game: CompletedGame): Promise<void> {
   const gameType = String(game.gameType || game.type || '');
   if (!isSupportedGameType(gameType)) return;
   const participants = (game.players || []).filter((player) => resolvePlayerId(player));
   if (participants.length < 2) return;
-  const observations = buildObservations(gameType, game, participants);
 
+  // ① LLM 分析本局所有玩家的表现
+  const observations = await analyzeGameObservations(gameType, game, participants);
+
+  // ② 对每对玩家，合并旧摘要 + 新观察
   for (const owner of participants) {
     const ownerId = resolvePlayerId(owner)!;
     for (const subject of participants) {
       const subjectId = resolvePlayerId(subject)!;
       if (ownerId === subjectId) continue;
+
       const previous = repo.findMemory(gameType, ownerId, subjectId);
-      const previousTraits = parseJson<MemoryTraits>(previous?.traits_json, {});
-      if (previousTraits.lastGameId === game.id) continue;
-      const observed = observations.get(subjectId) || {};
-      const traits = { ...mergeTraits(previousTraits, observed), lastGameId: game.id };
+      const prevData = parseJson<MemoryData>(previous?.traits_json, {});
+      if (prevData.lastGameId === game.id) continue;
+
+      const newObservation = observations.get(subjectId) || '';
+      const existingSummary = previous?.recent_summary || '';
+      const merged = existingSummary
+        ? await mergeMemorySummary(gameType, existingSummary, newObservation)
+        : newObservation;
+
       const gamesPlayed = Number(previous?.games_played || 0) + 1;
       repo.upsertMemory({
         gameType,
         ownerPlayerId: ownerId,
         subjectPlayerId: subjectId,
         gamesPlayed,
-        familiarityScore: Math.min(100, Number(previous?.familiarity_score || 0) + 1),
-        traitsJson: JSON.stringify(traits),
-        recentSummary: buildRecentSummary(gameType, subject, game),
+        familiarityScore: 0,
+        traitsJson: JSON.stringify({ lastGameId: game.id, gamesPlayed } satisfies MemoryData),
+        recentSummary: merged.slice(0, SUMMARY_CHAR_LIMIT),
       });
     }
   }
 }
+
+async function analyzeGameObservations(
+  gameType: string,
+  game: CompletedGame,
+  participants: Participant[],
+): Promise<Map<number, string>> {
+  const result = new Map<number, string>();
+  const config = getLlmConfig();
+  if (!config) return result;
+
+  const gameContext = buildGameContext(gameType, game, participants);
+  const prompt = gameType === 'werewolf'
+    ? buildWerewolfAnalysisPrompt(gameContext)
+    : buildDebateAnalysisPrompt(gameContext);
+
+  try {
+    const response = await callModelChat({
+      ...config,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.5,
+      maxTokens: 2000,
+    });
+    parseObservationResponse(response, participants, result);
+  } catch {
+    // LLM 调用失败时静默跳过，不影响对局保存
+  }
+  return result;
+}
+
+async function mergeMemorySummary(
+  gameType: string,
+  existing: string,
+  newObservation: string,
+): Promise<string> {
+  const config = getLlmConfig();
+  if (!config) return newObservation || existing;
+
+  const prompt = `你是一个记忆整理助手。请将以下"历史印象"和"最新观察"合并为一段简洁的玩家画像摘要。
+要求：
+- 保留历史印象中仍然重要的特征
+- 融入新观察中的关键信息
+- 去除重复内容
+- 语言自然、简洁，像简短的人物评价
+- 总字数不超过${SUMMARY_CHAR_LIMIT}字
+- 只输出合并后的摘要，不要输出其他内容
+
+游戏类型：${gameType === 'werewolf' ? '狼人杀' : '辩论赛'}
+
+【历史印象】
+${existing || '（无）'}
+
+【最新观察】
+${newObservation || '（无）'}
+
+【合并后的印象】：`;
+
+  try {
+    const response = await callModelChat({
+      ...config,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.5,
+      maxTokens: 800,
+    });
+    return response.trim().slice(0, SUMMARY_CHAR_LIMIT);
+  } catch {
+    return newObservation || existing;
+  }
+}
+
+// ============================================================
+// LLM Prompt 构建
+// ============================================================
+
+function buildGameContext(gameType: string, game: CompletedGame, participants: Participant[]): string {
+  const lines: string[] = [];
+  lines.push(`对局ID: ${game.id}`);
+  lines.push(`结果: ${game.winner || '未知'}`);
+  lines.push('');
+  for (const player of participants) {
+    const id = resolvePlayerId(player);
+    const name = player.nickname || player.name || `玩家${id}`;
+    const parts = [`[${id}] ${name}`];
+    if (player.role) parts.push(`角色: ${player.role}`);
+    if (player.faction) parts.push(`阵营: ${player.faction}`);
+    if (player.side) parts.push(`立场: ${player.side}`);
+    lines.push(parts.join('，'));
+  }
+  if (Array.isArray(game.rounds) && game.rounds.length) {
+    lines.push('');
+    lines.push('=== 对局过程 ===');
+    lines.push(serializeRounds(game.rounds, 3000));
+  }
+  return lines.join('\n');
+}
+
+function buildWerewolfAnalysisPrompt(gameContext: string): string {
+  return `分析以下狼人杀对局中每位玩家的表现。从玩法风格、个性特点、行为模式角度描述。
+只记录客观观察，不做评价。每人1-2句话，简洁具体。
+只输出JSON格式，不要输出其他内容。
+
+输出格式：
+{"玩家ID": "观察文本", ...}
+
+${gameContext}
+
+请输出JSON：`;
+}
+
+function buildDebateAnalysisPrompt(gameContext: string): string {
+  return `分析以下辩论赛对局中每位玩家的表现。从辩论风格、论证特点、个性特征角度描述。
+只记录客观观察，不做评价。每人1-2句话，简洁具体。
+只输出JSON格式，不要输出其他内容。
+
+输出格式：
+{"玩家ID": "观察文本", ...}
+
+${gameContext}
+
+请输出JSON：`;
+}
+
+function parseObservationResponse(
+  response: string,
+  participants: Participant[],
+  result: Map<number, string>,
+): void {
+  try {
+    const json = JSON.parse(response.trim().replace(/^```json\s*/, '').replace(/\s*```$/, ''));
+    if (typeof json !== 'object' || !json) return;
+    for (const player of participants) {
+      const id = resolvePlayerId(player);
+      if (!id) continue;
+      const raw = json[String(id)] || json[String(player.id)];
+      if (typeof raw === 'string' && raw.trim()) {
+        result.set(id, raw.trim().slice(0, OBSERVATION_CHAR_LIMIT));
+      }
+    }
+  } catch {
+    // 解析失败静默跳过
+  }
+}
+
+// ============================================================
+// 局内会话持久化
+// ============================================================
 
 function loadPlayerSession(gameType: string, matchId: string, playerId: number, basePromptHash: string): ChatMessage[] | null {
   const row = repo.loadLatestSession(matchId, `${gameType}_session`, String(playerId));
@@ -153,6 +309,10 @@ function savePlayerSession(
   };
   repo.replaceSession(matchId, `${gameType}_session`, String(playerId), JSON.stringify(snapshot));
 }
+
+// ============================================================
+// 查询/管理
+// ============================================================
 
 function getMemoryStats(): MemoryStats {
   const rows = repo.getMemoryStats();
@@ -184,9 +344,7 @@ function listPlayerMemories(
     subjectNickname: row.subject_nickname,
     subjectName: row.subject_name,
     gamesPlayed: row.games_played,
-    familiarityScore: row.familiarity_score,
-    traits: parseJson<MemoryTraits>(row.traits_json, {}),
-    recentSummary: row.recent_summary,
+    summary: row.recent_summary,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
@@ -199,6 +357,10 @@ function clearPlayerMemories(gameType: 'werewolf' | 'debate' | 'all'): { gameTyp
     deletedCount: repo.runInTransaction(() => repo.clearMemories(gameType === 'all' ? undefined : gameType)),
   };
 }
+
+// ============================================================
+// 工具函数
+// ============================================================
 
 function compactMessages(messages: ChatMessage[]): ChatMessage[] {
   const system = messages.find((message) => message.role === 'system');
@@ -222,93 +384,55 @@ function compactMessages(messages: ChatMessage[]): ChatMessage[] {
   ];
 }
 
-function buildObservations(gameType: string, game: CompletedGame, participants: Participant[]): Map<number, MemoryTraits> {
-  const result = new Map<number, MemoryTraits>();
-  const speechStats = collectSpeechStats(game.rounds || []);
-  participants.forEach((player) => {
-    const id = resolvePlayerId(player)!;
-    const stats = speechStats.get(Number(player.id)) || { count: 0, chars: 0 };
-    const won = didPlayerWin(gameType, player, game.winner);
-    result.set(id, {
-      speechCount: stats.count,
-      speechChars: stats.chars,
-      wins: won ? 1 : 0,
-      wolfGames: gameType === 'werewolf' && player.faction === 'wolves' ? 1 : 0,
-      goodGames: gameType === 'werewolf' && player.faction !== 'wolves' ? 1 : 0,
-      debateGames: gameType === 'debate' ? 1 : 0,
-      debateWins: gameType === 'debate' && won ? 1 : 0,
-    });
-  });
-  return result;
-}
-
-function collectSpeechStats(rounds: unknown[]): Map<number, { count: number; chars: number }> {
-  const result = new Map<number, { count: number; chars: number }>();
-  const visit = (value: unknown): void => {
+function serializeRounds(rounds: unknown[], maxChars: number): string {
+  const parts: string[] = [];
+  let total = 0;
+  const visit = (value: unknown, depth: number): void => {
+    if (total >= maxChars) return;
     if (Array.isArray(value)) {
-      value.forEach(visit);
+      for (const item of value) {
+        if (total >= maxChars) break;
+        visit(item, depth);
+      }
       return;
     }
     if (!value || typeof value !== 'object') return;
     const item = value as Record<string, unknown>;
     if (item.playerId && typeof item.text === 'string') {
-      const id = Number(item.playerId);
-      const current = result.get(id) || { count: 0, chars: 0 };
-      result.set(id, { count: current.count + 1, chars: current.chars + item.text.length });
+      const line = `[${item.playerId}] ${item.type || '发言'}：${item.text.slice(0, 200)}`;
+      parts.push(line);
+      total += line.length;
+      return;
     }
-    Object.values(item).forEach(visit);
+    if (item.type && (item.type === 'vote' || item.type === 'action')) {
+      const line = `[${item.playerId || '?'}] ${item.type}：${JSON.stringify(item.payload || item.target || '').slice(0, 100)}`;
+      parts.push(line);
+      total += line.length;
+      return;
+    }
+    for (const v of Object.values(item)) {
+      if (total >= maxChars) break;
+      visit(v, depth + 1);
+    }
   };
-  visit(rounds);
-  return result;
+  visit(rounds, 0);
+  return parts.join('\n').slice(0, maxChars);
 }
 
-function mergeTraits(previous: MemoryTraits, observed: MemoryTraits): MemoryTraits {
-  const keys: Array<Exclude<keyof MemoryTraits, 'lastGameId'>> = [
-    'speechCount',
-    'speechChars',
-    'voteCount',
-    'wins',
-    'wolfGames',
-    'goodGames',
-    'debateGames',
-    'debateWins',
-  ];
-  const next: MemoryTraits = {};
-  keys.forEach((key) => {
-    next[key] = Number(previous[key] || 0) + Number(observed[key] || 0);
-  });
-  return next;
-}
-
-function describeTraits(gameType: string, traits: MemoryTraits): string[] {
-  const games = gameType === 'debate'
-    ? Math.max(1, Number(traits.debateGames || 0))
-    : Math.max(1, Number(traits.wolfGames || 0) + Number(traits.goodGames || 0));
-  const speechCount = Number(traits.speechCount || 0);
-  const speechChars = Number(traits.speechChars || 0);
-  const lines: string[] = [];
-  if (speechCount / games >= 3) lines.push('公开表达较积极');
-  else if (speechCount > 0) lines.push('公开表达相对克制');
-  if (speechCount && speechChars / speechCount >= 100) lines.push('发言通常较详细');
-  if (gameType === 'werewolf' && Number(traits.wolfGames || 0) > 0) lines.push('有狼人身份的公开表现经验');
-  if (gameType === 'debate' && Number(traits.debateWins || 0) / games >= 0.5) lines.push('历史辩论胜率较高');
-  return lines;
-}
-
-function buildRecentSummary(gameType: string, subject: Participant, game: CompletedGame): string {
-  const name = subject.nickname || subject.name || `玩家${resolvePlayerId(subject)}`;
-  if (gameType === 'werewolf') {
-    const role = subject.role || (subject.faction === 'wolves' ? '狼人阵营' : '好人阵营');
-    return `最近一局${name}以${role}身份完成比赛。`;
+function getLlmConfig(): { apiKey: string; model: string; baseUrl?: string; apiFormat?: string } | null {
+  try {
+    const config = getAiConfig();
+    const host = config.host;
+    if (!host?.apiKey || !host?.model) return null;
+    return {
+      apiKey: host.apiKey,
+      model: host.model,
+      baseUrl: host.baseUrl,
+      apiFormat: host.apiFormat,
+    };
+  } catch {
+    return null;
   }
-  const side = subject.side === 'pro' ? '正方' : subject.side === 'con' ? '反方' : '评委';
-  return `最近一局${name}担任${side}。`;
-}
-
-function didPlayerWin(gameType: string, player: Participant, winner: string | null | undefined): boolean {
-  if (!winner) return false;
-  if (gameType === 'werewolf') return player.faction === winner;
-  return player.side === winner;
 }
 
 function resolvePlayerId(player: Participant): number | null {

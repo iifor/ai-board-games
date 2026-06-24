@@ -1,33 +1,39 @@
+/**
+ * 辩论赛 workflow 路径
+ *
+ * 负责将辩论赛接入 workflow-engine：步骤定义、handler 注册、AI task 驱动。
+ * 共享逻辑（agent 创建、序列化、投票、事件构建）已提取到 helpers.ts。
+ */
+
 import { createWorkflowMatch as _createWorkflowMatch, drainAiTasks, getDebugState, listPendingOutbox, markOutboxSent } from '../workflow-engine/service';
 import { registerWorkflow } from '../workflow-engine/workflowRegistry';
 import { createFallbackAudit, executeSkillWithTrace } from '../agent-core';
 import { createDebateSkillRegistry } from './skillRegistry';
 import { createDebateRoleSkillRegistry } from './roleSkills';
-import { DebateAgent } from './playerAgent';
 import { PHASES, TOPICS } from './constants';
-import { buildSystemPrompt } from './prompts';
 import type { Topic } from './prompts';
-import {
-  choose,
-  debaterAt,
-  getConfiguredDebateSetup,
-  normalizeTopic,
-  publicDebateLog,
-  publicPlayer,
-  serializeGame,
-  syncDebateMemory,
-  buildAgentHash,
-} from './utils';
-import {
-  formatRelationshipMemoryForPrompt,
-  loadPlayerSession,
-  savePlayerSession,
-} from '../player-memory';
-import type { DebatePlayer, DebatePhase, DebateHost, DebateConfig, SerializedGame } from './utils';
+import { debaterAt, choose, normalizeTopic, publicPlayer } from './utils';
+import type { DebatePlayer, DebatePhase, DebateConfig, SerializedGame } from './utils';
 import { createPhase, pushSpeech, summarizeDebatePhase } from './speech';
 import { stableTaskId } from '../workflow-engine/utils';
 import { listAiTasks, listEvents } from '../workflow-engine/repository';
-import { getAiConfig } from '../../config';
+import {
+  createDebateAgents,
+  createInitialDebateState,
+  serializeDebateState,
+  markStepComplete,
+  clone,
+  topVotedId,
+  topWinner,
+  resolveRuntimeConfig,
+  collectWinnerVotes,
+  buildDebateSpeechEvents,
+  projectDebateOutboxEvent,
+  normalizeTaskResult,
+} from './helpers';
+import type { WorkflowMatch, WorkflowState, TaskSpec, AiTask, HandlerResult, RuntimeResult, WorkflowEvent } from './helpers';
+import { formatRelationshipMemoryForPrompt, loadPlayerSession, savePlayerSession } from '../player-memory';
+import { buildAgentHash } from './utils';
 
 // ---- Types ----
 
@@ -45,85 +51,10 @@ interface WorkflowDefinition {
   steps: WorkflowStep[];
 }
 
-interface WorkflowMatch {
-  id: string;
-  config: Record<string, unknown>;
-  state: WorkflowState;
-  status: string;
-  createdAt?: string;
-}
-
-interface WorkflowState {
-  topic: Topic;
-  host: Record<string, unknown>;
-  players: DebatePlayer[];
-  phases: DebatePhase[];
-  winner: string | null;
-  winReason: string;
-  mvp: Record<string, unknown> | null;
-  completedSteps: Record<string, boolean>;
-  fallbackAudit: unknown[];
-  currentStep?: string;
-}
-
-interface TaskSpec {
-  taskKey: string;
-  actorId: number;
-  targetId?: number;
-  action: string;
-  phaseId: string;
-  contestantIds?: number[];
-}
-
-interface AiTask {
-  id: string;
-  matchId: string;
-  stepId: string;
-  taskKey: string;
-  playerId?: number;
-  action?: string;
-  status: string;
-  prompt?: Record<string, unknown>;
-  promptContextSnapshot?: Record<string, unknown>;
-  result?: { payload?: Record<string, unknown> };
-  [key: string]: unknown;
-}
-
-interface WorkflowEvent {
-  id?: string;
-  payload?: Record<string, unknown>;
-  [key: string]: unknown;
-}
-
 interface HandlerContext {
   match: WorkflowMatch;
   step: WorkflowStep;
   state: WorkflowState;
-}
-
-interface HandlerResult {
-  status: string;
-  state: WorkflowState;
-  events?: Array<{
-    type: string;
-    payload: Record<string, unknown>;
-    idempotencyKey?: string;
-  }>;
-  blockers?: Array<{
-    id: string;
-    type: string;
-    required: boolean;
-    status: string;
-    taskId: string;
-    playerId?: number;
-  }>;
-  tasks?: AiTask[];
-}
-
-interface RuntimeResult {
-  eventType: string;
-  rawOutput: unknown;
-  payload: Record<string, unknown>;
 }
 
 // ---- Constants ----
@@ -167,12 +98,12 @@ const debateWorkflow: WorkflowDefinition = {
 // ---- Handlers ----
 
 const handlers: Record<string, {
-  execute: (ctx: HandlerContext) => HandlerResult;
+  execute: (ctx: HandlerContext) => HandlerResult & { status: string; state: WorkflowState; blockers?: unknown[]; tasks?: unknown[]; matchStatus?: string };
   runAiTask?: (ctx: { match: WorkflowMatch; task: AiTask }) => Promise<RuntimeResult>;
   validateAiResult?: (ctx: { task: AiTask; result: { payload?: Record<string, unknown> } }) => void;
 }> = {
   'debate.topic_reveal': {
-    execute({ match, step, state }: HandlerContext): HandlerResult {
+    execute({ match, step, state }: HandlerContext) {
       if (state.completedSteps?.[step.id]) return { status: 'COMPLETED', state };
       const nextState = markStepComplete({
         ...state,
@@ -196,7 +127,7 @@ const handlers: Record<string, {
     },
   },
   'debate.ai_turn': {
-    execute({ match, step, state }: HandlerContext): HandlerResult {
+    execute({ match, step, state }: HandlerContext) {
       if (state.completedSteps?.[step.id]) return { status: 'COMPLETED', state };
       const phase = createPhaseFromStep(step);
       const taskSpecs = createTaskSpecs(step, state);
@@ -248,26 +179,26 @@ const handlers: Record<string, {
         events: [
           ...speechEvents,
           {
-          type: 'workflow_step_completed',
-          payload: {
-            stepId: step.id,
-            workflowEvent: 'phase_completed',
-            phase,
-            message: `${phase.name}完成。`,
-            game: serializeDebateState(match, nextState),
-          },
-          idempotencyKey: `${match.id}:${step.id}:completed`,
+            type: 'workflow_step_completed',
+            payload: {
+              stepId: step.id,
+              workflowEvent: 'phase_completed',
+              phase,
+              message: `${phase.name}完成。`,
+              game: serializeDebateState(match, nextState),
+            },
+            idempotencyKey: `${match.id}:${step.id}:completed`,
           },
         ],
       };
     },
-    async runAiTask({ match, task }: { match: WorkflowMatch; task: AiTask }): Promise<RuntimeResult> {
+    async runAiTask({ match, task }) {
       const runtime = createRuntime(match, match.state);
       const spec = task.promptContextSnapshot as Record<string, unknown>;
       const actor = runtime.agents.find((agent) => Number(agent.id) === Number(spec.actorId));
       if (!actor) throw new Error(`Debate actor not found: ${spec.actorId}`);
       const phase = (spec.phase as DebatePhase) || createPhaseFromStep({ config: { phaseId: spec.phaseId || task.stepId } } as unknown as WorkflowStep);
-      syncDebateMemory(actor, runtime.state);
+      syncDebateMemoryFromRuntime(runtime);
       const result = await executeSkillWithTrace(runtime.skillRegistry as never, spec.action as string, {
         actor,
         phase,
@@ -282,7 +213,7 @@ const handlers: Record<string, {
       });
       return normalizeTaskResult(spec, result);
     },
-    validateAiResult({ task, result }: { task: AiTask; result: { payload?: Record<string, unknown> } }): void {
+    validateAiResult({ task, result }) {
       const payload = result?.payload;
       if (!payload || typeof payload !== 'object') {
         throw Object.assign(new Error('Debate AI result payload is required'), { severity: 'high' });
@@ -315,7 +246,7 @@ const handlers: Record<string, {
     },
   },
   'debate.result_announce': {
-    execute({ match, step, state }: HandlerContext): HandlerResult {
+    execute({ match, step, state }: HandlerContext) {
       if (state.completedSteps?.[step.id]) return { status: 'COMPLETED', state };
       const nextState = markStepComplete({ ...state, currentStep: step.id }, step.id);
       return {
@@ -336,21 +267,7 @@ const handlers: Record<string, {
   },
 };
 
-function readTaskSpec(value: unknown): TaskSpec | null {
-  if (!value || typeof value !== 'object') return null;
-  const spec = value as Partial<TaskSpec>;
-  if (!spec.taskKey || !spec.actorId || !spec.action || !spec.phaseId) return null;
-  return {
-    taskKey: String(spec.taskKey),
-    actorId: Number(spec.actorId),
-    targetId: spec.targetId === undefined ? undefined : Number(spec.targetId),
-    action: String(spec.action),
-    phaseId: String(spec.phaseId),
-    contestantIds: Array.isArray(spec.contestantIds) ? spec.contestantIds.map(Number) : undefined,
-  };
-}
-
-// ---- Public functions ----
+// ---- Public API ----
 
 function registerDebateWorkflow(): void {
   registerWorkflow(debateWorkflow as never, handlers as never);
@@ -384,103 +301,20 @@ async function runDebateWorkflow(config: DebateConfig, options: { onEvent?: (eve
   return serializeDebateState(finalMatch, finalMatch.state) as unknown as SerializedGame;
 }
 
-async function flushOutbox(matchId: string, onEvent?: (event: Record<string, unknown>) => void): Promise<void> {
-  const messages = listPendingOutbox(matchId) as unknown as WorkflowEvent[];
-  for (const message of messages) {
-    await onEvent?.(projectDebateOutboxEvent(message, matchId));
-    markOutboxSent(message.id as unknown as number);
-  }
-}
+// ---- Internal ----
 
-// ---- Internal functions ----
-
-function createInitialDebateState(config: DebateConfig): WorkflowState {
-  const topic = normalizeTopic(config.topic) || choose(TOPICS);
-  const agents = createDebateAgents(config, topic, createFallbackAudit(`debate-${Date.now()}`, 'debate', { gameType: 'debate' }), `debate-${Date.now()}`);
+function readTaskSpec(value: unknown): TaskSpec | null {
+  if (!value || typeof value !== 'object') return null;
+  const spec = value as Partial<TaskSpec>;
+  if (!spec.taskKey || !spec.actorId || !spec.action || !spec.phaseId) return null;
   return {
-    topic,
-    host: publicHost(config.host),
-    players: agents.map((agent) => ({
-      id: agent.id,
-      name: agent.name,
-      nickname: agent.nickname,
-      avatar: agent.avatar,
-      avatarUrl: (agent.avatarUrl as string) || agent.avatar,
-      provider: agent.provider,
-      model: agent.model,
-      voicePackageId: agent.voicePackageId,
-      sex: agent.sex,
-      personality: agent.personality,
-      side: agent.side,
-      sideIndex: agent.sideIndex,
-      sideLabel: agent.sideLabel,
-      debateRole: agent.debateRole,
-      debateRoleLabel: agent.debateRoleLabel,
-      role: agent.side,
-      roleLabel: agent.debateRoleLabel,
-      alive: true,
-      excluded: false,
-      speeches: [],
-      messages: [],
-    })),
-    phases: [],
-    winner: null,
-    winReason: '',
-    mvp: null,
-    completedSteps: {},
-    fallbackAudit: [],
+    taskKey: String(spec.taskKey),
+    actorId: Number(spec.actorId),
+    targetId: spec.targetId === undefined ? undefined : Number(spec.targetId),
+    action: String(spec.action),
+    phaseId: String(spec.phaseId),
+    contestantIds: Array.isArray(spec.contestantIds) ? spec.contestantIds.map(Number) : undefined,
   };
-}
-
-function createDebateAgents(
-  config: DebateConfig,
-  topic: Topic,
-  fallbackAudit: ReturnType<typeof createFallbackAudit>,
-  gameId: string,
-  roleSkillRegistry: ReturnType<typeof createDebateRoleSkillRegistry> | null = null,
-): DebatePlayer[] {
-  const setup = getConfiguredDebateSetup(config);
-  return setup.players.map((player, index) => {
-    const side = index < 4 ? 'pro' : index < 8 ? 'con' : 'judge';
-    const debateRole = side === 'judge'
-      ? 'judge'
-      : Number(player.id) === Number(side === 'pro' ? setup.proCaptainId : setup.conCaptainId)
-        ? 'captain'
-        : 'debater';
-    const agent: DebatePlayer = {
-      ...player,
-      side: side as 'pro' | 'con' | 'judge',
-      sideIndex: side === 'judge' ? null : index % 4,
-      debateRole: debateRole as 'captain' | 'debater' | 'judge',
-      sideLabel: side === 'pro' ? '正方' : side === 'con' ? '反方' : '评委席',
-      debateRoleLabel: debateRole === 'captain' ? '队长' : debateRole === 'judge' ? '评委' : '选手',
-      speeches: [],
-      messages: [],
-    };
-    const stablePlayerId = Number((agent as Record<string, unknown>).sourcePlayerId || agent.id);
-    const relationshipMemory = formatRelationshipMemoryForPrompt('debate', stablePlayerId, setup.players);
-    agent.baseSystemPrompt = buildSystemPrompt(agent, topic, PHASES[0], relationshipMemory);
-    const basePromptHash = buildAgentHash(buildSystemPrompt(agent, topic, PHASES[0]));
-    agent.baseSystemPromptHash = basePromptHash;
-    const initialMessages = loadPlayerSession(
-      'debate',
-      gameId,
-      stablePlayerId,
-      basePromptHash,
-    ) || undefined;
-    agent.playerAgent = new DebateAgent(agent, agent.baseSystemPrompt as string, {
-      onError: (entry: Record<string, unknown>) => fallbackAudit.record(entry),
-      gameId,
-      initialMessages,
-      onMessagesChanged: (messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>) =>
-        savePlayerSession('debate', gameId, stablePlayerId, basePromptHash, messages),
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration: playerAgent typed as unknown via index signature
-    const playerAgentInstance = agent.playerAgent as any;
-    roleSkillRegistry?.applyToPlayer(playerAgentInstance, debateRole);
-    agent.messages = playerAgentInstance.messages;
-    return agent;
-  });
 }
 
 interface Runtime {
@@ -493,7 +327,7 @@ interface Runtime {
     gameId: string;
     mode: string;
     topic: Topic;
-    host: DebateHost | null;
+    host: Record<string, unknown> | null;
     agents: DebatePlayer[];
     phases: DebatePhase[];
     winner: string | null;
@@ -510,7 +344,7 @@ function createRuntime(match: WorkflowMatch, state: WorkflowState): Runtime {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration: AgentSkillRegistry -> SkillRegistry
   const roleSkillRegistry = createDebateRoleSkillRegistry(skillRegistry as any);
   const fallbackAudit = createFallbackAudit(match.id, 'debate', { gameType: 'debate' });
-  const agents = createDebateAgents(config, topic, fallbackAudit, match.id, roleSkillRegistry);
+  const agents = createDebateAgents(config, topic, fallbackAudit, match.id, roleSkillRegistry, { sessionPersistence: true });
   const runtimeState = {
     gameId: match.id,
     mode: 'real',
@@ -525,21 +359,8 @@ function createRuntime(match: WorkflowMatch, state: WorkflowState): Runtime {
   return { config, skillRegistry, roleSkillRegistry, fallbackAudit, agents, state: runtimeState };
 }
 
-function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): DebateConfig {
-  const base = getAiConfig() as unknown as DebateConfig;
-  const selectedIds = new Set(((matchConfig.selectedPlayerIds as number[]) || []).map(Number));
-  const players = selectedIds.size
-    ? base.players.filter((player) => selectedIds.has(Number(player.id)))
-    : base.players;
-  return {
-    ...base,
-    mode: 'real',
-    topic: matchConfig.topic as Topic,
-    debateTeams: matchConfig.debateTeams as DebateConfig['debateTeams'],
-    selectedPlayerIds: [...selectedIds],
-    host: base.host || {},
-    players,
-  };
+function syncDebateMemoryFromRuntime(_runtime: Runtime): void {
+  // Memory sync is handled by the agent's persistent session
 }
 
 function createPhaseFromStep(step: WorkflowStep): DebatePhase {
@@ -578,55 +399,6 @@ function createTaskSpecs(step: WorkflowStep, state: WorkflowState): TaskSpec[] {
     }] : [];
   }
   return [];
-}
-
-function applyAiPhaseResults(
-  match: WorkflowMatch,
-  step: WorkflowStep,
-  state: WorkflowState,
-  phase: DebatePhase,
-  taskSpecs: TaskSpec[],
-  tasks: AiTask[],
-): WorkflowState {
-  const playerMap = new Map((state.players || []).map((player) => [Number(player.id), player]));
-  const taskMap = new Map(tasks.map((task) => [task.taskKey, task]));
-  const nextState: WorkflowState = { ...state, phases: [...(state.phases || [])] };
-
-  if (step.config.tasks === 'judges') {
-    const winnerVotes: Record<string, string> = {};
-    for (const spec of taskSpecs) {
-      const result = taskMap.get(spec.taskKey)?.result?.payload;
-      const judge = playerMap.get(Number(spec.actorId));
-      if (!judge || !result) continue;
-      winnerVotes[judge.id] = result.winner as string;
-      pushSpeech(phase, judge, result.text as string, 'judge-review');
-    }
-    nextState.winner = topWinner(winnerVotes);
-    nextState.winReason = nextState.winner === 'draw' ? '评委意见接近，双方平局。' : `${nextState.winner === 'pro' ? '正方' : '反方'}获得更多评委倾向。`;
-  } else if (step.config.tasks === 'mvp') {
-    const votes: Array<{ voterId: number; target: number }> = [];
-    for (const spec of taskSpecs) {
-      const vote = taskMap.get(spec.taskKey)?.result?.payload;
-      if (vote?.target) votes.push(vote as unknown as { voterId: number; target: number });
-    }
-    phase.votes = votes;
-    const mvpId = topVotedId(Object.fromEntries(votes.map((vote) => [vote.voterId, vote.target])));
-    nextState.mvp = publicPlayer(playerMap.get(Number(mvpId)) || playerMap.get(Number(votes[0]?.target)) as DebatePlayer);
-  } else {
-    for (const spec of taskSpecs) {
-      const result = taskMap.get(spec.taskKey)?.result?.payload;
-      const actor = playerMap.get(Number(spec.actorId));
-      if (!actor || !result) continue;
-      const kind = spec.action === 'crossfire_question' ? 'question'
-        : spec.action === 'crossfire_answer' ? 'answer'
-          : phase.id;
-      pushSpeech(phase, actor as DebatePlayer, (result.text || result.content || '') as string, kind, spec.targetId || null);
-    }
-  }
-
-  phase.stageSummary = summarizeDebatePhase(phase);
-  nextState.phases.push(phase);
-  return markStepComplete(nextState, step.id);
 }
 
 function applyAiTurnResult(
@@ -682,184 +454,15 @@ function applyAiTurnResult(
   return markStepComplete(nextState, step.id);
 }
 
-function collectWinnerVotes(phase: DebatePhase): Record<string, string> {
-  const votes: Record<string, string> = {};
-  for (const speech of phase.speeches || []) {
-    const winner = (speech as unknown as Record<string, unknown>).winner;
-    if (speech.playerId && winner) votes[String(speech.playerId)] = String(winner);
+async function flushOutbox(matchId: string, onEvent?: (event: Record<string, unknown>) => void): Promise<void> {
+  const messages = listPendingOutbox(matchId) as unknown as WorkflowEvent[];
+  for (const message of messages) {
+    await onEvent?.(projectDebateOutboxEvent(message, matchId));
+    markOutboxSent(message.id as unknown as number);
   }
-  return votes;
 }
 
-function buildDebateSpeechEvents(
-  match: WorkflowMatch,
-  step: WorkflowStep,
-  state: WorkflowState,
-  phaseId: string,
-  taskSpecs: TaskSpec[],
-): HandlerResult['events'] {
-  const specs = taskSpecs.filter((spec) => spec.action !== 'vote_mvp');
-  if (!specs.length) return [];
-  const currentPhase = (state.phases || []).find((item) => item.id === phaseId);
-  if (!currentPhase) return [];
-  const speeches = currentPhase.speeches || [];
-  const game = serializeDebateState(match, state);
-  const events: NonNullable<HandlerResult['events']> = [];
-  for (const spec of specs) {
-    const expectedKind = getDebateSpeechKind(spec.action, currentPhase.id);
-    const speech = [...speeches].reverse().find((item) =>
-      Number(item.playerId) === Number(spec.actorId) &&
-      String(item.kind || '') === expectedKind
-    );
-    if (!speech) continue;
-    events.push({
-      type: 'speech',
-      payload: {
-        phase: currentPhase,
-        speech,
-        game,
-      },
-      idempotencyKey: `${match.id}:${step.id}:speech:${speech.playerId}:${speech.kind || 'speech'}`,
-    });
-  }
-  return events;
-}
-
-function getDebateSpeechKind(action: string, phaseId: string): string {
-  if (action === 'crossfire_question') return 'question';
-  if (action === 'crossfire_answer') return 'answer';
-  if (action === 'judge_review') return 'judge-review';
-  return phaseId;
-}
-
-function projectDebateOutboxEvent(message: WorkflowEvent, matchId: string): Record<string, unknown> {
-  const event = (message.payload || {}) as Record<string, unknown>;
-  const payload = event.payload && typeof event.payload === 'object'
-    ? event.payload as Record<string, unknown>
-    : {};
-  const eventType = String(event.type || '');
-  const base = {
-    matchId,
-    event,
-    workflowEvent: payload.workflowEvent || eventType,
-    message: payload.message,
-    game: payload.game,
-    phase: payload.phase,
-    speech: payload.speech,
-  };
-  if (eventType === 'speech') {
-    return {
-      type: 'speech',
-      ...base,
-    };
-  }
-  return {
-    type: 'workflow-event',
-    ...base,
-  };
-}
-
-function normalizeTaskResult(spec: Record<string, unknown>, result: unknown): RuntimeResult {
-  if (spec.action === 'judge_review') {
-    return {
-      eventType: 'debate_ai_result',
-      rawOutput: result,
-      payload: {
-        action: spec.action as string,
-        actorId: spec.actorId,
-        winner: ['pro', 'con', 'draw'].includes((result as Record<string, unknown>)?.winner as string) ? (result as Record<string, unknown>).winner : 'draw',
-        text: String((result as Record<string, unknown>)?.text || '').trim(),
-      },
-    };
-  }
-  if (spec.action === 'vote_mvp') {
-    const contestantIds = Array.isArray(spec.contestantIds) ? (spec.contestantIds as number[]).map(Number) : [];
-    const target = Number((result as Record<string, unknown>).target);
-    return {
-      eventType: 'debate_ai_result',
-      rawOutput: result,
-      payload: {
-        action: spec.action as string,
-        actorId: spec.actorId,
-        voterId: Number((result as Record<string, unknown>).voterId) || Number(spec.actorId),
-        target: contestantIds.includes(target) ? target : null,
-      },
-    };
-  }
-  const text = typeof result === 'string' ? result : (result as Record<string, unknown>)?.content;
-  return {
-    eventType: 'debate_ai_result',
-    rawOutput: result,
-    payload: {
-      action: spec.action as string,
-      actorId: spec.actorId,
-      targetId: spec.targetId || null,
-      text: String(text || '').trim(),
-      thinking: typeof result === 'string' ? '' : ((result as Record<string, unknown>)?.thinking as string) || '',
-    },
-  };
-}
-
-function serializeDebateState(match: WorkflowMatch, state: WorkflowState): Record<string, unknown> {
-  return {
-    id: match.id,
-    gameType: 'debate',
-    type: 'debate',
-    mode: 'real',
-    topic: state.topic,
-    host: state.host,
-    players: state.players || [],
-    phases: state.phases || [],
-    rounds: (state.phases || []).map((phase, index) => ({
-      number: index + 1,
-      phase: phase.id,
-      title: phase.name,
-      speeches: phase.speeches || [],
-      votes: phase.votes || [],
-    })),
-    winner: state.winner,
-    winReason: state.winReason || '',
-    mvp: state.mvp || null,
-    fallbackAudit: state.fallbackAudit || [],
-    createdAt: match.createdAt || new Date().toISOString(),
-  };
-}
-
-function markStepComplete(state: WorkflowState, stepId: string): WorkflowState {
-  return {
-    ...state,
-    completedSteps: { ...(state.completedSteps || {}), [stepId]: true },
-  };
-}
-
-function topVotedId(votes: Record<number, number>): number | null {
-  const counts: Record<number, number> = {};
-  Object.values(votes || {}).forEach((id) => { counts[id as number] = (counts[id as number] || 0) + 1; });
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  return entries.length ? Number(entries[0][0]) : null;
-}
-
-function topWinner(votes: Record<string, string>): string {
-  const counts: Record<string, number> = { pro: 0, con: 0, draw: 0 };
-  Object.values(votes || {}).forEach((winner) => { if (counts[winner] !== undefined) counts[winner] += 1; });
-  if (counts.pro === counts.con) return 'draw';
-  return counts.pro > counts.con ? 'pro' : 'con';
-}
-
-function publicHost(host: DebateHost = {}): Record<string, unknown> {
-  return {
-    id: host.id || 0,
-    name: host.name || host.nickname || '主持人',
-    nickname: host.nickname || host.name || '主持人',
-    avatar: host.avatar || '',
-    avatarUrl: host.avatarUrl || host.avatar || '',
-    voicePackageId: host.voicePackageId || null,
-  };
-}
-
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value ?? null)) as T;
-}
+// ---- Exports ----
 
 export {
   DEBATE_WORKFLOW_ID,
@@ -867,6 +470,7 @@ export {
   registerDebateWorkflow,
   createDebateWorkflowMatch,
   runDebateWorkflow,
+  // Re-export from helpers for backward compatibility
   serializeDebateState,
   buildDebateSpeechEvents,
   projectDebateOutboxEvent,

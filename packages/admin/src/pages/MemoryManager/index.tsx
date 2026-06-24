@@ -165,7 +165,7 @@ export function MemoryManager() {
               render: (value: string) => LABELS[value as 'werewolf' | 'debate'] ?? value,
             },
             { title: '交手局数', dataIndex: 'gamesPlayed', width: 80 },
-            { title: '最近摘要', dataIndex: 'recentSummary', ellipsis: true },
+            { title: '画像摘要', dataIndex: 'summary', ellipsis: true },
             { title: '更新于', dataIndex: 'updatedAt', width: 160, render: formatTime },
             {
               title: '操作', width: 80,

@@ -92,7 +92,7 @@ export function ModelProviderManager() {
             width: 260,
             render: (_: unknown, provider: ModelProvider) => (
               <Space>
-                <Button size="small" onClick={() => navigate(`/models/providers/${provider.id}`)}>模型列表</Button>
+                <Button size="small" onClick={() => navigate(`/system/models/providers/${provider.id}`)}>模型列表</Button>
                 <TableActions onEdit={() => setEditing(provider)} onDelete={() => confirmRemove(provider)} />
               </Space>
             )

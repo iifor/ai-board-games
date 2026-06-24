@@ -12,16 +12,10 @@ interface SessionSnapshot {
   updatedAt?: string;
 }
 
-interface MemoryTraits {
-  speechCount?: number;
-  speechChars?: number;
-  voteCount?: number;
-  wins?: number;
-  wolfGames?: number;
-  goodGames?: number;
-  debateGames?: number;
-  debateWins?: number;
+/** 存储在 traits_json 中的元数据 */
+interface MemoryData {
   lastGameId?: string;
+  gamesPlayed?: number;
 }
 
 interface PlayerGameMemory {
@@ -29,9 +23,7 @@ interface PlayerGameMemory {
   ownerPlayerId: number;
   subjectPlayerId: number;
   gamesPlayed: number;
-  familiarityScore: number;
-  traits: MemoryTraits;
-  recentSummary: string;
+  summary: string;
   updatedAt: string;
 }
 
@@ -57,9 +49,7 @@ interface PlayerMemoryRecord {
   subjectNickname: string;
   subjectName: string;
   gamesPlayed: number;
-  familiarityScore: number;
-  traits: MemoryTraits;
-  recentSummary: string;
+  summary: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -74,7 +64,7 @@ interface PaginatedMemories {
 export type {
   ChatMessage,
   SessionSnapshot,
-  MemoryTraits,
+  MemoryData,
   PlayerGameMemory,
   MemoryStats,
   MemoryStatsItem,

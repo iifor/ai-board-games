@@ -1,18 +1,42 @@
 import type { AdminRequestOptions } from '../types/api';
 import { AdminApiError } from '../types/api';
 
+const TOKEN_KEY = 'admin_jwt_token';
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 export async function adminRequest<T = unknown>(
   path: string,
   options: AdminRequestOptions = {}
 ): Promise<T> {
+  const token = getToken();
+  const authHeaders: Record<string, string> = token
+    ? { Authorization: `Bearer ${token}` }
+    : {};
   const response = await fetch(`/api/admin${path}`, {
     method: options.method,
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...(options.headers ?? {})
     },
     body: options.body
   });
+  if (response.status === 401) {
+    clearToken();
+    window.location.hash = '#/login';
+    throw new AdminApiError('登录已过期，请重新登录');
+  }
   const data = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (!response.ok) {
     throw new AdminApiError(
@@ -90,9 +114,7 @@ export interface PlayerMemoryRecord {
   subjectNickname: string;
   subjectName: string;
   gamesPlayed: number;
-  familiarityScore: number;
-  traits: Record<string, number | undefined>;
-  recentSummary: string;
+  summary: string;
   createdAt: string;
   updatedAt: string;
 }

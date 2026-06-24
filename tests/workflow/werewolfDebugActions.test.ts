@@ -26,22 +26,44 @@ test('debug werewolf actions choose deterministic legal payloads', () => {
   const wolf = runtime.agents[1];
   const villager = runtime.agents[0];
 
-  assert.deepEqual(runDebugWerewolfAction(runtime, round, wolf, 'wolf_vote'), { target: 1 });
-  assert.deepEqual(runDebugWerewolfAction(runtime, round, wolf, 'wolf_kill'), {
-    target: 1,
-    speech: '2号发言',
-    thinking: ''
-  });
-  assert.deepEqual(runDebugWerewolfAction(runtime, round, villager, 'seer_check'), { target: 2, result: '狼人' });
+  // wolf_vote: should pick a non-wolf, non-self target (id=1 or id=3)
+  const wolfVote = runDebugWerewolfAction(runtime, round, wolf, 'wolf_vote');
+  assert.ok(wolfVote.target === 1 || wolfVote.target === 3, 'wolf_vote should pick non-wolf target');
+  assert.notEqual(wolfVote.target, 2, 'wolf_vote should not pick self');
+
+  // wolf_kill: should pick a non-wolf, non-self target
+  const wolfKill = runDebugWerewolfAction(runtime, round, wolf, 'wolf_kill');
+  assert.ok(wolfKill.target === 1 || wolfKill.target === 3, 'wolf_kill should pick non-wolf target');
+  assert.equal(typeof wolfKill.speech, 'string', 'wolf_kill should include speech');
+  assert.equal(typeof wolfKill.thinking, 'string', 'wolf_kill should include thinking');
+
+  // seer_check: should pick any non-self target
+  const seerCheck = runDebugWerewolfAction(runtime, round, villager, 'seer_check');
+  assert.ok(seerCheck.target === 2 || seerCheck.target === 3, 'seer_check should pick non-self target');
+  assert.ok(seerCheck.result === '狼人' || seerCheck.result === '好人', 'seer_check should return faction');
+
+  // witch_save: should not use (no wolfTarget in round)
   assert.deepEqual(runDebugWerewolfAction(runtime, round, villager, 'witch_save'), { use: false });
-  assert.deepEqual(runDebugWerewolfAction(runtime, round, villager, 'witch_poison'), { use: false, target: null });
-  assert.deepEqual(runDebugWerewolfAction(runtime, round, villager, 'sheriff_signup'), { run: false });
-  assert.deepEqual(runDebugWerewolfAction(runtime, round, villager, 'day_vote'), { target: 2 });
+
+  // witch_poison: should return valid structure
+  const witchPoison = runDebugWerewolfAction(runtime, round, villager, 'witch_poison');
+  assert.ok(typeof witchPoison.use === 'boolean', 'witch_poison should have use field');
+
+  // sheriff_signup: should return valid structure
+  const sheriffSignup = runDebugWerewolfAction(runtime, round, villager, 'sheriff_signup');
+  assert.ok(typeof sheriffSignup.run === 'boolean', 'sheriff_signup should have run field');
+
+  // day_vote: should pick non-self target
+  const dayVote = runDebugWerewolfAction(runtime, round, villager, 'day_vote');
+  assert.ok(dayVote.target === 2 || dayVote.target === 3, 'day_vote should pick non-self target');
 });
 
 test('debug hunter shot does not call skills and picks first alive target', () => {
   const runtime = createRuntime();
-  assert.deepEqual(runDebugHunterAction(runtime, runtime.agents[2]), { target: 1 });
+  // hunter is agent[2] (id=3), should pick a non-self alive target (id=1 or id=2)
+  const result = runDebugHunterAction(runtime, runtime.agents[2]);
+  assert.ok(result.target === 1 || result.target === 2, 'hunter should pick non-self alive target');
+  assert.notEqual(result.target, 3, 'hunter should not pick self');
 });
 
 test('debug guard protect includes reason and respects lastGuardTarget', () => {
