@@ -10,7 +10,9 @@
 - zod
 - pnpm workspace exports
 
-## 目录结构
+## 稳定目录边界
+
+本节只记录 shared 包长期稳定的职责边界，帮助判断改动属于类型、schema、常量、工具还是测试契约；具体文件位置、符号定义、调用方和影响面使用 CodeGraph 查询。
 
 ```txt
 packages/shared/
@@ -156,6 +158,7 @@ Workflow 内部 `StatePatch` 使用路径操作表达状态增量：
 - `SeerCheckCompletedPayload`：`seerCheck: { target, result, reason? }`。
 - `GuardActionCompletedPayload`：`guardAction: { target, reason? }`。
 - `WitchActionCompletedPayload`：`witchAction: { use, target, reason? }`，覆盖解药和毒药。
+- `MagicianSwapPayload`：`magicianSwap: { firstTarget, secondTarget, reason? }`。
 - `HunterShotPayload`：`shot: { from, target }` 和可选公开 `reason`。
 
 这些类型描述展示事件字段，不改变 REST API 或 WebSocket 连接协议。
@@ -173,7 +176,7 @@ Workflow 内部 `StatePatch` 使用路径操作表达状态增量：
 `SheriffEventPayload` 可选携带 `sheriffId/sheriffBadge`。警长当选、警徽移交和撕毁仍复用既有公开事件类型，不改变 WebSocket 连接协议；C 端以这些字段更新当前警长。猎人内部 AI 输出为 `{ targetSeat: number | null, reason?: string | null }`，只有实际开枪时才公开原因。
 ## 狼人杀内部兼容约定
 
-- 本次修复不改变公开 REST、WebSocket 或 `GameEvent` 类型。
+- 内部兼容修复不改变公开 REST 或 WebSocket 连接协议；玩法扩展可以最小化增加 `GameEvent` 展示类型和序列化快照字段。
 - 遗言、猎人和警徽窗口仍使用原公开 action type；`last_words:<actorId>`、`hunter_shot:<actorId>`、`sheriff_badge_disposition:<actorId>` 仅作为服务端 AI task 与 action-window epoch 的内部键。
 - `nightResultPublished` 仅属于服务端死亡链检查点，序列化、视角投影和精确回放载荷必须移除。
 ## 狼人杀赛后共享契约
@@ -193,3 +196,124 @@ Workflow 内部 `StatePatch` 使用路径操作表达状态增量：
 - `PlaybackEvent`/game event consumers should treat `self-destruct` as one shared event semantic for real-time play and history replay.
 - This expansion does not change WebSocket start/control/ack message shapes and does not add a public REST API.
 - White wolf king death sources such as `self_destruct` and `white_wolf_king_self_destruct` are server workflow semantics; shared payloads only expose fields required by display clients.
+
+## Werewolf first-batch boards
+
+- `GameEventType` includes `hybrid-master`、`silence-result`、`knight-duel` for first-batch werewolf board display.
+- `HybridMasterPayload` exposes `hybridMaster: { actorId, masterId }` for scoped hybrid feedback.
+- `SilenceResultPayload` exposes `silencedPlayerId` and optional `reason` for the next-day silence display.
+- `KnightDuelPayload` exposes `knightDuel: { actorId, targetId, success, targetFaction }` for public duel display.
+- `SerializedRound` may contain `silencedPlayerId/silenceReason/knightDuel`; `SerializedPlayer` may contain `hybridMasterId/lastSilencedTarget/knightDuelUsed`.
+- These are display/state payload extensions only. WebSocket start/control/ack, REST API routes and database schema are unchanged.
+
+## Werewolf second-batch boards
+
+- `GameEventType` includes `butterfly-hug` and `stalker-assassinate`.
+- `ButterflyHugPayload` exposes `butterflyTarget` and optional `reason`.
+- `StalkerAssassinatePayload` exposes `stalkerTarget` and optional `reason`.
+- `SerializedNight` may include `butterflyTarget/butterflyReason/stalkerTarget/stalkerReason`; `SerializedPlayer` may include `butterflyHugUsed/stalkerAssassinateUsed`.
+- These fields are display/state extensions only and do not change REST, WebSocket connection messages or database schema.
+
+## Werewolf third-batch boards
+
+## Werewolf fourth-batch boards
+
+- `SerializedPlayer` may contain `evilKnightTriggered` and `oldRoguePendingDeath`.
+- `SerializedRound` may contain `evilKnightTrigger` and `oldRogueDeath`.
+- These fields are display/state extensions for `evil-knight-guard-12` and `wolf-beauty-rogue-12`; REST API routes, WebSocket connection messages and database schema are unchanged.
+
+- `GameEventType` includes `wolf-beauty-charm`, `demon-inspect` and `nightmare-fear`.
+- `WolfBeautyCharmPayload` exposes `wolfBeautyTarget` and optional `reason`.
+- `DemonInspectPayload` exposes `demonInspect: { target, result, reason? }`; this is a scoped/private result and must not be emitted as public audience state.
+- `NightmareFearPayload` exposes `nightmareTarget` and optional `reason`.
+- `SerializedNight` may include `wolfBeautyTarget/wolfBeautyReason/demonInspect/nightmareTarget/nightmareReason`; `SerializedPlayer` may include `lastNightmareTarget`.
+- These fields are display/state extensions only and do not change REST, WebSocket connection messages or database schema.
+
+## Werewolf fifth-batch boards
+
+- `GameEventType` includes `dreamer-dream` and `magician-swap`.
+- `DreamerDreamPayload` exposes `dreamerTarget` and optional `reason`.
+- `MagicianSwapPayload` exposes `magicianSwap.firstTarget/secondTarget` and optional `reason`.
+- `SerializedNight` may include `dreamerTarget/dreamerReason/dreamerRepeatedTarget` and `magicianSwap`; `SerializedPlayer` may include `magicianSwappedIds`.
+- These fields are display/state extensions for `wolf-king-dreamer-12` and `wolf-king-magician-12`; REST API routes, WebSocket connection messages and database schema are unchanged.
+
+## Werewolf sixth-batch boards
+
+- `GameEventType` includes `fortune-teller-mark`, `big-bad-wolf-kill`, `crow-curse` and `bear-tamer-roar`.
+- `FortuneTellerMarkPayload` exposes `fortuneTellerMark: { target, reason? }`.
+- `BigBadWolfKillPayload` exposes `bigBadWolfTarget` and optional `reason`.
+- `CrowCursePayload` exposes `crowCurse: { target, reason? }`.
+- `BearTamerRoarPayload` exposes `bearRoar: { roaring, adjacentWolfIds }`.
+- `SerializedNight` may include `fortuneTellerMark/bigBadWolfTarget/bigBadWolfReason/crowCurse`; `SerializedRound` may include `bearRoar/crowCursedPlayerId`; `SerializedPlayer` may include `fortuneTellerMarkUsed/bigBadWolfKillUsed/lastCrowTarget`.
+- These fields are display/state extensions for modes 14-16; REST API routes, WebSocket connection messages and database schema are unchanged.
+## Werewolf seventh-batch snapshot fields
+
+- `SerializedPlayer` now allows `wildChildModelId`, `wildChildTransformed` and `nineTailedFoxTails`.
+- `SerializedRound` and C-side `WerewolfRound` now allow `bombmanBlast`.
+- These are snapshot/display fields for existing werewolf events and history replay. They do not add a database table, REST route or WebSocket start/control/ack message shape.
+# 2026-07-04 狼人杀动物园模式补充
+
+- `GameEventType` 新增 `penguin-freeze`、`fox-inspect`。
+- `SerializedPlayer`/客户端 `Player` 新增企鹅与狐狸状态字段：`lastPenguinTarget`、`foxInspectLost`、`foxLastInspect`。
+- `SerializedNight`/客户端 `WerewolfNight` 新增 `penguinFrozenId`、`penguinReason`、`foxInspect`。
+
+## 2026-07-04 Black merchant boards
+
+- `GameEventType` includes `black-merchant-gift`, `lucky-seer-check`, `lucky-witch-poison` and `younger-brother-kill`.
+- `SerializedNight` may include `blackMerchantGift`, `luckySeerCheck`, `luckyPoisonTarget/luckyPoisonReason` and `youngerBrotherTarget/youngerBrotherReason`.
+- `SerializedPlayer` and C-side `Player` may include `blackMerchantGiftUsed`, `blackMerchantGift`, `blackMerchantDeathPending`, `bigTreeWolfHits`, `godSkillsDisabled`, `youngerBrotherSoloKillUsedDay` and `wolfElderBrotherDeathDay`.
+- Shared channel maps add black merchant, wolf brother, penguin and fox scoped actions. Lucky gifted actions remain public display events because lucky is temporary state, not a static role scope.
+- These are snapshot/display extensions only. REST routes, WebSocket connection/control/ack messages and database schema are unchanged.
+## 2026-07-04 Werewolf modes 23-24 fields
+
+- Werewolf night snapshots may include `wolfSeedInfect`, `heavenlyEyeCheck`, `requesterPrayer`, `requesterTarget` and `requesterReason`.
+- New action ids are `wolf_seed_infect`, `heavenly_eye_check`, `requester_pray` and `requester_kill`; they reuse the existing action-window and action-submitted payload shape.
+- REST API, WebSocket start/control/ack envelopes and database schemas are unchanged.
+
+## 2026-07-04 Werewolf modes 25-26 fields
+
+- Werewolf night snapshots may include `thiefChoice`, `loverLink` and `succubusLink`.
+- New action ids are `thief_choose`, `cupid_link` and `succubus_link`; they reuse the existing action-window and action-submitted payload shape.
+- Player snapshots may include `loverId` and `loverSource` when the server exposes full player state. REST API, WebSocket envelopes and database schemas are unchanged.
+## Werewolf Mode 27 Shared Contract
+
+- Shared channel maps now route `ghost_bride_link`, `ghost_bride_chat` and `ghost_bride_kill` to the `ghost_bride` scoped channel.
+- The server view policy treats `ghost_bride` scope as visible to the Ghost Bride role before linking and to `third_party` members after linking.
+- Client/server event payloads may include `ghostBrideLink`, `ghostBrideChat` and `ghostBrideTarget`.
+- Player payloads may include `ghostBridePartnerId`, `ghostBrideWitnessId` and `witnessForGhostBride`.
+- No database schema or external API contract changed.
+
+## Werewolf Mode 28 Shared Contract
+
+- `sapling` is a default role id in the werewolf config and is exposed through the existing mode/role config shape.
+- Firepower mode does not add a new public event type or WebSocket envelope; Sapling-linked Big Tree death is represented by the existing night/exile/hunter death data.
+- `GameEventType` includes `ghost-bride-link`, `ghost-bride-chat` and `ghost-bride-kill` so the existing Ghost Bride workflow events type-check in shared code.
+- REST API routes, socket start/control/ack messages and database schemas are unchanged.
+
+## Werewolf Mode 29 Shared Contract
+
+- `GameEventType` includes `escape-hunter-speech`, `escape-hunter-vote`, `escape-hunter-hunt` and `thick-wolf-armor`.
+- `channelMaps.ts` routes both Escape Hunter actions and the `escape_hunter` role to `scopeKey: escape_hunters`.
+- Serialized night state adds hunter ids, speech order, speeches, choices, tally, target and Thick Wolf armor-break data through the existing game snapshot shape.
+- Existing REST schemas, WebSocket envelopes and database schemas are unchanged.
+
+## Werewolf Mode 30 Shared Contract
+
+- `GameEventType` includes `demon-hunter-hunt`.
+- Shared channel maps route `demon_hunter_hunt` to the `demon_hunter` scoped channel and map `magic_wolf` to the wolf channel.
+- Werewolf night snapshots may include `demonHunterTarget` and `demonHunterReason`.
+- Action id `demon_hunter_hunt` reuses the existing action-window and action-submitted payload shape.
+- REST API routes, socket start/control/ack messages and database schemas are unchanged.
+
+## Werewolf Mode 31 Shared Contract
+
+- `GameEventType` includes `spirit-wolf-learn`, `spirit-wolf-inspect`, `spirit-wolf-guard` and `spirit-wolf-antidote`.
+- Shared channel maps route `spirit_wolf_*` actions to the `spirit_wolf` scoped channel and map role `spirit_wolf` to the wolves channel.
+- Werewolf night snapshots may include `spiritWolfLearn`, `spiritWolfInspect`, `spiritWolfGuardTarget`, `spiritWolfGuardReason`, `spiritWolfAntidoteTarget` and `spiritWolfAntidoteReason`.
+- Action ids `spirit_wolf_learn`, `spirit_wolf_inspect`, `spirit_wolf_guard` and `spirit_wolf_antidote` reuse the existing action-window and action-submitted payload shape.
+- REST API routes, socket start/control/ack messages and database schemas are unchanged.
+## Werewolf Mode 32 Shared Types
+
+- Added shared game event types `wolf-witch-curse` and `illusionist-illusion`.
+- Added channel mappings: `wolf_witch` actions use the wolves scope; `illusionist` actions use the illusionist scope.
+- Client/server night state now includes `wolfWitchCurse`, `illusionTarget`, and `illusionReason`.

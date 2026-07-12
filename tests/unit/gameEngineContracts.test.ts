@@ -9,6 +9,7 @@ import {
   checkEventChannelInvariant,
 } from '../../packages/server/modules/game-engine';
 import type { GameDefinition } from '../../packages/shared/types/gameEngine';
+import type { WorkflowRuntime } from '../../packages/server/modules/game-engine/workflow/workflowRuntime';
 import { MemoryMatchStateStore, createMatch, createWindow } from './gameEngineTestUtils';
 
 function createDefinition(overrides: Partial<GameDefinition> = {}): GameDefinition {
@@ -43,6 +44,24 @@ test('GameEngine rejects tick for terminal matches before workflow runtime is ca
   engine.registerDefinition(createDefinition());
 
   assert.throws(() => engine.tick('match-test'), /completed/);
+});
+
+test('GameEngine delegates run-until-blocked to its workflow runtime', async () => {
+  const store = new MemoryMatchStateStore();
+  store.addMatch(createMatch({ gameType: 'test-game', workflowId: 'test.workflow', status: 'running' }));
+  let received: unknown = null;
+  const workflowRuntime = {
+    runUntilBlocked: async (matchId: string, options: Record<string, unknown>) => {
+      received = { matchId, options };
+      return { processed: 2, match: createMatch({ status: 'completed' }) };
+    },
+  } as unknown as WorkflowRuntime;
+  const engine = new GameEngine({ store, workflowRuntime });
+
+  const result = await engine.runUntilBlocked('match-test', { batchSize: 2 });
+
+  assert.deepEqual(received, { matchId: 'match-test', options: { batchSize: 2 } });
+  assert.equal(result.match?.status, 'completed');
 });
 
 test('ChannelSystem rejects missing channel and scoped events without scopeKey', () => {

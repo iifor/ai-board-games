@@ -46,6 +46,9 @@ const witchPoisonPayloadSchema = z.object({
 const werewolfChannelPolicy: ChannelPolicy = {
   matchScope(scopeKey: string, viewer: ViewerContext): boolean {
     if (scopeKey === 'wolves') return viewer.faction === 'wolves';
+    if (scopeKey === 'ghost_bride') {
+      return viewer.faction === 'third_party' || (viewer.roles || []).includes('ghost_bride');
+    }
     if (scopeKey === 'seer' || scopeKey === 'guard' || scopeKey === 'witch') {
       return (viewer.roles || []).includes(scopeKey);
     }

@@ -2,6 +2,7 @@ import { useClientRouter, buildGamePath } from '../router/clientRouter';
 
 const PLAYER_SELECTION_STORAGE_KEY = 'ai-boardgame:selected-player-ids';
 type GameRouteVersion = 'v1' | 'v2';
+export const DEFAULT_GAME_ROUTE_VERSION: GameRouteVersion = 'v2';
 
 export function useGameNavigation() {
   const { route, navigate } = useClientRouter();
@@ -11,7 +12,7 @@ export function useGameNavigation() {
     navigate('/games');
   }
 
-  function startGame(gameKey: string, playerIds: number[], gameId: string = '', version: GameRouteVersion = 'v1') {
+  function startGame(gameKey: string, playerIds: number[], gameId: string = '', version: GameRouteVersion = DEFAULT_GAME_ROUTE_VERSION) {
     const cleanIds = playerIds.map(Number).filter(Boolean);
     const stored = readStoredSelections();
     stored[gameKey] = cleanIds;

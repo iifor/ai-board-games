@@ -34,7 +34,14 @@ import type { WerewolfActionEngineShadowAudit } from '../actionEngineBridge';
 /** 已有独立睁眼事件的夜晚行动 — phase-start 不再重复发布 */
 const NIGHT_WAKE_ACTIONS = new Set([
   'wolf_speech', 'wolf_vote', 'wolf_kill',
+  'escape_hunter_speech', 'escape_hunter_vote',
   'seer_check', 'guard_protect', 'witch_save', 'witch_poison',
+  'hybrid_choose_master', 'elder_silence', 'butterfly_hug', 'stalker_assassinate',
+  'wolf_beauty_charm', 'demon_inspect', 'nightmare_fear', 'dreamer_dream', 'magician_swap',
+  'fortune_teller_mark', 'big_bad_wolf_kill', 'crow_curse', 'penguin_freeze', 'fox_inspect', 'bear_tamer_roar',
+  'black_merchant_gift', 'lucky_seer_check', 'lucky_witch_poison', 'younger_brother_kill',
+  'demon_hunter_hunt', 'spirit_wolf_learn', 'spirit_wolf_inspect', 'spirit_wolf_guard', 'spirit_wolf_antidote',
+  'wolf_witch_curse', 'illusionist_illusion',
 ]);
 
 interface Match {
@@ -255,6 +262,7 @@ function createActionWindowHandler() {
 function shouldApplyPartialResults(step: Step): boolean {
   return Boolean(step.config.ordered && (
     step.config.actionType === 'wolf_speech'
+    || step.config.actionType === 'escape_hunter_speech'
     || step.config.actionType === 'day_speech'
     || step.config.actionType === 'day_vote'
     || step.config.actionType === 'mvp_vote'
@@ -514,6 +522,16 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
         builder.setStep(step.id).setPhase('night').setDay(step.config.day || 1);
         return builder.buildWitchPoison(wakeMessage);
       });
+    } else if (step.config.actionType === 'hybrid_choose_master' || step.config.actionType === 'elder_silence') {
+      const { channel, scopeKey } = resolveActionChannel(step.config.actionType);
+      publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+        builder.setStep(step.id).setPhase('night').setDay(step.config.day || 1);
+        return builder.build('phase-start', {
+          phase: 'night',
+          actionType: step.config.actionType,
+          message: wakeMessage,
+        }, channel, scopeKey, { actionType: step.config.actionType, message: wakeMessage });
+      });
     }
   }
 
@@ -587,6 +605,16 @@ function buildPhaseContext(actionType: string, results: ReducerActionResult[], r
     context.reason = normalizedReason;
   }
 
+  if (actionType === 'escape_hunter_speech') {
+    context.escapeHunterSpeeches = night.escapeHunterSpeeches || [];
+  }
+
+  if (actionType === 'escape_hunter_vote') {
+    context.escapeHunterTarget = night.escapeHunterTarget || null;
+    context.escapeHunterChoices = night.escapeHunterChoices || {};
+    context.escapeHunterVoteTally = night.escapeHunterVoteTally || {};
+  }
+
   if (actionType === 'witch_save') {
     context.actorId = results[0]?.actorId;
     context.wolfTarget = night.wolfTarget || null;
@@ -629,6 +657,230 @@ function buildPhaseContext(actionType: string, results: ReducerActionResult[], r
     };
   }
 
+  if (actionType === 'hybrid_choose_master') {
+    context.actorId = results[0]?.actorId;
+    const masterId = results[0]?.payload?.target || results[0]?.payload?.targetSeat || null;
+    context.hybridMasterId = masterId;
+    context.target = masterId;
+    context.hybridMaster = { actorId: context.actorId, masterId };
+  }
+
+  if (actionType === 'elder_silence') {
+    context.actorId = results[0]?.actorId;
+    const silencedPlayerId = (round as { silencedPlayerId?: unknown }).silencedPlayerId || results[0]?.payload?.target || null;
+    context.silencedPlayerId = silencedPlayerId;
+    context.target = silencedPlayerId;
+    context.reason = silencedPlayerId ? normalizeReason(results[0]?.payload?.reason) : null;
+  }
+
+  if (actionType === 'butterfly_hug') {
+    context.actorId = results[0]?.actorId;
+    const targetId = (night as { butterflyTarget?: unknown }).butterflyTarget || results[0]?.payload?.target || null;
+    context.butterflyTarget = targetId;
+    context.target = targetId;
+    context.reason = targetId ? normalizeReason(results[0]?.payload?.reason) : null;
+  }
+
+  if (actionType === 'stalker_assassinate') {
+    context.actorId = results[0]?.actorId;
+    const targetId = (night as { stalkerTarget?: unknown }).stalkerTarget || results[0]?.payload?.target || null;
+    context.stalkerTarget = targetId;
+    context.target = targetId;
+    context.reason = targetId ? normalizeReason(results[0]?.payload?.reason) : null;
+  }
+
+  if (actionType === 'wolf_beauty_charm') {
+    context.actorId = results[0]?.actorId;
+    const targetId = (night as { wolfBeautyTarget?: unknown }).wolfBeautyTarget || results[0]?.payload?.target || null;
+    context.wolfBeautyTarget = targetId;
+    context.target = targetId;
+    context.reason = targetId ? normalizeReason(results[0]?.payload?.reason) : null;
+  }
+
+  if (actionType === 'demon_inspect') {
+    context.actorId = results[0]?.actorId;
+    context.demonInspect = (night as { demonInspect?: unknown }).demonInspect || null;
+    context.target = (context.demonInspect as { target?: unknown } | null)?.target || results[0]?.payload?.target || null;
+  }
+
+  if (actionType === 'nightmare_fear') {
+    context.actorId = results[0]?.actorId;
+    const targetId = (night as { nightmareTarget?: unknown }).nightmareTarget || results[0]?.payload?.target || null;
+    context.nightmareTarget = targetId;
+    context.target = targetId;
+    context.reason = targetId ? normalizeReason(results[0]?.payload?.reason) : null;
+  }
+
+  if (actionType === 'penguin_freeze') {
+    context.actorId = results[0]?.actorId;
+    const targetId = (night as { penguinFrozenId?: unknown }).penguinFrozenId || results[0]?.payload?.target || null;
+    context.penguinFrozenId = targetId;
+    context.target = targetId;
+    context.reason = targetId ? normalizeReason((night as { penguinReason?: unknown }).penguinReason || results[0]?.payload?.reason) : null;
+  }
+
+  if (actionType === 'fox_inspect') {
+    context.actorId = results[0]?.actorId;
+    const foxInspect = (night as { foxInspect?: unknown }).foxInspect as { targetIds?: unknown[]; hasWolf?: unknown; reason?: unknown } | null | undefined;
+    context.foxInspect = foxInspect || null;
+    context.target = foxInspect?.targetIds?.[0] || results[0]?.payload?.target || null;
+    context.reason = foxInspect?.reason ? normalizeReason(foxInspect.reason) : normalizeReason(results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'dreamer_dream') {
+    context.actorId = results[0]?.actorId;
+    const targetId = (night as { dreamerTarget?: unknown }).dreamerTarget || results[0]?.payload?.target || null;
+    context.dreamerTarget = targetId;
+    context.target = targetId;
+    context.reason = targetId ? normalizeReason(results[0]?.payload?.reason) : null;
+  }
+
+  if (actionType === 'magician_swap') {
+    context.actorId = results[0]?.actorId;
+    const swap = (night as { magicianSwap?: unknown }).magicianSwap as { firstTarget?: unknown; secondTarget?: unknown; reason?: unknown } | null | undefined;
+    context.magicianSwap = swap || null;
+    context.target = swap?.firstTarget || results[0]?.payload?.target || null;
+    context.secondTarget = swap?.secondTarget || results[0]?.payload?.secondTarget || null;
+    context.reason = swap?.reason ? normalizeReason(swap.reason) : normalizeReason(results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'fortune_teller_mark') {
+    context.actorId = results[0]?.actorId;
+    const mark = (night as { fortuneTellerMark?: unknown }).fortuneTellerMark as { target?: unknown; reason?: unknown } | null | undefined;
+    context.fortuneTellerMark = mark || null;
+    context.target = mark?.target || results[0]?.payload?.target || null;
+    context.reason = mark?.reason ? normalizeReason(mark.reason) : normalizeReason(results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'big_bad_wolf_kill') {
+    context.actorId = results[0]?.actorId;
+    const targetId = (night as { bigBadWolfTarget?: unknown }).bigBadWolfTarget || results[0]?.payload?.target || null;
+    context.bigBadWolfTarget = targetId;
+    context.target = targetId;
+    context.reason = targetId ? normalizeReason((night as { bigBadWolfReason?: unknown }).bigBadWolfReason || results[0]?.payload?.reason) : null;
+  }
+
+  if (actionType === 'crow_curse') {
+    context.actorId = results[0]?.actorId;
+    const curse = (night as { crowCurse?: unknown }).crowCurse as { target?: unknown; reason?: unknown } | null | undefined;
+    context.crowCurse = curse || null;
+    context.target = curse?.target || results[0]?.payload?.target || null;
+    context.reason = curse?.reason ? normalizeReason(curse.reason) : normalizeReason(results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'black_merchant_gift') {
+    context.actorId = results[0]?.actorId;
+    const gift = (night as { blackMerchantGift?: unknown }).blackMerchantGift as { targetId?: unknown; gift?: unknown; success?: unknown; reason?: unknown } | null | undefined;
+    context.blackMerchantGift = gift || null;
+    context.target = gift?.targetId || results[0]?.payload?.target || null;
+    context.reason = gift?.reason ? normalizeReason(gift.reason) : normalizeReason(results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'lucky_seer_check') {
+    context.actorId = results[0]?.actorId;
+    const check = (night as { luckySeerCheck?: unknown }).luckySeerCheck as { target?: unknown; result?: unknown; reason?: unknown } | null | undefined;
+    context.luckySeerCheck = check || null;
+    context.target = check?.target || results[0]?.payload?.target || null;
+    context.reason = check?.reason ? normalizeReason(check.reason) : normalizeReason(results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'lucky_witch_poison') {
+    context.actorId = results[0]?.actorId;
+    context.luckyPoisonTarget = (night as { luckyPoisonTarget?: unknown }).luckyPoisonTarget || results[0]?.payload?.target || null;
+    context.target = context.luckyPoisonTarget;
+    context.reason = normalizeReason((night as { luckyPoisonReason?: unknown }).luckyPoisonReason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'younger_brother_kill') {
+    context.actorId = results[0]?.actorId;
+    context.youngerBrotherTarget = (night as { youngerBrotherTarget?: unknown }).youngerBrotherTarget || results[0]?.payload?.target || null;
+    context.target = context.youngerBrotherTarget;
+    context.reason = normalizeReason((night as { youngerBrotherReason?: unknown }).youngerBrotherReason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'ghost_bride_link') {
+    context.actorId = results[0]?.actorId;
+    const link = (night as { ghostBrideLink?: unknown }).ghostBrideLink as { partnerId?: unknown; witnessId?: unknown; reason?: unknown } | null | undefined;
+    context.ghostBrideLink = link || null;
+    context.target = link?.partnerId || results[0]?.payload?.target || null;
+    context.reason = link?.reason ? normalizeReason(link.reason) : normalizeReason(results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'ghost_bride_chat') {
+    context.actorId = results[0]?.actorId;
+    context.ghostBrideChat = (night as { ghostBrideChat?: unknown }).ghostBrideChat || [];
+  }
+
+  if (actionType === 'ghost_bride_kill') {
+    context.actorId = results[0]?.actorId;
+    context.ghostBrideTarget = (night as { ghostBrideTarget?: unknown }).ghostBrideTarget || results[0]?.payload?.target || null;
+    context.target = context.ghostBrideTarget;
+    context.reason = normalizeReason((night as { ghostBrideReason?: unknown }).ghostBrideReason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'demon_hunter_hunt') {
+    context.actorId = results[0]?.actorId;
+    context.demonHunterTarget = (night as { demonHunterTarget?: unknown }).demonHunterTarget || results[0]?.payload?.target || null;
+    context.target = context.demonHunterTarget;
+    context.reason = normalizeReason((night as { demonHunterReason?: unknown }).demonHunterReason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'spirit_wolf_learn') {
+    context.actorId = results[0]?.actorId;
+    context.spiritWolfLearn = (night as { spiritWolfLearn?: unknown }).spiritWolfLearn || null;
+    context.target = (context.spiritWolfLearn as { targetId?: unknown } | null)?.targetId || results[0]?.payload?.target || null;
+    context.reason = normalizeReason((context.spiritWolfLearn as { reason?: unknown } | null)?.reason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'spirit_wolf_inspect') {
+    context.actorId = results[0]?.actorId;
+    context.spiritWolfInspect = (night as { spiritWolfInspect?: unknown }).spiritWolfInspect || null;
+    context.target = (context.spiritWolfInspect as { target?: unknown } | null)?.target || results[0]?.payload?.target || null;
+    context.reason = normalizeReason((context.spiritWolfInspect as { reason?: unknown } | null)?.reason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'spirit_wolf_guard') {
+    context.actorId = results[0]?.actorId;
+    context.spiritWolfGuardTarget = (night as { spiritWolfGuardTarget?: unknown }).spiritWolfGuardTarget || results[0]?.payload?.target || null;
+    context.target = context.spiritWolfGuardTarget;
+    context.reason = normalizeReason((night as { spiritWolfGuardReason?: unknown }).spiritWolfGuardReason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'spirit_wolf_antidote') {
+    context.actorId = results[0]?.actorId;
+    context.spiritWolfAntidoteTarget = (night as { spiritWolfAntidoteTarget?: unknown }).spiritWolfAntidoteTarget || results[0]?.payload?.target || null;
+    context.target = context.spiritWolfAntidoteTarget;
+    context.reason = normalizeReason((night as { spiritWolfAntidoteReason?: unknown }).spiritWolfAntidoteReason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'wolf_witch_curse') {
+    context.actorId = results[0]?.actorId;
+    context.wolfWitchCurse = (night as { wolfWitchCurse?: unknown }).wolfWitchCurse || null;
+    context.target = (context.wolfWitchCurse as { targetId?: unknown } | null)?.targetId || results[0]?.payload?.target || null;
+    context.reason = normalizeReason((context.wolfWitchCurse as { reason?: unknown } | null)?.reason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'illusionist_illusion') {
+    context.actorId = results[0]?.actorId;
+    context.illusionTarget = (night as { illusionTarget?: unknown }).illusionTarget || results[0]?.payload?.target || null;
+    context.target = context.illusionTarget;
+    context.reason = normalizeReason((night as { illusionReason?: unknown }).illusionReason || results[0]?.payload?.reason);
+  }
+
+  if (actionType === 'bear_tamer_roar') {
+    context.actorId = results[0]?.actorId;
+    context.bearRoar = (round as { bearRoar?: unknown }).bearRoar || {
+      roaring: Boolean(results[0]?.payload?.roaring),
+      adjacentWolfIds: results[0]?.payload?.adjacentWolfIds || [],
+    };
+  }
+
+  if (actionType === 'knight_duel') {
+    context.actorId = results[0]?.actorId;
+    context.knightDuel = (round as { knightDuel?: unknown }).knightDuel || null;
+    context.target = (context.knightDuel as { targetId?: unknown } | null)?.targetId || results[0]?.payload?.target || null;
+  }
+
   return context;
 }
 
@@ -641,15 +893,79 @@ function publishScopedPhaseResultEvent(
   phaseContext: Record<string, unknown>,
   channelInfo: ReturnType<typeof resolveActionChannel>,
 ): void {
-  const eventType = step.config.actionType === 'wolf_vote'
+  const eventType = step.config.actionType === 'escape_hunter_speech'
+    ? 'escape-hunter-speech'
+    : step.config.actionType === 'escape_hunter_vote'
+      ? 'escape-hunter-vote'
+      : step.config.actionType === 'wolf_vote'
     ? 'wolf-vote'
     : step.config.actionType === 'seer_check'
       ? 'seer-check'
       : step.config.actionType === 'guard_protect'
         ? 'guard-action'
-      : step.config.actionType === 'witch_save' || step.config.actionType === 'witch_poison'
-        ? 'witch-action'
-      : null;
+        : step.config.actionType === 'witch_save' || step.config.actionType === 'witch_poison'
+          ? 'witch-action'
+          : step.config.actionType === 'hybrid_choose_master'
+            ? 'hybrid-master'
+            : step.config.actionType === 'elder_silence'
+              ? 'silence-result'
+              : step.config.actionType === 'knight_duel'
+                ? 'knight-duel'
+                : step.config.actionType === 'butterfly_hug'
+                  ? 'butterfly-hug'
+                  : step.config.actionType === 'stalker_assassinate'
+                    ? 'stalker-assassinate'
+                    : step.config.actionType === 'wolf_beauty_charm'
+                      ? 'wolf-beauty-charm'
+                      : step.config.actionType === 'demon_inspect'
+                        ? 'demon-inspect'
+                        : step.config.actionType === 'nightmare_fear'
+                          ? 'nightmare-fear'
+                          : step.config.actionType === 'dreamer_dream'
+                            ? 'dreamer-dream'
+                            : step.config.actionType === 'magician_swap'
+                              ? 'magician-swap'
+                              : step.config.actionType === 'fortune_teller_mark'
+                                ? 'fortune-teller-mark'
+                                : step.config.actionType === 'big_bad_wolf_kill'
+                                  ? 'big-bad-wolf-kill'
+                                  : step.config.actionType === 'crow_curse'
+                                    ? 'crow-curse'
+                                    : step.config.actionType === 'black_merchant_gift'
+                                      ? 'black-merchant-gift'
+                                      : step.config.actionType === 'lucky_seer_check'
+                                        ? 'lucky-seer-check'
+                                        : step.config.actionType === 'lucky_witch_poison'
+                                          ? 'lucky-witch-poison'
+                                          : step.config.actionType === 'younger_brother_kill'
+                                            ? 'younger-brother-kill'
+                                            : step.config.actionType === 'ghost_bride_link'
+                                              ? 'ghost-bride-link'
+                                              : step.config.actionType === 'ghost_bride_chat'
+                                                ? 'ghost-bride-chat'
+                                                : step.config.actionType === 'ghost_bride_kill'
+                                                  ? 'ghost-bride-kill'
+                                                  : step.config.actionType === 'demon_hunter_hunt'
+                                                    ? 'demon-hunter-hunt'
+                                                    : step.config.actionType === 'spirit_wolf_learn'
+                                                      ? 'spirit-wolf-learn'
+                                                      : step.config.actionType === 'spirit_wolf_inspect'
+                                                        ? 'spirit-wolf-inspect'
+                                                        : step.config.actionType === 'spirit_wolf_guard'
+                                                          ? 'spirit-wolf-guard'
+          : step.config.actionType === 'spirit_wolf_antidote'
+            ? 'spirit-wolf-antidote'
+            : step.config.actionType === 'wolf_witch_curse'
+              ? 'wolf-witch-curse'
+              : step.config.actionType === 'illusionist_illusion'
+                ? 'illusionist-illusion'
+                : step.config.actionType === 'penguin_freeze'
+                  ? 'penguin-freeze'
+                  : step.config.actionType === 'fox_inspect'
+                    ? 'fox-inspect'
+                    : step.config.actionType === 'bear_tamer_roar'
+                      ? 'bear-tamer-roar'
+                      : null;
   if (!eventType) return;
   const snapshot = serializeWerewolfState(match, state);
   const actorId = Number(phaseContext.actorId || 0);
@@ -672,6 +988,33 @@ function publishScopedPhaseResultEvent(
         ...(eventType === 'seer-check' ? { seerCheck: phaseContext.seerCheck } : {}),
         ...(eventType === 'guard-action' ? { guardAction: phaseContext.guardAction } : {}),
         ...(eventType === 'witch-action' ? { witchAction: phaseContext.witchAction } : {}),
+        ...(eventType === 'hybrid-master' ? { hybridMaster: phaseContext.hybridMaster } : {}),
+        ...(eventType === 'silence-result' ? { silencedPlayerId: phaseContext.silencedPlayerId } : {}),
+        ...(eventType === 'knight-duel' ? { knightDuel: phaseContext.knightDuel } : {}),
+        ...(eventType === 'butterfly-hug' ? { butterflyTarget: phaseContext.butterflyTarget } : {}),
+        ...(eventType === 'stalker-assassinate' ? { stalkerTarget: phaseContext.stalkerTarget } : {}),
+        ...(eventType === 'wolf-beauty-charm' ? { wolfBeautyTarget: phaseContext.wolfBeautyTarget } : {}),
+        ...(eventType === 'demon-inspect' ? { demonInspect: phaseContext.demonInspect } : {}),
+        ...(eventType === 'nightmare-fear' ? { nightmareTarget: phaseContext.nightmareTarget } : {}),
+        ...(eventType === 'dreamer-dream' ? { dreamerTarget: phaseContext.dreamerTarget } : {}),
+        ...(eventType === 'magician-swap' ? { magicianSwap: phaseContext.magicianSwap } : {}),
+        ...(eventType === 'fortune-teller-mark' ? { fortuneTellerMark: phaseContext.fortuneTellerMark } : {}),
+        ...(eventType === 'big-bad-wolf-kill' ? { bigBadWolfTarget: phaseContext.bigBadWolfTarget } : {}),
+        ...(eventType === 'crow-curse' ? { crowCurse: phaseContext.crowCurse } : {}),
+        ...(eventType === 'black-merchant-gift' ? { blackMerchantGift: phaseContext.blackMerchantGift } : {}),
+        ...(eventType === 'lucky-seer-check' ? { luckySeerCheck: phaseContext.luckySeerCheck } : {}),
+        ...(eventType === 'lucky-witch-poison' ? { luckyPoisonTarget: phaseContext.luckyPoisonTarget } : {}),
+        ...(eventType === 'younger-brother-kill' ? { youngerBrotherTarget: phaseContext.youngerBrotherTarget } : {}),
+        ...(eventType === 'ghost-bride-link' ? { ghostBrideLink: phaseContext.ghostBrideLink } : {}),
+        ...(eventType === 'ghost-bride-chat' ? { ghostBrideChat: phaseContext.ghostBrideChat } : {}),
+        ...(eventType === 'ghost-bride-kill' ? { ghostBrideTarget: phaseContext.ghostBrideTarget } : {}),
+        ...(eventType === 'spirit-wolf-learn' ? { spiritWolfLearn: phaseContext.spiritWolfLearn } : {}),
+        ...(eventType === 'spirit-wolf-inspect' ? { spiritWolfInspect: phaseContext.spiritWolfInspect } : {}),
+        ...(eventType === 'spirit-wolf-guard' ? { spiritWolfGuardTarget: phaseContext.spiritWolfGuardTarget } : {}),
+        ...(eventType === 'spirit-wolf-antidote' ? { spiritWolfAntidoteTarget: phaseContext.spiritWolfAntidoteTarget } : {}),
+        ...(eventType === 'penguin-freeze' ? { penguinFrozenId: phaseContext.penguinFrozenId } : {}),
+        ...(eventType === 'fox-inspect' ? { foxInspect: phaseContext.foxInspect } : {}),
+        ...(eventType === 'bear-tamer-roar' ? { bearRoar: phaseContext.bearRoar } : {}),
         ...(shouldUsePlayerVoice ? { speech: { playerId: actorId, text: message } } : {}),
       },
       channelInfo.channel,

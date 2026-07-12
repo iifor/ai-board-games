@@ -23,7 +23,10 @@ interface PlayerGameMemory {
   ownerPlayerId: number;
   subjectPlayerId: number;
   gamesPlayed: number;
-  summary: string;
+  summary?: string;
+  recentSummary?: string;
+  familiarityScore?: number;
+  traits?: Record<string, unknown>;
   updatedAt: string;
 }
 

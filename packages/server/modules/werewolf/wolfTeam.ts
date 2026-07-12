@@ -10,7 +10,12 @@ interface WolfTeamContext {
 
 function ensureWolfTeamContext(runtime: Runtime, round: Round): WolfTeamContext {
   const night = round.night;
-  const wolves = sortBySeat(runtime.agents.filter((agent) => agent.alive && agent.faction === 'wolves'));
+  const elderDeathDay = getWolfElderBrotherDeathDay(runtime);
+  const wolves = sortBySeat(runtime.agents.filter((agent) =>
+    agent.alive &&
+    agent.faction === 'wolves' &&
+    (!isRole(agent, 'wolf_younger_brother') || (elderDeathDay != null && Number(round.day) >= elderDeathDay + 2))
+  ));
   const existingLeader = Number(night.wolfLeaderId || 0);
   const leader = wolves.find((wolf) => Number(wolf.id) === existingLeader) || selectWolfLeader(wolves);
   const order = leader ? rotateFromSeat(wolves, leader.id, 'clockwise') : wolves;
@@ -55,6 +60,19 @@ function buildWolfSharedInfo(wolves: Agent[], leaderId: number | null, allAgents
   const wolfLabels = wolves.map((wolf) => `${seatOf(wolf.id)}号${wolf.roleLabel || wolf.role || '狼人'}`).join('、');
   const leader = leaderId ? `${seatOf(leaderId)}号` : '无';
   return `狼队成员：${wolfLabels || '无'}。本夜队长：${leader}。请先互通身份，再依次发言并统一刀口。`;
+}
+
+function getWolfElderBrotherDeathDay(runtime: Runtime): number | null {
+  const elder = runtime.agents.find((agent) => isRole(agent, 'wolf_elder_brother'));
+  const deathDay = Number(elder?.deathDay || 0);
+  if (deathDay > 0) return deathDay;
+  const younger = runtime.agents.find((agent) => isRole(agent, 'wolf_younger_brother'));
+  const stored = Number(younger?.wolfElderBrotherDeathDay || 0);
+  return stored > 0 ? stored : null;
+}
+
+function isRole(agent: Agent | null | undefined, roleId: string): boolean {
+  return String(agent?.role || agent?.roleConfig?.id || '').toLowerCase() === roleId;
 }
 
 export {

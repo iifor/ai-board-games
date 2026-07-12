@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, MessagesSquare, Moon, UsersRound } from 'lucide-react';
+import { Check, MessagesSquare, Moon } from 'lucide-react';
 import type { Player } from '../../types';
 import { fetchAiPlayers, fetchPlayerSelections, fetchRecentGames, savePlayerSelection } from '../../services/gameService';
 import bgSelect from '../../asserts/aiboardgame.png';
@@ -70,12 +70,6 @@ export function GameSelectPage({ onStartDebate, onStartWerewolf, onReplayGame }:
     const playerIds = getSelection(gameKey);
     if (gameKey === 'debate') onStartDebate(playerIds);
     else onStartWerewolf(playerIds);
-  }
-
-  function openEditor(gameKey: string) {
-    setSaveError('');
-    setEditingGame((value) => value === gameKey ? '' : gameKey);
-    setDraftIds(getSelection(gameKey));
   }
 
   function togglePlayer(id: number) {

@@ -13,6 +13,9 @@ interface WerewolfAgent {
   deathDay?: number | null;
   deathReason?: string;
   roleConfig?: RoleConfig;
+  wildChildModelId?: number | null;
+  wildChildTransformed?: boolean;
+  nineTailedFoxTails?: number;
   [key: string]: unknown;
 }
 
@@ -77,6 +80,7 @@ interface SheriffConfig {
 }
 
 interface ModeConfig {
+  id?: string;
   sheriff?: SheriffConfig;
   winCondition?: string;
   lastWordsLimit?: number;
@@ -94,6 +98,8 @@ function eliminate(agents: WerewolfAgent[], id: number, day: number, reason: str
   target.alive = false;
   target.deathDay = day;
   target.deathReason = reason;
+  transformWildChildren(agents, Number(target.id));
+  updateNineTailedFoxTails(agents, target, day);
 }
 
 function applyNightDeaths(agents: WerewolfAgent[], round: Round): void {
@@ -109,11 +115,26 @@ function shouldRunFirstDaySheriffElection(round: Round, modeConfig: ModeConfig):
 }
 
 function checkWin(agents: WerewolfAgent[], day: number, modeConfig: ModeConfig = {}): WinResult {
+  if (modeConfig.id === 'wolf-escape-10') return checkWolfEscapeWin(agents, day);
+  const thirdParty = checkThirdPartyWin(agents, day);
+  if (thirdParty.winner) return thirdParty;
   const roster = getAliveRosterStats(agents);
   if (roster.wolves === 0) {
     return { winner: 'good', winReason: `第 ${day} 天，狼人全部出局，好人阵营胜利。` };
   }
   return checkWolfVictoryFromRoster(roster, day, normalizeWinCondition(modeConfig.winCondition));
+}
+
+function checkWolfEscapeWin(agents: WerewolfAgent[], day: number): WinResult {
+  const alive = agents.filter((agent) => agent.alive);
+  const protectedWolves = alive.filter((agent) => ['tamed_werewolf', 'thick_wolf'].includes(getRoleId(agent)));
+  if (!protectedWolves.length) {
+    return { winner: 'hunters', winReason: `第 ${day} 天，受保护狼人全部出局，猎人阵营胜利。` };
+  }
+  if (!alive.some((agent) => getRoleId(agent) === 'escape_hunter')) {
+    return { winner: 'good', winReason: `第 ${day} 天，猎人全部出局，护狼阵营胜利。` };
+  }
+  return { winner: null, winReason: '' };
 }
 
 function checkDayWin(
@@ -122,6 +143,8 @@ function checkDayWin(
   modeConfig: ModeConfig = {},
   sheriffId: number | null = null,
 ): WinResult {
+  const thirdParty = checkThirdPartyWin(agents, day);
+  if (thirdParty.winner) return thirdParty;
   const rosterResult = checkWin(agents, day, modeConfig);
   if (rosterResult.winner) return rosterResult;
   const votePower = getAliveVotePower(
@@ -144,6 +167,22 @@ function checkWolfVictory(agents: WerewolfAgent[], day: number, modeConfig: Mode
     day,
     normalizeWinCondition(modeConfig.winCondition),
   );
+}
+
+function checkThirdPartyWin(agents: WerewolfAgent[], day: number): WinResult {
+  const alive = agents.filter((agent) => agent.alive);
+  if (alive.length === 1 && alive[0].faction === 'third_party' && alive[0].requesterGift === 'soloKill') {
+    return { winner: 'third_party', winReason: `第 ${day} 天，祈求者屠城成功，第三方胜利。` };
+  }
+  if (alive.length > 0 && alive.every((agent) => agent.faction === 'third_party') && alive.some(isThirdPartyLoverRole)) {
+    return { winner: 'third_party', winReason: `第 ${day} 天，第三方情侣阵营胜利。` };
+  }
+  return { winner: null, winReason: '' };
+}
+
+function isThirdPartyLoverRole(agent: WerewolfAgent): boolean {
+  const roleId = getRoleId(agent);
+  return Boolean(agent.loverId || agent.witnessForGhostBride || roleId === 'cupid' || roleId === 'succubus' || roleId === 'ghost_bride');
 }
 
 function checkWolfVictoryFromRoster(
@@ -310,11 +349,53 @@ const GOD_ACTIONS = new Set([
   'poison',
   'shootOnDeath',
   'surviveExileOnce',
+  'silence',
+  'duel',
+  'hug',
+  'stalk',
+  'charm',
+  'inspectRoleType',
+  'fear',
 ]);
 
-const GOD_ROLE_IDS = new Set(['seer', 'witch', 'hunter', 'guard', 'idiot']);
-const VILLAGER_ROLE_IDS = new Set(['villager']);
-const WOLF_ROLE_IDS = new Set(['werewolf', 'wolf']);
+const GOD_ROLE_IDS = new Set(['seer', 'witch', 'hunter', 'guard', 'idiot', 'silence_elder', 'knight', 'stalker', 'butterfly', 'fortune_teller', 'crow', 'bear_tamer', 'bombman', 'nine_tailed_fox', 'cupid', 'ghost_bride', 'demon_hunter', 'illusionist']);
+const VILLAGER_ROLE_IDS = new Set(['villager', 'hybrid', 'old_rogue', 'wild_child', 'thief']);
+const WOLF_ROLE_IDS = new Set(['werewolf', 'wolf', 'white_wolf_king', 'wolf_beauty', 'demon', 'nightmare', 'evil_knight', 'wolf_king', 'big_bad_wolf', 'hidden_wolf', 'wolf_seed', 'wolf_elder_brother', 'wolf_younger_brother', 'succubus', 'magic_wolf', 'spirit_wolf', 'wolf_witch']);
+
+function transformWildChildren(agents: WerewolfAgent[], deadId: number): void {
+  for (const agent of agents) {
+    if (!agent.alive || agent.wildChildTransformed || Number(agent.wildChildModelId) !== deadId) continue;
+    agent.faction = 'wolves';
+    agent.wildChildTransformed = true;
+    agent.roleConfig = {
+      ...(agent.roleConfig || {}),
+      roleType: 'wolf',
+      rule: {
+        ...((agent.roleConfig?.rule || {}) as Record<string, unknown>),
+        actions: addRoleAction((agent.roleConfig?.rule as { actions?: Array<{ action: string }> } | undefined)?.actions, 'kill'),
+      },
+    };
+  }
+}
+
+function updateNineTailedFoxTails(agents: WerewolfAgent[], dead: WerewolfAgent, day: number): void {
+  if (getRoleId(dead) === 'nine_tailed_fox') return;
+  const roleType = getRoleType(dead);
+  const loss = roleType === 'god' ? 2 : roleType === 'villager' ? 1 : 0;
+  if (!loss) return;
+  const fox = agents.find((agent) => agent.alive && getRoleId(agent) === 'nine_tailed_fox');
+  if (!fox) return;
+  fox.nineTailedFoxTails = Math.max(0, Number(fox.nineTailedFoxTails ?? 9) - loss);
+  if (fox.nineTailedFoxTails <= 0) eliminate(agents, Number(fox.id), day, 'nine_tailed_fox_tails');
+}
+
+function addRoleAction(actions: Array<{ action: string }> = [], action: string): Array<{ action: string }> {
+  return actions.some((item) => item.action === action) ? actions : [...actions, { action }];
+}
+
+function getRoleId(agent: WerewolfAgent | null | undefined): string {
+  return String(agent?.role || agent?.roleConfig?.id || '').trim().toLowerCase();
+}
 
 function getRoleType(agent: WerewolfAgent | null | undefined): string {
   if (!agent) return 'villager';
@@ -323,7 +404,7 @@ function getRoleType(agent: WerewolfAgent | null | undefined): string {
   if (configuredType === 'god' || configuredType === 'villager' || configuredType === 'wolf') {
     return configuredType;
   }
-  const roleId = String(agent.role || agent.roleConfig?.id || configuredType).trim().toLowerCase();
+  const roleId = getRoleId(agent) || configuredType;
   if (WOLF_ROLE_IDS.has(roleId)) return 'wolf';
   if (GOD_ROLE_IDS.has(roleId)) return 'god';
   if (VILLAGER_ROLE_IDS.has(roleId)) return 'villager';
@@ -333,6 +414,7 @@ function getRoleType(agent: WerewolfAgent | null | undefined): string {
 
 function getAliveRosterStats(agents: WerewolfAgent[]): AliveRosterStats {
   return agents.filter((agent) => agent.alive).reduce<AliveRosterStats>((stats, agent) => {
+    if (agent.faction === 'third_party') return stats;
     const roleType = getRoleType(agent);
     if (roleType === 'wolf') stats.wolves += 1;
     else if (roleType === 'god') {

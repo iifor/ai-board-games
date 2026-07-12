@@ -16,7 +16,9 @@ B 端位于 `packages/admin`，面向运营、配置和调试人员，负责玩�
 - @uiw/react-json-view
 - `@ai-presenter/shared`
 
-## 目录结构
+## 稳定目录边界
+
+本节只记录 B 端后台长期稳定的职责边界，帮助判断改动应落在页面、管理资源、service、表单状态还是观测调试能力；具体文件位置、符号定义、调用方和影响面使用 CodeGraph 查询。
 
 ```txt
 packages/admin/

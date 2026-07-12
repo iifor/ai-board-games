@@ -24,6 +24,42 @@ export interface Player {
   provider?: string;
   deathDay?: number;
   deathReason?: string;
+  hybridMasterId?: string | null;
+  wildChildModelId?: string | number | null;
+  wildChildTransformed?: boolean;
+  nineTailedFoxTails?: number;
+  lastSilencedTarget?: string | null;
+  knightDuelUsed?: boolean;
+  butterflyHugUsed?: number;
+  stalkerAssassinateUsed?: boolean;
+  lastNightmareTarget?: string | number | null;
+  lastPenguinTarget?: string | number | null;
+  foxInspectLost?: boolean;
+  foxLastInspect?: { targetIds?: Array<string | number>; hasWolf?: boolean } | null;
+  magicianSwappedIds?: Array<string | number>;
+  fortuneTellerMarkUsed?: boolean;
+  bigBadWolfKillUsed?: boolean;
+  lastCrowTarget?: string | number | null;
+  blackMerchantGiftUsed?: boolean;
+  blackMerchantGift?: { action?: string; from?: string | number; used?: boolean } | null;
+  blackMerchantDeathPending?: boolean;
+  bigTreeWolfHits?: number;
+  thickWolfHuntHits?: number;
+  godSkillsDisabled?: boolean;
+  youngerBrotherSoloKillUsedDay?: number | null;
+  wolfElderBrotherDeathDay?: number | null;
+  loverId?: number | null;
+  loverSource?: string | null;
+  ghostBridePartnerId?: number | null;
+  ghostBrideWitnessId?: number | null;
+  witnessForGhostBride?: number | null;
+  evilKnightTriggered?: boolean;
+  oldRoguePendingDeath?: {
+    reason?: string;
+    sourceAction?: string;
+    resolveDay?: number;
+    announced?: boolean;
+  } | null;
 }
 
 export interface HostOption {

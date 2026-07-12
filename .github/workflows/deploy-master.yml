@@ -1,0 +1,92 @@
+name: Deploy master to Tencent Cloud
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-master
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.4 --activate
+          pnpm install --frozen-lockfile
+
+      - name: Verify release gates
+        run: |
+          pnpm run check
+          pnpm run build
+          pnpm run test:unit
+          pnpm run test:workflow
+          pnpm run test:migration
+
+      - name: Validate Docker build
+        run: docker build --target builder -t consensus-build-check:${{ github.sha }} .
+
+      - name: Configure SSH
+        env:
+          TENCENT_CLOUD_HOST: ${{ secrets.TENCENT_CLOUD_HOST }}
+          TENCENT_CLOUD_SSH_KEY: ${{ secrets.TENCENT_CLOUD_SSH_KEY }}
+          TENCENT_CLOUD_SSH_PORT: ${{ secrets.TENCENT_CLOUD_SSH_PORT || '22' }}
+        run: |
+          test -n "${TENCENT_CLOUD_HOST}"
+          test -n "${TENCENT_CLOUD_SSH_KEY}"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${TENCENT_CLOUD_SSH_KEY}" > ~/.ssh/tencent-cloud-deploy-key
+          chmod 600 ~/.ssh/tencent-cloud-deploy-key
+          ssh-keyscan -p "${TENCENT_CLOUD_SSH_PORT}" "${TENCENT_CLOUD_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Deploy with Docker Compose
+        env:
+          TENCENT_CLOUD_HOST: ${{ secrets.TENCENT_CLOUD_HOST }}
+          TENCENT_CLOUD_USER: ${{ secrets.TENCENT_CLOUD_USER }}
+          TENCENT_CLOUD_SSH_PORT: ${{ secrets.TENCENT_CLOUD_SSH_PORT || '22' }}
+          TENCENT_CLOUD_PROJECT_PATH: ${{ secrets.TENCENT_CLOUD_PROJECT_PATH }}
+        run: |
+          test -n "${TENCENT_CLOUD_HOST}"
+          test -n "${TENCENT_CLOUD_USER}"
+          test -n "${TENCENT_CLOUD_PROJECT_PATH}"
+
+          PROJECT_PATH_B64="$(printf '%s' "${TENCENT_CLOUD_PROJECT_PATH}" | base64 -w 0)"
+
+          ssh \
+            -i ~/.ssh/tencent-cloud-deploy-key \
+            -p "${TENCENT_CLOUD_SSH_PORT}" \
+            "${TENCENT_CLOUD_USER}@${TENCENT_CLOUD_HOST}" \
+            "bash -s -- '${PROJECT_PATH_B64}'" <<'REMOTE'
+          set -euo pipefail
+
+          PROJECT_PATH="$(printf '%s' "$1" | base64 -d)"
+          cd "${PROJECT_PATH}"
+          git fetch origin master
+          git reset --hard origin/master
+
+          if docker compose version >/dev/null 2>&1; then
+            docker compose up -d --build
+            docker compose ps
+          else
+            docker-compose up -d --build
+            docker-compose ps
+          fi
+          REMOTE

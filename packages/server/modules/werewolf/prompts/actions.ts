@@ -1,8 +1,3 @@
-// ============================================================
-// 行动决策提示词 —— AI 玩家执行具体动作时收到的指令
-// ============================================================
-
-// ---- 技能描述提示（注入系统提示，告知 AI 拥有什么技能）----
 export const SKILL_DESCRIPTIONS: Record<string, string> = {
   kill: '夜晚击杀一名存活玩家。',
   inspectFaction: '夜晚查验一名玩家阵营。',
@@ -10,129 +5,150 @@ export const SKILL_DESCRIPTIONS: Record<string, string> = {
   save: '女巫解药，可救今晚被狼人袭击的玩家。',
   poison: '女巫毒药，可毒杀一名玩家。',
   shootOnDeath: '死亡或放逐时可以开枪带走一名玩家。',
-  selfDestruct: '狼人白天可以自爆，立即出局并中止当前白天流程。',
+  selfDestruct: '狼人白天可自爆，立即出局并中止当前白天流程。',
   surviveExileOnce: '首次被白天放逐时翻牌免死并失去投票权。',
+  chooseMaster: '首夜选择一名玩家作为主人。',
+  silence: '夜晚禁言一名玩家。',
+  duel: '白天发起一次骑士决斗。',
+  hug: '夜晚抱住一名玩家，使其当晚特殊能力失效。',
+  stalk: '若白天投票目标未被放逐，下一夜可暗杀该目标。',
+  charm: '夜晚魅惑一名玩家，狼美人死亡时带走魅惑目标。',
+  inspectRoleType: '夜晚查验一名好人是神职还是平民。',
+  fear: '夜晚恐惧一名玩家，使其当晚技能失效。',
+  dream: '夜晚摄梦一名玩家。',
+  swap: '夜晚交换两名玩家号码。',
+  mark: '夜晚标记一名玩家，限制狼队刀口范围。',
+  soloKill: '夜晚单独击杀一名非狼玩家。',
+  curse: '夜晚诅咒一名玩家，使其次日放逐投票多一票。',
+  blackMerchantGift: '夜晚赠送一次临时查验、毒药或死亡开枪能力。',
+  youngerBrotherKill: '狼兄死亡后的下一夜，狼弟单独击杀一名非狼玩家。',
+  treeSurviveWolfHit: '大树被动承受狼人击杀。',
+  bearRoar: '白天公开熊是否咆哮。',
+  infect: '夜晚全局一次感染狼队刀口，成功时目标不死并加入狼人阵营。',
+  inspectRole: '夜晚查验一名玩家的具体角色身份。',
+  request: '首夜祈求一名玩家，根据对方身份获得对应能力。',
+  stealRole: '首夜从盗贼备选身份中选择一张。',
+  linkLovers: '首夜选择两名玩家成为情侣。',
+  succubusLink: '首夜魅魔自连一名好人组成第三方。',
+  ghostBrideLink: '首夜选择新郎和见证人组成鬼魂新娘第三方。',
+  ghostBrideChat: '鬼魂新娘阵营夜间私聊。',
+  ghostBrideKill: '无普通狼人存活后，鬼魂新娘阵营夜间击杀一名非第三方玩家。',
+  freeze: '夜晚冰冻一名玩家。',
+  foxInspect: '夜晚查验三连座位中是否有狼。',
+  blastVoters: '被放逐时炸死投票给自己的玩家。',
+  loseTailOnGoodDeath: '好人死亡时扣除九尾狐尾巴。',
   voteOnly: '白天投票。',
   speakOnly: '白天发言。',
 };
 
-// ---- 技能行动提示（执行技能时发送给 AI）----
-
-/** 狼人击杀目标 */
-export function buildTargetJsonContract(validIds: number[], options: { reason?: 'required' | 'optional' | 'none'; nullable?: boolean } = {}): string {
+export function buildTargetJsonContract(
+  validIds: number[],
+  options: { reason?: 'required' | 'optional' | 'none'; nullable?: boolean } = {},
+): string {
   const reason = options.reason || 'none';
-  const reasonText = reason === 'required'
-    ? 'reason 必须填写简短原因。'
-    : reason === 'optional'
-      ? 'reason 可以填写简短原因；不行动时可为 null。'
-      : '不需要 reason。';
-  const actionExample = `JSON 示例：{"targetSeat":2${reason === 'none' ? '' : ',"reason":"简短原因"'}}。`;
-  const skipExample = options.nullable ? `不行动示例：{"targetSeat":null${reason === 'none' ? '' : ',"reason":"简短原因"'}}。` : '';
+  const targetExample = options.nullable ? 'number|null' : 'number';
   return [
     '只返回标准 JSON 对象，不要输出 Markdown、解释或多余文本。',
     `可选目标座位号：${validIds.join('、') || '无'}。`,
-    actionExample,
-    skipExample,
-    reasonText,
+    `格式：{"targetSeat":${targetExample}${reason === 'none' ? '' : ',"reason":"简短原因"'}}。`,
+    options.nullable ? `不行动：{"targetSeat":null${reason === 'none' ? '' : ',"reason":null'}}。` : '',
+    reason === 'optional' ? 'reason 可选。' : reason === 'required' ? 'reason 必须填写。' : '',
   ].filter(Boolean).join('\n');
 }
 
-/** 狼人击杀目标 */
 export function buildKillActionPrompt(validIds: number[] = []): string {
-  return [
-    '狼人夜晚行动：请选择今晚击杀目标或者空刀（不击杀）。',
-    validIds.length ? `可选目标座位号：${validIds.join('、')}。` : '',
-  ].filter(Boolean).join('\n');
+  return actionPrompt('狼人夜晚行动，请选择今晚击杀目标或空刀。', validIds, true);
 }
 
-/** 预言家查验阵营 */
 export function buildInspectFactionActionPrompt(validIds: number[] = []): string {
-  return [
-    '预言家夜晚行动：请选择一名玩家查验阵营，可以简要说明查验原因。',
-    validIds.length ? `可选目标座位号：${validIds.join('、')}。` : '',
-    '只返回标准 JSON 对象，例如 {"targetSeat":2,"reason":"我今晚查x号，原因是..."}；reason 可为 null。',
-  ].filter(Boolean).join('\n');
+  return actionPrompt('预言家夜晚行动，请选择一名玩家查验阵营。', validIds);
 }
 
-/** 守卫守护 */
 export function buildGuardActionPrompt(validIds: number[] = []): string {
+  return actionPrompt('守卫夜晚行动，请选择守护目标或空守，不能连续两晚守护同一人。', validIds, true);
+}
+
+export function buildSaveActionPrompt(victimId: number, isSelf: boolean, canSelfSave: boolean): string {
+  const selfRule = isSelf ? (canSelfSave ? '本局允许首夜自救。' : '本局不允许自救。') : '';
   return [
-    '守卫夜晚行动：请选择今晚守护目标或者空守，不能连续两晚守同一人。',
-    validIds.length ? `可选目标座位号：${validIds.join('、')}。` : '',
-    '只返回标准 JSON 对象：守护返回 {"targetSeat":2,"reason":"我今晚守x号，原因是..."}；空守返回 {"targetSeat":null,"reason":"今晚我空守，原因是..."}。reason 可选。',
+    `今晚狼刀目标是 ${victimId} 号，是否使用解药（antidote）？`,
+    selfRule,
+    '只返回 JSON：{"use":true,"reason":"简短原因"} 或 {"use":false,"reason":null}。',
+    'reason 可以填写简短原因；不使用时为 null。',
   ].filter(Boolean).join('\n');
 }
 
-/** 女巫解药 */
-export function buildSaveActionPrompt(victimId: number, isSelf: boolean, canSelfSave: boolean): string {
-  const lines = [
-    `今晚狼刀目标是 ${victimId} 号。你还有解药。`,
-    isSelf && canSelfSave ? '首夜允许自救。' : '不允许自救。',
-    isSelf
-      ? '是否使用解药自救？只返回标准 JSON 对象：{"use":true,"reason":""} 或 {"use":false,"reason":null}。reason 可以填写简短原因；不行动时可为 null。'
-      : '是否使用解药救人？只返回标准 JSON 对象：{"use":true,"reason":"我选择救x号，原因是..."} 或 {"use":false,"reason":null}。reason 可以填写简短原因；不行动时可为 null。'
-  ].filter(Boolean);
-  return lines.join('\n\n');
-}
-
-/** 女巫毒药 */
 export function buildPoisonActionPrompt(validIds: number[]): string {
   return [
-    '你还有毒药。请选择是否使用毒药；可以填写 reason 简短说明原因。',
-    `可选目标座位号：${validIds.join('、') || '无'}`,
-    '只返回标准 JSON 对象，不要输出 Markdown、解释或多余文本。',
-    '示例：{"use":true,"targetSeat":2,"reason":"我选择毒杀x号，原因是..."}。'
-  ].join('\n\n');
-}
-
-/** 猎人开枪 */
-export function buildHunterShootActionPrompt(validIds: number[] = []): string {
-  return [
-    '你是猎人，已出局。请选择是否开枪带走一名玩家。',
-    `可选目标座位号：${validIds.join('、')}。`,
-    '只返回标准 JSON 对象：开枪返回 {"targetSeat":2}；不开枪返回 {"targetSeat":null}。'
+    '女巫毒药行动，请决定是否使用毒药。',
+    buildTargetJsonContract(validIds, { reason: 'optional', nullable: true }).replace('"targetSeat"', '"targetSeat"'),
+    '使用时返回 {"use":true,"targetSeat":2,"reason":"简短原因"}；不用时返回 {"use":false,"targetSeat":null,"reason":null}。',
   ].join('\n');
 }
 
-/** 狼人自爆 */
-export function buildSelfDestructActionPrompt(publicContext: string, speechText: string, validTargetIds: number[] = []): string {
-  const targetInstruction = validTargetIds.length
-    ? [
-        `白狼王自爆时必须选择 1 名当前存活且非自己的玩家带走，可选目标：${validTargetIds.join('、')}。`,
-        '白狼王自爆示例：{"use":true,"text":"自爆发言","targetSeat":2}。'
-      ].join('\n')
-    : '普通狼人自爆不带人，targetSeat 必须为 null。';
+export function buildHunterShootActionPrompt(validIds: number[] = []): string {
   return [
-    targetInstruction,
-    '你是狼人，当前处于白天公开流程。你可以选择是否发动自爆。',
-    '自爆效果：你立即出局，本轮白天发言/投票中止，流程进入后续胜负检查或夜晚。',
-    publicContext ? `当前公开信息：\n${publicContext}` : '',
-    `你刚才的公开发言：${speechText || '暂无'}`,
-    '建议在继续发言会明显暴露狼队、或自爆能保护狼队/打断关键归票时才使用。',
-    '只返回JSON对象：{"use":false,"text":""} 或 {"use":true,"text":"自爆遗言"}。'
+    '你已出局，可选择是否开枪带走一名玩家。',
+    `可选目标座位号：${validIds.join('、') || '无'}。`,
+    '只返回标准 JSON 对象，不要输出 Markdown、解释或多余文本。',
+    '开枪：{"targetSeat":2}；不行动：{"targetSeat":null}。',
+  ].join('\n');
+}
+
+export function buildSelfDestructActionPrompt(publicContext: string, speechText: string, validTargetIds: number[] = []): string {
+  return [
+    '你可以选择是否自爆。',
+    validTargetIds.length ? `白狼王自爆可带走目标：${validTargetIds.join('、')}。` : '普通狼人自爆不带人。',
+    publicContext ? `公开信息：\n${publicContext}` : '',
+    speechText ? `刚才发言：${speechText}` : '',
+    '只返回 JSON：{"use":false,"text":""} 或 {"use":true,"text":"自爆发言","targetSeat":2}。',
   ].filter(Boolean).join('\n\n');
 }
 
-// ---- 投票/竞选提示 ----
+export const buildHybridChooseMasterPrompt = (validIds: number[] = []): string => actionPrompt('混血儿首夜选择主人。', validIds);
+export const buildElderSilencePrompt = (validIds: number[] = []): string => actionPrompt('禁言长老选择明天被禁言的玩家。', validIds);
+export const buildKnightDuelPrompt = (validIds: number[] = []): string => actionPrompt('骑士可发起一次决斗。', validIds, true);
+export const buildButterflyHugPrompt = (validIds: number[] = []): string => actionPrompt('花蝴蝶选择今晚抱住的玩家。', validIds, true);
 
-/** 狼人夜聊后刀口投票 */
-export function buildWolfVotePrompt(): string {
-  return '狼人夜晚刀口投票。请根据本次提示中的狼队夜聊内容选择今晚击杀目标。';
-}
-
-/** 白天放逐投票 */
-export const DAY_VOTE_PROMPT = '请选择你要放逐的玩家。';
-
-/** 警长竞选报名 */
-export const SHERIFF_SIGNUP_PROMPT = '警长竞选开始。请选择是否竞选警长。';
-
-/** 警长退水 */
-export function buildSheriffWithdrawPrompt(): string {
+export function buildStalkerAssassinatePrompt(targetId: number): string {
   return [
-    '你的警上竞选发言已经结束。请根据所有警上候选人的发言内容，判断是否退水退出警长竞选。',
-    '判断标准：如果你的发言明显弱于其他候选人，或你认为其他候选人更适合担任警长，可以选择退水。',
-  ].join('\n\n');
+    `你可以暗杀昨天投过且未被放逐的 ${targetId} 号。`,
+    `只返回 JSON：{"use":true,"targetSeat":${targetId},"reason":"简短原因"} 或 {"use":false,"targetSeat":null,"reason":null}。`,
+  ].join('\n');
 }
 
-/** 警长投票 */
+export const buildWolfBeautyCharmPrompt = (validIds: number[] = []): string => actionPrompt('狼美人选择今晚魅惑的玩家。', validIds, true);
+export const buildDemonInspectPrompt = (validIds: number[] = []): string => actionPrompt('恶魔选择一名好人查验其是神职还是平民。', validIds);
+export const buildNightmareFearPrompt = (validIds: number[] = []): string => actionPrompt('梦魇选择今晚恐惧的玩家。', validIds, true);
+export const buildDreamerDreamPrompt = (validIds: number[] = []): string => actionPrompt('摄梦人选择今晚摄梦的玩家。', validIds);
+export const buildMagicianSwapPrompt = (validIds: number[] = []): string => actionPrompt('魔术师选择两名玩家交换号码，返回 targetSeat 和 secondTargetSeat。', validIds, true);
+export const buildFortuneTellerMarkPrompt = (validIds: number[] = []): string => actionPrompt('占卜师可全局一次标记一名玩家。', validIds, true);
+export const buildBigBadWolfKillPrompt = (validIds: number[] = []): string => actionPrompt('大灰狼可单独击杀一名非狼玩家。', validIds, true);
+export const buildCrowCursePrompt = (validIds: number[] = []): string => actionPrompt('乌鸦选择今晚诅咒的玩家。', validIds, true);
+
+export function buildBearTamerRoarPrompt(adjacentWolfIds: number[] = []): string {
+  return [
+    '驯熊师白天提示，请根据服务端结果返回熊是否咆哮。',
+    `邻座狼人：${adjacentWolfIds.join('、') || '无'}。`,
+    '只返回 JSON：{"roaring":true/false,"adjacentWolfIds":[数字]}。',
+  ].join('\n');
+}
+
+export function buildWolfVotePrompt(): string {
+  return '狼队夜晚刀口投票，请根据夜聊内容选择今晚击杀目标。';
+}
+
+export const DAY_VOTE_PROMPT = '请选择你要放逐的玩家。';
+export const SHERIFF_SIGNUP_PROMPT = '警长竞选开始，请选择是否竞选警长。';
 export const SHERIFF_VOTE_PROMPT = '警长竞选投票，请从候选人中选择警长。';
+
+export function buildSheriffWithdrawPrompt(): string {
+  return '请判断是否退水退出警长竞选。只返回 JSON：{"withdraw":true} 或 {"withdraw":false}。';
+}
+
+function actionPrompt(title: string, validIds: number[], nullable = false): string {
+  return [
+    title,
+    buildTargetJsonContract(validIds, { reason: 'optional', nullable }),
+  ].join('\n');
+}

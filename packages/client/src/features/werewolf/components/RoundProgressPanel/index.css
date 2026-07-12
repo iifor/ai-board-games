@@ -50,6 +50,73 @@
   font-weight: 800;
 }
 
+.werewolf-ghost-chat {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(175, 164, 255, 0.22);
+}
+
+.werewolf-ghost-chat header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #e7ddff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.werewolf-ghost-chat header svg {
+  color: #b6a9ff;
+}
+
+.werewolf-ghost-chat__list {
+  display: grid;
+  gap: 10px;
+  max-height: 210px;
+  overflow-y: auto;
+}
+
+.werewolf-ghost-chat__list article {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid rgba(174, 145, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(12, 16, 42, 0.72);
+  box-shadow: inset 0 0 18px rgba(123, 85, 255, 0.1);
+}
+
+.werewolf-ghost-chat__list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.werewolf-ghost-chat__list strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.werewolf-ghost-chat__list span {
+  flex: 0 0 auto;
+  color: rgba(221, 230, 255, 0.62);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.werewolf-ghost-chat__list p {
+  color: rgba(239, 243, 255, 0.9);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .werewolf-elimination-list p,
 .werewolf-progress-list p {
   margin: 0;

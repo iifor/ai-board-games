@@ -1,5 +1,6 @@
 import {
   createWorkflowMatch,
+  drainAiTasks,
   getDebugState,
   submitPendingAction,
   wakeTick,
@@ -14,6 +15,11 @@ interface CreateRuntimeMatchInput {
   matchId?: string;
 }
 
+interface RunUntilBlockedOptions {
+  batchSize?: number;
+  workerId?: string;
+}
+
 class WorkflowRuntime {
   createMatch(input: CreateRuntimeMatchInput): Match {
     return createWorkflowMatch(input);
@@ -21,6 +27,19 @@ class WorkflowRuntime {
 
   tick(matchId: string): Match {
     return wakeTick(matchId);
+  }
+
+  async runUntilBlocked(matchId: string, options: RunUntilBlockedOptions = {}): Promise<{ processed: number; match: Match | null }> {
+    const batchSize = Math.max(1, Math.floor(options.batchSize || 100));
+    let processed = 0;
+
+    while (true) {
+      const result = await drainAiTasks(matchId, { maxTasks: batchSize, workerId: options.workerId });
+      processed += result.processed;
+      if (!result.processed || !result.match || ['completed', 'failed', 'paused_debug'].includes(result.match.status)) {
+        return { processed, match: result.match };
+      }
+    }
   }
 
   submitPendingAction(input: {
@@ -38,4 +57,4 @@ class WorkflowRuntime {
 }
 
 export { WorkflowRuntime };
-export type { CreateRuntimeMatchInput };
+export type { CreateRuntimeMatchInput, RunUntilBlockedOptions };

@@ -12,9 +12,24 @@ export interface WerewolfRound {
   voteTally?: Record<string, number>;
   speeches?: unknown[];
   selfDestruct?: { playerId?: string | number; text?: string; day?: number } | null;
+  silencedPlayerId?: string | number | null;
+  silenceReason?: string | null;
+  knightDuel?: { actorId?: string | number; targetId?: string | number; targetFaction?: string; success?: boolean; reason?: string | null } | null;
+  evilKnightTrigger?: { actorId?: string | number; trigger?: string; targetId?: string | number } | null;
+  oldRogueDeath?: { id?: string | number; reason?: string; sourceAction?: string } | null;
+  bearRoar?: { roaring?: boolean; adjacentWolfIds?: Array<string | number> } | null;
+  crowCursedPlayerId?: string | number | null;
+  bombmanBlast?: { actorId?: string | number; targetIds?: Array<string | number> } | null;
 }
 
 export interface WerewolfNight {
+  escapeHunterIds?: Array<string | number>;
+  escapeHunterSpeechOrder?: Array<string | number>;
+  escapeHunterSpeeches?: { playerId?: string | number; text?: string; thinking?: string }[];
+  escapeHunterChoices?: Record<string, string | number>;
+  escapeHunterVoteTally?: Record<string, number>;
+  escapeHunterTarget?: string | number | null;
+  thickWolfArmorBreak?: { targetId: string | number } | null;
   deaths?: { id: string; reason?: string }[];
   wolfIds?: string[] | number[];
   wolfLeaderId?: string | number | null;
@@ -31,6 +46,51 @@ export interface WerewolfNight {
   witchSave?: boolean;
   witchPoisonTarget?: string;
   witchPoisonReason?: string | null;
+  butterflyTarget?: string | number | null;
+  stalkerTarget?: string | number | null;
+  wolfBeautyTarget?: string | number | null;
+  demonInspect?: { target?: string | number | null; result?: string; reason?: string | null };
+  nightmareTarget?: string | number | null;
+  penguinFrozenId?: string | number | null;
+  penguinReason?: string | null;
+  foxInspect?: { targetIds?: Array<string | number>; hasWolf?: boolean; reason?: string | null } | null;
+  dreamerTarget?: string | number | null;
+  dreamerReason?: string | null;
+  dreamerRepeatedTarget?: boolean;
+  magicianSwap?: { firstTarget?: string | number | null; secondTarget?: string | number | null; reason?: string | null } | null;
+  fortuneTellerMark?: { target?: string | number | null; reason?: string | null } | null;
+  bigBadWolfTarget?: string | number | null;
+  bigBadWolfReason?: string | null;
+  crowCurse?: { target?: string | number | null; reason?: string | null } | null;
+  blackMerchantGift?: { actorId?: string | number; targetId?: string | number; gift?: string; success?: boolean; reason?: string | null } | null;
+  luckySeerCheck?: { actorId?: string | number; target?: string | number | null; result?: string; reason?: string | null } | null;
+  luckyPoisonTarget?: string | number | null;
+  luckyPoisonReason?: string | null;
+  youngerBrotherTarget?: string | number | null;
+  youngerBrotherReason?: string | null;
+  wolfSeedInfect?: { actorId?: string | number; targetId?: string | number; used?: boolean; success?: boolean; reason?: string | null } | null;
+  heavenlyEyeCheck?: { target?: string | number | null; roleId?: string; roleName?: string; reason?: string | null } | null;
+  requesterPrayer?: { actorId?: string | number; targetId?: string | number; result?: string; reason?: string | null } | null;
+  requesterTarget?: string | number | null;
+  requesterReason?: string | null;
+  thiefChoice?: { actorId?: string | number; roleId?: string; offeredRoleIds?: string[]; reason?: string | null } | null;
+  loverLink?: { actorId?: string | number; targetIds?: Array<string | number>; source?: string; reason?: string | null } | null;
+  succubusLink?: { actorId?: string | number; targetIds?: Array<string | number>; reason?: string | null } | null;
+  ghostBrideLink?: { actorId?: string | number; partnerId?: string | number; witnessId?: string | number; reason?: string | null } | null;
+  ghostBrideChat?: { playerId?: string | number; text?: string; day?: number; phase?: string; thinking?: string }[];
+  ghostBrideTarget?: string | number | null;
+  ghostBrideReason?: string | null;
+  demonHunterTarget?: string | number | null;
+  demonHunterReason?: string | null;
+  spiritWolfLearn?: { actorId?: string | number; targetId?: string | number; learnedRole?: string; reason?: string | null } | null;
+  spiritWolfInspect?: { target?: string | number | null; result?: string; reason?: string | null } | null;
+  spiritWolfGuardTarget?: string | number | null;
+  spiritWolfGuardReason?: string | null;
+  spiritWolfAntidoteTarget?: string | number | null;
+  spiritWolfAntidoteReason?: string | null;
+  wolfWitchCurse?: { actorId?: string | number; targetId?: string | number; reason?: string | null } | null;
+  illusionTarget?: string | number | null;
+  illusionReason?: string | null;
 }
 
 export interface SheriffElection {

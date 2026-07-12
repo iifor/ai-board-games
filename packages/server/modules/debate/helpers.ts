@@ -39,7 +39,7 @@ interface WorkflowMatch {
 
 interface WorkflowState {
   topic: Topic;
-  host: Record<string, unknown>;
+  host: DebateHost;
   players: DebatePlayer[];
   phases: DebatePhase[];
   winner: string | null;
@@ -74,6 +74,8 @@ interface AiTask {
 }
 
 interface HandlerResult {
+  blockers?: unknown[];
+  tasks?: unknown[];
   events?: Array<{
     type: string;
     payload: Record<string, unknown>;

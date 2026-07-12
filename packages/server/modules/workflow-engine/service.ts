@@ -85,7 +85,15 @@ async function drainAiTasks(matchId: string, options: DrainOptions = {}): Promis
   let processed = 0;
   while (processed < maxTasks) {
     const task = claimNextAiTask({ matchId, workerId });
-    if (!task) break;
+    if (!task) {
+      const current = repo.getMatch(matchId);
+      if (!current || current.status !== MATCH_STATUS.RUNNING || current.blockers.length) break;
+      const advanced = wakeTick(matchId);
+      if (advanced.status === current.status && advanced.currentStepIndex === current.currentStepIndex) break;
+      processed += 1;
+      if (TERMINAL_STATUSES.includes(advanced.status)) break;
+      continue;
+    }
     await processClaimedAiTask(task.id);
     processed += 1;
     const match = repo.getMatch(matchId);

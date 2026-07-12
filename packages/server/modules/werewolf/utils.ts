@@ -31,7 +31,27 @@ const ROLE_ACTION_ALIASES: Record<string, string[]> = {
   poison: ['witch_poison'],
   witch_poison: ['poison'],
   guard: ['guard_protect'],
-  guard_protect: ['guard']
+  guard_protect: ['guard'],
+  chooseMaster: ['hybrid_choose_master'],
+  hybrid_choose_master: ['chooseMaster'],
+  silence: ['elder_silence'],
+  elder_silence: ['silence'],
+  duel: ['knight_duel'],
+  knight_duel: ['duel'],
+  hug: ['butterfly_hug'],
+  butterfly_hug: ['hug'],
+  stalk: ['stalker_assassinate'],
+  stalker_assassinate: ['stalk'],
+  charm: ['wolf_beauty_charm'],
+  wolf_beauty_charm: ['charm'],
+  inspectRoleType: ['demon_inspect'],
+  demon_inspect: ['inspectRoleType'],
+  fear: ['nightmare_fear'],
+  nightmare_fear: ['fear'],
+  dream: ['dreamer_dream'],
+  dreamer_dream: ['dream'],
+  swap: ['magician_swap'],
+  magician_swap: ['swap']
 };
 
 interface AgentForFallback {
@@ -425,7 +445,9 @@ function hashMemoryText(value: string): string {
 
 const ROLE_NAME_FALLBACK: Record<string, string> = {
   werewolf: '狼人', seer: '预言家', witch: '女巫', hunter: '猎人',
-  idiot: '白痴', guard: '守卫', villager: '村民'
+  idiot: '白痴', guard: '守卫', villager: '村民',
+  black_merchant: '黑商', big_tree: '大树',
+  wolf_elder_brother: '狼兄', wolf_younger_brother: '狼弟'
 };
 
 function getRoleConfig(modeConfig: ModeConfigForRole, roleId: string): RoleConfigFull {

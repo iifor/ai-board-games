@@ -404,6 +404,37 @@
   background: rgba(76, 10, 47, 0.94);
 }
 
+.werewolf-night-action-badge.escape-hunt {
+  border-color: rgba(255, 112, 112, 0.9);
+  background: rgba(82, 13, 25, 0.96);
+  animation: werewolf-hunt-lock 680ms ease-out both;
+}
+
+.werewolf-night-action-badge.thick-wolf-armor {
+  border-color: rgba(121, 239, 214, 0.94);
+  background: rgba(8, 58, 58, 0.96);
+  animation: werewolf-armor-break 900ms ease-out both;
+}
+
+@keyframes werewolf-hunt-lock {
+  0% { opacity: 0; transform: translateX(18px) scale(1.35); }
+  55% { opacity: 1; transform: translateX(-3px) scale(0.94); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes werewolf-armor-break {
+  0%, 28%, 56% { transform: translateX(-4px) rotate(-4deg); }
+  14%, 42%, 70% { transform: translateX(4px) rotate(4deg); }
+  100% { transform: translateX(0) rotate(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .werewolf-night-action-badge.escape-hunt,
+  .werewolf-night-action-badge.thick-wolf-armor {
+    animation: none;
+  }
+}
+
 .werewolf-night-action-badge.muted {
   opacity: 0.84;
 }

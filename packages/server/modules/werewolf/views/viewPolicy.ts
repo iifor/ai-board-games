@@ -44,6 +44,12 @@ interface Player {
 }
 
 interface NightData {
+  escapeHunterIds?: number[];
+  escapeHunterSpeechOrder?: number[];
+  escapeHunterSpeeches?: unknown[];
+  escapeHunterChoices?: Record<string, unknown>;
+  escapeHunterVoteTally?: Record<string, number>;
+  escapeHunterTarget?: number | null;
   wolfTarget?: number | null;
   wolfLeaderId?: number | null;
   wolfSpeechOrder?: number[];
@@ -59,6 +65,17 @@ interface NightData {
   witchPoisonReason?: string | null;
   guardTarget?: number | null;
   guardReason?: string | null;
+  demonHunterTarget?: number | null;
+  demonHunterReason?: string | null;
+  spiritWolfLearn?: unknown;
+  spiritWolfInspect?: unknown;
+  spiritWolfGuardTarget?: number | null;
+  spiritWolfGuardReason?: string | null;
+  spiritWolfAntidoteTarget?: number | null;
+  spiritWolfAntidoteReason?: string | null;
+  wolfWitchCurse?: unknown;
+  illusionTarget?: number | null;
+  illusionReason?: string | null;
   deaths?: Array<{ id: number; reason: string }>;
 }
 
@@ -201,7 +218,8 @@ function projectPlayer(player: Player, context: ProjectionContext = { mode: VIEW
 
   const isViewer = Number(player.id) === Number(context.viewerPlayerId);
   const wolfTeammate = context.viewerFaction === 'wolves' && player.faction === 'wolves';
-  if (isViewer || wolfTeammate) {
+  const escapeHunterTeammate = context.viewerRoleId === 'escape_hunter' && player.role === 'escape_hunter';
+  if (isViewer || wolfTeammate || escapeHunterTeammate) {
     return {
       ...base,
       seerChecks: isViewer && player.role === 'seer' ? seerChecks || [] : []
@@ -239,7 +257,14 @@ function projectNight(night: NightData, round: Round = {}, context: ProjectionCo
 
   const viewerRoleId = context.viewerRoleId;
   const wolves = context.viewerFaction === 'wolves';
+  const escapeHunter = viewerRoleId === 'escape_hunter';
   return {
+    escapeHunterIds: escapeHunter ? night.escapeHunterIds || [] : [],
+    escapeHunterSpeechOrder: escapeHunter ? night.escapeHunterSpeechOrder || [] : [],
+    escapeHunterSpeeches: escapeHunter ? night.escapeHunterSpeeches || [] : [],
+    escapeHunterChoices: escapeHunter ? night.escapeHunterChoices || {} : {},
+    escapeHunterVoteTally: escapeHunter ? night.escapeHunterVoteTally || {} : {},
+    escapeHunterTarget: escapeHunter ? night.escapeHunterTarget || null : null,
     wolfTarget: wolves ? night.wolfTarget || null : null,
     wolfLeaderId: wolves ? night.wolfLeaderId || null : null,
     wolfSpeechOrder: wolves ? night.wolfSpeechOrder || [] : [],
@@ -263,12 +288,37 @@ function projectNight(night: NightData, round: Round = {}, context: ProjectionCo
     ...(viewerRoleId === 'guard' && night.guardReason
       ? { guardReason: night.guardReason }
       : {}),
+    demonHunterTarget: viewerRoleId === 'demon_hunter' ? night.demonHunterTarget || null : null,
+    ...(viewerRoleId === 'demon_hunter' && night.demonHunterReason
+      ? { demonHunterReason: night.demonHunterReason }
+      : {}),
+    spiritWolfLearn: viewerRoleId === 'spirit_wolf' ? night.spiritWolfLearn || null : null,
+    spiritWolfInspect: viewerRoleId === 'spirit_wolf' ? night.spiritWolfInspect || null : null,
+    spiritWolfGuardTarget: viewerRoleId === 'spirit_wolf' ? night.spiritWolfGuardTarget || null : null,
+    ...(viewerRoleId === 'spirit_wolf' && night.spiritWolfGuardReason
+      ? { spiritWolfGuardReason: night.spiritWolfGuardReason }
+      : {}),
+    spiritWolfAntidoteTarget: viewerRoleId === 'spirit_wolf' ? night.spiritWolfAntidoteTarget || null : null,
+    ...(viewerRoleId === 'spirit_wolf' && night.spiritWolfAntidoteReason
+      ? { spiritWolfAntidoteReason: night.spiritWolfAntidoteReason }
+      : {}),
+    wolfWitchCurse: wolves ? night.wolfWitchCurse || null : null,
+    illusionTarget: viewerRoleId === 'illusionist' ? night.illusionTarget || null : null,
+    ...(viewerRoleId === 'illusionist' && night.illusionReason
+      ? { illusionReason: night.illusionReason }
+      : {}),
     deaths: round.nightRevealed ? night.deaths || [] : []
   };
 }
 
 function cloneNight(night: NightData, round: Round = {}): NightData {
   return {
+    escapeHunterIds: night.escapeHunterIds || [],
+    escapeHunterSpeechOrder: night.escapeHunterSpeechOrder || [],
+    escapeHunterSpeeches: night.escapeHunterSpeeches || [],
+    escapeHunterChoices: night.escapeHunterChoices || {},
+    escapeHunterVoteTally: night.escapeHunterVoteTally || {},
+    escapeHunterTarget: night.escapeHunterTarget || null,
     wolfTarget: night.wolfTarget || null,
     wolfLeaderId: night.wolfLeaderId || null,
     wolfSpeechOrder: night.wolfSpeechOrder || [],
@@ -284,6 +334,17 @@ function cloneNight(night: NightData, round: Round = {}): NightData {
     ...(night.witchPoisonReason ? { witchPoisonReason: night.witchPoisonReason } : {}),
     guardTarget: night.guardTarget || null,
     ...(night.guardReason ? { guardReason: night.guardReason } : {}),
+    demonHunterTarget: night.demonHunterTarget || null,
+    ...(night.demonHunterReason ? { demonHunterReason: night.demonHunterReason } : {}),
+    spiritWolfLearn: night.spiritWolfLearn || null,
+    spiritWolfInspect: night.spiritWolfInspect || null,
+    spiritWolfGuardTarget: night.spiritWolfGuardTarget || null,
+    ...(night.spiritWolfGuardReason ? { spiritWolfGuardReason: night.spiritWolfGuardReason } : {}),
+    spiritWolfAntidoteTarget: night.spiritWolfAntidoteTarget || null,
+    ...(night.spiritWolfAntidoteReason ? { spiritWolfAntidoteReason: night.spiritWolfAntidoteReason } : {}),
+    wolfWitchCurse: night.wolfWitchCurse || null,
+    illusionTarget: night.illusionTarget || null,
+    ...(night.illusionReason ? { illusionReason: night.illusionReason } : {}),
     deaths: round.nightRevealed ? night.deaths || [] : []
   };
 }

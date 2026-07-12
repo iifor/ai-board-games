@@ -2,9 +2,7 @@ import {
   App as AntApp,
   Layout,
   Menu,
-  Button,
-  Dropdown,
-  Space
+  Button
 } from 'antd';
 import {
   DashboardOutlined,
@@ -13,14 +11,10 @@ import {
   EyeOutlined,
   LogoutOutlined,
   PartitionOutlined,
-  RobotOutlined,
   SettingOutlined,
-  SoundOutlined,
-  TeamOutlined,
   TrophyOutlined
 } from '@ant-design/icons';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import { normalizePath } from '../../utils/adminHelpers';
 import { getToken, clearToken } from '../../services/adminApi';
 import { Login } from '../../pages/Login';

@@ -101,26 +101,19 @@ flowchart TD
 - 新狼人杀对局同时保存实际展示事件序列；实时和回放共用播放管线，旧对局继续从快照重建。
 - 管理后台与 C 端隔离，后台负责配置、观测和调试。
 
-## 核心模块索引
+## 文档路由
 
-- 后端服务架构：见 `docs/project-server.md`。
-- 游戏工作流与 AI 调度：见 `docs/project-workflow.md`。
-- 狼人杀 AI 玩家提示词与 LLM 调用：见 `docs/project-prompts.md`。
-- C 端游戏前台：见 `docs/project-client.md`。
-- B 端管理后台：见 `docs/project-admin.md`。
-- 共享类型、schema、测试：见 `docs/project-shared.md`。
+本节只用于选择应阅读的契约文档，不维护源码入口清单。具体函数、类型、调用链和影响面使用 CodeGraph 查询。
 
-## AI 快速定位表
-
-| 问题类型 | 先读文档 | 主要源码入口 |
+| 任务类型 | 先读文档 | CodeGraph 继续追问 |
 | --- | --- | --- |
-| 游戏不推进、ack 卡住、回放异常 | `docs/project-workflow.md` | `packages/server/modules/game-socket/service.ts`、`packages/server/modules/game-socket/session.ts`、`packages/server/modules/workflow-engine/tick.ts` |
-| 辩论赛流程或 AI 发言异常 | `docs/project-workflow.md` | `packages/server/aiDebateRunner.ts`、`packages/server/modules/debate/workflow.ts`、`packages/client/src/features/debate/DebateGame` |
-| 狼人杀阶段、角色、胜负判断异常 | `docs/project-workflow.md` | `packages/server/modules/werewolf/workflow.ts`、`packages/server/modules/werewolf/steps.ts`、`packages/server/modules/werewolf/reducers.ts` |
-| C 端页面、播放、字幕、选人问题 | `docs/project-client.md` | `packages/client/src/App.tsx`、`packages/client/src/services/gameService.ts`、`packages/client/src/hooks/useGameSocketSession.ts` |
-| 后台配置、历史、观测、调试问题 | `docs/project-admin.md` | `packages/admin/src/components/AdminPage/index.tsx`、`packages/admin/src/services/adminApi.ts` |
-| 后端 API、数据库、配置问题 | `docs/project-server.md` | `packages/server/app.ts`、`packages/server/db/migrations.ts`、`packages/server/modules/*` |
-| 类型、schema、测试失败 | `docs/project-shared.md` | `packages/shared/types`、`packages/shared/schemas`、`tests` |
+| 后端 API、数据库、配置、错误处理 | `docs/project-server.md` | 相关 controller/service/repository、迁移、配置读取和调用方 |
+| 游戏不推进、ack 卡住、回放异常 | `docs/project-workflow.md` | WebSocket session、workflow tick、outbox、回放投影的调用链 |
+| 辩论赛或狼人杀流程异常 | `docs/project-workflow.md` | 对应游戏 workflow、step handler、reducer、presentation、runner 的影响面 |
+| 狼人杀 AI prompt、行动理由、LLM trace | `docs/project-prompts.md` | prompt builder、PromptContext、agent-core、LLM record 的调用路径 |
+| C 端页面、播放、字幕、选人问题 | `docs/project-client.md` | 路由、feature 容器、socket hook、播放队列、service 调用方 |
+| B 端配置、历史、观测、调试页面 | `docs/project-admin.md` | 管理页面、admin API service、表单状态和后端资源模块 |
+| shared 类型、schema、常量、测试失败 | `docs/project-shared.md` | 类型定义、schema 消费方、测试入口和跨包引用 |
 
 ## 配置与部署
 
@@ -157,6 +150,27 @@ flowchart TD
 - 服务端通过 Express 静态托管这些产物。
 - `dist/` 是构建产物目录，不纳入源码目录树。
 
+### GitHub Actions 自动部署到腾讯云
+
+`.github/workflows/deploy-master.yml` 监听 `master` 分支 push，也支持手动触发。流程先在 GitHub runner 中使用 Node.js 20 与 pnpm 9.15.4 安装锁定依赖，依次执行类型检查、完整构建、单元测试、工作流测试、迁移测试和 `docker build --target builder`；全部通过后才通过 SSH 登录腾讯云 CVM，在服务器项目目录执行：
+
+```bash
+git fetch origin master
+git reset --hard origin/master
+docker compose up -d --build
+docker compose ps
+```
+
+腾讯云 CVM 需要提前安装 Docker，并安装 `docker compose` 插件或旧版 `docker-compose` 命令；需要提前 clone 本仓库，并在项目目录放置生产 `.env`。数据库和上传资源由 `docker-compose.yml` 中的 volume 持久化，部署脚本不会把 GitHub Secrets 写入仓库。
+
+GitHub 仓库需要配置以下 Secrets：
+
+- `TENCENT_CLOUD_HOST`：腾讯云 CVM 公网 IP 或域名。
+- `TENCENT_CLOUD_USER`：SSH 登录用户。
+- `TENCENT_CLOUD_SSH_KEY`：可登录服务器的私钥内容。
+- `TENCENT_CLOUD_SSH_PORT`：SSH 端口，可不填，默认 `22`。
+- `TENCENT_CLOUD_PROJECT_PATH`：服务器上的项目目录，例如 `/opt/consensus`。
+
 ## 扩展点与注意事项
 
 - 新增 C 端业务能力优先放入 `packages/client/src/features/<featureName>`。
@@ -164,3 +178,15 @@ flowchart TD
 - 新增后端资源模块优先遵循 `controller/service/repository/routes/validator` 分层。
 - 新增游戏或复杂流程时，需要同步考虑 workflow、WebSocket 事件、前端投影、对局保存、测试和文档。
 - 修改共享协议时，优先更新 `packages/shared`，再同步前后端消费方。
+## Werewolf mode coverage
+
+- Default werewolf mode coverage now includes boards 1-19 from the local rule list, including `wild-child-12`, `bombman-12` and `nine-tailed-fox-12`.
+- The expansion uses existing workflow, event, snapshot and seed mechanisms; no new top-level package, database table or deployment command was added.
+- Latest local werewolf expansion includes mode 27 `ghost-bride-thief-12`, implemented with existing workflow/event/snapshot mechanisms and no database schema change.
+- Latest local werewolf expansion includes mode 28 `firepower-12`. Mode 29 is skipped because the local rule list only says `略` and does not provide executable rules.
+
+## Werewolf mode coverage update
+
+- Default werewolf mode coverage now includes mode 30 `magic-wolf-demon-hunter-12`.
+- Mode 29 remains skipped because the local rule list is insufficient for executable workflow rules.
+- Mode 30 reuses the existing werewolf workflow, event, snapshot, debug and seed mechanisms; no new package, database table or deployment command was added.

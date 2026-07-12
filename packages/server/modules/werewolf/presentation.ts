@@ -20,14 +20,48 @@ interface PresentationInput {
 
 const SILENT_ACTIONS = new Set([
   'wolf_vote',
+  'escape_hunter_vote',
   'mvp_vote',
 ]);
 
 const PHASE_ACTION_TYPES = new Set([
+  'escape_hunter_speech',
+  'escape_hunter_vote',
   'seer_check',
   'guard_protect',
   'witch_save',
   'witch_poison',
+  'hybrid_choose_master',
+  'elder_silence',
+  'knight_duel',
+  'butterfly_hug',
+  'stalker_assassinate',
+  'wolf_beauty_charm',
+  'demon_inspect',
+  'nightmare_fear',
+  'dreamer_dream',
+  'magician_swap',
+  'fortune_teller_mark',
+  'big_bad_wolf_kill',
+  'crow_curse',
+  'bear_tamer_roar',
+  'wolf_seed_infect',
+  'heavenly_eye_check',
+  'requester_pray',
+  'requester_kill',
+  'thief_choose',
+  'cupid_link',
+  'succubus_link',
+  'ghost_bride_link',
+  'ghost_bride_chat',
+  'ghost_bride_kill',
+  'demon_hunter_hunt',
+  'spirit_wolf_learn',
+  'spirit_wolf_inspect',
+  'spirit_wolf_guard',
+  'spirit_wolf_antidote',
+  'wolf_witch_curse',
+  'illusionist_illusion',
 ]);
 
 function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPresentation {
@@ -62,6 +96,15 @@ function resolveWerewolfPresentation(input: PresentationInput = {}): WerewolfPre
   }
   if (eventType === 'wolf-speech' || (actionType === 'wolf_speech' && speechText)) {
     return speak(speechText || message, '狼队夜聊', 'speech', 'wolf-speech');
+  }
+  if (eventType === 'escape-hunter-speech' || (actionType === 'escape_hunter_speech' && speechText)) {
+    return speak(speechText || message, '猎人夜聊', 'speech', 'escape-hunter-speech');
+  }
+  if (eventType === 'escape-hunter-vote') {
+    return silent(message || '猎人投票完成', 'badge', 'escape-hunter-vote');
+  }
+  if (eventType === 'thick-wolf-armor') {
+    return speak(message || '厚皮狼抵挡了本次猎杀。', message || '厚皮狼护甲破裂', 'status', 'thick-wolf-armor');
   }
   if (workflowEvent === 'werewolf_action_submitted' && actionType === 'wolf_speech') {
     return silent(actionDisplayText('wolf_speech', '已完成'), 'badge', 'wolf-speech');
@@ -164,7 +207,15 @@ function inferActionType(stepId?: string): string {
     'wolf_speech', 'wolf_vote', 'seer_check', 'guard_protect', 'witch_save',
     'witch_poison', 'day_speech', 'day_vote', 'sheriff_signup',
     'sheriff_speech', 'sheriff_withdraw', 'sheriff_vote',
-    'sheriff_runoff_speech', 'sheriff_runoff_vote', 'mvp_vote', 'postgame_speech'
+    'sheriff_runoff_speech', 'sheriff_runoff_vote', 'hybrid_choose_master',
+    'elder_silence', 'knight_duel', 'butterfly_hug', 'stalker_assassinate',
+    'wolf_beauty_charm', 'demon_inspect', 'nightmare_fear', 'dreamer_dream', 'magician_swap',
+    'fortune_teller_mark', 'big_bad_wolf_kill', 'crow_curse', 'bear_tamer_roar',
+    'wolf_seed_infect', 'heavenly_eye_check', 'requester_pray', 'requester_kill',
+    'thief_choose', 'cupid_link', 'succubus_link', 'ghost_bride_link', 'ghost_bride_chat', 'ghost_bride_kill',
+    'demon_hunter_hunt', 'spirit_wolf_learn', 'spirit_wolf_inspect', 'spirit_wolf_guard', 'spirit_wolf_antidote',
+    'wolf_witch_curse', 'illusionist_illusion',
+    'mvp_vote', 'postgame_speech'
   ];
   return known.find((action) => id.startsWith(action)) || '';
 }
@@ -181,10 +232,43 @@ function actionDisplayText(actionType: string, suffix: string): string {
   const labels: Record<string, string> = {
     wolf_speech: '狼队战术部署',
     wolf_vote: '狼队投票',
+    escape_hunter_speech: '猎人夜聊',
+    escape_hunter_vote: '猎人共同投票',
     seer_check: '预言家查验',
     guard_protect: '守卫守护',
     witch_save: '女巫解药',
     witch_poison: '女巫毒药',
+    hybrid_choose_master: '混血儿选主人',
+    elder_silence: '禁言长老禁言',
+    knight_duel: '骑士决斗',
+    butterfly_hug: '花蝴蝶抱人',
+    stalker_assassinate: '潜行者暗杀',
+    wolf_beauty_charm: '狼美人魅惑',
+    demon_inspect: '恶魔查验',
+    nightmare_fear: '梦魇恐惧',
+    dreamer_dream: '摄梦人摄梦',
+    magician_swap: '魔术师换牌',
+    fortune_teller_mark: '占卜师标记',
+    big_bad_wolf_kill: '大灰狼击杀',
+    crow_curse: '乌鸦诅咒',
+    bear_tamer_roar: '驯熊师咆哮',
+    wolf_seed_infect: '种狼感染',
+    heavenly_eye_check: '天眼查验',
+    requester_pray: '祈求者祈求',
+    requester_kill: '祈求者独刀',
+    thief_choose: '盗贼换牌',
+    cupid_link: '丘比特连人',
+    succubus_link: '魅魔连人',
+    ghost_bride_link: '鬼魂新娘牵绊',
+    ghost_bride_chat: '鬼魂新娘夜聊',
+    ghost_bride_kill: '鬼魂新娘击杀',
+    demon_hunter_hunt: '猎魔人狩猎',
+    spirit_wolf_learn: '灵狼学习',
+    spirit_wolf_inspect: '灵狼查验',
+    spirit_wolf_guard: '灵狼庇护',
+    spirit_wolf_antidote: '灵狼解药',
+    wolf_witch_curse: '狼巫诅咒',
+    illusionist_illusion: '幻术师幻象',
     mvp_vote: 'MVP投票',
     postgame_speech: '赛后感言',
   };

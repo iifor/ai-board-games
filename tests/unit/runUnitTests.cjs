@@ -6,7 +6,8 @@ const ts = require('../../packages/server/node_modules/typescript');
 const root = path.resolve(__dirname, '../..');
 const serverRoot = path.join(root, 'packages', 'server');
 const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
-const testFiles = [
+const requestedFiles = process.argv.slice(2);
+const testFiles = (requestedFiles.length ? requestedFiles : [
   'gameSocketSession.test.ts',
   'gameEventBuilder.test.ts',
   'eventBus.test.ts',
@@ -22,14 +23,20 @@ const testFiles = [
   'werewolfPromptContext.test.ts',
   'playerMemory.test.ts',
   'werewolfClientDisplayState.test.ts',
+  'werewolfPresentationProjection.test.ts',
+  'werewolfSetup.test.ts',
+  'werewolfV2InteractionState.test.ts',
+  'gameNavigation.test.ts',
   'llmRetry.test.ts',
   'traceParticipants.test.ts',
   'nightResolutionAuditViewModel.test.ts',
   'werewolfPostgameRules.test.ts'
   ,'werewolfDefaultConfig.test.ts'
-].map((file) => path.join(__dirname, file));
+  ,'edgeTts.test.ts'
+]).map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];
+const originalTsxLoader = Module._extensions['.tsx'];
 
 if (fs.existsSync(pnpmRoot)) {
   const pnpmModulePaths = fs.readdirSync(pnpmRoot)
@@ -43,7 +50,7 @@ if (fs.existsSync(pnpmRoot)) {
   Module._initPaths();
 }
 
-Module._extensions['.ts'] = function loadTs(module, filename) {
+function loadTypeScript(module, filename) {
   const source = fs.readFileSync(filename, 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: {
@@ -52,17 +59,22 @@ Module._extensions['.ts'] = function loadTs(module, filename) {
       esModuleInterop: true,
       allowSyntheticDefaultImports: true,
       moduleResolution: ts.ModuleResolutionKind.Node10,
+      jsx: ts.JsxEmit.ReactJSX,
       skipLibCheck: true,
       sourceMap: false
     },
     fileName: filename
   }).outputText;
   module._compile(output, filename);
-};
+}
+Module._extensions['.ts'] = loadTypeScript;
+Module._extensions['.tsx'] = loadTypeScript;
 
 try {
   process.chdir(root);
   for (const file of testFiles) require(file);
 } finally {
   if (originalTsLoader) Module._extensions['.ts'] = originalTsLoader;
+  if (originalTsxLoader) Module._extensions['.tsx'] = originalTsxLoader;
+  else delete Module._extensions['.tsx'];
 }

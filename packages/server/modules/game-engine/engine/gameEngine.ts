@@ -14,6 +14,7 @@ import { EffectResolutionService, EffectResolverRegistry } from '../effect/effec
 import { SqliteMatchStateStore } from '../state/sqliteMatchStateStore';
 import type { MatchStateStore } from '../state/matchStateStore';
 import { WorkflowRuntime } from '../workflow/workflowRuntime';
+import type { RunUntilBlockedOptions } from '../workflow/workflowRuntime';
 import { assertCanTick, collectEngineInvariants } from './invariantChecker';
 import { GameDefinitionRegistry } from './gameDefinitionRegistry';
 
@@ -83,6 +84,10 @@ class GameEngine {
   tick(matchId: string) {
     assertCanTick(this.store.loadMatch(matchId));
     return this.workflowRuntime.tick(matchId);
+  }
+
+  runUntilBlocked(matchId: string, options: RunUntilBlockedOptions = {}) {
+    return this.workflowRuntime.runUntilBlocked(matchId, options);
   }
 
   /**

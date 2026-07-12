@@ -4,6 +4,8 @@
 
 狼人杀提示词系统运行在服务端，核心目标是让 AI 玩家在每次行动时只看到自己应该看到的信息，并按服务端要求输出文本或结构化 Action。
 
+本文件记录提示词系统的权限边界、上下文构造规则、输出契约和观测约定；具体文件位置、符号定义、调用链和影响面使用 CodeGraph 查询，不在这里维护完整源码索引。
+
 整体链路：
 
 ```txt
@@ -31,19 +33,18 @@ werewolf workflow step
 - 服务端必须校验 JSON、合法目标、行动窗口和角色权限。
 - 预言家查验、女巫用药、守卫目标、狼人刀口等私密信息只能进入对应角色或阵营 prompt，不能进入 public / audience 播报。
 
-## 核心文件
+## 提示词契约组件
 
-| 文件 | 职责 |
+| 组件 | 职责 |
 | --- | --- |
-| `packages/server/modules/werewolf/prompts/system.ts` | 构建狼人杀玩家完整 debug system prompt、轻量 system prompt，并保留遗留私密记忆 helper。 |
-| `packages/server/modules/werewolf/prompts/context.ts` | 每次行动构造短上下文 Prompt Bundle。 |
-| `packages/server/modules/werewolf/prompts/actions.ts` | 定义各类狼人杀 action 的任务提示词和技能描述。 |
-| `packages/server/modules/werewolf/prompts/speech.ts` | 封装白天发言、狼人夜聊、警长发言等文本调用。 |
-| `packages/server/modules/werewolf/prompts/announcements.ts` | 主持人规则介绍、阶段提示、结果公布等 C 端播报文案。 |
-| `packages/server/modules/werewolf/aiActions.ts` | 狼人杀 AI 行动分发入口，根据 `actionType` 调用对应 prompt 和 skill。 |
-| `packages/server/modules/werewolf/roles.ts` | 预言家、女巫、守卫、猎人、狼人等角色 skill 的执行逻辑。 |
-| `packages/server/modules/werewolf/runtime.ts` | 创建 / 重建狼人杀 runtime agent，并注入 system prompt 和角色 skill。 |
-| `packages/server/modules/agent-core/playerAgent.ts` | 通用 AI 玩家调用层，提供短上下文和长上下文 LLM 调用、JSON 解析、目标校验。 |
+| 身份提示词 | 开局建立玩家身份、阵营、能力、队友、人格和长期规则。 |
+| 动态上下文 | 每次行动组装公开事实、私密信息、近期上下文、任务说明和输出契约。 |
+| 行动提示词 | 为查验、用药、守护、刀人、投票、发言等 action 定义合法目标和输出格式。 |
+| 发言调用 | 生成白天发言、狼人夜聊、警长发言等文本内容。 |
+| 主持播报 | 生成 C 端展示和语音播放文案，不参与 AI 决策和状态结算。 |
+| 行动分发 | 根据 `actionType` 选择提示词和角色 skill，并把结构化输出交回服务端校验。 |
+| 角色 skill | 执行角色能力的目标校验、JSON 解析、fallback 和结果反馈。 |
+| AI 玩家调用层 | 管理长短上下文 LLM 调用、会话快照、JSON 解析、目标校验和 trace 记录。 |
 
 ## 身份提示词
 
@@ -352,3 +353,53 @@ Trace 详情同时保存本局参与者快照，使用
 - `sheriff_speech_direction` 由当前存活警长执行，输出 `{"direction":"clockwise|counterclockwise","reason":"简短原因"}`。非法输出或调用失败时由规则层随机选择方向；警长固定最后发言。
 - `last_words` 允许已死亡玩家作为 actor，使用一次性自然语言发言 prompt，不要求 JSON。服务端负责首夜/放逐资格和顺序，prompt 不得让模型自行判断自己是否有遗言权。
 - `postgame_speech` 使用结构化决定：发言返回 `{"speak":true,"text":"..."}`，跳过返回 `{"speak":false,"text":null}`。模型调用失败、非法 JSON、空文本均按跳过处理，不生成兜底感言。
+
+## 狼人杀第二批玩法 Prompt
+
+- `butterfly_hug` 输出 `{"targetSeat":数字或null,"reason":"..."}`，私密上下文包含花蝴蝶已抱人次数，最多 2 次。
+- `stalker_assassinate` 只在服务端确认“上一天投票目标未被放逐且仍存活”时创建行动窗口；输出 `{"use":true/false,"targetSeat":数字或null,"reason":"..."}`，发动时目标只能是该投票目标。
+- 已发生的花蝴蝶抱人和潜行者暗杀会进入后续公开事实，供发言和投票 prompt 使用。
+
+## 狼人杀第三批玩法 Prompt
+
+- `wolf_beauty_charm` 输出 `{"targetSeat":数字或null,"reason":"..."}`；魅惑目标可进入后续公开事实，狼美人死亡后的连死由服务端 effect/death chain 处理。
+- `demon_inspect` 输出 `{"targetSeat":数字或null,"reason":"..."}`；服务端只返回目标是否为神职，结果只进入恶灵骑士私密上下文和私密事件，不进入 public facts 或 C 端公开展示。
+- `nightmare_fear` 输出 `{"targetSeat":数字或null,"reason":"..."}`；私密上下文包含上一晚恐惧目标，服务端拒绝连续两晚恐惧同一目标。已发生的恐惧目标可进入后续公开事实，供发言和投票 prompt 使用。
+
+## 狼人杀第四批玩法 Prompt
+
+- `evil_knight` 复用狼队夜间刀人 prompt/action contract；反伤、免疫和同夜只触发一次由服务端 effect 处理，不向模型请求被动技能决策。
+- `old_rogue` 复用民边发言和投票 prompt/action contract；延迟死亡状态来自服务端快照，模型不得自行判断是否延迟死亡。
+- 狼美人被毒不带魅惑目标、老流氓不受魅惑殉情影响，均属于服务端结算规则，不进入 prompt 决策。
+
+## 狼人杀第六批玩法 Prompt
+
+- `fortune_teller_mark` 输出 `{"targetSeat":数字或null,"reason":"..."}`；服务端限制每局一次，目标必须是存活非自己玩家。
+- `big_bad_wolf_kill` 输出 `{"targetSeat":数字或null,"reason":"..."}`；服务端限制每局一次，目标必须是存活非狼人玩家。
+- `crow_curse` 输出 `{"targetSeat":数字或null,"reason":"..."}`；私密上下文包含上一晚诅咒目标，服务端拒绝连续两晚诅咒同一目标。
+- `bear_tamer_roar` 不请求模型决策，由服务端根据驯熊师相邻座位存活狼人自动生成 `{ roaring, adjacentWolfIds }`。
+- 隐狼查验为好人、普通狼人全灭后隐狼随狼队出局、乌鸦放逐加票都属于服务端结算规则，不允许 prompt 自行推导或改写。
+## Werewolf seventh-batch prompt scope
+
+- `wild_child` reuses the existing `chooseMaster` action contract for first-night model selection.
+- `bombman` and `nine_tailed_fox` are passive server-side effects in this batch; they do not introduce new LLM output schemas.
+- Debug mode should continue generating legal payloads through the same action-window path instead of bypassing role rules.
+## Werewolf Mode 27 Prompt Additions
+
+- `ghostBrideLink` asks Ghost Bride to choose a groom target and a distinct witness target.
+- `ghostBrideChat` asks Ghost Bride group members to return a short private night-chat text payload.
+- `ghostBrideKill` asks the eligible Ghost Bride group actor to choose one non-third-party kill target.
+- Debug mode bypasses LLM calls and returns deterministic legal payload shapes for all three actions.
+
+## Werewolf Mode 28 Prompt Scope
+
+- `sapling` does not introduce a night skill or LLM action schema; it reuses normal day speech and vote contracts.
+- Firepower mode reuses existing prompts for White Wolf King, Demon, Wolf Beauty, Hidden Wolf, Fox, Witch, Hunter and Guard actions.
+- Sapling-linked Big Tree death is a server-side passive rule and must not be inferred or rewritten by prompts.
+- Debug mode should continue using the existing action-window payload generation for all active roles in the board.
+
+## Werewolf Mode 30 Prompt Contract
+
+- `demonHunterHunt` uses the existing target JSON contract with one living non-self `target` and optional `reason`.
+- The server enforces night-2 eligibility and target legality; prompt output is only an action proposal.
+- `magic_wolf` self-destruct reuses the existing self-destruct/debug speech path and does not add a separate LLM prompt contract.

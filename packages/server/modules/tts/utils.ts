@@ -23,8 +23,12 @@ function isMimoVoice(voice: VoicePackage | null | undefined): boolean {
   return Boolean(voice?.enabled) && String(voice?.provider || '').toLowerCase() === 'mimo';
 }
 
+function isEdgeVoice(voice: VoicePackage | null | undefined): boolean {
+  return Boolean(voice?.enabled) && String(voice?.provider || '').toLowerCase() === 'edge';
+}
+
 function isServerTtsVoice(voice: VoicePackage | null | undefined): boolean {
-  return isAzureVoice(voice) || isMimoVoice(voice);
+  return isAzureVoice(voice) || isMimoVoice(voice) || isEdgeVoice(voice);
 }
 
 function buildAudioCacheKey(voice: VoicePackage, text: string): string {
@@ -96,6 +100,7 @@ export type { VoicePackage, WordBoundary };
 export {
   isAzureVoice,
   isMimoVoice,
+  isEdgeVoice,
   isServerTtsVoice,
   buildAudioCacheKey,
   escapeXml,

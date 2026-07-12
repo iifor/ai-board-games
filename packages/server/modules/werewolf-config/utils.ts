@@ -20,11 +20,16 @@ const EXECUTABLE_WEREWOLF_ACTIONS = new Set([
   'poison', 'witch_poison',
   'guard', 'guard_protect',
   'selfDestruct',
-  'shootOnDeath', 'surviveExileOnce', 'voteOnly', 'speakOnly'
+  'shootOnDeath', 'surviveExileOnce',
+  'chooseMaster', 'silence', 'duel', 'hug', 'stalk', 'charm', 'inspectRoleType', 'fear', 'dream', 'swap',
+  'mark', 'soloKill', 'curse', 'blackMerchantGift', 'treeSurviveWolfHit', 'youngerBrotherKill', 'freeze', 'foxInspect', 'bearRoar', 'blastVoters', 'loseTailOnGoodDeath',
+  'infect', 'inspectRole', 'request', 'stealRole', 'linkLovers', 'succubusLink', 'ghostBrideLink', 'ghostBrideChat', 'ghostBrideKill',
+  'demonHunterHunt', 'spiritWolfLearn', 'spiritWolfInspect', 'spiritWolfGuard', 'spiritWolfAntidote', 'wolfWitchCurse', 'illusion', 'hunterHunt',
+  'voteOnly', 'speakOnly'
 ]);
 
 function normalizeWerewolfFaction(value: unknown): string {
-  const factions = ['good', 'wolves'];
+  const factions = ['good', 'wolves', 'hunters'];
   const text = String(value || '').toLowerCase().trim();
   return factions.includes(text) ? text : 'good';
 }

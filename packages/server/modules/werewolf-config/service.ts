@@ -1,5 +1,6 @@
 import * as repo from './repository';
 import { rowToWerewolfRole, werewolfRoleToRow, rowToWerewolfMode, werewolfModeToRow } from './utils';
+import { DEFAULT_WEREWOLF_MODES, DEFAULT_WEREWOLF_ROLES } from './constants';
 import { AppError, ErrorCodes } from '../../utils/errors';
 import type { WerewolfRole, WerewolfMode } from '../../types/api';
 
@@ -47,11 +48,14 @@ interface WerewolfModeConfig extends WerewolfMode {
 
 // Roles
 function listWerewolfRoles(): WerewolfRole[] {
-  return repo.findAllRoles().map((row) => rowToWerewolfRole(row)!);
+  const rows = repo.findAllRoles().map((row) => rowToWerewolfRole(row)!);
+  return rows.length ? rows : DEFAULT_WEREWOLF_ROLES as unknown as WerewolfRole[];
 }
 
 function getWerewolfRole(id: string): WerewolfRole | null {
-  return rowToWerewolfRole(repo.findRoleById(id));
+  return rowToWerewolfRole(repo.findRoleById(id))
+    || (DEFAULT_WEREWOLF_ROLES.find((role) => role.id === id) as unknown as WerewolfRole | undefined)
+    || null;
 }
 
 function upsertWerewolfRole(input: WerewolfRoleInput): WerewolfRole | null {
@@ -69,11 +73,14 @@ function deleteWerewolfRole(id: string): { ok: true } {
 
 // Modes
 function listWerewolfModes(): WerewolfMode[] {
-  return repo.findAllModes().map((row) => rowToWerewolfMode(row)!);
+  const rows = repo.findAllModes().map((row) => rowToWerewolfMode(row)!);
+  return rows.length ? rows : DEFAULT_WEREWOLF_MODES as unknown as WerewolfMode[];
 }
 
 function getWerewolfMode(id: string): WerewolfMode | null {
-  return rowToWerewolfMode(repo.findModeById(id));
+  return rowToWerewolfMode(repo.findModeById(id))
+    || (DEFAULT_WEREWOLF_MODES.find((mode) => mode.id === id) as unknown as WerewolfMode | undefined)
+    || null;
 }
 
 function upsertWerewolfMode(input: WerewolfModeInput): WerewolfMode | null {

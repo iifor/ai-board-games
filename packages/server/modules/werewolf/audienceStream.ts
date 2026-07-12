@@ -288,6 +288,14 @@ export class AudienceStream {
       return viewer.faction === 'wolves';
     }
 
+    if (scopeKey === 'escape_hunters') {
+      return viewer.faction === 'hunters' && (viewer.roles || []).includes('escape_hunter');
+    }
+
+    if (scopeKey === 'ghost_bride') {
+      return viewer.faction === 'third_party' || (viewer.roles || []).includes('ghost_bride');
+    }
+
     // 角色频道
     if (['seer', 'guard', 'witch'].includes(scopeKey)) {
       return (viewer.roles || []).includes(scopeKey);

@@ -23,6 +23,7 @@ export type GameEventType =
   // 发言事件
   | 'speech'
   | 'wolf-speech'
+  | 'escape-hunter-speech'
   | 'self-destruct'
 
   // Skill 事件
@@ -37,6 +38,9 @@ export type GameEventType =
   | 'wolf-wake'
   | 'wolf-leader'
   | 'wolf-vote'
+  | 'escape-hunter-vote'
+  | 'escape-hunter-hunt'
+  | 'thick-wolf-armor'
   | 'seer-wake'
   | 'seer-check'
   | 'guard-wake'
@@ -44,6 +48,35 @@ export type GameEventType =
   | 'witch-antidote'
   | 'witch-poison'
   | 'witch-action'
+  | 'hybrid-master'
+  | 'silence-result'
+  | 'butterfly-hug'
+  | 'stalker-assassinate'
+  | 'wolf-beauty-charm'
+  | 'demon-inspect'
+  | 'nightmare-fear'
+  | 'dreamer-dream'
+  | 'magician-swap'
+  | 'fortune-teller-mark'
+  | 'big-bad-wolf-kill'
+  | 'crow-curse'
+  | 'black-merchant-gift'
+  | 'lucky-seer-check'
+  | 'lucky-witch-poison'
+  | 'younger-brother-kill'
+  | 'ghost-bride-link'
+  | 'ghost-bride-chat'
+  | 'ghost-bride-kill'
+  | 'demon-hunter-hunt'
+  | 'spirit-wolf-learn'
+  | 'spirit-wolf-inspect'
+  | 'spirit-wolf-guard'
+  | 'spirit-wolf-antidote'
+  | 'wolf-witch-curse'
+  | 'illusionist-illusion'
+  | 'penguin-freeze'
+  | 'fox-inspect'
+  | 'bear-tamer-roar'
   | 'night-result'
 
   // 白天事件
@@ -53,6 +86,7 @@ export type GameEventType =
   | 'mvp-vote'
   | 'mvp-start'
   | 'mvp-result'
+  | 'knight-duel'
 
   // 警长事件
   | 'sheriff-start'
@@ -135,7 +169,37 @@ export interface SerializedPlayer {
   usedAntidote: boolean;
   usedPoison: boolean;
   lastGuardTarget: number | null;
+  lastSilencedTarget?: number | null;
   hunterShotUsed: boolean;
+  hybridMasterId?: number | null;
+  wildChildModelId?: number | null;
+  wildChildTransformed?: boolean;
+  nineTailedFoxTails?: number;
+  knightDuelUsed?: boolean;
+  butterflyHugUsed?: number;
+  stalkerAssassinateUsed?: boolean;
+  lastNightmareTarget?: number | null;
+  lastPenguinTarget?: number | null;
+  foxInspectLost?: boolean;
+  foxLastInspect?: { targetIds: number[]; hasWolf: boolean } | null;
+  magicianSwappedIds?: number[];
+  fortuneTellerMarkUsed?: boolean;
+  bigBadWolfKillUsed?: boolean;
+  lastCrowTarget?: number | null;
+  blackMerchantGiftUsed?: boolean;
+  blackMerchantGift?: { action: string; from: number; used?: boolean } | null;
+  blackMerchantDeathPending?: boolean;
+  bigTreeWolfHits?: number;
+  godSkillsDisabled?: boolean;
+  youngerBrotherSoloKillUsedDay?: number | null;
+  wolfElderBrotherDeathDay?: number | null;
+  evilKnightTriggered?: boolean;
+  oldRoguePendingDeath?: {
+    reason: string;
+    sourceAction: string;
+    resolveDay: number;
+    announced?: boolean;
+  } | null;
   seerChecks: unknown[];
   votes: unknown[];
   avatar?: string;
@@ -163,6 +227,14 @@ export interface SerializedRound {
   lastWords: unknown[];
   testimonies: unknown[];
   selfDestruct: Record<string, unknown> | null;
+  silencedPlayerId?: number | null;
+  silenceReason?: string | null;
+  knightDuel?: Record<string, unknown> | null;
+  evilKnightTrigger?: { actorId: number; trigger: string; targetId: number } | null;
+  oldRogueDeath?: { id: number; reason: string; sourceAction?: string } | null;
+  bearRoar?: { roaring: boolean; adjacentWolfIds: number[] } | null;
+  crowCursedPlayerId?: number | null;
+  bombmanBlast?: { actorId: number; targetIds: number[] } | null;
 }
 
 export interface SerializedNight {
@@ -181,6 +253,32 @@ export interface SerializedNight {
   witchPoisonReason?: string | null;
   guardTarget: number | null;
   guardReason?: string | null;
+  butterflyTarget?: number | null;
+  butterflyReason?: string | null;
+  stalkerTarget?: number | null;
+  stalkerReason?: string | null;
+  wolfBeautyTarget?: number | null;
+  wolfBeautyReason?: string | null;
+  demonInspect?: { target?: number | string | null; result?: string; reason?: string | null } | null;
+  nightmareTarget?: number | null;
+  nightmareReason?: string | null;
+  penguinFrozenId?: number | null;
+  penguinReason?: string | null;
+  foxInspect?: { targetIds?: Array<number | string>; hasWolf?: boolean; reason?: string | null } | null;
+  dreamerTarget?: number | null;
+  dreamerReason?: string | null;
+  dreamerRepeatedTarget?: boolean;
+  magicianSwap?: { firstTarget?: number | string | null; secondTarget?: number | string | null; reason?: string | null } | null;
+  fortuneTellerMark?: { target?: number | string | null; reason?: string | null } | null;
+  bigBadWolfTarget?: number | string | null;
+  bigBadWolfReason?: string | null;
+  crowCurse?: { target?: number | string | null; reason?: string | null } | null;
+  blackMerchantGift?: { actorId?: number | string; targetId?: number | string; gift?: string; success?: boolean; reason?: string | null } | null;
+  luckySeerCheck?: { actorId?: number | string; target?: number | string | null; result?: string; reason?: string | null } | null;
+  luckyPoisonTarget?: number | string | null;
+  luckyPoisonReason?: string | null;
+  youngerBrotherTarget?: number | string | null;
+  youngerBrotherReason?: string | null;
   deaths: Array<{ id: number; reason: string }>;
 }
 
@@ -226,6 +324,123 @@ export interface WitchActionCompletedPayload {
   speech?: {
     playerId: number;
     text: string;
+  };
+}
+
+export interface HybridMasterPayload {
+  actionType: 'hybrid_choose_master';
+  message: string;
+  hybridMaster: {
+    actorId: number | string;
+    masterId: number | string | null;
+  };
+}
+
+export interface SilenceResultPayload {
+  actionType: 'elder_silence';
+  message: string;
+  silencedPlayerId: number | string | null;
+  reason?: string | null;
+}
+
+export interface KnightDuelPayload {
+  actionType: 'knight_duel';
+  message: string;
+  knightDuel: {
+    actorId: number | string;
+    targetId: number | string;
+    targetFaction: string;
+    success: boolean;
+    reason?: string | null;
+  };
+}
+
+export interface ButterflyHugPayload {
+  actionType: 'butterfly_hug';
+  message: string;
+  butterflyTarget: number | string | null;
+  reason?: string | null;
+}
+
+export interface StalkerAssassinatePayload {
+  actionType: 'stalker_assassinate';
+  message: string;
+  stalkerTarget: number | string | null;
+  reason?: string | null;
+}
+
+export interface WolfBeautyCharmPayload {
+  actionType: 'wolf_beauty_charm';
+  message: string;
+  wolfBeautyTarget: number | string | null;
+  reason?: string | null;
+}
+
+export interface DemonInspectPayload {
+  actionType: 'demon_inspect';
+  message: string;
+  demonInspect: {
+    target: number | string | null;
+    result: string;
+    reason?: string | null;
+  };
+}
+
+export interface NightmareFearPayload {
+  actionType: 'nightmare_fear';
+  message: string;
+  nightmareTarget: number | string | null;
+  reason?: string | null;
+}
+
+export interface DreamerDreamPayload {
+  actionType: 'dreamer_dream';
+  message: string;
+  dreamerTarget: number | string | null;
+  reason?: string | null;
+}
+
+export interface MagicianSwapPayload {
+  actionType: 'magician_swap';
+  message: string;
+  magicianSwap: {
+    firstTarget?: number | string | null;
+    secondTarget?: number | string | null;
+    reason?: string | null;
+  } | null;
+}
+
+export interface FortuneTellerMarkPayload {
+  actionType: 'fortune_teller_mark';
+  message: string;
+  fortuneTellerMark: {
+    target?: number | string | null;
+    reason?: string | null;
+  } | null;
+}
+
+export interface BigBadWolfKillPayload {
+  actionType: 'big_bad_wolf_kill';
+  message: string;
+  bigBadWolfTarget: number | string | null;
+  reason?: string | null;
+}
+
+export interface CrowCursePayload {
+  actionType: 'crow_curse';
+  message: string;
+  crowCurse: {
+    target?: number | string | null;
+    reason?: string | null;
+  } | null;
+}
+
+export interface BearTamerRoarPayload {
+  actionType: 'bear_tamer_roar';
+  message: string;
+  bearRoar: {
+    roaring: boolean;
+    adjacentWolfIds: Array<number | string>;
   };
 }
 
@@ -435,6 +650,20 @@ export type TypedGameEvent =
   | GameEvent<SkillCompletedPayload>
   | GameEvent<NightResultPayload>
   | GameEvent<VoteResultPayload>
+  | GameEvent<HybridMasterPayload>
+  | GameEvent<SilenceResultPayload>
+  | GameEvent<KnightDuelPayload>
+  | GameEvent<ButterflyHugPayload>
+  | GameEvent<StalkerAssassinatePayload>
+  | GameEvent<WolfBeautyCharmPayload>
+  | GameEvent<DemonInspectPayload>
+  | GameEvent<NightmareFearPayload>
+  | GameEvent<DreamerDreamPayload>
+  | GameEvent<MagicianSwapPayload>
+  | GameEvent<FortuneTellerMarkPayload>
+  | GameEvent<BigBadWolfKillPayload>
+  | GameEvent<CrowCursePayload>
+  | GameEvent<BearTamerRoarPayload>
   | GameEvent<SheriffEventPayload>
   | GameEvent<ErrorPayload>
   | GameEvent<Record<string, unknown>>;

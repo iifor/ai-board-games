@@ -1,8 +1,9 @@
-import { ArrowLeft, FastForward, Pause, Play, RotateCcw } from 'lucide-react';
+import { ArrowLeft, FastForward, MoonStar, Pause, Play, RotateCcw } from 'lucide-react';
 import { classNames } from '../../../../utils/classNames';
 import './index.css';
 
 interface WerewolfControlsProps {
+  variant?: 'classic' | 'v2';
   autoPlay: boolean;
   startDisabled: boolean;
   playbackDisabled: boolean;
@@ -15,16 +16,18 @@ interface WerewolfControlsProps {
   onSkipPhase: () => void;
 }
 
-export function WerewolfControls({ autoPlay, startDisabled, playbackDisabled, showSkip, skipDisabled, skipActive, onReturn, setAutoPlay, onStart, onSkipPhase }: WerewolfControlsProps) {
+export function WerewolfControls({ variant = 'classic', autoPlay, startDisabled, playbackDisabled, showSkip, skipDisabled, skipActive, onReturn, setAutoPlay, onStart, onSkipPhase }: WerewolfControlsProps) {
+  const v2 = variant === 'v2';
   return (
-    <nav className="werewolf-controls" aria-label="狼人杀控制">
+    <nav className={classNames('werewolf-controls', v2 && 'werewolf-controls--v2')} aria-label="狼人杀控制">
+      {v2 && <i className="werewolf-controls__sigil" aria-hidden="true"><MoonStar size={17} /></i>}
       <button type="button" title="返回游戏选择" onClick={onReturn}>
         <ArrowLeft size={18} />
-        <span>返回</span>
+        <span>{v2 ? '离场' : '返回'}</span>
       </button>
       <button type="button" title={startDisabled ? '暂停后可以开局' : '开局'} disabled={startDisabled} onClick={onStart}>
         <RotateCcw size={18} />
-        <span>开局</span>
+        <span>{v2 ? '新一局' : '开局'}</span>
       </button>
       <button
         type="button"

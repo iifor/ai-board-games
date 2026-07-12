@@ -61,6 +61,17 @@ function createNightResolveHandler() {
         const day = step.config.day || Number(round.day) || 1;
         const stateBeforeLegacy = cloneRecord(runtime.state as unknown as Record<string, unknown>);
         const resolved = resolveNightEffects(runtime.agents as never, round as never, runtime.modeConfig as never);
+        const armorEffect = resolved.effects.find((effect) => effect.type === 'thick_wolf_armor');
+        if (armorEffect?.target) {
+          publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
+            builder.setStep(step.id).setPhase('day').setDay(day);
+            return builder.build('thick-wolf-armor', {
+              targetId: armorEffect.target,
+              thickWolfArmorBreak: { targetId: armorEffect.target },
+              message: `${getSeatNumber(Number(armorEffect.target), runtime.agents)}号厚皮狼抵挡了本次夜猎。`,
+            }, CHANNEL_TYPES.PUBLIC);
+          }, serializeWerewolfState(match, syncRuntimeState(runtime)));
+        }
         checkpoint.initialDeathIds = resolved.deaths.map((death) => Number(death.id));
         recordInitialEffects(context, resolved.effects as unknown as Array<Record<string, unknown>>);
         enqueueNightLastWords(round, checkpoint.initialDeathIds);

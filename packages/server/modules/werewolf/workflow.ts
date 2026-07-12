@@ -11,6 +11,7 @@ import { createEventDeliverySubscriber } from './eventDeliverySubscriber';
 import { createChannelRouter } from './channelRouter';
 import { createAudienceStream } from './audienceStream';
 import { randomBytes } from 'crypto';
+import { WorkflowRuntime } from '../game-engine/workflow/workflowRuntime';
 
 const WEREWOLF_WORKFLOW_ID = 'werewolf.workflow.basic.v1';
 
@@ -67,13 +68,10 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
     (statePlayers(match) || []) as Array<Record<string, unknown>>,
   );
   try {
-    while (true) {
-      const { processed, match: current } = await workflowService.drainAiTasks(match.id as string, { maxTasks: 1 });
-      if (!processed || ['completed', 'failed', 'paused_debug'].includes(current?.status as string)) break;
-    }
-    const finalMatch = workflowService.getDebugState(match.id as string)?.match || match;
+    const { match: drivenMatch } = await new WorkflowRuntime().runUntilBlocked(match.id as string);
+    const finalMatch = drivenMatch || workflowService.getDebugState(match.id as string)?.match || match;
     await flushMatchEventPublishes(match.id as string);
-    assertWerewolfWorkflowCompleted(finalMatch as Record<string, unknown>);
+    assertWerewolfWorkflowCompleted(finalMatch as Record<string, unknown>, { allowPausedDebug: isDebug });
     if (trace) { markTraceComplete(trace); /* flushTrace 推迟到 runSession 中 saveGameRecord 之后 */ }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = serializeWerewolfState(finalMatch as any, (finalMatch as Record<string, unknown>).state as import('./runtime').WerewolfState);
@@ -100,9 +98,13 @@ function statePlayers(match: Record<string, unknown>): unknown[] {
   return Array.isArray(state?.players) ? state.players : [];
 }
 
-function assertWerewolfWorkflowCompleted(match: Record<string, unknown>): void {
+function assertWerewolfWorkflowCompleted(
+  match: Record<string, unknown>,
+  options: { allowPausedDebug?: boolean } = {},
+): void {
   const status = String(match.status || 'unknown');
   if (status === 'completed') return;
+  if (options.allowPausedDebug && status === 'paused_debug') return;
   const matchError = match.error && typeof match.error === 'object'
     ? match.error as Record<string, unknown>
     : {};

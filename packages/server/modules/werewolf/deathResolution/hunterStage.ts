@@ -114,7 +114,7 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
     from: actorId,
     target,
     reason: context.round.phase as string | undefined,
-  });
+  }, context.runtime.modeConfig as never);
   if (effect && context.step.config.phase === 'night') enqueueNightLastWords(context.round, [target]);
   recordWerewolfInteractionFeedback({
     matchId: context.match.id,

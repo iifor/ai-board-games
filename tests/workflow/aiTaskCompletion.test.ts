@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as repo from '../../packages/server/modules/workflow-engine/repository';
 import * as tick from '../../packages/server/modules/workflow-engine/tick';
-import { completeAiTask } from '../../packages/server/modules/workflow-engine/service';
+import * as workflowService from '../../packages/server/modules/workflow-engine/service';
+import { completeAiTask, drainAiTasks } from '../../packages/server/modules/workflow-engine/service';
+import { WorkflowRuntime } from '../../packages/server/modules/game-engine/workflow/workflowRuntime';
 
 test('successful AI result is not retried when the following workflow advance fails', () => {
   const task = {
@@ -66,6 +68,69 @@ test('successful AI result is not retried when the following workflow advance fa
     replace(repo, 'updateAiTask', original.updateAiTask);
     replace(repo, 'commitWorkflowChange', original.commitWorkflowChange);
     replace(tick, 'tickMatch', original.tickMatch);
+  }
+});
+
+test('drain continues ticking a running unblocked match after tick budget exhaustion', async () => {
+  const original = {
+    claimNextAiTask: repo.claimNextAiTask,
+    getMatch: repo.getMatch,
+    tickMatch: tick.tickMatch,
+  };
+  let current = {
+    id: 'match-budget-exhausted',
+    status: 'running',
+    version: 1,
+    blockers: [] as Array<Record<string, unknown>>,
+  };
+  let ticks = 0;
+
+  try {
+    replace(repo, 'claimNextAiTask', () => null);
+    replace(repo, 'getMatch', () => current);
+    replace(tick, 'tickMatch', () => {
+      ticks += 1;
+      current = { ...current, status: 'waiting', version: 2, blockers: [{ type: 'AI_TASK' }] };
+      return current;
+    });
+
+    const result = await drainAiTasks(current.id, { maxTasks: 1 });
+
+    assert.equal(ticks, 1);
+    assert.equal(result.processed, 1);
+    assert.equal(result.match?.status, 'waiting');
+  } finally {
+    replace(repo, 'claimNextAiTask', original.claimNextAiTask);
+    replace(repo, 'getMatch', original.getMatch);
+    replace(tick, 'tickMatch', original.tickMatch);
+  }
+});
+
+test('workflow runtime owns the run-until-blocked driver contract', async () => {
+  const originalDrain = workflowService.drainAiTasks;
+  const results = [
+    { processed: 3, match: { id: 'runtime-match', status: 'running' } },
+    { processed: 1, match: { id: 'runtime-match', status: 'completed' } },
+  ];
+  const received: unknown[] = [];
+
+  try {
+    replace(workflowService, 'drainAiTasks', async (matchId: string, options: Record<string, unknown>) => {
+      received.push({ matchId, options });
+      return results.shift();
+    });
+
+    const runtime = new WorkflowRuntime();
+    const result = await runtime.runUntilBlocked('runtime-match', { batchSize: 3 });
+
+    assert.deepEqual(received, [
+      { matchId: 'runtime-match', options: { maxTasks: 3, workerId: undefined } },
+      { matchId: 'runtime-match', options: { maxTasks: 3, workerId: undefined } },
+    ]);
+    assert.equal(result.processed, 4);
+    assert.equal(result.match?.status, 'completed');
+  } finally {
+    replace(workflowService, 'drainAiTasks', originalDrain);
   }
 });
 

@@ -14,7 +14,9 @@ C 端位于 `packages/client`，面向玩家和观众，负责游戏选择、玩
 - lucide-react
 - `@ai-presenter/shared`
 
-## 目录结构
+## 稳定目录边界
+
+本节只记录 C 端长期稳定的职责边界，帮助判断改动应落在 page、feature、hook、service、style 还是 shared 消费层；具体文件位置、符号定义、调用方和影响面使用 CodeGraph 查询。
 
 ```txt
 packages/client/
@@ -177,6 +179,7 @@ pnpm run check:client
 - `resolveActiveSheriffId` 会从当前 round 和历史 rounds 反查有效警徽，避免进入后续夜晚或下一天后警徽图标消失。
 - `vote-result` 事件即使没有完整 `game` snapshot，也会用顶层 `votes/tally/exile` patch 到对应 day 的 round，供座位投票角标展示。
 - `wolf-vote/seer-check/guard-action/witch-action` 会把顶层完成字段合并到当前夜晚；女巫解药与毒药必须按 `actionType` 分流，完成事件不能回退为睁眼态。
+- `magician-swap` 会把顶层 `magicianSwap` 合并到当前夜晚，用于展示魔术师交换号码的事件记录和座位角标；实际死亡、查验和药效结果仍以服务端夜间结算快照为准。
 - 狼人座位在授权视角显示最终“刀 X 号”，预言家座位显示“查 X 号 / 好人或狼人”，女巫座位显示“毒 X 号”或“不毒”。
 - 女巫选择不使用毒药时仍消费 `witch-action` 并展示“不毒”，但该事件没有旁白、TTS 或语音 ACK；实时与精确回放使用相同最终载荷。
 - 预言家、守卫、女巫的有效技能结果带有可选原因时，C 端直接播放服务端生成的 `presentation.speakableText`；原因不单独排队，不读取或播报模型 thinking。夜间原因沿用事件 scope 视角权限，猎人开枪原因随公开 `hunter-shot` 播报。
@@ -208,17 +211,158 @@ pnpm run check:client
 - `/games/debate`、`/games/werewolf`：继续作为 v1 回退入口保留。
 - 游戏选择页默认进入 `/game/v2/*`；历史回放仍使用 `gameId` 查询参数，例如 `/game/v2/debate?gameId=xxx`。
 - `features/debate-v2`、`features/werewolf-v2` 只负责 v2 展示入口和 scoped 样式，复用现有 `features/debate`、`features/werewolf` 游戏容器、WebSocket、语音、字幕、弹窗、服务请求和工具函数。
-- `components/GameBroadcastHud` 是 v2 共用赛事 HUD；`styles/game-theme.css` 是 v2 共用视觉 token 入口。
+- `components/GameBroadcastHud` 供辩论 v2 等赛事页复用；狼人杀 v2 使用视角内的阶段标题，避免与双视角舞台重复。`styles/game-theme.css` 是 v2 共用视觉 token 入口。
 - v2 皮肤样式必须限定在 `.debate-shell--v2`、`.werewolf-shell--v2` 或 v2 模块 CSS 中，避免污染旧 `/games/*` 路由。
 
 ## Werewolf v2 专用 Arena 边界
 
-- `/game/v2/werewolf` 不再仅对 v1 `WerewolfArena` 做 CSS 换肤；`features/werewolf-v2/components/WerewolfArenaV2` 承载房间式三栏竞技桌游组合层。
-- v2 组合层包含左侧角色/状态/进程、中间横向玩家卡环形舞台、右侧发言记录、底部发言安全区；业务状态、WebSocket、语音、回放、弹窗和玩家选择仍复用 `features/werewolf/WerewolfGame` 控制器。
+- `/game/v2/werewolf` 不再仅对 v1 `WerewolfArena` 做 CSS 换肤；`features/werewolf-v2/components/WerewolfArenaV2` 承载月夜双视角舞台组合层。
+- v2 组合层包含围绕中央舞台的 6+6 无卡片席位、中央阶段/发言/技能展示、左上角模式标签和底部身份或局势摘要；业务状态、WebSocket、语音、回放、弹窗和玩家选择仍复用 `features/werewolf/WerewolfGame` 控制器。
 - v2 样式必须限定在 `features/werewolf-v2` 与 `.werewolf-shell--v2`，旧 `/games/werewolf` 继续使用 v1 展示。
+
+## Werewolf v2 双视角展示
+
+- `/game/v2/werewolf` 按开局锁定的 `clientViewMode` 渲染两套独立全屏界面，不在同一页面同时展示上帝层和玩家层。
+- `god` 使用完整上帝视角，展示服务端投影提供的全部身份、行动目标、警长流程、票型和 AI 播放状态。
+- `player` 使用角色沉浸视角，只展示服务端频道过滤和 `audienceSession.viewerPlayerId` 授权的数据；客户端不得补全其他玩家身份、未公开票型或私有行动。
+- 白天发言、警长竞选、放逐投票、狼人/预言家/女巫/守卫夜间行动以及猎人、自爆、骑士、白痴、禁言等公开技能统一归一为只读 AI 展示状态：等待、行动中、已提交、已公布、已跳过。
+- 扩展角色复用单目标、双目标、二选一、多选、被动触发和结果揭示模板；事件没有目标或结果字段时只展示阶段和播报，不由客户端推导。
+- 双视角继续复用现有 `WerewolfGame` 控制器、WebSocket、事件合并、TTS/字幕、ACK 和精确回放；不新增真人行动提交消息或客户端规则判断。
+- `WerewolfGame` 的模式、玩家、视角、调试和主持人配置状态集中在 `hooks/useWerewolfSetup.ts`；控制器只消费 Hook 输出并负责开局会话编排。
+- legacy 与 workflow 事件的夜间行动者、技能覆盖、查验目标和猎人触发统一经 `utils/presentationProjection.ts` 的纯 reducer 投影，实时与回放不得分别维护展示状态分支。
+- 参考设计中的房间号、邀请、网络信号、在线/准备等项目能力之外的信息不得进入 v2；等待态只展示真实模式入口，配置态继续使用现有模式、AI 玩家、视角和调试配置。
+- v2 开局配置以模式选择为主；玩家列表默认折叠，观看视角与调试模式使用底部紧凑开关。经典版继续使用共享 `WerewolfModeDialog` 的原布局。
+- 玩家视角未授权的身份直接不渲染，不使用“身份隐藏”等占位文案；说明权限边界或 AI 自动行动的解释性提示不进入游戏舞台。
+- v2 右上角复用原返回、开局、暂停/继续和回放跳过回调，以月夜控制坞展示，不增加房间、网络或邀请等虚假能力。
+- 当前发言者座位使用脉冲光环、麦克风状态和姓名聚光，并在底部发言条展示实时字幕；主持播报沿用同一条，不新增语音队列。
+- 技能舞台直接消费交互解析器的 `actorIds/targetIds/status/template/tone`，展示行动者到目标的关系；六类通用模板统一提供施法入场、目标锁定、选择聚焦、被动触发和结果揭示过渡，`tone` 只控制阵营色彩（狼刀使用红色切割光效）。动作、状态或目标变化时重播当前过渡，未知扩展事件没有字段时仍不推断目标，也不增加按角色分支的动画逻辑。
+- v2 开局、思考和玩家详情弹窗使用同一月夜面板视觉；玩家视角未授权身份在详情弹窗中整段省略。
+- v2 存活与出局人数固定在阶段标题下方，避免底部多行字幕遮挡；发言字幕优先使用语音载荷的 `fullText`，复用 `splitPlayableDisplaySegments` 按标点与长度拆行，不截断正文。
+- v2 发言期间由底部发言条独占字幕展示；中央舞台优先展示 `speech.thinking`，无思考内容时才降级为完整字幕。中央思考区左对齐并限制最大高度，超出后在区域内部滚动。
+- v2 中央舞台在 `speech.playerId` 能匹配现有玩家时展示发言者头像、座位号和昵称，并使用身份条呼吸光、头像缩放和麦克风跳动强化发言状态；主持人播报或无法匹配玩家时省略该身份条，不生成占位玩家。
+- 夜间视图根据当前 round 的 `phase` 增加夜幕，并仅依据现有 `actionType` 显示狼队、预言家、女巫、守卫或通用夜间角色睁眼提示；上警、查验、用药和狼刀继续复用 `actorIds/targetIds`，通过席位聚光、目标锁定与行动流动画表达，不新增客户端规则判断。
+- v2 舞台根据现有 `currentRound.phase` 在同机位昼夜背景间交叉淡入 1.2 秒：白天使用晨光与远景议事村民，夜间使用月夜、空座篝火及环境狼人剪影；剪影不绑定玩家座位，也不表达任何身份信息。
+- v2 顶部阶段标题内合并存活/出局人数，不再重复展示当前事件摘要；中央区域遵循“终局战报 > 发言/技能 > 等待阶段”的单一主内容规则。`game.winner` 产生后隐藏阶段标题、身份摘要和事件舞台，仅保留两侧最终席位、中央胜负/MVP 战报、控制区及仍在播放的底部字幕。
 ## Werewolf 12-player expansion
 
 - C-side werewolf role display recognizes `white_wolf_king` as `白狼王`.
 - `self-destruct` display events may carry `targetId`; the client renders both the self-destruct actor and the carried target when present.
 - C-side must not decide whether the target is legal, whether a player dies, whether hunter/sheriff follow-up triggers, or whether the game has ended. It only consumes server events and merged game state.
 - Real-time play and history replay continue to consume the same final display payloads; no separate replay-only white wolf king rule path should be introduced.
+
+## Werewolf first-batch boards
+
+- C 端识别 `hybrid`、`silence_elder`、`knight` 的名称、图标和身份说明；混血儿在角色配置统计中按平民阵营展示。
+- `hybrid-master`、`silence-result`、`knight-duel` 作为服务端事件展示。`silence-result` 会合并 `round.silencedPlayerId`，用于显示禁言对象；`knight-duel` 会合并 `round.knightDuel`，用于展示决斗结果。
+- 被禁言玩家是否跳过发言、骑士决斗后是否跳过放逐投票、死亡和胜负均由服务端状态决定；C 端只消费事件和合并状态，不推导技能资格或目标合法性。
+- 实时对局和历史回放继续复用同一最终展示载荷，不新增独立播放器或额外 WebSocket 消息。
+
+## Werewolf second-batch boards
+
+- C 端识别 `stalker`、`butterfly` 的名称、图标和身份说明。
+- `butterfly-hug` 合并 `night.butterflyTarget`，`stalker-assassinate` 合并 `night.stalkerTarget`，用于夜间行动角标和事件记录。
+- 花蝴蝶是否屏蔽技能、潜行者是否有暗杀资格和死亡结算均由服务端决定；C 端不推导目标合法性、技能次数或死亡。
+
+## Werewolf third-batch boards
+
+## Werewolf fourth-batch boards
+
+- C 端识别 `evil_knight` 和 `old_rogue` 的名称、图标和身份说明。
+- `evilKnightTrigger`、`oldRoguePendingDeath`、`oldRogueDeath` 均来自服务端快照或事件合并状态；C 端不推导反伤、免疫、延迟死亡或狼美人连死资格。
+- 老流氓被猎人枪击的负伤状态可通过 `oldRoguePendingDeath.announced` 展示；女巫毒导致的延迟死亡不公开负伤状态。
+- 本批不新增独立播放器，不改变 WebSocket start/control/ack，实时对局和历史回放继续消费同一最终状态。
+
+- C 端识别 `wolf_beauty`、`demon`、`nightmare` 的名称、图标和身份说明。
+- `wolf-beauty-charm` 合并 `night.wolfBeautyTarget`，`demon-inspect` 合并 `night.demonInspect`，`nightmare-fear` 合并 `night.nightmareTarget`，用于夜间行动角标和事件记录。
+- 狼美人连死、恶灵骑士免毒、噩梦恐惧封技能和所有死亡/胜负均由服务端决定；C 端只消费事件和合并状态，不推导目标合法性、技能资格或死亡。
+
+## Werewolf fifth-batch boards
+
+- C 端识别 `wolf_king`、`dreamer`、`magician` 的名称和图标；`wolf_king` 按狼人阵营统计，`dreamer/magician` 按神职统计。
+- `dreamer-dream` 合并 `night.dreamerTarget`，用于事件记录和夜间行动角标；摄梦目标显示为“摄梦”徽章。
+- `magician-swap` 合并 `night.magicianSwap`，用于事件记录和夜间行动角标；两个交换目标显示为“交换”徽章。
+- 摄梦抵消狼刀/毒药、连梦死亡、摄梦人死亡牵连，以及狼王死亡技能资格均由服务端决定；C 端只展示服务端事件和快照字段。
+- 魔术师交换后的狼刀、解药、毒药和查验结算均由服务端决定；C 端不得根据 `magicianSwap` 自行推导死亡或查验阵营。
+
+## Werewolf sixth-batch boards
+
+- C 端识别 `big_bad_wolf`、`fortune_teller`、`hidden_wolf`、`crow`、`bear_tamer` 的名称和图标；大灰狼/隐狼按狼人阵营统计，占卜师/乌鸦/驯熊师按神职统计。
+- `fortune-teller-mark` 合并 `night.fortuneTellerMark`，座位显示“标记”徽章。
+- `big-bad-wolf-kill` 合并 `night.bigBadWolfTarget`，座位显示“袭击”徽章。
+- `crow-curse` 合并 `night.crowCurse` 和 `round.crowCursedPlayerId`，座位显示“诅咒 / 放逐票 +1”徽章。
+- `bear-tamer-roar` 合并 `round.bearRoar`，座位显示“咆哮/安静”徽章；该结果可在天亮后继续展示。
+- 大灰狼击杀、乌鸦加票、隐狼查验和驯熊师相邻狼人判断均由服务端决定；C 端只展示服务端事件和快照字段。
+## Werewolf seventh-batch boards
+
+- C-side role display now recognizes `wild_child`, `bombman` and `nine_tailed_fox`; `wild_child` is grouped with villagers, while `bombman` and `nine_tailed_fox` are grouped with gods.
+- Player snapshots may include `wildChildModelId`, `wildChildTransformed` and `nineTailedFoxTails`; round snapshots may include `bombmanBlast`.
+- The client only renders these fields and consumes server events/snapshots. It must not decide wild child transformation, bombman blast targets, fox tail loss, death-skill eligibility or win results.
+- No new C-side route, REST call or WebSocket start/control/ack shape was added.
+# 2026-07-04 狼人杀动物园模式补充
+
+- C 端新增动物园角色显示：企鹅、狐狸、兔子。
+- 夜间事件新增 `penguin-freeze` 和 `fox-inspect`，会归并到当前 round 的 `night.penguinFrozenId` 与 `night.foxInspect`。
+- 狼人杀夜间 badge 增加企鹅冰冻目标与狐狸三连结果展示。
+
+## 2026-07-04 Black merchant boards
+
+- C-side display recognizes `black_merchant`, `big_tree`, `wolf_elder_brother` and `wolf_younger_brother`.
+- Event merge handles `black-merchant-gift`, `lucky-seer-check`, `lucky-witch-poison` and `younger-brother-kill`, updating `night.blackMerchantGift`, `night.luckySeerCheck`, `night.luckyPoisonTarget` and `night.youngerBrotherTarget`.
+- Seat badges display pending black-merchant gifts, big-tree wolf-hit count, disabled god skills, younger-brother awakening, lucky check/poison, and younger-brother solo kill.
+- Client rendering remains state-driven. The client does not decide gift legality, tree death, god skill loss, younger-brother timing, deaths or win results.
+## 2026-07-04 Werewolf modes 23-24 display
+
+- C side receives the new night snapshot fields `wolfSeedInfect`, `heavenlyEyeCheck`, `requesterPrayer`, `requesterTarget` and `requesterReason` through the existing werewolf game snapshot.
+- The presentation layer recognizes `wolf_seed_infect`, `heavenly_eye_check`, `requester_pray` and `requester_kill` as badge/action UI hints. No new WebSocket command, REST endpoint or client authority rule is introduced.
+- The client may render these as skill badges or action animations, but final legality, faction conversion, deaths and win result remain server-side.
+
+## 2026-07-04 Werewolf modes 25-26 display
+
+- C side receives `night.thiefChoice`, `night.loverLink` and `night.succubusLink` through the existing werewolf round snapshot.
+- The presentation layer recognizes `thief_choose`, `cupid_link` and `succubus_link` as badge/action UI hints.
+- The client remains display-only for thief choice, lover links, third-party conversion, lover death and win results.
+## Werewolf Mode 27 Client Surface
+
+- C-side werewolf state accepts `ghostBrideLink`, `ghostBrideChat`, `ghostBrideTarget` and `ghostBrideReason` on `round.night`.
+- Player snapshots accept `ghostBridePartnerId`, `ghostBrideWitnessId` and `witnessForGhostBride` so seats can identify the Ghost Bride group.
+- Workflow display maps `ghost_bride_link`, `ghost_bride_chat` and `ghost_bride_kill` to `ghost-bride-link`, `ghost-bride-chat` and `ghost-bride-kill`.
+- Existing night action actor highlighting is reused for Ghost Bride animations/styles; no new page-level chat UI was added.
+- Night badges show the groom/witness link, Ghost Bride private-chat state, and Ghost Bride kill target.
+- `RoundProgressPanel` now renders `night.ghostBrideChat` as a read-only Ghost Bride private-chat transcript with speaker seat and day labels; this reuses existing event snapshots and does not add a live chat input or WebSocket command.
+
+## Werewolf Mode 28 Client Surface
+
+- C-side role display recognizes `sapling` as `树苗` and groups it with villager-style display.
+- Firepower mode uses existing role action visuals for White Wolf King, Demon, Wolf Beauty, Hidden Wolf, Fox, Witch, Hunter, Guard, Idiot and Big Tree.
+- Sapling-linked Big Tree death is received through the normal server snapshot death list; the client remains display-only and does not decide Sapling survival, Big Tree death or god-skill loss.
+- No new route, REST call, WebSocket command or client-authoritative rule was added.
+
+## Werewolf Mode 29 Client Surface
+
+- C-side role metadata recognizes `escape_hunter`, `tamed_werewolf` and `thick_wolf`.
+- `escape-hunter-speech` and `escape-hunter-vote` highlight all living Escape Hunters through the existing night-actor presentation.
+- Hunter vote completion displays the shared hunt target on hunter seats. `thick-wolf-armor` highlights Thick Wolf and displays an animated armor-break badge.
+- Player view receives hunter speech, choices, tally and target only for an Escape Hunter viewer; other player roles receive empty hunter-team night fields.
+- The client remains display-only. Hunt resolution, armor consumption and victory decisions stay on the server.
+- No new route, REST call or WebSocket command was added.
+
+## Werewolf Mode 30 Client Surface
+
+- C-side role display recognizes `magic_wolf` and `demon_hunter`.
+- `demon-hunter-hunt` events merge `night.demonHunterTarget` and optional `night.demonHunterReason` into the current round.
+- Night badges render Demon Hunter's selected target for the `demon-hunter-hunt` phase.
+- Magic Wolf seal, delayed death, Demon Hunter hunt legality and all deaths remain server-authoritative; the client only renders events and snapshots.
+- No new route, REST call, WebSocket command or client-authoritative rule was added.
+
+## Werewolf Mode 31 Client Surface
+
+- C-side role display recognizes `spirit_wolf`.
+- `spirit-wolf-learn`, `spirit-wolf-inspect`, `spirit-wolf-guard` and `spirit-wolf-antidote` events merge into `round.night.spiritWolfLearn`, `spiritWolfInspect`, `spiritWolfGuardTarget` and `spiritWolfAntidoteTarget`.
+- Night badges render Spirit Wolf learning, inspect result, guard target and antidote save target using the existing night action animation/highlight flow.
+- Spirit Wolf skill legality, learned role state, protection, poison save, hunter-shot eligibility and all deaths remain server-authoritative.
+- No new route, REST call, WebSocket command or client-authoritative rule was added.
+## Werewolf Mode 32 Client Notes
+
+- Added role labels/icons for `wolf_witch` and `illusionist`.
+- Added event labels and event-state merging for `wolf-witch-curse` and `illusionist-illusion`.
+- Night badges now show the Wolf Witch curse target and Illusionist illusion target on the acting player's panel when the matching night event is active.

@@ -79,7 +79,11 @@ function formatRelationshipMemoryList(
   const lines: string[] = [];
   let used = header.join('\n').length + 1;
   const rankedMemories = [...memories]
-    .filter((m) => m.gamesPlayed >= MEMORY_INJECTION_THRESHOLD && m.summary)
+    .filter((m) => (
+      m.gamesPlayed >= MEMORY_INJECTION_THRESHOLD
+      && (m.familiarityScore == null || m.familiarityScore > MEMORY_INJECTION_THRESHOLD)
+      && (m.summary || m.recentSummary)
+    ))
     .sort((left, right) =>
       right.gamesPlayed - left.gamesPlayed
       || right.updatedAt.localeCompare(left.updatedAt)
@@ -89,7 +93,7 @@ function formatRelationshipMemoryList(
     const subject = byId.get(memory.subjectPlayerId);
     if (!subject) continue;
     const name = subject?.nickname || subject?.name || `玩家${memory.subjectPlayerId}`;
-    const line = `- ${name}（${memory.gamesPlayed}局）：${memory.summary}`.slice(0, 200);
+    const line = `- ${name}（${memory.gamesPlayed}局）：${memory.summary || memory.recentSummary}`.slice(0, 100);
     if (used + line.length > RELATIONSHIP_PROMPT_CHAR_LIMIT) break;
     lines.push(line);
     used += line.length;

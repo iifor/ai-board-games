@@ -1,104 +1,104 @@
-.werewolf-shell--v2 {
+.game-shell.werewolf-shell--v2 {
+  position: relative;
+  display: block;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
+  padding: 0;
+  border: 0;
+  align-items: stretch;
+  justify-content: normal;
   color: #f4f7ff;
   background:
-    linear-gradient(90deg, rgba(2, 5, 15, 0.95), rgba(5, 9, 27, 0.36) 22%, rgba(5, 9, 27, 0.36) 78%, rgba(2, 5, 15, 0.95)),
-    radial-gradient(circle at 50% 42%, rgba(54, 123, 255, 0.28), transparent 34%),
-    radial-gradient(circle at 52% 58%, rgba(129, 72, 255, 0.25), transparent 38%),
-    var(--bg-werewolf) center / cover no-repeat,
-    #030716;
+    linear-gradient(90deg, rgba(1, 6, 18, .74), rgba(4, 14, 38, .08) 28%, rgba(4, 14, 38, .08) 72%, rgba(1, 6, 18, .7)),
+    linear-gradient(180deg, rgba(1, 8, 26, .05), rgba(1, 6, 20, .34)),
+    #02091b;
 }
-
-.werewolf-shell--v2::before,
-.werewolf-shell--v2::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.werewolf-shell--v2::before {
-  background:
-    linear-gradient(rgba(97, 142, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(97, 142, 255, 0.045) 1px, transparent 1px);
-  background-size: 54px 54px;
-  mask-image: linear-gradient(180deg, transparent, black 12%, black 82%, transparent);
-}
-
-.werewolf-shell--v2::after {
-  background:
-    radial-gradient(ellipse at 50% 48%, transparent 0 48%, rgba(0, 0, 0, 0.42) 76%, rgba(0, 0, 0, 0.78) 100%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 28%, rgba(0, 0, 0, 0.36));
-}
-
-.werewolf-shell--v2 .game-broadcast-hud {
-  top: 18px;
-  z-index: 80;
-  width: min(760px, calc(100vw - 620px));
-  min-height: 54px;
-}
-
+.werewolf-shell--god { --v2-accent: #76b8ff; }
+.werewolf-shell--player { --v2-accent: #ff766f; }
+.werewolf-shell--v2::before, .werewolf-shell--v2::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.werewolf-shell--v2::before { background: linear-gradient(90deg, rgba(0, 4, 15, .48), transparent 16%, transparent 84%, rgba(0, 4, 15, .48)); }
+.werewolf-shell--v2::after { background: radial-gradient(ellipse at 50% 48%, transparent 0 52%, rgba(0, 4, 16, .2) 76%, rgba(0, 3, 12, .55) 100%); }
 .werewolf-shell--v2 .werewolf-controls {
-  position: fixed;
-  z-index: 82;
-  top: 18px;
-  right: clamp(16px, 2vw, 32px);
-  gap: 8px;
-  height: 54px;
-  padding: 6px;
-  border: 1px solid rgba(118, 143, 220, 0.28);
-  border-radius: 8px;
-  background: rgba(7, 11, 30, 0.76);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34), inset 0 0 22px rgba(71, 112, 255, 0.08);
-  backdrop-filter: blur(16px);
+  position: fixed; z-index: 82; top: 18px; right: clamp(14px, 2vw, 28px); gap: 4px; height: 50px; padding: 5px;
+  border: 1px solid rgba(91, 137, 218, .3); border-radius: 25px; background: linear-gradient(180deg, rgba(7, 22, 54, .88), rgba(3, 10, 29, .82)); box-shadow: 0 14px 42px rgba(0, 0, 0, .38), inset 0 0 24px rgba(62, 124, 255, .08); backdrop-filter: blur(16px);
 }
-
-.werewolf-shell--v2 .werewolf-controls button {
-  height: 40px;
-  min-width: 40px;
-  padding: 0 14px;
-  border: 1px solid rgba(125, 151, 229, 0.24);
-  border-radius: 8px;
-  color: rgba(239, 244, 255, 0.88);
-  background: rgba(16, 24, 58, 0.78);
-  box-shadow: none;
-  font-size: 14px;
+.werewolf-shell--v2 .werewolf-controls__sigil { display: grid; width: 32px; height: 32px; margin: 3px 2px 3px 3px; place-items: center; border-radius: 50%; color: #9fc8ff; background: rgba(53, 105, 188, .2); box-shadow: inset 0 0 14px rgba(77, 140, 255, .16); }
+.werewolf-shell--v2 .werewolf-controls button { height: 38px; min-width: 40px; padding: 0 12px; border: 0; border-left: 1px solid rgba(125, 151, 229, .16); border-radius: 0; color: rgba(230, 239, 255, .76); background: transparent; box-shadow: none; font-size: 13px; transition: color .18s ease, background .18s ease; }
+.werewolf-shell--v2 .werewolf-controls button:last-child { border-radius: 0 19px 19px 0; }
+.werewolf-shell--v2 .werewolf-controls span { font-size: 13px; font-weight: 800; }
+.werewolf-shell--v2 .werewolf-controls button:hover:not(:disabled) { color: #fff; background: rgba(61, 118, 215, .18); }
+.werewolf-shell--v2 .werewolf-controls button:first-of-type { color: #ffbcc3; }
+.werewolf-shell--v2 .werewolf-controls button.skip-active:not(:disabled) { border-color: rgba(255, 188, 85, .28); color: #ffe1a0; background: rgba(111, 67, 12, .22); }
+.werewolf-shell--v2 .werewolf-error { z-index: 84; right: 24px; bottom: 18px; left: auto; max-width: min(620px, 70vw); margin: 0; }
+.werewolf-shell--v2 .mode-modal-overlay { z-index: 100; background: rgba(1, 5, 16, .72); backdrop-filter: blur(12px); }
+.werewolf-shell--v2 .werewolf-mode-backdrop { padding: 32px; background: rgba(1, 6, 18, .7); backdrop-filter: blur(14px); }
+.werewolf-shell--v2 .werewolf-mode-dialog {
+  width: min(900px, calc(100vw - 64px)); max-height: min(820px, calc(100vh - 64px)); gap: 14px; padding: 20px 24px 18px;
+  border-color: rgba(116, 151, 255, .38); border-radius: 18px;
+  background: linear-gradient(180deg, rgba(8, 22, 55, .94), rgba(3, 10, 30, .94));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .54), inset 0 0 38px rgba(67, 112, 255, .08);
 }
-
-.werewolf-shell--v2 .werewolf-controls span {
-  font-size: 15px;
-  font-weight: 900;
+.werewolf-shell--v2 .werewolf-mode-dialog header { min-height: 38px; padding-bottom: 12px; border-bottom: 1px solid rgba(119, 150, 225, .16); }
+.werewolf-shell--v2 .werewolf-mode-dialog h2 { font-size: 24px; letter-spacing: .03em; }
+.werewolf-shell--v2 .werewolf-setup-heading small { display: block; margin-bottom: 3px; color: #7faeff; font-size: 10px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
+.werewolf-shell--v2 .werewolf-setup-heading h2 { margin: 0; }
+.werewolf-shell--v2 .werewolf-mode-dialog header button { padding: 7px 14px; border-radius: 9px; font-size: 13px; }
+.werewolf-shell--v2 .werewolf-setup-grid {
+  display: grid; grid-template-columns: 1fr; gap: 10px; overflow-y: auto;
 }
-
-.werewolf-shell--v2 .werewolf-controls button:first-child,
-.werewolf-shell--v2 .werewolf-controls button.skip-active:not(:disabled) {
-  border-color: rgba(255, 97, 111, 0.54);
-  color: #ffd9df;
-  background: linear-gradient(180deg, rgba(90, 28, 45, 0.92), rgba(42, 14, 28, 0.92));
+.werewolf-shell--v2 .werewolf-setup-grid > section { padding: 12px; border-color: rgba(116, 151, 255, .16); border-radius: 14px; background: rgba(5, 16, 43, .52); }
+.werewolf-shell--v2 .werewolf-setup-grid > section:first-child { padding: 14px; border-color: rgba(95, 148, 255, .3); background: linear-gradient(180deg, rgba(9, 28, 67, .72), rgba(4, 14, 39, .62)); box-shadow: inset 0 0 28px rgba(59, 115, 235, .06); }
+.werewolf-shell--v2 .werewolf-mode-focus { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 12px; }
+.werewolf-shell--v2 .werewolf-mode-focus span { display: flex; align-items: center; gap: 7px; color: rgba(218, 231, 255, .64); font-size: 12px; font-weight: 850; }
+.werewolf-shell--v2 .werewolf-mode-focus strong { overflow: hidden; color: #dfeaff; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.werewolf-shell--v2 .werewolf-panel-title { margin-bottom: 10px; }
+.werewolf-shell--v2 .werewolf-mode-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-height: 460px; }
+.werewolf-shell--v2 .werewolf-mode-card { padding: 10px 12px; border-radius: 10px; }
+.werewolf-shell--v2 .werewolf-mode-card.active { border-color: rgba(111, 171, 255, .74); color: #fff; background: linear-gradient(135deg, rgba(26, 78, 166, .82), rgba(15, 43, 103, .78)); box-shadow: 0 0 24px rgba(59, 126, 255, .2), inset 0 0 20px rgba(104, 166, 255, .1); }
+.werewolf-shell--v2 .werewolf-mode-card strong { margin-bottom: 4px; font-size: 15px; }
+.werewolf-shell--v2 .werewolf-mode-card small { margin-top: 2px; font-size: 11px; line-height: 1.35; }
+.werewolf-shell--v2 .werewolf-player-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-height: 460px; }
+.werewolf-shell--v2 .werewolf-player-grid button { grid-template-columns: 28px minmax(0, 1fr) 16px; padding: 8px; border-radius: 9px; }
+.werewolf-shell--v2 .werewolf-player-grid button span { width: 26px; height: 26px; font-size: 12px; }
+.werewolf-shell--v2 .werewolf-player-section { padding: 0; }
+.werewolf-shell--v2 .werewolf-player-section summary {
+  display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 9px; padding: 12px 14px;
+  color: rgba(235, 241, 255, .9); cursor: pointer; list-style: none;
 }
-
-.werewolf-shell--v2 .werewolf-idle-stage {
-  z-index: 4;
+.werewolf-shell--v2 .werewolf-player-section summary::-webkit-details-marker { display: none; }
+.werewolf-shell--v2 .werewolf-player-section summary::after { content: '⌄'; color: #8eabef; transition: transform .18s ease; }
+.werewolf-shell--v2 .werewolf-player-section details[open] summary::after { transform: rotate(180deg); }
+.werewolf-shell--v2 .werewolf-player-section summary small { color: rgba(204, 217, 248, .5); font-size: 11px; }
+.werewolf-shell--v2 .werewolf-player-section .werewolf-player-grid { margin: 0 12px 12px; }
+.werewolf-shell--v2 .werewolf-view-mode {
+  display: block; width: auto; padding: 6px 10px; background: rgba(5, 16, 43, .28);
 }
-
-@media (max-width: 1280px) {
-  .werewolf-shell--v2 .game-broadcast-hud {
-    left: 50%;
-    width: min(560px, calc(100vw - 420px));
-  }
+.werewolf-shell--v2 .werewolf-view-mode > .werewolf-panel-title { grid-column: 1 / -1; margin-bottom: 0; }
+.werewolf-shell--v2 .werewolf-view-mode-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.werewolf-shell--v2 .werewolf-view-mode-switch button, .werewolf-shell--v2 .werewolf-debug-toggle { min-height: 58px; padding: 9px 12px; border-radius: 10px; }
+.werewolf-shell--v2 .werewolf-debug-toggle { margin: 0; }
+.werewolf-shell--v2 .werewolf-compact-switches { display: flex; justify-content: flex-end; gap: 18px; }
+.werewolf-shell--v2 .werewolf-compact-switches button {
+  display: grid; grid-template-columns: auto auto 32px; align-items: center; gap: 8px; padding: 4px 0 4px 18px;
+  border: 0; border-left: 1px solid rgba(116, 151, 255, .16); border-radius: 0; color: #eef4ff; background: transparent; text-align: left;
 }
-
-@media (max-width: 900px) {
-  .werewolf-shell--v2 .game-broadcast-hud {
-    left: 14px;
-    width: calc(100vw - 28px);
-    transform: none;
-  }
-
-  .werewolf-shell--v2 .werewolf-controls {
-    top: auto;
-    right: 14px;
-    bottom: 14px;
-  }
+.werewolf-shell--v2 .werewolf-compact-switches button > span { display: flex; align-items: center; gap: 6px; color: rgba(219, 230, 255, .58); font-size: 11px; }
+.werewolf-shell--v2 .werewolf-compact-switches button > strong { font-size: 11px; }
+.werewolf-shell--v2 .werewolf-compact-switches button > i { position: relative; width: 32px; height: 18px; border-radius: 999px; background: rgba(114, 132, 178, .36); }
+.werewolf-shell--v2 .werewolf-compact-switches button > i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: #d5def4; transition: transform .18s ease; }
+.werewolf-shell--v2 .werewolf-compact-switches button[aria-checked='true'] { border-color: rgba(108, 159, 255, .36); background: transparent; }
+.werewolf-shell--v2 .werewolf-compact-switches button[aria-checked='true'] > i { background: #3976df; }
+.werewolf-shell--v2 .werewolf-compact-switches button[aria-checked='true'] > i::after { transform: translateX(14px); background: white; }
+.werewolf-shell--v2 .werewolf-mode-dialog footer { min-height: 44px; padding-top: 12px; border-top: 1px solid rgba(119, 150, 225, .16); }
+.werewolf-shell--v2 .werewolf-mode-dialog footer .primary { min-width: 142px; border-color: rgba(104, 157, 255, .6); color: #f1f6ff; background: linear-gradient(180deg, rgba(43, 96, 196, .92), rgba(22, 54, 126, .92)); }
+.werewolf-shell--v2 .werewolf-setup-error { margin: -4px 0 0; padding: 8px 12px; border: 1px solid rgba(255, 105, 119, .28); border-radius: 9px; background: rgba(91, 19, 35, .32); font-size: 12px; }
+.werewolf-shell--v2 .thinking-backdrop, .werewolf-shell--v2 .player-detail-backdrop { z-index: 130; background: radial-gradient(circle at 50% 38%, rgba(18, 52, 111, .22), transparent 42%), rgba(1, 5, 17, .76); backdrop-filter: blur(14px); }
+.werewolf-shell--v2 .thinking-dialog, .werewolf-shell--v2 .player-detail-modal { border-color: rgba(92, 151, 255, .42); border-radius: 18px; background: linear-gradient(180deg, rgba(8, 24, 58, .96), rgba(3, 10, 30, .96)); box-shadow: 0 28px 88px rgba(0, 0, 0, .56), inset 0 0 32px rgba(71, 132, 255, .08); }
+.werewolf-shell--v2 .thinking-header { border-color: rgba(102, 155, 255, .18); }
+.werewolf-shell--v2 .thinking-header strong { color: #e7f1ff; font-size: 18px; }
+.werewolf-shell--v2 .player-detail-avatar { border-color: rgba(110, 174, 255, .76); box-shadow: 0 0 24px rgba(53, 127, 255, .24); }
+@media (max-width: 1000px) {
+  .werewolf-shell--v2 .werewolf-player-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 900px) { .werewolf-shell--v2 .werewolf-controls { top: auto; right: 14px; bottom: 14px; } }

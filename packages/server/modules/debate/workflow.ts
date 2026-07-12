@@ -13,7 +13,7 @@ import { createDebateRoleSkillRegistry } from './roleSkills';
 import { PHASES, TOPICS } from './constants';
 import type { Topic } from './prompts';
 import { debaterAt, choose, normalizeTopic, publicPlayer } from './utils';
-import type { DebatePlayer, DebatePhase, DebateConfig, SerializedGame } from './utils';
+import type { DebatePlayer, DebatePhase, DebateHost, DebateConfig, SerializedGame } from './utils';
 import { createPhase, pushSpeech, summarizeDebatePhase } from './speech';
 import { stableTaskId } from '../workflow-engine/utils';
 import { listAiTasks, listEvents } from '../workflow-engine/repository';
@@ -42,6 +42,7 @@ interface WorkflowStep {
   type: string;
   name: string;
   config: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 interface WorkflowDefinition {
@@ -327,7 +328,7 @@ interface Runtime {
     gameId: string;
     mode: string;
     topic: Topic;
-    host: Record<string, unknown> | null;
+    host: DebateHost | null;
     agents: DebatePlayer[];
     phases: DebatePhase[];
     winner: string | null;

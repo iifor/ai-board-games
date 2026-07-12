@@ -14,7 +14,9 @@
 - Microsoft Cognitive Services Speech SDK
 - OpenTelemetry
 
-## 目录结构
+## 稳定目录边界
+
+本节只记录后端长期稳定的职责边界，帮助判断改动应落在哪一层；具体文件位置、符号定义、调用方和影响面使用 CodeGraph 查询。
 
 ```txt
 packages/server/
@@ -264,3 +266,91 @@ pnpm run check:server
 - Startup seed upserts default werewolf roles and modes even when the database already contains data, so existing local databases can receive new default roles/modes without a new table.
 - White wolf king self-destruct target validation and death application live under `packages/server/modules/werewolf`. The frontend/admin only consume resulting events and snapshots.
 - No database table was added for this expansion. The change extends existing role, mode, workflow event and playback payload structures.
+
+## Werewolf first-batch boards
+
+- Default seed and werewolf-config constants are aligned for first-batch boards: `standard-12`、`standard-hybrid-12`、`elder-knight-12`.
+- Default roles now include `hybrid`、`silence_elder`、`knight`; default executable actions include `chooseMaster`、`silence`、`duel`.
+- Rule execution remains inside `packages/server/modules/werewolf`: workflow steps schedule the action windows, reducers validate/apply results, prompts/actions provide AI contracts, and death resolution handles any resulting deaths.
+- No database table, migration, REST route or WebSocket connection protocol was added. Existing seed upsert brings new default roles and modes into local databases.
+
+## Werewolf second-batch boards
+
+- Default seed and werewolf-config constants now include `elder-stalker-12` and `butterfly-stalker-12`.
+- Default roles now include `stalker` and `butterfly`; executable actions include `stalk` and `hug`.
+- Server reducers enforce stalker eligibility from the previous day vote and butterfly skill blocking. Night deaths still flow through existing `night_resolve` and death resolution.
+- No database table, migration, REST route or WebSocket connection protocol was added.
+
+## Werewolf third-batch boards
+
+- Default seed and werewolf-config constants now include `wolf-beauty-guard-12`, `demon-guard-12` and `nightmare-guard-12`.
+- Default roles now include `wolf_beauty`, `demon` and `nightmare`; executable actions include `charm`, `inspectRoleType` and `fear`.
+- Server reducers/effects enforce wolf beauty charm linked death, demon god-role inspection and poison immunity, and nightmare skill blocking with non-repeat target validation. Deaths continue to flow through existing `night_resolve`, death resolution and win check paths.
+- No database table, migration, REST route or WebSocket connection protocol was added.
+
+## Werewolf fourth-batch boards
+
+- Root `TODO.md` records the remaining board status from `狼人杀玩法.md`; mode 29 is now implemented from the confirmed shared-hunt rules.
+- Default werewolf config includes mode 28 `firepower-12`, mode 29 `wolf-escape-10`, and the passive villager role `sapling`.
+- Default seed and werewolf-config constants now include `evil-knight-guard-12` and `wolf-beauty-rogue-12`.
+- Default roles now include `evil_knight` and `old_rogue`.
+- `evil_knight` is a wolf-side role and participates in the existing wolf kill action. It does not receive a self-destruct action. Its first night reflection from witch poison or seer check is resolved in `werewolf/effects.ts`; the same night can trigger it only once.
+- `old_rogue` is counted as villager-side. Witch poison and hunter shot set `oldRoguePendingDeath`; the player dies after next-day `day_speech` resolves.
+- Wolf beauty on `wolf-beauty-rogue-12` does not charm-kill when poisoned, and `old_rogue` is not killed by wolf beauty charm.
+
+## Werewolf sixth-batch boards
+
+- Default seed and werewolf-config constants now include `big-bad-wolf-fortune-teller-12`, `hidden-wolf-crow-12` and `bear-tamer-hidden-wolf-12`.
+- Default roles now include `big_bad_wolf`, `fortune_teller`, `hidden_wolf`, `crow` and `bear_tamer`; executable actions include `soloKill`, `mark`, `curse` and `bearRoar`.
+- Server reducers/effects enforce big bad wolf extra kill, fortune teller once-per-game mark, crow non-repeat curse and exile vote bonus, hidden wolf good-side seer result, bear tamer adjacent wolf roar and hidden wolf weak-link death in the bear tamer board.
+- Debug mode uses the same action windows and reducers as real mode, with random legal payloads and skill trigger probability instead of bypassing these roles.
+- No database table, migration, REST route or WebSocket connection protocol was added.
+- No database table, migration, REST route or WebSocket start/control/ack shape was added.
+
+## Werewolf seventh-batch boards
+
+- Default seed and werewolf-config constants now include `wild-child-12`, `bombman-12` and `nine-tailed-fox-12`.
+- Default roles now include `wild_child`, `bombman` and `nine_tailed_fox`; executable actions include `chooseMaster`, `blastVoters` and `loseTailOnGoodDeath`.
+- Wild child reuses the existing first-night `chooseMaster` action window and stores `wildChildModelId`; when the model dies, the server changes the living wild child to wolf faction and grants the existing wolf kill action.
+- Bombman uses the existing exile resolver. When exiled, the server blasts living voters who voted for the bombman, marks their death reason as `bombman_blast`, and disables death-shot skills for that death reason.
+- Nine-tailed fox starts with 9 tails. Good god deaths remove 2 tails, good villager deaths remove 1 tail, and tail count reaching 0 kills the fox with `nine_tailed_fox_tails`.
+- No database table, migration, REST route or WebSocket start/control/ack shape was added. Bombman third-party solo win remains deferred until the project has explicit third-party win handling.
+# 2026-07-04 狼人杀动物园模式补充
+
+- 默认狼人杀配置与 seed 新增 `animal-zoo-12`。
+- 新增角色配置：`penguin`、`fox`、`rabbit`；新增可执行动作白名单：`freeze`、`foxInspect`。
+- 20-21 黑商板子涉及动态授予跨角色技能，暂作为专项后续接入。
+
+## Werewolf Mode 29 Server Notes
+
+- Default config adds `wolf-escape-10` with 3 `escape_hunter`, 2 `tamed_werewolf`, 1 `thick_wolf`, Seer, Witch and 2 Villagers.
+- `escape_hunter_speech` and `escape_hunter_vote` reuse the existing ordered action-window pipeline. All living hunters vote, and deterministic plurality resolves one non-hunter target.
+- Witch antidote resolves against `escapeHunterTarget`; Seer reads `escape_hunter` as wolf-side information.
+- The first unresolved hunter hit on `thick_wolf` records `thickWolfHuntHits` and emits `thick-wolf-armor`; the next hunter hit enters the normal death chain.
+- `escape_hunter` death shots reuse the existing hunter-shot window and are disabled by witch poison.
+- Dedicated victory checks give hunters precedence when all protected wolves are dead, otherwise good wins when all escape hunters are dead.
+- Debug mode generates legal hunter speech/votes and uses the escape-hunt target for Witch save decisions.
+- No database table, migration, REST route or WebSocket start/control/ack shape was added.
+
+## Werewolf Mode 30 Server Notes
+
+- Default werewolf config now includes `magic-wolf-demon-hunter-12`.
+- Default roles now include `magic_wolf` and `demon_hunter`; executable actions include `demonHunterHunt`.
+- Server reducers/effects enforce Demon Hunter night-2 eligibility, wolf/good hunt resolution, witch-poison immunity, Magic Wolf self-destruct seal and last-wolf delayed exile death.
+- Debug mode emits legal random payloads for `demon_hunter_hunt` and Magic Wolf self-destruct.
+- No database table, migration, REST route or WebSocket start/control/ack shape was added.
+
+## Werewolf Mode 31 Server Notes
+
+- Default werewolf config now includes `spirit-wolf-12`.
+- Default roles now include `spirit_wolf`; executable actions include `spiritWolfLearn`, `spiritWolfInspect`, `spiritWolfGuard` and `spiritWolfAntidote`.
+- Server reducers store Spirit Wolf learned-role state on the player and night action results on `round.night`.
+- Server effects enforce Spirit Wolf guard protection, Spirit Wolf antidote save, learned-villager Seer disguise and learned-hunter exile shot reuse.
+- Debug mode emits legal random payloads for all Spirit Wolf action windows.
+- No database table, migration, REST route or WebSocket start/control/ack shape was added.
+## Werewolf Mode 32 Server Notes
+
+- Added default role/mode config for `wolf_witch`, `illusionist`, and `illusionist-wolf-witch-12`.
+- Added executable role actions `wolfWitchCurse` and `illusion`.
+- Debug mode uses the existing optional special-skill probability for both new role skills, so they can trigger or skip during debug runs.
+- No database schema change is required; new state is stored in the existing serialized werewolf runtime state.

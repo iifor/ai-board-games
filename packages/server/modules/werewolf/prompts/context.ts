@@ -13,6 +13,11 @@ interface PromptAgent {
   usedAntidote?: boolean;
   usedPoison?: boolean;
   lastGuardTarget?: number | null;
+  lastSilencedTarget?: number | null;
+  hybridMasterId?: number | null;
+  butterflyHugUsed?: number;
+  stalkerAssassinateUsed?: boolean;
+  lastNightmareTarget?: number | null;
   seerChecks?: Array<Record<string, unknown>>;
   playerAgent?: { messages?: Array<{ role: string; content: string }> };
   [key: string]: unknown;
@@ -26,6 +31,11 @@ interface PromptRound {
     wolfTarget?: number | null;
     wolfStrategy?: string;
     wolfSpeeches?: Array<Record<string, unknown>>;
+    butterflyTarget?: number | null;
+    stalkerTarget?: number | null;
+    wolfBeautyTarget?: number | null;
+    demonInspect?: { target?: number; result?: string; reason?: string | null } | null;
+    nightmareTarget?: number | null;
     [key: string]: unknown;
   };
   nightRevealed?: boolean;
@@ -36,6 +46,8 @@ interface PromptRound {
   idiotReveal?: { id: number; reason?: string } | null;
   hunterShot?: { from?: number; target?: number; reason?: string } | null;
   selfDestruct?: { playerId?: number; text?: string } | null;
+  silencedPlayerId?: number | null;
+  knightDuel?: Record<string, unknown> | null;
   sheriffId?: number | null;
   sheriffBadge?: Record<string, unknown>;
   sheriffElection?: Record<string, unknown> | null;
@@ -146,6 +158,27 @@ function buildPrivateKnowledge(actor: PromptAgent, agents: PromptAgent[], round:
     const guarded = actor.lastGuardTarget ? `${getSeatNumber(Number(actor.lastGuardTarget), agents)}号` : '无';
     lines.push(`守卫状态：上一晚守护目标：${guarded}。`);
   }
+  if (actor.role === 'hybrid') {
+    const master = actor.hybridMasterId ? `${getSeatNumber(Number(actor.hybridMasterId), agents)}号` : '尚未选择';
+    lines.push(`混血儿私密信息：你的主人是${master}；你不知道主人的身份。`);
+  }
+  if (actor.role === 'silence_elder') {
+    const target = actor.lastSilencedTarget ? `${getSeatNumber(Number(actor.lastSilencedTarget), agents)}号` : '无';
+    lines.push(`禁言长老状态：上一晚禁言目标：${target}。`);
+  }
+  if (actor.role === 'butterfly') {
+    lines.push(`花蝴蝶状态：已抱人 ${Number(actor.butterflyHugUsed || 0)} 次，最多 2 次。`);
+  }
+  if (actor.role === 'stalker') {
+    lines.push(`潜行者状态：暗杀技能${actor.stalkerAssassinateUsed ? '已使用' : '尚未使用'}。`);
+  }
+  if (actor.role === 'nightmare') {
+    const target = actor.lastNightmareTarget ? `${getSeatNumber(Number(actor.lastNightmareTarget), agents)}号` : '无';
+    lines.push(`梦魇状态：上一晚恐惧目标：${target}。`);
+  }
+  if (actor.role === 'demon' && round.night?.demonInspect?.target) {
+    lines.push(`恶灵骑士私密查验：${getSeatNumber(Number(round.night.demonInspect.target), agents)}号是${round.night.demonInspect.result || '未知'}。`);
+  }
   if (actionType === 'witch_save' && round.night?.wolfTarget) {
     lines.push(`今晚狼刀目标：${getSeatNumber(Number(round.night.wolfTarget), agents)}号。`);
   }
@@ -215,6 +248,26 @@ function formatRoundFacts(round: PromptRound, agents: PromptAgent[]): string[] {
   }
   if (round.selfDestruct?.playerId) {
     lines.push(`第${day}天自爆：${getSeatNumber(Number(round.selfDestruct.playerId), agents)}号狼人自爆，白天流程中止。`);
+  }
+  if (round.silencedPlayerId) {
+    lines.push(`第${day}天禁言：${getSeatNumber(Number(round.silencedPlayerId), agents)}号玩家本日不能发言。`);
+  }
+  const knightDuel = round.knightDuel as { actorId?: number; targetId?: number; success?: boolean } | null | undefined;
+  if (knightDuel?.targetId) {
+    const duel = knightDuel;
+    lines.push(`第${day}天骑士决斗：${getSeatNumber(Number(duel.actorId), agents)}号决斗${getSeatNumber(Number(duel.targetId), agents)}号，${duel.success ? '目标是狼人并出局' : '目标是好人，骑士出局'}。`);
+  }
+  if (round.night?.butterflyTarget) {
+    lines.push(`第${day}晚花蝴蝶抱住了${getSeatNumber(Number(round.night.butterflyTarget), agents)}号。`);
+  }
+  if (round.night?.stalkerTarget) {
+    lines.push(`第${day}晚潜行者暗杀了${getSeatNumber(Number(round.night.stalkerTarget), agents)}号。`);
+  }
+  if (round.night?.wolfBeautyTarget) {
+    lines.push(`第${day}晚狼美人魅惑了${getSeatNumber(Number(round.night.wolfBeautyTarget), agents)}号。`);
+  }
+  if (round.night?.nightmareTarget) {
+    lines.push(`第${day}晚梦魇恐惧了${getSeatNumber(Number(round.night.nightmareTarget), agents)}号。`);
   }
   lines.push(...formatDayVoteFacts(round, agents));
   const electionFacts = formatSheriffElectionFacts(day, round.sheriffElection, agents);

@@ -4,6 +4,7 @@ import { createFallbackAudit } from './fallbackAudit';
 import { executeSkillWithTrace } from './skillExecutor';
 import { BaseGameAgent } from './gameAgent';
 import { RoleSkillRegistry } from './roleSkillRegistry';
+import { createTraceContext } from '../observability/tracer';
 
 export {
   BasePlayerAgent,
@@ -12,5 +13,6 @@ export {
   AgentSkillRegistry,
   RoleSkillRegistry,
   createFallbackAudit,
-  executeSkillWithTrace
+  executeSkillWithTrace,
+  createTraceContext
 };

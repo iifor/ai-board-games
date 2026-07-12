@@ -5,7 +5,6 @@
  * 保留完整的 EventBus 基础设施（ChannelRouter、AudienceStream、EventDelivery）。
  */
 
-import * as workflowService from './workflow-engine/service';
 import { getGameEngine } from './engine-registry';
 import { createTraceContext, flushTrace, markTraceComplete, markTraceError } from './observability';
 import { createInitialWerewolfState, serializeWerewolfState, registerMatchInfra, unregisterMatchInfra, flushMatchEventPublishes } from './werewolf/runtime';
@@ -21,7 +20,7 @@ import { randomBytes } from 'crypto';
  *
  * 1. 设置 EventBus 基础设施（与 runWerewolfWorkflow 相同）
  * 2. 通过 engine.createMatch() 创建对局（经过 definition 注册）
- * 3. 通过 drainAiTasks() 循环驱动执行
+ * 3. 通过 GameEngine 持续驱动到等待点或终态
  * 4. 清理基础设施
  */
 async function runWerewolfViaEngine(
@@ -69,18 +68,13 @@ async function runWerewolfViaEngine(
   );
 
   try {
-    // 通过 drainAiTasks 循环推进（与 runWerewolfWorkflow 相同的执行路径）
-    while (true) {
-      const { processed, match: current } = await workflowService.drainAiTasks(actualMatchId, { maxTasks: 1 });
-      if (!processed || ['completed', 'failed', 'paused_debug'].includes(current?.status as string)) break;
-    }
-
-    const finalMatch = workflowService.getDebugState(actualMatchId)?.match || matchResult;
+    const { match: drivenMatch } = await engine.runUntilBlocked(actualMatchId);
+    const finalMatch = drivenMatch || engine.getDebugState(actualMatchId).match || matchResult;
     await flushMatchEventPublishes(actualMatchId);
-    assertWerewolfWorkflowCompleted(finalMatch as Record<string, unknown>);
+    assertWerewolfWorkflowCompleted(finalMatch as unknown as Record<string, unknown>, { allowPausedDebug: isDebug });
     if (trace) { markTraceComplete(trace); }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = serializeWerewolfState(finalMatch as any, (finalMatch as Record<string, unknown>).state as import('./werewolf/runtime').WerewolfState);
+    const result = serializeWerewolfState(finalMatch as any, (finalMatch as unknown as Record<string, unknown>).state as import('./werewolf/runtime').WerewolfState);
     return result;
   } catch (error) {
     if (trace) { markTraceError(trace, (error as Error).message || String(error)); flushTrace(trace); }
@@ -103,9 +97,13 @@ function statePlayers(match: unknown): unknown[] {
   return Array.isArray(state?.players) ? state.players : [];
 }
 
-function assertWerewolfWorkflowCompleted(match: Record<string, unknown>): void {
+function assertWerewolfWorkflowCompleted(
+  match: Record<string, unknown>,
+  options: { allowPausedDebug?: boolean } = {},
+): void {
   const status = String(match.status || 'unknown');
   if (status === 'completed') return;
+  if (options.allowPausedDebug && status === 'paused_debug') return;
   const matchError = match.error && typeof match.error === 'object'
     ? match.error as Record<string, unknown>
     : {};

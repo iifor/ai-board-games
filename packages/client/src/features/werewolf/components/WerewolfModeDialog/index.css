@@ -166,6 +166,10 @@
   padding-right: 4px;
 }
 
+.werewolf-player-section:not(.is-collapsible) > details > summary {
+  display: none;
+}
+
 .werewolf-player-grid button,
 .werewolf-host-grid button {
   display: grid;

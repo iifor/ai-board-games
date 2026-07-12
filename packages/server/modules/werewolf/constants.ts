@@ -9,7 +9,13 @@ const ROLE_TYPE_VILLAGER = 'villager';
 
 const EXECUTABLE_WEREWOLF_ACTIONS = new Set([
   'kill', 'inspectFaction', 'save', 'poison', 'guard',
-  'shootOnDeath', 'surviveExileOnce', 'voteOnly', 'speakOnly'
+  'selfDestruct', 'shootOnDeath', 'surviveExileOnce',
+  'chooseMaster', 'silence', 'duel', 'hug', 'stalk', 'charm', 'inspectRoleType', 'fear',
+  'dream', 'swap', 'mark', 'soloKill', 'curse', 'blackMerchantGift', 'treeSurviveWolfHit', 'youngerBrotherKill',
+  'freeze', 'foxInspect', 'bearRoar', 'blastVoters', 'loseTailOnGoodDeath',
+  'infect', 'inspectRole', 'request', 'stealRole', 'linkLovers', 'succubusLink', 'ghostBrideLink', 'ghostBrideChat', 'ghostBrideKill',
+  'demonHunterHunt',
+  'voteOnly', 'speakOnly'
 ]);
 
 export {

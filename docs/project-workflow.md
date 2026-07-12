@@ -13,7 +13,9 @@
 - OpenAI-compatible LLM 调用
 - TTS 语音资源生成
 
-## 目录结构
+## 稳定目录边界
+
+本节只记录工作流相关模块的长期职责边界，帮助判断改动是否影响 WebSocket、workflow-engine、game-engine、AI task 或游戏规则契约；具体文件位置、符号定义、调用方和影响面使用 CodeGraph 查询。
 
 ```txt
 packages/server/modules/
@@ -105,6 +107,13 @@ packages/server/modules/
 - `outbox_messages` 保存待推送给前端的消息。
 - `match_snapshots` 保存状态快照。
 
+### 统一持续驱动入口
+
+- `WorkflowRuntime.runUntilBlocked()` 是离线 runner 持续推进 match 的统一入口，内部复用 `drainAiTasks()`，跨 tick 预算分批运行，直到没有可处理工作或进入 `completed/failed/paused_debug`。
+- `GameEngine.runUntilBlocked()` 只做该 runtime 能力的公开委托；狼人杀 runner 不再自行复制 `while + drainAiTasks` 循环。
+- WebSocket ACK 驱动仍可按单事件调用底层 service，不改变播放节奏、暂停、跳过或连接协议。
+- 赛后 `mvp_vote/postgame_speech` 是 match 级动作，不得创建或修改无日期 round；所有 round-bound reducer 在创建 round 前必须具有正整数 `day`。
+
 ### Workflow 持久化性能与恢复
 
 - 调试 match 的 `tickMatch` 与 `commitWorkflowChange` 会输出结构化
@@ -123,6 +132,9 @@ packages/server/modules/
   3 个快照。
 - `debugMode` 终态 match 仅保留最近 20 局。服务启动和调试对局进入终态时清理，
   `running/waiting` match 不删除，也不会自动执行阻塞式 `VACUUM`。
+- 狼人杀调试模式只跳过真实模型与语音依赖，不跳过玩法分支。禁言长老、骑士、
+  花蝴蝶、潜行者、狼美人、噩梦之影、摄梦人、魔术师等特殊技能，以及白狼王自爆，会按调试
+  随机概率决定是否发动，结果继续进入原有 reducer、死亡链和播放管线。
 
 推进模型：
 
@@ -193,6 +205,7 @@ flowchart TD
 
 - `debate-runner.ts`：`runDebateViaEngine()` — 通过 `engine.createMatch()` 创建对局，`drainAiTasks()` 循环推进。
 - `werewolf-runner.ts`：`runWerewolfViaEngine()` — 通过 `engine.createMatch()` 创建对局，设置 EventBus 基础设施，`drainAiTasks()` 循环推进。
+- `drainAiTasks()` 遇到 `running`、无 blocker 且暂无 AI task 的 match 时会继续 tick；这用于跨过单次 tick 预算耗尽或连续确定性/跳过步骤，不能把“当前无 task”当作流程结束。
 
 `game-socket/service.ts` 的 `getRunner()` 分发到这两个 runner。
 
@@ -485,3 +498,157 @@ pnpm run test:workflow
 - Self-destruct stops the rest of the current day speech and exile vote. The actor dies with source `self_destruct`; a valid carried target dies with source `white_wolf_king_self_destruct`.
 - Self-destruct deaths enter the shared death resolution pipeline. Last words, hunter shot, sheriff badge disposition, win check, postgame transition, real-time playback and history replay must all consume the same final event/state semantics.
 - The public `self-destruct` event may include `targetId`. The client displays it, but the server remains the only authority for target legality, death, skills and win result.
+
+## Werewolf first-batch boards
+
+- 首批只接入 `狼人杀玩法.md` 前 3 个板子：`standard-12`（预女猎白，已覆盖）、`standard-hybrid-12`（预女猎白混）和 `elder-knight-12`（禁言长老&骑士）。
+- 新增行动顺序复用现有 `werewolf.action_window`：`hybrid_choose_master_1` 位于分配身份后；`elder_silence_${day}` 位于每天夜晚开始后；`knight_duel_${day}` 位于白天发言和白狼王自爆结算后、放逐投票前。
+- 混血儿首夜选择主人，只记录主人座位。混血儿在屠边统计中按民边计入；赛后通过 `hybridResults` 记录其是否随主人阵营获胜，不改变全局二阵营 `winner`。
+- 禁言长老每晚可禁言一名存活玩家，不能连续两晚禁言同一目标。次日 `silence-result` 公布被禁言者；被禁言者跳过 `day_speech`，但仍可参与 `day_vote`。
+- 骑士全局一次白天决斗。决斗狼人时目标死亡并跳过当天放逐投票；决斗好人时骑士死亡且当天放逐流程继续。死亡统一进入现有死亡链、胜负判定和播放事件管线。
+- 新增公开/私密展示事件字段包括 `hybridMaster`、`silencedPlayerId`、`knightDuel`。这些字段只扩展展示载荷，不改变 WebSocket start/control/ack 结构，不新增 REST API 或数据库表。
+
+## Werewolf second-batch boards
+
+- 第二批接入 `狼人杀玩法.md` 第 4、5 个板子：`elder-stalker-12`（禁言长老&潜行者）和 `butterfly-stalker-12`（花蝴蝶）。
+- 新增夜间 action window：`butterfly_hug_${day}`、`stalker_assassinate_${day}`，均复用现有 AI task/pending action/ACK/playback 管线。
+- 潜行者全局一次。若上一天自己投票的目标没有被放逐且仍存活，下一夜可暗杀该目标；暗杀死亡写入当夜死亡结算，随 `night_resolve` 进入现有死亡链。
+- 花蝴蝶最多抱人两次。被抱玩家当晚特殊能力失效；抱到狼人时，狼队当晚不产生狼刀行动。当前实现覆盖 wolf、seer、guard、witch、silence elder、stalker 的夜间行动屏蔽。
+- 新增展示事件 `butterfly-hug`、`stalker-assassinate`，只扩展展示载荷，不改变 REST API、WebSocket start/control/ack 或数据库表结构。
+
+## Werewolf third-batch boards
+
+## Werewolf fourth-batch boards
+
+- 本批接入 `狼人杀玩法.md` 第 9、11 个板子：`evil-knight-guard-12` 和 `wolf-beauty-rogue-12`；第 13 号之后继续保留在 `TODO.md`。
+- `evil_knight` 复用狼队夜间 kill action，不新增夜间独立 action window。女巫毒或预言家查验命中恶灵骑士时，恶灵骑士不死，对应神职当夜死亡；同夜同时命中只写入一次 `round.evilKnightTrigger`。
+- `old_rogue` 复用白天发言/投票 action。女巫毒和猎人枪击不会立即杀死老流氓，而是写入 `player.oldRoguePendingDeath`，在下一天 `day_speech` reducer 收尾时写入 `round.oldRogueDeath` 并淘汰。
+- 狼美人老流氓板中，狼美人被 `witch_poison` 杀死不触发魅惑殉情；老流氓作为魅惑目标时也不被魅惑杀死。
+- 新增字段是快照/展示字段，不改变 REST API、WebSocket start/control/ack、AI task/pending action 基础结构或数据库表。
+
+- 第三批接入 `狼人杀玩法.md` 后续 3 个非第三方板子：`wolf-beauty-guard-12`（狼美人&守卫）、`demon-guard-12`（恶灵骑士&守卫）和 `nightmare-guard-12`（噩梦之影&守卫）。第 6 个板子仍由已实现的 `white-wolf-king-guard-12` 覆盖。
+- 新增夜间 action window：`nightmare_fear_${day}` 位于每天夜晚开始后，`wolf_beauty_charm_${day}` 与 `demon_inspect_${day}` 位于狼队刀人后、预言家/守卫/女巫前。
+- 狼美人每晚魅惑一名存活玩家；狼美人夜死、放逐死或骑士决斗死时，当前被魅惑目标随之死亡，死亡仍写入现有死亡链和胜负判定。
+- 恶灵骑士每晚查验一名非狼人玩家是否为神职；查验结果只进入恶灵骑士私密 prompt 和私密事件，不进入 public facts 或观众展示；恶灵骑士免疫女巫毒药。
+- 噩梦之影每晚恐惧一名存活玩家，使目标当晚技能失效；不能连续两晚恐惧同一目标。当前实现覆盖 wolf、seer、guard、witch、silence elder、butterfly、stalker、wolf beauty、demon 的夜间行动屏蔽。
+- 新增展示事件 `wolf-beauty-charm`、`demon-inspect`、`nightmare-fear`，只扩展展示载荷，不改变 REST API、WebSocket start/control/ack 或数据库表结构。
+
+## Werewolf fifth-batch boards
+
+- 本批接入 `狼人杀玩法.md` 第 12-13 个板子：`wolf-king-dreamer-12`（狼王&摄梦人）和 `wolf-king-magician-12`（狼王&魔术师）。
+- 角色配置为 1 狼王、3 狼人、预言家、女巫、猎人、摄梦人、4 村民。`wolf_king` 属于狼人阵营，夜晚参与狼队 kill；死亡技能复用 `shootOnDeath` 管线，但按角色写入狼王带走文案。
+- 狼王被放逐、被猎人枪击或自刀死亡时可进入死亡技能队列；被 `witch_poison`、`dreamer_repeat` 或 `dreamer_link` 死亡时禁用死亡技能。狼王自爆仍走既有自爆流程，不触发狼枪。
+- 新增夜间 action window：`dreamer_dream_${day}` 位于每天 `night_start_${day}` 后、梦魇和狼队行动前。摄梦人每晚选择一名非自己存活玩家，reducer 写入 `round.night.dreamerTarget`、`dreamerReason` 和 `dreamerRepeatedTarget`。
+- 夜间结算中，梦游者会抵消狼刀和女巫毒药；连续两晚被摄梦或摄梦人当夜死亡时，梦游者以 `dreamer_dream` 来源进入死亡链。
+- 新增展示事件 `dreamer-dream` 和快照字段 `dreamerTarget/dreamerReason/dreamerRepeatedTarget`，只扩展展示载荷，不改变 REST API、WebSocket start/control/ack 或数据库表结构。
+- 魔术师板子使用 1 狼王、3 狼人、预言家、女巫、猎人、魔术师、4 村民。新增夜间 action window：`magician_swap_${day}`，位于每天 `night_start_${day}` 后且早于摄梦人、梦魇、狼队和神职行动。
+- 魔术师行动写入 `round.night.magicianSwap = { firstTarget, secondTarget, reason? }`，并在魔术师玩家状态记录 `magicianSwappedIds`，保证同一局每个号码最多被交换一次。该状态只影响当晚技能结算，不永久交换玩家身份或座位。
+- 夜间结算中，狼刀、守护、女巫解药、女巫毒药和预言家查验会先通过魔术师交换关系映射到实际结算目标；死亡链、狼刀胜利锁定、恶灵骑士反伤等后续逻辑继续复用既有 `effects` 管线。
+- 新增展示事件 `magician-swap` 和快照字段 `magicianSwap/magicianSwappedIds`，C 端只展示交换动画/角标，不自行决定实际死亡或查验结果。
+
+## Werewolf sixth-batch boards
+
+- 本批接入 `狼人杀玩法.md` 第 14-16 个板子：`big-bad-wolf-fortune-teller-12`、`hidden-wolf-crow-12` 和 `bear-tamer-hidden-wolf-12`。
+- `big_bad_wolf` 属于狼人阵营，夜晚参与狼队行动，并在 `wolf_vote_${day}` 后获得一次 `big_bad_wolf_kill_${day}` 额外击杀窗口；目标必须是存活非狼人，死亡继续进入现有夜间死亡和死亡链管线。
+- `fortune_teller_mark_${day}` 位于每天 `night_start_${day}` 后、魔术师/摄梦人等行动前。占卜师每局一次标记一名存活非自己玩家，结果写入 `round.night.fortuneTellerMark` 和玩家 `fortuneTellerMarkUsed`。
+- `crow_curse_${day}` 位于 `witch_poison_${day}` 后。乌鸦每晚诅咒一名存活玩家，不能连续两晚选择同一目标；白天放逐计票时该玩家额外 +1 票，状态写入 `round.crowCursedPlayerId`。
+- `hidden_wolf` 查验为好人；在 `bear-tamer-hidden-wolf-12` 中，当普通狼人全部出局后，隐狼随狼队出局。`bear_tamer_roar_${day}` 位于 `night_resolve_${day}` 后，只公开驯熊师相邻座位是否存在狼人。
+- 新增展示事件 `fortune-teller-mark`、`big-bad-wolf-kill`、`crow-curse`、`bear-tamer-roar` 和对应快照字段，只扩展展示载荷，不改变 REST API、WebSocket start/control/ack 或数据库表结构。
+## Werewolf seventh-batch boards
+
+- This batch adds `wild-child-12`, `bombman-12` and `nine-tailed-fox-12`.
+- `wild_child` reuses the existing `hybrid_choose_master_1` first-night action window because the workflow requirement is the same: choose one alive non-self player. Reducers store the result as `wildChildModelId`; if that model later dies through any server death entry, the living wild child transforms into wolf faction and gains the existing wolf kill action.
+- `bombman` has no separate action window. The exile resolver applies `blastVoters` after the bombman is actually exiled, reads `round.votes`, kills living voters who voted for the bombman with reason `bombman_blast`, and prevents death-shot skills from that death reason.
+- `nine_tailed_fox` is passive. Every effective good-side death updates the living fox tail count: god deaths -2, villager deaths -1. Reaching 0 tails creates a normal server death with reason `nine_tailed_fox_tails`.
+- These rules extend existing reducers/effects/win-check paths and public snapshots. REST API, WebSocket start/control/ack and database tables are unchanged.
+# 2026-07-04 狼人杀动物园模式补充
+
+- 新增 `animal-zoo-12` 模式工作流动作：`penguin_freeze` 和 `fox_inspect`。
+- 企鹅动作在夜间梦魇之后执行，记录 `round.night.penguinFrozenId`，并在 actor 选择阶段阻断狼队刀人、熊咆哮、狐狸查验、乌鸦诅咒。
+- 狐狸动作记录 `round.night.foxInspect`；当三连查验结果无狼时，设置玩家 `foxInspectLost`，后续夜晚不再进入狐狸动作窗口。
+- 动物园模式下乌鸦诅咒的放逐加票为 +2；其他模式保持既有 +1。
+
+## 2026-07-04 Black merchant boards
+
+- Added `black-merchant-big-tree-12` and `black-merchant-wolf-brothers-12`.
+- `black_merchant_gift_${day}` reuses the existing action-window pipeline. In the big-tree board it only opens on night 1; in the wolf-brothers board it opens on any night until used. Gifts are limited to `inspectFaction`, `poison` and `shootOnDeath`.
+- Gifting a wolf fails and marks the black merchant with `blackMerchantDeathPending`; daybreak death resolution adds the black merchant death.
+- Gifted check and poison use `lucky_seer_check_${day}` and `lucky_witch_poison_${day}`. Gifted gun reuses the existing death-shot queue.
+- `big_tree` counts wolf-source hits in `bigTreeWolfHits`; the first wolf hit is absorbed and the second kills. A full-health tree saved by witch antidote still consumes one tree hit. If tree dies from non-wolf and non-white-wolf-king self-destruct sources, good-side gods receive `godSkillsDisabled`.
+- `wolf_younger_brother` checks as good before elder brother death, does not join wolf vote early, gets `younger_brother_kill_${day}` on the night after elder death, then joins the wolf team from the following night.
+- Display events added: `black-merchant-gift`, `lucky-seer-check`, `lucky-witch-poison`, `younger-brother-kill`. REST API, WebSocket start/control/ack and database tables are unchanged.
+
+## 2026-07-04 Werewolf modes 23-24
+
+- Added `wolf-seed-hidden-wolf-12`: `wolf_seed`, `hidden_wolf`, 2 `werewolf`, `seer`, `witch`, `hunter`, `guard`, 4 `villager`.
+- Added `heavenly-eye-requester-12`: `demon`, 3 `werewolf`, `heavenly_eye`, `witch`, `hunter`, `requester`, 4 `villager`.
+- `wolf_seed_infect_${day}` runs after `wolf_vote_${day}`. If the wolf kill later succeeds on that same target, the death is removed, the target joins `wolves`, loses original skills and receives the normal wolf kill action. Guard/save blocks the infection.
+- `heavenly_eye_check_${day}` runs after `demon_inspect_${day}` and records the target exact role id/name in `round.night.heavenlyEyeCheck`.
+- `requester_pray_${day}` runs on night 1. Praying a villager grants double exile vote; hunter grants one gun; witch grants one poison; heavenly eye grants one check; wolf or demon turns the requester into `third_party`.
+- Third-party requester receives `requester_kill_${day}` and wins only when they are the last living player.
+- Debug mode now emits legal payloads for `wolf_seed_infect`, `heavenly_eye_check`, `requester_pray` and `requester_kill`.
+- Presentation/action badges now recognize the four new action types. REST API, WebSocket start/control/ack and database tables are unchanged.
+
+## 2026-07-04 Werewolf modes 25-26
+
+- Added `cupid-thief-12` and `succubus-thief-12`.
+- `thief_choose_1` runs after role assignment and before other first-night identity actions. The thief chooses from `thiefOfferedRoleIds` or the submitted payload; if a wolf role is offered, the thief takes that wolf role.
+- `cupid_link_1` links two living players. If the pair crosses good/wolf factions, both lovers and Cupid become `third_party`.
+- `succubus_link_1` links Succubus with one living non-wolf target; both become `third_party`.
+- Lover death is appended in the unified night death chain with reason `lover_link`. Third-party lover groups win when all living players belong to that third-party group.
+- Debug mode now emits legal payloads for `thief_choose`, `cupid_link` and `succubus_link`. REST API, WebSocket start/control/ack and database tables are unchanged.
+## Werewolf Mode 27: Ghost Bride & Thief
+
+- `ghost-bride-thief-12` is a 12-player mode using the existing werewolf workflow, action-window, EventBus, scoped-channel and death-resolution pipeline.
+- New role `ghost_bride` has three actions: `ghost_bride_link` on first night, `ghost_bride_chat` every night after linking, and `ghost_bride_kill` when no normal wolves are alive.
+- `ghost_bride_link` chooses a groom and a witness. Bride and groom are stored through existing lover fields with `loverSource: "ghost_bride"`; bride, groom and witness switch to `third_party`.
+- `ghost_bride_chat` reuses the action-window flow instead of adding a generic chat room. If bride or groom is alive, living bride/groom/witness members participate; if both lovers are dead, the living witness may act alone.
+- `ghost_bride_kill` records `round.night.ghostBrideTarget` and is resolved as `sourceFaction: "third_party"`, `sourceAction: "ghost_bride_kill"`.
+- Third-party victory now includes the Ghost Bride group and the witness-only endgame.
+
+## Werewolf Mode 28: Firepower
+
+- Added `firepower-12`: White Wolf King, Demon, Wolf Beauty, Hidden Wolf, Fox, Witch, Hunter, Guard, Idiot, Big Tree and 2 Saplings.
+- This mode reuses the existing wolf-team night speech/kill pipeline. Hidden Wolf belongs to `wolves`, so it joins the shared wolf context and unified night kill in this board.
+- `sapling` is a good-side villager role with only day speech and vote actions.
+- In `firepower-12`, if projected deaths leave no living Saplings, living Big Tree players are appended to the same death chain with reason `树苗全灭`.
+- Sapling-linked Big Tree death runs through the existing death side effects, including good-side god skill loss when Big Tree dies.
+- Mode 29 is implemented from the confirmed shared-hunt rules below.
+
+## Werewolf Mode 29: Wolf Escape
+
+- Added `wolf-escape-10`: 3 Escape Hunters, Seer, Witch, Thick Wolf, 2 Tamed Werewolves and 2 Villagers.
+- Each night runs `escape_hunter_speech_${day}` and `escape_hunter_vote_${day}` before Seer. Hunters share the `escape_hunters` scope and cannot target a hunter teammate.
+- All living hunters submit one vote. The existing reducer resolves deterministic plurality into `round.night.escapeHunterTarget`; Witch save and night resolution consume that target through the shared attack-target helper.
+- Thick Wolf absorbs the first unsaved hunter attack. The armor break emits `thick-wolf-armor`; the second attack uses the normal night-death pipeline.
+- Seer checks report Escape Hunters as wolves. Escape Hunter death shots reuse the existing hunter-shot action window and poison-disable rule.
+- Hunters win when no living `tamed_werewolf` or `thick_wolf` remains. Good wins when no living `escape_hunter` remains; hunters take precedence on simultaneous elimination.
+- Debug mode runs the same action windows, reducers, effects and presentation pipeline with legal random speech and votes.
+- REST API, WebSocket start/control/ack and database tables are unchanged.
+
+## Werewolf Mode 30: Magic Wolf & Demon Hunter
+
+- Added `magic-wolf-demon-hunter-12`: `magic_wolf`, 3 `werewolf`, `seer`, `witch`, `demon_hunter`, `idiot` and 4 `villager`.
+- `demon_hunter_hunt_${day}` runs from night 2 onward and reuses the existing action-window, pending-action, scoped event and night-death pipeline.
+- Demon Hunter chooses one living non-self target. If the target is wolf-side, the target dies; if the target is good-side, Demon Hunter dies instead. Demon Hunter is immune to witch poison.
+- `magic_wolf` participates in the normal wolf team kill. Its debug/day self-destruct reuses the existing self-destruct path but does not carry a target.
+- After Magic Wolf self-destructs, `magicWolfSealNightDay` suppresses good god night actions for the following night. This is implemented in actor selection instead of adding a separate workflow branch.
+- If Magic Wolf is the last living wolf and is exiled, it remains alive without vote power until the next daybreak/night-resolution pass, then dies with `magic_wolf_delayed_death`.
+- Mode 29 is documented in the preceding section and is no longer skipped.
+
+## Werewolf Mode 31: Spirit Wolf
+
+- Added `spirit-wolf-12`: `spirit_wolf`, 3 `werewolf`, `seer`, `witch`, `hunter`, `guard` and 4 `villager`.
+- `spirit_wolf` joins the normal wolf team night speech/kill flow.
+- `spirit_wolf_learn_${day}` opens on night 1 after the witch poison step and stores `round.night.spiritWolfLearn` plus the Spirit Wolf player's learned role state.
+- From night 2, learned Seer opens `spirit_wolf_inspect_${day}` and stores `round.night.spiritWolfInspect` as god/villager.
+- From night 2, learned Guard opens `spirit_wolf_guard_${day}` and stores `round.night.spiritWolfGuardTarget`; this blocks wolf kill, witch poison and night hunter shot on that target, and makes Seer checks on that target show no result.
+- Learned Witch opens `spirit_wolf_antidote_${day}` only after a witch poison target exists, and may save that poisoned non-self target once.
+- Learned Hunter reuses the existing death-resolution hunter shot window when Spirit Wolf is exiled.
+- Debug mode emits legal random payloads for all Spirit Wolf action windows. REST API, WebSocket start/control/ack and database tables are unchanged.
+## Werewolf Mode 32: Illusionist & Wolf Witch
+
+- Mode id: `illusionist-wolf-witch-12`.
+- Night workflow adds `wolf_witch_curse` and `illusionist_illusion` after existing early night special actions and before wolf team discussion/vote.
+- `wolf_witch_curse` records `round.night.wolfWitchCurse` and sets the target player's `skillDisabledUntilDay` to the next night. Normal actor selection filters this temporary disable state, so cursed god-role skills are skipped until the next night starts.
+- `illusionist_illusion` records `round.night.illusionTarget`; during night resolution, if the Illusionist is killed by `wolf_kill` or `witch_poison`, the death is redirected to the illusion target as `illusion_substitute`.

@@ -1,17 +1,18 @@
 .werewolf-v2-bottom-speech {
   position: absolute;
   left: 50%;
-  bottom: 22px;
+  bottom: 18px;
   z-index: 48;
   display: grid;
   width: min(760px, calc(100% - 36px));
-  min-height: 112px;
-  grid-template-columns: minmax(0, 1fr) 170px 34px;
+  min-height: 90px;
+  max-height: 38vh;
+  grid-template-columns: minmax(0, 1fr) 110px;
   gap: 18px;
   align-items: center;
   padding: 18px 18px 18px 24px;
   border: 1px solid rgba(68, 151, 255, 0.42);
-  border-radius: 8px;
+  border-radius: 16px;
   background:
     radial-gradient(circle at 86% 42%, rgba(135, 79, 255, 0.18), transparent 34%),
     linear-gradient(180deg, rgba(12, 25, 62, 0.88), rgba(5, 9, 28, 0.94));
@@ -19,9 +20,13 @@
   backdrop-filter: blur(18px);
   transform: translateX(-50%);
 }
+.werewolf-v2-bottom-speech::before { content: ''; position: absolute; inset: -1px; border: 1px solid rgba(111, 204, 255, .38); border-radius: inherit; box-shadow: 0 0 30px rgba(63, 136, 255, .18); pointer-events: none; }
 
 .werewolf-v2-bottom-speech__copy {
   min-width: 0;
+  max-height: calc(38vh - 36px);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .werewolf-v2-bottom-speech__copy span {
@@ -31,22 +36,20 @@
   gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
-  color: #d9d1ff;
-  background: rgba(104, 78, 255, 0.26);
+  color: #d9fff0;
+  background: rgba(41, 151, 107, 0.24);
   font-size: 13px;
   font-weight: 900;
 }
 
+.werewolf-v2-bottom-speech__lines { display: grid; gap: 2px; margin-top: 8px; }
 .werewolf-v2-bottom-speech__copy p {
-  display: -webkit-box;
-  overflow: hidden;
-  margin: 12px 0 0;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  margin: 0;
   color: #f4f7ff;
-  font-size: clamp(17px, 1.35vw, 23px);
+  font-size: clamp(15px, 1.18vw, 20px);
   font-weight: 850;
-  line-height: 1.55;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 
 .werewolf-v2-bottom-speech__wave {
@@ -69,17 +72,6 @@
   animation-delay: calc(var(--bar-index) * -70ms);
 }
 
-.werewolf-v2-bottom-speech button {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid rgba(117, 154, 255, 0.32);
-  border-radius: 8px;
-  color: #dce6ff;
-  background: rgba(24, 43, 88, 0.8);
-}
-
 @keyframes werewolf-v2-wave {
   50% {
     transform: scaleY(0.45);
@@ -90,7 +82,7 @@
 @media (max-width: 760px) {
   .werewolf-v2-bottom-speech {
     min-height: 112px;
-    grid-template-columns: minmax(0, 1fr) 34px;
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     padding: 14px;
   }

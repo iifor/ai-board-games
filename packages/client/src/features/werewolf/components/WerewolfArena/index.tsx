@@ -62,7 +62,7 @@ export function WerewolfArena({
       <aside className="werewolf-side werewolf-left-board" aria-label="狼人杀左侧信息">
         <WerewolfBrandPanel game={game} mode={mode} showRoles={showRoles} onShowRolesChange={onShowRolesChange} />
         <RoleConfigPanel players={orderedPlayers} mode={mode} showRoles={showRoles} />
-        <RoundProgressPanel rounds={(game.rounds || []) as WerewolfRound[]} currentRound={currentRound} />
+        <RoundProgressPanel rounds={(game.rounds || []) as WerewolfRound[]} currentRound={currentRound} players={orderedPlayers} />
       </aside>
 
       <section className="werewolf-orbit-stage" aria-label="狼人杀玩家圆桌">

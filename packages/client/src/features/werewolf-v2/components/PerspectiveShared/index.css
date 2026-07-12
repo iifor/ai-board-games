@@ -1,0 +1,191 @@
+.perspective-header {
+  position: absolute; z-index: 16; top: 18px; left: 50%; width: min(420px, 34vw); transform: translateX(-50%); color: #edf4ff;
+}
+.perspective-header > div {
+  display: flex; min-height: 58px; align-items: center; justify-content: center; gap: 12px; padding: 8px 28px;
+  border: 1px solid rgba(126, 150, 255, .62); border-radius: 32px; background: rgba(4, 17, 47, .76);
+  box-shadow: inset 0 0 24px rgba(73, 115, 255, .14), 0 0 34px rgba(67, 106, 255, .22); backdrop-filter: blur(15px);
+}
+.perspective-header > div > span { display: grid; text-align: center; }
+.perspective-header strong { font-size: clamp(17px, 1.35vw, 21px); letter-spacing: .04em; }
+.perspective-header__stats { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 3px; color: rgba(221, 232, 255, .58); font-size: 11px; }
+.perspective-header__stats span { display: inline-flex; align-items: center; gap: 4px; }
+.perspective-header__stats span:last-child { color: rgba(255, 166, 173, .72); }
+.perspective-header__stats b { color: #f5f8ff; }
+.perspective-mode-label {
+  position: absolute; z-index: 15; top: 24px; left: 28px; display: grid; gap: 3px; color: #edf4ff;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, .72);
+}
+.perspective-mode-label strong { font-size: 15px; letter-spacing: .04em; }
+.perspective-mode-label span { color: rgba(218, 230, 255, .5); font-size: 11px; }
+.perspective-roster {
+  position: absolute; z-index: 10; top: 50%; display: grid; width: 236px;
+  grid-template-rows: repeat(6, 72px); gap: clamp(36px, 4vh, 52px); transform: translateY(-50%);
+}
+.perspective-roster--left { left: clamp(120px, 10vw, 190px); }
+.perspective-roster--right { right: clamp(120px, 10vw, 190px); }
+.perspective-roster--left .perspective-seat:nth-child(1), .perspective-roster--left .perspective-seat:nth-child(6) { transform: translateX(42px); }
+.perspective-roster--left .perspective-seat:nth-child(2), .perspective-roster--left .perspective-seat:nth-child(5) { transform: translateX(16px); }
+.perspective-roster--right .perspective-seat:nth-child(1), .perspective-roster--right .perspective-seat:nth-child(6) { transform: translateX(-42px); }
+.perspective-roster--right .perspective-seat:nth-child(2), .perspective-roster--right .perspective-seat:nth-child(5) { transform: translateX(-16px); }
+.perspective-seat {
+  position: relative; display: grid; grid-template-columns: 32px 58px minmax(0, 1fr); align-items: center; gap: 10px;
+  min-height: 0; padding: 0; border: 0; color: #e8f0ff; background: transparent; text-align: left;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .82); transition: filter .18s, opacity .18s;
+}
+.perspective-seat:hover, .perspective-seat:focus-visible { outline: none; filter: brightness(1.22); }
+.perspective-seat > b { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid rgba(119, 166, 244, .5); border-radius: 50%; background: rgba(2, 13, 38, .66); font-size: 13px; }
+.perspective-seat__avatar { width: 56px; height: 56px; border: 2px solid rgba(105, 159, 239, .76); border-radius: 50%; background: rgba(3, 13, 35, .9) center/cover; box-shadow: 0 0 18px rgba(39, 104, 219, .16); }
+.perspective-seat > span { min-width: 0; }
+.perspective-seat > span strong, .perspective-seat > span small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.perspective-seat > span strong { font-size: 14px; }
+.perspective-seat > span small { margin-top: 4px; color: #55c6ff; font-size: 11px; }
+.perspective-seat > i { position: absolute; top: 56px; left: 100px; display: flex; align-items: center; gap: 4px; color: #76e2a5; font-size: 10px; font-style: normal; font-weight: 850; white-space: nowrap; }
+.perspective-seat > em { position: absolute; top: 6px; left: 82px; display: flex; align-items: center; gap: 3px; color: #f5c46b; font-style: normal; }
+.perspective-seat.is-speaking { filter: brightness(1.35); }
+.perspective-seat.is-speaking::before { content: ''; position: absolute; top: 2px; left: 37px; width: 66px; height: 66px; border: 2px solid rgba(113, 255, 184, .96); border-radius: 50%; box-shadow: 0 0 34px rgba(77, 235, 156, .72), inset 0 0 22px rgba(77, 235, 156, .2); animation: werewolf-speaker-ring 1.15s ease-out infinite; }
+.perspective-seat.is-speaking .perspective-seat__avatar { border-color: #8bffc1; box-shadow: 0 0 42px rgba(77, 235, 156, .72); animation: werewolf-speaker-avatar 1s ease-in-out infinite alternate; }
+.perspective-seat.is-speaking > span strong { color: #effff7; text-shadow: 0 0 16px rgba(77, 235, 156, .72); }
+.perspective-seat.is-acting .perspective-seat__avatar { border-color: #a879ff; box-shadow: 0 0 26px rgba(157, 91, 255, .32); animation: werewolf-actor-focus 1.8s ease-in-out infinite; }
+.perspective-seat.is-target .perspective-seat__avatar { border-color: #ff6875; box-shadow: 0 0 24px rgba(255, 72, 86, .32); animation: werewolf-target-lock 1.15s ease-in-out infinite alternate; }
+.perspective-seat.is-viewer .perspective-seat__avatar, .perspective-seat.is-viewer > b { border-color: #ff9d38; box-shadow: 0 0 20px rgba(255, 129, 42, .24); }
+.perspective-seat.is-dead { opacity: .42; filter: grayscale(.85); }
+.interaction-stage {
+  --skill-color: 90, 160, 255;
+  position: absolute; inset: 88px 360px 58px; display: grid; place-items: center; overflow: hidden;
+}
+.interaction-stage__card { position: relative; z-index: 2; width: min(620px, 88%); padding: 24px 32px; color: #eef4ff; text-align: center; text-shadow: 0 2px 16px rgba(0, 0, 0, .7); }
+.interaction-stage__card::before {
+  content: ''; position: absolute; z-index: -1; inset: -24px -40px; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(4, 17, 46, .75), rgba(4, 17, 46, .22) 58%, transparent 74%); filter: blur(4px);
+}
+.interaction-stage:not([data-template=idle]):not([data-template=speech]) .interaction-stage__card {
+  animation: werewolf-skill-stage-enter .58s cubic-bezier(.2, .78, .2, 1) both;
+}
+.interaction-stage:not([data-template=idle]):not([data-template=speech]) .interaction-stage__card::after {
+  content: ''; position: absolute; z-index: -2; inset: 16% 8%; border: 1px solid rgba(var(--skill-color), .7); border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(var(--skill-color), .2), transparent 66%); pointer-events: none;
+  animation: werewolf-skill-wave .9s ease-out both;
+}
+.interaction-stage__night-cue {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 13px; padding: 8px 16px;
+  border: 1px solid rgba(148, 119, 255, .35); border-radius: 999px; color: #d8cbff;
+  background: rgba(43, 24, 91, .4); box-shadow: 0 0 28px rgba(113, 75, 231, .2); font-size: 13px; font-weight: 900;
+  animation: werewolf-eye-open 1.8s ease-in-out infinite;
+}
+.interaction-stage__sheriff-cue {
+  display: inline-flex; align-items: center; gap: 7px; margin-bottom: 13px; padding: 7px 15px;
+  border: 1px solid rgba(247, 198, 88, .42); border-radius: 999px; color: #ffe29a;
+  background: rgba(83, 55, 9, .36); box-shadow: 0 0 26px rgba(236, 179, 59, .16); font-size: 12px; font-weight: 900;
+  animation: werewolf-sheriff-cue 1.8s ease-in-out infinite;
+}
+.interaction-stage.is-night::before {
+  content: ''; position: absolute; inset: 6% 10%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(81, 70, 184, .12), transparent 64%); animation: werewolf-night-breathe 5s ease-in-out infinite;
+}
+.interaction-stage__status { display: inline-flex; align-items: center; gap: 6px; color: #86d9ff; font-size: 12px; font-weight: 800; }
+.interaction-stage h1 { margin: 12px 0 9px; font-size: clamp(26px, 2.8vw, 44px); line-height: 1.1; }
+.interaction-stage__speaker { position: relative; display: inline-flex; align-items: center; gap: 9px; margin: 2px auto 12px; padding: 6px 15px 6px 7px; border: 1px solid rgba(113, 245, 178, .52); border-radius: 999px; background: rgba(5, 38, 45, .74); box-shadow: 0 0 30px rgba(55, 221, 145, .24); isolation: isolate; animation: werewolf-speaker-card 1.4s ease-in-out infinite; }
+.interaction-stage__speaker::before { content: ''; position: absolute; z-index: -1; inset: -6px; border: 1px solid rgba(100, 244, 173, .48); border-radius: inherit; animation: werewolf-speaker-halo 1.4s ease-out infinite; }
+.interaction-stage__speaker-avatar { width: 46px; height: 46px; border: 2px solid #80f4b6; border-radius: 50%; background: rgba(3, 13, 35, .9) center/cover; box-shadow: 0 0 26px rgba(58, 232, 151, .5); animation: werewolf-speaker-avatar 1s ease-in-out infinite alternate; }
+.interaction-stage__speaker-mic { color: #8affbe; filter: drop-shadow(0 0 8px rgba(80, 255, 164, .72)); animation: werewolf-speaker-mic .72s ease-in-out infinite alternate; }
+.interaction-stage__speaker > span { display: grid; min-width: 76px; text-align: left; }
+.interaction-stage__speaker small { color: #76cfff; font-size: 10px; font-weight: 900; }
+.interaction-stage__speaker strong { max-width: 150px; overflow: hidden; color: #f4f8ff; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.interaction-stage__narrative { max-height: min(24vh, 190px); margin: 0 auto; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(128, 157, 255, .42) transparent; }
+.interaction-stage__narrative > small { display: block; margin-bottom: 7px; color: rgba(151, 183, 255, .72); font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+.interaction-stage__narrative p { min-height: 40px; margin: 0 auto; color: rgba(231, 239, 255, .74); font-size: 15px; line-height: 1.65; white-space: pre-wrap; }
+.interaction-stage__narrative.is-thinking { width: min(560px, 100%); padding: 13px 16px; border: 1px solid rgba(113, 145, 229, .2); border-radius: 12px; background: rgba(4, 16, 43, .44); text-align: left; box-shadow: inset 0 0 22px rgba(73, 110, 216, .06); }
+.interaction-stage__narrative.is-thinking p { color: rgba(229, 237, 255, .8); text-align: left; }
+.interaction-stage__targets { display: inline-flex; align-items: center; gap: 9px; margin: 16px 0 0; padding: 9px 18px; border: 1px solid rgba(255, 105, 120, .28); border-radius: 22px; color: #ffd6da; background: rgba(115, 21, 42, .34); font-weight: 800; }
+.interaction-stage__flow { display: flex; align-items: stretch; justify-content: center; gap: 12px; margin: 20px auto 0; }
+.interaction-stage__flow > svg { align-self: center; color: rgba(184, 210, 255, .58); filter: drop-shadow(0 0 8px rgba(94, 151, 255, .34)); animation: werewolf-flow-arrow 1.25s ease-in-out infinite; }
+.interaction-stage__flow article { display: grid; min-width: 148px; max-width: 260px; gap: 5px; padding: 11px 16px; border: 1px solid rgba(105, 165, 255, .28); border-radius: 12px; background: rgba(5, 22, 55, .58); box-shadow: inset 0 0 20px rgba(54, 116, 255, .08); }
+.interaction-stage__flow article.is-target { border-color: rgba(255, 91, 111, .38); background: rgba(72, 13, 32, .52); box-shadow: inset 0 0 20px rgba(255, 66, 94, .08); }
+.interaction-stage:not([data-template=speech]) .interaction-stage__flow article:first-of-type { animation: werewolf-skill-actor-enter .48s .12s ease-out both; }
+.interaction-stage:not([data-template=speech]) .interaction-stage__flow article.is-target { animation: werewolf-skill-target-enter .54s .28s cubic-bezier(.18, .82, .24, 1.18) both; }
+.interaction-stage[data-status=acting] .interaction-stage__flow article,
+.interaction-stage[data-status=submitted] .interaction-stage__flow article { box-shadow: 0 0 26px rgba(var(--skill-color), .16), inset 0 0 20px rgba(var(--skill-color), .1); }
+.interaction-stage[data-template=dual-target] .interaction-stage__flow article { animation-name: werewolf-skill-dual-enter; }
+.interaction-stage[data-template=binary-choice] .interaction-stage__flow,
+.interaction-stage[data-template=multi-choice] .interaction-stage__flow { animation: werewolf-skill-choice-focus 1.5s .55s ease-in-out infinite; }
+.interaction-stage[data-template=passive-trigger] .interaction-stage__card::after { animation-name: werewolf-skill-passive-wave; }
+.interaction-stage[data-template=result-reveal] .interaction-stage__card { animation-name: werewolf-skill-result-reveal; }
+.interaction-stage__flow small { display: flex; align-items: center; justify-content: center; gap: 4px; color: rgba(210, 225, 255, .54); font-size: 10px; font-weight: 800; }
+.interaction-stage__flow strong { overflow: hidden; color: #f5f8ff; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.interaction-stage__facts { display: flex; justify-content: center; gap: 28px; margin-top: 16px; color: rgba(222, 233, 255, .6); font-size: 12px; }
+.interaction-stage__facts b { color: #fff; }
+.interaction-stage[data-tone=day] { --skill-color: 242, 190, 84; }
+.interaction-stage[data-tone=wolf] { --skill-color: 255, 67, 82; }
+.interaction-stage[data-tone=seer] { --skill-color: 137, 111, 255; }
+.interaction-stage[data-tone=witch] { --skill-color: 76, 225, 156; }
+.interaction-stage[data-tone=guard] { --skill-color: 72, 184, 255; }
+.interaction-stage[data-tone=wolf] .interaction-stage__status, .interaction-stage[data-tone=wolf] h1 { color: #ff6d72; }
+.interaction-stage[data-tone=witch] .interaction-stage__status, .interaction-stage[data-tone=seer] .interaction-stage__status { color: #bd91ff; }
+.interaction-stage[data-tone=wolf] .interaction-stage__flow article.is-target { border-color: rgba(255, 65, 82, .72); box-shadow: 0 0 30px rgba(255, 49, 68, .2), inset 0 0 24px rgba(255, 49, 68, .12); }
+.interaction-stage[data-tone=wolf]:not([data-template=idle]) .interaction-stage__card::after {
+  border-radius: 36%;
+  background: linear-gradient(112deg, transparent 42%, rgba(255, 104, 112, .08) 47%, rgba(255, 104, 112, .82) 49.5%, transparent 52%), radial-gradient(ellipse, rgba(255, 43, 58, .22), transparent 64%);
+  transform: rotate(-4deg);
+}
+.interaction-stage[data-tone=seer] .interaction-stage__flow article.is-target { border-color: rgba(139, 117, 255, .72); background: rgba(35, 24, 89, .58); box-shadow: 0 0 34px rgba(115, 88, 255, .26); }
+.interaction-stage[data-tone=witch] .interaction-stage__flow article.is-target { border-color: rgba(115, 232, 177, .58); background: rgba(18, 74, 62, .48); box-shadow: 0 0 32px rgba(79, 223, 155, .2); }
+.interaction-stage[data-action=sheriff_signup] .interaction-stage__card,
+.interaction-stage[data-action=sheriff_vote] .interaction-stage__card { filter: drop-shadow(0 0 22px rgba(242, 193, 86, .16)); }
+.interaction-stage[data-action=sheriff_signup] h1,
+.interaction-stage[data-action=sheriff_vote] h1 { color: #ffd878; }
+@keyframes werewolf-speaker-ring { 0% { opacity: .9; transform: scale(.88); } 80%, 100% { opacity: 0; transform: scale(1.28); } }
+@keyframes werewolf-speaker-card { 50% { border-color: rgba(131, 255, 191, .94); box-shadow: 0 0 48px rgba(55, 221, 145, .48); transform: translateY(-2px); } }
+@keyframes werewolf-speaker-halo { 0% { opacity: .8; transform: scale(.96); } 80%, 100% { opacity: 0; transform: scale(1.12); } }
+@keyframes werewolf-speaker-avatar { to { filter: brightness(1.2); transform: scale(1.08); } }
+@keyframes werewolf-speaker-mic { to { color: #fff; transform: scale(1.2) rotate(-7deg); } }
+@keyframes werewolf-actor-focus { 50% { box-shadow: 0 0 38px rgba(157, 91, 255, .58); } }
+@keyframes werewolf-target-lock { to { filter: brightness(1.28); transform: scale(1.06); } }
+@keyframes werewolf-eye-open { 50% { color: #fff; box-shadow: 0 0 40px rgba(132, 91, 255, .4); } }
+@keyframes werewolf-night-breathe { 50% { opacity: .48; transform: scale(1.08); } }
+@keyframes werewolf-flow-arrow { 50% { opacity: .42; transform: translateX(5px); } }
+@keyframes werewolf-sheriff-cue { 50% { box-shadow: 0 0 38px rgba(236, 179, 59, .32); transform: translateY(-2px); } }
+@keyframes werewolf-skill-stage-enter {
+  0% { opacity: 0; filter: blur(8px) brightness(1.5); transform: scale(.92) translateY(14px); }
+  65% { opacity: 1; filter: blur(0) brightness(1.12); transform: scale(1.015) translateY(-2px); }
+  100% { filter: none; transform: none; }
+}
+@keyframes werewolf-skill-wave {
+  0% { opacity: 0; transform: scale(.45); }
+  30% { opacity: .9; }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes werewolf-skill-passive-wave {
+  0% { opacity: 0; transform: scale(.35); }
+  35% { opacity: 1; box-shadow: 0 0 48px rgba(var(--skill-color), .46); }
+  100% { opacity: 0; transform: scale(1.55); }
+}
+@keyframes werewolf-skill-actor-enter {
+  from { opacity: 0; filter: blur(4px); transform: translateX(-28px) scale(.94); }
+}
+@keyframes werewolf-skill-target-enter {
+  from { opacity: 0; filter: blur(5px); transform: translateX(32px) scale(.84); }
+  70% { filter: blur(0) brightness(1.28); transform: translateX(-3px) scale(1.04); }
+}
+@keyframes werewolf-skill-dual-enter {
+  from { opacity: 0; filter: blur(4px); transform: translateY(18px) scale(.9); }
+}
+@keyframes werewolf-skill-choice-focus {
+  50% { filter: brightness(1.16); transform: translateY(-2px); }
+}
+@keyframes werewolf-skill-result-reveal {
+  0% { opacity: 0; filter: blur(10px) brightness(2); transform: scale(.82); }
+  55% { opacity: 1; filter: blur(0) brightness(1.45); transform: scale(1.035); }
+  100% { filter: none; transform: none; }
+}
+@media (max-width: 1360px) {
+  .perspective-roster { width: 212px; grid-template-rows: repeat(6, 64px); gap: clamp(22px, 3vh, 34px); }
+  .perspective-roster--left { left: 58px; }
+  .perspective-roster--right { right: 58px; }
+  .interaction-stage { inset-inline: 300px; }
+  .perspective-seat { grid-template-columns: 28px 48px minmax(0, 1fr); gap: 8px; }
+  .perspective-seat > b { width: 28px; height: 28px; }
+  .perspective-seat__avatar { width: 46px; height: 46px; }
+  .perspective-seat > i { display: none; }
+  .perspective-seat.is-speaking::before { top: 3px; left: 30px; width: 56px; height: 56px; }
+}
