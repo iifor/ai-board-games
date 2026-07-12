@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { trace, context, SpanKind, SpanStatusCode } from '@opentelemetry/api';
 import type { Span, Context, Attributes, AttributeValue, SpanStatus } from '@opentelemetry/api';
 import { BasicTracerProvider, BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
@@ -20,6 +21,7 @@ interface TraceContext {
   status: string;
   errorMessage: string | null;
   completedAt: string | null;
+  rootContext: Context;
 }
 
 interface LlmRecordInput {
@@ -209,9 +211,19 @@ function safeInt(value: unknown): number | null {
 
 const activeTraces = new Map<string, TraceContext>();
 
-// Module-level root OTel context — all child spans inherit this to share a single trace_id.
-// Safe because only one game runs at a time (sequential Node.js event loop).
-let _rootCtx: Context = context.active();
+const traceStorage = new AsyncLocalStorage<TraceContext>();
+
+function runWithTraceContext<T>(traceContext: TraceContext, task: () => T): T {
+  return traceStorage.run(traceContext, task);
+}
+
+function getCurrentTraceContext(): TraceContext | null {
+  return traceStorage.getStore() || null;
+}
+
+function currentRootContext(): Context {
+  return getCurrentTraceContext()?.rootContext || context.active();
+}
 
 function createTraceContext(
   gameId: string,
@@ -230,7 +242,7 @@ function createTraceContext(
     },
   });
   // Set as the active root so all child spans belong to the same trace
-  _rootCtx = trace.setSpan(context.active(), rootSpan);
+  const rootContext = trace.setSpan(context.active(), rootSpan);
   const traceId = rootSpan.spanContext().traceId;
   const startedAt = now();
 
@@ -264,8 +276,10 @@ function createTraceContext(
     status: 'recording',
     errorMessage: null,
     completedAt: null,
+    rootContext,
   };
   activeTraces.set(gameId, ctx);
+  traceStorage.enterWith(ctx);
   return ctx;
 }
 
@@ -280,7 +294,7 @@ function startPhaseSpan(name: string, attributes: Attributes = {}): Span {
   return otelTracer!.startSpan(name, {
     kind: SpanKind.INTERNAL,
     attributes: sanitizeAttributes({ 'span.type': 'phase', ...attributes }),
-  }, _rootCtx);
+  }, currentRootContext());
 }
 
 function startDecisionSpan(name: string, attributes: Attributes = {}): Span {
@@ -288,7 +302,7 @@ function startDecisionSpan(name: string, attributes: Attributes = {}): Span {
   return otelTracer!.startSpan(name, {
     kind: SpanKind.INTERNAL,
     attributes: sanitizeAttributes({ 'span.type': 'agent-decision', ...attributes }),
-  }, _rootCtx);
+  }, currentRootContext());
 }
 
 function startSkillSpan(name: string, attributes: Attributes = {}): Span {
@@ -296,7 +310,7 @@ function startSkillSpan(name: string, attributes: Attributes = {}): Span {
   return otelTracer!.startSpan(name, {
     kind: SpanKind.INTERNAL,
     attributes: sanitizeAttributes({ 'span.type': 'skill-execution', ...attributes }),
-  }, _rootCtx);
+  }, currentRootContext());
 }
 
 function startLlmSpan(attributes: Attributes = {}): Span {
@@ -308,7 +322,7 @@ function startLlmSpan(attributes: Attributes = {}): Span {
       'gen_ai.operation.name': 'chat',
       ...attributes,
     }),
-  }, _rootCtx);
+  }, currentRootContext());
 }
 
 // OTel only allows string | number | boolean | Array<string|number|boolean>
@@ -479,8 +493,6 @@ function flushTrace(ctx: TraceContext | null): void {
   }
 
   activeTraces.delete(ctx.gameId);
-  // Reset root context so next game gets a fresh trace
-  _rootCtx = context.active();
 }
 
 function markTraceError(ctx: TraceContext, message: string): void {
@@ -524,4 +536,6 @@ export {
   markTraceComplete,
   ensureOtel,
   getTracerProvider,
+  runWithTraceContext,
+  getCurrentTraceContext,
 };

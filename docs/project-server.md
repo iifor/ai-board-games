@@ -229,6 +229,8 @@ JSON 和目标校验仍由 Agent 层处理。
 
 ## 配置与部署
 
+单实例并发由 `MAX_CONCURRENT_GAMES`（默认 5）、`MAX_CONCURRENT_LLM_REQUESTS`（默认 8）和 `MAX_CONCURRENT_TTS_REQUESTS`（默认 4）限制。重复 WebSocket `start` 会被拒绝；游戏容量超限返回“服务器繁忙，请稍后重试”。这些限制仅作用于当前 Node.js 进程，不提供多实例协调。
+
 启动与构建：
 
 ```bash

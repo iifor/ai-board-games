@@ -7,6 +7,7 @@ import {
 import { synthesizeMimoVoice } from './mimo';
 import { AppError, ErrorCodes } from '../../utils/errors';
 import type { VoicePackage, WordBoundary } from './utils';
+import { upstreamConcurrency } from '../../utils/concurrency';
 
 interface SynthesizePreviewOptions {
   collectWordBoundaries?: boolean;
@@ -27,9 +28,14 @@ async function synthesizeVoicePreview(
   const provider = String(voicePackage.provider || 'browser').trim().toLowerCase();
   const content = String(text || voicePackage.sampleText || DEFAULT_SAMPLE_TEXT).trim() || DEFAULT_SAMPLE_TEXT;
 
-  if (provider === 'azure') return synthesizeAzureVoice(voicePackage, content, options);
-  if (provider === 'mimo') return synthesizeMimoVoice(voicePackage, content);
-  throw new AppError('UNSUPPORTED_VOICE', '该语音包使用浏览器本地语音，请在前端直接试听。', 422);
+  try {
+    if (provider === 'azure') return await upstreamConcurrency.ttsLimiter.run(() => synthesizeAzureVoice(voicePackage, content, options));
+    if (provider === 'mimo') return await upstreamConcurrency.ttsLimiter.run(() => synthesizeMimoVoice(voicePackage, content));
+    throw new AppError('UNSUPPORTED_VOICE', '该语音包使用浏览器本地语音，请在前端直接试听。', 422);
+  } catch (error) {
+    if (/timeout|超时/i.test(error instanceof Error ? error.message : String(error))) upstreamConcurrency.recordTtsTimeout();
+    throw error;
+  }
 }
 
 interface SynthesizeMediaResult {

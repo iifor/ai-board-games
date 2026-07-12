@@ -21,6 +21,7 @@
     "test:workflow": "node --preserve-symlinks --preserve-symlinks-main ./tests/workflow/runWorkflowTests.cjs",
     "test:unit": "node --preserve-symlinks --preserve-symlinks-main ./tests/unit/runUnitTests.cjs",
     "test:migration": "node --preserve-symlinks --preserve-symlinks-main ./tests/migration/runMigrationTests.cjs"
+    ,"test:concurrency": "node ./tests/load/fiveConcurrentGames.cjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

@@ -22,6 +22,7 @@ import {
 import type { ProjectionContext } from '../werewolf/views/viewPolicy';
 import { getActiveTrace, recordEvent, markTraceError, flushTrace } from '../observability';
 import { getSpectatorMode } from '../settings/service';
+import { sessionStartGuard } from './capacity';
 
 // games is TS — import directly
 import { saveGameRecord } from '../games';
@@ -154,7 +155,7 @@ function attachGameSocket(server: import('http').Server): void {
           session.send({ type: 'error', message: '当前处于观战模式，无法开始新游戏。请联系管理员关闭观战模式。' });
           return;
         }
-        runSession(
+        sessionStartGuard.run(session, Boolean(message.replayGameId), () => runSession(
           session,
           message.mode || 'real',
           message.playerIds,
@@ -168,7 +169,7 @@ function attachGameSocket(server: import('http').Server): void {
             debugMode: message.debugMode,
             replayView: message.replayView,
           },
-        ).catch((error: unknown) => {
+        )).catch((error: unknown) => {
           if (isSessionCancelled(error)) return;
           console.error(error);
           session.send({ type: 'error', message: (error as Error).message });

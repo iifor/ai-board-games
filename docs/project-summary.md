@@ -129,6 +129,7 @@ flowchart TD
 - `pnpm run test:unit`：运行单元测试。
 - `pnpm run test:workflow`：运行工作流测试。
 - `pnpm run test:migration`：运行迁移测试。
+- `pnpm run test:concurrency`：对已启动的本地服务发起 5 局并发调试对局并输出结构化结果。
 
 服务端端口：
 

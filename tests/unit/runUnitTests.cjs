@@ -9,6 +9,10 @@ const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
 const requestedFiles = process.argv.slice(2);
 const testFiles = (requestedFiles.length ? requestedFiles : [
   'gameSocketSession.test.ts',
+  'concurrencyLimiter.test.ts',
+  'gameSessionConcurrency.test.ts',
+  'upstreamConcurrency.test.ts',
+  'traceConcurrency.test.ts',
   'gameEventBuilder.test.ts',
   'eventBus.test.ts',
   'audienceStream.test.ts',

@@ -354,6 +354,8 @@ ack 流程：
 
 ## 配置与部署
 
+每个 WebSocket session 同时只能运行一局；重复 `start` 返回错误。实时新对局占用进程级游戏 lease，回放不占用；成功、失败、取消和断线都会在 `finally` 中释放。LLM/TTS 外部请求分别经过 FIFO 并发门禁，Trace 使用 `AsyncLocalStorage` 隔离并发对局上下文。
+
 工作流依赖服务端启动：
 
 ```bash

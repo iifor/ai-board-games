@@ -154,6 +154,7 @@ async function callOpenAIChatRawAttempt({
       obs!.endSpan(span, 'error', {}, new Error(errMsg));
     }
     const error = new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
+    if (response.status === 429) upstreamConcurrency.recordLlm429();
     if (response.status === 429 || response.status >= 500) {
       (error as RetryableLlmError).retryable = true;
     }
@@ -339,6 +340,7 @@ async function callAnthropicChatRawAttempt({
       obs!.endSpan(span, 'error', {}, new Error(errMsg));
     }
     const error = new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
+    if (response.status === 429) upstreamConcurrency.recordLlm429();
     if (response.status === 429 || response.status >= 500) {
       (error as RetryableLlmError).retryable = true;
     }
@@ -413,13 +415,13 @@ async function withSingleTransientRetry<T>(call: () => Promise<T>): Promise<T> {
 async function callOpenAIChatRaw(
   options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] },
 ): Promise<LlmRawResult> {
-  return withSingleTransientRetry(() => callOpenAIChatRawAttempt(options));
+  return upstreamConcurrency.llmLimiter.run(() => withSingleTransientRetry(() => callOpenAIChatRawAttempt(options)));
 }
 
 async function callAnthropicChatRaw(
   options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] },
 ): Promise<LlmRawResult> {
-  return withSingleTransientRetry(() => callAnthropicChatRawAttempt(options));
+  return upstreamConcurrency.llmLimiter.run(() => withSingleTransientRetry(() => callAnthropicChatRawAttempt(options)));
 }
 
 async function callAnthropicChat(options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] }): Promise<string> {
@@ -529,3 +531,4 @@ export {
 };
 
 export type { LlmCallOptions, LlmMessage };
+import { upstreamConcurrency } from '../../utils/concurrency';
