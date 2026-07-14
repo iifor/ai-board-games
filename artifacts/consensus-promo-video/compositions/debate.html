@@ -1,0 +1,52 @@
+﻿<template id="promo-debate-template">
+  <div id="promo-debate-root" data-composition-id="promo-debate" data-width="1920" data-height="1080">
+    <div class="scene-content">
+      <img class="debate-art" src="assets/debate.png" alt="AI 辩论舞台" crossorigin="anonymous" />
+      <div class="paper" data-layout-ignore></div>
+      <div class="eyebrow">AI DEBATE / 观点交锋</div>
+      <h1>不只会隐藏<br />也会论证、反驳与说服</h1>
+      <div class="arguments" data-layout-allow-overflow>
+        <article class="positive"><small>正方立论</small><strong>效率，应该成为选择的第一原则。</strong><span>证据链 04</span></article>
+        <div class="versus">VS</div>
+        <article class="negative"><small>反方质询</small><strong>如果忽略人的感受，效率还有意义吗？</strong><span>反驳点 03</span></article>
+      </div>
+      <div class="score"><b>评委投票</b><strong>4 : 3</strong><span>MVP · 反方二辩</span></div>
+      <div class="caption">AI 辩论：立论、攻辩、总结、评委投票，全流程实时推进</div>
+    </div>
+    <style>
+      @font-face { font-family:"Noto Sans SC"; src:local("Microsoft YaHei"); }
+      #promo-debate-root { width:100%;height:100%;overflow:hidden;background:#F5F1E8;color:#111827;font-family:"Noto Sans SC",sans-serif; }
+      #promo-debate-root .scene-content { position:relative;width:100%;height:100%;padding:66px 94px 64px;display:flex;flex-direction:column;gap:22px;box-sizing:border-box;overflow:hidden; }
+      #promo-debate-root .debate-art { position:absolute;right:-50px;top:-30px;width:860px;height:1140px;object-fit:cover;opacity:.12;filter:saturate(.7); }
+      #promo-debate-root .paper { position:absolute;inset:0;background:radial-gradient(circle at 82% 22%,rgba(47,107,255,.22),rgba(245,241,232,0) 45%); }
+      #promo-debate-root .eyebrow,#promo-debate-root h1,#promo-debate-root .arguments,#promo-debate-root .score,#promo-debate-root .caption { position:relative;z-index:2; }
+      #promo-debate-root .eyebrow { color:#2F6BFF;font-size:23px;font-weight:900;letter-spacing:.15em; }
+      #promo-debate-root h1 { margin:0;max-width:1250px;font-size:72px;line-height:1.06;letter-spacing:-.04em;font-weight:900; }
+      #promo-debate-root .arguments { display:grid;grid-template-columns:1fr 90px 1fr;gap:18px;align-items:center;flex:1; }
+      #promo-debate-root article { min-height:270px;padding:30px;display:flex;flex-direction:column;justify-content:space-between;gap:16px;border:3px solid #111827;border-radius:22px;background:rgba(248,250,252,.94);box-shadow:10px 12px 0 rgba(17,24,39,.12); }
+      #promo-debate-root .negative { border-color:#2F6BFF; }
+      #promo-debate-root article small { font-size:21px;font-weight:900;color:#2F6BFF; }
+      #promo-debate-root article strong { font-size:34px;line-height:1.35;font-weight:900; }
+      #promo-debate-root article span { align-self:flex-start;padding:8px 12px;background:#111827;color:#F8FAFC;border-radius:7px;font-size:18px;font-weight:700; }
+      #promo-debate-root .versus { display:grid;place-items:center;width:78px;height:78px;border-radius:50%;background:#FF8A34;font-size:29px;font-weight:900;transform:rotate(-7deg); }
+      #promo-debate-root .score { display:flex;align-items:center;gap:24px;padding:14px 22px;border-radius:16px;background:#0B1220;color:#F8FAFC;font-size:22px; }
+      #promo-debate-root .score strong { color:#FF8A34;font-size:36px;font-variant-numeric:tabular-nums; }
+      #promo-debate-root .score span { margin-left:auto;font-weight:800; }
+      #promo-debate-root .caption { text-align:center;font-size:28px;font-weight:700; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines=window.__timelines||{};const tl=gsap.timeline({ paused: true });
+      tl.from(".debate-art",{x:100,opacity:0,duration:.9,ease:"sine.out"},.15);
+      tl.from(".paper",{opacity:0,duration:.55,ease:"power1.out"},.18);
+      tl.from(".eyebrow",{y:-22,opacity:0,duration:.36,ease:"power2.out"},.22);
+      tl.from("h1",{x:-62,opacity:0,duration:.62,ease:"expo.out"},.34);
+      tl.from(".positive",{x:-100,opacity:0,rotation:-2,duration:.62,ease:"power4.out"},.72);
+      tl.from(".negative",{x:100,opacity:0,rotation:2,duration:.68,ease:"circ.out"},.83);
+      tl.from(".versus",{scale:.1,opacity:0,rotation:-90,duration:.55,ease:"back.out(1.9)"},1.18);
+      tl.from(".score",{y:48,opacity:0,duration:.48,ease:"power3.out"},1.56);
+      tl.from(".caption",{y:24,opacity:0,duration:.4,ease:"sine.out"},1.86);
+      window.__timelines["promo-debate"]=tl;
+    </script>
+  </div>
+</template>

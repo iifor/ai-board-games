@@ -1,0 +1,56 @@
+﻿<template id="promo-highlights-template">
+  <div id="promo-highlights-root" data-composition-id="promo-highlights" data-width="1920" data-height="1080">
+    <div class="scene-content">
+      <img class="stage" src="assets/werewolf-night.png" alt="狼人杀月夜舞台" crossorigin="anonymous" data-layout-allow-overflow />
+      <div class="shade" data-layout-ignore></div>
+      <header><span class="demo">演示对局片段</span><span class="round">第 3 夜 · 关键轮次</span></header>
+      <h1>AI 会判断，也会翻盘</h1>
+      <div class="action-grid">
+        <article class="action seer"><small>预言家 · 08号</small><strong>“查杀 03，今天必须出。”</strong><div class="tag">强势查杀</div></article>
+        <article class="action witch"><small>女巫 · 11号</small><strong>“这一刀，我救。”</strong><div class="tag">夜晚逆转</div></article>
+        <article class="action wolf"><small>白狼王 · 03号</small><strong>“那就一起离场。”</strong><div class="tag">自爆带人</div></article>
+      </div>
+      <div class="vote"><span>放逐票型</span><b>3 → 7</b><em>全场反转</em></div>
+      <div class="caption">预言家查杀、女巫反救、白狼王自爆——每个 AI 都在独立决策</div>
+    </div>
+    <style>
+      @font-face { font-family: "Noto Sans SC"; src: local("Microsoft YaHei"); }
+      #promo-highlights-root { width: 100%; height: 100%; overflow: hidden; color: #F8FAFC; background: #0B1220; font-family: "Noto Sans SC", sans-serif; }
+      #promo-highlights-root .scene-content { position: relative; width: 100%; height: 100%; padding: 70px 96px 92px; display: flex; flex-direction: column; gap: 24px; box-sizing: border-box; overflow: hidden; }
+      #promo-highlights-root .stage { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .44; transform: scale(1.04); }
+      #promo-highlights-root .shade { position: absolute; inset: 0; background: radial-gradient(circle at 70% 36%, rgba(47,107,255,.16), rgba(11,18,32,.36) 42%, #0B1220 86%); }
+      #promo-highlights-root header, #promo-highlights-root h1, #promo-highlights-root .action-grid, #promo-highlights-root .vote, #promo-highlights-root .caption { position: relative; z-index: 2; }
+      #promo-highlights-root header { display: flex; justify-content: space-between; align-items: center; font-size: 24px; font-weight: 800; }
+      #promo-highlights-root .demo { padding: 12px 19px; border-radius: 9px; background: #E83B4B; color: #F8FAFC; letter-spacing: .08em; }
+      #promo-highlights-root .round { color: #F8FAFC; opacity: .88; }
+      #promo-highlights-root h1 { margin: 0; font-size: 82px; line-height: 1.04; letter-spacing: -.04em; font-weight: 900; }
+      #promo-highlights-root .action-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: stretch; gap: 24px; flex: 1; min-height: 0; }
+      #promo-highlights-root .action { position: relative; padding: 30px; display: flex; flex-direction: column; justify-content: space-between; gap: 20px; border: 2px solid rgba(248,250,252,.26); border-radius: 26px; background: rgba(11,18,32,.84); box-shadow: 0 22px 60px rgba(0,0,0,.28); }
+      #promo-highlights-root .action.seer { border-color: #2F6BFF; }
+      #promo-highlights-root .action.witch { border-color: #FF8A34; transform: translateY(28px); }
+      #promo-highlights-root .action.wolf { border-color: #E83B4B; }
+      #promo-highlights-root small { font-size: 23px; color: #F8FAFC; opacity: .76; font-weight: 600; }
+      #promo-highlights-root strong { font-size: 39px; line-height: 1.28; font-weight: 900; }
+      #promo-highlights-root .tag { align-self: flex-start; padding: 10px 16px; border-radius: 8px; background: #F5F1E8; color: #111827; font-size: 23px; font-weight: 900; }
+      #promo-highlights-root .vote { align-self: flex-end; display: flex; align-items: center; gap: 18px; padding: 14px 22px; border-radius: 16px; background: #F5F1E8; color: #111827; font-size: 24px; font-weight: 800; }
+      #promo-highlights-root .vote b { color: #E83B4B; font-size: 38px; font-variant-numeric: tabular-nums; }
+      #promo-highlights-root .vote em { padding: 8px 14px; background: #E83B4B; color: #F8FAFC; font-style: normal; border-radius: 8px; }
+      #promo-highlights-root .caption { text-align: center; font-size: 31px; font-weight: 600; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.from(".stage", { scale: 1.16, opacity: 0, duration: 1.1, ease: "sine.out" }, .15);
+      tl.from(".shade", { opacity: 0, duration: .6, ease: "power1.out" }, .18);
+      tl.from("header", { y: -28, opacity: 0, duration: .42, ease: "power3.out" }, .22);
+      tl.from("h1", { x: -62, opacity: 0, duration: .66, ease: "expo.out" }, .38);
+      tl.from(".seer", { x: -90, opacity: 0, rotation: -3, duration: .7, ease: "back.out(1.3)" }, .85);
+      tl.from(".witch", { y: 100, opacity: 0, scale: .9, duration: .72, ease: "circ.out" }, 5.15);
+      tl.from(".wolf", { x: 110, opacity: 0, rotation: 4, duration: .58, ease: "power4.out" }, 9.95);
+      tl.from(".vote", { scale: .55, opacity: 0, rotation: -5, duration: .48, ease: "elastic.out(1,.45)" }, 11.0);
+      tl.from(".caption", { y: 28, opacity: 0, duration: .5, ease: "power2.out" }, 11.35);
+      window.__timelines["promo-highlights"] = tl;
+    </script>
+  </div>
+</template>

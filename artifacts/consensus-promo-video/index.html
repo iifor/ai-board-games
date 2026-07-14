@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Noto Sans SC"; src: local("Microsoft YaHei"); }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0B1220; }
+      body { font-family: "Noto Sans SC", sans-serif; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #0B1220; }
+      .transition { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 30; }
+      .transition-panel { position: absolute; inset: -40px; background: #FF8A34; transform: skewX(-8deg); }
+      .transition.tech .transition-panel { background: #2F6BFF; }
+      .transition.flash .transition-panel { background: #F5F1E8; transform: none; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="consensus-promo" data-start="0" data-duration="60" data-width="1920" data-height="1080">
+      <div id="scene-intro" class="clip" data-composition-id="promo-intro" data-composition-src="compositions/intro.html" data-start="0" data-duration="3.999" data-track-index="1"></div>
+      <div id="scene-highlights" class="clip" data-composition-id="promo-highlights" data-composition-src="compositions/highlights.html" data-start="4" data-duration="15.999" data-track-index="1"></div>
+      <div id="scene-modes" class="clip" data-composition-id="promo-modes" data-composition-src="compositions/modes.html" data-start="20" data-duration="9.999" data-track-index="1"></div>
+      <div id="scene-debate" class="clip" data-composition-id="promo-debate" data-composition-src="compositions/debate.html" data-start="30" data-duration="8.999" data-track-index="1"></div>
+      <div id="scene-admin" class="clip" data-composition-id="promo-admin" data-composition-src="compositions/admin.html" data-start="39" data-duration="11.999" data-track-index="1"></div>
+      <div id="scene-finale" class="clip" data-composition-id="promo-finale" data-composition-src="compositions/finale.html" data-start="51" data-duration="9" data-track-index="1"></div>
+
+      <div id="t1" class="clip transition" data-start="3.65" data-duration="0.35" data-track-index="3" data-layout-ignore><div class="transition-panel" data-layout-ignore></div></div>
+      <div id="t2" class="clip transition tech" data-start="19.65" data-duration="0.35" data-track-index="4" data-layout-ignore><div class="transition-panel" data-layout-ignore></div></div>
+      <div id="t3" class="clip transition flash" data-start="29.65" data-duration="0.35" data-track-index="5" data-layout-ignore><div class="transition-panel" data-layout-ignore></div></div>
+      <div id="t4" class="clip transition tech" data-start="38.65" data-duration="0.35" data-track-index="8" data-layout-ignore><div class="transition-panel" data-layout-ignore></div></div>
+      <div id="t5" class="clip transition" data-start="50.65" data-duration="0.35" data-track-index="9" data-layout-ignore><div class="transition-panel" data-layout-ignore></div></div>
+
+      <audio id="narration" class="clip" src="assets/narration.wav" data-start="0" data-duration="55.503" data-track-index="6" data-volume="1"></audio>
+      <audio id="music" class="clip" src="assets/music.wav" data-start="0" data-duration="60" data-track-index="7" data-volume="0.24"></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      [3.65, 19.65, 29.65, 38.65, 50.65].forEach((at, i) => {
+        tl.fromTo(`#t${i + 1} .transition-panel`, { xPercent: -115 }, { xPercent: 115, duration: 0.35, ease: "power4.inOut" }, at);
+      });
+      window.__timelines["consensus-promo"] = tl;
+    </script>
+  </body>
+</html>

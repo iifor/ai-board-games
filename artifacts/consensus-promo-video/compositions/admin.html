@@ -1,0 +1,75 @@
+﻿<template id="promo-admin-template">
+  <div id="promo-admin-root" data-composition-id="promo-admin" data-width="1920" data-height="1080">
+    <div class="scene-content">
+      <div class="grid-bg" data-layout-ignore></div>
+      <div class="eyebrow">B 端控制台 / 一处配置</div>
+      <div class="heading"><h1>模型、声音、角色、流程<br />都在同一套平台里</h1><span>OPERATOR VIEW</span></div>
+      <div class="workspace">
+        <section class="config-panel">
+          <header><b>智能体配置</b><i>已连接</i></header>
+          <div class="row"><span>模型供应商</span><strong>OpenAI Compatible</strong><em>ACTIVE</em></div>
+          <div class="row"><span>玩家主模型</span><strong>reasoning-model-01</strong><em>PRIMARY</em></div>
+          <div class="row"><span>备用模型</span><strong>fallback-model-02</strong><em>READY</em></div>
+          <div class="row accent"><span>音色 / TTS</span><strong>中文主持 · 实时语音</strong><em>VOICE</em></div>
+        </section>
+        <section class="ops-panel">
+          <div class="chip-row"><b>角色模式</b><b>历史回放</b><b>AI Trace</b><b>工作流调试</b></div>
+          <div class="timeline">
+            <div><i></i><span>workflow.step</span><strong>night.resolve</strong><em>128ms</em></div>
+            <div><i></i><span>agent.decision</span><strong>witch_save</strong><em>842ms</em></div>
+            <div><i></i><span>tts.generated</span><strong>playback.ready</strong><em>316ms</em></div>
+            <div><i></i><span>snapshot.saved</span><strong>replay.available</strong><em>64ms</em></div>
+          </div>
+        </section>
+      </div>
+      <div class="caption">模型供应商、备用模型、音色 TTS、Trace 与工作流调试，一处配置</div>
+    </div>
+    <style>
+      @font-face { font-family:"Noto Sans SC"; src:local("Microsoft YaHei"); }
+      #promo-admin-root { width:100%;height:100%;overflow:hidden;background:#F5F1E8;color:#111827;font-family:"Noto Sans SC",sans-serif; }
+      #promo-admin-root .scene-content { position:relative;width:100%;height:100%;padding:64px 90px 58px;display:flex;flex-direction:column;gap:21px;box-sizing:border-box;overflow:hidden; }
+      #promo-admin-root .grid-bg { position:absolute;inset:0;background-image:linear-gradient(rgba(47,107,255,.08) 2px,rgba(47,107,255,0) 2px),linear-gradient(90deg,rgba(47,107,255,.08) 2px,rgba(47,107,255,0) 2px);background-size:72px 72px;opacity:.45; }
+      #promo-admin-root .eyebrow,#promo-admin-root .heading,#promo-admin-root .workspace,#promo-admin-root .caption { position:relative;z-index:2; }
+      #promo-admin-root .eyebrow { color:#2F6BFF;font-size:22px;font-weight:900;letter-spacing:.14em; }
+      #promo-admin-root .heading { display:flex;justify-content:space-between;align-items:flex-end;gap:36px; }
+      #promo-admin-root h1 { margin:0;font-size:62px;line-height:1.06;letter-spacing:-.04em;font-weight:900; }
+      #promo-admin-root .heading>span { padding:12px 17px;border:2px solid #111827;border-radius:999px;font-size:18px;font-weight:900;letter-spacing:.1em; }
+      #promo-admin-root .workspace { display:grid;grid-template-columns:1.12fr .88fr;gap:24px;flex:1;min-height:0; }
+      #promo-admin-root section { padding:22px;border:2px solid #111827;border-radius:22px;background:rgba(248,250,252,.95);box-shadow:10px 12px 0 rgba(17,24,39,.11); }
+      #promo-admin-root .config-panel { display:flex;flex-direction:column;gap:12px; }
+      #promo-admin-root .config-panel header { display:flex;justify-content:space-between;align-items:center;padding-bottom:13px;border-bottom:2px solid #111827;font-size:22px; }
+      #promo-admin-root header i { padding:7px 11px;border-radius:999px;background:#0B1220;color:#F8FAFC;font-style:normal;font-size:16px; }
+      #promo-admin-root .row { display:grid;grid-template-columns:165px 1fr auto;align-items:center;gap:16px;padding:15px 16px;border-radius:12px;background:#F5F1E8;font-size:19px; }
+      #promo-admin-root .row span { color:#111827;opacity:.7;font-weight:700; }
+      #promo-admin-root .row strong { font-weight:900; }
+      #promo-admin-root .row em { padding:6px 9px;border-radius:6px;background:#111827;color:#F8FAFC;font-style:normal;font-size:13px;font-weight:900; }
+      #promo-admin-root .row.accent { background:#2F6BFF;color:#F8FAFC; }
+      #promo-admin-root .row.accent span { color:#F8FAFC;opacity:.9; }
+      #promo-admin-root .row.accent em { background:#FF8A34;color:#111827; }
+      #promo-admin-root .ops-panel { display:flex;flex-direction:column;gap:18px; }
+      #promo-admin-root .chip-row { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+      #promo-admin-root .chip-row b { padding:12px;border-radius:10px;background:#0B1220;color:#F8FAFC;text-align:center;font-size:17px; }
+      #promo-admin-root .timeline { display:flex;flex-direction:column;justify-content:space-between;gap:11px;flex:1; }
+      #promo-admin-root .timeline div { display:grid;grid-template-columns:13px 145px 1fr auto;align-items:center;gap:10px;padding:13px 12px;border-bottom:1px solid rgba(17,24,39,.2);font-size:16px;font-variant-numeric:tabular-nums; }
+      #promo-admin-root .timeline i { width:11px;height:11px;border-radius:50%;background:#FF8A34; }
+      #promo-admin-root .timeline span { opacity:.65; }
+      #promo-admin-root .timeline em { color:#0B1220;font-style:normal;font-weight:900; }
+      #promo-admin-root .caption { text-align:center;font-size:27px;font-weight:700; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines=window.__timelines||{};const tl=gsap.timeline({ paused: true });
+      tl.from(".grid-bg",{opacity:0,scale:1.08,duration:.75,ease:"sine.out"},.15);
+      tl.from(".eyebrow",{y:-20,opacity:0,duration:.34,ease:"power2.out"},.2);
+      tl.from("h1",{x:-58,opacity:0,duration:.62,ease:"expo.out"},.32);
+      tl.from(".heading>span",{scale:.5,opacity:0,duration:.4,ease:"back.out(1.6)"},.58);
+      tl.from(".config-panel",{x:-80,opacity:0,duration:.58,ease:"power4.out"},.72);
+      tl.from(".row",{x:-36,opacity:0,duration:.34,stagger:.1,ease:"circ.out"},1.06);
+      tl.from(".ops-panel",{x:90,opacity:0,duration:.62,ease:"power3.out"},1.12);
+      tl.from(".chip-row b",{scale:.72,opacity:0,duration:.3,stagger:.07,ease:"back.out(1.4)"},1.5);
+      tl.from(".timeline div",{y:26,opacity:0,duration:.35,stagger:.12,ease:"power2.out"},1.85);
+      tl.from(".caption",{y:22,opacity:0,duration:.4,ease:"sine.out"},2.42);
+      window.__timelines["promo-admin"]=tl;
+    </script>
+  </div>
+</template>
