@@ -14,6 +14,7 @@ services:
       - "127.0.0.1:3001:3001"  # Only accessible locally; Nginx handles external traffic
     volumes:
       - consensus-data:/app/data        # SQLite database persistence
+      - consensus-resources:/app/packages/server/resources # Uploaded images and generated audio
       - ./avatars:/app/avatars          # Avatar images
     env_file:
       - .env
@@ -42,4 +43,6 @@ services:
 
 volumes:
   consensus-data:
+    driver: local
+  consensus-resources:
     driver: local
