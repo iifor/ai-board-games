@@ -26,6 +26,7 @@ interface Player {
   provider: string;
   model: string;
   modelId: number | null;
+  fallbackModelId: number | null;
   voicePackageId: number | null;
   temperature: number;
   enabled: boolean;

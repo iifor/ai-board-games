@@ -46,6 +46,8 @@ interface LlmRawResult {
   thinking: string;
 }
 
+type CallableModel = LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] };
+
 interface TestConnectionResult {
   ok: boolean;
   latencyMs?: number;
@@ -439,6 +441,84 @@ async function callModelChatWithThinking(target: LlmCallOptions & { apiKey: stri
   return callOpenAIChatRaw(target);
 }
 
+async function callWithModelFallback<T>(
+  primary: LlmCallOptions | null | undefined,
+  fallback: LlmCallOptions | null | undefined,
+  invoke: (target: CallableModel) => Promise<T>,
+  isEmpty: (result: T) => boolean,
+): Promise<T> {
+  const primaryTarget = toCallableModel(primary);
+  const fallbackTarget = toCallableModel(fallback);
+  let primaryError: unknown = null;
+
+  if (primaryTarget) {
+    try {
+      const result = await invoke(primaryTarget);
+      if (!isEmpty(result)) return result;
+      primaryError = new Error(`[${primaryTarget.provider}:${primaryTarget.model}] empty response`);
+    } catch (error) {
+      primaryError = error;
+    }
+  }
+
+  if (fallbackTarget && !isSameModel(primaryTarget, fallbackTarget)) {
+    if (primaryError) {
+      console.warn(
+        `[llm] ${primaryTarget?.provider || 'primary'}:${primaryTarget?.model || 'unavailable'} failed; `
+        + `using ${fallbackTarget.provider}:${fallbackTarget.model}: ${errorMessage(primaryError)}`,
+      );
+    }
+    try {
+      const result = await invoke(fallbackTarget);
+      if (!isEmpty(result)) return result;
+      throw new Error(`[${fallbackTarget.provider}:${fallbackTarget.model}] empty response`);
+    } catch (fallbackError) {
+      if (primaryError) {
+        throw new AggregateError([primaryError, fallbackError], 'Primary and fallback models both failed');
+      }
+      throw fallbackError;
+    }
+  }
+
+  if (primaryError) throw primaryError;
+  throw new Error('No callable primary or fallback model is configured');
+}
+
+function toCallableModel(target: LlmCallOptions | null | undefined): CallableModel | null {
+  if (!target?.apiKey || !target.model) return null;
+  return { ...target, messages: target.messages || [] } as CallableModel;
+}
+
+function isSameModel(primary: CallableModel | null, fallback: CallableModel): boolean {
+  if (!primary) return false;
+  return primary.provider === fallback.provider
+    && primary.baseUrl === fallback.baseUrl
+    && primary.model === fallback.model;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function callModelChatWithFallback(
+  primary: LlmCallOptions | null | undefined,
+  fallback?: LlmCallOptions | null,
+): Promise<string> {
+  return callWithModelFallback(primary, fallback, callModelChat, (content) => !content.trim());
+}
+
+function callModelChatWithThinkingFallback(
+  primary: LlmCallOptions | null | undefined,
+  fallback?: LlmCallOptions | null,
+): Promise<LlmRawResult> {
+  return callWithModelFallback(
+    primary,
+    fallback,
+    callModelChatWithThinking,
+    (result) => !result.content.trim(),
+  );
+}
+
 async function testModelConnection(target: LlmCallOptions): Promise<TestConnectionResult> {
   const startedAt = Date.now();
   if (!target?.apiKey) {
@@ -523,7 +603,9 @@ export {
   callAnthropicChat,
   callAnthropicChatRaw,
   callModelChat,
+  callModelChatWithFallback,
   callModelChatWithThinking,
+  callModelChatWithThinkingFallback,
   callOpenAIChat,
   callOpenAIChatRaw,
   testModelConnection,

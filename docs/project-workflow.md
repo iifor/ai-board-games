@@ -654,3 +654,9 @@ pnpm run test:workflow
 - Night workflow adds `wolf_witch_curse` and `illusionist_illusion` after existing early night special actions and before wolf team discussion/vote.
 - `wolf_witch_curse` records `round.night.wolfWitchCurse` and sets the target player's `skillDisabledUntilDay` to the next night. Normal actor selection filters this temporary disable state, so cursed god-role skills are skipped until the next night starts.
 - `illusionist_illusion` records `round.night.illusionTarget`; during night resolution, if the Illusionist is killed by `wolf_kill` or `witch_poison`, the death is redirected to the illusion target as `illusion_substitute`.
+
+## AI 模型故障转移
+
+- 狼人杀和辩论的玩家 Agent 都继承共享 `BasePlayerAgent`，不在各游戏工作流内复制降级分支。
+- 调用顺序为：主模型现有瞬时重试 → 单次备选模型 → 现有规则级兜底。
+- 备选模型配置只传入 Agent 调用选项，不写入公开玩家状态，也不产生新的 WebSocket 事件。

@@ -3,6 +3,13 @@ import { BasePlayerAgent, normalizeText } from '../agent-core';
 interface PlayerAgentOptions {
   onError?: (entry: unknown) => void;
   gameId?: string;
+  fallbackModel?: {
+    apiKey?: string;
+    baseUrl?: string;
+    provider?: string;
+    model?: string;
+    apiFormat?: string;
+  } | null;
   [key: string]: unknown;
 }
 

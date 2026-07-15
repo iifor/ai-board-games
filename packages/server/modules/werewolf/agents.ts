@@ -23,6 +23,14 @@ interface RoleConfig {
   [key: string]: unknown;
 }
 
+interface ModelConfig {
+  apiKey?: string;
+  baseUrl?: string;
+  provider?: string;
+  model?: string;
+  apiFormat?: string;
+}
+
 interface PlayerInput {
   id: number;
   sourcePlayerId?: number;
@@ -36,6 +44,7 @@ interface PlayerInput {
   sex?: string;
   personality?: string;
   apiKey?: string;
+  fallbackModel?: ModelConfig | null;
   [key: string]: unknown;
 }
 
@@ -294,10 +303,11 @@ function createWerewolfAgents(
   const wolves = selected.filter((_, index) => getRoleConfig(modeConfig, resolveRoleId(roles[index])).faction === 'wolves').map((player) => player.id);
 
   return selected.map((player, index) => {
+    const { fallbackModel, ...publicPlayer } = player;
     const roleId = resolveRoleId(roles[index]);
     const roleConfig = getRoleConfig(modeConfig, roleId);
     const agent: WerewolfAgent = {
-      ...player,
+      ...publicPlayer,
       role: roleId,
       roleConfig,
       roleLabel: roleConfig.name || roleId,
@@ -346,7 +356,8 @@ function createWerewolfAgents(
     agent.baseSystemPromptHash = hashText(agent.baseSystemPrompt!);
     agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt, {
       onError: (entry: unknown) => fallbackAudit.record(entry as Record<string, unknown>),
-      gameId
+      gameId,
+      fallbackModel,
     });
     roleSkillRegistry?.applyToPlayer(agent.playerAgent, roleId);
     return agent;

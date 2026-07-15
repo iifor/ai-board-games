@@ -1,27 +1,102 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getWerewolfInteractionStatusText, resolveNightAwakeLabel, resolveWerewolfInteraction, resolveWerewolfSpeechSpeaker, resolveWerewolfStageNarrative } from '../../packages/client/src/features/werewolf-v2/utils/interactionState';
+import { readFileSync } from 'node:fs';
+import { getWerewolfInteractionAnimationKey, getWerewolfInteractionStatusText, getWerewolfInteractionVisualKind, resolveNightAwakeLabel, resolveWerewolfActiveSubtitle, resolveWerewolfInteraction, resolveWerewolfSpeechSpeaker, shouldShowWerewolfStageDetails } from '../../packages/client/src/features/werewolf-v2/utils/interactionState';
+
+test('werewolf v2 maps core actions to distinct role visuals', () => {
+  assert.equal(getWerewolfInteractionVisualKind('wolf_vote'), 'wolf');
+  assert.equal(getWerewolfInteractionVisualKind('seer_check'), 'seer');
+  assert.equal(getWerewolfInteractionVisualKind('witch_poison'), 'witch');
+  assert.equal(getWerewolfInteractionVisualKind('guard_protect'), 'guard');
+  assert.equal(getWerewolfInteractionVisualKind('hunter_shot'), 'hunter');
+  assert.equal(getWerewolfInteractionVisualKind('self_destruct'), 'self-destruct');
+  assert.equal(getWerewolfInteractionVisualKind('knight_duel'), 'knight');
+  assert.equal(getWerewolfInteractionVisualKind('idiot_reveal'), 'idiot');
+  assert.equal(getWerewolfInteractionVisualKind('sheriff_vote'), 'sheriff');
+  assert.equal(getWerewolfInteractionVisualKind('future_skill'), 'generic');
+  assert.equal(getWerewolfInteractionVisualKind(''), 'none');
+});
+
+test('werewolf v2 exposes only event-backed skill result labels', () => {
+  assert.equal(resolveWerewolfInteraction({ type: 'seer-check', actionType: 'seer_check', seerCheck: { target: 4, result: '狼人' } }).resultLabel, '查验结果：狼人');
+  assert.equal(resolveWerewolfInteraction({ type: 'guard-action', actionType: 'guard_protect', guardAction: { target: 6 } }).resultLabel, '守护生效');
+  assert.equal(resolveWerewolfInteraction({ type: 'witch-action', actionType: 'witch_poison', witchAction: { use: true, target: 9 } }).resultLabel, '毒药已使用');
+  assert.equal(resolveWerewolfInteraction({ type: 'witch-action', actionType: 'witch_poison', witchAction: { use: false, target: null } }).resultLabel, '保留药剂');
+  assert.equal(resolveWerewolfInteraction({ type: 'knight-duel', actionType: 'knight_duel', knightDuel: { actorId: 4, targetId: 9, success: true } }).resultLabel, '决斗成功');
+  assert.equal(resolveWerewolfInteraction({ type: 'workflow-event', actionType: 'future_skill' }).resultLabel, '');
+});
+
+test('werewolf v2 renders the approved visual stage and public seat badges', () => {
+  const stage = readFileSync('packages/client/src/features/werewolf-v2/components/PerspectiveShared/index.tsx', 'utf8');
+  const roleVisual = readFileSync('packages/client/src/features/werewolf-v2/components/RoleInteractionVisual/index.tsx', 'utf8');
+  assert.match(stage, /RoleInteractionVisual/);
+  assert.match(roleVisual, /interaction\.template === 'idle'/);
+  for (const label of ['发言中', '警长候选', '警长', '已退水', '已翻牌', '已出局']) {
+    assert.match(stage, new RegExp(label));
+  }
+});
+
+test('werewolf v2 hides duplicate center details while a player is speaking', () => {
+  assert.equal(shouldShowWerewolfStageDetails({ template: 'speech' }), false);
+  assert.equal(shouldShowWerewolfStageDetails({ template: 'single-target' }), true);
+});
+
+test('werewolf v2 keeps spoken copy in the bottom bar only', () => {
+  const stage = readFileSync('packages/client/src/features/werewolf-v2/components/PerspectiveShared/index.tsx', 'utf8');
+  const bottomBar = readFileSync('packages/client/src/features/werewolf-v2/components/WerewolfBottomSpeechBar/index.tsx', 'utf8');
+
+  assert.doesNotMatch(stage, /resolveWerewolfStageNarrative|interaction-stage__narrative|interaction-stage__speaker/);
+  assert.match(bottomBar, /resolveWerewolfSpeechSpeaker/);
+  assert.match(bottomBar, /PlayerAvatar/);
+});
+
+test('werewolf v2 subtitle follows the active speech cue instead of showing the full speech', () => {
+  const speech = {
+    text: '第一句正在播放，内容足够清楚。第二句随后播放，不能提前展示。',
+    wordBoundaries: [
+      { text: '第一句正在播放', offset: 0, duration: 800 },
+      { text: '，', offset: 800, duration: 80 },
+      { text: '内容足够清楚', offset: 880, duration: 800 },
+      { text: '。', offset: 1680, duration: 80 },
+      { text: '第二句随后播放', offset: 2200, duration: 800 },
+      { text: '，', offset: 3000, duration: 80 },
+      { text: '不能提前展示', offset: 3080, duration: 800 },
+      { text: '。', offset: 3880, duration: 80 },
+    ],
+  };
+
+  assert.equal(resolveWerewolfActiveSubtitle({ ...speech, currentTimeMs: 900 }), '第一句正在播放，内容足够清楚。');
+  assert.equal(resolveWerewolfActiveSubtitle({ ...speech, currentTimeMs: 3200 }), '第二句随后播放，不能提前展示。');
+  assert.equal(resolveWerewolfActiveSubtitle({ text: speech.text, wordBoundaries: null, currentTimeMs: null }), '第一句正在播放，内容足够清楚。');
+});
+
+test('werewolf result opens MVP vote records by default', () => {
+  const source = readFileSync('packages/client/src/features/werewolf/components/WerewolfResult/index.tsx', 'utf8');
+  assert.match(source, /<details className="werewolf-result-votes" open>/);
+  assert.doesNotMatch(source, /open=\{!game\.mvp\}/);
+});
+
+test('werewolf v2 does not restart the stage animation for transient updates in one action', () => {
+  const acting = resolveWerewolfInteraction({
+    type: 'workflow-event',
+    workflowEvent: 'werewolf_action_window_opened',
+    actionType: 'wolf_vote',
+    actionWindow: { actorIds: [1, 2], targetIds: [4, 5] },
+  });
+  const resolved = resolveWerewolfInteraction({
+    type: 'wolf-vote',
+    actionType: 'wolf_vote',
+    wolfTarget: 5,
+  });
+
+  assert.equal(getWerewolfInteractionAnimationKey(acting), getWerewolfInteractionAnimationKey(resolved));
+});
 
 test('werewolf v2 resolves the speaking player for the stage identity', () => {
   const players = [{ id: 1, nickname: '豆包' }, { id: 2, nickname: 'Grok' }];
   assert.deepEqual(resolveWerewolfSpeechSpeaker({ playerId: '2' }, players), players[1]);
   assert.equal(resolveWerewolfSpeechSpeaker({ playerId: null }, players), null);
   assert.equal(resolveWerewolfSpeechSpeaker({ playerId: '9' }, players), null);
-});
-
-test('werewolf v2 stage prefers thinking and falls back to subtitle', () => {
-  assert.deepEqual(
-    resolveWerewolfStageNarrative({ thinking: '先判断狼队目标。', fullText: '公开发言。' }, '阶段信息'),
-    { kind: 'thinking', label: '思考过程', text: '先判断狼队目标。' },
-  );
-  assert.deepEqual(
-    resolveWerewolfStageNarrative({ thinking: '  ', fullText: '完整字幕。', text: '当前字幕。' }, '阶段信息'),
-    { kind: 'subtitle', label: '发言内容', text: '完整字幕。' },
-  );
-  assert.deepEqual(
-    resolveWerewolfStageNarrative(null, '阶段信息'),
-    { kind: 'status', label: '', text: '阶段信息' },
-  );
 });
 
 test('werewolf v2 keeps submitted as an internal state without exposing submission copy', () => {

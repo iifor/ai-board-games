@@ -4,6 +4,13 @@ import type { DebatePlayer } from './utils';
 interface DebateAgentOptions {
   onError?: (entry: Record<string, unknown>) => void;
   gameId?: string;
+  fallbackModel?: {
+    apiKey?: string;
+    baseUrl?: string;
+    provider?: string;
+    model?: string;
+    apiFormat?: string;
+  } | null;
   [key: string]: unknown;
 }
 

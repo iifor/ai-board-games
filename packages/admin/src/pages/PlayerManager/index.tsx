@@ -144,7 +144,16 @@ export function PlayerManager() {
           { title: '头像', dataIndex: 'avatar', width: 72, render: (value: string) => <Avatar src={value} icon={<UserOutlined />} /> },
           { title: '昵称', width: 120, dataIndex: 'nickname' },
           { title: '性别', width: 80, dataIndex: 'sex', render: (value: string) => value || '-' },
-          { title: '模型', width: 250, dataIndex: 'model', render: (_: unknown, record: Player) => modelName(record, models) },
+          {
+            title: '模型', width: 280, dataIndex: 'model', render: (_: unknown, record: Player) => (
+              <Space direction="vertical" size={0}>
+                <Text>{modelName(record, models)}</Text>
+                {record.fallbackModelId && (
+                  <Text type="secondary">备选：{modelName({ modelId: record.fallbackModelId }, models)}</Text>
+                )}
+              </Space>
+            )
+          },
           { title: '人格', dataIndex: 'personality', ellipsis: true },
           { title: '语音包', width: 200, dataIndex: 'voicePackageId', render: (value: number) => voices.find((voice) => voice.id === value)?.name || '-' },
           { title: '状态', width: 100, dataIndex: 'enabled', render: enabledTag },
@@ -177,13 +186,29 @@ interface PlayerModalProps {
 }
 
 function PlayerModal({ open, initialValues, modelOptions, voiceOptions, onCancel, onSave }: PlayerModalProps) {
-  const selectableModelOptions = modelOptions.filter((option) => !option.disabled || option.value === initialValues?.modelId);
+  const selectedModelIds = [initialValues?.modelId, initialValues?.fallbackModelId];
+  const selectableModelOptions = modelOptions.filter((option) => !option.disabled || selectedModelIds.includes(option.value));
   return (
     <EntityModal open={open} title={initialValues?.id ? '编辑玩家' : '新增玩家'} initialValues={{ ...emptyPlayer, ...(initialValues || {}) }} onCancel={onCancel} onSave={onSave}>
       <Form.Item name="nickname" label="昵称" rules={[{ required: true, message: '请输入昵称' }]}><Input /></Form.Item>
       <Form.Item name="avatar" label="头像"><AvatarUpload /></Form.Item>
       <Form.Item name="sex" label="性别"><Select options={['未知', '男', '女'].map((value) => ({ value, label: value }))} /></Form.Item>
-      <Form.Item name="modelId" label="模型"><Select allowClear options={selectableModelOptions} /></Form.Item>
+      <Form.Item name="modelId" label="主模型"><Select allowClear options={selectableModelOptions} /></Form.Item>
+      <Form.Item
+        name="fallbackModelId"
+        label="备选模型"
+        dependencies={['modelId']}
+        extra="主模型调用失败或输出无效时自动使用一次"
+        rules={[({ getFieldValue }) => ({
+          validator(_, value) {
+            return value != null && value === getFieldValue('modelId')
+              ? Promise.reject(new Error('备选模型不能与主模型相同'))
+              : Promise.resolve();
+          }
+        })]}
+      >
+        <Select allowClear placeholder="不启用模型降级" options={selectableModelOptions} />
+      </Form.Item>
       <Form.Item name="personality" label="人格"><Input.TextArea rows={4} /></Form.Item>
       <Form.Item name="voicePackageId" label="语音包"><Select allowClear options={voiceOptions} /></Form.Item>
       <Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item>
@@ -219,6 +244,7 @@ function PlayerDebugModal({ open, player, models, voices, onCancel }: PlayerDebu
   if (!player) return null;
   const currentPlayer = player;
   const model = models.find((item) => item.id === currentPlayer.modelId);
+  const fallbackModel = models.find((item) => item.id === currentPlayer.fallbackModelId);
   const voice = voices.find((item) => item.id === currentPlayer.voicePackageId);
 
   async function send() {
@@ -263,6 +289,7 @@ function PlayerDebugModal({ open, player, models, voices, onCancel }: PlayerDebu
           <Descriptions.Item label="昵称">{player.nickname || '-'}</Descriptions.Item>
           <Descriptions.Item label="人格">{player.personality || '-'}</Descriptions.Item>
           <Descriptions.Item label="模型">{model ? `${model.provider}/${model.name}` : '未绑定'}</Descriptions.Item>
+          <Descriptions.Item label="备选模型">{fallbackModel ? `${fallbackModel.provider}/${fallbackModel.name}` : '未配置'}</Descriptions.Item>
           <Descriptions.Item label="语音包">{voice?.name || '未绑定'}</Descriptions.Item>
         </Descriptions>
         <div className="admin-chat-log">

@@ -6,6 +6,7 @@ export interface Player {
   sex: string;
   personality: string;
   modelId: number | null;
+  fallbackModelId: number | null;
   model?: string;
   modelName?: string;
   voicePackageId: number | null;

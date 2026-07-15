@@ -32,6 +32,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'werewolfV2InteractionState.test.ts',
   'gameNavigation.test.ts',
   'llmRetry.test.ts',
+  'playerModelFallback.test.ts',
   'traceParticipants.test.ts',
   'nightResolutionAuditViewModel.test.ts',
   'werewolfPostgameRules.test.ts'

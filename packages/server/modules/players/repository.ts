@@ -19,12 +19,12 @@ function getNextPlayerId(): number {
 
 function insertPlayer(row: PlayerInsertRow): void {
   getDb().prepare(`
-    INSERT INTO players (id, nickname, name, avatar, sex, personality, provider, model, model_id, voice_package_id, temperature, enabled, sort_order, created_at, updated_at)
-    VALUES (@id, @nickname, @name, @avatar, @sex, @personality, @provider, @model, @model_id, @voice_package_id, @temperature, @enabled, @sort_order, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    INSERT INTO players (id, nickname, name, avatar, sex, personality, provider, model, model_id, fallback_model_id, voice_package_id, temperature, enabled, sort_order, created_at, updated_at)
+    VALUES (@id, @nickname, @name, @avatar, @sex, @personality, @provider, @model, @model_id, @fallback_model_id, @voice_package_id, @temperature, @enabled, @sort_order, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO UPDATE SET
       nickname = excluded.nickname, name = excluded.name, avatar = excluded.avatar,
       sex = excluded.sex, personality = excluded.personality, provider = excluded.provider,
-      model = excluded.model, model_id = excluded.model_id, voice_package_id = excluded.voice_package_id,
+      model = excluded.model, model_id = excluded.model_id, fallback_model_id = excluded.fallback_model_id, voice_package_id = excluded.voice_package_id,
       temperature = excluded.temperature, enabled = excluded.enabled, sort_order = excluded.sort_order,
       updated_at = CURRENT_TIMESTAMP
   `).run(row);
@@ -48,6 +48,7 @@ function countGamePlayersByPlayerId(id: number | string): number {
 
 function nullifyPlayerModelRefs(modelId: number | string): void {
   getDb().prepare('UPDATE players SET model_id = NULL WHERE model_id = ?').run(Number(modelId));
+  getDb().prepare('UPDATE players SET fallback_model_id = NULL WHERE fallback_model_id = ?').run(Number(modelId));
 }
 
 function nullifyPlayerVoiceRefs(voiceId: number | string): void {

@@ -4,13 +4,13 @@
   bottom: 18px;
   z-index: 48;
   display: grid;
-  width: min(760px, calc(100% - 36px));
-  min-height: 90px;
-  max-height: 38vh;
-  grid-template-columns: minmax(0, 1fr) 110px;
-  gap: 18px;
+  width: min(820px, calc(100% - 36px));
+  min-height: 78px;
+  max-height: 30vh;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 16px;
   align-items: center;
-  padding: 18px 18px 18px 24px;
+  padding: 12px 20px 12px 14px;
   border: 1px solid rgba(68, 151, 255, 0.42);
   border-radius: 16px;
   background:
@@ -22,72 +22,35 @@
 }
 .werewolf-v2-bottom-speech::before { content: ''; position: absolute; inset: -1px; border: 1px solid rgba(111, 204, 255, .38); border-radius: inherit; box-shadow: 0 0 30px rgba(63, 136, 255, .18); pointer-events: none; }
 
+.werewolf-v2-bottom-speech__speaker { display: flex; min-width: 0; align-items: center; gap: 10px; padding-right: 16px; border-right: 1px solid rgba(116, 159, 239, .18); }
+.werewolf-v2-bottom-speech__avatar { display: grid; flex: 0 0 auto; width: 48px; height: 48px; place-items: center; border: 2px solid rgba(112, 244, 181, .76); border-radius: 50%; color: #8affbe; background: rgba(5, 38, 45, .84) center/cover; box-shadow: 0 0 24px rgba(55, 221, 145, .24); }
+.werewolf-v2-bottom-speech__speaker > span { display: grid; min-width: 0; gap: 2px; }
+.werewolf-v2-bottom-speech__speaker small { color: rgba(143, 196, 255, .68); font-size: 10px; font-weight: 800; white-space: nowrap; }
+.werewolf-v2-bottom-speech__speaker strong { overflow: hidden; color: #dffff0; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+
 .werewolf-v2-bottom-speech__copy {
   min-width: 0;
-  max-height: calc(38vh - 36px);
+  max-height: calc(30vh - 24px);
   overflow-y: auto;
   scrollbar-width: thin;
 }
-
-.werewolf-v2-bottom-speech__copy span {
-  display: inline-flex;
-  max-width: 100%;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  color: #d9fff0;
-  background: rgba(41, 151, 107, 0.24);
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.werewolf-v2-bottom-speech__lines { display: grid; gap: 2px; margin-top: 8px; }
+.werewolf-v2-bottom-speech__lines { display: grid; gap: 2px; }
 .werewolf-v2-bottom-speech__copy p {
   margin: 0;
   color: #f4f7ff;
-  font-size: clamp(15px, 1.18vw, 20px);
+  font-size: clamp(14px, 1.05vw, 18px);
   font-weight: 850;
-  line-height: 1.5;
+  line-height: 1.45;
   text-wrap: pretty;
 }
-
-.werewolf-v2-bottom-speech__wave {
-  display: flex;
-  height: 48px;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-
-.werewolf-v2-bottom-speech__wave i {
-  display: block;
-  width: 4px;
-  height: calc(12px + (var(--bar-index) % 5) * 7px);
-  border-radius: 999px;
-  background: linear-gradient(180deg, #c08cff, #557dff);
-  box-shadow: 0 0 12px rgba(147, 91, 255, 0.55);
-  opacity: 0.9;
-  animation: werewolf-v2-wave 1.25s ease-in-out infinite;
-  animation-delay: calc(var(--bar-index) * -70ms);
-}
-
-@keyframes werewolf-v2-wave {
-  50% {
-    transform: scaleY(0.45);
-    opacity: 0.48;
-  }
-}
+@keyframes werewolf-v2-cursor { 50% { opacity: 0; } }
 
 @media (max-width: 760px) {
   .werewolf-v2-bottom-speech {
-    min-height: 112px;
+    min-height: 104px;
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     padding: 14px;
   }
-
-  .werewolf-v2-bottom-speech__wave {
-    display: none;
-  }
+  .werewolf-v2-bottom-speech__speaker { padding-right: 0; padding-bottom: 10px; border-right: 0; border-bottom: 1px solid rgba(116, 159, 239, .18); }
 }

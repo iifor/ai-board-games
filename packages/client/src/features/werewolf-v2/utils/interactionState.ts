@@ -1,5 +1,10 @@
+import { splitPlayableDisplaySegments } from '../../../utils/playableText';
+import { buildSpeechSubtitleTimeline, findActiveCue } from '../../../utils/wordBoundariesToSubtitle';
+import type { SpeechState } from '../../../types';
+
 export type WerewolfInteractionStatus = 'idle' | 'acting' | 'submitted' | 'resolved' | 'skipped';
 export type WerewolfInteractionTemplate = 'idle' | 'speech' | 'single-target' | 'dual-target' | 'binary-choice' | 'multi-choice' | 'passive-trigger' | 'result-reveal';
+export type WerewolfInteractionVisualKind = 'wolf' | 'seer' | 'witch' | 'guard' | 'hunter' | 'self-destruct' | 'knight' | 'idiot' | 'sheriff' | 'generic' | 'none';
 
 export interface WerewolfInteractionState {
   action: string;
@@ -10,6 +15,7 @@ export interface WerewolfInteractionState {
   tone: 'day' | 'wolf' | 'seer' | 'witch' | 'guard' | 'system';
   actorIds: number[];
   targetIds: number[];
+  resultLabel: string;
 }
 
 type EventLike = Record<string, unknown> & {
@@ -85,6 +91,21 @@ const RESOLVED_EVENTS = new Set([
   'spirit_wolf_antidote', 'wolf_witch_curse', 'illusionist_illusion',
 ]);
 
+const ACTION_VISUALS: Partial<Record<string, WerewolfInteractionVisualKind>> = {
+  wolf_vote: 'wolf',
+  wolf_kill: 'wolf',
+  wolf_speech: 'wolf',
+  seer_check: 'seer',
+  witch_save: 'witch',
+  witch_poison: 'witch',
+  guard_protect: 'guard',
+  hunter_shot: 'hunter',
+  self_destruct: 'self-destruct',
+  selfdestruct: 'self-destruct',
+  knight_duel: 'knight',
+  idiot_reveal: 'idiot',
+};
+
 export function resolveWerewolfInteraction(event: EventLike | null | undefined): WerewolfInteractionState {
   if (!event) return idleState();
   const workflowEvent = normalize(String(event.workflowEvent || event.type || ''));
@@ -105,7 +126,15 @@ export function resolveWerewolfInteraction(event: EventLike | null | undefined):
     tone: meta.tone,
     actorIds: actorIds.length ? actorIds : resolveActors(event),
     targetIds,
+    resultLabel: resolveResultLabel(event, resolvedAction, status),
   };
+}
+
+export function getWerewolfInteractionVisualKind(action: string): WerewolfInteractionVisualKind {
+  const normalized = normalize(action);
+  if (!normalized) return 'none';
+  if (normalized.startsWith('sheriff_')) return 'sheriff';
+  return ACTION_VISUALS[normalized] || 'generic';
 }
 
 export function resolveNightAwakeLabel(action: string): string {
@@ -122,15 +151,12 @@ export function getWerewolfInteractionStatusText(status: WerewolfInteractionStat
   return { idle: '等待行动', acting: '正在选择', submitted: '正在行动', resolved: '结果已公布', skipped: '本次行动已跳过' }[status];
 }
 
-export function resolveWerewolfStageNarrative(
-  speech: { thinking?: unknown; fullText?: unknown; text?: unknown } | null | undefined,
-  fallback: string,
-) {
-  const thinking = String(speech?.thinking || '').trim();
-  if (thinking) return { kind: 'thinking' as const, label: '思考过程', text: thinking };
-  const subtitle = String(speech?.fullText || speech?.text || '').trim();
-  if (subtitle) return { kind: 'subtitle' as const, label: '发言内容', text: subtitle };
-  return { kind: 'status' as const, label: '', text: fallback };
+export function getWerewolfInteractionAnimationKey(interaction: WerewolfInteractionState): string {
+  return interaction.action;
+}
+
+export function shouldShowWerewolfStageDetails(interaction: Pick<WerewolfInteractionState, 'template'>): boolean {
+  return interaction.template !== 'speech';
 }
 
 export function resolveWerewolfSpeechSpeaker<T extends { id: unknown }>(
@@ -141,8 +167,41 @@ export function resolveWerewolfSpeechSpeaker<T extends { id: unknown }>(
   return players.find((player) => Number(player.id) === Number(speech.playerId)) || null;
 }
 
+export function resolveWerewolfActiveSubtitle(
+  speech: Pick<SpeechState, 'text' | 'fullText' | 'wordBoundaries' | 'currentTimeMs'> | null | undefined,
+  fallback: string = '',
+): string {
+  const text = String(speech?.text || speech?.fullText || fallback).trim();
+  if (!text) return '';
+  const timeline = buildSpeechSubtitleTimeline(text, speech?.wordBoundaries);
+  if (timeline.cues.length && speech?.currentTimeMs != null) {
+    return findActiveCue(timeline.cues, speech.currentTimeMs)?.text || '';
+  }
+  return splitPlayableDisplaySegments(text, { maxChars: 42 })[0] || text;
+}
+
 function idleState(): WerewolfInteractionState {
-  return { action: '', title: '等待下一阶段', detail: '游戏尚未开始', status: 'idle', template: 'idle', tone: 'system', actorIds: [], targetIds: [] };
+  return { action: '', title: '等待下一阶段', detail: '游戏尚未开始', status: 'idle', template: 'idle', tone: 'system', actorIds: [], targetIds: [], resultLabel: '' };
+}
+
+function resolveResultLabel(event: EventLike, action: string, status: WerewolfInteractionStatus): string {
+  if (status !== 'resolved') return '';
+  const seer = event.seerCheck as { result?: unknown } | undefined;
+  const witch = event.witchAction as { use?: unknown } | undefined;
+  const duel = event.knightDuel as { success?: unknown } | undefined;
+  if (action === 'seer_check' && seer?.result) return `查验结果：${String(seer.result)}`;
+  if (action === 'guard_protect') return '守护生效';
+  if (action.startsWith('witch_')) {
+    if (witch?.use === false) return '保留药剂';
+    return action === 'witch_save' ? '解药已使用' : '毒药已使用';
+  }
+  if (action === 'hunter_shot') return '开枪发动';
+  if (action === 'self_destruct' || action === 'selfdestruct') return '自爆发动';
+  if (action === 'knight_duel' && typeof duel?.success === 'boolean') return duel.success ? '决斗成功' : '决斗失败';
+  if (action === 'idiot_reveal') return '身份已公开';
+  if (action.startsWith('sheriff_') && event.sheriffId != null) return '警长当选';
+  if ((action === 'wolf_vote' || action === 'wolf_kill') && event.wolfTarget != null) return '刀口锁定';
+  return '';
 }
 
 function resolveStatus(workflowEvent: string, event: EventLike): WerewolfInteractionStatus {

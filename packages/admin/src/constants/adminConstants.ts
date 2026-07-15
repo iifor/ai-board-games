@@ -32,6 +32,7 @@ export const emptyPlayer: Partial<Player> = {
   sex: '未知',
   personality: '',
   modelId: null,
+  fallbackModelId: null,
   voicePackageId: null,
   enabled: true
 };

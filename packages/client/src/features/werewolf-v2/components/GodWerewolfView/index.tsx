@@ -7,12 +7,15 @@ import './index.css';
 
 export function GodWerewolfView(props: WerewolfGameArenaProps) {
   const players = ((props.game.players || []) as Player[]).slice().sort((a, b) => Number(a.id) - Number(b.id));
+  const rounds = (props.game.rounds || []) as WerewolfRound[];
   const interaction = resolveWerewolfInteraction(props.activeEvent);
-  const sheriffId = resolveActiveSheriffId((props.game.rounds || []) as WerewolfRound[], props.currentRound);
+  const sheriffId = resolveActiveSheriffId(rounds, props.currentRound);
   const election = props.currentRound?.sheriffElection;
   const candidateIds = new Set((props.sheriffCandidateIds.length ? props.sheriffCandidateIds : election?.signedUpIds || election?.candidates || []).map(Number));
+  const withdrawnIds = new Set((election?.withdrawnIds || []).map(Number));
+  const revealedIdiotIds = new Set(rounds.flatMap((round) => round.idiotReveal?.id ? [Number(round.idiotReveal.id)] : []));
   const alive = players.filter((player) => player.alive).length;
-  const rosterProps = { interaction, speakerId: props.currentSpeakerId, sheriffId, candidateIds, revealRoles: true, onSelect: props.onPlayerSelect };
+  const rosterProps = { interaction, speakerId: props.currentSpeakerId, sheriffId, candidateIds, withdrawnIds, revealedIdiotIds, revealRoles: true, onSelect: props.onPlayerSelect };
 
   return <section className="god-werewolf-view" data-phase={props.currentRound?.phase || 'idle'} aria-label="狼人杀上帝视角">
     <PerspectiveModeLabel modeName={props.mode?.name || '狼人杀'} />

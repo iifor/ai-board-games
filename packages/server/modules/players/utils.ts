@@ -12,6 +12,8 @@ interface PlayerInput {
   model?: string;
   modelId?: number | null;
   model_id?: number | null;
+  fallbackModelId?: number | null;
+  fallback_model_id?: number | null;
   voicePackageId?: number | null;
   voice_package_id?: number | null;
   temperature?: number;
@@ -33,6 +35,7 @@ function playerToRow(input: PlayerInput): PlayerInsertRow {
     provider: input.provider || 'deepseek',
     model: input.model || 'deepseek-v4-flash',
     model_id: input.modelId != null ? Number(input.modelId) : input.model_id != null ? Number(input.model_id) : null,
+    fallback_model_id: input.fallbackModelId != null ? Number(input.fallbackModelId) : input.fallback_model_id != null ? Number(input.fallback_model_id) : null,
     voice_package_id: input.voicePackageId != null ? Number(input.voicePackageId) : input.voice_package_id != null ? Number(input.voice_package_id) : null,
     temperature: Number(input.temperature ?? 0.85),
     enabled: Number(input.enabled !== false),
@@ -52,6 +55,7 @@ function rowToPlayer(row: PlayerRow | null | undefined): Player | null {
     provider: row.provider,
     model: row.model,
     modelId: row.model_id,
+    fallbackModelId: row.fallback_model_id,
     voicePackageId: row.voice_package_id,
     temperature: row.temperature,
     enabled: Boolean(row.enabled),

@@ -43,6 +43,7 @@ function migrate(db: Database | JsonDb): void {
       provider TEXT NOT NULL DEFAULT 'deepseek',
       model TEXT NOT NULL DEFAULT 'deepseek-v4-pro',
       model_id INTEGER,
+      fallback_model_id INTEGER,
       voice_package_id INTEGER,
       temperature REAL NOT NULL DEFAULT 0.85,
       enabled INTEGER NOT NULL DEFAULT 1,
@@ -50,6 +51,7 @@ function migrate(db: Database | JsonDb): void {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE SET NULL,
+      FOREIGN KEY (fallback_model_id) REFERENCES models(id) ON DELETE SET NULL,
       FOREIGN KEY (voice_package_id) REFERENCES voice_packages(id) ON DELETE SET NULL
     );
 
@@ -372,6 +374,7 @@ function migrate(db: Database | JsonDb): void {
   ensureColumn(db, 'games', 'game_type', "TEXT NOT NULL DEFAULT 'werewolf'");
   ensureColumn(db, 'games', 'topic_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumn(db, 'players', 'model_id', 'INTEGER');
+  ensureColumn(db, 'players', 'fallback_model_id', 'INTEGER');
   ensureColumn(db, 'players', 'voice_package_id', 'INTEGER');
   ensureColumn(db, 'players', 'sort_order', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'models', 'provider_id', 'INTEGER');

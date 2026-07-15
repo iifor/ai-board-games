@@ -317,3 +317,8 @@ Workflow 内部 `StatePatch` 使用路径操作表达状态增量：
 - Added shared game event types `wolf-witch-curse` and `illusionist-illusion`.
 - Added channel mappings: `wolf_witch` actions use the wolves scope; `illusionist` actions use the illusionist scope.
 - Client/server night state now includes `wolfWitchCurse`, `illusionTarget`, and `illusionReason`.
+
+## 玩家备选模型契约
+
+- B 端玩家 DTO 新增可空 `fallbackModelId`；服务端数据库行字段为 `fallback_model_id`。
+- C 端玩家类型、公开游戏事件、WebSocket 消息和回放契约不增加模型配置字段。

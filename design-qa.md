@@ -95,3 +95,72 @@ previous result: passed
 - Post-fix evidence: seven interaction-state tests pass; the active speech visual state remains blocked by replay progression.
 
 final result: blocked
+
+## Role Interaction Visuals QA
+
+- source visual truth paths:
+  - `C:\Users\Administrator\.codex\generated_images\019f4fd3-e845-7d42-98e0-10925c9b02b0\exec-e32b5367-be53-463d-beeb-ec01d19a4ba7.png` (wolf / seer)
+  - `C:\Users\Administrator\.codex\generated_images\019f4fd3-e845-7d42-98e0-10925c9b02b0\exec-82e6d22d-a940-4e30-b609-16279ec055db.png` (witch / guard)
+  - `C:\Users\Administrator\.codex\generated_images\019f4fd3-e845-7d42-98e0-10925c9b02b0\exec-1ee58d6a-a0f4-41c2-b665-ff07bc24122b.png` (hunter / white wolf king / knight)
+  - `C:\Users\Administrator\.codex\generated_images\019f4fd3-e845-7d42-98e0-10925c9b02b0\exec-6bd5c1cf-15dd-4e14-884a-174e543195fd.png` (sheriff states)
+- implementation route: `http://localhost:5173/game/v2/werewolf`
+- implementation screenshot path: `artifacts/werewolf-v2-role-interactions.png`
+- viewport: 1440 x 900 desktop
+
+**Implemented fidelity surfaces**
+
+- Core actions use distinct icon, color, transition and three-stage progress treatments for wolf, seer, witch, guard, hunter, self-destruct, knight, idiot and sheriff interactions.
+- Result text is event-backed and appears only after a resolved event; no target or result is inferred on the client.
+- Seat status is reduced to one prominent public badge with explicit speaking, sheriff, candidate, withdrawn, revealed and eliminated treatments.
+- Host announcements and idle preparation events do not render the generic role-skill animation.
+- The page has no horizontal or vertical overflow at the audited desktop viewport.
+
+**Verification evidence**
+
+- The browser rendered the updated v2 route at 1440 x 900 without layout overflow.
+- Browser inspection caught an initial false-positive generic skill animation on the preparation announcement; the idle-template guard was added and the follow-up inspection reports zero role visuals for the idle state.
+- Fifteen focused v2 interaction tests, the complete 193-test unit suite, the client TypeScript check and the production build pass.
+
+**Remaining same-state visual limitation**
+
+- [P2] A live role-action screenshot could not be captured in this run because the debug match did not advance from the host/preparation sequence into a role action before the audit ended. The event mapping and rendering boundary are covered by tests, but the exact wolf/seer/witch/guard same-state pixel comparison remains pending a replay or live event that reaches one of those actions.
+
+final result: blocked
+
+## Single Speech Outlet QA
+
+- source visual truth path: `C:\Users\Administrator\.codex\generated_images\019f4fd3-e845-7d42-98e0-10925c9b02b0\exec-45caa87f-cfbb-4983-84d4-afe8b3f03d7f.png`
+- implementation route: `http://localhost:5173/game/v2/werewolf`
+- implementation screenshot path: `artifacts/werewolf-v2-speech-single-outlet-blocked.png`
+- viewport: 1280 x 720 desktop
+- source state: witch wake action with one host subtitle at the bottom
+- implementation state: game preparation; server returned no enabled werewolf modes
+
+**Findings**
+
+- [P2] The matching witch speech state cannot be captured.
+  Evidence: the current start dialog reports that no werewolf mode is enabled, so the browser cannot enter a speech or night-skill state.
+  Impact: source-level responsibility checks, TypeScript and interaction tests pass, but pixel-level comparison of the final subtitle bar remains unavailable.
+  Fix: enable an existing werewolf mode, start or replay the witch action, then capture the same 1280 x 720 state.
+
+**Required fidelity surfaces**
+
+- Fonts and typography: the bottom copy uses the existing v2 font stack at 14-18px with 1.45 line height; central speech typography was removed.
+- Spacing and layout rhythm: the subtitle bar is reduced to a 78px minimum height and separates speaker identity from copy with one divider.
+- Colors and visual tokens: the bar reuses the existing midnight-blue glass surface, cyan border and green speaking accent.
+- Image quality and asset fidelity: existing player avatar assets are reused; host speech uses the existing microphone icon because no host avatar is exposed to this component.
+- Copy and content: speech text now exists only in `WerewolfBottomSpeechBar`; the central stage retains phase, action status and target relations.
+
+**Focused region comparison evidence**
+
+- Source: bottom subtitle contains host identity, one sentence and one cursor; the center contains only the witch action.
+- Implementation code: the central speaker/narrative blocks were removed and the bottom bar owns avatar, seat/name, split lines and cursor.
+- Browser evidence: the updated idle stage loads without layout overflow, but the required active speech region is absent because game start is blocked.
+
+**Comparison history**
+
+- Pass 1: the original implementation rendered the same sentence in the central title, central narrative and bottom subtitle.
+- Fix: remove central speaker/narrative rendering and move identity plus the sole subtitle into the compact bottom bar.
+- Post-fix evidence: sixteen targeted tests pass and the relaxed client type check passes; same-state browser comparison remains blocked by missing enabled modes.
+
+final result: blocked

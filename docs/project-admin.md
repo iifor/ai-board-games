@@ -146,3 +146,9 @@ pnpm run check:admin
 - Mode details for `guard-12` should show `预女猎守（12人）` with 12 players and the 4 wolf, 4 villager, seer, witch, hunter and guard lineup.
 - Mode details for `white-wolf-king-guard-12` should show 12 players and the 3 normal wolf, 1 white wolf king, 4 villager, seer, witch, hunter and guard lineup.
 - History/debug views should display `self-destruct` events with `targetId` when supplied, but must not implement independent death-chain or win-condition rules.
+
+## 玩家备选模型
+
+- 玩家管理支持为每个玩家配置一个可选 `fallbackModelId`，且不能与主模型相同。
+- 玩家列表和调试弹窗同时展示主模型、备选模型；调试对话与正式游戏使用相同的降级规则。
+- 首版不提供多级备选链、权重或手工切换。

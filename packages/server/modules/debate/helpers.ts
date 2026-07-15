@@ -117,6 +117,9 @@ function createDebateAgents(
 ): DebatePlayer[] {
   const setup = getConfiguredDebateSetup(config);
   return setup.players.map((player, index) => {
+    const { fallbackModel, ...publicPlayer } = player as DebatePlayer & {
+      fallbackModel?: { apiKey?: string; baseUrl?: string; provider?: string; model?: string; apiFormat?: string } | null;
+    };
     const side = index < 4 ? 'pro' : index < 8 ? 'con' : 'judge';
     const debateRole = side === 'judge'
       ? 'judge'
@@ -124,7 +127,7 @@ function createDebateAgents(
         ? 'captain'
         : 'debater';
     const agent: DebatePlayer = {
-      ...player,
+      ...publicPlayer,
       side: side as 'pro' | 'con' | 'judge',
       sideIndex: side === 'judge' ? null : index % 4,
       debateRole: debateRole as 'captain' | 'debater' | 'judge',
@@ -150,6 +153,7 @@ function createDebateAgents(
     agent.playerAgent = new DebateAgent(agent, agent.baseSystemPrompt as string, {
       onError: (entry: Record<string, unknown>) => fallbackAudit.record(entry as never),
       gameId,
+      fallbackModel,
       ...sessionOptions,
     });
     roleSkillRegistry?.applyToPlayer(agent.playerAgent as never, debateRole);

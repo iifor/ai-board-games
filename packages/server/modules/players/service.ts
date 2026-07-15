@@ -7,7 +7,7 @@ import { getDb } from '../../db';
 import type { Player } from '../../types/api';
 
 // Lazy-loaded JS modules to avoid circular deps
-function getLlmModule(): { callModelChat: (target: Record<string, unknown>) => Promise<string> } {
+function getLlmModule(): { callModelChatWithFallback: (primary: Record<string, unknown> | null, fallback: Record<string, unknown> | null) => Promise<string> } {
   return require('../llm');
 }
 
@@ -46,14 +46,18 @@ function createPlayer(input: PlayerInput & { id?: number | string }): Player {
   const maxId = repo.getNextPlayerId();
   const id = Number(input.id || maxId);
   if (repo.findPlayerById(id)) throw new AppError(ErrorCodes.ALREADY_EXISTS, `玩家已存在：${id}`, 409);
+  validatePlayerModels(input);
   const row = playerToRow({ ...input, id });
   repo.insertPlayer(row);
   return getPlayer(id) as Player;
 }
 
 function updatePlayer(id: number | string, input: PlayerInput): Player {
-  if (!repo.findPlayerById(id)) throw new AppError(ErrorCodes.NOT_FOUND, '玩家不存在', 404);
-  const row = playerToRow({ ...input, id: Number(id) });
+  const existing = getPlayer(id);
+  if (!existing) throw new AppError(ErrorCodes.NOT_FOUND, '玩家不存在', 404);
+  const merged = { ...existing, ...input, id: Number(id) };
+  validatePlayerModels(merged);
+  const row = playerToRow(merged);
   repo.insertPlayer(row);
   return getPlayer(id) as Player;
 }
@@ -77,14 +81,15 @@ function reorderPlayers(items: ReorderItem[] = []): Player[] {
 async function debugPlayerChat(id: number | string, input: DebugChatInput = {}): Promise<{ reply: string }> {
   const player = getPlayer(id);
   if (!player) throw new AppError(ErrorCodes.NOT_FOUND, '玩家不存在', 404);
-  if (!player.modelId) throw new AppError(ErrorCodes.VALIDATION_ERROR, '该玩家还没有绑定模型', 400);
 
   const { getRuntimeModel } = getModelsModule();
-  const model = getRuntimeModel(player.modelId);
-  if (!model || !model.enabled) throw new AppError(ErrorCodes.VALIDATION_ERROR, '玩家绑定的模型不可用', 400);
-  if (!model.apiKey) throw new AppError(ErrorCodes.VALIDATION_ERROR, '玩家绑定的模型缺少 API Key', 400);
+  const primaryModel = player.modelId ? getRuntimeModel(player.modelId) : null;
+  const fallbackModel = player.fallbackModelId ? getRuntimeModel(player.fallbackModelId) : null;
+  if (!toDebugTarget(primaryModel, player, []) && !toDebugTarget(fallbackModel, player, [])) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, '玩家绑定的主模型和备选模型均不可用', 400);
+  }
 
-  const { callModelChat } = getLlmModule();
+  const { callModelChatWithFallback } = getLlmModule();
   const messages = [
     { role: 'system', content: buildDebugSystemPrompt(player) },
     ...normalizeDebugHistory(input.history),
@@ -92,18 +97,36 @@ async function debugPlayerChat(id: number | string, input: DebugChatInput = {}):
   ];
 
   try {
-    const reply = await callModelChat({
-      ...model,
-      model: model.name,
-      messages,
-      temperature: Number(player.temperature ?? 0.85),
-      maxTokens: 260
-    });
+    const reply = await callModelChatWithFallback(
+      toDebugTarget(primaryModel, player, messages),
+      toDebugTarget(fallbackModel, player, messages),
+    );
     return { reply: String(reply || '').trim() };
   } catch (error) {
     console.error(`Player ${player.id} debug chat failed: ${(error as Error).message}`);
     throw new AppError(ErrorCodes.UPSTREAM_ERROR, '玩家调试失败，请检查绑定模型配置', 502);
   }
+}
+
+function validatePlayerModels(input: PlayerInput): void {
+  if (input.modelId != null && input.fallbackModelId != null && Number(input.modelId) === Number(input.fallbackModelId)) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, '备选模型不能与主模型相同', 400);
+  }
+}
+
+function toDebugTarget(
+  model: Record<string, unknown> | null,
+  player: Player,
+  messages: Array<{ role: string; content: string }>,
+): Record<string, unknown> | null {
+  if (!model?.enabled || !model.apiKey || !model.name) return null;
+  return {
+    ...model,
+    model: model.name,
+    messages,
+    temperature: Number(player.temperature ?? 0.85),
+    maxTokens: 260,
+  };
 }
 
 function deletePlayer(id: number | string): { ok: true } {

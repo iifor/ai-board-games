@@ -1,4 +1,4 @@
-import { callOpenAIChat, callModelChatWithThinking, parseJsonObject, LLM_THINKING_MAX_TOKENS_CAP } from '../llm';
+import { callModelChatWithFallback, callModelChatWithThinkingFallback, parseJsonObject, LLM_THINKING_MAX_TOKENS_CAP } from '../llm';
 import { AgentSkillRegistry, AgentSkill } from './skillRegistry';
 import { FallbackEntry } from './fallbackAudit';
 import { getActiveTrace, recordEvent } from '../observability';
@@ -13,13 +13,16 @@ interface CallResult {
   thinking: string;
 }
 
-interface Player {
-  id: string | number;
+interface ModelConfig {
   apiKey?: string;
   baseUrl?: string;
   provider?: string;
   model?: string;
   apiFormat?: string;
+}
+
+interface Player extends ModelConfig {
+  id: string | number;
   temperature?: number;
   thinkingEnabled?: boolean;
   [key: string]: unknown;
@@ -58,6 +61,7 @@ interface PlayerAgentOptions {
   resolveFaction?: (item: Player) => string;
   initialMessages?: ChatMessage[];
   onMessagesChanged?: (messages: ChatMessage[]) => void;
+  fallbackModel?: ModelConfig | null;
 }
 
 function normalizeText(text: unknown, limit: number): string {
@@ -76,6 +80,7 @@ class BasePlayerAgent {
   resolveFaction: (item: Player) => string;
   skillRegistry: AgentSkillRegistry;
   onMessagesChanged?: (messages: ChatMessage[]) => void;
+  fallbackModel: ModelConfig | null;
 
   constructor(player: Player, systemPrompt: string, options: PlayerAgentOptions = {}) {
     this.player = player;
@@ -90,6 +95,7 @@ class BasePlayerAgent {
     this.resolveFaction = options.resolveFaction || ((item: Player) => (item.faction as string) || (item.side as string) || '');
     this.skillRegistry = new AgentSkillRegistry();
     this.onMessagesChanged = options.onMessagesChanged;
+    this.fallbackModel = options.fallbackModel || null;
   }
 
   registerSkill(skill: AgentSkill): this {
@@ -124,7 +130,7 @@ class BasePlayerAgent {
 
   async askText(prompt: string, options: AskTextOptions = {}): Promise<string | null> {
     const limit = options.limit || 260;
-    if (!this.player.apiKey) {
+    if (!this.hasCallableModel()) {
       this.recordError(options.skillId || 'player-text', 'missing-api-key', options);
       return null;
     }
@@ -145,7 +151,7 @@ class BasePlayerAgent {
 
   async askTextOnce(prompt: string, options: AskOnceOptions = {}): Promise<string | null> {
     const limit = options.limit || 260;
-    if (!this.player.apiKey) {
+    if (!this.hasCallableModel()) {
       this.recordError(options.skillId || 'player-text', 'missing-api-key', options);
       return null;
     }
@@ -165,7 +171,7 @@ class BasePlayerAgent {
   }
 
   async askJson(prompt: string, options: AskJsonOptions = {}): Promise<Record<string, unknown> | null> {
-    if (!this.player.apiKey) {
+    if (!this.hasCallableModel()) {
       this.recordError(options.skillId || 'player-json', 'missing-api-key', options);
       return null;
     }
@@ -178,7 +184,7 @@ class BasePlayerAgent {
       const retryInstruction = options.promptHasContract
         ? 'Your previous output was not valid JSON. Return one valid JSON object matching the specified output contract.'
         : 'Return one valid JSON object only. No markdown wrapping.';
-      const retryParsed = parseJsonObject(await this.call(`${prompt}\n\n${retryInstruction}`, options.maxTokens || 120)) as Record<string, unknown> | null;
+      const retryParsed = parseJsonObject(await this.call(`${prompt}\n\n${retryInstruction}`, options.maxTokens || 120, true)) as Record<string, unknown> | null;
       if (retryParsed) return retryParsed;
       this.recordError(options.skillId || 'player-json', 'invalid-json', options);
       return null;
@@ -190,7 +196,7 @@ class BasePlayerAgent {
   }
 
   async askJsonOnce(prompt: string, options: AskJsonOptions & { messages?: ChatMessage[] } = {}): Promise<Record<string, unknown> | null> {
-    if (!this.player.apiKey) {
+    if (!this.hasCallableModel()) {
       this.recordError(options.skillId || 'player-json', 'missing-api-key', options);
       return null;
     }
@@ -203,7 +209,7 @@ class BasePlayerAgent {
       const retryInstruction = options.promptHasContract
         ? 'Your previous output was not valid JSON. Return one valid JSON object matching the specified output contract.'
         : 'Return one valid JSON object only. No markdown wrapping.';
-      const retryParsed = parseJsonObject(await this.callOnce(this.buildOneShotMessages(`${prompt}\n\n${retryInstruction}`), options.maxTokens || 120)) as Record<string, unknown> | null;
+      const retryParsed = parseJsonObject(await this.callOnce(this.buildOneShotMessages(`${prompt}\n\n${retryInstruction}`), options.maxTokens || 120, true)) as Record<string, unknown> | null;
       if (retryParsed) return retryParsed;
       this.recordError(options.skillId || 'player-json', 'invalid-json', options);
       return null;
@@ -299,22 +305,10 @@ class BasePlayerAgent {
   // LLM call helpers.
   // -----------------------------------------------------------
 
-  async call(prompt: string, maxTokens?: number): Promise<string> {
+  async call(prompt: string, maxTokens?: number, preferFallback = false): Promise<string> {
     this.messages.push({ role: 'user', content: prompt });
-    const reply = await callOpenAIChat({
-      apiKey: this.player.apiKey!,
-      baseUrl: this.player.baseUrl,
-      provider: this.player.provider,
-      model: this.player.model!,
-      apiFormat: this.player.apiFormat,
-      temperature: this.player.temperature,
-      messages: this.messages,
-      maxTokens,
-      _gameId: this.gameId,
-      _playerId: this.player.id,
-      _playerRole: this.resolveRole(this.player),
-      _playerFaction: this.resolveFaction(this.player)
-    });
+    const { primary, fallback } = this.getModelTargets(this.messages, maxTokens, preferFallback);
+    const reply = await callModelChatWithFallback(primary, fallback);
     this.messages.push({ role: 'assistant', content: reply });
     this.persistMessages();
     return reply;
@@ -328,39 +322,15 @@ class BasePlayerAgent {
     ];
   }
 
-  async callOnce(messages: ChatMessage[], maxTokens?: number): Promise<string> {
-    return callOpenAIChat({
-      apiKey: this.player.apiKey!,
-      baseUrl: this.player.baseUrl,
-      provider: this.player.provider,
-      model: this.player.model!,
-      apiFormat: this.player.apiFormat,
-      temperature: this.player.temperature,
-      messages,
-      maxTokens,
-      _gameId: this.gameId,
-      _playerId: this.player.id,
-      _playerRole: this.resolveRole(this.player),
-      _playerFaction: this.resolveFaction(this.player)
-    });
+  async callOnce(messages: ChatMessage[], maxTokens?: number, preferFallback = false): Promise<string> {
+    const { primary, fallback } = this.getModelTargets(messages, maxTokens, preferFallback);
+    return callModelChatWithFallback(primary, fallback);
   }
 
   async callWithThinking(prompt: string, maxTokens?: number): Promise<CallResult> {
     this.messages.push({ role: 'user', content: prompt });
-    const result = await callModelChatWithThinking({
-      apiKey: this.player.apiKey!,
-      baseUrl: this.player.baseUrl,
-      provider: this.player.provider,
-      model: this.player.model!,
-      apiFormat: this.player.apiFormat,
-      temperature: this.player.temperature,
-      messages: this.messages,
-      maxTokens,
-      _gameId: this.gameId,
-      _playerId: this.player.id,
-      _playerRole: this.resolveRole(this.player),
-      _playerFaction: this.resolveFaction(this.player)
-    });
+    const { primary, fallback } = this.getModelTargets(this.messages, maxTokens);
+    const result = await callModelChatWithThinkingFallback(primary, fallback);
     this.messages.push({ role: 'assistant', content: result.content });
     this.persistMessages();
     return result;
@@ -368,7 +338,7 @@ class BasePlayerAgent {
 
   async askTextWithThinking(prompt: string, options: AskTextOptions = {}): Promise<{ content: string; thinking: string } | null> {
     const limit = options.limit || 260;
-    if (!this.player.apiKey) {
+    if (!this.hasCallableModel()) {
       this.recordError(options.skillId || 'player-text', 'missing-api-key', options);
       return null;
     }
@@ -393,7 +363,7 @@ class BasePlayerAgent {
 
   async askTextWithThinkingOnce(prompt: string, options: AskOnceOptions = {}): Promise<{ content: string; thinking: string } | null> {
     const limit = options.limit || 260;
-    if (!this.player.apiKey) {
+    if (!this.hasCallableModel()) {
       this.recordError(options.skillId || 'player-text', 'missing-api-key', options);
       return null;
     }
@@ -402,20 +372,8 @@ class BasePlayerAgent {
       const maxTokens = this.thinkingEnabled
         ? Math.min(options.maxTokens || 800, LLM_THINKING_MAX_TOKENS_CAP)
         : (options.maxTokens || 800);
-      const result = await callModelChatWithThinking({
-        apiKey: this.player.apiKey!,
-        baseUrl: this.player.baseUrl,
-        provider: this.player.provider,
-        model: this.player.model!,
-        apiFormat: this.player.apiFormat,
-        temperature: this.player.temperature,
-        messages: options.messages || this.buildOneShotMessages(prompt),
-        maxTokens,
-        _gameId: this.gameId,
-        _playerId: this.player.id,
-        _playerRole: this.resolveRole(this.player),
-        _playerFaction: this.resolveFaction(this.player)
-      });
+      const { primary, fallback } = this.getModelTargets(options.messages || this.buildOneShotMessages(prompt), maxTokens);
+      const result = await callModelChatWithThinkingFallback(primary, fallback);
       const text = normalizeText(result.content, limit);
       if (!text) {
         this.recordError(options.skillId || 'player-text', 'empty-response', options);
@@ -427,6 +385,30 @@ class BasePlayerAgent {
       this.recordError(options.skillId || 'player-text', err.message, options);
       return null;
     }
+  }
+
+  private hasCallableModel(): boolean {
+    return Boolean(
+      (this.player.apiKey && this.player.model)
+      || (this.fallbackModel?.apiKey && this.fallbackModel.model),
+    );
+  }
+
+  private getModelTargets(messages: ChatMessage[], maxTokens?: number, preferFallback = false) {
+    const metadata = {
+      temperature: this.player.temperature,
+      messages,
+      maxTokens,
+      _gameId: this.gameId || undefined,
+      _playerId: this.player.id,
+      _playerRole: this.resolveRole(this.player),
+      _playerFaction: this.resolveFaction(this.player),
+    };
+    const primary = { ...this.player, ...metadata };
+    const fallback = this.fallbackModel ? { ...this.fallbackModel, ...metadata } : null;
+    return preferFallback && fallback
+      ? { primary: fallback, fallback: null }
+      : { primary, fallback };
   }
 
   // -----------------------------------------------------------

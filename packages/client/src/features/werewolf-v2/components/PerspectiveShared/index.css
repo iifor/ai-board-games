@@ -40,12 +40,26 @@
 .perspective-seat > span strong, .perspective-seat > span small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .perspective-seat > span strong { font-size: 14px; }
 .perspective-seat > span small { margin-top: 4px; color: #55c6ff; font-size: 11px; }
-.perspective-seat > i { position: absolute; top: 56px; left: 100px; display: flex; align-items: center; gap: 4px; color: #76e2a5; font-size: 10px; font-style: normal; font-weight: 850; white-space: nowrap; }
-.perspective-seat > em { position: absolute; top: 6px; left: 82px; display: flex; align-items: center; gap: 3px; color: #f5c46b; font-style: normal; }
+.perspective-seat > i {
+  position: absolute; z-index: 2; top: 52px; left: 94px; display: flex; align-items: center; gap: 4px; padding: 4px 9px;
+  border: 1px solid rgba(118, 226, 165, .46); border-radius: 999px; color: #a7ffd0; background: rgba(3, 31, 45, .88);
+  box-shadow: 0 0 20px rgba(72, 220, 161, .18); font-size: 10px; font-style: normal; font-weight: 900; white-space: nowrap;
+}
+.perspective-seat > i[data-status=speaking] { border-color: rgba(85, 227, 255, .82); color: #d8fbff; background: rgba(4, 54, 76, .92); box-shadow: 0 0 28px rgba(68, 218, 255, .48); animation: werewolf-seat-badge-pulse 1s ease-in-out infinite; }
+.perspective-seat > i[data-status=candidate] { border-color: rgba(176, 111, 255, .78); color: #f1d8ff; background: rgba(56, 24, 92, .92); box-shadow: 0 0 26px rgba(165, 86, 255, .42); }
+.perspective-seat > i[data-status=sheriff] { border-color: rgba(255, 211, 94, .9); color: #fff1b4; background: rgba(85, 57, 9, .94); box-shadow: 0 0 30px rgba(255, 196, 61, .48); animation: werewolf-sheriff-badge 1.6s ease-in-out infinite; }
+.perspective-seat > i[data-status=withdrawn], .perspective-seat > i[data-status=dead] { border-color: rgba(164, 175, 198, .34); color: rgba(218, 224, 238, .66); background: rgba(19, 25, 40, .82); box-shadow: none; }
+.perspective-seat > i[data-status=revealed] { border-color: rgba(255, 238, 175, .72); color: #fff5cf; background: rgba(76, 63, 25, .88); box-shadow: 0 0 24px rgba(255, 229, 135, .3); }
+.perspective-seat > i[data-status=target] { border-color: rgba(255, 91, 111, .72); color: #ffdbe0; background: rgba(85, 19, 37, .9); box-shadow: 0 0 24px rgba(255, 66, 94, .34); }
+.perspective-seat > i[data-status=acting] { border-color: rgba(168, 121, 255, .68); color: #eadcff; background: rgba(48, 25, 82, .9); box-shadow: 0 0 22px rgba(157, 91, 255, .3); }
 .perspective-seat.is-speaking { filter: brightness(1.35); }
-.perspective-seat.is-speaking::before { content: ''; position: absolute; top: 2px; left: 37px; width: 66px; height: 66px; border: 2px solid rgba(113, 255, 184, .96); border-radius: 50%; box-shadow: 0 0 34px rgba(77, 235, 156, .72), inset 0 0 22px rgba(77, 235, 156, .2); animation: werewolf-speaker-ring 1.15s ease-out infinite; }
-.perspective-seat.is-speaking .perspective-seat__avatar { border-color: #8bffc1; box-shadow: 0 0 42px rgba(77, 235, 156, .72); animation: werewolf-speaker-avatar 1s ease-in-out infinite alternate; }
-.perspective-seat.is-speaking > span strong { color: #effff7; text-shadow: 0 0 16px rgba(77, 235, 156, .72); }
+.perspective-seat.is-speaking::before { content: ''; position: absolute; top: 2px; left: 37px; width: 66px; height: 66px; border: 2px solid rgba(83, 230, 255, .96); border-radius: 50%; box-shadow: 0 0 38px rgba(58, 213, 255, .78), inset 0 0 22px rgba(58, 213, 255, .2); animation: werewolf-speaker-ring .92s ease-out infinite; }
+.perspective-seat.is-speaking .perspective-seat__avatar { border-color: #8ff1ff; box-shadow: 0 0 46px rgba(58, 213, 255, .76); animation: werewolf-speaker-avatar .72s ease-in-out infinite alternate; }
+.perspective-seat.is-speaking > span strong { color: #effcff; text-shadow: 0 0 18px rgba(58, 213, 255, .84); }
+.perspective-seat.is-candidate .perspective-seat__avatar { border-color: #bd78ff; box-shadow: 0 0 30px rgba(167, 86, 255, .48); }
+.perspective-seat.is-sheriff .perspective-seat__avatar, .perspective-seat.is-sheriff > b { border-color: #ffd65c; box-shadow: 0 0 34px rgba(255, 199, 54, .5); }
+.perspective-seat.is-withdrawn { opacity: .62; }
+.perspective-seat.is-revealed .perspective-seat__avatar { border-color: #ffe7a0; box-shadow: 0 0 28px rgba(255, 229, 143, .38); }
 .perspective-seat.is-acting .perspective-seat__avatar { border-color: #a879ff; box-shadow: 0 0 26px rgba(157, 91, 255, .32); animation: werewolf-actor-focus 1.8s ease-in-out infinite; }
 .perspective-seat.is-target .perspective-seat__avatar { border-color: #ff6875; box-shadow: 0 0 24px rgba(255, 72, 86, .32); animation: werewolf-target-lock 1.15s ease-in-out infinite alternate; }
 .perspective-seat.is-viewer .perspective-seat__avatar, .perspective-seat.is-viewer > b { border-color: #ff9d38; box-shadow: 0 0 20px rgba(255, 129, 42, .24); }
@@ -85,18 +99,6 @@
 }
 .interaction-stage__status { display: inline-flex; align-items: center; gap: 6px; color: #86d9ff; font-size: 12px; font-weight: 800; }
 .interaction-stage h1 { margin: 12px 0 9px; font-size: clamp(26px, 2.8vw, 44px); line-height: 1.1; }
-.interaction-stage__speaker { position: relative; display: inline-flex; align-items: center; gap: 9px; margin: 2px auto 12px; padding: 6px 15px 6px 7px; border: 1px solid rgba(113, 245, 178, .52); border-radius: 999px; background: rgba(5, 38, 45, .74); box-shadow: 0 0 30px rgba(55, 221, 145, .24); isolation: isolate; animation: werewolf-speaker-card 1.4s ease-in-out infinite; }
-.interaction-stage__speaker::before { content: ''; position: absolute; z-index: -1; inset: -6px; border: 1px solid rgba(100, 244, 173, .48); border-radius: inherit; animation: werewolf-speaker-halo 1.4s ease-out infinite; }
-.interaction-stage__speaker-avatar { width: 46px; height: 46px; border: 2px solid #80f4b6; border-radius: 50%; background: rgba(3, 13, 35, .9) center/cover; box-shadow: 0 0 26px rgba(58, 232, 151, .5); animation: werewolf-speaker-avatar 1s ease-in-out infinite alternate; }
-.interaction-stage__speaker-mic { color: #8affbe; filter: drop-shadow(0 0 8px rgba(80, 255, 164, .72)); animation: werewolf-speaker-mic .72s ease-in-out infinite alternate; }
-.interaction-stage__speaker > span { display: grid; min-width: 76px; text-align: left; }
-.interaction-stage__speaker small { color: #76cfff; font-size: 10px; font-weight: 900; }
-.interaction-stage__speaker strong { max-width: 150px; overflow: hidden; color: #f4f8ff; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.interaction-stage__narrative { max-height: min(24vh, 190px); margin: 0 auto; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(128, 157, 255, .42) transparent; }
-.interaction-stage__narrative > small { display: block; margin-bottom: 7px; color: rgba(151, 183, 255, .72); font-size: 10px; font-weight: 900; letter-spacing: .12em; }
-.interaction-stage__narrative p { min-height: 40px; margin: 0 auto; color: rgba(231, 239, 255, .74); font-size: 15px; line-height: 1.65; white-space: pre-wrap; }
-.interaction-stage__narrative.is-thinking { width: min(560px, 100%); padding: 13px 16px; border: 1px solid rgba(113, 145, 229, .2); border-radius: 12px; background: rgba(4, 16, 43, .44); text-align: left; box-shadow: inset 0 0 22px rgba(73, 110, 216, .06); }
-.interaction-stage__narrative.is-thinking p { color: rgba(229, 237, 255, .8); text-align: left; }
 .interaction-stage__targets { display: inline-flex; align-items: center; gap: 9px; margin: 16px 0 0; padding: 9px 18px; border: 1px solid rgba(255, 105, 120, .28); border-radius: 22px; color: #ffd6da; background: rgba(115, 21, 42, .34); font-weight: 800; }
 .interaction-stage__flow { display: flex; align-items: stretch; justify-content: center; gap: 12px; margin: 20px auto 0; }
 .interaction-stage__flow > svg { align-self: center; color: rgba(184, 210, 255, .58); filter: drop-shadow(0 0 8px rgba(94, 151, 255, .34)); animation: werewolf-flow-arrow 1.25s ease-in-out infinite; }
@@ -135,10 +137,9 @@
 .interaction-stage[data-action=sheriff_signup] h1,
 .interaction-stage[data-action=sheriff_vote] h1 { color: #ffd878; }
 @keyframes werewolf-speaker-ring { 0% { opacity: .9; transform: scale(.88); } 80%, 100% { opacity: 0; transform: scale(1.28); } }
-@keyframes werewolf-speaker-card { 50% { border-color: rgba(131, 255, 191, .94); box-shadow: 0 0 48px rgba(55, 221, 145, .48); transform: translateY(-2px); } }
-@keyframes werewolf-speaker-halo { 0% { opacity: .8; transform: scale(.96); } 80%, 100% { opacity: 0; transform: scale(1.12); } }
 @keyframes werewolf-speaker-avatar { to { filter: brightness(1.2); transform: scale(1.08); } }
-@keyframes werewolf-speaker-mic { to { color: #fff; transform: scale(1.2) rotate(-7deg); } }
+@keyframes werewolf-seat-badge-pulse { 50% { filter: brightness(1.24); transform: translateY(-2px); } }
+@keyframes werewolf-sheriff-badge { 50% { filter: brightness(1.2); box-shadow: 0 0 42px rgba(255, 196, 61, .68); } }
 @keyframes werewolf-actor-focus { 50% { box-shadow: 0 0 38px rgba(157, 91, 255, .58); } }
 @keyframes werewolf-target-lock { to { filter: brightness(1.28); transform: scale(1.06); } }
 @keyframes werewolf-eye-open { 50% { color: #fff; box-shadow: 0 0 40px rgba(132, 91, 255, .4); } }
@@ -186,6 +187,10 @@
   .perspective-seat { grid-template-columns: 28px 48px minmax(0, 1fr); gap: 8px; }
   .perspective-seat > b { width: 28px; height: 28px; }
   .perspective-seat__avatar { width: 46px; height: 46px; }
-  .perspective-seat > i { display: none; }
+  .perspective-seat > i { top: 44px; left: 78px; padding: 3px 7px; font-size: 9px; }
   .perspective-seat.is-speaking::before { top: 3px; left: 30px; width: 56px; height: 56px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perspective-seat, .perspective-seat::before, .perspective-seat__avatar, .perspective-seat > i { animation: none !important; transition: none !important; }
 }

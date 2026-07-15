@@ -356,3 +356,10 @@ pnpm run check:server
 - Added executable role actions `wolfWitchCurse` and `illusion`.
 - Debug mode uses the existing optional special-skill probability for both new role skills, so they can trigger or skip during debug runs.
 - No database schema change is required; new state is stored in the existing serialized werewolf runtime state.
+
+## Player Model Fallback
+
+- `players.fallback_model_id` stores one optional backup model reference and is exposed as `fallbackModelId` only through the admin player API.
+- The shared LLM boundary keeps the existing single transient retry for network, timeout, 429 and 5xx failures, then invokes the configured backup model once.
+- Missing/disabled primary configuration, upstream errors and empty responses can fall back. Invalid JSON uses the backup for the existing correction attempt.
+- Werewolf, debate and player debug chat share this path. If both models fail, the existing game-level fallback behavior remains authoritative.

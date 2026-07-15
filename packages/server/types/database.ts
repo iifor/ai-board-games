@@ -26,6 +26,7 @@ interface PlayerRow {
   provider: string;
   model: string;
   model_id: number | null;
+  fallback_model_id: number | null;
   voice_package_id: number | null;
   temperature: number;
   enabled: number;

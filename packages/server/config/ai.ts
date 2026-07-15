@@ -34,7 +34,18 @@ interface AgentConfig {
   sex: string;
   voicePackageId: number | null;
   thinkingEnabled: boolean;
+  fallbackModel: AgentModelConfig | null;
   defaultHostPlayerId?: number | null;
+}
+
+interface AgentModelConfig {
+  apiKey: string;
+  baseUrl: string;
+  provider: string;
+  model: string;
+  modelId: number | null;
+  apiFormat: string;
+  thinkingEnabled: boolean;
 }
 
 interface AiConfig {
@@ -79,7 +90,7 @@ function getAiConfig(): AiConfig {
     ...DEFAULT_CONFIG,
     providers,
     configuredProviders: {},
-    usedProviderNames: Array.from(new Set(aiPlayers.map((p: AgentConfig) => p.provider).filter(Boolean))),
+    usedProviderNames: Array.from(new Set(aiPlayers.flatMap((p: AgentConfig) => [p.provider, p.fallbackModel?.provider]).filter(Boolean) as string[])),
     host,
     players: aiPlayers,
     realReady: aiPlayers.length > 0 && missingProviders.length === 0,
@@ -90,6 +101,7 @@ function getAiConfig(): AiConfig {
 function normalizePlayer(player: Record<string, unknown>, models: Record<string, unknown>[], defaultModel: Record<string, unknown> | null, index: number): AgentConfig {
   const model = resolvePlayerModel(player, models, defaultModel);
   const provider = model ? modelToProvider(model) : null;
+  const fallbackModel = models.find((item) => Number(item.id) === Number(player.fallbackModelId)) || null;
   const name = (player.name as string) || (player.nickname as string) || `${index + 1}号`;
   return {
     id: Number(player.id || index + 1),
@@ -102,7 +114,8 @@ function normalizePlayer(player: Record<string, unknown>, models: Record<string,
     model: (model?.name as string) || (player.model as string) || '', modelId: (model?.id as number) || (player.modelId as number) || null,
     temperature: 0.85, personality: (player.personality as string) || '记录者',
     sex: (player.sex as string) || '未知', voicePackageId: (player.voicePackageId as number) || null,
-    thinkingEnabled: (model?.thinkingEnabled as boolean) || false
+    thinkingEnabled: (model?.thinkingEnabled as boolean) || false,
+    fallbackModel: toAgentModelConfig(fallbackModel)
   };
 }
 
@@ -143,7 +156,8 @@ function emptyHost(): AgentConfig {
     personality: '',
     sex: '',
     voicePackageId: null,
-    thinkingEnabled: false
+    thinkingEnabled: false,
+    fallbackModel: null
   };
 }
 
@@ -163,10 +177,26 @@ function modelToProvider(model: Record<string, unknown>): ProviderInfo {
     apiFormat: (model.apiFormat as string) || 'openai-compatible' };
 }
 
+function toAgentModelConfig(model: Record<string, unknown> | null): AgentModelConfig | null {
+  if (!model) return null;
+  const provider = modelToProvider(model);
+  return {
+    apiKey: provider.apiKey,
+    baseUrl: provider.baseUrl,
+    provider: provider.name,
+    model: String(model.name || ''),
+    modelId: Number(model.id) || null,
+    apiFormat: String(model.apiFormat || provider.apiFormat || 'openai-compatible'),
+    thinkingEnabled: Boolean(model.thinkingEnabled),
+  };
+}
+
 function getMissingProviders(players: AgentConfig[]): Array<{ provider: string; apiKeyEnv: string }> {
   const missing = new Map<string, string>();
   for (const agent of players) {
-    if (!agent.provider || !agent.model || !agent.apiKey) {
+    const primaryReady = Boolean(agent.provider && agent.model && agent.apiKey);
+    const fallbackReady = Boolean(agent.fallbackModel?.provider && agent.fallbackModel.model && agent.fallbackModel.apiKey);
+    if (!primaryReady && !fallbackReady) {
       missing.set(agent.provider || '未绑定模型', agent.apiKeyEnv || 'DATABASE_MODEL_API_KEY');
     }
   }

@@ -36,7 +36,7 @@ export function WerewolfResult({ game }: WerewolfResultProps) {
         </div>
       )}
       {mvpVotes.length > 0 && (
-        <details className="werewolf-result-votes" open={!game.mvp}>
+        <details className="werewolf-result-votes" open>
           <summary>MVP 投票记录（{mvpVotes.length}票）</summary>
           <ul>
             {mvpVotes.map((vote) => <li key={vote.voterId}>{vote.text}</li>)}
