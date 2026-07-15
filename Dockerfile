@@ -63,7 +63,7 @@ EXPOSE 3001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:3001/api/toc/games').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://localhost:3001/api/toc/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Start server
 CMD ["node", "--preserve-symlinks", "--preserve-symlinks-main", "packages/server/dev-runtime.cjs"]

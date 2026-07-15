@@ -78,7 +78,7 @@ Register the file in `runUnitTests.cjs`.
 Run:
 
 ```powershell
-pnpm.cmd run test:unit -- authProductionConfig.test.ts
+pnpm.cmd run test:unit authProductionConfig.test.ts
 ```
 
 Expected: FAIL because `modules/auth/config.ts` does not exist.
@@ -167,7 +167,7 @@ ADMIN_PASSWORD=replace-with-at-least-12-random-characters
 Run:
 
 ```powershell
-pnpm.cmd run test:unit -- authProductionConfig.test.ts
+pnpm.cmd run test:unit authProductionConfig.test.ts
 pnpm.cmd run check:server
 ```
 
@@ -372,7 +372,7 @@ Register the file in `runUnitTests.cjs`.
 - [ ] **Step 2: Run focused test and verify RED**
 
 ```powershell
-pnpm.cmd run test:unit -- serverLifecycle.test.ts
+pnpm.cmd run test:unit serverLifecycle.test.ts
 ```
 
 Expected: FAIL because `packages/server/lifecycle.ts` does not exist.
@@ -405,7 +405,7 @@ process.once('SIGINT', shutdown);
 - [ ] **Step 4: Verify GREEN and server type safety**
 
 ```powershell
-pnpm.cmd run test:unit -- serverLifecycle.test.ts
+pnpm.cmd run test:unit serverLifecycle.test.ts
 pnpm.cmd run check:server
 ```
 
@@ -441,7 +441,7 @@ Add PowerShell/Bash-friendly operator commands for:
 docker compose config --quiet
 docker compose up -d --build
 docker compose ps
-curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/games"
+curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/health"
 ```
 
 Document backing up both `consensus-data` and `consensus-resources` before deployment and restoring them only while the application container is stopped. State that CVM port 80 must accept traffic only from the Tencent Cloud load balancer.
@@ -501,10 +501,10 @@ Expected: `app` becomes healthy and `nginx` remains running. Do not claim image/
 - [ ] **Step 4: Smoke test local and load-balancer routes**
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing http://127.0.0.1/api/toc/games
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1/api/toc/health
 ```
 
-After infrastructure deployment, set `PRODUCTION_DOMAIN` to the real domain, verify `https://${PRODUCTION_DOMAIN}/api/toc/games`, and open a WebSocket game connection through the Tencent Cloud load balancer.
+After infrastructure deployment, set `PRODUCTION_DOMAIN` to the real domain, verify `https://${PRODUCTION_DOMAIN}/api/toc/health`, and open a WebSocket game connection through the Tencent Cloud load balancer.
 
 - [ ] **Step 5: Final audit**
 

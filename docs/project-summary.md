@@ -166,7 +166,7 @@ docker compose ps
 
 腾讯云 CVM 需要提前安装 Docker，并安装 `docker compose` 插件或旧版 `docker-compose` 命令；需要提前 clone 本仓库，并在项目目录放置生产 `.env`。`consensus-data` 保存 SQLite，`consensus-resources` 保存上传图片和生成语音，头像继续使用 `./avatars` bind mount。部署脚本不会把 GitHub Secrets 写入仓库。
 
-公网 HTTPS 由腾讯云负载均衡终止，负载均衡通过 HTTP/WebSocket 回源 CVM 的 Nginx 80 端口。CVM 安全组必须只允许负载均衡访问 80 端口；应用和 Nginx 不直接暴露公网 TLS。部署完成后先确认 `docker compose ps` 中 `app` 为 healthy，再通过生产域名请求 `/api/toc/games`。
+公网 HTTPS 由腾讯云负载均衡终止，负载均衡通过 HTTP/WebSocket 回源 CVM 的 Nginx 80 端口。CVM 安全组必须只允许负载均衡访问 80 端口；应用和 Nginx 不直接暴露公网 TLS。部署完成后先确认 `docker compose ps` 中 `app` 为 healthy，再通过生产域名请求 `/api/toc/health`。
 
 GitHub 仓库需要配置以下 Secrets：
 

@@ -274,7 +274,7 @@ pnpm run check:server
 docker compose config --quiet
 docker compose up -d --build
 docker compose ps
-curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/games"
+curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/health"
 ```
 
 部署前备份数据库与生成资源（生产 `.env` 使用 `COMPOSE_PROJECT_NAME=consensus`）：
