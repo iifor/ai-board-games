@@ -50,6 +50,7 @@ RUN pnpm install --frozen-lockfile --prod
 # Copy server source (runs from TS via dev-runtime.cjs)
 COPY packages/server ./packages/server
 COPY packages/shared ./packages/shared
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 
 # Copy built static assets from builder
 COPY --from=builder /app/dist ./dist
