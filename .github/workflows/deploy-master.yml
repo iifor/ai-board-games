@@ -39,8 +39,8 @@ jobs:
           pnpm run test:workflow
           pnpm run test:migration
 
-      - name: Validate Docker build
-        run: docker build --target builder -t consensus-build-check:${{ github.sha }} .
+      - name: Validate Docker runtime image
+        run: docker build -t consensus-runtime-check:${{ github.sha }} .
 
       - name: Configure SSH
         env:

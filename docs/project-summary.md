@@ -143,6 +143,8 @@ flowchart TD
 - Mimo TTS：`MIMO_API_KEY`、`MIMO_BASE_URL`、`MIMO_TTS_MODEL`、`MIMO_TTS_FORMAT`、`MIMO_TTS_VOICE`
 - Cloudflare：`CLOUDFLARE_ACCOUNT_ID`
 - 数据库模型密钥：`DATABASE_MODEL_API_KEY`
+- 生产认证：`JWT_SECRET`（至少 32 字符）、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（至少 12 字符）。生产环境缺失或强度不足时服务拒绝启动。
+- Docker Compose：生产 `.env` 固定 `COMPOSE_PROJECT_NAME=consensus`，便于稳定识别数据库和资源 volume。
 
 构建产物：
 
@@ -153,7 +155,7 @@ flowchart TD
 
 ### GitHub Actions 自动部署到腾讯云
 
-`.github/workflows/deploy-master.yml` 监听 `master` 分支 push，也支持手动触发。流程先在 GitHub runner 中使用 Node.js 20 与 pnpm 9.15.4 安装锁定依赖，依次执行类型检查、完整构建、单元测试、工作流测试、迁移测试和 `docker build --target builder`；全部通过后才通过 SSH 登录腾讯云 CVM，在服务器项目目录执行：
+`.github/workflows/deploy-master.yml` 监听 `master` 分支 push，也支持手动触发。流程先在 GitHub runner 中使用 Node.js 20 与 pnpm 9.15.4 安装锁定依赖，依次执行类型检查、完整构建、单元测试、工作流测试、迁移测试和最终 runtime 镜像构建；全部通过后才通过 SSH 登录腾讯云 CVM，在服务器项目目录执行：
 
 ```bash
 git fetch origin master
@@ -162,7 +164,9 @@ docker compose up -d --build
 docker compose ps
 ```
 
-腾讯云 CVM 需要提前安装 Docker，并安装 `docker compose` 插件或旧版 `docker-compose` 命令；需要提前 clone 本仓库，并在项目目录放置生产 `.env`。数据库和上传资源由 `docker-compose.yml` 中的 volume 持久化，部署脚本不会把 GitHub Secrets 写入仓库。
+腾讯云 CVM 需要提前安装 Docker，并安装 `docker compose` 插件或旧版 `docker-compose` 命令；需要提前 clone 本仓库，并在项目目录放置生产 `.env`。`consensus-data` 保存 SQLite，`consensus-resources` 保存上传图片和生成语音，头像继续使用 `./avatars` bind mount。部署脚本不会把 GitHub Secrets 写入仓库。
+
+公网 HTTPS 由腾讯云负载均衡终止，负载均衡通过 HTTP/WebSocket 回源 CVM 的 Nginx 80 端口。CVM 安全组必须只允许负载均衡访问 80 端口；应用和 Nginx 不直接暴露公网 TLS。部署完成后先确认 `docker compose ps` 中 `app` 为 healthy，再通过生产域名请求 `/api/toc/health`。
 
 GitHub 仓库需要配置以下 Secrets：
 

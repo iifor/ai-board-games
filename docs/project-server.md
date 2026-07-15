@@ -242,9 +242,11 @@ pnpm run check:server
 
 环境变量：
 
-- `.env.example` 提供语音、TTS、Cloudflare、数据库模型密钥示例。
+- `.env.example` 提供语音、TTS、Cloudflare、数据库模型密钥和生产认证示例。
 - `config/env.ts` 会从根目录或 server 上级目录加载 `.env`。
 - 模型运行时 key 主要通过数据库模型配置或 `DATABASE_MODEL_API_KEY` 兜底。
+- 生产环境必须配置至少 32 字符的 `JWT_SECRET`、非空 `ADMIN_USERNAME` 和至少 12 字符的 `ADMIN_PASSWORD`；缺失或强度不足时服务在监听端口前失败。
+- 管理员账号只从环境变量初始化或轮换。未配置时开发环境不会自动创建管理员，代码中不保留默认账号或密码。
 
 静态资源：
 
@@ -252,6 +254,53 @@ pnpm run check:server
 - `/admin` 托管后台构建产物。
 - 根路径托管 C 端构建产物。
 - 服务端端口和根命令以 `docs/project-summary.md` 为准。
+
+生产容器：
+
+- 最终 runtime 镜像包含 TypeScript 运行器及 `packages/shared/dist`，CI 必须构建最终镜像而不是只构建 builder stage。
+- `consensus-data` volume 挂载到 `/app/data`，保存 SQLite 数据库。
+- `consensus-resources` volume 挂载到 `/app/packages/server/resources`，保存上传图片和生成语音。
+- 收到 `SIGTERM` 或 `SIGINT` 后停止接收新连接；10 秒内无法关闭时以非零状态强制退出。
+
+腾讯云入口：
+
+- HTTPS、域名证书、WAF 和公网健康检查由腾讯云负载均衡负责。
+- 负载均衡通过 HTTP/WebSocket 回源 Nginx 80 端口；Nginx 保留 `X-Forwarded-Proto`，Express 信任一个代理 hop。
+- CVM 安全组的 80 端口只允许负载均衡访问，Node.js 的 3001 端口只绑定到本机。
+
+部署验证（在 CVM 项目目录执行）：
+
+```bash
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/health"
+```
+
+部署前备份数据库与生成资源（生产 `.env` 使用 `COMPOSE_PROJECT_NAME=consensus`）：
+
+```bash
+mkdir -p backups
+STAMP="$(date +%Y%m%d-%H%M%S)"
+docker compose stop app
+docker run --rm -v consensus_consensus-data:/source:ro -v "$PWD/backups:/backup" alpine sh -c "tar czf /backup/data-${STAMP}.tgz -C /source ."
+docker run --rm -v consensus_consensus-resources:/source:ro -v "$PWD/backups:/backup" alpine sh -c "tar czf /backup/resources-${STAMP}.tgz -C /source ."
+docker compose start app
+```
+
+恢复前确认两个文件的时间戳一致，然后执行：
+
+```bash
+DATA_BACKUP="data-20260715-120000.tgz"
+RESOURCES_BACKUP="resources-20260715-120000.tgz"
+docker compose stop app
+docker run --rm -e ARCHIVE="$DATA_BACKUP" -v consensus_consensus-data:/target -v "$PWD/backups:/backup:ro" alpine sh -c 'find /target -mindepth 1 -maxdepth 1 -exec rm -rf {} + && tar xzf "/backup/$ARCHIVE" -C /target'
+docker run --rm -e ARCHIVE="$RESOURCES_BACKUP" -v consensus_consensus-resources:/target -v "$PWD/backups:/backup:ro" alpine sh -c 'find /target -mindepth 1 -maxdepth 1 -exec rm -rf {} + && tar xzf "/backup/$ARCHIVE" -C /target'
+docker compose start app
+docker compose ps
+```
+
+将示例文件名替换为实际备份。SQLite 与资源必须使用同一时间点的成对备份；volume 持久化不能替代异机备份。
 
 ## 扩展点与注意事项
 

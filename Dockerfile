@@ -50,6 +50,7 @@ RUN pnpm install --frozen-lockfile --prod
 # Copy server source (runs from TS via dev-runtime.cjs)
 COPY packages/server ./packages/server
 COPY packages/shared ./packages/shared
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 
 # Copy built static assets from builder
 COPY --from=builder /app/dist ./dist
@@ -62,7 +63,7 @@ EXPOSE 3001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:3001/api/toc/games').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://localhost:3001/api/toc/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Start server
 CMD ["node", "--preserve-symlinks", "--preserve-symlinks-main", "packages/server/dev-runtime.cjs"]
