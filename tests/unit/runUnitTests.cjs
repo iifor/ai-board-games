@@ -14,6 +14,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'upstreamConcurrency.test.ts',
   'traceConcurrency.test.ts',
   'authProductionConfig.test.ts',
+  'serverLifecycle.test.ts',
   'gameEventBuilder.test.ts',
   'eventBus.test.ts',
   'audienceStream.test.ts',
