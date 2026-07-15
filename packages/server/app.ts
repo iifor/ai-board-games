@@ -19,11 +19,13 @@ import * as workflowEngine from './modules/workflow-engine';
 import * as playerMemory from './modules/player-memory';
 import { registerDebateWorkflow } from './modules/debate';
 import { authRouter, authMiddleware, seedAdminUser } from './modules/auth';
+import { readAuthConfig } from './modules/auth/config';
+import type { AdminBootstrapConfig } from './modules/auth/config';
 
 // Game module
 import * as gameSocket from './modules/game-socket';
 
-function seedData(): void {
+function seedData(admin: AdminBootstrapConfig | null): void {
   const db = getDb();
   if ((db.prepare('SELECT COUNT(*) AS count FROM skins').get() as { count: number }).count === 0) {
     skins.importMarkdownSkins();
@@ -43,16 +45,18 @@ function seedData(): void {
   const { DEFAULT_WEREWOLF_ROLES, DEFAULT_WEREWOLF_MODES } = require('./db/seed');
   DEFAULT_WEREWOLF_ROLES.forEach((r: Record<string, unknown>) => werewolfConfig.upsertWerewolfRole(r));
   DEFAULT_WEREWOLF_MODES.forEach((m: Record<string, unknown>) => werewolfConfig.upsertWerewolfMode(m));
-  seedAdminUser(db);
+  seedAdminUser(db, admin);
 }
 
 function createApp(): express.Application {
+  const authConfig = readAuthConfig();
   const app = express();
+  app.set('trust proxy', 1);
   const clientDistDir = path.join(__dirname, '..', '..', 'dist', 'client');
   const adminDistDir = path.join(__dirname, '..', '..', 'dist', 'admin');
 
   registerDebateWorkflow();
-  seedData();
+  seedData(authConfig.admin);
   workflowEngine.initializeWorkflowMaintenance();
 
   app.use(express.json({ limit: '8mb' }));

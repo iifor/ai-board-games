@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import type { AuthTokenPayload } from './types';
+import { readAuthConfig } from './config';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'consensus-mist-jwt-secret-2026';
 const TOKEN_EXPIRES_IN = 24 * 60 * 60; // 24 hours in seconds
 
 /**
@@ -45,6 +45,7 @@ function base64url(input: Buffer | string): string {
 }
 
 function signToken(payload: { sub: number; username: string }): string {
+  const jwtSecret = readAuthConfig().jwtSecret;
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = base64url(JSON.stringify({
@@ -54,18 +55,19 @@ function signToken(payload: { sub: number; username: string }): string {
     exp: now + TOKEN_EXPIRES_IN,
   }));
   const signature = base64url(
-    crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest()
+    crypto.createHmac('sha256', jwtSecret).update(`${header}.${body}`).digest()
   );
   return `${header}.${body}.${signature}`;
 }
 
 function verifyToken(token: string): AuthTokenPayload | null {
   try {
+    const jwtSecret = readAuthConfig().jwtSecret;
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const [header, body, signature] = parts;
     const expectedSig = base64url(
-      crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest()
+      crypto.createHmac('sha256', jwtSecret).update(`${header}.${body}`).digest()
     );
     if (signature !== expectedSig) return null;
     const payload: AuthTokenPayload = JSON.parse(Buffer.from(body, 'base64').toString());
