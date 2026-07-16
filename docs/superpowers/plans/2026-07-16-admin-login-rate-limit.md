@@ -133,6 +133,8 @@ git commit -m "feat: limit failed admin logins"
 **Files:**
 
 - Modify: `packages/server/modules/auth/controller.ts`
+- Create: `tests/unit/authLoginRateLimit.test.ts`
+- Modify: `tests/unit/runUnitTests.cjs`
 
 **Interfaces:**
 
@@ -140,7 +142,31 @@ git commit -m "feat: limit failed admin logins"
 - Produces: HTTP 429 from `POST /api/admin/auth/login` after the fifth failed password attempt for one IP and username.
 - Preserves: existing 400, 401, and successful-login responses.
 
-- [ ] **Step 1: Integrate the limiter**
+- [ ] **Step 1: Write the failing controller test**
+
+Create `tests/unit/authLoginRateLimit.test.ts`. Call the exported `login` handler with a unique unknown username, a fixed test IP, and a minimal response object that records `status` and `json`. Assert that the first five requests return 401 and the sixth returns 429 with a positive `data.retryAfterSeconds`.
+
+```ts
+for (let attempt = 0; attempt < 5; attempt += 1) {
+  const response = createResponse();
+  await login(createRequest(ip, username), response.value);
+  assert.equal(response.statusCode, 401);
+}
+const blocked = createResponse();
+await login(createRequest(ip, username), blocked.value);
+assert.equal(blocked.statusCode, 429);
+assert.ok(Number(blocked.body.data.retryAfterSeconds) > 0);
+```
+
+Register `'authLoginRateLimit.test.ts'` after `'loginRateLimiter.test.ts'` in `tests/unit/runUnitTests.cjs`.
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `pnpm.cmd run test:unit authLoginRateLimit.test.ts`
+
+Expected: failure because the sixth unknown-user login still returns 401.
+
+- [ ] **Step 3: Integrate the limiter**
 
 In `packages/server/modules/auth/controller.ts`, create one `const loginRateLimiter = new LoginRateLimiter()` and, after the required-field guard, use this code:
 
@@ -154,20 +180,20 @@ if (!limit.allowed) {
 
 Call `loginRateLimiter.recordFailure(req.ip, username)` immediately before each existing 401 response. Call `loginRateLimiter.clear(req.ip, username)` immediately before the successful response. Do not record missing username/password validation errors.
 
-- [ ] **Step 2: Run focused and full unit suite**
+- [ ] **Step 4: Run focused and full unit suite**
 
 Run: `pnpm.cmd run test:unit -- loginRateLimiter.test.ts`
 
-Expected: 2 passing tests, 0 failures.
+Expected: 3 passing tests, 0 failures.
 
 Run: `pnpm.cmd run test:unit`
 
 Expected: 0 failures.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 5: Commit**
 
 ```powershell
-git add packages/server/modules/auth/controller.ts
+git add packages/server/modules/auth/controller.ts tests/unit/authLoginRateLimit.test.ts tests/unit/runUnitTests.cjs
 git commit -m "fix: reject repeated admin login failures"
 ```
 
