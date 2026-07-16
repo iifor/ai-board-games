@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import * as repo from './repository';
+import { LoginRateLimiter } from './loginRateLimiter';
 import { verifyPassword, signToken } from './service';
 import type { LoginRequest, LoginResponse } from './types';
+
+const loginRateLimiter = new LoginRateLimiter();
 
 async function login(req: Request, res: Response): Promise<void> {
   const { username, password } = req.body as LoginRequest;
@@ -11,14 +14,26 @@ async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  const limit = loginRateLimiter.check(req.ip, username);
+  if (!limit.allowed) {
+    res.status(429).json({
+      code: 429,
+      message: '登录尝试过于频繁，请稍后再试',
+      data: { retryAfterSeconds: limit.retryAfterSeconds },
+    });
+    return;
+  }
+
   const user = repo.findByUsername(username);
   if (!user || !user.enabled) {
+    loginRateLimiter.recordFailure(req.ip, username);
     res.status(401).json({ code: 401, message: '用户名或密码错误' });
     return;
   }
 
   const valid = await verifyPassword(password, user.password_hash);
   if (!valid) {
+    loginRateLimiter.recordFailure(req.ip, username);
     res.status(401).json({ code: 401, message: '用户名或密码错误' });
     return;
   }
@@ -32,6 +47,7 @@ async function login(req: Request, res: Response): Promise<void> {
       displayName: user.display_name,
     },
   };
+  loginRateLimiter.clear(req.ip, username);
   res.json({ code: 0, message: '登录成功', data });
 }
 
