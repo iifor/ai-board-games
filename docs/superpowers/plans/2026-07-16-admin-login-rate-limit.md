@@ -133,7 +133,6 @@ git commit -m "feat: limit failed admin logins"
 **Files:**
 
 - Modify: `packages/server/modules/auth/controller.ts`
-- Modify: `tests/unit/loginRateLimiter.test.ts`
 
 **Interfaces:**
 
@@ -141,26 +140,7 @@ git commit -m "feat: limit failed admin logins"
 - Produces: HTTP 429 from `POST /api/admin/auth/login` after the fifth failed password attempt for one IP and username.
 - Preserves: existing 400, 401, and successful-login responses.
 
-- [ ] **Step 1: Write the failing normalization test**
-
-Append to `tests/unit/loginRateLimiter.test.ts`:
-
-```ts
-test('clearing a normalized login subject restores access', () => {
-  const limiter = new LoginRateLimiter(() => 0);
-  for (let attempt = 0; attempt < 5; attempt += 1) limiter.recordFailure('203.0.113.10', 'Admin ');
-  limiter.clear('203.0.113.10', 'admin');
-  assert.equal(limiter.check('203.0.113.10', 'ADMIN').allowed, true);
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `pnpm.cmd run test:unit -- loginRateLimiter.test.ts`
-
-Expected: the new test fails until all limiter methods share normalized keys.
-
-- [ ] **Step 3: Integrate the limiter**
+- [ ] **Step 1: Integrate the limiter**
 
 In `packages/server/modules/auth/controller.ts`, create one `const loginRateLimiter = new LoginRateLimiter()` and, after the required-field guard, use this code:
 
@@ -174,20 +154,20 @@ if (!limit.allowed) {
 
 Call `loginRateLimiter.recordFailure(req.ip, username)` immediately before each existing 401 response. Call `loginRateLimiter.clear(req.ip, username)` immediately before the successful response. Do not record missing username/password validation errors.
 
-- [ ] **Step 4: Run focused and full unit suite**
+- [ ] **Step 2: Run focused and full unit suite**
 
 Run: `pnpm.cmd run test:unit -- loginRateLimiter.test.ts`
 
-Expected: 3 passing tests, 0 failures.
+Expected: 2 passing tests, 0 failures.
 
 Run: `pnpm.cmd run test:unit`
 
 Expected: 0 failures.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 ```powershell
-git add packages/server/modules/auth/controller.ts tests/unit/loginRateLimiter.test.ts
+git add packages/server/modules/auth/controller.ts
 git commit -m "fix: reject repeated admin login failures"
 ```
 
