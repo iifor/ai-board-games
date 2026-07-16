@@ -6,7 +6,7 @@ const ts = require('../../packages/server/node_modules/typescript');
 const root = path.resolve(__dirname, '../..');
 const serverRoot = path.join(root, 'packages', 'server');
 const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
-const requestedFiles = process.argv.slice(2);
+const requestedFiles = process.argv.slice(2).filter((file) => file !== '--');
 const testFiles = (requestedFiles.length ? requestedFiles : [
   'gameSocketSession.test.ts',
   'concurrencyLimiter.test.ts',
@@ -14,6 +14,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'upstreamConcurrency.test.ts',
   'traceConcurrency.test.ts',
   'authProductionConfig.test.ts',
+  'loginRateLimiter.test.ts',
   'serverLifecycle.test.ts',
   'deploymentConfig.test.ts',
   'gameEventBuilder.test.ts',
