@@ -38,3 +38,19 @@ test('expires failures after fifteen minutes', () => {
 
   assert.equal(limiter.check('127.0.0.1', 'admin').allowed, true);
 });
+
+test('evicts the oldest unexpired subject when capacity is reached', () => {
+  let now = 0;
+  const limiter = new LoginRateLimiter(() => now, 2);
+
+  for (const username of ['oldest', 'newer']) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      limiter.recordFailure('127.0.0.1', username);
+    }
+    now += 1;
+  }
+  limiter.recordFailure('127.0.0.1', 'third');
+
+  assert.equal(limiter.check('127.0.0.1', 'oldest').allowed, true);
+  assert.equal(limiter.check('127.0.0.1', 'newer').allowed, false);
+});
