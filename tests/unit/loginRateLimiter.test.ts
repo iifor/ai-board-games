@@ -2,16 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { LoginRateLimiter } from '../../packages/server/modules/auth/loginRateLimiter';
 
-test('allows five failures and blocks the sixth for one normalized login key', () => {
+test('reserves five attempts and blocks the sixth for one normalized login key', () => {
   let now = 0;
   const limiter = new LoginRateLimiter(() => now);
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    assert.equal(limiter.check('127.0.0.1', ' Admin ').allowed, true);
-    limiter.recordFailure('127.0.0.1', ' Admin ');
+    assert.equal(limiter.registerAttempt('127.0.0.1', ' Admin ').allowed, true);
   }
 
-  const result = limiter.check('127.0.0.1', 'admin');
+  const result = limiter.registerAttempt('127.0.0.1', 'admin');
   assert.equal(result.allowed, false);
   assert.ok(result.retryAfterSeconds > 0);
 });

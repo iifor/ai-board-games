@@ -14,7 +14,7 @@ async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const limit = loginRateLimiter.check(req.ip, username);
+  const limit = loginRateLimiter.registerAttempt(req.ip, username);
   if (!limit.allowed) {
     res.status(429).json({
       code: 429,
@@ -26,14 +26,12 @@ async function login(req: Request, res: Response): Promise<void> {
 
   const user = repo.findByUsername(username);
   if (!user || !user.enabled) {
-    loginRateLimiter.recordFailure(req.ip, username);
     res.status(401).json({ code: 401, message: '用户名或密码错误' });
     return;
   }
 
   const valid = await verifyPassword(password, user.password_hash);
   if (!valid) {
-    loginRateLimiter.recordFailure(req.ip, username);
     res.status(401).json({ code: 401, message: '用户名或密码错误' });
     return;
   }

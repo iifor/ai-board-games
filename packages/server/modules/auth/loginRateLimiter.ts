@@ -32,6 +32,12 @@ export class LoginRateLimiter {
     };
   }
 
+  registerAttempt(ip: string, username: string): { allowed: boolean; retryAfterSeconds: number } {
+    const result = this.check(ip, username);
+    if (result.allowed) this.recordFailure(ip, username);
+    return result;
+  }
+
   recordFailure(ip: string, username: string): void {
     const key = this.key(ip, username);
     const now = this.now();
