@@ -247,6 +247,7 @@ pnpm run check:server
 - 模型运行时 key 主要通过数据库模型配置或 `DATABASE_MODEL_API_KEY` 兜底。
 - 生产环境必须配置至少 32 字符的 `JWT_SECRET`、非空 `ADMIN_USERNAME` 和至少 12 字符的 `ADMIN_PASSWORD`；缺失或强度不足时服务在监听端口前失败。
 - 管理员账号只从环境变量初始化或轮换。未配置时开发环境不会自动创建管理员，代码中不保留默认账号或密码。
+- 管理员登录按“客户端 IP + 用户名”限流：15 分钟内最多允许 5 次失败，第 6 次请求返回 HTTP 429；登录成功会清除该组合的失败计数。计数仅保存在当前 Node.js 进程内存中，重启后会重置；当前单实例 Compose 部署符合这一边界。
 
 静态资源：
 
@@ -265,6 +266,7 @@ pnpm run check:server
 腾讯云入口：
 
 - HTTPS、域名证书、WAF 和公网健康检查由腾讯云负载均衡负责。
+- 腾讯云 WAF 必须为 `POST /api/admin/auth/login` 配置按 IP 的频率规则。WAF 覆盖进程重启和分布式来源；应用层限流则通过 IP + 用户名保护单个账号。
 - 负载均衡通过 HTTP/WebSocket 回源 Nginx 80 端口；Nginx 保留 `X-Forwarded-Proto`，Express 信任一个代理 hop。
 - CVM 安全组的 80 端口只允许负载均衡访问，Node.js 的 3001 端口只绑定到本机。
 
