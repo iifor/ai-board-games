@@ -224,6 +224,11 @@ Replace `metadata?: Record<string, unknown>` in `GameDefinition` with:
 interface GameSessionMetadata {
   startMessage: string;
   doneMessage: string;
+  playerSelection?: {
+    min: number;
+    max: number;
+    errorMessage: string;
+  };
   playback?: {
     prefetchCount?: number;
     phaseLookahead?: number;
@@ -621,6 +626,11 @@ Vote execution must call `askJson(prompt, { skillId: 'undercover-vote', phase: '
     session: {
       startMessage: '谁是卧底开始',
       doneMessage: '谁是卧底结束，身份已经揭晓。',
+      playerSelection: {
+        min: 6,
+        max: 6,
+        errorMessage: 'AI 谁是卧底需要选择恰好 6 位 AI 玩家。',
+      },
       playback: { phaseLookahead: 1 },
     },
   },
@@ -761,12 +771,17 @@ In `runSession`, call `resolveGameRunner(gameType)` once. Use its normalized `ga
 
 Create PlaybackPipeline for every resolved game. Preserve werewolf-only player projection and existing debate/werewolf prefetch values by storing those values in their definition metadata; Undercover uses `{ phaseLookahead: 1 }`.
 
-Update `selectPlayersForGame()` with one trust-boundary rule:
+Update `selectPlayersForGame()` with one generic trust-boundary rule driven by
+the registered definition, so Undercover and later games do not add socket
+branches:
 
 ```ts
-if (gameType === 'undercover') {
-  if (selected.length !== 6) throw new Error('AI 谁是卧底需要选择恰好 6 位 AI 玩家。');
-  return selected;
+const selection = getGameEngine()
+  .getDefinition(gameType)
+  ?.metadata?.session?.playerSelection;
+
+if (selection && (selected.length < selection.min || selected.length > selection.max)) {
+  throw new Error(selection.errorMessage);
 }
 ```
 
