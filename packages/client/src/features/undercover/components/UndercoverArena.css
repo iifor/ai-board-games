@@ -83,6 +83,12 @@
   color: #7de9df;
 }
 
+.undercover-round-data .undercover-vote-summary {
+  margin-top: 10px;
+  color: #ffe18f;
+  font-weight: 800;
+}
+
 .undercover-reveal {
   border: 1px solid rgba(255, 211, 111, 0.5);
   text-align: center;

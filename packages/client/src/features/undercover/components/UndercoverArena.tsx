@@ -1,4 +1,5 @@
 import type { UndercoverPublicState } from '../types';
+import { getUndercoverPlayerLabel, getUndercoverVoteSummary } from './undercoverVoteSummary';
 import './UndercoverArena.css';
 
 interface UndercoverArenaProps {
@@ -8,6 +9,7 @@ interface UndercoverArenaProps {
 export function UndercoverArena({ game }: UndercoverArenaProps) {
   const roundSpeeches = game.speeches.filter((speech) => speech.round === game.round);
   const currentSpeakerId = game.status === 'speaking' ? roundSpeeches.at(-1)?.playerId : undefined;
+  const voteSummary = getUndercoverVoteSummary(game);
 
   return (
     <section className="undercover-arena" aria-label="谁是卧底对局">
@@ -41,7 +43,7 @@ export function UndercoverArena({ game }: UndercoverArenaProps) {
             <ol>
               {roundSpeeches.map((speech) => (
                 <li key={`${speech.round}-${speech.playerId}`}>
-                  <strong>{getPlayerLabel(game, speech.playerId)}</strong>
+                  <strong>{getUndercoverPlayerLabel(game, speech.playerId)}</strong>
                   <span>{speech.text}</span>
                 </li>
               ))}
@@ -49,15 +51,16 @@ export function UndercoverArena({ game }: UndercoverArenaProps) {
           ) : <p>等待首位玩家发言。</p>}
         </section>
 
-        <section aria-labelledby="undercover-votes-title">
+        <section aria-labelledby="undercover-votes-title" aria-live="polite">
           <h3 id="undercover-votes-title">汇总票型</h3>
           {game.voteResult ? (
             <ul>
               {Object.entries(game.voteResult.tally).map(([playerId, votes]) => (
-                <li key={playerId}>{getPlayerLabel(game, Number(playerId))}：{votes} 票</li>
+                <li key={playerId}>{getUndercoverPlayerLabel(game, Number(playerId))}：{votes} 票</li>
               ))}
             </ul>
           ) : <p>本轮尚未公布票型。</p>}
+          {voteSummary.map((item) => <p className="undercover-vote-summary" key={item}>{item}</p>)}
         </section>
       </div>
 
@@ -68,17 +71,12 @@ export function UndercoverArena({ game }: UndercoverArenaProps) {
           <dl>
             <div><dt>平民词</dt><dd>{game.reveal.civilianWord}</dd></div>
             <div><dt>卧底词</dt><dd>{game.reveal.undercoverWord}</dd></div>
-            <div><dt>卧底玩家</dt><dd>{getPlayerLabel(game, game.reveal.undercoverPlayerId)}</dd></div>
+            <div><dt>卧底玩家</dt><dd>{getUndercoverPlayerLabel(game, game.reveal.undercoverPlayerId)}</dd></div>
           </dl>
         </section>
       )}
     </section>
   );
-}
-
-function getPlayerLabel(game: UndercoverPublicState, playerId: number): string {
-  const player = game.players.find((item) => item.id === playerId);
-  return player ? `${player.id}号 ${player.nickname}` : `${playerId}号`;
 }
 
 function getPhaseLabel(status: UndercoverPublicState['status']): string {

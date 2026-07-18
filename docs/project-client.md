@@ -147,8 +147,8 @@ packages/client/
 目录：`packages/client/src/features/undercover`
 
 - `UndercoverGame`：实时与历史回放共用的页面容器，只组合控制区、公开竞技场和错误状态。
-- `useUndercoverGame`：消费通用 WebSocket session、语音队列和 ACK；仅保存服务端公开状态，开局复用导航 sessionStorage 中已选择的 6 个玩家 ID。
-- `UndercoverArena`：展示六个席位、轮次发言、汇总票型和淘汰轮次；仅当状态为 `completed` 且存在 `reveal` 时展示词语和卧底身份。
+- `useUndercoverGame`：消费通用 WebSocket session、语音队列和 ACK；仅保存服务端公开状态，票型事件只归一化轮次、加赛、汇总计数、平票候选和淘汰玩家，不保留逐人投票；开局复用导航 sessionStorage 中已选择的 6 个玩家 ID。
+- `UndercoverArena`：展示六个席位、轮次发言、汇总票型、平票/加赛状态和淘汰玩家；仅当状态为 `completed` 且存在 `reveal` 时展示词语和卧底身份。
 - `UndercoverControls`：复用开始、暂停/继续和回放跳过控制语义，不增加新 WebSocket 消息。
 
 ## WebSocket 客户端职责

@@ -43,6 +43,15 @@ export interface GameEvent {
   text?: string;
   narration?: string;
   message?: string;
+  payload?: {
+    message?: string;
+    round?: number;
+    runoff?: boolean;
+    tally?: Record<string, number>;
+    tiedCandidateIds?: number[];
+    eliminatedPlayerId?: number;
+    [key: string]: unknown;
+  };
   audienceCue?: {
     kind: string;
     display?: 'modal' | 'none';

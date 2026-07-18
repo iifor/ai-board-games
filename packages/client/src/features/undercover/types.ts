@@ -1,4 +1,4 @@
-import type { UndercoverPublicState } from '@ai-presenter/shared/types/undercover';
+import type { UndercoverPublicState, UndercoverVoteResult } from '@ai-presenter/shared/types/undercover';
 
 export interface UndercoverViewState {
   game: UndercoverPublicState | null;
@@ -8,4 +8,4 @@ export interface UndercoverViewState {
 
 export type UndercoverStartOptions = { playerIds: number[] } | { replayGameId: string };
 
-export type { UndercoverPublicState };
+export type { UndercoverPublicState, UndercoverVoteResult };

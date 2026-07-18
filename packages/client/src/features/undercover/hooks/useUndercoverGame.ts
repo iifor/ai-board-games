@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useGameSocketSession } from '../../../hooks/useGameSocketSession';
 import { useSpeechQueue } from '../../../hooks/useSpeechQueue';
 import type { GameEvent, QueueItem } from '../../../types';
-import type { UndercoverPublicState, UndercoverStartOptions, UndercoverViewState } from '../types';
+import type { UndercoverPublicState, UndercoverStartOptions, UndercoverViewState, UndercoverVoteResult } from '../types';
 
 export const EMPTY_UNDERCOVER_VIEW_STATE: UndercoverViewState = {
   game: null,
@@ -40,8 +40,12 @@ export function reduceUndercoverViewState(state: UndercoverViewState, event: Gam
   if (event.game?.gameType !== 'undercover') {
     return event.message ? { ...state, message: event.message } : state;
   }
+  const game = projectUndercoverPublicState(event.game as unknown as UndercoverPublicState);
+  const voteResult = normalizeAggregateVoteResult(event, game)
+    || (state.game?.round === game.round ? state.game.voteResult : undefined);
+  if (voteResult) game.voteResult = { ...voteResult, votes: {} };
   return {
-    game: projectUndercoverPublicState(event.game as unknown as UndercoverPublicState),
+    game,
     error: '',
     message: String(event.message || state.message)
   };
@@ -134,7 +138,7 @@ function projectUndercoverPublicState(game: UndercoverPublicState): UndercoverPu
     projected.voteResult = {
       round: game.voteResult.round,
       runoff: game.voteResult.runoff,
-      votes: { ...game.voteResult.votes },
+      votes: {},
       tally: { ...game.voteResult.tally },
       tiedCandidateIds: [...game.voteResult.tiedCandidateIds],
       ...(game.voteResult.eliminatedPlayerId ? { eliminatedPlayerId: game.voteResult.eliminatedPlayerId } : {})
@@ -144,4 +148,26 @@ function projectUndercoverPublicState(game: UndercoverPublicState): UndercoverPu
   if (game.winReason) projected.winReason = game.winReason;
   if (game.status === 'completed' && game.reveal) projected.reveal = { ...game.reveal };
   return projected;
+}
+
+function normalizeAggregateVoteResult(event: GameEvent, game: UndercoverPublicState): UndercoverVoteResult | null {
+  if (event.type !== 'undercover-vote-result' || !event.payload) return null;
+  const round = Number(event.payload.round);
+  const eliminatedPlayerId = Number(event.payload.eliminatedPlayerId);
+  const tally = Object.fromEntries(
+    Object.entries(event.payload.tally || {})
+      .map(([playerId, votes]) => [playerId, Number(votes)] as const)
+      .filter(([, votes]) => Number.isFinite(votes) && votes >= 0)
+  );
+  const tiedCandidateIds = Array.isArray(event.payload.tiedCandidateIds)
+    ? event.payload.tiedCandidateIds.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    : [];
+  return {
+    round: Number.isInteger(round) && round > 0 ? round : game.round,
+    runoff: event.payload.runoff === true,
+    votes: {},
+    tally,
+    tiedCandidateIds,
+    ...(Number.isInteger(eliminatedPlayerId) && eliminatedPlayerId > 0 ? { eliminatedPlayerId } : {})
+  };
 }

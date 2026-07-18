@@ -67,3 +67,119 @@ test('Undercover start config forwards exactly the selected six ids', () => {
   assert.throws(() => feature!.buildUndercoverStartOptions([1, 2, 3, 4, 5], ''), /固定选择 6 位 AI 玩家/);
   assert.throws(() => feature!.buildUndercoverStartOptions([1, 2, 3, 4, 5, 5], ''), /固定选择 6 位 AI 玩家/);
 });
+
+test('Undercover vote summary names runoff tie candidates and the eliminated player', () => {
+  let summary: {
+    getUndercoverVoteSummary?: (game: unknown) => string[];
+  } | undefined;
+  try {
+    summary = require('../../packages/client/src/features/undercover/components/undercoverVoteSummary');
+  } catch {
+    summary = undefined;
+  }
+  assert.equal(typeof summary?.getUndercoverVoteSummary, 'function');
+
+  const game = {
+    id: 'game-1',
+    gameType: 'undercover',
+    mode: 'standard-6',
+    status: 'voting',
+    round: 2,
+    players: [
+      { id: 2, nickname: '小北', alive: true },
+      { id: 4, nickname: '阿青', alive: false, eliminatedRound: 2 }
+    ],
+    speeches: [],
+    voteResult: {
+      round: 2,
+      runoff: false,
+      votes: { '2': 4, '4': 2 },
+      tally: { '2': 1, '4': 1 },
+      tiedCandidateIds: [2, 4],
+    }
+  };
+  assert.deepEqual(summary!.getUndercoverVoteSummary!(game), [
+    '平票候选：2号 小北、4号 阿青，将进入加赛投票。'
+  ]);
+  assert.deepEqual(summary!.getUndercoverVoteSummary!({
+    ...game,
+    voteResult: {
+      round: 2,
+      runoff: true,
+      votes: {},
+      tally: { '2': 1, '4': 1 },
+      tiedCandidateIds: [],
+      eliminatedPlayerId: 4
+    }
+  }), [
+    '本轮为加赛投票。',
+    '本轮淘汰：4号 阿青。'
+  ]);
+});
+
+test('Undercover reducer normalizes aggregate vote payloads without retaining ballots', () => {
+  const feature = require('../../packages/client/src/features/undercover/hooks/useUndercoverGame') as typeof import('../../packages/client/src/features/undercover/hooks/useUndercoverGame');
+  const summary = require('../../packages/client/src/features/undercover/components/undercoverVoteSummary') as {
+    getUndercoverVoteSummary: (game: unknown) => string[];
+  };
+  const publicGame = {
+    id: 'game-1',
+    gameType: 'undercover' as const,
+    mode: 'standard-6' as const,
+    status: 'voting' as const,
+    round: 2,
+    players: [
+      { id: 2, nickname: '小北', alive: true },
+      { id: 4, nickname: '阿青', alive: true }
+    ],
+    speeches: []
+  };
+
+  const tied = feature.reduceUndercoverViewState(feature.EMPTY_UNDERCOVER_VIEW_STATE, {
+    type: 'undercover-vote-result',
+    game: publicGame,
+    payload: {
+      message: '本轮投票平票，进入复投。',
+      round: 2,
+      runoff: false,
+      tally: { '2': 1, '4': 1 },
+      tiedCandidateIds: [2, 4],
+      votes: { '2': 4, '4': 2 }
+    }
+  });
+  assert.deepEqual(tied.game?.voteResult, {
+    round: 2,
+    runoff: false,
+    votes: {},
+    tally: { '2': 1, '4': 1 },
+    tiedCandidateIds: [2, 4]
+  });
+
+  const runoff = feature.reduceUndercoverViewState(tied, {
+    type: 'undercover-vote-result',
+    game: publicGame,
+    payload: {
+      message: '投票结束。',
+      round: 2,
+      runoff: true,
+      tally: { '2': 1, '4': 1 },
+      tiedCandidateIds: [],
+      eliminatedPlayerId: 4,
+      votes: { '2': 4, '4': 2 }
+    }
+  });
+  assert.deepEqual(summary.getUndercoverVoteSummary(runoff.game), [
+    '本轮为加赛投票。',
+    '本轮淘汰：4号 阿青。'
+  ]);
+  assert.deepEqual(runoff.game?.voteResult?.votes, {});
+
+  const eliminated = feature.reduceUndercoverViewState(runoff, {
+    type: 'undercover-eliminated',
+    game: {
+      ...publicGame,
+      players: publicGame.players.map((player) => player.id === 4 ? { ...player, alive: false, eliminatedRound: 2 } : player)
+    }
+  });
+  assert.equal(eliminated.game?.voteResult?.eliminatedPlayerId, 4);
+});
