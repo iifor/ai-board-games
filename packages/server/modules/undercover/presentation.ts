@@ -29,7 +29,11 @@ function toUndercoverPublicState(state: UndercoverState): UndercoverPublicState 
       alive: player.alive,
       eliminatedRound: player.eliminatedRound,
     })),
-    speeches: state.speeches.map((speech) => ({ ...speech })),
+    speeches: state.speeches.map((speech) => ({
+      round: speech.round,
+      playerId: speech.playerId,
+      text: speech.text,
+    })),
   };
   if (state.winner) publicState.winner = state.winner;
   if (state.winReason) publicState.winReason = state.winReason;

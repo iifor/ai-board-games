@@ -111,9 +111,9 @@ function containsSecretWord(text: string, secretWord: string): boolean {
   return Boolean(secretWord.trim()) && text.toLocaleLowerCase().includes(secretWord.trim().toLocaleLowerCase());
 }
 
-function validatePublicSpeech(text: string, secretWord: string): { ok: true; text: string } | { ok: false; reason: 'secret-leak' } {
+function validatePublicSpeech(text: string, wordPair: UndercoverWordPair): { ok: true; text: string } | { ok: false; reason: 'secret-leak' } {
   const speech = text.trim().slice(0, 120);
-  if (!speech || containsSecretWord(speech, secretWord)) return { ok: false, reason: 'secret-leak' };
+  if (!speech || containsSecretWord(speech, wordPair.civilian) || containsSecretWord(speech, wordPair.undercover)) return { ok: false, reason: 'secret-leak' };
   return { ok: true, text: speech };
 }
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createInitialUndercoverState } from '../../packages/server/modules/undercover/rules';
-import { buildUndercoverSpeechPrompt } from '../../packages/server/modules/undercover/prompts';
+import { buildUndercoverSpeechPrompt, buildUndercoverVotePrompt } from '../../packages/server/modules/undercover/prompts';
 import { createUndercoverPresentationEvent, toUndercoverPublicState } from '../../packages/server/modules/undercover/presentation';
 
 const state = createInitialUndercoverState(
@@ -18,11 +18,28 @@ test('each speech prompt contains only the actor secret word', () => {
   assert.doesNotMatch(undercoverPrompt, /咖啡/);
 });
 
+test('vote prompt contains only the actor secret word and public vote context', () => {
+  const prompt = buildUndercoverVotePrompt(state, 1, [2, 3, 6]);
+  assert.match(prompt, /咖啡/);
+  assert.doesNotMatch(prompt, /茶|undercoverPlayerId|你是卧底/);
+  assert.match(prompt, /2, 3, 6/);
+});
+
 test('public state and pre-result events contain no secrets', () => {
   const publicState = toUndercoverPublicState(state);
   const event = createUndercoverPresentationEvent('undercover-game-start', state, { message: '游戏开始' });
   const serialized = JSON.stringify({ publicState, event });
   assert.doesNotMatch(serialized, /咖啡|茶|undercoverPlayerId/);
+});
+
+test('public speech projection excludes non-public runtime fields', () => {
+  const stateWithInternalSpeech = {
+    ...state,
+    speeches: [{ round: 1, playerId: 1, text: '描述', internalSecret: '咖啡' }],
+  };
+  const publicState = toUndercoverPublicState(stateWithInternalSpeech);
+  assert.deepEqual(publicState.speeches, [{ round: 1, playerId: 1, text: '描述' }]);
+  assert.doesNotMatch(JSON.stringify(publicState), /internalSecret|咖啡/);
 });
 
 test('result event reveals both words and the undercover id', () => {

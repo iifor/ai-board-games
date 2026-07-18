@@ -86,7 +86,9 @@ test('seed fallbacks are deterministic and secret words are detected', () => {
   assert.throws(() => seededIndex(7, 0), /empty collection/);
 });
 
-test('public speech rejects only the actor secret word and normalizes accepted text', () => {
-  assert.deepEqual(validatePublicSpeech('  描述我的体验  ', '咖啡'), { ok: true, text: '描述我的体验' });
-  assert.deepEqual(validatePublicSpeech('我喜欢咖啡', '咖啡'), { ok: false, reason: 'secret-leak' });
+test('public speech rejects either secret word and normalizes allowed text', () => {
+  const wordPair = { civilian: '咖啡', undercover: '茶' };
+  assert.deepEqual(validatePublicSpeech('  描述我的体验  ', wordPair), { ok: true, text: '描述我的体验' });
+  assert.deepEqual(validatePublicSpeech('我喜欢咖啡', wordPair), { ok: false, reason: 'secret-leak' });
+  assert.deepEqual(validatePublicSpeech('我喜欢茶', wordPair), { ok: false, reason: 'secret-leak' });
 });
