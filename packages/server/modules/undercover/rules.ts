@@ -62,10 +62,13 @@ function resolveVote(state: UndercoverState, votes: Record<string, number>, isRu
   const candidates = isRunoff && state.runoffCandidateIds.length ? state.runoffCandidateIds : undefined;
 
   for (const voter of state.players.filter((player) => player.alive)) {
-    const targetId = votes[String(voter.id)];
-    if (getLegalVoteTargets(state, voter.id, candidates).includes(targetId)) {
-      tally.set(targetId, (tally.get(targetId) || 0) + 1);
-    }
+    const legalTargets = getLegalVoteTargets(state, voter.id, candidates);
+    if (!legalTargets.length) continue;
+    const submittedTargetId = votes[String(voter.id)];
+    const targetId = legalTargets.includes(submittedTargetId)
+      ? submittedTargetId
+      : legalTargets[seededIndex(state.seed, legalTargets.length, (Math.imul(state.round, 31) ^ Math.imul(voter.id, 131) ^ (isRunoff ? 1 : 0)))];
+    tally.set(targetId, (tally.get(targetId) || 0) + 1);
   }
 
   const resultTally = Object.fromEntries([...tally.entries()].sort(([left], [right]) => left - right));

@@ -41,6 +41,35 @@ test('first tie requests runoff and second tie uses stable seeded elimination', 
   assert.ok([1, 2].includes(result.playerId));
 });
 
+test('invalid self and dead-target ballots use deterministic legal fallbacks', () => {
+  const selfState = createInitialUndercoverState(players, { seed: 7, wordPair: { civilian: '咖啡', undercover: '茶' }, undercoverPlayerId: 6 });
+  selfState.players.slice(2).forEach((player) => { player.alive = false; });
+  const selfVotes = { 1: 1, 2: 1 };
+  const selfResult = resolveVote(selfState, selfVotes, false);
+  assert.deepEqual(selfResult, { kind: 'runoff', candidateIds: [1, 2], tally: { 1: 1, 2: 1 } });
+  assert.deepEqual(resolveVote(selfState, selfVotes, false), selfResult);
+
+  const deadTargetState = createInitialUndercoverState(players, { seed: 7, wordPair: { civilian: '咖啡', undercover: '茶' }, undercoverPlayerId: 6 });
+  deadTargetState.players.slice(2).forEach((player) => { player.alive = false; });
+  const deadTargetVotes = { 1: 3, 2: 1 };
+  const deadTargetResult = resolveVote(deadTargetState, deadTargetVotes, false);
+  assert.deepEqual(deadTargetResult, { kind: 'runoff', candidateIds: [1, 2], tally: { 1: 1, 2: 1 } });
+  assert.deepEqual(resolveVote(deadTargetState, deadTargetVotes, false), deadTargetResult);
+});
+
+test('out-of-runoff ballots use deterministic candidates and no-target voters remain empty', () => {
+  const state = createInitialUndercoverState(players, { seed: 7, wordPair: { civilian: '咖啡', undercover: '茶' }, undercoverPlayerId: 6 });
+  state.runoffCandidateIds = [1, 2];
+  const votes = { 1: 3, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 };
+  const result = resolveVote(state, votes, true);
+  assert.deepEqual(result, { kind: 'eliminate', playerId: 1, tally: { 1: 5, 2: 1 } });
+  assert.deepEqual(resolveVote(state, votes, true), result);
+
+  const noTargetState = createInitialUndercoverState(players, { seed: 7, wordPair: { civilian: '咖啡', undercover: '茶' }, undercoverPlayerId: 6 });
+  noTargetState.players.slice(1).forEach((player) => { player.alive = false; });
+  assert.deepEqual(resolveVote(noTargetState, { 1: 1 }, false), { kind: 'none', tally: {} });
+});
+
 test('winner is civilians when undercover leaves and undercover at three alive', () => {
   const state = createInitialUndercoverState(players, { seed: 7, wordPair: { civilian: '咖啡', undercover: '茶' }, undercoverPlayerId: 6 });
   assert.deepEqual(checkWinner(eliminatePlayer(state, 6, 1)), { winner: 'civilians', reason: '卧底被淘汰' });
