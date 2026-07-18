@@ -11,7 +11,6 @@ import { replayGameSession } from './replay';
 import type { GameSession, SessionEvent } from './session';
 import { getAiConfig } from '../../config';
 import { getWerewolfModeConfig } from '../werewolf-config';
-import { buildWerewolfRuleIntro } from '../werewolf/messages';
 import {
   createProjectionContext,
   projectWerewolfEvent,
@@ -217,6 +216,30 @@ async function runSession(
     ...resolved.session.playback,
     capture: true,
   });
+  if (getGameEngine().getDefinition(safeGameType)?.runtime) {
+    const gamePlayers = config.players.map((player) => ({
+      id: Number(player.id),
+      name: player.name || player.nickname || '',
+      nickname: player.nickname || player.name || '',
+      avatar: player.avatar || '',
+      avatarUrl: player.avatarUrl || player.avatar || '',
+      alive: true,
+      role: '',
+      roleLabel: '',
+      faction: '',
+    }));
+    await playbackPipeline.send({
+      type: 'host',
+      message: resolved.session.startMessage,
+      debugMode: Boolean(config.debugMode),
+      game: {
+        type: safeGameType,
+        debugMode: Boolean(config.debugMode),
+        host: publicSocketHost(config.host),
+        players: gamePlayers,
+      },
+    });
+  }
   const liveSource = createLivePlaybackSource();
   const livePlaybackResult = playbackPipeline.playLive(liveSource).then(
     () => ({ error: null as unknown }),

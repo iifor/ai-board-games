@@ -36,7 +36,7 @@ function createUndercoverHandlers(): Record<string, StepHandler> {
         const current = state as unknown as WorkflowState;
         if (isComplete(current, step.id)) return done(current);
         const next = completeStep(current, step.id);
-        return done(next, [publicEvent(match.id as string, step.id, 'undercover-game-start', next, '谁是卧底开始')]);
+        return done(next);
       },
     },
     'undercover.round_start': {
