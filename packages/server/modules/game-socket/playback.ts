@@ -3,7 +3,7 @@ import type {
   PlaybackEventSource,
   PlaybackMediaReference,
 } from '@ai-presenter/shared/types/playbackTypes';
-import { createPreparedSender } from './sender';
+import { createPreparedSender, isDisplayEvent } from './sender';
 import type { GameSession, SessionEvent } from './session';
 
 const PLAYBACK_PROTOCOL_VERSION = 1;
@@ -61,7 +61,9 @@ function createPlaybackPipeline(
 
   async function play(source: PlaybackEventSource): Promise<void> {
     for await (const event of source.events()) {
-      await sender.sendPrepared(event.payload as SessionEvent);
+      const payload = event.payload as SessionEvent;
+      if (isDisplayEvent(payload)) await sender.sendPrepared(payload);
+      else await sender.send(payload);
     }
   }
 

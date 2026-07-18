@@ -6,6 +6,7 @@ import {
   createLivePlaybackSource,
   createPlaybackPipeline,
   preparePlaybackEvents,
+  toPlaybackEvent,
 } from './playback';
 import { replayGameSession } from './replay';
 import type { GameSession, SessionEvent } from './session';
@@ -216,6 +217,8 @@ async function runSession(
     ...resolved.session.playback,
     capture: true,
   });
+  let sessionStartEvent: SessionEvent | null = null;
+  let capturedBeforeRuntimeCount = 0;
   if (getGameEngine().getDefinition(safeGameType)?.runtime) {
     const gamePlayers = config.players.map((player) => ({
       id: Number(player.id),
@@ -228,7 +231,7 @@ async function runSession(
       roleLabel: '',
       faction: '',
     }));
-    await playbackPipeline.send({
+    sessionStartEvent = {
       type: 'host',
       message: resolved.session.startMessage,
       debugMode: Boolean(config.debugMode),
@@ -238,7 +241,9 @@ async function runSession(
         host: publicSocketHost(config.host),
         players: gamePlayers,
       },
-    });
+    };
+    await playbackPipeline.send(sessionStartEvent);
+    capturedBeforeRuntimeCount = playbackPipeline.getEvents().length;
   }
   const liveSource = createLivePlaybackSource();
   const livePlaybackResult = playbackPipeline.playLive(liveSource).then(
@@ -305,16 +310,29 @@ async function runSession(
         ? projectWerewolfGame(game, createProjectionContext(game))
         : game,
   };
-  const capturedPlaybackEvents = playbackPipeline.freezeCapture();
+  const capturedRuntimeEvents = playbackPipeline
+    .freezeCapture()
+    .slice(capturedBeforeRuntimeCount);
+  const storedStartEvents = sessionStartEvent
+    ? [toPlaybackEvent(sessionStartEvent, viewMode, 1)]
+    : [];
+  const capturedPlaybackEvents = capturedRuntimeEvents.map((event, index) => ({
+    ...event,
+    sequence: storedStartEvents.length + index + 1,
+  }));
   const missingPlaybackEvents = await preparePlaybackEvents(
     [
-      ...playbackSourceEvents.slice(capturedPlaybackEvents.length),
+      ...playbackSourceEvents.slice(capturedRuntimeEvents.length),
       completedEvent,
     ],
     viewMode,
-    capturedPlaybackEvents.length + 1,
+    storedStartEvents.length + capturedPlaybackEvents.length + 1,
   );
-  const playbackEvents = [...capturedPlaybackEvents, ...missingPlaybackEvents];
+  const playbackEvents = [
+    ...storedStartEvents,
+    ...capturedPlaybackEvents,
+    ...missingPlaybackEvents,
+  ];
   const preparedCompletedEvent = playbackEvents[playbackEvents.length - 1] || null;
 
   // 调试模式不保存数据库，只保留 AI 观测数据

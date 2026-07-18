@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BasePlayerAgent } from '../../packages/server/modules/agent-core/playerAgent';
-import { resetGameEngine } from '../../packages/server/modules/engine-registry';
+import { getGameEngine, resetGameEngine } from '../../packages/server/modules/engine-registry';
 import { resolveGameRunner } from '../../packages/server/modules/game-socket/gameRunner';
 import { runSession, selectPlayersForGame } from '../../packages/server/modules/game-socket/service';
 
@@ -120,3 +120,119 @@ test('runSession delivers definition-backed Undercover start once and completes 
   assert.equal((completed?.game as Record<string, unknown>).gameType, 'undercover');
   assert.equal(closed, true);
 });
+
+test('runSession persists the start before every runtime event while live playback is delayed', async (t) => {
+  resetGameEngine();
+  const firstDisplayStarted = deferred<void>();
+  const releasePlayback = deferred<void>();
+  const savedRecord = deferred<Record<string, unknown>>();
+  const gameType = 'delayed-playback-fixture';
+  const firstRuntimeEvent = createRuntimeEvent('fixture-first', 'first narration');
+  const finalRuntimeEvent = createRuntimeEvent('fixture-final-result', 'final result narration');
+  getGameEngine().registerDefinition({
+    gameType,
+    version: '1.0.0',
+    workflowId: 'delayed-playback-fixture-v1',
+    actionSchemas: {},
+    metadata: {
+      session: {
+        startMessage: 'fixture start',
+        doneMessage: 'fixture done',
+        playerSelection: { min: 1, max: 1, errorMessage: 'select one fixture player' },
+        playback: { prefetchCount: 1 },
+      },
+    },
+    runtime: {
+      createMatch: () => ({ id: 'delayed-playback-match' }),
+      run: async (_matchId, context) => {
+        context?.onEvent?.(firstRuntimeEvent);
+        await firstDisplayStarted.promise;
+        context?.onEvent?.(finalRuntimeEvent);
+        return {
+          id: 'delayed-playback-match',
+          gameType,
+          players: [{ id: 201, nickname: 'fixture player' }],
+          winner: 'fixture',
+        };
+      },
+    },
+  });
+
+  const aiConfigModule = require('../../packages/server/config/ai') as { getAiConfig: () => unknown };
+  const settingsModule = require('../../packages/server/modules/settings/service') as { getSpectatorMode: () => boolean };
+  const gamesModule = require('../../packages/server/modules/games/service') as { saveGameRecord: (game: unknown) => unknown };
+  const originalGetAiConfig = aiConfigModule.getAiConfig;
+  const originalGetSpectatorMode = settingsModule.getSpectatorMode;
+  const originalSaveGameRecord = gamesModule.saveGameRecord;
+  aiConfigModule.getAiConfig = () => ({
+    host: { id: 0, name: 'host', nickname: 'host' },
+    players: [{ id: 201, name: 'fixture player', nickname: 'fixture player', provider: 'test' }],
+    missingProviders: [],
+    realReady: true,
+  });
+  settingsModule.getSpectatorMode = () => false;
+  gamesModule.saveGameRecord = (game) => {
+    savedRecord.resolve(game as Record<string, unknown>);
+    return [];
+  };
+  t.after(() => {
+    releasePlayback.resolve();
+    aiConfigModule.getAiConfig = originalGetAiConfig;
+    settingsModule.getSpectatorMode = originalGetSpectatorMode;
+    gamesModule.saveGameRecord = originalSaveGameRecord;
+    resetGameEngine();
+  });
+
+  const sent: Record<string, unknown>[] = [];
+  let closed = false;
+  const session = {
+    send(payload: Record<string, unknown>) { sent.push(payload); },
+    async sendAndWait(payload: Record<string, unknown>) {
+      sent.push(payload);
+      firstDisplayStarted.resolve();
+      await releasePlayback.promise;
+    },
+    resolveAck() {},
+    close() { closed = true; },
+    setPaused() {},
+    skipCurrentPhase() {},
+  };
+
+  const running = runSession(session as never, 'real', [201], gameType);
+  const saved = await savedRecord.promise;
+  assert.equal(closed, false);
+  releasePlayback.resolve();
+  await running;
+
+  const playbackEvents = saved.playbackEvents as Array<{ payload: Record<string, unknown> }>;
+  assert.deepEqual(
+    playbackEvents.map((event) => event.payload.type),
+    ['host', 'fixture-first', 'fixture-final-result', 'done'],
+  );
+  assert.equal(playbackEvents[0].payload.message, 'fixture start');
+  assert.equal(playbackEvents[2].payload.message, 'final result narration');
+  assert.equal(sent.filter((event) => event.type === 'host').length, 1);
+  assert.equal(closed, true);
+});
+
+function createRuntimeEvent(type: string, message: string): Record<string, unknown> {
+  return {
+    type,
+    message,
+    presentation: {
+      speakableText: message,
+      displayText: message,
+      displayMode: 'status',
+      suppressSpeech: false,
+      requiresAck: true,
+    },
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value?: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done as (value?: T | PromiseLike<T>) => void;
+  });
+  return { promise, resolve };
+}

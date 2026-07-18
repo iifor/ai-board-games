@@ -204,6 +204,34 @@ test('PlaybackPipeline replays exact prepared payloads without ack ids', async (
   assert.deepEqual(completed.payload, stored[1].payload);
 });
 
+test('PlaybackPipeline replays a stored host start as an immediate event', async () => {
+  const sent: SentPayload[] = [];
+  const waited: SentPayload[] = [];
+  const session = {
+    send(payload: Record<string, unknown>) { sent.push(payload as SentPayload); },
+    async sendAndWait(payload: Record<string, unknown>) { waited.push(payload as SentPayload); },
+    resolveAck() {},
+    close() {},
+    setPaused() {},
+    skipCurrentPhase() {},
+  };
+  const pipeline = createPlaybackPipeline(session as never, {
+    viewMode: 'god',
+    capture: false,
+  });
+  const storedStart = toPlaybackEvent({
+    type: 'host',
+    message: 'fixture start',
+    game: { type: 'fixture' },
+  }, 'god', 1);
+
+  await pipeline.play(createStoredPlaybackSource([storedStart]));
+
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].type, 'host');
+  assert.equal(waited.length, 0);
+});
+
 test('PlaybackEvent strips ack ids and records media references', () => {
   const event = toPlaybackEvent({
     type: 'speech',
