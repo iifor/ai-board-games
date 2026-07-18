@@ -61,13 +61,10 @@ function registerUndercoverWorkflow(): void {
 function createUndercoverWorkflowMatch(config: UndercoverRuntimeConfig): Match {
   registerUndercoverWorkflow();
   const players = resolvePlayers(config);
-  const debug = config.debug || {};
-  const hasCustomWords = Boolean(debug.civilianWord || debug.undercoverWord);
-  if (hasCustomWords && !config.debugMode) {
-    throw new Error('Custom undercover words require debugMode');
-  }
+  const debugMode = config.debugMode === true;
+  const debug = debugMode ? config.debug || {} : {};
   const seed = Number.isInteger(debug.seed) ? Number(debug.seed) : randomBytes(4).readUInt32BE(0);
-  const wordPair = config.debugMode && debug.civilianWord && debug.undercoverWord
+  const wordPair = debug.civilianWord && debug.undercoverWord
     ? { civilian: debug.civilianWord, undercover: debug.undercoverWord }
     : undefined;
   const matchId = `undercover-${Date.now()}-${randomBytes(6).toString('hex')}`;
@@ -83,7 +80,7 @@ function createUndercoverWorkflowMatch(config: UndercoverRuntimeConfig): Match {
     matchId,
     config: {
       selectedPlayerIds: players.map((player) => player.id),
-      debugMode: Boolean(config.debugMode),
+      debugMode,
     },
     initialState: { ...initialState, completedSteps: {} },
   });

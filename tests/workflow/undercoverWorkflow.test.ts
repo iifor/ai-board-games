@@ -3,11 +3,12 @@ import test from 'node:test';
 import type { AiConfig } from '../../packages/server/config/ai';
 import { BasePlayerAgent } from '../../packages/server/modules/agent-core/playerAgent';
 import { flushTrace, getActiveTrace, markTraceError } from '../../packages/server/modules/observability';
-import { UNDERCOVER_WORD_PAIRS } from '../../packages/server/modules/undercover/rules';
+import { UNDERCOVER_WORD_PAIRS, seededIndex } from '../../packages/server/modules/undercover/rules';
 import {
   createUndercoverWorkflowMatch,
   registerUndercoverWorkflow,
   runUndercoverWorkflow,
+  type UndercoverRuntimeConfig,
 } from '../../packages/server/modules/undercover/workflow';
 import { claimNextAiTask, completeAiTask, getDebugState } from '../../packages/server/modules/workflow-engine';
 
@@ -71,17 +72,44 @@ test('persisted ballots are omitted from the public vote result', () => {
   assert.equal('votes' in publicPayload, false);
 });
 
-test('production match rejects custom words and uses only the approved list', () => {
+test('production match ignores every debug override and uses server-owned setup', () => {
   const players = Array.from({ length: 6 }, (_, index) => ({ id: index + 1, nickname: `${index + 1}号` }));
-  assert.throws(() => createUndercoverWorkflowMatch({
+  const match = createUndercoverWorkflowMatch({
     players,
     debugMode: false,
-    debug: { seed: 7, civilianWord: '未审核词甲', undercoverWord: '未审核词乙' },
-  }), /debugMode/);
+    debug: {
+      seed: -1,
+      civilianWord: '未审核词甲',
+      undercoverWord: '未审核词乙',
+      undercoverPlayerId: 6,
+    },
+  });
+  const state = getDebugState(match.id).match.state;
+  assert.ok(Number.isInteger(state.seed) && state.seed >= 0 && state.seed <= 0xffffffff);
+  assert.notEqual(state.seed, -1);
+  assert.ok(UNDERCOVER_WORD_PAIRS.some((candidate) => candidate.civilian === state.wordPair.civilian && candidate.undercover === state.wordPair.undercover));
+  assert.equal(state.undercoverPlayerId, players[seededIndex(state.seed, players.length, 1)].id);
+});
 
-  const approved = createUndercoverWorkflowMatch({ players, debugMode: false, debug: { seed: 7 } });
-  const pair = getDebugState(approved.id).match.state.wordPair;
-  assert.ok(UNDERCOVER_WORD_PAIRS.some((candidate) => candidate.civilian === pair.civilian && candidate.undercover === pair.undercover));
+test('debug match retains deterministic setup overrides', () => {
+  const match = createDebugMatch();
+  const state = getDebugState(match.id).match.state;
+  assert.equal(state.seed, 7);
+  assert.deepEqual(state.wordPair, { civilian: '咖啡', undercover: '茶' });
+  assert.equal(state.undercoverPlayerId, 6);
+});
+
+test('only literal debugMode true enables setup overrides', () => {
+  const players = Array.from({ length: 6 }, (_, index) => ({ id: index + 1, nickname: `${index + 1}号` }));
+  const config = {
+    players,
+    debugMode: 'true',
+    debug: { seed: -1, civilianWord: '未审核词甲', undercoverWord: '未审核词乙', undercoverPlayerId: 6 },
+  } as unknown as UndercoverRuntimeConfig;
+  const match = createUndercoverWorkflowMatch(config);
+  const state = getDebugState(match.id).match.state;
+  assert.ok(state.seed >= 0);
+  assert.equal(state.undercoverPlayerId, players[seededIndex(state.seed, players.length, 1)].id);
 });
 
 test('runtime applies one askJson call per invalid AI task and delivers outbox events', async (t) => {
@@ -97,7 +125,7 @@ test('runtime applies one askJson call per invalid AI task and delivers outbox e
   t.after(() => { BasePlayerAgent.prototype.askJson = originalAskJson; });
 
   const players = configuredPlayers(t);
-  const match = createUndercoverWorkflowMatch({ players, debugMode: false, debug: { seed: 7 } });
+  const match = createUndercoverWorkflowMatch({ players, debugMode: false });
   t.after(() => cleanupTrace(match.id));
   const delivered: Record<string, unknown>[] = [];
   await runUndercoverWorkflow(match.id, { onEvent: (event) => { delivered.push(event); } });
@@ -115,13 +143,13 @@ test('successful runtime finalizes its trace after outbox delivery', async (t) =
   t.after(() => { BasePlayerAgent.prototype.askJson = originalAskJson; });
 
   const players = configuredPlayers(t);
-  const undercoverId = players[5].id;
+  const match = createUndercoverWorkflowMatch({ players, debugMode: false });
+  const undercoverId = Number(getDebugState(match.id).match.state.undercoverPlayerId);
   BasePlayerAgent.prototype.askJson = async function (_prompt, options) {
     return options.phase === 'speech'
       ? { speech: '常见描述' }
       : { targetId: Number(this.player.id) === undercoverId ? players[0].id : undercoverId, reason: '测试票' };
   };
-  const match = createUndercoverWorkflowMatch({ players, debugMode: false, debug: { seed: 7, undercoverPlayerId: undercoverId } });
   const delivered: Record<string, unknown>[] = [];
   try {
     await runUndercoverWorkflow(match.id, { onEvent: (event) => { delivered.push(event); } });
