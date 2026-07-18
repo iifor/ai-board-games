@@ -44,6 +44,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'werewolfPostgameRules.test.ts'
   ,'undercoverSchemas.test.ts'
   ,'undercoverRules.test.ts'
+  ,'undercoverVisibility.test.ts'
   ,'werewolfDefaultConfig.test.ts'
   ,'edgeTts.test.ts'
 ]).map((file) => path.join(__dirname, file));

@@ -8,6 +8,7 @@ import {
   getLegalVoteTargets,
   resolveVote,
   seededIndex,
+  validatePublicSpeech,
 } from '../../packages/server/modules/undercover/rules';
 
 const players = Array.from({ length: 6 }, (_, index) => ({
@@ -80,7 +81,12 @@ test('winner is civilians when undercover leaves and undercover at three alive',
 test('seed fallbacks are deterministic and secret words are detected', () => {
   const state = createInitialUndercoverState(players, { seed: 7 });
   assert.equal(state.undercoverPlayerId, players[seededIndex(7, players.length, 1)].id);
-  assert.equal(containsSecretWord('我喜欢咖啡', { civilian: '咖啡', undercover: '茶' }), true);
-  assert.equal(containsSecretWord('我喜欢果汁', { civilian: '咖啡', undercover: '茶' }), false);
+  assert.equal(containsSecretWord('我喜欢咖啡', '咖啡'), true);
+  assert.equal(containsSecretWord('我喜欢果汁', '咖啡'), false);
   assert.throws(() => seededIndex(7, 0), /empty collection/);
+});
+
+test('public speech rejects only the actor secret word and normalizes accepted text', () => {
+  assert.deepEqual(validatePublicSpeech('  描述我的体验  ', '咖啡'), { ok: true, text: '描述我的体验' });
+  assert.deepEqual(validatePublicSpeech('我喜欢咖啡', '咖啡'), { ok: false, reason: 'secret-leak' });
 });

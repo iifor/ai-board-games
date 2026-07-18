@@ -107,11 +107,14 @@ function checkWinner(state: UndercoverState): { winner: 'civilians' | 'undercove
   return null;
 }
 
-function containsSecretWord(text: string, wordPair: UndercoverWordPair): boolean {
-  const normalizedText = text.toLowerCase();
-  return [wordPair.civilian, wordPair.undercover]
-    .map((word) => word.trim().toLowerCase())
-    .some((word) => word.length > 0 && normalizedText.includes(word));
+function containsSecretWord(text: string, secretWord: string): boolean {
+  return Boolean(secretWord.trim()) && text.toLocaleLowerCase().includes(secretWord.trim().toLocaleLowerCase());
+}
+
+function validatePublicSpeech(text: string, secretWord: string): { ok: true; text: string } | { ok: false; reason: 'secret-leak' } {
+  const speech = text.trim().slice(0, 120);
+  if (!speech || containsSecretWord(speech, secretWord)) return { ok: false, reason: 'secret-leak' };
+  return { ok: true, text: speech };
 }
 
 export {
@@ -123,4 +126,5 @@ export {
   getLegalVoteTargets,
   resolveVote,
   seededIndex,
+  validatePublicSpeech,
 };
