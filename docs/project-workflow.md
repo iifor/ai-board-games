@@ -301,13 +301,13 @@ Shadow audit 接入方式：
 
 隐私与兜底契约：
 
-- 生产对局的词对、随机种子和卧底座位由服务端生成；只有 `debugMode === true` 的调试 match 可以覆盖这些值。
+- 生产对局由服务端从固定、已审核的内置 `UNDERCOVER_WORD_PAIRS` 词对列表中选择词对，并生成随机种子和卧底座位；只有 `debugMode === true` 的调试 match 可以覆盖这些值，不接受任意生成词对或后台输入。
 - 每个 Agent 只收到自己的词、公开发言和本次合法投票目标，并被明确告知不知道自己是否为卧底；不得向其他 Agent 或公开事件暴露另一词语、完整词对或卧底座位。
 - 公开投影逐字段构造。终局前不得包含 `wordPair`、`playerWords`、`undercoverPlayerId`、`winner`、`winReason` 或逐人 ballot；投票只公开汇总票数、平票候选、是否复投和淘汰结果。
-- 描述为空或命中任一秘密词时使用固定公开描述；非法/不可解析投票按当前合法目标与服务端种子稳定兜底。模型级故障转移仍复用 `BasePlayerAgent` 的主模型、备选模型和规则兜底链。
+- 结构化输出先按 schema/contract 校验；失败后只追加一次纠错指令并重试，即最多两次结构化模型输出尝试。两次仍不合规时，描述使用固定中性文本，投票按当前合法目标与服务端种子稳定兜底。该契约重试独立于单次调用内部复用的主模型/备选模型 provider 故障转移，两者不得混为额外规则重试。
 - 只有 `undercover-game-result` 的 completed 投影携带 `winner/winReason/reveal`，其中 reveal 含双方词语和卧底座位。保存的精确播放序列同样只允许最终结果事件携带揭示数据。
 
-实时与回放复用现有 PlaybackPipeline、TTS/字幕、ACK、outbox 和对局保存。首版不增加数据库表、REST API、WebSocket start/control/ack 消息，也不提供可配置人数/轮数/卧底数量、自定义词库管理、真人行动、赛后 MVP 或独立复盘流程。
+实时与回放复用现有 PlaybackPipeline、TTS/字幕、ACK、outbox 和对局保存。首版不增加数据库表、REST API、WebSocket start/control/ack 消息，也不提供可配置人数/轮数/卧底数量、自定义词库管理、通用游戏 DSL、真人行动、赛后 MVP 或独立复盘流程；浏览器级实时 WebSocket E2E 作为后续验收工作明确延后。
 
 ### agent-core
 

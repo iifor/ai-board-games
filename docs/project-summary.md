@@ -195,7 +195,8 @@ GitHub 仓库需要配置以下 Secrets：
 - 服务端持有词对、每名玩家的私词与卧底身份；终局前公开状态只含玩家存活状态、公开发言、汇总票数、平票候选和淘汰结果，最终结果事件才揭示双方词语与卧底座位。
 - C 端实时与历史回放共用同一个单页容器，以及既有 WebSocket、字幕、语音、ACK 和播放事件持久化管线。
 - 本次没有新增数据库表、REST API 或 WebSocket start/control/ack 消息；现有对局、玩家选择、工作流、Trace 与播放事件能力直接复用。
-- 首版明确不包含可配置人数/轮数/卧底数量、自定义词库或后台玩法管理、真人输入/投票、赛后 MVP 与独立复盘流程；这些需求确认后再扩展 definition、规则和公开契约。
+- 首版明确不包含可配置人数/轮数/卧底数量、自定义词库或后台玩法管理、通用游戏 DSL、真人输入/投票、赛后 MVP、独立复盘流程或浏览器级实时 WebSocket E2E 验收；这些需求确认后再扩展 definition、规则、公开契约与验收覆盖。
+
 ## Werewolf mode coverage
 
 - Default werewolf mode coverage now includes boards 1-19 from the local rule list, including `wild-child-12`, `bombman-12` and `nine-tailed-fox-12`.
