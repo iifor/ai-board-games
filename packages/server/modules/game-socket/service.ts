@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { getDb } from '../../db';
 import { createSession, isSessionCancelled, parseMessage } from './session';
-import { createPreparedSender, isDisplayEvent } from './sender';
+import { isDisplayEvent } from './sender';
 import {
   createLivePlaybackSource,
   createPlaybackPipeline,
@@ -10,8 +10,6 @@ import {
 import { replayGameSession } from './replay';
 import type { GameSession, SessionEvent } from './session';
 import { getAiConfig } from '../../config';
-import { runDebateViaEngine } from '../debate-runner';
-import { runWerewolfViaEngine } from '../werewolf-runner';
 import { getWerewolfModeConfig } from '../werewolf-config';
 import { buildWerewolfRuleIntro } from '../werewolf/messages';
 import {
@@ -23,6 +21,8 @@ import type { ProjectionContext } from '../werewolf/views/viewPolicy';
 import { getActiveTrace, recordEvent, markTraceError, flushTrace } from '../observability';
 import { getSpectatorMode } from '../settings/service';
 import { sessionStartGuard } from './capacity';
+import { resolveGameRunner } from './gameRunner';
+import { getGameEngine } from '../engine-registry';
 
 // games is TS — import directly
 import { saveGameRecord } from '../games';
@@ -197,7 +197,8 @@ async function runSession(
   gameType = 'werewolf',
   options: RunSessionOptions = {},
 ): Promise<void> {
-  const safeGameType = normalizeGameType(gameType);
+  const resolved = resolveGameRunner(gameType);
+  const safeGameType = resolved.gameType;
   if (mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
   if (options.replayGameId) {
     await replayGameSession(session, safeGameType, options.replayGameId, { replayView: options.replayView });
@@ -211,29 +212,20 @@ async function runSession(
   const config = getRequestConfig(mode, playerIds, safeGameType, options);
 
   const viewMode = String((config as Record<string, unknown>).clientViewMode || 'god');
-  const playbackPipeline = (safeGameType === 'werewolf' || safeGameType === 'debate')
-    ? createPlaybackPipeline(session, {
-        viewMode,
-        prefetchCount: safeGameType === 'werewolf' ? 2 : undefined,
-        phaseLookahead: safeGameType === 'debate' ? 1 : undefined,
-        capture: true,
-      })
-    : null;
-  const sender = playbackPipeline || createPreparedSender(session, { phaseLookahead: 1 });
-  const liveSource = playbackPipeline ? createLivePlaybackSource() : null;
-  const livePlayback = playbackPipeline && liveSource
-    ? playbackPipeline.playLive(liveSource)
-    : null;
-  const livePlaybackResult = livePlayback
-    ? livePlayback.then(
-        () => ({ error: null as unknown }),
-        (error: unknown) => ({ error }),
-      )
-    : null;
+  const playbackPipeline = createPlaybackPipeline(session, {
+    viewMode,
+    ...resolved.session.playback,
+    capture: true,
+  });
+  const liveSource = createLivePlaybackSource();
+  const livePlaybackResult = playbackPipeline.playLive(liveSource).then(
+    () => ({ error: null as unknown }),
+    (error: unknown) => ({ error }),
+  );
   const playbackSourceEvents: SessionEvent[] = [];
   let liveProjectionContext: ProjectionContext | null = null;
 
-  const runner = getRunner(safeGameType);
+  const runner = resolved.run;
   let game: GameRecord | null = null;
   let runnerError: unknown = null;
   try {
@@ -270,7 +262,6 @@ async function runSession(
             liveSource.push(projected);
           }
         }
-        else return sender.enqueue(event);
       },
     })) as GameRecord;
   } catch (error) {
@@ -285,35 +276,27 @@ async function runSession(
       safeGameType === 'debate' || safeGameType === 'werewolf'
         ? 'workflow-completed'
         : 'done',
-    message: getDoneMessage(safeGameType),
+    message: resolved.session.doneMessage,
     game:
       safeGameType === 'werewolf'
         ? projectWerewolfGame(game, createProjectionContext(game))
         : game,
   };
-  const capturedPlaybackEvents = playbackPipeline
-    ? playbackPipeline.freezeCapture()
-    : [];
-  const missingPlaybackEvents = playbackPipeline
-    ? await preparePlaybackEvents(
-        [
-          ...playbackSourceEvents.slice(capturedPlaybackEvents.length),
-          completedEvent,
-        ],
-        viewMode,
-        capturedPlaybackEvents.length + 1,
-      )
-    : [];
+  const capturedPlaybackEvents = playbackPipeline.freezeCapture();
+  const missingPlaybackEvents = await preparePlaybackEvents(
+    [
+      ...playbackSourceEvents.slice(capturedPlaybackEvents.length),
+      completedEvent,
+    ],
+    viewMode,
+    capturedPlaybackEvents.length + 1,
+  );
   const playbackEvents = [...capturedPlaybackEvents, ...missingPlaybackEvents];
-  const preparedCompletedEvent = playbackPipeline
-    ? playbackEvents[playbackEvents.length - 1] || null
-    : null;
+  const preparedCompletedEvent = playbackEvents[playbackEvents.length - 1] || null;
 
   // 调试模式不保存数据库，只保留 AI 观测数据
   if (!(config as Record<string, unknown>).debugMode) {
-    const audioResources = playbackPipeline
-      ? collectPlaybackAudioResources(playbackEvents)
-      : sender.getAudioResources();
+    const audioResources = collectPlaybackAudioResources(playbackEvents);
     try {
       saveGameRecord({
         ...game,
@@ -340,21 +323,17 @@ async function runSession(
   const sessionTrace = getActiveTrace((game as Record<string, unknown>)?.id as string || '');
   if (sessionTrace) { flushTrace(sessionTrace); }
 
-  if (livePlaybackResult) {
-    const { error } = await livePlaybackResult;
-    if (error && !isSessionCancelled(error)) throw error;
-  } else {
-    await sender.flush();
-  }
+  const { error } = await livePlaybackResult;
+  if (error && !isSessionCancelled(error)) throw error;
 
-  if (preparedCompletedEvent && playbackPipeline) {
+  if (preparedCompletedEvent) {
     try {
       await playbackPipeline.sendPrepared(preparedCompletedEvent);
     } catch (error) {
       if (!isSessionCancelled(error)) throw error;
     }
   } else {
-    await sender.send(completedEvent);
+    await playbackPipeline.send(completedEvent);
   }
   session.close();
 }
@@ -381,27 +360,6 @@ function normalizeSelectedPlayerIds(value: unknown): number[] {
 }
 
 // --- Helpers ---
-
-function normalizeGameType(gameType?: string): string {
-  if (gameType === 'debate') return 'debate';
-  if (gameType === 'werewolf') return 'werewolf';
-  return 'werewolf';
-}
-
-function getRunner(gameType: string): (config: unknown, options: unknown) => Promise<unknown> {
-  if (gameType === 'debate') return runDebateViaEngine as (config: unknown, options: unknown) => Promise<unknown>;
-  return runWerewolfViaEngine as (config: unknown, options: unknown) => Promise<unknown>;
-}
-
-function getStartMessage(gameType: string): string {
-  if (gameType === 'debate') return '辩论赛开始';
-  return '游戏开始';
-}
-
-function getDoneMessage(gameType: string): string {
-  if (gameType === 'debate') return '辩论赛结束，完整赛果已生成。';
-  return '狼人杀结束，完整战报已生成。';
-}
 
 function getRequestConfig(
   mode: string,
@@ -513,6 +471,9 @@ function selectPlayersForGame(
     ? playerIds.map(Number).filter(Boolean)
     : [];
   const ids = explicitIds.length ? explicitIds : getSavedPlayerIds(gameType);
+  const selection = getGameEngine()
+    .getDefinition(gameType)
+    ?.metadata?.session?.playerSelection;
   const expectedWerewolfCount =
     gameType === 'werewolf'
       ? getWerewolfModeConfig(options.werewolfMode).totalPlayers
@@ -540,6 +501,10 @@ function selectPlayersForGame(
       );
     }
     return selected;
+  }
+
+  if (selection && (selected.length < selection.min || selected.length > selection.max)) {
+    throw new Error(selection.errorMessage);
   }
 
   return selected;
@@ -620,8 +585,6 @@ function handleRandomizeTeams(session: GameSession, playerIds?: (number | string
 export {
   attachGameSocket,
   runSession,
-  normalizeGameType,
-  getRunner,
   getRequestConfig,
   publicSocketHost,
   selectPlayersForGame,

@@ -33,6 +33,11 @@ function createDebateGameDefinition(): GameDefinition {
       phases: ['strategy', 'opening', 'crossfire', 'free', 'closing', 'judges', 'mvp', 'postgame'],
       maxPlayers: 12,
       minPlayers: 9,
+      session: {
+        startMessage: '辩论赛开始',
+        doneMessage: '辩论赛结束，完整赛果已生成。',
+        playback: { phaseLookahead: 1 },
+      },
     },
   };
 }

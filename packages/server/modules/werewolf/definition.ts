@@ -85,6 +85,11 @@ function createWerewolfGameDefinition(): GameDefinition {
     channelPolicy: werewolfChannelPolicy,
     metadata: {
       migratedActions: ['wolf_vote', 'wolf_kill', 'seer_check', 'guard_protect', 'witch_save', 'witch_poison'],
+      session: {
+        startMessage: '游戏开始',
+        doneMessage: '狼人杀结束，完整战报已生成。',
+        playback: { prefetchCount: 2 },
+      },
     },
   };
 }

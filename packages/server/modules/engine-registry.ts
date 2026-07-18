@@ -10,6 +10,8 @@ import { createDebateGameDefinition } from './debate/definition';
 import { registerDebateWorkflow } from './debate/workflow';
 import { createWerewolfGameDefinition } from './werewolf/definition';
 import { registerWerewolfWorkflow } from './werewolf/workflow';
+import { createUndercoverGameDefinition } from './undercover/definition';
+import { registerUndercoverWorkflow } from './undercover/workflow';
 
 let engine: GameEngine | null = null;
 
@@ -30,6 +32,10 @@ function getGameEngine(): GameEngine {
   // 注册狼人杀
   registerWerewolfWorkflow();
   engine.registerDefinition(createWerewolfGameDefinition());
+
+  // 注册谁是卧底
+  registerUndercoverWorkflow();
+  engine.registerDefinition(createUndercoverGameDefinition());
 
   return engine;
 }
