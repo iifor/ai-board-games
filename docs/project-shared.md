@@ -24,6 +24,7 @@ packages/shared/
 ├── schemas/
 │   ├── gameSchemas.ts
 │   ├── gameEngineSchemas.ts
+│   ├── undercover.ts
 │   ├── skillRegistry.ts
 │   └── workflowSchemas.ts
 ├── types/
@@ -32,6 +33,7 @@ packages/shared/
 │   ├── gameEngine.ts
 │   ├── gameEvent.ts
 │   ├── gameTypes.ts
+│   ├── undercover.ts
 │   ├── speechTypes.ts
 │   └── workflowTypes.ts
 ├── utils/
@@ -70,12 +72,14 @@ tests/
 - `channelTypes.ts`：事件通道和可见性类型。
 - `gameEvent.ts`：游戏事件类型。
 - `gameEngine.ts`：通用游戏引擎类型，包括 `GameDefinition`、`DomainAction`、`WorkflowEffect`、`DomainEvent`、`ChannelPolicy`、debug state、invariant issue、状态投影契约。
+- `undercover.ts`：谁是卧底公开玩家、发言、汇总票型、终局揭示和 `standard-6` 公开状态。
 
 ### Schema
 
 - `gameSchemas.ts`：游戏参数校验 schema。
 - `workflowSchemas.ts`：工作流参数校验 schema。
 - `gameEngineSchemas.ts`：游戏引擎 schema，校验 definition、action、effect、event、channel policy 和可选 `projectState`。
+- `undercover.ts`：校验固定 6 个唯一正整数玩家 ID、1-120 字描述和带 0-80 字可选原因的正整数投票目标。
 - `skillRegistry.ts`：技能注册相关 schema。
 
 ### 通用 Game Engine 类型
@@ -83,6 +87,7 @@ tests/
 `packages/shared/types/gameEngine.ts` 是 `packages/server/modules/game-engine` 的共享 contract：
 
 - `GameDefinition`：游戏接入点，声明 `gameType`、`version`、`workflowId`、action schema、effect resolver、channel policy 和可选 `projectState`。
+- `GameRuntime` / `GameSessionMetadata`：definition 驱动的新游戏接入点，声明 match 创建/运行、开场结束文案、玩家数量约束和播放预取参数；谁是卧底使用该通用扩展点，辩论赛与狼人杀继续由两个兼容 runner 承接。
 - `DomainAction`：玩家或 AI 在 ActionWindow 内提交的结构化动作，不直接修改状态。
 - `WorkflowEffect`：由 action 派生的待结算效果，必须由 resolver 统一处理。
 - `DomainEvent`：唯一事实事件，必须带 `channel`，`scope` 事件必须带 `scopeKey`。
@@ -123,7 +128,7 @@ pnpm run test:migration
 测试目录：
 
 - `tests/unit`：通用单元测试，例如 event bus、game engine contract、socket session、skill event emitter、玩家记忆长度与会话裁剪。
-- `tests/workflow`：工作流测试，例如狼人杀 reducer/effects/action window、事件投影、辩论发言事件、展示事件。
+- `tests/workflow`：工作流测试，例如狼人杀 reducer/effects/action window、事件投影、辩论发言事件、谁是卧底有界流程和展示事件。
 - `tests/migration`：迁移和事件映射测试。
 
 测试选择建议：
@@ -143,6 +148,15 @@ Workflow 内部 `StatePatch` 使用路径操作表达状态增量：
 `MatchSnapshot.lastEventSeq` 为可选字段，用于兼容没有事件水位的历史快照。该类型
 属于服务端 workflow 恢复协议，不改变 REST、WebSocket 或游戏回放公开载荷。
 | 跨包类型或导出调整 | `pnpm run check`，必要时追加相关测试 |
+
+## 谁是卧底共享契约
+
+- `undercoverStartSchema` 在信任边界要求恰好 6 个不重复的正整数 `playerIds`；definition session metadata 同步声明 `min = max = 6`，客户端也在开局前执行相同约束。
+- AI 描述 schema 限制为 1-120 字；投票 schema 使用正整数 `targetId` 和最多 80 字的 `reason`。目标是否存活、是否为自己、是否属于复投候选仍由服务端规则校验。
+- `UndercoverPublicState` 只描述 `standard-6` 的公开字段。`winner`、`winReason` 与 `reveal` 均为终局可选字段；终局前投影不得出现秘密词、完整词对、玩家私词或卧底座位。
+- `UndercoverVoteResult` 的公开消费只使用 `tally/tiedCandidateIds/eliminatedPlayerId/runoff`；服务端不发送逐人 ballot，C 端将 `votes` 归一为空对象以保持既有展示类型稳定。
+- `UndercoverReveal` 仅允许出现在 completed 的最终结果事件/状态中，包含平民词、卧底词和卧底玩家 ID。实时与回放使用同一公开类型。
+- 以上为内部 shared 类型/schema 扩展，没有新增 REST 响应、WebSocket start/control/ack 字段或数据库 schema；可配置玩法、词库管理、真人行动、MVP 和独立复盘契约均延后。
 
 ## 扩展点与注意事项
 

@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-游戏工作流是服务端最复杂的部分，负责把辩论赛、狼人杀等游戏拆成可持久化、可调试、可重放的步骤，并通过 WebSocket 按播放节奏推送给 C 端。
+游戏工作流是服务端最复杂的部分，负责把辩论赛、狼人杀、谁是卧底等游戏拆成可持久化、可调试、可重放的步骤，并通过 WebSocket 按播放节奏推送给 C 端。
 
 ## 技术栈
 
@@ -27,6 +27,7 @@ packages/server/modules/
 │   ├── narration.ts     # 事件旁白
 │   ├── media.ts         # 媒体资源处理
 │   ├── displayQueue.ts
+│   ├── gameRunner.ts    # definition 驱动的 runner 解析；只保留两个旧游戏兼容入口
 │   └── constants.ts
 ├── workflow-engine/
 │   ├── workflowRegistry.ts # workflow 和 step handler 注册
@@ -82,6 +83,7 @@ packages/server/modules/
 │   ├── sheriffWorkflow.ts
 │   ├── winCheck.ts
 │   └── wolfTeam.ts
+├── undercover/              # 固定六人的规则、prompt、公开投影、workflow 与 definition runtime
 ├── agent-core/
 │   ├── playerAgent.ts
 │   ├── gameAgent.ts
@@ -182,7 +184,7 @@ flowchart TD
 
 ### game-engine
 
-`game-engine` 是所有游戏的统一入口。辩论赛和狼人杀都通过 `GameEngine` 创建对局和推进执行。
+`game-engine` 是所有游戏的统一注册入口。辩论赛和狼人杀通过兼容 runner 委托 `GameEngine` 创建对局；谁是卧底及后续定义型游戏直接运行 `GameDefinition.runtime`。
 
 - `GameEngine`：注册 `GameDefinition`、创建 match、tick、提交 action、解析 pending effect、运行自定义 runtime，并提供 `getDebugState(matchId)`。
 - `GameDefinitionRegistry`：按 `gameType@version` 注册和查询游戏定义。
@@ -200,14 +202,18 @@ flowchart TD
 
 - 辩论赛：`createDebateGameDefinition()`（`debate/definition.ts`）
 - 狼人杀：`createWerewolfGameDefinition()`（`werewolf/definition.ts`）
+- 谁是卧底：`createUndercoverGameDefinition()`，注册 `undercover.workflow.standard.v1` 与 definition runtime
 
 游戏运行入口：
 
 - `debate-runner.ts`：`runDebateViaEngine()` — 通过 `engine.createMatch()` 创建对局，`drainAiTasks()` 循环推进。
 - `werewolf-runner.ts`：`runWerewolfViaEngine()` — 通过 `engine.createMatch()` 创建对局，设置 EventBus 基础设施，`drainAiTasks()` 循环推进。
+- 其他已注册游戏：runner resolver 读取 definition 的 runtime、开场/结束文案、玩家数量与播放参数，再调用通用 `engine.runGame()`；未注册游戏或缺少 runtime 的游戏会显式失败，不回退到狼人杀。
 - `drainAiTasks()` 遇到 `running`、无 blocker 且暂无 AI task 的 match 时会继续 tick；这用于跨过单次 tick 预算耗尽或连续确定性/跳过步骤，不能把“当前无 task”当作流程结束。
 
-`game-socket/service.ts` 的 `getRunner()` 分发到这两个 runner。
+`debate`、`werewolf` 是仅有的两个 legacy compatibility runner。`game-socket` 不得为 `undercover` 或后续 definition-runtime 游戏增加按游戏类型分支。
+
+`game-socket` 的通用 runner resolver 只对这两个旧游戏选择兼容 runner，其余游戏走 definition runtime。
 
 当前狼人杀 adapter 只迁移低风险动作：
 
@@ -288,6 +294,20 @@ Shadow audit 接入方式：
 - 夜间结算、放逐结算、胜负检查由服务端规则处理。
 - `serializeWerewolfState` 输出前端可展示状态。
 - 视角投影避免普通视角看到隐藏身份和私密信息。
+
+### 谁是卧底流程
+
+游戏类型为 `undercover`，工作流 ID 为 `undercover.workflow.standard.v1`。首版边界固定为 6 名 AI 玩家、1 名卧底和最多 3 轮：每轮存活玩家依序描述，随后全员投票；首次平票进入一次复投，复投仍平票时按服务端种子稳定淘汰。卧底出局时平民胜，卧底存活到最后 3 人时卧底胜，命中胜负后直接跳到结果 step。
+
+隐私与兜底契约：
+
+- 生产对局的词对、随机种子和卧底座位由服务端生成；只有 `debugMode === true` 的调试 match 可以覆盖这些值。
+- 每个 Agent 只收到自己的词、公开发言和本次合法投票目标，并被明确告知不知道自己是否为卧底；不得向其他 Agent 或公开事件暴露另一词语、完整词对或卧底座位。
+- 公开投影逐字段构造。终局前不得包含 `wordPair`、`playerWords`、`undercoverPlayerId`、`winner`、`winReason` 或逐人 ballot；投票只公开汇总票数、平票候选、是否复投和淘汰结果。
+- 描述为空或命中任一秘密词时使用固定公开描述；非法/不可解析投票按当前合法目标与服务端种子稳定兜底。模型级故障转移仍复用 `BasePlayerAgent` 的主模型、备选模型和规则兜底链。
+- 只有 `undercover-game-result` 的 completed 投影携带 `winner/winReason/reveal`，其中 reveal 含双方词语和卧底座位。保存的精确播放序列同样只允许最终结果事件携带揭示数据。
+
+实时与回放复用现有 PlaybackPipeline、TTS/字幕、ACK、outbox 和对局保存。首版不增加数据库表、REST API、WebSocket start/control/ack 消息，也不提供可配置人数/轮数/卧底数量、自定义词库管理、真人行动、赛后 MVP 或独立复盘流程。
 
 ### agent-core
 
@@ -376,7 +396,7 @@ pnpm run test:workflow
 
 ## 扩展点与注意事项
 
-- 新增游戏优先新增独立 workflow，并在 `game-socket` runner 分发中接入。
+- 新增游戏优先新增独立 workflow，并通过注册 `GameDefinition.runtime`、session metadata 和玩家选择约束接入通用 runner；不要为每个新游戏增加 `game-socket` 类型分支。
 - 所有可持久化流程变化都要考虑 event、snapshot、outbox 和回放兼容性。
 - AI 输出必须校验，不允许直接信任模型返回。
 - 需要等待前端播放的事件必须使用 ack，避免服务端推进过快。

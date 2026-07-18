@@ -6,7 +6,7 @@
 
 主要功能：
 
-- C 端选择游戏、选择玩家、开始 AI 辩论赛或 AI 狼人杀、实时播放游戏事件、查看历史回放。
+- C 端选择游戏、选择玩家、开始 AI 辩论赛、AI 狼人杀或 AI 谁是卧底、实时播放游戏事件、查看历史回放。
 - B 端管理玩家、模型供应商、模型、音色、狼人杀角色/模式、皮肤、历史对局、AI trace 和工作流调试。
 - 服务端负责游戏规则、AI 调度、工作流推进、事件投影、对局落库、静态资源和统一 API。
 
@@ -77,11 +77,14 @@ flowchart TD
   Client -->|WebSocket /api/toc/ws/game| Socket["game-socket"]
   Admin["B 端 React"] -->|REST /api/admin/*| AdminApi["Admin API"]
   Socket --> Session["GameSession: ack/pause/resume/skip"]
-  Socket --> Runner{"gameType"}
-  Runner --> Debate["debate workflow"]
-  Runner --> Werewolf["werewolf workflow"]
+  Socket --> Resolver{"registered GameDefinition"}
+  Resolver --> Debate["debate compatibility runner"]
+  Resolver --> Werewolf["werewolf compatibility runner"]
+  Resolver --> Runtime["generic definition runtime"]
+  Runtime --> Undercover["undercover workflow"]
   Debate --> Engine["workflow-engine"]
   Werewolf --> Engine
+  Undercover --> Engine
   Engine --> Db["SQLite / JSON fallback"]
   Engine --> Outbox["outbox_messages"]
   Outbox --> Socket
@@ -96,6 +99,7 @@ flowchart TD
 
 - 前端只负责展示和交互，不决定核心游戏结果。
 - 服务端通过 workflow-engine 管理 match、step、AI task、pending action、event、outbox。
+- `undercover` 是继 `debate`、`werewolf` 后注册的第三种游戏；新游戏优先由 `GameDefinition.runtime` 与 session metadata 接入，辩论赛和狼人杀暂保留两个兼容 runner。
 - WebSocket 使用 `ackId` 等待前端播放完成后继续推进。
 - 游戏完成后保存完整对局快照，支持历史详情和回放。
 - 新狼人杀对局同时保存实际展示事件序列；实时和回放共用播放管线，旧对局继续从快照重建。
@@ -109,7 +113,7 @@ flowchart TD
 | --- | --- | --- |
 | 后端 API、数据库、配置、错误处理 | `docs/project-server.md` | 相关 controller/service/repository、迁移、配置读取和调用方 |
 | 游戏不推进、ack 卡住、回放异常 | `docs/project-workflow.md` | WebSocket session、workflow tick、outbox、回放投影的调用链 |
-| 辩论赛或狼人杀流程异常 | `docs/project-workflow.md` | 对应游戏 workflow、step handler、reducer、presentation、runner 的影响面 |
+| 辩论赛、狼人杀或谁是卧底流程异常 | `docs/project-workflow.md` | 对应游戏 workflow、step handler、reducer、presentation、runner 的影响面 |
 | 狼人杀 AI prompt、行动理由、LLM trace | `docs/project-prompts.md` | prompt builder、PromptContext、agent-core、LLM record 的调用路径 |
 | C 端页面、播放、字幕、选人问题 | `docs/project-client.md` | 路由、feature 容器、socket hook、播放队列、service 调用方 |
 | B 端配置、历史、观测、调试页面 | `docs/project-admin.md` | 管理页面、admin API service、表单状态和后端资源模块 |
@@ -182,7 +186,16 @@ GitHub 仓库需要配置以下 Secrets：
 - 新增后台页面优先放入 `packages/admin/src/pages`，API 调用集中在 `services/adminApi.ts`。
 - 新增后端资源模块优先遵循 `controller/service/repository/routes/validator` 分层。
 - 新增游戏或复杂流程时，需要同步考虑 workflow、WebSocket 事件、前端投影、对局保存、测试和文档。
+- 新增游戏优先注册包含 runtime、session metadata 与玩家数量约束的 `GameDefinition`；只有旧流程兼容需要才增加专用 runner 分支。
 - 修改共享协议时，优先更新 `packages/shared`，再同步前后端消费方。
+
+## 谁是卧底首版范围
+
+- 当前只提供 `standard-6`：固定 6 名 AI 玩家、1 名卧底、最多 3 轮描述与投票；首轮平票进入一次复投，复投仍平票时按服务端种子稳定淘汰。卧底被淘汰则平民获胜，卧底存活到最后 3 人则卧底获胜。
+- 服务端持有词对、每名玩家的私词与卧底身份；终局前公开状态只含玩家存活状态、公开发言、汇总票数、平票候选和淘汰结果，最终结果事件才揭示双方词语与卧底座位。
+- C 端实时与历史回放共用同一个单页容器，以及既有 WebSocket、字幕、语音、ACK 和播放事件持久化管线。
+- 本次没有新增数据库表、REST API 或 WebSocket start/control/ack 消息；现有对局、玩家选择、工作流、Trace 与播放事件能力直接复用。
+- 首版明确不包含可配置人数/轮数/卧底数量、自定义词库或后台玩法管理、真人输入/投票、赛后 MVP 与独立复盘流程；这些需求确认后再扩展 definition、规则和公开契约。
 ## Werewolf mode coverage
 
 - Default werewolf mode coverage now includes boards 1-19 from the local rule list, including `wild-child-12`, `bombman-12` and `nine-tailed-fox-12`.
