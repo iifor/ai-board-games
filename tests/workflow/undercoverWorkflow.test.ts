@@ -10,7 +10,12 @@ import {
   runUndercoverWorkflow,
   type UndercoverRuntimeConfig,
 } from '../../packages/server/modules/undercover/workflow';
-import { claimNextAiTask, completeAiTask, getDebugState } from '../../packages/server/modules/workflow-engine';
+import {
+  claimNextAiTask,
+  commitWorkflowChange,
+  completeAiTask,
+  getDebugState,
+} from '../../packages/server/modules/workflow-engine';
 
 function createDebugMatch() {
   return createUndercoverWorkflowMatch({
@@ -160,6 +165,24 @@ test('successful runtime finalizes its trace after outbox delivery', async (t) =
     cleanupTrace(match.id);
   }
 });
+
+for (const status of ['failed', 'paused_debug']) {
+  test(`undercover runtime rejects a ${status} workflow match`, async () => {
+    const match = createDebugMatch();
+    commitWorkflowChange({
+      matchId: match.id,
+      matchPatch: {
+        status,
+        error_json: JSON.stringify({ message: `injected ${status}` }),
+      },
+    });
+
+    await assert.rejects(
+      runUndercoverWorkflow(match.id),
+      new RegExp(`谁是卧底工作流异常停止（${status}）：injected ${status}`),
+    );
+  });
+}
 
 function configuredPlayers(t: { after(callback: () => void): void }) {
   const aiConfigModule = require('../../packages/server/config/ai') as { getAiConfig: () => AiConfig };

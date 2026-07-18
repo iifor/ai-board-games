@@ -1,6 +1,7 @@
 import { getGame } from '../games';
 import { listPlayers } from '../players';
 import { getWerewolfModeConfig } from '../werewolf-config';
+import { getGameEngine } from '../engine-registry';
 import { createPreparedSender } from './sender';
 import { createPlaybackPipeline, createStoredPlaybackSource } from './playback';
 import { listPlaybackEvents } from './playbackRepository';
@@ -1289,9 +1290,12 @@ function getWerewolfTestimonies(round: WerewolfRound = {}): TestimonyData[] {
 }
 
 function normalizeGameType(gameType?: string): string {
-  if (gameType === 'debate') return 'debate';
-  if (gameType === 'werewolf') return 'werewolf';
-  return 'werewolf';
+  const storedType = String(gameType || '').trim().toLowerCase();
+  const definition = getGameEngine().getDefinition(storedType);
+  if (definition) return definition.gameType;
+  if (storedType.includes('debate')) return 'debate';
+  if (storedType.includes('werewolf') || !storedType) return 'werewolf';
+  return storedType;
 }
 
 export {

@@ -54,7 +54,7 @@ export function reduceUndercoverViewState(state: UndercoverViewState, event: Gam
 export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercoverGameParams) {
   const [view, setView] = useState<UndercoverViewState>(EMPTY_UNDERCOVER_VIEW_STATE);
   const [started, setStarted] = useState(false);
-  const { speechEnabled, speak, unlock, cancel } = useSpeechQueue();
+  const { speechEnabled, setSpeechEnabled, speak, unlock, cancel } = useSpeechQueue();
   const session = useGameSocketSession({
     gameType: 'undercover',
     speechEnabled,
@@ -103,6 +103,8 @@ export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercove
     autoPlay: session.autoPlay,
     replayMode: session.isReplayMode,
     started,
+    speechEnabled,
+    setSpeechEnabled,
     startGame,
     stopGame,
     setAutoPlayEnabled: session.setAutoPlayEnabled,

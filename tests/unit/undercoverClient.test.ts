@@ -11,6 +11,20 @@ test('game selection exposes an accessible Undercover player editor entry', () =
   assert.match(source, />选择玩家<\/button>/);
 });
 
+test('Undercover exposes the speech queue toggle as an independent accessible control', () => {
+  const hook = readFileSync(resolve('packages/client/src/features/undercover/hooks/useUndercoverGame.ts'), 'utf8');
+  const controls = readFileSync(resolve('packages/client/src/features/undercover/components/UndercoverControls.tsx'), 'utf8');
+  const game = readFileSync(resolve('packages/client/src/features/undercover/UndercoverGame/index.tsx'), 'utf8');
+
+  assert.match(hook, /const \{ speechEnabled, setSpeechEnabled,/);
+  assert.match(hook, /speechEnabled,\s*setSpeechEnabled,/);
+  assert.match(controls, /speechEnabled: boolean/);
+  assert.match(controls, /aria-pressed=\{speechEnabled\}/);
+  assert.match(controls, /onToggleSpeech\(!speechEnabled\)/);
+  assert.match(game, /speechEnabled=\{controller\.speechEnabled\}/);
+  assert.match(game, /onToggleSpeech=\{controller\.setSpeechEnabled\}/);
+});
+
 test('Undercover client state hides secrets until completion and retains public progress', () => {
   let feature: typeof import('../../packages/client/src/features/undercover/hooks/useUndercoverGame') | undefined;
   try {

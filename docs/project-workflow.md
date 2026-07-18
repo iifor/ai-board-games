@@ -20,7 +20,7 @@
 ```txt
 packages/server/modules/
 ├── game-socket/
-│   ├── service.ts       # attachGameSocket、runSession、runner 选择
+│   ├── service.ts       # attachGameSocket、runSession、definition runner 调用
 │   ├── session.ts       # send/sendAndWait/ack/pause/resume/skip
 │   ├── sender.ts        # 事件准备、推送、音频资源维护
 │   ├── replay.ts        # 历史对局回放
@@ -167,7 +167,7 @@ flowchart TD
 - `attachGameSocket(server)`：把 WebSocketServer 挂到 HTTP server。
 - `runSession`：根据首包启动真实游戏或回放。
 - `getRequestConfig`：解析玩家、主持人、模式和模型 key 状态。
-- `getRunner`：按 `gameType` 选择辩论赛或狼人杀 runner。
+- `resolveGameRunner()`：从已注册 `GameDefinition` 解析 session/runtime；只有辩论赛和狼人杀走兼容 runner，其他已注册游戏走通用 definition runtime。
 - `GameSession`：封装 `send`、`sendAndWait`、`resolveAck`、`pause`、`resume`、`skipCurrentPhase`。
 - `sender`：准备事件、维护音频资源并推送给前端。
 - `replay`：读取历史对局并按事件节奏回放。

@@ -102,10 +102,10 @@ async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunCon
     }
     const finalMatch = getDebugState(matchId)?.match;
     if (!finalMatch) throw new Error(`Undercover match disappeared: ${matchId}`);
+    assertUndercoverWorkflowCompleted(finalMatch);
     const publicState = toUndercoverPublicState(finalMatch.state as unknown as Parameters<typeof toUndercoverPublicState>[0]) as unknown as Record<string, unknown>;
     if (trace) {
-      if (finalMatch.status === 'completed') markTraceComplete(trace);
-      else markTraceError(trace, `Undercover workflow stopped: ${finalMatch.status}`);
+      markTraceComplete(trace);
       flushTrace(trace);
     }
     return publicState;
@@ -116,6 +116,15 @@ async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunCon
     }
     throw error;
   }
+}
+
+function assertUndercoverWorkflowCompleted(match: Match): void {
+  if (match.status === 'completed') return;
+  const matchError = match.error && typeof match.error === 'object'
+    ? match.error as Record<string, unknown>
+    : {};
+  const detail = String(matchError.message || 'workflow stopped before completion');
+  throw new Error(`谁是卧底工作流异常停止（${match.status || 'unknown'}）：${detail}`);
 }
 
 function resolvePlayers(config: UndercoverRuntimeConfig): UndercoverPlayerInput[] {

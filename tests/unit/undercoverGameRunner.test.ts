@@ -215,6 +215,87 @@ test('runSession persists the start before every runtime event while live playba
   assert.equal(closed, true);
 });
 
+for (const status of ['failed', 'paused_debug']) {
+  test(`runSession does not save or emit done for a ${status} Undercover match`, async (t) => {
+    resetGameEngine();
+    const gameType = `undercover-${status}-fixture`;
+    const failureMessage = `谁是卧底工作流异常停止（${status}）：injected ${status}`;
+    getGameEngine().registerDefinition({
+      gameType,
+      version: '1.0.0',
+      workflowId: `${gameType}-v1`,
+      actionSchemas: {},
+      metadata: {
+        session: {
+          startMessage: '谁是卧底开始',
+          doneMessage: '谁是卧底结束，身份已经揭晓。',
+          playerSelection: { min: 1, max: 1, errorMessage: 'select one fixture player' },
+        },
+      },
+      runtime: {
+        createMatch: () => ({ id: `${gameType}-match` }),
+        run: async () => { throw new Error(failureMessage); },
+      },
+    });
+    const players = createSocketPlayers();
+    const aiConfigModule = require('../../packages/server/config/ai') as { getAiConfig: () => unknown };
+    const settingsModule = require('../../packages/server/modules/settings/service') as { getSpectatorMode: () => boolean };
+    const gamesModule = require('../../packages/server/modules/games/service') as { saveGameRecord: (game: unknown) => unknown };
+    const originalGetAiConfig = aiConfigModule.getAiConfig;
+    const originalGetSpectatorMode = settingsModule.getSpectatorMode;
+    const originalSaveGameRecord = gamesModule.saveGameRecord;
+    let saveCalls = 0;
+    aiConfigModule.getAiConfig = () => ({
+      host: { id: 0, name: '主持人', nickname: '主持人' },
+      players,
+      missingProviders: [],
+      realReady: true,
+    });
+    settingsModule.getSpectatorMode = () => false;
+    gamesModule.saveGameRecord = () => {
+      saveCalls += 1;
+      return [];
+    };
+    t.after(() => {
+      aiConfigModule.getAiConfig = originalGetAiConfig;
+      settingsModule.getSpectatorMode = originalGetSpectatorMode;
+      gamesModule.saveGameRecord = originalSaveGameRecord;
+      resetGameEngine();
+    });
+
+    const sent: Record<string, unknown>[] = [];
+    const session = {
+      send(payload: Record<string, unknown>) { sent.push(payload); },
+      async sendAndWait(payload: Record<string, unknown>) { sent.push(payload); },
+      resolveAck() {},
+      close() {},
+      setPaused() {},
+      skipCurrentPhase() {},
+    };
+    let failure = '';
+    try {
+      await runSession(
+        session as never,
+        'real',
+        [players[0].id],
+        gameType,
+      );
+    } catch (error) {
+      failure = (error as Error).message;
+    }
+
+    assert.deepEqual({
+      failure,
+      saveCalls,
+      doneEvents: sent.filter((event) => event.type === 'done').length,
+    }, {
+      failure: failureMessage,
+      saveCalls: 0,
+      doneEvents: 0,
+    });
+  });
+}
+
 function createRuntimeEvent(type: string, message: string): Record<string, unknown> {
   return {
     type,
@@ -227,6 +308,30 @@ function createRuntimeEvent(type: string, message: string): Record<string, unkno
       requiresAck: true,
     },
   };
+}
+
+function createSocketPlayers() {
+  return Array.from({ length: 6 }, (_, index) => ({
+    id: index + 301,
+    name: `${index + 1}号`,
+    nickname: `${index + 1}号`,
+    avatar: '',
+    avatarUrl: '',
+    provider: 'test',
+    providerName: 'test',
+    baseUrl: 'https://undercover.test/v1',
+    apiKeyEnv: 'TEST_KEY',
+    apiKey: 'test-key',
+    apiFormat: 'openai-compatible',
+    model: 'test-model',
+    modelId: 1,
+    temperature: 0.5,
+    personality: '测试玩家',
+    sex: '未知',
+    voicePackageId: null,
+    thinkingEnabled: false,
+    fallbackModel: null,
+  }));
 }
 
 function deferred<T>() {

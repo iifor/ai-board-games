@@ -27,11 +27,13 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', onReturnToSe
 
       <UndercoverControls
         autoPlay={controller.autoPlay}
+        speechEnabled={controller.speechEnabled}
         started={controller.started}
         replayMode={controller.replayMode}
         onReturn={returnToSelect}
         onStart={controller.startGame}
         onTogglePlayback={controller.setAutoPlayEnabled}
+        onToggleSpeech={controller.setSpeechEnabled}
         onSkipPhase={controller.skipCurrentReplayPhase}
       />
 
