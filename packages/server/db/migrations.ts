@@ -409,10 +409,12 @@ function migrate(db: Database | JsonDb): void {
       password_hash TEXT NOT NULL,
       display_name TEXT NOT NULL DEFAULT '',
       enabled INTEGER NOT NULL DEFAULT 1,
+      must_change_password INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
+  ensureColumn(db, 'admin_users', 'must_change_password', 'INTEGER NOT NULL DEFAULT 0');
 
   migrateLegacyModelProviders(db);
 

@@ -39,22 +39,36 @@ test('development auth does not invent an administrator', () => {
   assert.equal(readAuthConfig({ NODE_ENV: 'development' }).admin, null);
 });
 
-test('admin bootstrap disables legacy accounts and uses configured credentials', async () => {
+test('admin bootstrap creates the configured account with forced password change only for an empty table', async () => {
   const db = new Database(':memory:');
   migrate(db);
-  db.prepare("INSERT INTO admin_users (username, password_hash) VALUES ('admin', 'legacy'), ('ifor', 'legacy')").run();
 
   seedAdminUser(db, { username: 'release-admin', password: 'a-secure-password' });
 
-  const rows = db.prepare('SELECT username, password_hash, enabled FROM admin_users ORDER BY username').all() as Array<{
+  const rows = db.prepare('SELECT username, password_hash, enabled, must_change_password FROM admin_users').all() as Array<{
     username: string;
     password_hash: string;
     enabled: number;
+    must_change_password: number;
   }>;
-  assert.deepEqual(rows.filter((row) => row.enabled === 1).map((row) => row.username), ['release-admin']);
-  const current = rows.find((row) => row.username === 'release-admin');
+  assert.equal(rows.length, 1);
+  const current = rows[0];
   assert.ok(current);
+  assert.equal(current.username, 'release-admin');
+  assert.equal(current.must_change_password, 1);
   const passwordDigest = crypto.createHash('md5').update('a-secure-password').digest('hex');
   assert.equal(await verifyPassword(passwordDigest, current.password_hash), true);
+  db.close();
+});
+
+test('admin bootstrap leaves every existing account unchanged', () => {
+  const db = new Database(':memory:');
+  migrate(db);
+  db.prepare("INSERT INTO admin_users (username, password_hash, enabled) VALUES ('legacy', 'legacy-hash', 1)").run();
+
+  seedAdminUser(db, { username: 'release-admin', password: 'a-secure-password' });
+
+  const rows = db.prepare('SELECT username, password_hash, enabled FROM admin_users').all();
+  assert.deepEqual(rows, [{ username: 'legacy', password_hash: 'legacy-hash', enabled: 1 }]);
   db.close();
 });

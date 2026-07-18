@@ -4,6 +4,7 @@ export interface AdminUser {
   password_hash: string;
   display_name: string;
   enabled: number;
+  must_change_password: number;
   created_at: string;
   updated_at: string;
 }

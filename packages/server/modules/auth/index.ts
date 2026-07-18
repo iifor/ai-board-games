@@ -11,24 +11,21 @@ function md5(plain: string): string {
 }
 
 function seedAdminUser(db: Database, admin: AdminBootstrapConfig | null): void {
+  const existingCount = db.prepare('SELECT COUNT(*) AS count FROM admin_users').get() as { count: number };
+  if (existingCount.count > 0) {
+    console.log('[auth] 已存在管理员账号，跳过初始化。');
+    return;
+  }
+
   if (!admin) {
     console.warn('[auth] 未配置管理员初始化凭据，跳过管理员账号初始化。');
     return;
   }
 
-  db.prepare('UPDATE admin_users SET enabled = 0 WHERE username <> ?').run(admin.username);
-  const existing = db.prepare('SELECT id FROM admin_users WHERE username = ?').get(admin.username) as { id: number } | undefined;
   const passwordHash = hashPasswordSync(md5(admin.password));
-
-  if (existing) {
-    db.prepare("UPDATE admin_users SET password_hash = ?, enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .run(passwordHash, existing.id);
-    console.log(`[auth] 管理员账号已更新: ${admin.username}`);
-  } else {
-    db.prepare('INSERT INTO admin_users (username, password_hash, display_name) VALUES (?, ?, ?)')
-      .run(admin.username, passwordHash, '管理员');
-    console.log(`[auth] 管理员账号已创建: ${admin.username}`);
-  }
+  db.prepare('INSERT INTO admin_users (username, password_hash, display_name, must_change_password) VALUES (?, ?, ?, 1)')
+    .run(admin.username, passwordHash, '管理员');
+  console.log(`[auth] 管理员账号已创建: ${admin.username}`);
 }
 
 export { seedAdminUser };
