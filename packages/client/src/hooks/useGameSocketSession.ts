@@ -53,9 +53,21 @@ export function useGameSocketSession({
   const startedAckIdsRef = useRef<Set<number | string>>(new Set());
   const autoPlayRef = useRef<boolean>(false);
   const ackTimerRef = useRef<number | null>(null);
+  const previousSpeechEnabledRef = useRef<boolean>(speechEnabled);
+  const disabledSpeechAckIdRef = useRef<number | string | null>(null);
   const latestRef = useRef<UseGameSocketSessionParams>({
     gameType, speechEnabled, speak, cancel, applyServerEvent, getNarration, getSpeechOptions, getAckDelay, playPendingEvent, onError, onAcknowledge, onAutoPlayStopped, onSkipPhase
   });
+
+  if (previousSpeechEnabledRef.current && !speechEnabled) {
+    const pendingAckId = pendingAckRef.current?.ackId;
+    disabledSpeechAckIdRef.current = autoPlayRef.current
+      && pendingAckId != null
+      && startedAckIdsRef.current.has(pendingAckId)
+      ? pendingAckId
+      : null;
+  }
+  previousSpeechEnabledRef.current = speechEnabled;
 
   latestRef.current = {
     gameType, speechEnabled, speak, cancel, applyServerEvent, getNarration, getSpeechOptions, getAckDelay, playPendingEvent, onError, onAcknowledge, onAutoPlayStopped, onSkipPhase
@@ -68,6 +80,13 @@ export function useGameSocketSession({
     if (autoPlay && pendingAckRef.current) continuePendingEvent();
   }, [autoPlay]);
 
+  useEffect(() => {
+    if (speechEnabled) return;
+    const pendingAckId = disabledSpeechAckIdRef.current;
+    disabledSpeechAckIdRef.current = null;
+    if (pendingAckId != null) acknowledgePending(pendingAckId);
+  }, [speechEnabled]);
+
   function clearPendingAckTimer() {
     if (!ackTimerRef.current) return;
     window.clearTimeout(ackTimerRef.current);
@@ -79,6 +98,7 @@ export function useGameSocketSession({
     pendingEventRef.current = null;
     deferredQueueRef.current = [];
     startedAckIdsRef.current.clear();
+    disabledSpeechAckIdRef.current = null;
     autoPlayRef.current = false;
     clearPendingAckTimer();
     setAutoPlay(false);
@@ -127,9 +147,10 @@ export function useGameSocketSession({
     startPendingEvent(event, socket);
   }
 
-  function acknowledgePending() {
+  function acknowledgePending(expectedAckId?: number | string) {
     const pending = pendingAckRef.current;
     if (!pending?.ackId) return;
+    if (expectedAckId != null && pending.ackId !== expectedAckId) return;
     if (pending.socket.readyState === WebSocket.OPEN) {
       pending.socket.send(JSON.stringify({ type: 'ack', ackId: pending.ackId }));
     }
@@ -161,13 +182,14 @@ export function useGameSocketSession({
     const ackId = event.ackId;
     if (ackId && startedAckIdsRef.current.has(ackId)) return;
     if (ackId) startedAckIdsRef.current.add(ackId);
+    const acknowledgeCurrent = () => acknowledgePending(ackId);
 
     clearPendingAckTimer();
 
     const handled = latestRef.current.playPendingEvent?.(event, {
-      acknowledgePending,
+      acknowledgePending: acknowledgeCurrent,
       setAckTimer: (delay: number) => {
-        ackTimerRef.current = window.setTimeout(acknowledgePending, delay);
+        ackTimerRef.current = window.setTimeout(acknowledgeCurrent, delay);
       },
       clearPendingAckTimer
     });
@@ -177,9 +199,9 @@ export function useGameSocketSession({
     const speechOptions = latestRef.current.getSpeechOptions?.(event) || {};
     const delay = latestRef.current.getAckDelay?.(event, narration) || 120;
     if (latestRef.current.speechEnabled && narration) {
-      latestRef.current.speak?.(narration, acknowledgePending, speechOptions);
+      latestRef.current.speak?.(narration, acknowledgeCurrent, speechOptions);
     } else {
-      ackTimerRef.current = window.setTimeout(acknowledgePending, delay);
+      ackTimerRef.current = window.setTimeout(acknowledgeCurrent, delay);
     }
   }
 
@@ -197,6 +219,8 @@ export function useGameSocketSession({
     if (!next) {
       latestRef.current.cancel?.();
       clearPendingAckTimer();
+      const pendingAckId = pendingAckRef.current?.ackId;
+      if (pendingAckId != null) startedAckIdsRef.current.delete(pendingAckId);
       latestRef.current.onAutoPlayStopped?.();
     }
   }

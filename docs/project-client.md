@@ -112,6 +112,7 @@ packages/client/
   - 管理 WebSocket 生命周期。
   - 处理服务端事件、ack、暂停、继续、跳过当前阶段。
   - 对接语音/字幕播放完成后的 ack。
+  - 暂停时保留当前待确认事件并允许继续后重新播放；关闭语音时只确认当前活跃 ack 一次，后续事件沿用无语音延迟确认。
 
 - `useSpeechQueue` / `useSpeechPlayback`
   - 管理语音播放队列。
