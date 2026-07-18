@@ -62,8 +62,12 @@ function createUndercoverWorkflowMatch(config: UndercoverRuntimeConfig): Match {
   registerUndercoverWorkflow();
   const players = resolvePlayers(config);
   const debug = config.debug || {};
+  const hasCustomWords = Boolean(debug.civilianWord || debug.undercoverWord);
+  if (hasCustomWords && !config.debugMode) {
+    throw new Error('Custom undercover words require debugMode');
+  }
   const seed = Number.isInteger(debug.seed) ? Number(debug.seed) : randomBytes(4).readUInt32BE(0);
-  const wordPair = debug.civilianWord && debug.undercoverWord
+  const wordPair = config.debugMode && debug.civilianWord && debug.undercoverWord
     ? { civilian: debug.civilianWord, undercover: debug.undercoverWord }
     : undefined;
   const matchId = `undercover-${Date.now()}-${randomBytes(6).toString('hex')}`;
@@ -101,11 +105,13 @@ async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunCon
     }
     const finalMatch = getDebugState(matchId)?.match;
     if (!finalMatch) throw new Error(`Undercover match disappeared: ${matchId}`);
+    const publicState = toUndercoverPublicState(finalMatch.state as unknown as Parameters<typeof toUndercoverPublicState>[0]) as unknown as Record<string, unknown>;
     if (trace) {
       if (finalMatch.status === 'completed') markTraceComplete(trace);
       else markTraceError(trace, `Undercover workflow stopped: ${finalMatch.status}`);
+      flushTrace(trace);
     }
-    return toUndercoverPublicState(finalMatch.state as unknown as Parameters<typeof toUndercoverPublicState>[0]) as unknown as Record<string, unknown>;
+    return publicState;
   } catch (error) {
     if (trace) {
       markTraceError(trace, error instanceof Error ? error.message : String(error));

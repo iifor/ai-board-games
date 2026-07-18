@@ -4,6 +4,7 @@ import { BasePlayerAgent } from '../../packages/server/modules/agent-core/player
 import { callModelChatWithFallback } from '../../packages/server/modules/llm/service';
 import { createPlayerSchema } from '../../packages/server/modules/players/validator';
 import { playerToRow, rowToPlayer } from '../../packages/server/modules/players/utils';
+import { z } from 'zod';
 
 const messages = [{ role: 'user', content: 'hello' }];
 
@@ -94,6 +95,25 @@ test('uses the fallback model when the primary model returns invalid JSON', asyn
     'https://primary.test/v1/chat/completions',
     'https://fallback.test/v1/chat/completions',
   ]);
+});
+
+test('askJson retries a refined schema failure once and returns validated data', async () => {
+  let calls = 0;
+  await withFetch(() => {
+    calls += 1;
+    return openAiResponse(calls === 1 ? '{"targetId":1}' : '{"targetId":2}');
+  }, async () => {
+    const agent = new BasePlayerAgent({
+      id: 1,
+      ...model('https://primary.test/v1', 'primary'),
+    }, 'system');
+    const result = await agent.askJson('choose', {
+      promptHasContract: true,
+      schema: z.object({ targetId: z.number().refine((targetId) => [2, 3].includes(targetId)) }),
+    });
+    assert.deepEqual(result, { targetId: 2 });
+  });
+  assert.equal(calls, 2);
 });
 
 test('maps and validates a distinct fallback model', () => {

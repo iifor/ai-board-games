@@ -40,6 +40,13 @@ interface AskJsonOptions {
   skillId?: string;
   phase?: string;
   promptHasContract?: boolean;
+  schema?: JsonResponseSchema;
+}
+
+interface JsonResponseSchema {
+  safeParse(value: unknown):
+    | { success: true; data: Record<string, unknown> }
+    | { success: false };
 }
 
 interface AskVoteOptions {
@@ -67,6 +74,13 @@ interface PlayerAgentOptions {
 function normalizeText(text: unknown, limit: number): string {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   return clean;
+}
+
+function parseJsonResponse(raw: string, schema?: JsonResponseSchema): Record<string, unknown> | null {
+  const parsed = parseJsonObject(raw) as Record<string, unknown> | null;
+  if (!parsed || !schema) return parsed;
+  const validated = schema.safeParse(parsed);
+  return validated.success ? validated.data : null;
 }
 
 class BasePlayerAgent {
@@ -179,12 +193,12 @@ class BasePlayerAgent {
       ? ''
       : '\n\nReturn ONLY a raw JSON object. Do NOT wrap in JSON markdown blocks. No explanations outside the JSON.';
     try {
-      const parsed = parseJsonObject(await this.call(prompt + jsonOnly, options.maxTokens || 120)) as Record<string, unknown> | null;
+      const parsed = parseJsonResponse(await this.call(prompt + jsonOnly, options.maxTokens || 120), options.schema);
       if (parsed) return parsed;
       const retryInstruction = options.promptHasContract
-        ? 'Your previous output was not valid JSON. Return one valid JSON object matching the specified output contract.'
+        ? 'Your previous output was not valid JSON or did not match the specified output contract. Return one valid JSON object matching that contract.'
         : 'Return one valid JSON object only. No markdown wrapping.';
-      const retryParsed = parseJsonObject(await this.call(`${prompt}\n\n${retryInstruction}`, options.maxTokens || 120, true)) as Record<string, unknown> | null;
+      const retryParsed = parseJsonResponse(await this.call(`${prompt}\n\n${retryInstruction}`, options.maxTokens || 120, true), options.schema);
       if (retryParsed) return retryParsed;
       this.recordError(options.skillId || 'player-json', 'invalid-json', options);
       return null;

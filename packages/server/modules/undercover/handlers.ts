@@ -124,13 +124,18 @@ function createSpeechHandler(): StepHandler {
       const current = (match as unknown as MatchContext).state;
       const actorId = Number(task.playerId);
       const agent = createAgent(match.id as string, current, actorId);
-      const options = { skillId: 'undercover-speech', phase: 'speech', promptHasContract: true };
       const prompt = buildUndercoverSpeechPrompt(current, actorId);
-      const first = parseSafeSpeech(await agent.askJson(prompt, options), current);
-      if (first) return aiResult(task.action as string, { speech: first });
-
-      const corrected = parseSafeSpeech(await agent.askJson(`${prompt}\n\n上次发言泄露了秘密词或不符合格式。请换一种不含秘密词的描述。`, options), current);
-      if (corrected) return aiResult(task.action as string, { speech: corrected });
+      const schema = undercoverSpeechSchema.refine(
+        ({ speech }) => validatePublicSpeech(speech, current.wordPair).ok,
+        { message: 'secret-leak' },
+      );
+      const speech = parseSafeSpeech(await agent.askJson(prompt, {
+        skillId: 'undercover-speech',
+        phase: 'speech',
+        promptHasContract: true,
+        schema,
+      }), current);
+      if (speech) return aiResult(task.action as string, { speech });
       agent.recordError('undercover-speech', 'secret-leak', { phase: 'speech' });
       return aiResult(task.action as string, { speech: '这个事物在生活中并不少见', fallbackReason: 'secret-leak' });
     },
@@ -201,7 +206,7 @@ function createVoteHandler(): StepHandler {
         votes,
         runoffCandidateIds: resolution.kind === 'runoff' ? resolution.candidateIds : current.runoffCandidateIds,
       }, step.id);
-      const details = voteDetails(current.round, runoff, votes, resolution);
+      const details = voteDetails(current.round, runoff, resolution);
       return {
         ...done(next, [publicEvent(matchId, step.id, 'undercover-vote-result', next, resolution.kind === 'runoff' ? '本轮投票平票，进入复投。' : '投票结束。', details)]),
         nextStepId: resolution.kind === 'runoff' ? `round_${current.round}_runoff` : `round_${current.round}_resolve`,
@@ -214,12 +219,18 @@ function createVoteHandler(): StepHandler {
       const legalIds = (context.legalIds || []).map(Number);
       if (!legalIds.length) throw new Error(`Undercover voter ${actorId} has no legal targets`);
       const agent = createAgent(match.id as string, current, actorId);
-      const options = { skillId: 'undercover-vote', phase: 'vote', promptHasContract: true };
       const prompt = buildUndercoverVotePrompt(current, actorId, legalIds);
-      const first = parseSafeVote(await agent.askJson(prompt, options), legalIds);
-      if (first) return aiResult(task.action as string, first);
-      const corrected = parseSafeVote(await agent.askJson(`${prompt}\n\n上次输出无效。targetId 必须是以下合法座位号之一：${legalIds.join(', ')}。`, options), legalIds);
-      if (corrected) return aiResult(task.action as string, corrected);
+      const schema = undercoverVoteSchema.refine(
+        ({ targetId }) => legalIds.includes(targetId),
+        { message: `targetId must be one of: ${legalIds.join(', ')}` },
+      );
+      const vote = parseSafeVote(await agent.askJson(prompt, {
+        skillId: 'undercover-vote',
+        phase: 'vote',
+        promptHasContract: true,
+        schema,
+      }), legalIds);
+      if (vote) return aiResult(task.action as string, vote);
       const targetId = legalIds[seededIndex(current.seed, legalIds.length, Math.imul(current.round, 31) ^ Math.imul(actorId, 131) ^ (context.runoff ? 1 : 0))];
       agent.recordError('undercover-vote', 'invalid-target', { phase: 'vote' });
       return aiResult(task.action as string, { targetId, reason: '', fallbackReason: 'invalid-target' });
@@ -333,11 +344,10 @@ function validateTaskAction(task: Record<string, unknown>, result: Record<string
   if ((result.payload as EventDetails | undefined)?.action !== task.action) throw new Error('Undercover AI result action mismatch');
 }
 
-function voteDetails(round: number, runoff: boolean, votes: Record<string, number>, resolution: VoteResolution): EventDetails {
+function voteDetails(round: number, runoff: boolean, resolution: VoteResolution): EventDetails {
   return {
     round,
     runoff,
-    votes,
     tally: resolution.tally,
     tiedCandidateIds: resolution.kind === 'runoff' ? resolution.candidateIds : [],
     ...(resolution.kind === 'eliminate' ? { eliminatedPlayerId: resolution.playerId } : {}),

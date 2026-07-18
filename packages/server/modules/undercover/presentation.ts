@@ -35,9 +35,9 @@ function toUndercoverPublicState(state: UndercoverState): UndercoverPublicState 
       text: speech.text,
     })),
   };
-  if (state.winner) publicState.winner = state.winner;
-  if (state.winReason) publicState.winReason = state.winReason;
   if (state.status === 'completed') {
+    if (state.winner) publicState.winner = state.winner;
+    if (state.winReason) publicState.winReason = state.winReason;
     publicState.reveal = {
       civilianWord: state.wordPair.civilian,
       undercoverWord: state.wordPair.undercover,

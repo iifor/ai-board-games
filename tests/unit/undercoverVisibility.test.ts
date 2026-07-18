@@ -32,6 +32,26 @@ test('public state and pre-result events contain no secrets', () => {
   assert.doesNotMatch(serialized, /咖啡|茶|undercoverPlayerId/);
 });
 
+test('pre-terminal public state hides winner inference after an elimination', () => {
+  const internalWinnerState = {
+    ...state,
+    status: 'speaking' as const,
+    players: state.players.map((player) => player.id === 6 ? { ...player, alive: false, eliminatedRound: 1 } : player),
+    winner: 'civilians' as const,
+    winReason: '卧底被淘汰',
+  };
+
+  const publicState = toUndercoverPublicState(internalWinnerState);
+  const event = createUndercoverPresentationEvent('undercover-eliminated', internalWinnerState, { message: '6号玩家被淘汰。' });
+  assert.equal('winner' in publicState, false);
+  assert.equal('winReason' in publicState, false);
+  assert.doesNotMatch(JSON.stringify(event), /winner|winReason|卧底被淘汰/);
+
+  const completed = toUndercoverPublicState({ ...internalWinnerState, status: 'completed' });
+  assert.equal(completed.winner, 'civilians');
+  assert.equal(completed.winReason, '卧底被淘汰');
+});
+
 test('public speech projection excludes non-public runtime fields', () => {
   const stateWithInternalSpeech = {
     ...state,
