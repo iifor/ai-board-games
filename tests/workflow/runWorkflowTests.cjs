@@ -19,6 +19,7 @@ const testFiles = [
   'workflowPersistence.test.ts',
   'tickCompleted.test.ts',
   'aiTaskCompletion.test.ts',
+  'undercoverWorkflow.test.ts',
   'werewolfWorkflowStatus.test.ts'
 ].map((file) => path.join(__dirname, file));
 
