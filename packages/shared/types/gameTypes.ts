@@ -1,6 +1,7 @@
 const GAME_TYPES = {
   DEBATE: 'debate',
-  WEREWOLF: 'werewolf'
+  WEREWOLF: 'werewolf',
+  UNDERCOVER: 'undercover'
 } as const;
 
 const GAME_EVENTS = {

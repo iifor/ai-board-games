@@ -151,6 +151,24 @@ interface GameRuntime {
   run(matchId: string, context?: GameRuntimeRunContext): Promise<Record<string, unknown>>;
 }
 
+interface GameSessionMetadata {
+  startMessage: string;
+  doneMessage: string;
+  playerSelection?: {
+    min: number;
+    max: number;
+    errorMessage: string;
+  };
+  playback?: {
+    prefetchCount?: number;
+    phaseLookahead?: number;
+  };
+}
+
+interface GameDefinitionMetadata extends Record<string, unknown> {
+  session?: GameSessionMetadata;
+}
+
 interface GameDefinition {
   gameType: string;
   version: string;
@@ -162,7 +180,7 @@ interface GameDefinition {
   projectState?: ProjectStateFromEvent;
   channelPolicy?: ChannelPolicy;
   runtime?: GameRuntime;
-  metadata?: Record<string, unknown>;
+  metadata?: GameDefinitionMetadata;
 }
 
 interface InvariantIssue {
@@ -216,6 +234,8 @@ export type {
   SkillDefinition,
   GameRuntimeRunContext,
   GameRuntime,
+  GameSessionMetadata,
+  GameDefinitionMetadata,
   GameDefinition,
   InvariantIssue,
   EngineDefinitionSummary,

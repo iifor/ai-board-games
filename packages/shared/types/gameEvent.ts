@@ -116,6 +116,13 @@ export type GameEventType =
   | 'game-end'
   | 'match-completed'
   | 'workflow-completed'
+  | 'undercover-game-start'
+  | 'undercover-round-start'
+  | 'undercover-speech'
+  | 'undercover-vote-start'
+  | 'undercover-vote-result'
+  | 'undercover-eliminated'
+  | 'undercover-game-result'
   | 'error';
 
 // ============================================================

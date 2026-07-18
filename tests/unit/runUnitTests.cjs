@@ -42,6 +42,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'traceParticipants.test.ts',
   'nightResolutionAuditViewModel.test.ts',
   'werewolfPostgameRules.test.ts'
+  ,'undercoverSchemas.test.ts'
   ,'werewolfDefaultConfig.test.ts'
   ,'edgeTts.test.ts'
 ]).map((file) => path.join(__dirname, file));
