@@ -49,12 +49,13 @@ packages/client/
     │   │   ├── constants.ts
     │   │   ├── debatePoster.ts
     │   │   └── debateUtils.ts
-    │   └── werewolf/
-    │       ├── WerewolfGame/
-    │       ├── components/
-    │       ├── hooks/
-    │       ├── utils/
-    │       └── constants.tsx
+    │   ├── werewolf/
+    │   │   ├── WerewolfGame/
+    │   │   ├── components/
+    │   │   ├── hooks/
+    │   │   ├── utils/
+    │   │   └── constants.tsx
+    │   └── undercover/            # 谁是卧底公开状态、控制器与六人展示
     ├── hooks/
     │   ├── speech/
     │   ├── useGameNavigation.ts
@@ -78,7 +79,7 @@ packages/client/
 `App.tsx` 只负责路由分发和页面组合，不承载复杂业务逻辑。业务逻辑按 feature、hook、service、utils 拆分：
 
 - 页面层：`HomePage`、`GameSelectPage` 负责页面布局和组合。
-- 业务模块：`features/debate`、`features/werewolf` 承载具体游戏 UI 和业务展示。
+- 业务模块：`features/debate`、`features/werewolf`、`features/undercover` 承载具体游戏 UI 和业务展示。
 - 服务层：`services/gameService.ts` 封装 REST 和 WebSocket。
 - hooks 层：封装导航、WebSocket session、语音播放、字幕队列。
 - 通用组件：弹窗、导航、状态视图、字幕等可复用 UI。
@@ -90,6 +91,7 @@ packages/client/
 - `/` 或未匹配路径：游戏选择页。
 - `/games/debate`：辩论赛。
 - `/games/werewolf`：狼人杀。
+- `/games/undercover`：谁是卧底经典入口。
 - `/games/:gameKey?gameId=xxx`：历史对局回放。
 
 ## 核心模块
@@ -140,6 +142,15 @@ packages/client/
 - `hooks/useWerewolfSpeechPlayback.ts`：狼人杀语音/字幕播放逻辑。
 - `utils/roles.ts`、`players.ts`、`rounds.ts`、`nightActions.ts`、`eventLog.tsx`：游戏展示工具。
 
+### 谁是卧底模块
+
+目录：`packages/client/src/features/undercover`
+
+- `UndercoverGame`：实时与历史回放共用的页面容器，只组合控制区、公开竞技场和错误状态。
+- `useUndercoverGame`：消费通用 WebSocket session、语音队列和 ACK；仅保存服务端公开状态，开局复用导航 sessionStorage 中已选择的 6 个玩家 ID。
+- `UndercoverArena`：展示六个席位、轮次发言、汇总票型和淘汰轮次；仅当状态为 `completed` 且存在 `reveal` 时展示词语和卧底身份。
+- `UndercoverControls`：复用开始、暂停/继续和回放跳过控制语义，不增加新 WebSocket 消息。
+
 ## WebSocket 客户端职责
 
 WebSocket 协议以 `docs/project-workflow.md` 为唯一来源。C 端负责：
@@ -158,7 +169,7 @@ WebSocket 协议以 `docs/project-workflow.md` 为唯一来源。C 端负责：
 ```bash
 pnpm run dev:client
 pnpm run build:client
-pnpm run check:client
+pnpm --filter @ai-presenter/client run check
 ```
 
 构建产物输出到 `dist/client`，由服务端静态托管。`dist/` 不作为源码目录维护。
@@ -208,7 +219,8 @@ pnpm run check:client
 
 - `/game/v2/debate`：辩论赛统一 C 端赛事皮肤入口。
 - `/game/v2/werewolf`：狼人杀统一 C 端赛事皮肤入口。
-- `/games/debate`、`/games/werewolf`：继续作为 v1 回退入口保留。
+- `/game/v2/undercover`：谁是卧底 C 端入口，实时与回放复用同一 Undercover 容器。
+- `/games/debate`、`/games/werewolf`、`/games/undercover`：继续作为 v1 回退入口保留。
 - 游戏选择页默认进入 `/game/v2/*`；历史回放仍使用 `gameId` 查询参数，例如 `/game/v2/debate?gameId=xxx`。
 - `features/debate-v2`、`features/werewolf-v2` 只负责 v2 展示入口和 scoped 样式，复用现有 `features/debate`、`features/werewolf` 游戏容器、WebSocket、语音、字幕、弹窗、服务请求和工具函数。
 - `components/GameBroadcastHud` 供辩论 v2 等赛事页复用；狼人杀 v2 使用视角内的阶段标题，避免与双视角舞台重复。`styles/game-theme.css` 是 v2 共用视觉 token 入口。

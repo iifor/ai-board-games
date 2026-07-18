@@ -1,0 +1,30 @@
+.undercover-controls {
+  position: sticky;
+  z-index: 5;
+  top: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+}
+
+.undercover-controls button {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid rgba(131, 231, 222, 0.48);
+  border-radius: 10px;
+  color: #efffff;
+  background: rgba(7, 41, 52, 0.92);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.undercover-controls button:focus-visible {
+  outline: 3px solid #ffe18f;
+  outline-offset: 2px;
+}
+
+.undercover-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}

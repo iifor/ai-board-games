@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, MessagesSquare, Moon } from 'lucide-react';
+import { Check, MessagesSquare, Moon, UsersRound } from 'lucide-react';
 import type { Player } from '../../types';
 import { fetchAiPlayers, fetchPlayerSelections, fetchRecentGames, savePlayerSelection } from '../../services/gameService';
 import bgSelect from '../../asserts/aiboardgame.png';
@@ -7,21 +7,22 @@ import './index.css';
 
 const GAME_RULES: Record<string, { min: number; max: number; recommended: number; label: string }> = {
   debate: { min: 8, max: 12, recommended: 12, label: '8-12 人' },
-  werewolf: { min: 12, max: 12, recommended: 12, label: '固定 12 人' }
+  werewolf: { min: 12, max: 12, recommended: 12, label: '固定 12 人' },
+  undercover: { min: 6, max: 6, recommended: 6, label: '固定 6 人' }
 };
 
 const games = [
   { key: 'debate', title: 'AI 辩论赛', subtitle: '正反攻辩与评委点评', tone: 'debate', icon: <MessagesSquare size={34} /> },
-  { key: 'werewolf', title: 'AI 狼人杀', subtitle: '12人标准场与扩展模式', tone: 'wolf', icon: <Moon size={34} /> }
+  { key: 'werewolf', title: 'AI 狼人杀', subtitle: '12人标准场与扩展模式', tone: 'wolf', icon: <Moon size={34} /> },
+  { key: 'undercover', title: 'AI 谁是卧底', subtitle: '6人语言推理局', tone: 'undercover', icon: <UsersRound size={34} /> }
 ];
 
 interface GameSelectPageProps {
-  onStartDebate: (playerIds: number[]) => void;
-  onStartWerewolf: (playerIds: number[]) => void;
+  onStartGame: (gameType: string, playerIds: number[]) => void;
   onReplayGame?: (gameType: string, gameId: string, playerIds?: number[]) => void;
 }
 
-export function GameSelectPage({ onStartDebate, onStartWerewolf, onReplayGame }: GameSelectPageProps) {
+export function GameSelectPage({ onStartGame, onReplayGame }: GameSelectPageProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [selections, setSelections] = useState<Record<string, number[]>>({});
   const [editingGame, setEditingGame] = useState<string>('');
@@ -68,8 +69,8 @@ export function GameSelectPage({ onStartDebate, onStartWerewolf, onReplayGame }:
 
   function startGame(gameKey: string) {
     const playerIds = getSelection(gameKey);
-    if (gameKey === 'debate') onStartDebate(playerIds);
-    else onStartWerewolf(playerIds);
+    if (!isValidSelection(gameKey, playerIds)) return;
+    onStartGame(gameKey, playerIds);
   }
 
   function togglePlayer(id: number) {
@@ -97,13 +98,29 @@ export function GameSelectPage({ onStartDebate, onStartWerewolf, onReplayGame }:
           const isEditing = editingGame === game.key;
           return (
             <article className={`game-entry-card ${game.tone}`} key={game.key}>
-              <button type="button" className="game-entry-main" onClick={() => startGame(game.key)}>
+              <button
+                type="button"
+                className="game-entry-main"
+                title={`开始${game.title}`}
+                disabled={!isValidSelection(game.key, selectedIds)}
+                onClick={() => startGame(game.key)}
+              >
                 <span className="game-entry-icon">{game.icon}</span>
                 <strong>{game.title}</strong>
                 <em>{game.subtitle}</em>
               </button>
               <div className="game-entry-actions">
                 <span>{selectedIds.length} / {GAME_RULES[game.key].label}</span>
+                <button
+                  type="button"
+                  title={`选择 ${game.title}玩家`}
+                  aria-expanded={isEditing}
+                  onClick={() => {
+                    setEditingGame(game.key);
+                    setDraftIds(selectedIds);
+                    setSaveError('');
+                  }}
+                >选择玩家</button>
               </div>
               {isEditing && (
                 <GamePlayerEditor
@@ -155,6 +172,7 @@ function getHistoryTitle(gameType: string, game: Record<string, unknown>): strin
   const werewolfMode = event?.werewolfMode as Record<string, unknown> | undefined;
   if (gameType === 'debate') return (topic?.title as string) || String(game.id);
   if (gameType === 'werewolf') return (game.modeName as string) || (werewolfMode?.name as string) || (game.mode as string) || '标准局';
+  if (gameType === 'undercover') return (game.modeName as string) || '标准 6 人局';
   return (game.skinName as string) || (event?.name as string) || String(game.id);
 }
 
@@ -180,7 +198,7 @@ function GamePlayerEditor({ gameKey, players, draftIds, onToggle, onSave, error 
         {players.map((player) => {
           const checked = draftIds.includes(player.id);
           return (
-            <button type="button" className={checked ? 'checked' : ''} onClick={() => onToggle(player.id)} key={player.id}>
+            <button type="button" className={checked ? 'checked' : ''} aria-pressed={checked} onClick={() => onToggle(player.id)} key={player.id}>
               <span>{player.id}</span>
               <strong>{player.nickname || player.name || `${player.id}号`}</strong>
               {checked && <Check size={14} />}

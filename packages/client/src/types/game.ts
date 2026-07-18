@@ -5,6 +5,7 @@ import type { WerewolfRound } from './werewolf';
 
 export interface GameState {
   id?: string;
+  gameType?: string;
   type?: string;
   mode?: string;
   topic?: DebateTopic;

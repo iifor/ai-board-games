@@ -5,10 +5,11 @@ import { GameSelectPage } from './pages/GameSelectPage';
 import { HomePage } from './pages/HomePage';
 import { WerewolfGame } from './features/werewolf/WerewolfGame';
 import { WerewolfGameV2 } from './features/werewolf-v2';
+import { UndercoverGame } from './features/undercover';
 import { useGameNavigation } from './hooks/useGameNavigation';
 
 export function App() {
-  const { route, replayGameId, openSelectPage, startGame } = useGameNavigation();
+  const { route, replayGameId, selectedPlayerIds, openSelectPage, startGame } = useGameNavigation();
 
   useEffect(() => {
     if (route.name !== 'game') return;
@@ -27,6 +28,16 @@ export function App() {
       return <DebateGame replayGameId={replayGameId} onReturnToSelect={openSelectPage} />;
     }
 
+    if (route.gameKey === 'undercover') {
+      return (
+        <UndercoverGame
+          playerIds={selectedPlayerIds}
+          replayGameId={replayGameId}
+          onReturnToSelect={openSelectPage}
+        />
+      );
+    }
+
     if (route.version === 'v2') {
       return <WerewolfGameV2 replayGameId={replayGameId} onReturnToSelect={openSelectPage} />;
     }
@@ -35,8 +46,7 @@ export function App() {
 
   return (
     <GameSelectPage
-      onStartDebate={(playerIds) => startGame('debate', playerIds)}
-      onStartWerewolf={(playerIds) => startGame('werewolf', playerIds)}
+      onStartGame={(gameType, playerIds) => startGame(gameType, playerIds)}
       onReplayGame={(gameType, gameId, playerIds = []) => startGame(gameType, playerIds, gameId)}
     />
   );

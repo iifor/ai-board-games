@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Route } from '../types';
 
-const GAME_PATHS = new Set(['debate', 'werewolf']);
+const GAME_PATHS = new Set(['debate', 'werewolf', 'undercover']);
 type GameRouteVersion = 'v1' | 'v2';
 
 interface LocationState {
@@ -49,7 +49,7 @@ function readLocation(): LocationState {
   };
 }
 
-function parseClientRoute(locationState: LocationState): Route {
+export function parseClientRoute(locationState: LocationState): Route {
   const pathname = normalizePath(locationState.pathname);
   const segments = pathname.split('/').filter(Boolean);
   const searchParams = new URLSearchParams(locationState.search);

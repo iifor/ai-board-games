@@ -1,0 +1,119 @@
+.undercover-arena {
+  display: grid;
+  gap: 24px;
+  width: min(1180px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 28px;
+  border: 1px solid rgba(118, 224, 218, 0.35);
+  border-radius: 24px;
+  background: rgba(5, 23, 35, 0.86);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.4);
+}
+
+.undercover-arena > header {
+  text-align: center;
+}
+
+.undercover-arena h2,
+.undercover-arena h3,
+.undercover-arena p {
+  margin: 0;
+}
+
+.undercover-arena > header p {
+  color: #7de9df;
+  font-weight: 800;
+}
+
+.undercover-seats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.undercover-seat {
+  display: grid;
+  gap: 6px;
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid rgba(188, 242, 237, 0.2);
+  border-radius: 16px;
+  background: rgba(12, 55, 64, 0.62);
+}
+
+.undercover-seat > span,
+.undercover-seat > em {
+  color: #9edbd7;
+  font-size: 13px;
+  font-style: normal;
+}
+
+.undercover-seat.is-speaking {
+  border-color: #7de9df;
+  box-shadow: 0 0 22px rgba(82, 230, 216, 0.28);
+}
+
+.undercover-seat.is-eliminated {
+  opacity: 0.52;
+}
+
+.undercover-round-data {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+}
+
+.undercover-round-data > section,
+.undercover-reveal {
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(1, 12, 23, 0.62);
+}
+
+.undercover-round-data ol,
+.undercover-round-data ul {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding-left: 22px;
+}
+
+.undercover-round-data li strong {
+  margin-right: 10px;
+  color: #7de9df;
+}
+
+.undercover-reveal {
+  border: 1px solid rgba(255, 211, 111, 0.5);
+  text-align: center;
+}
+
+.undercover-reveal dl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 18px 0 0;
+}
+
+.undercover-reveal dt {
+  color: #a9c8c6;
+  font-size: 13px;
+}
+
+.undercover-reveal dd {
+  margin: 6px 0 0;
+  color: #ffe18f;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+@media (max-width: 760px) {
+  .undercover-seats,
+  .undercover-reveal dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .undercover-round-data {
+    grid-template-columns: 1fr;
+  }
+}

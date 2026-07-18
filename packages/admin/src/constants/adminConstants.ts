@@ -1,7 +1,7 @@
 import type { SelectOption } from '../types/api';
 import type { Player, Skin, VoicePackage } from '../types/entities';
 
-export const GAME_LABELS: Record<string, string> = { debate: '辩论赛', werewolf: '狼人杀' };
+export const GAME_LABELS: Record<string, string> = { debate: '辩论赛', werewolf: '狼人杀', undercover: '谁是卧底' };
 export const DEBATE_ROLE_LABELS: string[] = ['一辩', '二辩', '三辩', '四辩'];
 
 export const TITLES: Record<string, string> = {

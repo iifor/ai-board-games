@@ -1,4 +1,4 @@
-export type GameType = 'debate' | 'werewolf' | 'consensus';
+export type GameType = 'debate' | 'werewolf' | 'undercover' | 'consensus';
 
 export interface GameTopic {
   title?: string;

@@ -7,20 +7,28 @@ export const DEFAULT_GAME_ROUTE_VERSION: GameRouteVersion = 'v2';
 export function useGameNavigation() {
   const { route, navigate } = useClientRouter();
   const replayGameId = route.name === 'game' ? route.searchParams.get('gameId') || '' : '';
+  const selectedPlayerIds = route.name === 'game' ? readStoredPlayerSelection(route.gameKey) : [];
 
   function openSelectPage() {
     navigate('/games');
   }
 
   function startGame(gameKey: string, playerIds: number[], gameId: string = '', version: GameRouteVersion = DEFAULT_GAME_ROUTE_VERSION) {
-    const cleanIds = playerIds.map(Number).filter(Boolean);
+    const cleanIds = [...new Set(playerIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
     const stored = readStoredSelections();
     stored[gameKey] = cleanIds;
     window.sessionStorage.setItem(PLAYER_SELECTION_STORAGE_KEY, JSON.stringify(stored));
     navigate(buildGamePath(gameKey, { gameId, version }));
   }
 
-  return { route, navigate, replayGameId, openSelectPage, startGame };
+  return { route, navigate, replayGameId, selectedPlayerIds, openSelectPage, startGame };
+}
+
+export function readStoredPlayerSelection(gameKey: string): number[] {
+  const playerIds = readStoredSelections()[gameKey];
+  return Array.isArray(playerIds)
+    ? playerIds.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    : [];
 }
 
 function readStoredSelections(): Record<string, number[]> {

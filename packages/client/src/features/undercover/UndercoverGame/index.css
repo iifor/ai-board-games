@@ -1,0 +1,64 @@
+.undercover-shell {
+  min-height: 100vh;
+  overflow: auto;
+  padding: 24px 0 48px;
+  color: #efffff;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(31, 156, 145, 0.28), transparent 36%),
+    linear-gradient(145deg, #031018, #071f2b 58%, #020b13);
+}
+
+.undercover-heading {
+  text-align: center;
+}
+
+.undercover-heading p,
+.undercover-heading h1 {
+  margin: 0;
+}
+
+.undercover-heading p {
+  color: #7de9df;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.undercover-heading h1 {
+  margin-top: 5px;
+  font-size: clamp(32px, 4vw, 50px);
+}
+
+.undercover-heading span {
+  display: block;
+  margin-top: 7px;
+  color: #aed0ce;
+}
+
+.undercover-empty {
+  width: min(720px, calc(100vw - 48px));
+  margin: 72px auto 0;
+  padding: 56px 24px;
+  border: 1px dashed rgba(125, 233, 223, 0.44);
+  border-radius: 22px;
+  background: rgba(5, 30, 40, 0.62);
+  text-align: center;
+}
+
+.undercover-empty h2,
+.undercover-empty p {
+  margin: 0;
+}
+
+.undercover-empty p {
+  margin-top: 10px;
+  color: #aed0ce;
+}
+
+.undercover-error {
+  width: min(720px, calc(100vw - 48px));
+  margin: 16px auto 0;
+  color: #ffb9a8;
+  text-align: center;
+}

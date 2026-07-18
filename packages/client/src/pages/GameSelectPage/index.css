@@ -104,6 +104,10 @@
   background: linear-gradient(180deg, rgba(63, 20, 35, 0.84), rgba(6, 13, 31, 0.8));
 }
 
+.game-entry-card.undercover {
+  background: linear-gradient(180deg, rgba(17, 77, 79, 0.86), rgba(6, 19, 34, 0.82));
+}
+
 .game-entry-main {
   display: flex;
   flex: 0 0 258px;
@@ -117,6 +121,11 @@
   background: transparent;
   cursor: pointer;
   text-align: center;
+}
+
+.game-entry-main:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
 }
 
 .game-entry-icon {
