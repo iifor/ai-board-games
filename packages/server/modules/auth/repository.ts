@@ -18,7 +18,7 @@ function create(username: string, passwordHash: string, displayName: string): nu
 
 function updatePassword(id: number, newPasswordHash: string): void {
   getDb().prepare(
-    'UPDATE admin_users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    'UPDATE admin_users SET password_hash = ?, must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
   ).run(newPasswordHash, id);
 }
 

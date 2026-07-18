@@ -246,7 +246,8 @@ pnpm run check:server
 - `config/env.ts` 会从根目录或 server 上级目录加载 `.env`。
 - 模型运行时 key 主要通过数据库模型配置或 `DATABASE_MODEL_API_KEY` 兜底。
 - 生产环境必须配置至少 32 字符的 `JWT_SECRET`、非空 `ADMIN_USERNAME` 和至少 12 字符的 `ADMIN_PASSWORD`；缺失或强度不足时服务在监听端口前失败。
-- 管理员账号只从环境变量初始化或轮换。未配置时开发环境不会自动创建管理员，代码中不保留默认账号或密码。
+- 环境变量只在 `admin_users` 为空时创建首个管理员，并标记为必须修改密码；已有任意管理员时启动过程不创建、禁用、更新或覆盖账号。未配置时开发环境不会自动创建管理员，代码中不保留默认账号或密码。
+- 首次登录的管理员只能调用改密和当前身份接口；其余管理 API 返回 `PASSWORD_CHANGE_REQUIRED`。`POST /api/admin/auth/change-password` 接收客户端 MD5 摘要，服务端以 scrypt 保存，并在成功后清除改密标记、返回新 JWT。
 - 管理员登录按“客户端 IP + 用户名”限流：15 分钟内最多允许 5 次失败，第 6 次请求返回 HTTP 429；登录成功会清除该组合的失败计数。计数仅保存在当前 Node.js 进程内存中，重启后会重置；当前单实例 Compose 部署符合这一边界。
 
 静态资源：

@@ -95,6 +95,8 @@ packages/admin/
 
 ### 页面模块
 
+- `Login`：登录后根据服务端 `mustChangePassword` 状态跳转。
+- `ChangePassword`：首次登录时强制展示；改密成功后才允许进入后台页面。
 - `Dashboard`：后台概览。
 - `GameHistory`：历史对局列表和详情入口。
 - `PlayerManager`：玩家资料、头像、人格、模型、音色、启用状态。
@@ -133,6 +135,8 @@ pnpm run check:admin
 ```
 
 构建产物输出到 `dist/admin`，由服务端挂载到 `/admin`。`dist/` 不作为源码目录维护。
+
+首次部署在 `.env` 设置 `ADMIN_USERNAME=admin` 和不少于 12 字符的 `ADMIN_PASSWORD`。该账号只会在管理员表为空时创建一次；首次登录会被引导到改密页。已有管理员时，修改这两个环境变量不会覆盖任何账号。
 
 ## 扩展点与注意事项
 

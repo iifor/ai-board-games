@@ -2,17 +2,28 @@ import type { AdminRequestOptions } from '../types/api';
 import { AdminApiError } from '../types/api';
 
 const TOKEN_KEY = 'admin_jwt_token';
+const PASSWORD_CHANGE_REQUIRED_KEY = 'admin_password_change_required';
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export function setToken(token: string): void {
+export function setToken(token: string, mustChangePassword = false): void {
   localStorage.setItem(TOKEN_KEY, token);
+  if (mustChangePassword) {
+    localStorage.setItem(PASSWORD_CHANGE_REQUIRED_KEY, '1');
+  } else {
+    localStorage.removeItem(PASSWORD_CHANGE_REQUIRED_KEY);
+  }
 }
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(PASSWORD_CHANGE_REQUIRED_KEY);
+}
+
+export function requiresPasswordChange(): boolean {
+  return localStorage.getItem(PASSWORD_CHANGE_REQUIRED_KEY) === '1';
 }
 
 export async function adminRequest<T = unknown>(
@@ -38,6 +49,11 @@ export async function adminRequest<T = unknown>(
     throw new AdminApiError('登录已过期，请重新登录');
   }
   const data = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (response.status === 403 && data?.code === 'PASSWORD_CHANGE_REQUIRED') {
+    localStorage.setItem(PASSWORD_CHANGE_REQUIRED_KEY, '1');
+    window.location.hash = '#/change-password';
+    throw new AdminApiError('请先修改初始密码');
+  }
   if (!response.ok) {
     throw new AdminApiError(
       (data?.message as string) || '后台请求失败',
@@ -48,6 +64,23 @@ export async function adminRequest<T = unknown>(
   return (data?.code === 0 && Object.prototype.hasOwnProperty.call(data, 'data')
     ? data.data
     : data) as T;
+}
+
+export interface PasswordChangeResult {
+  token: string;
+  mustChangePassword: false;
+  user: {
+    id: number;
+    username: string;
+    displayName: string;
+  };
+}
+
+export function changePassword(password: string) {
+  return adminRequest<PasswordChangeResult>('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
 }
 
 export function getWorkflowDebug(matchId: string) {

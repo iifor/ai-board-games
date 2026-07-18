@@ -14,6 +14,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'upstreamConcurrency.test.ts',
   'traceConcurrency.test.ts',
   'authProductionConfig.test.ts',
+  'authFirstPasswordChange.test.ts',
   'loginRateLimiter.test.ts',
   'authLoginRateLimit.test.ts',
   'serverLifecycle.test.ts',

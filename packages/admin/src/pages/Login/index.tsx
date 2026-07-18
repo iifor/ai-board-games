@@ -27,10 +27,10 @@ export function Login() {
       if (!res.ok || !data?.data) {
         throw new Error((data?.message as string) || '登录失败');
       }
-      const loginData = data.data as { token: string; user: Record<string, unknown> };
-      setToken(loginData.token);
+      const loginData = data.data as { token: string; mustChangePassword: boolean; user: Record<string, unknown> };
+      setToken(loginData.token, loginData.mustChangePassword);
       messageApi.success('登录成功');
-      navigate('/dashboard', { replace: true });
+      navigate(loginData.mustChangePassword ? '/change-password' : '/dashboard', { replace: true });
     } catch (err) {
       messageApi.error((err as Error).message || '登录失败，请重试');
     }

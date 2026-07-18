@@ -16,8 +16,9 @@ import {
 } from '@ant-design/icons';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { normalizePath } from '../../utils/adminHelpers';
-import { getToken, clearToken } from '../../services/adminApi';
+import { getToken, clearToken, requiresPasswordChange } from '../../services/adminApi';
 import { Login } from '../../pages/Login';
+import { ChangePassword } from '../../pages/ChangePassword';
 import { Dashboard } from '../../pages/Dashboard';
 import { GameHistory } from '../../pages/GameHistory';
 import { PlayerManager } from '../../pages/PlayerManager';
@@ -83,6 +84,7 @@ function AdminShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const isLoginPage = location.pathname === '/login';
+  const isChangePasswordPage = location.pathname === '/change-password';
 
   if (isLoginPage) {
     return <Login />;
@@ -90,6 +92,14 @@ function AdminShell() {
 
   if (!getToken()) {
     return <Login />;
+  }
+
+  if (requiresPasswordChange()) {
+    return isChangePasswordPage ? <ChangePassword /> : <Navigate to="/change-password" replace />;
+  }
+
+  if (isChangePasswordPage) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   const activePath = normalizePath(location.pathname);
@@ -123,6 +133,7 @@ function AdminShell() {
         <Content className="admin-content">
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/debate/history" element={<GameHistory gameType="debate" />} />
