@@ -82,7 +82,6 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
     startSession,
     closeSession,
     resetSessionRefs,
-    acknowledgePending,
     setAutoPlayEnabled,
     skipCurrentReplayPhase,
     clearPendingAckTimer
@@ -123,7 +122,6 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
     game: displayGame,
     speechEnabled,
     speak,
-    acknowledgePending,
     setActiveSpeech,
     setSubtitleSpeech
   });

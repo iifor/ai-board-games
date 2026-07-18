@@ -115,7 +115,6 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect, variant = 'c
     startSession,
     closeSession,
     resetSessionRefs,
-    acknowledgePending,
     setAutoPlayEnabled,
     skipCurrentReplayPhase,
     clearPendingAckTimer
@@ -125,7 +124,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect, variant = 'c
     speak,
     cancel,
     applyServerEvent,
-    playPendingEvent: (event: GameEvent, controls: { setAckTimer: (delay: number) => void; clearPendingAckTimer: () => void }) => speechPlaybackRef.current?.playPendingWerewolfEvent(event, controls) || false,
+    playPendingEvent: (event, controls) => speechPlaybackRef.current?.playPendingWerewolfEvent(event, controls) || false,
     getNarration: (event: GameEvent) => {
       if (event.presentation?.suppressSpeech) return '';
       return event.presentation?.speakableText || event.subtitle?.text || event.narration || getWerewolfNarration(event);
@@ -163,7 +162,6 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect, variant = 'c
     game: displayGame,
     speechEnabled,
     speak,
-    acknowledgePending,
     setActiveSpeech
   });
   speechPlaybackRef.current = speechPlayback;

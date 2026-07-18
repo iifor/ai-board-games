@@ -7,15 +7,19 @@ interface UseDebateSpeechPlaybackParams {
   game: GameState;
   speechEnabled: boolean;
   speak: (text: string, onEnd?: () => void, options?: Record<string, unknown>) => boolean;
-  acknowledgePending: () => void;
   setActiveSpeech: (state: { playerId: string | null; text: string } | null) => void;
   setSubtitleSpeech: (state: SpeechState | ((current: SpeechState | null) => SpeechState | null)) => void;
 }
 
 interface UseDebateSpeechPlaybackReturn {
   clearSubtitleTimer: () => void;
-  playPendingDebateEvent: (event: GameEvent, controls: { setAckTimer: (delay: number) => void }) => boolean;
+  playPendingDebateEvent: (event: GameEvent, controls: SpeechPlaybackControls) => boolean;
   playSubtitleText: (text: string, playerId: string | null | undefined, ackId: number | string | undefined, event: GameEvent) => string;
+}
+
+interface SpeechPlaybackControls {
+  acknowledgePending: () => void;
+  setAckTimer: (delay: number) => void;
 }
 
 function getDebateExtraFields(event: GameEvent, text: string): Partial<SpeechState> {
@@ -37,7 +41,6 @@ export function useDebateSpeechPlayback({
   game,
   speechEnabled,
   speak,
-  acknowledgePending,
   setActiveSpeech: _setActiveSpeech,
   setSubtitleSpeech
 }: UseDebateSpeechPlaybackParams): UseDebateSpeechPlaybackReturn {
@@ -45,7 +48,6 @@ export function useDebateSpeechPlayback({
     game,
     speechEnabled,
     speak,
-    acknowledgePending,
     setSpeechState: setSubtitleSpeech,
     extractNarration: getDebateNarration,
     getExtraFields: getDebateExtraFields,
@@ -53,11 +55,18 @@ export function useDebateSpeechPlayback({
     splitConfig: PLAYABLE_TEXT_CONFIG
   });
 
-  function playPendingDebateEvent(event: GameEvent, { setAckTimer }: { setAckTimer: (delay: number) => void }): boolean {
+  function playPendingDebateEvent(event: GameEvent, controls: SpeechPlaybackControls): boolean {
     const narration = event.subtitle?.text || event.narration || getDebateNarration(event);
+    const { acknowledgePending, setAckTimer } = controls;
 
     if (speechEnabled && narration) {
-      const queued = shared.speakSingle(narration, event?.speech?.playerId || null, event.ackId, event);
+      const queued = shared.speakSingle(
+        narration,
+        event?.speech?.playerId || null,
+        event.ackId,
+        event,
+        acknowledgePending
+      );
 
       if (!queued) {
         shared.playSubtitleText(narration, event?.speech?.playerId || null, event.ackId, event);

@@ -8,6 +8,7 @@ const WEREWOLF_NIGHT_ACTION_HOLD_MS = 1000;
 const WEREWOLF_NIGHT_ACTION_EVENT_TYPES = new Set(['wolf-vote', 'seer-check', 'guard-action', 'witch-action']);
 
 interface SpeechPlaybackControls {
+  acknowledgePending: () => void;
   setAckTimer: (delay: number) => void;
   clearPendingAckTimer?: () => void;
 }
@@ -35,7 +36,6 @@ interface UseWerewolfSpeechPlaybackParams {
   game: GameState;
   speechEnabled: boolean;
   speak: (text: string, onEnd?: () => void, options?: Partial<QueueItem>) => boolean;
-  acknowledgePending: () => void;
   setActiveSpeech: (state: SpeechState | ((prev: SpeechState | null) => SpeechState | null)) => void;
 }
 
@@ -48,14 +48,12 @@ export function useWerewolfSpeechPlayback({
   game,
   speechEnabled,
   speak,
-  acknowledgePending,
   setActiveSpeech
 }: UseWerewolfSpeechPlaybackParams): UseWerewolfSpeechPlaybackResult {
   const { clearSubtitleTimer, playPendingEvent } = useSpeechPlayback({
     game,
     speechEnabled,
     speak,
-    acknowledgePending,
     setSpeechState: setActiveSpeech,
     extractNarration: getWerewolfNarration,
     getExtraFields: getWerewolfExtraFields,
@@ -74,11 +72,12 @@ export function useWerewolfSpeechPlayback({
             const utterance = new SpeechSynthesisUtterance(cue.text);
             utterance.lang = 'zh-CN';
             utterance.rate = 0.9;
-            utterance.onend = () => acknowledgePending();
+            utterance.onend = controls.acknowledgePending;
+            utterance.onerror = controls.acknowledgePending;
             window.speechSynthesis.speak(utterance);
             return true;
           } catch {
-            acknowledgePending();
+            controls.acknowledgePending();
             return true;
           }
         }

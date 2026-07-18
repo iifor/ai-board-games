@@ -10,7 +10,6 @@ interface UseSpeechPlaybackParams {
   game: GameState | null;
   speechEnabled: boolean;
   speak: (text: string, onEnd?: () => void, options?: Partial<QueueItem>) => boolean;
-  acknowledgePending: () => void;
   setSpeechState: (state: SpeechState | ((current: SpeechState | null) => SpeechState | null)) => void;
   extractNarration: (event: GameEvent) => string | null;
   getExtraFields: (event: GameEvent, text: string) => Partial<SpeechState>;
@@ -19,11 +18,15 @@ interface UseSpeechPlaybackParams {
   splitConfig?: PlayableTextOptions;
 }
 
+interface SpeechPlaybackControls {
+  acknowledgePending: () => void;
+  setAckTimer: (delay: number) => void;
+}
+
 export function useSpeechPlayback({
   game,
   speechEnabled,
   speak,
-  acknowledgePending,
   setSpeechState,
   extractNarration,
   getExtraFields,
@@ -39,12 +42,12 @@ export function useSpeechPlayback({
     subtitleTimerRef.current = null;
   }
 
-  function playPendingEvent(event: GameEvent, { setAckTimer }: { setAckTimer: (delay: number) => void }): boolean {
+  function playPendingEvent(event: GameEvent, { acknowledgePending, setAckTimer }: SpeechPlaybackControls): boolean {
     const narration = event.subtitle?.text || event.narration || extractNarration(event) || '';
     const playerId = event?.speech?.playerId || event?.testimony?.playerId || null;
 
     if (speechEnabled && narration) {
-      const queued = speakSingle(narration, playerId, event.ackId, event);
+      const queued = speakSingle(narration, playerId, event.ackId, event, acknowledgePending);
 
       if (!queued) {
         playSubtitleText(narration, playerId, event.ackId, event);
@@ -72,7 +75,13 @@ export function useSpeechPlayback({
     return baseId;
   }
 
-  function speakSingle(text: string, playerId: string | null | undefined, ackId: number | string | undefined, event: GameEvent): boolean {
+  function speakSingle(
+    text: string,
+    playerId: string | null | undefined,
+    ackId: number | string | undefined,
+    event: GameEvent,
+    acknowledgePending: () => void
+  ): boolean {
     clearSubtitleTimer();
     const isHostSpeech = !playerId;
     const browserSpeechOnly = shouldUseBrowserSpeechOnly(event, game);
