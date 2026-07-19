@@ -215,6 +215,19 @@ function runJsonQuery(db: JsonDb, sql: string, args: unknown[], mode: string): u
   if (lower.startsWith('insert into matches')) {
     return upsertJsonRow(data.matches, values[0] as Record<string, unknown>, 'id');
   }
+  if (lower.startsWith('select id from matches') && lower.includes("status in ('running', 'waiting')")) {
+    const cutoffIso = String(values[0] || '');
+    return data.matches
+      .filter((row) =>
+        ['running', 'waiting'].includes(String(row.status))
+        && String(row.updated_at || '') < cutoffIso
+      )
+      .sort((a, b) =>
+        String(a.updated_at || '').localeCompare(String(b.updated_at || ''))
+        || String(a.id || '').localeCompare(String(b.id || ''))
+      )
+      .map((row) => ({ id: row.id }));
+  }
   if (lower.startsWith('select * from matches')) {
     let rows = [...data.matches];
     if (lower.includes('where id = ?')) rows = rows.filter((row) => row.id === values[0]);

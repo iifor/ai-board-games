@@ -8,7 +8,7 @@ import { getWorkflow } from './workflowRegistry';
 import { createId, nowIso, toJson } from './utils';
 import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import type { Match, AiTask } from '../../types/workflow';
-import { cleanupTerminalDebugMatches } from './debugRetention';
+import { cleanupTerminalDebugMatches, scheduleWorkflowMaintenance } from './debugRetention';
 
 const MAX_AI_ATTEMPTS = 2;
 
@@ -325,7 +325,7 @@ function markOutboxSent(id: number): void {
 }
 
 function initializeWorkflowMaintenance(): void {
-  cleanupTerminalDebugMatches();
+  scheduleWorkflowMaintenance();
 }
 
 function afterTick(match: Match): Match {
