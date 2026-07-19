@@ -132,8 +132,11 @@ packages/server/modules/
   `workflow-projection-mismatch` 审计日志并采用最新 match 状态。
 - 等待点、终态或距上次快照累计 10 个事件时创建快照；每个 match 仅保留最近
   3 个快照。
-- `debugMode` 终态 match 仅保留最近 20 局。服务启动和调试对局进入终态时清理，
-  `running/waiting` match 不删除，也不会自动执行阻塞式 `VACUUM`。
+- `debugMode` 终态 match 仅保留最近 20 局。服务启动和调试对局进入终态时清理。
+- `running` / `waiting` match 若 `updated_at` 超过 7 天未变化，服务启动时立即清理，
+  并在持续运行期间每 24 小时再次清理；刚好 7 天的 match 保留。
+- 两类清理都硬删除 `matches` 并依赖外键级联，不会在在线服务中自动执行阻塞式
+  `VACUUM`。
 - 狼人杀调试模式只跳过真实模型与语音依赖，不跳过玩法分支。禁言长老、骑士、
   花蝴蝶、潜行者、狼美人、噩梦之影、摄梦人、魔术师等特殊技能，以及白狼王自爆，会按调试
   随机概率决定是否发动，结果继续进入原有 reducer、死亡链和播放管线。

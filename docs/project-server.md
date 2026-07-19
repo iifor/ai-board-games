@@ -209,6 +209,10 @@ Workflow 快照使用 `match_snapshots.last_event_seq` 记录事件水位，恢�
 状态和恢复校验来源。快照按 match 保留最近 3 个；调试终态 match 自动保留最近
 20 局并依赖外键级联清理关联 workflow 数据。
 
+`running` / `waiting` match 若连续超过 7 天未更新，服务会在启动时及此后每 24 小时
+执行硬删除，并依赖外键级联清理关联 workflow 数据。该清理释放的 SQLite 页面可被
+后续写入复用；在线服务不执行阻塞式 `VACUUM`，物理缩小数据库文件需在停服维护窗口完成。
+
 调试 workflow 的持久化耗时直接输出结构化服务端日志，不写入 observability 或
 workflow 表，避免性能测量再次产生数据库写入放大。超过 500ms 的记录使用 warning。
 
