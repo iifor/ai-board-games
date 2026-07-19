@@ -1,11 +1,11 @@
 import { getDb } from '../../db';
 import { parseJson } from './utils';
 
-interface TerminalDebugMatch {
+interface RetentionMatch {
   id: string;
 }
 
-function listTerminalDebugMatches(): TerminalDebugMatch[] {
+function listTerminalDebugMatches(): RetentionMatch[] {
   const rows = getDb().prepare(`
     SELECT id, config_json, created_at FROM matches
     WHERE status IN ('completed', 'failed', 'paused_debug')
@@ -14,6 +14,15 @@ function listTerminalDebugMatches(): TerminalDebugMatch[] {
   return rows
     .filter((row) => Boolean(parseJson<Record<string, unknown>>(row.config_json, {}).debugMode))
     .map((row) => ({ id: row.id }));
+}
+
+function listStaleActiveMatches(cutoffIso: string): RetentionMatch[] {
+  return getDb().prepare(`
+    SELECT id FROM matches
+    WHERE status IN ('running', 'waiting')
+      AND updated_at < ?
+    ORDER BY updated_at ASC, id ASC
+  `).all(cutoffIso) as RetentionMatch[];
 }
 
 function deleteMatchCascade(matchId: string): boolean {
@@ -53,5 +62,10 @@ function getMatchLogicalBytes(matchId: string): number {
   }, 0);
 }
 
-export { listTerminalDebugMatches, deleteMatchCascade, getMatchLogicalBytes };
-export type { TerminalDebugMatch };
+export {
+  listTerminalDebugMatches,
+  listStaleActiveMatches,
+  deleteMatchCascade,
+  getMatchLogicalBytes,
+};
+export type { RetentionMatch };
