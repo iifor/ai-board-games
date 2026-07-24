@@ -4,6 +4,10 @@ import { BasePlayerAgent } from '../../packages/server/modules/agent-core/player
 import { getGameEngine, resetGameEngine } from '../../packages/server/modules/engine-registry';
 import { resolveGameRunner } from '../../packages/server/modules/game-socket/gameRunner';
 import { runSession, selectPlayersForGame } from '../../packages/server/modules/game-socket/service';
+import {
+  normalizeGameType,
+  validatePlayerSelection,
+} from '../../packages/server/routes/gameRoutes';
 
 test('registered undercover resolves through generic runtime metadata', () => {
   resetGameEngine();
@@ -19,6 +23,24 @@ test('unknown games fail instead of falling back to werewolf', () => {
   resetGameEngine();
 
   assert.throws(() => resolveGameRunner('not-a-game'), /GameDefinition not registered/);
+});
+
+test('public validation accepts every registered game definition', () => {
+  assert.equal(normalizeGameType('debate'), 'debate');
+  assert.equal(normalizeGameType('werewolf'), 'werewolf');
+  assert.equal(normalizeGameType('undercover'), 'undercover');
+  assert.throws(() => normalizeGameType('unknown-game'), /未知游戏类型/);
+});
+
+test('public player selection uses definition metadata', () => {
+  const ids = (count: number) => Array.from({ length: count }, (_, index) => index + 1);
+
+  assert.doesNotThrow(() => validatePlayerSelection('debate', ids(8)));
+  assert.throws(() => validatePlayerSelection('debate', ids(7)), /8-12/);
+  assert.doesNotThrow(() => validatePlayerSelection('werewolf', ids(12)));
+  assert.throws(() => validatePlayerSelection('werewolf', ids(11)), /12/);
+  assert.doesNotThrow(() => validatePlayerSelection('undercover', ids(6)));
+  assert.throws(() => validatePlayerSelection('undercover', ids(5)), /6/);
 });
 
 test('registered player selection metadata validates undercover without a game branch', () => {

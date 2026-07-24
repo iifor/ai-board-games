@@ -42,17 +42,4 @@ function rowToGameSummary(row: GameRow | null | undefined): GameSummary | null {
   };
 }
 
-function normalizeGameType(value: unknown): string {
-  const text = String(value || '').toLowerCase();
-  if (text.includes('debate')) return 'debate';
-  if (text.includes('werewolf')) return 'werewolf';
-  return 'werewolf';
-}
-
-function getGameTypeName(gameType: string): string {
-  if (gameType === 'debate') return 'AI 辩论赛';
-  if (gameType === 'werewolf') return 'AI 狼人杀';
-  return 'AI 狼人杀';
-}
-
-export { parseJson, toJson, rowToGame, rowToGameSummary, normalizeGameType, getGameTypeName };
+export { parseJson, toJson, rowToGame, rowToGameSummary };

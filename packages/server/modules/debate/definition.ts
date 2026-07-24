@@ -36,6 +36,11 @@ function createDebateGameDefinition(): GameDefinition {
       session: {
         startMessage: '辩论赛开始',
         doneMessage: '辩论赛结束，完整赛果已生成。',
+        playerSelection: {
+          min: 8,
+          max: 12,
+          errorMessage: 'AI 辩论赛需要选择 8-12 位 AI 玩家。',
+        },
         playback: { phaseLookahead: 1 },
       },
     },

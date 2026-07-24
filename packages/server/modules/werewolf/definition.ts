@@ -88,6 +88,11 @@ function createWerewolfGameDefinition(): GameDefinition {
       session: {
         startMessage: '游戏开始',
         doneMessage: '狼人杀结束，完整战报已生成。',
+        playerSelection: {
+          min: 12,
+          max: 12,
+          errorMessage: 'AI 狼人杀需要选择恰好 12 位 AI 玩家。',
+        },
         playback: { prefetchCount: 2 },
       },
     },

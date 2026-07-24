@@ -323,6 +323,9 @@ Shadow audit 接入方式：
 
 ## WebSocket 协议与数据流
 
+- 客户端入站消息仅接受 `start`、`ack`、`control`、`randomize-teams` 四类结构；未知字段或非法载荷返回 `INVALID_MESSAGE`。
+- WebSocket 单条消息限制为 64 KiB。`start` 保留现有客户端兼容字段，不改变公开消息结构。
+
 ### 狼人杀统一播放事件管线
 
 狼人杀实时播放和新对局回放共用

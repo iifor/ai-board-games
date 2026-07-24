@@ -32,4 +32,10 @@ function getDatabasePath(): string {
   return (connection as JsonDb)?.isJsonFallback ? fallbackPath : databasePath;
 }
 
-export { getDb, getDatabasePath };
+function closeDb(): void {
+  const activeConnection = connection as (Database | JsonDb) & { close?: () => void } | null;
+  activeConnection?.close?.();
+  connection = null;
+}
+
+export { getDb, getDatabasePath, closeDb };

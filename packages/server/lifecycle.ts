@@ -11,6 +11,7 @@ interface GracefulShutdownOptions {
   exit?: (code: number) => void;
   setTimer?: (callback: () => void, timeoutMs: number) => TimerHandle;
   clearTimer?: (timer: TimerHandle) => void;
+  cleanup?: () => Promise<void> | void;
 }
 
 function createGracefulShutdownHandler(
@@ -37,7 +38,13 @@ function createGracefulShutdownHandler(
     };
     timer = setTimer(() => finish(1), timeoutMs);
     timer.unref?.();
-    server.close((error) => finish(error ? 1 : 0));
+    void Promise.resolve()
+      .then(() => options.cleanup?.())
+      .then(() => server.close((error) => finish(error ? 1 : 0)))
+      .catch((error: unknown) => {
+        console.error('[lifecycle] graceful shutdown failed:', (error as Error).message);
+        finish(1);
+      });
   };
 }
 

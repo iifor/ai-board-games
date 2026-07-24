@@ -2,14 +2,22 @@ import http from 'http';
 import { createApp } from './app';
 import { getAiConfig } from './config';
 import { attachGameSocket } from './modules/game-socket';
+import { closeDb } from './db';
+import { shutdownObservability } from './modules/observability';
 import { createGracefulShutdownHandler } from './lifecycle';
 
 const port = Number(process.env.API_PORT || (process.env.NODE_ENV === 'production' ? process.env.PORT : undefined) || 3001);
 const app = createApp();
 const server = http.createServer(app);
 
-attachGameSocket(server);
-const shutdown = createGracefulShutdownHandler(server);
+const gameSocket = attachGameSocket(server);
+const shutdown = createGracefulShutdownHandler(server, {
+  cleanup: async () => {
+    await gameSocket.close();
+    await shutdownObservability();
+    closeDb();
+  },
+});
 process.once('SIGTERM', () => shutdown('SIGTERM'));
 process.once('SIGINT', () => shutdown('SIGINT'));
 

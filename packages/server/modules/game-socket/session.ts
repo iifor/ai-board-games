@@ -1,7 +1,50 @@
 import WebSocket from 'ws';
+import { z } from 'zod';
 
 const SPEECH_ACK_TIMEOUT_MS = 120000;
 const DEFAULT_ACK_TIMEOUT_MS = 15000;
+
+const playerIdSchema = z.union([
+  z.number().int().positive(),
+  z.string().max(64).regex(/^\d+$/),
+]);
+const recordSchema = z.record(z.string(), z.unknown());
+const playerIdListSchema = z.array(playerIdSchema).max(100);
+const debateTeamsSchema = z.object({
+  proIds: playerIdListSchema.optional(),
+  conIds: playerIdListSchema.optional(),
+  judgeIds: playerIdListSchema.optional(),
+}).passthrough();
+const sessionMessageSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('start'),
+    mode: z.string().max(16).optional(),
+    playerIds: playerIdListSchema.optional(),
+    gameType: z.string().min(1).max(64).optional(),
+    hostId: playerIdSchema.optional(),
+    topic: recordSchema.nullable().optional(),
+    debateTeams: debateTeamsSchema.nullable().optional(),
+    werewolfMode: z.union([z.string().max(64), recordSchema]).optional(),
+    replayGameId: z.string().min(1).max(128).optional(),
+    clientViewMode: z.string().max(32).optional(),
+    debugMode: z.boolean().optional(),
+    replayView: z.union([recordSchema, z.boolean()]).optional(),
+  }).strict(),
+  z.object({
+    type: z.literal('ack'),
+    ackId: z.union([z.number().finite(), z.string().min(1).max(64)]),
+  }).strict(),
+  z.object({
+    type: z.literal('control'),
+    action: z.enum(['pause', 'resume', 'skip-phase']),
+  }).strict(),
+  z.object({
+    type: z.literal('randomize-teams'),
+    playerIds: playerIdListSchema.optional(),
+  }).strict(),
+]);
+
+type SessionMessage = z.infer<typeof sessionMessageSchema>;
 
 interface SessionCancelledError extends Error {
   code: string;
@@ -195,9 +238,10 @@ function isSessionCancelled(error: unknown): boolean {
   return err?.code === 'GAME_SESSION_CANCELLED' || err?.message === 'game-session-cancelled';
 }
 
-function parseMessage(raw: unknown): Record<string, unknown> | null {
+function parseMessage(raw: unknown): SessionMessage | null {
   try {
-    return JSON.parse(String(raw));
+    const result = sessionMessageSchema.safeParse(JSON.parse(String(raw)));
+    return result.success ? result.data : null;
   } catch {
     return null;
   }
@@ -212,4 +256,4 @@ export {
   parseMessage,
   SPEECH_ACK_TIMEOUT_MS,
 };
-export type { GameSession, SessionEvent };
+export type { GameSession, SessionEvent, SessionMessage };

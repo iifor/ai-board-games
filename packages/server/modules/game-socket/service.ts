@@ -30,6 +30,8 @@ import type { SaveGameInput } from '../games';
 
 // --- Interfaces ---
 
+const GAME_SOCKET_MAX_PAYLOAD_BYTES = 64 * 1024;
+
 interface AiConfigHost {
   id?: number;
   name?: string;
@@ -95,23 +97,6 @@ interface DebateTeams {
   [key: string]: unknown;
 }
 
-interface SessionMessage {
-  type?: string;
-  mode?: string;
-  playerIds?: (number | string)[];
-  gameType?: string;
-  topic?: Record<string, unknown>;
-  debateTeams?: DebateTeams;
-  werewolfMode?: string | Record<string, unknown>;
-  replayGameId?: string;
-  clientViewMode?: string;
-  debugMode?: boolean;
-  replayView?: Record<string, unknown>;
-  ackId?: number | string;
-  action?: string;
-  [key: string]: unknown;
-}
-
 interface RunSessionOptions {
   topic?: Record<string, unknown>;
   debateTeams?: DebateTeams;
@@ -133,17 +118,32 @@ interface GameRecord {
   [key: string]: unknown;
 }
 
+interface GameSocketHandle {
+  close: () => Promise<void>;
+}
+
 // --- Socket attachment ---
 
-function attachGameSocket(server: import('http').Server): void {
-  const wss = new WebSocketServer({ server, path: '/api/toc/ws/game' });
+function attachGameSocket(server: import('http').Server): GameSocketHandle {
+  const wss = new WebSocketServer({
+    server,
+    path: '/api/toc/ws/game',
+    maxPayload: GAME_SOCKET_MAX_PAYLOAD_BYTES,
+  });
 
   wss.on('connection', (socket: WebSocket) => {
     const session = createSession(socket);
 
     socket.on('message', async (raw: Buffer | string) => {
-      const message = parseMessage(raw) as SessionMessage | null;
-      if (!message) return;
+      const message = parseMessage(raw);
+      if (!message) {
+        session.send({
+          type: 'error',
+          code: 'INVALID_MESSAGE',
+          message: '无效的游戏指令。',
+        });
+        return;
+      }
 
       if (message.type === 'randomize-teams') {
         handleRandomizeTeams(session, message.playerIds);
@@ -161,13 +161,13 @@ function attachGameSocket(server: import('http').Server): void {
           message.playerIds,
           message.gameType,
           {
-            topic: message.topic,
-            debateTeams: message.debateTeams,
+            topic: message.topic || undefined,
+            debateTeams: message.debateTeams || undefined,
             werewolfMode: message.werewolfMode,
             replayGameId: message.replayGameId,
             clientViewMode: message.clientViewMode,
             debugMode: message.debugMode,
-            replayView: message.replayView,
+            replayView: typeof message.replayView === 'object' ? message.replayView : undefined,
           },
         )).catch((error: unknown) => {
           if (isSessionCancelled(error)) return;
@@ -177,7 +177,7 @@ function attachGameSocket(server: import('http').Server): void {
       }
 
       if (message.type === 'ack') {
-        session.resolveAck(message.ackId!);
+        session.resolveAck(message.ackId);
       }
 
       if (message.type === 'control') {
@@ -186,6 +186,16 @@ function attachGameSocket(server: import('http').Server): void {
       }
     });
   });
+
+  return {
+    close: () => new Promise<void>((resolve, reject) => {
+      for (const client of wss.clients) client.terminate();
+      wss.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    }),
+  };
 }
 
 // --- Session runner ---
@@ -632,3 +642,4 @@ export {
   getSavedPlayerIds,
   handleRandomizeTeams,
 };
+export type { GameSocketHandle };

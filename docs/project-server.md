@@ -86,6 +86,7 @@ API 分为两类：
 WebSocket：
 
 - `/api/toc/ws/game`
+- 入站消息使用按 `type` 区分的 Zod schema 校验；单条消息最大 64 KiB，无效消息返回 `INVALID_MESSAGE`。
 
 统一响应结构来自 `responseFormatter` 和共享类型：
 
@@ -180,6 +181,7 @@ C 端 REST 路由挂载到 `/api/toc`，主要能力包括：
 - `effect`：`EffectQueue` 和 `EffectResolutionService`，负责 `Action -> Effect -> Event -> State` 链路。
 - `channel`：统一校验 DomainEvent 可见性通道。
 - `state`：`MatchStateStore` 接口和 SQLite adapter，隔离 core 与数据库实现。
+- C 端公开游戏类型和玩家数量校验统一读取已注册 `GameDefinition.session.playerSelection`，路由不再维护重复白名单。
 
 当前阶段复用既有工作流表，不新增数据库表。`SqliteMatchStateStore` 通过现有 `matches.state_json` 保存投影后的 match state，通过 `workflow_effects` 和 `workflow_events` 保存 effect/event。
 
@@ -266,7 +268,7 @@ pnpm run check:server
 - 最终 runtime 镜像包含 TypeScript 运行器及 `packages/shared/dist`，CI 必须构建最终镜像而不是只构建 builder stage。
 - `consensus-data` volume 挂载到 `/app/data`，保存 SQLite 数据库。
 - `consensus-resources` volume 挂载到 `/app/packages/server/resources`，保存上传图片和生成语音。
-- 收到 `SIGTERM` 或 `SIGINT` 后停止接收新连接；10 秒内无法关闭时以非零状态强制退出。
+- 收到 `SIGTERM` 或 `SIGINT` 后依次关闭 WebSocket、OpenTelemetry、数据库和 HTTP server；10 秒内无法关闭或清理失败时以非零状态退出。
 
 腾讯云入口：
 

@@ -143,13 +143,7 @@ class SqliteSpanExporter implements SpanExporter {
   }
 
   shutdown(): Promise<void> {
-    return new Promise<void>((resolve) => {
-      if (tracerProvider) {
-        tracerProvider.shutdown().then(resolve).catch(resolve);
-      } else {
-        resolve();
-      }
-    });
+    return Promise.resolve();
   }
 
   forceFlush(): Promise<void> {
@@ -508,6 +502,13 @@ function getTracerProvider(): BasicTracerProvider | null {
   return tracerProvider;
 }
 
+async function shutdownObservability(): Promise<void> {
+  const provider = tracerProvider;
+  tracerProvider = null;
+  otelTracer = null;
+  if (provider) await provider.shutdown();
+}
+
 export type {
   TraceContext,
   LlmRecordInput,
@@ -535,6 +536,7 @@ export {
   markTraceError,
   markTraceComplete,
   ensureOtel,
+  shutdownObservability,
   getTracerProvider,
   runWithTraceContext,
   getCurrentTraceContext,

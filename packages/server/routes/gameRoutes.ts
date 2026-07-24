@@ -9,6 +9,7 @@ import { listWerewolfModes } from '../modules/werewolf-config';
 import { isServerTtsVoice, synthesizeVoiceMedia, synthesizeVoicePreview } from '../modules/tts';
 import { AppError, ErrorCodes } from '../utils/errors';
 import { getSpectatorMode } from '../modules/settings/service';
+import { getGameEngine } from '../modules/engine-registry';
 
 const router = express.Router();
 
@@ -267,8 +268,16 @@ function getPlayerSelections(): Record<string, number[]> {
 }
 
 function normalizeGameType(value: string): string {
-  if (['debate', 'werewolf'].includes(value)) return value;
-  throw new Error(`未知游戏类型：${value}`);
+  const gameType = value.trim().toLowerCase();
+  const definition = getGameEngine().getDefinition(gameType);
+  if (!definition) {
+    throw new AppError(
+      ErrorCodes.VALIDATION_ERROR,
+      `未知游戏类型：${value}`,
+      400,
+    );
+  }
+  return definition.gameType;
 }
 
 function normalizePlayerIds(value: unknown): number[] {
@@ -277,12 +286,18 @@ function normalizePlayerIds(value: unknown): number[] {
 }
 
 function validatePlayerSelection(gameType: string, playerIds: number[]): void {
-  if (gameType === 'debate') {
-    if (playerIds.length < 8 || playerIds.length > 12) throw new Error('AI 辩论赛需要选择 8-12 位 AI 玩家。');
-    return;
-  }
-  if (gameType === 'werewolf' && playerIds.length !== 12) {
-    throw new Error('AI 狼人杀需要选择恰好 12 位 AI 玩家。');
+  const selection = getGameEngine()
+    .getDefinition(gameType)
+    ?.metadata?.session?.playerSelection;
+  if (
+    selection
+    && (playerIds.length < selection.min || playerIds.length > selection.max)
+  ) {
+    throw new AppError(
+      ErrorCodes.VALIDATION_ERROR,
+      selection.errorMessage,
+      400,
+    );
   }
 }
 
@@ -295,3 +310,4 @@ function safeParseJson<T>(value: string, fallback: T): T {
 }
 
 export default router;
+export { normalizeGameType, validatePlayerSelection };

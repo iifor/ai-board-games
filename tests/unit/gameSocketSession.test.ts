@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { createSession, isSpeechWaitPayload } from '../../packages/server/modules/game-socket/session';
+import { createSession, isSpeechWaitPayload, parseMessage } from '../../packages/server/modules/game-socket/session';
 import { createPreparedSender, isImmediateEvent, isRuleIntroEvent } from '../../packages/server/modules/game-socket/sender';
 import { replayGameSession } from '../../packages/server/modules/game-socket/replay';
 import {
@@ -74,6 +74,54 @@ test('GameSession treats rule intro as long playback wait payload', () => {
     type: 'workflow-event',
     workflowEvent: 'action-requested',
   }), false);
+});
+
+test('parseMessage accepts supported game commands', () => {
+  assert.deepEqual(parseMessage(JSON.stringify({
+    type: 'start',
+    gameType: 'undercover',
+    playerIds: [1, '2'],
+    debugMode: false,
+  })), {
+    type: 'start',
+    gameType: 'undercover',
+    playerIds: [1, '2'],
+    debugMode: false,
+  });
+  assert.deepEqual(parseMessage('{"type":"ack","ackId":1}'), {
+    type: 'ack',
+    ackId: 1,
+  });
+  assert.deepEqual(parseMessage('{"type":"control","action":"skip-phase"}'), {
+    type: 'control',
+    action: 'skip-phase',
+  });
+});
+
+test('parseMessage preserves the existing client start payload', () => {
+  const payload = {
+    type: 'start',
+    mode: 'real',
+    gameType: 'werewolf',
+    playerIds: [1, 2],
+    hostId: 3,
+    topic: null,
+    debateTeams: null,
+    replayView: false,
+  };
+
+  assert.deepEqual(parseMessage(JSON.stringify(payload)), payload);
+});
+
+test('parseMessage rejects malformed and unknown commands', () => {
+  assert.equal(parseMessage('{'), null);
+  assert.equal(parseMessage('{"type":"unknown"}'), null);
+  assert.equal(parseMessage('{"type":"ack"}'), null);
+  assert.equal(parseMessage('{"type":"control","action":"restart"}'), null);
+  assert.equal(parseMessage(JSON.stringify({
+    type: 'start',
+    playerIds: Array.from({ length: 101 }, (_, index) => index + 1),
+  })), null);
 });
 
 test('PreparedSender sends display events one at a time behind ack', async () => {

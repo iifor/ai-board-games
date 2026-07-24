@@ -87,7 +87,7 @@ tests/
 `packages/shared/types/gameEngine.ts` 是 `packages/server/modules/game-engine` 的共享 contract：
 
 - `GameDefinition`：游戏接入点，声明 `gameType`、`version`、`workflowId`、action schema、effect resolver、channel policy 和可选 `projectState`。
-- `GameRuntime` / `GameSessionMetadata`：definition 驱动的新游戏接入点，声明 match 创建/运行、开场结束文案、玩家数量约束和播放预取参数；谁是卧底使用该通用扩展点，辩论赛与狼人杀继续由两个兼容 runner 承接。
+- `GameRuntime` / `GameSessionMetadata`：definition 驱动的新游戏接入点，声明 match 创建/运行、开场结束文案、玩家数量约束和播放预取参数；公开游戏路由直接读取注册 definition 的 `session.playerSelection`，谁是卧底使用通用 runtime，辩论赛与狼人杀继续由两个兼容 runner 承接。
 - `DomainAction`：玩家或 AI 在 ActionWindow 内提交的结构化动作，不直接修改状态。
 - `WorkflowEffect`：由 action 派生的待结算效果，必须由 resolver 统一处理。
 - `DomainEvent`：唯一事实事件，必须带 `channel`，`scope` 事件必须带 `scopeKey`。
