@@ -105,7 +105,7 @@ function createActionWindowHandler() {
         }
       }
       const actors = getActorsForStep(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, round as unknown as ReducerRound);
-      if (!actors.length) return skipAction(match, step, runtime);
+      if (!actors.length) return skipAction(match, step, runtime, { systemOnly: true });
 
       if (!hasOpenWork(match.id, step.id, step.config.actionType)) {
         return openActionWindow({ match, step, state, runtime, round, actors });

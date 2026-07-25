@@ -130,6 +130,11 @@ export function resolveWerewolfInteraction(event: EventLike | null | undefined):
   };
 }
 
+export function shouldProjectWerewolfInteraction(event: EventLike | null | undefined): boolean {
+  const interaction = resolveWerewolfInteraction(event);
+  return interaction.status !== 'skipped' && Boolean(ACTION_META[interaction.action]);
+}
+
 export function getWerewolfInteractionVisualKind(action: string): WerewolfInteractionVisualKind {
   const normalized = normalize(action);
   if (!normalized) return 'none';
@@ -248,7 +253,7 @@ function resolveTargets(event: EventLike): number[] {
     shot?.target, seer?.target, guard?.target, witch?.target, exile?.id, duel?.targetId,
     fortune?.target, crow?.target, demon?.target, swap?.firstTarget, swap?.secondTarget,
   ]);
-  return targets.length ? targets : ids(event.actionWindow?.targetIds);
+  return targets;
 }
 
 function ids(values: unknown): number[] {

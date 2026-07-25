@@ -235,6 +235,7 @@ flowchart TD
 - 解药已使用或平安夜时，解药 step 直接完成，不创建 action window，也不产生 C 端唤醒、结果或跳过展示。
 - `witch_poison` 只依赖女巫存活、毒药未使用及 `onePotionPerNight` 限制，不因解药耗尽而失效，且其提示不得携带 `wolfTarget`。
 - 两瓶药均耗尽或女巫已出局时，两个固定 workflow step 都静默跳过；跳过原因只写入 `channel: system` 的审计事件。
+- 当前板子没有对应行动角色时，固定 workflow step 同样只生成 `channel: system` 的跳过审计事件，不进入实时播放或历史回放。
 - `EventDeliverySubscriber` 不向实时播放回调交付 system channel，确保内部跳过和审计不会进入精确回放事件。
 
 夜间死亡结算已新增旁路 resolver：

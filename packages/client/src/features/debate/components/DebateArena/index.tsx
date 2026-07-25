@@ -3,6 +3,7 @@ import { DebateSide } from '../DebateSide';
 import { DebateSeat } from '../DebateSeat';
 import { DebatePhaseTimeline } from '../DebatePhaseTimeline';
 import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
+import { PlayerPosterSpotlight } from '../../../../components/PlayerPosterSpotlight';
 import { getDebatePhaseSteps, getActiveStageIndex, getStageTitle, getDebatePlayerLabel, getMvpVoteTargetMap } from '../../utils';
 import './index.css';
 import type { GameState, SpeechState, Player, DebatePhase } from '../../../../types';
@@ -16,9 +17,10 @@ interface DebateArenaProps {
   subtitleSpeech?: SpeechState | null;
   onPlayerSelect: (player: Player) => void;
   isIdle: boolean;
+  showPlayerPoster?: boolean;
 }
 
-export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subtitleSpeech, onPlayerSelect, isIdle }: DebateArenaProps) {
+export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessage, subtitleSpeech, onPlayerSelect, isIdle, showPlayerPoster = false }: DebateArenaProps) {
   const proPlayers = useMemo(() => (game.players || []).filter((player) => player.side === 'pro'), [game.players]);
   const conPlayers = useMemo(() => (game.players || []).filter((player) => player.side === 'con'), [game.players]);
   const judges = useMemo(() => (game.players || []).filter((player) => player.side === 'judge'), [game.players]);
@@ -26,8 +28,14 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
   const phaseSteps = useMemo(() => getDebatePhaseSteps(game.phases, currentPhase), [game.phases, currentPhase]);
   const activeStepIndex = getActiveStageIndex(currentPhase, phaseSteps);
   const currentTitle = isIdle ? '等待开局' : getStageTitle(currentPhase);
+  const currentSpeaker = currentSpeakerId
+    ? (game.players || []).find((player) => Number(player.id) === Number(currentSpeakerId)) || null
+    : null;
   return (
     <section className="debate-arena" aria-label="辩论赛竞技场">
+      {showPlayerPoster && currentSpeaker && (
+        <PlayerPosterSpotlight key={currentSpeaker.id} player={currentSpeaker} />
+      )}
       <DebateSide
         title="正方"
         position={game.topic?.proPosition}

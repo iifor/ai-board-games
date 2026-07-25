@@ -34,6 +34,7 @@ export function App() {
           playerIds={selectedPlayerIds}
           replayGameId={replayGameId}
           onReturnToSelect={openSelectPage}
+          variant={route.version === 'v2' ? 'v2' : 'classic'}
         />
       );
     }

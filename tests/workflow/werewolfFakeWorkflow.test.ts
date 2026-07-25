@@ -31,6 +31,22 @@ test('initial werewolf state normalizes selected database ids to seat numbers', 
   assert.equal(state.players?.[10].sourcePlayerId, 14);
 });
 
+test('absent role action skips stay system-only', () => {
+  const state = createState();
+  const match = { id: 'm-absent-role', config: { players: state.players }, createdAt: 'now' };
+  const step = {
+    id: 'ghost_bride_link_1',
+    type: 'werewolf.action_window',
+    config: { day: 1, phase: 'night', actionType: 'ghost_bride_link', optional: true },
+  };
+
+  const result = createActionWindowHandler().execute({ match, step, state } as never);
+
+  assert.equal(result.status, 'COMPLETED');
+  assert.equal(result.events?.[0].channel, 'system');
+  assert.equal(result.events?.[0].visibility, 'system');
+});
+
 test('fake werewolf action window opens, completes, and night resolve emits effects', () => {
   const original = snapshotRepo(repo);
   const tasks: Array<Record<string, unknown>> = [];

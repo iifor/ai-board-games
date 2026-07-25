@@ -280,6 +280,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
         subtitleSpeech={subtitleSpeech}
         onPlayerSelect={setSelectedPlayer}
         isIdle={status === 'idle' || !displayGame.phases?.length}
+        showPlayerPoster={variant === 'v2'}
       />
 
       <ThinkingModal visible={Boolean(activeThinking)} player={activeThinking?.player} thinking={activeThinking?.thinking || ''} />

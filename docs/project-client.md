@@ -150,8 +150,8 @@ packages/client/
 
 - `UndercoverGame`：`standard-6` 实时与历史回放共用的单页容器，只组合控制区、公开竞技场和错误状态；游戏选择页和开局前再次校验恰好 6 个唯一玩家 ID。
 - `useUndercoverGame`：消费通用 WebSocket session、语音队列和 ACK；仅保存服务端公开状态，票型事件只归一化轮次、加赛、汇总计数、平票候选和淘汰玩家，逐人投票始终归一为空对象；开局复用导航 sessionStorage 中已选择的 6 个玩家 ID。
-- `UndercoverArena`：展示六个席位、轮次发言、汇总票型、平票/加赛状态和淘汰玩家；仅当状态为 `completed` 且存在 `reveal` 时展示词语和卧底身份。
-- `UndercoverControls`：复用开始、暂停/继续、独立语音开关和回放跳过控制语义，不增加新 WebSocket 消息。
+- `UndercoverArena`：经典页面保持当前布局；v2 使用 16:9 环形观战舞台，六席位在所有阶段保持固定坐标，发言阶段只显示一个中央人物海报和一处姓名/状态，下三分之一承载字幕与下一位提示。准备、投票和终局复用中央区域，并且只展示服务端公开状态。
+- `UndercoverControls`：使用底部悬浮控制条复用开始、暂停/继续、独立语音开关和回放跳过控制语义，不增加新 WebSocket 消息；实时 AI 对局不提供人工投票或跳阶段能力。
 - C 端不接收或推导词对、玩家私词、卧底身份、合法投票目标、胜负或淘汰规则；终局前即使收到异常 secret 字段也会清除，只有 completed 结果保留 `reveal`。
 - 首版不增加谁是卧底后台管理页、词库/人数/轮数配置、真人行动、MVP 或独立复盘 UI；需求确认后再扩展 shared 公共契约和 feature。
 
@@ -229,6 +229,14 @@ pnpm --filter @ai-presenter/client run check
 - `features/debate-v2`、`features/werewolf-v2` 只负责 v2 展示入口和 scoped 样式，复用现有 `features/debate`、`features/werewolf` 游戏容器、WebSocket、语音、字幕、弹窗、服务请求和工具函数。
 - `components/GameBroadcastHud` 供辩论 v2 等赛事页复用；狼人杀 v2 使用视角内的阶段标题，避免与双视角舞台重复。`styles/game-theme.css` 是 v2 共用视觉 token 入口。
 - v2 皮肤样式必须限定在 `.debate-shell--v2`、`.werewolf-shell--v2` 或 v2 模块 CSS 中，避免污染旧 `/games/*` 路由。
+
+### v2 玩家发言海报
+
+- `components/PlayerPosterSpotlight` 是辩论、狼人杀、谁是卧底三种 v2 舞台共用的纯展示组件；只有当前公开发言事件能够匹配现有玩家时才出现，v1 路由不启用。
+- 海报按标准化后的玩家昵称映射到 `/player-posters/*.webp`，图片加载失败时依次降级为玩家头像和姓名标签；组件不推导发言顺序、身份或游戏规则。
+- 海报层位于舞台背景之上、席位与字幕等业务 UI 之下，不拦截操作；减少动态效果偏好下关闭过渡动画。
+- 谁是卧底 v2 通过 `.undercover-stage--v2` 限定海报、环形席位和字幕覆盖；共享 `PlayerPosterSpotlight` 的默认标签仅在该舞台隐藏，辩论和狼人杀 v2 不受影响。
+- 该能力只消费现有前端玩家和公开发言状态，不新增 REST API、WebSocket 消息、TTS/ACK 队列或 shared 协议字段。
 
 ## Werewolf v2 专用 Arena 边界
 
@@ -384,3 +392,12 @@ pnpm --filter @ai-presenter/client run check
 - Added role labels/icons for `wolf_witch` and `illusionist`.
 - Added event labels and event-state merging for `wolf-witch-curse` and `illusionist-illusion`.
 - Night badges now show the Wolf Witch curse target and Illusionist illusion target on the acting player's panel when the matching night event is active.
+
+## Werewolf v2 foreground projection
+
+- The foreground interaction stage retains the latest recognized gameplay action. Technical synchronization, phase narration, ACK and unknown workflow events update state without replacing the foreground card.
+- `werewolf_action_skipped` never replaces the foreground interaction. This also protects historical replays that already contain skipped events for roles absent from the selected board.
+- A day/night phase change clears the retained interaction before the next recognized action, so a night skill card cannot leak into the daytime stage or vice versa.
+- The bottom speech bar and player poster are reserved for speech attributed to a real player. Host and system narration continue through the existing playback/stream message path without creating transient foreground panels.
+- `actionWindow.targetIds` is an eligibility set, not a resolved selection. The foreground target relation and seat target badges render only explicit submitted or resolved target fields from display events.
+- This is a client presentation rule only. WebSocket events, ACK timing, replay payloads and server-authoritative game state are unchanged.

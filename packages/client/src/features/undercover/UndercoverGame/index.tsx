@@ -6,10 +6,11 @@ import './index.css';
 interface UndercoverGameProps {
   playerIds?: number[];
   replayGameId?: string;
+  variant?: 'classic' | 'v2';
   onReturnToSelect: () => void;
 }
 
-export function UndercoverGame({ playerIds = [], replayGameId = '', onReturnToSelect }: UndercoverGameProps) {
+export function UndercoverGame({ playerIds = [], replayGameId = '', variant = 'classic', onReturnToSelect }: UndercoverGameProps) {
   const controller = useUndercoverGame({ playerIds, replayGameId });
 
   function returnToSelect(): void {
@@ -18,14 +19,19 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', onReturnToSe
   }
 
   return (
-    <main className="undercover-shell">
-      <header className="undercover-heading">
-        <p>AI Social Deduction</p>
-        <h1>AI 谁是卧底</h1>
-        <span aria-live="polite">{controller.message}</span>
-      </header>
+    <main className={variant === 'v2' ? 'undercover-shell undercover-shell--v2' : 'undercover-shell'}>
+      {(variant === 'classic' || !controller.game) && (
+        <header className="undercover-heading">
+          <p>AI Social Deduction</p>
+          <h1>AI 谁是卧底</h1>
+          <span aria-live="polite">{controller.message}</span>
+        </header>
+      )}
+
+      {variant === 'v2' && controller.game && <p className="undercover-status" aria-live="polite">{controller.message}</p>}
 
       <UndercoverControls
+        variant={variant}
         autoPlay={controller.autoPlay}
         speechEnabled={controller.speechEnabled}
         started={controller.started}
@@ -38,7 +44,7 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', onReturnToSe
       />
 
       {controller.game ? (
-        <UndercoverArena game={controller.game} />
+        <UndercoverArena game={controller.game} showPlayerPoster={variant === 'v2'} />
       ) : (
         <section className="undercover-empty" aria-label="等待开局">
           <h2>{replayGameId ? '正在载入回放' : '六人推理局'}</h2>

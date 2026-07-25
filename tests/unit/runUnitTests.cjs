@@ -48,6 +48,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   ,'undercoverVisibility.test.ts'
   ,'undercoverGameRunner.test.ts'
   ,'undercoverClient.test.ts'
+  ,'playerPosterSpotlight.test.ts'
   ,'werewolfDefaultConfig.test.ts'
   ,'edgeTts.test.ts'
 ]).map((file) => path.join(__dirname, file));

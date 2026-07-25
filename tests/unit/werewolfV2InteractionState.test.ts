@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getWerewolfInteractionAnimationKey, getWerewolfInteractionStatusText, getWerewolfInteractionVisualKind, resolveNightAwakeLabel, resolveWerewolfActiveSubtitle, resolveWerewolfInteraction, resolveWerewolfSpeechSpeaker, shouldShowWerewolfStageDetails } from '../../packages/client/src/features/werewolf-v2/utils/interactionState';
+import { getWerewolfInteractionAnimationKey, getWerewolfInteractionStatusText, getWerewolfInteractionVisualKind, resolveNightAwakeLabel, resolveWerewolfActiveSubtitle, resolveWerewolfInteraction, resolveWerewolfSpeechSpeaker, shouldProjectWerewolfInteraction, shouldShowWerewolfStageDetails } from '../../packages/client/src/features/werewolf-v2/utils/interactionState';
 
 test('werewolf v2 maps core actions to distinct role visuals', () => {
   assert.equal(getWerewolfInteractionVisualKind('wolf_vote'), 'wolf');
@@ -92,6 +92,26 @@ test('werewolf v2 does not restart the stage animation for transient updates in 
   assert.equal(getWerewolfInteractionAnimationKey(acting), getWerewolfInteractionAnimationKey(resolved));
 });
 
+test('werewolf v2 keeps technical and narration-only events out of the foreground stage', () => {
+  assert.equal(shouldProjectWerewolfInteraction({ type: 'workflow-state', message: 'state synchronized' }), false);
+  assert.equal(shouldProjectWerewolfInteraction({ type: 'phase-start', narration: 'day begins' }), false);
+  assert.equal(shouldProjectWerewolfInteraction({
+    type: 'workflow-event',
+    workflowEvent: 'werewolf_action_submitted',
+    actionType: 'wolf_vote',
+  }), true);
+  assert.equal(shouldProjectWerewolfInteraction({
+    type: 'speech',
+    actionType: 'day_speech',
+    speech: { playerId: 2, text: 'statement' },
+  }), true);
+  assert.equal(shouldProjectWerewolfInteraction({
+    type: 'workflow-event',
+    workflowEvent: 'werewolf_action_skipped',
+    actionType: 'ghost_bride_link',
+  }), false);
+});
+
 test('werewolf v2 resolves the speaking player for the stage identity', () => {
   const players = [{ id: 1, nickname: '豆包' }, { id: 2, nickname: 'Grok' }];
   assert.deepEqual(resolveWerewolfSpeechSpeaker({ playerId: '2' }, players), players[1]);
@@ -130,6 +150,7 @@ test('werewolf v2 resolves core AI interaction states', () => {
   assert.equal(wolf.template, 'single-target');
   assert.equal(wolf.status, 'acting');
   assert.deepEqual(wolf.actorIds, [1, 2]);
+  assert.deepEqual(wolf.targetIds, []);
 
   const seer = resolveWerewolfInteraction({
     type: 'seer-check',

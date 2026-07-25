@@ -3,6 +3,114 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+const { createElement } = require('../../packages/client/node_modules/react') as typeof import('react');
+const { renderToStaticMarkup } = require('../../packages/client/node_modules/react-dom/server') as typeof import('react-dom/server');
+
+function loadUndercoverComponents() {
+  const originalCssLoader = require.extensions['.css'];
+  require.extensions['.css'] = () => {};
+  try {
+    return {
+      ...require('../../packages/client/src/features/undercover/components/UndercoverArena'),
+      ...require('../../packages/client/src/features/undercover/components/UndercoverControls')
+    } as typeof import('../../packages/client/src/features/undercover/components/UndercoverArena')
+      & typeof import('../../packages/client/src/features/undercover/components/UndercoverControls');
+  } finally {
+    if (originalCssLoader) require.extensions['.css'] = originalCssLoader;
+    else delete require.extensions['.css'];
+  }
+}
+
+const undercoverComponents = loadUndercoverComponents();
+const players = [1, 2, 3].map((id) => ({ id, nickname: `${id}号玩家`, alive: true }));
+
+function speakingGame(playerId: number) {
+  return {
+    id: 'game-1',
+    gameType: 'undercover' as const,
+    mode: 'standard-6' as const,
+    status: 'speaking' as const,
+    round: 1,
+    players,
+    speeches: [{ round: 1, playerId, text: `${playerId}号发言` }]
+  };
+}
+
+test('Undercover arena keeps classic DOM separate from the v2 spectator stage', () => {
+  const classic = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
+    game: speakingGame(1),
+    variant: 'classic'
+  }));
+  const v2 = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
+    game: speakingGame(1),
+    variant: 'v2'
+  }));
+
+  assert.match(classic, /class="undercover-arena"/);
+  assert.match(classic, /本轮发言/);
+  assert.doesNotMatch(classic, /undercover-stage/);
+  assert.doesNotMatch(classic, /undercover-speaker-poster/);
+  assert.match(v2, /class="undercover-stage undercover-stage--speaking undercover-stage--v2"/);
+  assert.match(v2, /undercover-speaker-poster/);
+  assert.doesNotMatch(v2, /class="undercover-arena"/);
+});
+
+test('Undercover controls keep classic behavior while v2 opts into the fixed control bar', () => {
+  const props = {
+    autoPlay: true,
+    speechEnabled: true,
+    started: false,
+    replayMode: false,
+    onReturn: () => {},
+    onStart: () => {},
+    onTogglePlayback: () => {},
+    onToggleSpeech: () => {},
+    onSkipPhase: () => {}
+  };
+  const classic = renderToStaticMarkup(createElement(undercoverComponents.UndercoverControls, {
+    ...props,
+    variant: 'classic'
+  }));
+  const v2 = renderToStaticMarkup(createElement(undercoverComponents.UndercoverControls, {
+    ...props,
+    variant: 'v2'
+  }));
+
+  assert.match(classic, /class="undercover-controls"/);
+  assert.match(classic, />返回选择</);
+  assert.match(classic, /title="开始谁是卧底对局">开始游戏</);
+  assert.match(classic, /title="暂停自动播放"[^>]*disabled=""/);
+  assert.doesNotMatch(classic, /undercover-controls--v2/);
+  assert.match(v2, /class="undercover-controls undercover-controls--v2"/);
+  assert.match(v2, />返回</);
+  assert.doesNotMatch(v2, /title="暂停自动播放"/);
+});
+
+test('Undercover next-player cue exists only for a real following alive player', () => {
+  assert.equal(undercoverComponents.getUndercoverArenaViewModel(speakingGame(1), 'v2').nextPlayer?.id, 2);
+  assert.equal(undercoverComponents.getUndercoverArenaViewModel(speakingGame(2), 'v2').nextPlayer?.id, 3);
+  assert.equal(undercoverComponents.getUndercoverArenaViewModel(speakingGame(3), 'v2').nextPlayer, undefined);
+  assert.equal(undercoverComponents.getUndercoverArenaViewModel(speakingGame(99), 'v2').nextPlayer, undefined);
+});
+
+test('Undercover v2 layout CSS remains scoped to explicit v2 classes', () => {
+  const arenaStyles = readFileSync(resolve('packages/client/src/features/undercover/components/UndercoverArena.css'), 'utf8');
+  const gameStyles = readFileSync(resolve('packages/client/src/features/undercover/UndercoverGame/index.css'), 'utf8');
+  const controlStyles = readFileSync(resolve('packages/client/src/features/undercover/components/UndercoverControls.css'), 'utf8');
+
+  assert.match(arenaStyles, /\.undercover-stage--v2\s*\{/);
+  for (let seat = 1; seat <= 6; seat += 1) {
+    assert.match(arenaStyles, new RegExp(`undercover-stage--v2 \\.seat-${seat}`));
+  }
+  assert.doesNotMatch(arenaStyles, /^\.undercover-stage--v2 \.undercover-player-seat\.seat-\d+\s*\{/m);
+  assert.match(arenaStyles, /\.undercover-stage--v2 \.undercover-speaker-poster \.player-poster-spotlight__caption\s*\{\s*display: none;/);
+  assert.match(arenaStyles, /\.undercover-stage--v2\.undercover-stage--speaking \.undercover-focus/);
+  assert.match(arenaStyles, /prefers-reduced-motion: reduce/);
+  assert.match(gameStyles, /\.undercover-shell--v2 \.undercover-status/);
+  assert.match(controlStyles, /\.undercover-controls--v2\s*\{[^}]*position: fixed;/s);
+  assert.match(controlStyles, /@media \(max-width: 760px\)\s*\{\s*\.undercover-controls--v2 button\s*\{\s*min-width: 0;/);
+});
+
 test('game selection exposes an accessible Undercover player editor entry', () => {
   const source = readFileSync(resolve('packages/client/src/pages/GameSelectPage/index.tsx'), 'utf8');
   assert.match(source, /title: 'AI 谁是卧底'/);

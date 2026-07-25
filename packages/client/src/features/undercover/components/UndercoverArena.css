@@ -64,7 +64,7 @@
 }
 
 .undercover-round-data > section,
-.undercover-reveal {
+.undercover-arena > .undercover-reveal {
   padding: 18px;
   border-radius: 16px;
   background: rgba(1, 12, 23, 0.62);
@@ -89,24 +89,24 @@
   font-weight: 800;
 }
 
-.undercover-reveal {
+.undercover-arena > .undercover-reveal {
   border: 1px solid rgba(255, 211, 111, 0.5);
   text-align: center;
 }
 
-.undercover-reveal dl {
+.undercover-arena > .undercover-reveal dl {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin: 18px 0 0;
 }
 
-.undercover-reveal dt {
+.undercover-arena > .undercover-reveal dt {
   color: #a9c8c6;
   font-size: 13px;
 }
 
-.undercover-reveal dd {
+.undercover-arena > .undercover-reveal dd {
   margin: 6px 0 0;
   color: #ffe18f;
   font-size: 20px;
@@ -115,11 +115,302 @@
 
 @media (max-width: 760px) {
   .undercover-seats,
-  .undercover-reveal dl {
+  .undercover-arena > .undercover-reveal dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .undercover-round-data {
     grid-template-columns: 1fr;
+  }
+}
+
+.undercover-stage--v2 {
+  position: relative;
+  width: min(100vw, calc((100vh - 24px) * 1.4055));
+  aspect-ratio: 1487 / 1058;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #050918 url('/assets/undercover/stage-background.png') center / cover no-repeat;
+  box-shadow: 0 0 80px rgba(41, 69, 156, 0.28);
+}
+
+.undercover-stage--v2::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(2, 5, 18, 0.18);
+  pointer-events: none;
+}
+
+.undercover-stage--v2 > .player-poster-spotlight .player-poster-spotlight__card {
+  width: 26%;
+  opacity: 0.74;
+}
+
+.undercover-stage--v2 > .player-poster-spotlight > p {
+  bottom: 7%;
+}
+
+.undercover-stage--v2 .undercover-round-heading {
+  position: absolute;
+  z-index: 4;
+  top: 2.8%;
+  left: 50%;
+  width: 36%;
+  min-height: 6%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8em;
+  border-bottom: 1px solid rgba(230, 93, 151, 0.72);
+  color: #f7f6ff;
+  background: rgba(4, 8, 25, 0.9);
+  font-size: clamp(16px, 1.9vw, 30px);
+  clip-path: polygon(6% 0, 94% 0, 88% 100%, 12% 100%);
+}
+
+.undercover-stage--v2 .undercover-round-heading b { color: #e86799; font-size: 1.3em; }
+.undercover-stage--v2 .undercover-round-heading i { color: #9299b4; font-style: normal; }
+.undercover-stage--v2 .undercover-round-heading small { color: #dce2f6; font-size: 0.62em; font-weight: 800; }
+
+.undercover-stage--v2 .undercover-stage-seats { position: absolute; inset: 0; z-index: 3; }
+
+.undercover-stage--v2 .undercover-player-seat {
+  position: absolute;
+  width: 15%;
+  min-width: 112px;
+  padding: 1.05%;
+  display: grid;
+  justify-items: center;
+  gap: 0.45em;
+  border: 1px solid rgba(81, 124, 232, 0.55);
+  border-radius: 18px;
+  color: #fff;
+  background: rgba(5, 10, 31, 0.91);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.48), inset 0 0 28px rgba(65, 92, 186, 0.1);
+}
+
+.undercover-stage--v2 .undercover-player-icon {
+  width: clamp(54px, 7vw, 104px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 3px solid #4d70df;
+  border-radius: 50%;
+  color: #6684df;
+  background: #fff;
+  box-shadow: 0 0 22px rgba(68, 105, 234, 0.5);
+}
+
+.undercover-stage--v2 .undercover-player-icon img { width: 82%; height: 82%; object-fit: contain; }
+.undercover-stage--v2 .undercover-player-icon svg { width: 54%; height: 54%; }
+
+.undercover-stage--v2 .undercover-player-name { display: flex; align-items: center; gap: 0.5em; font-size: clamp(11px, 1.08vw, 17px); }
+.undercover-stage--v2 .undercover-player-name b { padding: 0.18em 0.42em; border: 1px solid #4c88e8; border-radius: 5px; color: #8bb9ff; }
+.undercover-stage--v2 .undercover-player-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.undercover-stage--v2 .undercover-player-seat em { color: #65e782; font-size: clamp(9px, 0.88vw, 14px); font-style: normal; }
+
+.undercover-stage--v2 .undercover-player-seat.is-speaking { transform: scale(1.08); border-color: #f06b9f; box-shadow: 0 0 34px rgba(239, 72, 142, 0.45); }
+.undercover-stage--v2 .undercover-player-seat.is-speaking .undercover-player-icon { border-color: #f36da3; box-shadow: 0 0 34px rgba(242, 78, 145, 0.75); }
+.undercover-stage--v2 .undercover-player-seat.is-speaking em { color: #ff91b9; }
+.undercover-stage--v2 .undercover-player-seat.is-eliminated { border-color: #a8465e; filter: grayscale(1); opacity: 0.46; }
+.undercover-stage--v2 .undercover-player-seat.is-eliminated em { color: #ff687c; }
+
+.undercover-stage--v2 .undercover-focus {
+  position: absolute;
+  z-index: 3;
+  top: 57%;
+  left: 50%;
+  width: 40%;
+  min-height: 23%;
+  padding: 2% 3%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.65em;
+  border: 1px solid rgba(239, 84, 151, 0.72);
+  border-radius: 18px;
+  color: #f8f8ff;
+  background: rgba(4, 8, 25, 0.92);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.undercover-stage--v2 .undercover-focus p,
+.undercover-stage--v2 .undercover-focus h2,
+.undercover-stage--v2 .undercover-focus blockquote { margin: 0; }
+.undercover-stage--v2 .undercover-focus p { color: #ef79a7; font-size: clamp(11px, 1.2vw, 18px); font-weight: 800; }
+.undercover-stage--v2 .undercover-focus h2 { font-size: clamp(22px, 2.5vw, 38px); }
+.undercover-stage--v2 .undercover-focus > svg { width: 34%; height: 20px; color: #ff6ca5; }
+.undercover-stage--v2 .undercover-focus blockquote { width: 100%; padding: 0.9em 1.15em; border: 1px solid rgba(95, 116, 189, 0.45); border-radius: 10px; color: #eef1ff; font-size: clamp(10px, 1.13vw, 17px); line-height: 1.6; text-align: left; }
+.undercover-stage--v2 .undercover-focus small { color: #a9b2d0; font-size: clamp(9px, 0.95vw, 14px); }
+
+.undercover-stage--v2 .undercover-tally { width: 100%; max-height: 90px; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4em; list-style: none; }
+.undercover-stage--v2 .undercover-tally li { display: flex; justify-content: space-between; padding: 0.45em 0.65em; border-radius: 7px; background: #0c1434; font-size: clamp(9px, 0.85vw, 13px); }
+.undercover-stage--v2 .undercover-tally b { color: #ff8db5; }
+.undercover-stage--v2 .undercover-vote-summary { color: #ffd47c !important; font-weight: 800; }
+
+.undercover-stage--v2 .undercover-reveal { width: 100%; display: grid; justify-items: center; gap: 0.65em; }
+.undercover-stage--v2 .undercover-reveal dl { width: 100%; margin: 0.35em 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6em; }
+.undercover-stage--v2 .undercover-reveal dl div { padding: 0.65em; border-radius: 8px; background: #0c1434; }
+.undercover-stage--v2 .undercover-reveal dt { color: #8fa7df; font-size: clamp(8px, 0.78vw, 12px); }
+.undercover-stage--v2 .undercover-reveal dd { margin: 0.3em 0 0; font-size: clamp(10px, 1vw, 15px); font-weight: 800; }
+
+@media (max-width: 760px) {
+  .undercover-stage--v2 .undercover-round-heading { width: 48%; }
+  .undercover-stage--v2 .undercover-player-seat { width: 18%; min-width: 82px; border-radius: 12px; }
+  .undercover-stage--v2 .undercover-player-seat.seat-1 { left: 9%; }
+  .undercover-stage--v2 .undercover-player-seat.seat-4 { right: 9%; }
+  .undercover-stage--v2 .undercover-focus { width: 48%; }
+}
+
+.undercover-stage--v2 {
+  width: min(100vw, calc((100vh - 24px) * 1.7778));
+  aspect-ratio: 16 / 9;
+  background-position: center;
+}
+
+.undercover-stage--v2::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 54%;
+  width: 64%;
+  aspect-ratio: 2.15 / 1;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(115, 108, 213, 0.42);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(89, 58, 145, 0.16), rgba(5, 9, 28, 0.08) 58%, transparent 72%);
+  box-shadow: inset 0 0 46px rgba(112, 74, 178, 0.18), 0 0 56px rgba(32, 47, 112, 0.18);
+  pointer-events: none;
+}
+
+.undercover-stage--v2 > .undercover-speaker-poster {
+  z-index: 2;
+}
+
+.undercover-stage--v2 .undercover-speaker-poster::after {
+  background: radial-gradient(circle at 50% 42%, transparent 16%, rgba(2, 5, 16, 0.24) 58%, rgba(2, 5, 16, 0.66) 100%);
+}
+
+.undercover-stage--v2 .undercover-speaker-poster .player-poster-spotlight__backdrop {
+  opacity: 0.22;
+}
+
+.undercover-stage--v2 .undercover-speaker-poster .player-poster-spotlight__card {
+  width: clamp(250px, 27%, 430px);
+  max-height: 67%;
+  opacity: 0.96;
+  object-position: center top;
+  transform: translateY(-4%);
+}
+
+.undercover-stage--v2 .undercover-speaker-poster .player-poster-spotlight__caption {
+  display: none;
+}
+
+.undercover-stage--v2 .undercover-round-heading {
+  top: 2.4%;
+  width: 34%;
+  min-height: 6.5%;
+  font-size: clamp(15px, 1.55vw, 27px);
+}
+
+.undercover-stage--v2 .undercover-player-seat {
+  width: 12.5%;
+  min-width: 104px;
+  padding: 0.72%;
+  gap: 0.28em;
+  border-radius: 14px;
+  transition: opacity 240ms ease, border-color 240ms ease, box-shadow 240ms ease, transform 240ms ease;
+}
+
+.undercover-stage--v2 .undercover-player-icon {
+  width: clamp(48px, 5.4vw, 86px);
+}
+
+.undercover-stage--v2 .undercover-player-name {
+  max-width: 100%;
+  font-size: clamp(10px, 0.88vw, 15px);
+}
+
+.undercover-stage--v2 .undercover-player-seat em {
+  font-size: clamp(9px, 0.72vw, 12px);
+}
+
+.undercover-stage--v2 .undercover-player-seat.is-speaking {
+  transform: scale(1.04);
+}
+
+.undercover-stage--v2 .seat-1 { top: 18%; left: 9%; }
+.undercover-stage--v2 .seat-2 { top: 10.5%; left: 25%; }
+.undercover-stage--v2 .seat-3 { top: 10.5%; right: 25%; left: auto; }
+.undercover-stage--v2 .seat-4 { top: 18%; right: 9%; left: auto; }
+.undercover-stage--v2 .seat-5 { top: 57%; right: 5%; left: auto; bottom: auto; }
+.undercover-stage--v2 .seat-6 { top: 57%; left: 5%; right: auto; bottom: auto; }
+
+.undercover-stage--v2 .undercover-focus {
+  top: 53%;
+  width: 44%;
+  min-height: 24%;
+  padding: 1.4% 2.2%;
+}
+
+.undercover-stage--v2.undercover-stage--speaking .undercover-focus {
+  top: auto;
+  bottom: 11.5%;
+  width: 52%;
+  min-height: 13%;
+  padding: 1% 1.8%;
+  transform: translateX(-50%);
+  gap: 0.35em;
+  background: rgba(4, 8, 25, 0.88);
+  backdrop-filter: blur(12px);
+}
+
+.undercover-stage--v2.undercover-stage--speaking .undercover-focus h2 {
+  font-size: clamp(18px, 1.8vw, 30px);
+}
+
+.undercover-stage--v2.undercover-stage--speaking .undercover-focus > svg {
+  height: 14px;
+}
+
+.undercover-stage--v2.undercover-stage--speaking .undercover-focus blockquote {
+  padding: 0.62em 0.9em;
+  font-size: clamp(12px, 1.02vw, 17px);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .undercover-stage--v2 .undercover-player-seat {
+    width: 15%;
+    min-width: 78px;
+    border-radius: 10px;
+  }
+
+  .undercover-stage--v2 .undercover-player-icon {
+    width: clamp(38px, 6vw, 58px);
+  }
+
+  .undercover-stage--v2 .undercover-focus {
+    width: 48%;
+  }
+
+  .undercover-stage--v2.undercover-stage--speaking .undercover-focus {
+    width: 58%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .undercover-stage--v2 .undercover-player-seat,
+  .undercover-stage--v2 .player-poster-spotlight__card {
+    transition: none;
+    transform: none;
   }
 }

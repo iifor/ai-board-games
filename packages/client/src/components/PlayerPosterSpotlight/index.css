@@ -1,0 +1,137 @@
+.player-poster-spotlight {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  isolation: isolate;
+  pointer-events: none;
+  animation: player-poster-spotlight-in 220ms ease-out both;
+}
+
+.player-poster-spotlight__backdrop {
+  position: absolute;
+  z-index: -3;
+  inset: -8%;
+  width: 116%;
+  height: 116%;
+  object-fit: cover;
+  opacity: 0.58;
+  filter: blur(42px) brightness(0.48) saturate(1.25);
+  transform: scale(1.08);
+}
+
+.player-poster-spotlight__shade {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(8, 15, 35, 0.08), rgba(2, 7, 20, 0.68) 72%),
+    linear-gradient(180deg, rgba(2, 7, 18, 0.18), rgba(2, 7, 18, 0.74));
+  backdrop-filter: blur(4px);
+}
+
+.player-poster-spotlight__card {
+  position: relative;
+  overflow: hidden;
+  width: min(440px, 34vw);
+  aspect-ratio: 4 / 5;
+  border: 1px solid rgba(255, 255, 255, 0.54);
+  border-radius: 24px;
+  background: linear-gradient(145deg, rgba(28, 42, 74, 0.96), rgba(5, 10, 24, 0.98));
+  box-shadow:
+    0 36px 100px rgba(0, 0, 0, 0.62),
+    0 0 56px rgba(119, 177, 255, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  transform: translateY(-3%);
+}
+
+.player-poster-spotlight__card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 46px rgba(4, 9, 24, 0.26);
+}
+
+.player-poster-spotlight__portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.player-poster-spotlight__card.is-name-only {
+  display: grid;
+  place-items: center;
+}
+
+.player-poster-spotlight__initials {
+  display: grid;
+  width: 42%;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: clamp(42px, 6vw, 80px);
+  font-weight: 950;
+  letter-spacing: -0.08em;
+  text-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.player-poster-spotlight__caption {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  gap: 4px;
+  padding: 72px 24px 24px;
+  color: #fff;
+  background: linear-gradient(180deg, transparent, rgba(2, 7, 18, 0.92) 62%);
+  text-align: center;
+}
+
+.player-poster-spotlight__caption small {
+  color: rgba(218, 235, 255, 0.78);
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0.18em;
+}
+
+.player-poster-spotlight__caption strong {
+  overflow: hidden;
+  font-size: clamp(26px, 3vw, 42px);
+  font-weight: 950;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.72);
+  white-space: nowrap;
+}
+
+@keyframes player-poster-spotlight-in {
+  from {
+    opacity: 0;
+    transform: scale(1.025);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 760px) {
+  .player-poster-spotlight__card {
+    width: min(70vw, 380px);
+    max-height: calc(100% - 132px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-poster-spotlight {
+    animation: none;
+  }
+}

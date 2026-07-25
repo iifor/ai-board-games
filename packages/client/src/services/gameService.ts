@@ -170,7 +170,7 @@ export function openGameSocket({
       clientViewMode,
       debugMode,
       replayView,
-      replayGameId
+      replayGameId: replayGameId || undefined
     };
     socket.send(JSON.stringify(payload));
   };

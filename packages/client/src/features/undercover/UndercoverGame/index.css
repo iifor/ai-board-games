@@ -62,3 +62,62 @@
   color: #ffb9a8;
   text-align: center;
 }
+
+.undercover-shell--v2 {
+  overflow: hidden;
+  padding: 12px 0;
+  color: #eff2ff;
+  background: #020612;
+}
+
+.undercover-shell--v2 .undercover-heading {
+  margin-top: 5vh;
+}
+
+.undercover-shell--v2 .undercover-heading p {
+  color: #8fa7df;
+}
+
+.undercover-shell--v2 .undercover-heading span {
+  color: #aeb9d7;
+}
+
+.undercover-shell--v2 .undercover-empty {
+  margin-top: 64px;
+  border-color: rgba(116, 148, 228, 0.48);
+  background: rgba(5, 12, 34, 0.72);
+}
+
+.undercover-shell--v2 .undercover-empty p {
+  color: #aeb9d7;
+}
+
+.undercover-shell--v2 .undercover-status {
+  position: fixed;
+  z-index: 9;
+  top: 18px;
+  left: 20px;
+  width: 1px;
+  height: 1px;
+  max-width: min(360px, 35vw);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+  color: #aeb9d7;
+  background: rgba(3, 8, 25, 0.76);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.undercover-shell--v2 .undercover-error {
+  position: fixed;
+  z-index: 12;
+  top: 18px;
+  right: 20px;
+  max-width: 360px;
+  margin: 0;
+  color: #ff9caa;
+  text-align: left;
+}
