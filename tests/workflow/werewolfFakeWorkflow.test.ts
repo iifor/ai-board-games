@@ -1029,7 +1029,7 @@ test('private night action phase results are scoped and not public', () => {
         assert.equal(resultEvent.scopeKey, item.scopeKey, item.actionType);
         assert.equal((resultEvent.payload as Record<string, unknown> | undefined)?.channel, 'scope', item.actionType);
         assert.equal((resultEvent.payload as Record<string, unknown> | undefined)?.scopeKey, item.scopeKey, item.actionType);
-        assert.match(String((resultEvent.payload as Record<string, unknown> | undefined)?.message || ''), /。/);
+        assert.equal(String((resultEvent.payload as Record<string, unknown> | undefined)?.message || ''), item.payload.reason, item.actionType);
       }
       const auditEvent = (completed.events || []).find((event: Record<string, unknown>) => event.type === 'werewolf_action_engine_shadow_audited') as Record<string, unknown> | undefined;
       assert.equal(auditEvent?.channel, 'system', item.actionType);
@@ -1140,8 +1140,7 @@ test('seer check phase result is published to EventBus as scoped seer feedback',
     const seerEvent = delivered.find((event) => event.type === 'seer-check');
     assert.equal(seerEvent?.channel, 'scope');
     assert.equal(seerEvent?.scopeKey, 'seer');
-    assert.match(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), /2号玩家的身份是：好人/);
-    assert.match(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), /。验证中置位/);
+    assert.equal(String((seerEvent?.payload as Record<string, unknown> | undefined)?.message || ''), '验证中置位');
     assert.equal(
       ((seerEvent?.payload as Record<string, unknown> | undefined)?.seerCheck as Record<string, unknown> | undefined)?.reason,
       '验证中置位',

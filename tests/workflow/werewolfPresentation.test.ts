@@ -66,15 +66,17 @@ test('werewolf presentation keeps skipped poison visible without speech or ack',
   assert.equal(result.requiresAck, false);
 });
 
-test('werewolf presentation speaks divine action result with reason', () => {
+test('werewolf presentation keeps natural action speech unchanged', () => {
+  const speech = '我今晚守护2号，他很可能是关键神职。';
   const presentation = resolveWerewolfPresentation({
     workflowEvent: 'werewolf_phase_result',
     eventType: 'guard-action',
     actionType: 'guard_protect',
-    message: '守卫守护了2号。保护关键位',
+    message: speech,
   });
 
-  assert.equal(presentation.speakableText, '守卫守护了2号。保护关键位');
+  assert.equal(presentation.speakableText, speech);
+  assert.equal(presentation.displayText, speech);
   assert.equal(presentation.suppressSpeech, false);
 });
 
