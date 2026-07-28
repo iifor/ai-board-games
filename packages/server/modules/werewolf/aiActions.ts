@@ -29,6 +29,7 @@ import {
   isEffectiveActionPayload,
   isNaturalActionSpeechType,
   isResultDependentActionSpeechType,
+  normalizeActionSpeechForPayload,
 } from './actionSpeech';
 import {
   resolveBlackMerchantGiftSuccess,
@@ -155,10 +156,11 @@ async function runActionWindowAiTask({ match, step, task }: { match: Match; step
   const round: Round = ensureRound(runtime.state, step.config.day);
   const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
   if (!actor) throw Object.assign(new Error(`Actor not found: ${task.playerId}`), { severity: 'high' });
-  const payload = isWerewolfDebugMode(runtime)
+  const debugMode = isWerewolfDebugMode(runtime);
+  const payload = debugMode
     ? runDebugWerewolfAction(runtime, round, actor, step.config.actionType!)
     : await runWerewolfAiAction(runtime, round, actor, step.config.actionType!);
-  const payloadWithSpeech = isWerewolfDebugMode(runtime)
+  const payloadWithSpeech = debugMode || !isNaturalActionSpeechType(step.config.actionType!)
     ? payload
     : {
         ...payload,
@@ -1159,9 +1161,9 @@ export async function resolveAiActionSpeech(input: ResolveAiActionSpeechInput): 
   const { runtime, round, actor, actionType, payload } = input;
   if (!isEffectiveActionPayload(payload)) return '';
 
-  const existingReason = normalizeActionReason(payload.reason);
+  const existingReason = normalizeActionSpeechForPayload(actionType, payload, payload.reason);
   if (!isNaturalActionSpeechType(actionType)) return existingReason || '';
-  if (!isResultDependentActionSpeechType(actionType) && existingReason) return existingReason;
+  if (!isResultDependentActionSpeechType(actionType)) return existingReason;
 
   const resolvedFact = resolveActionSpeechFact(runtime, round, actionType, payload);
   if (isResultDependentActionSpeechType(actionType) && !resolvedFact) return '';
@@ -1177,7 +1179,7 @@ export async function resolveAiActionSpeech(input: ResolveAiActionSpeechInput): 
       }),
       { limit: 80, maxTokens: 120, skillId: `action-speech:${actionType}`, phase: 'night' },
     );
-    return normalizeActionReason(generated) || '';
+    return normalizeActionSpeechForPayload(actionType, payload, generated);
   } catch {
     return '';
   }

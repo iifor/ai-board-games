@@ -58,7 +58,41 @@ export function isResultDependentActionSpeechType(actionType: string): boolean {
 export function isEffectiveActionPayload(payload: Record<string, unknown>): boolean {
   if (payload.use === false) return false;
   if (payload.use === true) return true;
-  return ['target', 'targetSeat', 'secondTarget'].some((key) => payload[key] != null);
+  return [
+    'target', 'targetSeat', 'targetId',
+    'firstTarget', 'firstTargetSeat', 'targetA',
+    'secondTarget', 'secondTargetSeat', 'targetB',
+    'partnerId', 'groomId', 'witnessId',
+  ].some((key) => payload[key] != null);
+}
+
+export function normalizeActionSpeechForPayload(
+  actionType: string,
+  payload: Record<string, unknown>,
+  speech: unknown,
+): string {
+  const normalized = String(speech || '').trim().slice(0, 80);
+  if (!normalized || !isNaturalActionSpeechType(actionType)) return normalized;
+  return actionSpeechTargetIds(actionType, payload)
+    .every((id) => new RegExp(`(?:^|\\D)${id}号`).test(normalized))
+    ? normalized
+    : '';
+}
+
+function actionSpeechTargetIds(actionType: string, payload: Record<string, unknown>): number[] {
+  const primary = actionType === 'magician_swap'
+    ? payload.target ?? payload.firstTarget ?? payload.targetA ?? payload.targetSeat ?? payload.firstTargetSeat
+    : actionType === 'ghost_bride_link'
+      ? payload.target ?? payload.partnerId ?? payload.groomId ?? payload.targetSeat
+      : payload.target ?? payload.targetSeat ?? payload.targetId;
+  const secondary = actionType === 'magician_swap'
+    ? payload.secondTarget ?? payload.targetB ?? payload.secondTargetSeat
+    : actionType === 'ghost_bride_link'
+      ? payload.witnessId ?? payload.secondTarget ?? payload.secondTargetSeat
+      : null;
+  return [...new Set([primary, secondary]
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0))];
 }
 
 export function actionSpeechContract(actionType: string): string {
