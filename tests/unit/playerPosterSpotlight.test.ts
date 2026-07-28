@@ -60,6 +60,15 @@ test('ships the exact 13 optimized poster assets', () => {
   }
 });
 
+test('ships the exact 13 transparent speaker cutouts', () => {
+  const cutoutDir = path.join(process.cwd(), 'packages', 'client', 'public', 'player-poster-cutouts');
+  const cutoutFiles = fs.readdirSync(cutoutDir).filter((file) => file.endsWith('.webp')).sort();
+  assert.deepEqual(cutoutFiles, EXPECTED_POSTERS);
+  for (const file of cutoutFiles) {
+    assert.ok(fs.statSync(path.join(cutoutDir, file)).size > 20_000, `${file} should contain a real cutout`);
+  }
+});
+
 test('scopes poster spotlight wiring to v2 game routes', () => {
   const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), 'utf8');
   const debateGame = read('packages/client/src/features/debate/DebateGame/index.tsx');
