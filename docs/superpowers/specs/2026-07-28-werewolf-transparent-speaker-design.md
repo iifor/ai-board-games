@@ -39,10 +39,10 @@
 ### 新增
 
 - `packages/client/public/player-poster-cutouts/*.webp`：13 个透明人物立绘。
-- `tests/unit/playerPosterSpotlight.test.ts`：验证默认海报路径不变、透明立绘路径正确，以及未知人物回退规则。
 
 ### 修改
 
+- `tests/unit/playerPosterSpotlight.test.ts`：扩展现有测试，验证默认海报路径不变、透明立绘路径正确，以及 13 个透明素材完整交付。
 - `packages/client/src/components/PlayerPosterSpotlight/posters.ts`：支持默认海报和透明立绘两种路径解析。
 - `packages/client/src/components/PlayerPosterSpotlight/index.tsx`：支持透明立绘模式及其回退顺序。
 - `packages/client/src/features/werewolf-v2/components/WerewolfArenaV2/index.tsx`：狼人杀 V2 发言人物启用透明立绘模式。
