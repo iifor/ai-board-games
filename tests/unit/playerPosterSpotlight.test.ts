@@ -44,6 +44,13 @@ test('resolves built-in player aliases to stable public poster paths', () => {
   assert.equal(resolvePlayerPoster({ nickname: '自定义玩家' }), null);
 });
 
+test('resolves transparent cutout paths without changing default poster paths', () => {
+  const player = { nickname: 'Claude Code' };
+  assert.equal(resolvePlayerPoster(player), '/player-posters/claude-code.webp');
+  assert.equal(resolvePlayerPoster(player, 'cutout'), '/player-poster-cutouts/claude-code.webp');
+  assert.equal(resolvePlayerPoster({ nickname: '自定义玩家' }, 'cutout'), null);
+});
+
 test('ships the exact 13 optimized poster assets', () => {
   const posterDir = path.join(process.cwd(), 'packages', 'client', 'public', 'player-posters');
   const posterFiles = fs.readdirSync(posterDir).filter((file) => file.endsWith('.webp')).sort();
