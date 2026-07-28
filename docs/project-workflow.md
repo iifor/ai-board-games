@@ -687,3 +687,11 @@ pnpm run test:workflow
 - 狼人杀和辩论的玩家 Agent 都继承共享 `BasePlayerAgent`，不在各游戏工作流内复制降级分支。
 - 调用顺序为：主模型现有瞬时重试 → 单次备选模型 → 现有规则级兜底。
 - 备选模型配置只传入 Agent 调用选项，不写入公开玩家状态，也不产生新的 WebSocket 事件。
+
+## Werewolf action speech
+
+- The 24 actions whose decisions are already known reuse their existing action call for role speech.
+- The four result-dependent actions calculate the authoritative result on the server first, then make one additional `askTextOnce()` call for the role speech.
+- The speech remains on the existing `reason -> werewolf_phase_result -> presentation.speakableText` delivery path.
+- Deterministic text is used only as the human, debug, or model-failure fallback.
+- This changes no API, database, shared type, C-end layout, or channel visibility contract.
