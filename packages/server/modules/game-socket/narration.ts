@@ -3,6 +3,7 @@ import {
   buildSheriffStartMessage,
   buildSheriffResultMessage,
 } from '../werewolf/announcements';
+import { resolveActionSpeech } from '../werewolf/actionSpeech';
 
 interface SpeechData {
   text?: string;
@@ -204,22 +205,21 @@ function getSheriffVoteNarration(round: RoundData = {}, runoff: boolean): string
 
 function getSeerCheckNarration(check: SeerCheckData = {}): string {
   if (!check?.target) return '';
-  return withReason(`${check.target}号玩家的身份是：${check.result || '未知'}`, check.reason);
+  return resolveActionSpeech(
+    check.reason,
+    '',
+    `${check.target}号玩家的身份是：${check.result || '未知'}。`,
+  );
 }
 
 function getGuardActionNarration(action: RoleActionData = {}): string {
   if (!action.target) return '守卫选择空守。';
-  return withReason(`守卫守护了${action.target}号`, action.reason);
+  return resolveActionSpeech(action.reason, '', `守卫守护了${action.target}号。`);
 }
 
 function getWitchActionNarration(action: RoleActionData = {}): string {
   if (!action.use || !action.target) return '';
-  return withReason(`女巫对${action.target}号使用了药剂`, action.reason);
-}
-
-function withReason(result: string, reason?: string): string {
-  const normalized = String(reason || '').trim();
-  return normalized ? `${result}。${normalized}` : `${result}。`;
+  return resolveActionSpeech(action.reason, '', `女巫对${action.target}号使用了药剂。`);
 }
 
 function getWerewolfSpeechOrderNarration(round: RoundData = {}): string {

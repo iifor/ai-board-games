@@ -33,6 +33,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'werewolfPromptRecentContext.test.ts',
   'werewolfPromptContext.test.ts',
   'werewolfActionSpeech.test.ts',
+  'werewolfNarration.test.ts',
   'playerMemory.test.ts',
   'werewolfClientDisplayState.test.ts',
   'werewolfPresentationProjection.test.ts',
