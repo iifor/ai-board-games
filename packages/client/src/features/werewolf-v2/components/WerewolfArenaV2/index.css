@@ -13,34 +13,32 @@
 }
 .werewolf-v2-arena[data-phase='day'] .werewolf-v2-background > .is-night { opacity: 0; }
 .werewolf-v2-arena[data-phase='day'] .werewolf-v2-background > .is-day { opacity: 1; }
-.werewolf-v2-speaker-backdrop { z-index: 0; }
-.werewolf-v2-speaker-backdrop .player-poster-spotlight__backdrop {
-  opacity: .3;
-  filter: blur(28px) brightness(.42) saturate(1.05);
-}
-.werewolf-v2-speaker-backdrop .player-poster-spotlight__shade {
-  background:
-    linear-gradient(90deg, rgba(2, 7, 20, .82), rgba(2, 7, 20, .28) 30%, rgba(2, 7, 20, .28) 70%, rgba(2, 7, 20, .82)),
-    linear-gradient(180deg, rgba(2, 7, 18, .42), rgba(2, 7, 18, .72));
-  backdrop-filter: blur(2px);
+.werewolf-v2-speaker-backdrop {
+  z-index: 0;
+  pointer-events: none;
 }
 .werewolf-v2-speaker-backdrop .player-poster-spotlight__card {
   position: absolute;
-  inset: clamp(16px, 2.5vmin, 32px);
+  inset:
+    clamp(78px, 10vh, 112px)
+    clamp(330px, 26vw, 440px)
+    clamp(168px, 22vh, 240px);
   width: auto;
   height: auto;
   aspect-ratio: auto;
   border: 0;
   border-radius: 0;
-  opacity: .42;
+  opacity: 1;
   background: none;
   box-shadow: none;
-  filter: contrast(.92) saturate(.88);
+  filter: drop-shadow(0 24px 30px rgba(0, 0, 0, .34));
   transform: none;
 }
 .werewolf-v2-speaker-backdrop .player-poster-spotlight__portrait {
-  object-fit: cover;
-  object-position: center 28%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
 }
 .werewolf-v2-speaker-backdrop .player-poster-spotlight__caption { display: none; }
 .werewolf-v2-arena[data-speech-active='true'] .werewolf-v2-bottom-speech {
@@ -64,6 +62,6 @@
   top: 50%; width: min(560px, 42vw); padding: 24px 28px; border-radius: 16px;
   transform: translate(-50%, -50%); backdrop-filter: blur(16px);
 }
-.werewolf-v2-arena[data-speech-active='true'] .interaction-stage { bottom: 150px; }
+.werewolf-v2-arena[data-speech-active='true'] .interaction-stage { display: none; }
 .werewolf-v2-arena[data-speech-active='true'] .player-view-identity { bottom: 126px; }
 @media (prefers-reduced-motion: reduce) { .werewolf-v2-arena *, .werewolf-v2-arena *::before, .werewolf-v2-arena *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }

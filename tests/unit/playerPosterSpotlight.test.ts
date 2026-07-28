@@ -73,12 +73,20 @@ test('scopes poster spotlight wiring to v2 game routes', () => {
   const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), 'utf8');
   const debateGame = read('packages/client/src/features/debate/DebateGame/index.tsx');
   const werewolfArena = read('packages/client/src/features/werewolf-v2/components/WerewolfArenaV2/index.tsx');
+  const werewolfCss = read('packages/client/src/features/werewolf-v2/components/WerewolfArenaV2/index.css');
   const undercoverGame = read('packages/client/src/features/undercover/UndercoverGame/index.tsx');
   const app = read('packages/client/src/App.tsx');
 
   assert.match(debateGame, /variant = 'classic'/);
   assert.match(debateGame, /showPlayerPoster=\{variant === 'v2'\}/);
   assert.match(werewolfArena, /<PlayerPosterSpotlight/);
+  assert.match(werewolfArena, /variant="cutout"/);
+  assert.match(werewolfCss, /object-fit:\s*contain/);
+  assert.match(
+    werewolfCss,
+    /\[data-speech-active='true'\]\s+\.interaction-stage\s*\{\s*display:\s*none;/,
+  );
+  assert.doesNotMatch(werewolfCss, /player-poster-spotlight__backdrop/);
   assert.match(undercoverGame, /variant = 'classic'/);
   assert.match(undercoverGame, /showPlayerPoster=\{variant === 'v2'\}/);
   assert.match(app, /variant=\{route\.version === 'v2' \? 'v2' : 'classic'\}/);
