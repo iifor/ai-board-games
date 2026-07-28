@@ -425,7 +425,7 @@ function applyEscapeHunterVote(runtime: Runtime, round: Round, results: ActionRe
   round.night.escapeHunterTarget = getTopCandidateIds(round.night.escapeHunterVoteTally)[0] || null;
 }
 
-function resolveSeerFactionResult(runtime: Runtime, target: Agent | null | undefined, fallback: unknown): string {
+export function resolveSeerFactionResult(runtime: Runtime, target: Agent | null | undefined, fallback: unknown): string {
   if (isRole(target, 'escape_hunter')) return '狼人';
   if (isRole(target, 'spirit_wolf') && target?.spiritWolfLearnedRole === 'villager') return '濂戒汉';
   if (isRole(target, 'hidden_wolf')) return '好人';
@@ -690,11 +690,9 @@ function applyFoxInspect(runtime: Runtime, round: Round, results: ActionResult[]
   const actor = runtime.agents.find((agent) => Number(agent.id) === Number(result?.actorId));
   if (!actor || actor.foxInspectLost) return;
   const centerId = Number(result?.payload?.target ?? result?.payload?.targetSeat);
-  if (!runtime.agents.some((agent) => Number(agent.id) === centerId && agent.alive)) return;
-  const targetIds = Array.from(getSeatNeighborScope(runtime.agents, centerId))
-    .filter((id) => runtime.agents.some((agent) => Number(agent.id) === id && agent.alive));
-  if (!targetIds.length) return;
-  const hasWolf = targetIds.some((id) => runtime.agents.find((agent) => Number(agent.id) === id)?.faction === 'wolves');
+  const inspection = resolveFoxInspectResult(runtime, centerId);
+  if (!inspection) return;
+  const { targetIds, hasWolf } = inspection;
   const reason = normalizeReason(result.payload.reason);
   round.night.foxInspect = {
     targetIds,
@@ -703,6 +701,17 @@ function applyFoxInspect(runtime: Runtime, round: Round, results: ActionResult[]
   };
   actor.foxLastInspect = { targetIds, hasWolf };
   if (!hasWolf) actor.foxInspectLost = true;
+}
+
+export function resolveFoxInspectResult(runtime: Runtime, targetId: number): { targetIds: number[]; hasWolf: boolean } | null {
+  if (!runtime.agents.some((agent) => Number(agent.id) === Number(targetId) && agent.alive)) return null;
+  const targetIds = Array.from(getSeatNeighborScope(runtime.agents, targetId))
+    .filter((id) => runtime.agents.some((agent) => Number(agent.id) === id && agent.alive));
+  if (!targetIds.length) return null;
+  return {
+    targetIds,
+    hasWolf: targetIds.some((id) => runtime.agents.find((agent) => Number(agent.id) === id)?.faction === 'wolves'),
+  };
 }
 
 function applyDreamerDream(runtime: Runtime, round: Round, results: ActionResult[]): void {
@@ -787,7 +796,7 @@ function applyBlackMerchantGift(runtime: Runtime, round: Round, results: ActionR
   if (!actor || actor.blackMerchantGiftUsed || !target || Number(actor.id) === Number(target.id) || !gift) return;
   actor.blackMerchantGiftUsed = true;
   const reason = normalizeReason(result.payload.reason);
-  const success = target.faction !== 'wolves';
+  const success = resolveBlackMerchantGiftSuccess(target);
   round.night.blackMerchantGift = {
     actorId: Number(actor.id),
     targetId: Number(target.id),
@@ -800,6 +809,10 @@ function applyBlackMerchantGift(runtime: Runtime, round: Round, results: ActionR
     return;
   }
   target.blackMerchantGift = { action: gift, from: Number(actor.id), used: false };
+}
+
+export function resolveBlackMerchantGiftSuccess(target: Agent): boolean {
+  return target.faction !== 'wolves';
 }
 
 function applyLuckySeerCheck(runtime: Runtime, round: Round, results: ActionResult[]): void {

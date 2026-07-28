@@ -8,6 +8,9 @@ import {
   getActorsForStep,
   getTargetIds,
   getWitchActionEligibility,
+  resolveBlackMerchantGiftSuccess,
+  resolveFoxInspectResult,
+  resolveSeerFactionResult,
 } from '../../packages/server/modules/werewolf/reducers';
 import { ensureWolfTeamContext, wolfLeaderPriority } from '../../packages/server/modules/werewolf/wolfTeam';
 import { getActionPhaseConfig } from '../../packages/server/modules/werewolf/actionPhases';
@@ -58,6 +61,30 @@ function runtime() {
     state: { rounds: [round] }
   };
 }
+
+test('authoritative result helpers match reducer rule outcomes', () => {
+  const ctx = {
+    agents: [
+      actor(1, 'good'),
+      actor(2, 'good'),
+      actor(3, 'good'),
+      actor(4, 'good'),
+      actor(5, 'good'),
+    ],
+    state: { rounds: [createRound(1)] },
+  };
+  const hiddenWolf = actor(6, 'wolves', [], { role: 'hidden_wolf' });
+  const wolf = actor(7, 'wolves');
+  const villager = actor(8, 'good');
+
+  assert.equal(resolveSeerFactionResult(ctx as never, hiddenWolf as never, undefined), '好人');
+  assert.deepEqual(resolveFoxInspectResult(ctx as never, 4), {
+    targetIds: [3, 4, 5],
+    hasWolf: false,
+  });
+  assert.equal(resolveBlackMerchantGiftSuccess(wolf as never), false);
+  assert.equal(resolveBlackMerchantGiftSuccess(villager as never), true);
+});
 
 test('reducers aggregate wolf kill choices and target ids', () => {
   const ctx = runtime();
