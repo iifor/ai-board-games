@@ -46,6 +46,13 @@
 - Side seats: all 12 seats remain visible. Clicking left-side 豆包 and right-side Claude Code opened the corresponding player-detail panel.
 - Focused inspection found no background rectangle, poster border, black edge, head clipping, or subtitle overlap.
 
+**Automated verification outcomes**
+
+- Alpha validation: 13/13 passed (`validated 13 transparent cutouts`).
+- Targeted unit test: 6/6 passed (`pnpm.cmd test:unit -- playerPosterSpotlight.test.ts`).
+- Client type check: passed (`pnpm.cmd --filter @ai-presenter/client run check`).
+- Production client build: passed; 1726 modules transformed in 5.08s (`pnpm.cmd build:client`).
+
 **Console and interaction checks**
 
 - Browser console: `error=[]`, `warn=[]`.
