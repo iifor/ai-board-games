@@ -1,10 +1,10 @@
-import { Activity, ArrowRight, Crown, Eye, Mic2, Moon, Skull, Sun, Target, Users } from 'lucide-react';
+import { ArrowRight, Crown, Eye, Mic2, Moon, Skull, Sun, Target, Users } from 'lucide-react';
 import { PlayerAvatar } from '../../../../components/common/BaseModal';
 import { classNames } from '../../../../utils/classNames';
 import { ROLE_NAMES } from '../../../werewolf/constants';
 import { formatWerewolfSeatLabel } from '../../../werewolf/utils';
 import type { Player, SpeechState, WerewolfRound } from '../../../../types';
-import { getWerewolfInteractionAnimationKey, getWerewolfInteractionStatusText, resolveNightAwakeLabel, shouldShowWerewolfStageDetails, type WerewolfInteractionState } from '../../utils/interactionState';
+import { getWerewolfInteractionAnimationKey, resolveNightAwakeLabel, shouldShowWerewolfStageDetails, type WerewolfInteractionState } from '../../utils/interactionState';
 import { RoleInteractionVisual } from '../RoleInteractionVisual';
 import './index.css';
 
@@ -70,7 +70,6 @@ export function InteractionStage({ interaction, players, view, round }: { intera
     <section className="interaction-stage__card" aria-live="polite" key={animationKey}>
       {showDetails && night && <div className="interaction-stage__night-cue"><Eye size={18} />{resolveNightAwakeLabel(interaction.action)}</div>}
       {showDetails && sheriffAction && <div className="interaction-stage__sheriff-cue"><Crown size={17} />警长竞选</div>}
-      {showDetails && <span className="interaction-stage__status"><Activity size={14} />{idle ? '等待开始' : getWerewolfInteractionStatusText(interaction.status)}</span>}
       <h1>{idle ? '选择模式并开始游戏' : interaction.title}</h1>
       {showDetails && !idle && <RoleInteractionVisual interaction={interaction} />}
       {showDetails && showFlow && <div className="interaction-stage__flow" aria-label="技能作用关系">

@@ -97,7 +97,6 @@
   content: ''; position: absolute; inset: 6% 10%; border-radius: 50%; pointer-events: none;
   background: radial-gradient(circle, rgba(81, 70, 184, .12), transparent 64%); animation: werewolf-night-breathe 5s ease-in-out infinite;
 }
-.interaction-stage__status { display: inline-flex; align-items: center; gap: 6px; color: #86d9ff; font-size: 12px; font-weight: 800; }
 .interaction-stage h1 { margin: 12px 0 9px; font-size: clamp(26px, 2.8vw, 44px); line-height: 1.1; }
 .interaction-stage__targets { display: inline-flex; align-items: center; gap: 9px; margin: 16px 0 0; padding: 9px 18px; border: 1px solid rgba(255, 105, 120, .28); border-radius: 22px; color: #ffd6da; background: rgba(115, 21, 42, .34); font-weight: 800; }
 .interaction-stage__flow { display: flex; align-items: stretch; justify-content: center; gap: 12px; margin: 20px auto 0; }
@@ -122,8 +121,7 @@
 .interaction-stage[data-tone=seer] { --skill-color: 137, 111, 255; }
 .interaction-stage[data-tone=witch] { --skill-color: 76, 225, 156; }
 .interaction-stage[data-tone=guard] { --skill-color: 72, 184, 255; }
-.interaction-stage[data-tone=wolf] .interaction-stage__status, .interaction-stage[data-tone=wolf] h1 { color: #ff6d72; }
-.interaction-stage[data-tone=witch] .interaction-stage__status, .interaction-stage[data-tone=seer] .interaction-stage__status { color: #bd91ff; }
+.interaction-stage[data-tone=wolf] h1 { color: #ff6d72; }
 .interaction-stage[data-tone=wolf] .interaction-stage__flow article.is-target { border-color: rgba(255, 65, 82, .72); box-shadow: 0 0 30px rgba(255, 49, 68, .2), inset 0 0 24px rgba(255, 49, 68, .12); }
 .interaction-stage[data-tone=wolf]:not([data-template=idle]) .interaction-stage__card::after {
   border-radius: 36%;

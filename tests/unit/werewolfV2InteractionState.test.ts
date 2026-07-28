@@ -36,6 +36,11 @@ test('werewolf v2 renders the approved visual stage and public seat badges', () 
   }
 });
 
+test('werewolf v2 omits the redundant stage status row', () => {
+  const stage = readFileSync('packages/client/src/features/werewolf-v2/components/PerspectiveShared/index.tsx', 'utf8');
+  assert.doesNotMatch(stage, /interaction-stage__status|<Activity|getWerewolfInteractionStatusText/);
+});
+
 test('werewolf v2 hides duplicate center details while a player is speaking', () => {
   assert.equal(shouldShowWerewolfStageDetails({ template: 'speech' }), false);
   assert.equal(shouldShowWerewolfStageDetails({ template: 'single-target' }), true);
