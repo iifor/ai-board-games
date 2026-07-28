@@ -95,4 +95,8 @@ test('keeps the spotlight accessible and resilient', () => {
   assert.match(component, /onError=/);
   assert.match(component, /player-poster-spotlight__backdrop/);
   assert.match(component, /player-poster-spotlight__card/);
+  assert.match(component, /variant = 'poster'/);
+  assert.match(component, /resolvePlayerPoster\(player, variant\)/);
+  assert.match(component, /variant === 'cutout'/);
+  assert.match(component, /is-cutout/);
 });

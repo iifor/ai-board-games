@@ -4,17 +4,23 @@ import {
   getPosterPlayerName,
   resolvePlayerPoster,
 } from './posters';
-import type { PosterPlayer } from './posters';
+import type { PlayerPosterVariant, PosterPlayer } from './posters';
 import './index.css';
 
 interface PlayerPosterSpotlightProps {
   player?: PosterPlayer | null;
   className?: string;
+  variant?: PlayerPosterVariant;
 }
 
-export function PlayerPosterSpotlight({ player, className = '' }: PlayerPosterSpotlightProps) {
-  const poster = resolvePlayerPoster(player);
+export function PlayerPosterSpotlight({
+  player,
+  className = '',
+  variant = 'poster',
+}: PlayerPosterSpotlightProps) {
+  const poster = resolvePlayerPoster(player, variant);
   const avatar = getPosterPlayerAvatar(player);
+  const isCutout = variant === 'cutout';
   const sources = useMemo(() => [...new Set([poster, avatar].filter(Boolean))] as string[], [poster, avatar]);
   const [sourceIndex, setSourceIndex] = useState(0);
   const playerName = getPosterPlayerName(player);
@@ -32,7 +38,7 @@ export function PlayerPosterSpotlight({ player, className = '' }: PlayerPosterSp
       aria-label={`${playerName}正在发言`}
       aria-live="polite"
     >
-      {imageSource && (
+      {!isCutout && imageSource && (
         <img
           className="player-poster-spotlight__backdrop"
           src={imageSource}
@@ -40,8 +46,8 @@ export function PlayerPosterSpotlight({ player, className = '' }: PlayerPosterSp
           aria-hidden="true"
         />
       )}
-      <div className="player-poster-spotlight__shade" aria-hidden="true" />
-      <div className={`player-poster-spotlight__card${imageSource ? '' : ' is-name-only'}`}>
+      {!isCutout && <div className="player-poster-spotlight__shade" aria-hidden="true" />}
+      <div className={`player-poster-spotlight__card${isCutout ? ' is-cutout' : ''}${imageSource ? '' : ' is-name-only'}`}>
         {imageSource ? (
           <img
             className="player-poster-spotlight__portrait"
@@ -54,10 +60,12 @@ export function PlayerPosterSpotlight({ player, className = '' }: PlayerPosterSp
             {playerName.slice(0, 2).toUpperCase()}
           </span>
         )}
-        <footer className="player-poster-spotlight__caption">
-          <small>正在发言</small>
-          <strong>{playerName}</strong>
-        </footer>
+        {!isCutout && (
+          <footer className="player-poster-spotlight__caption">
+            <small>正在发言</small>
+            <strong>{playerName}</strong>
+          </footer>
+        )}
       </div>
     </aside>
   );
