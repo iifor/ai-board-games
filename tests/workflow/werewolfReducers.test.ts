@@ -8,6 +8,9 @@ import {
   getActorsForStep,
   getTargetIds,
   getWitchActionEligibility,
+  resolveBlackMerchantGiftSuccess,
+  resolveFoxInspectResult,
+  resolveSeerFactionResult,
 } from '../../packages/server/modules/werewolf/reducers';
 import { ensureWolfTeamContext, wolfLeaderPriority } from '../../packages/server/modules/werewolf/wolfTeam';
 import { getActionPhaseConfig } from '../../packages/server/modules/werewolf/actionPhases';
@@ -58,6 +61,30 @@ function runtime() {
     state: { rounds: [round] }
   };
 }
+
+test('authoritative result helpers match reducer rule outcomes', () => {
+  const ctx = {
+    agents: [
+      actor(1, 'good'),
+      actor(2, 'good'),
+      actor(3, 'good'),
+      actor(4, 'good'),
+      actor(5, 'good'),
+    ],
+    state: { rounds: [createRound(1)] },
+  };
+  const hiddenWolf = actor(6, 'wolves', [], { role: 'hidden_wolf' });
+  const wolf = actor(7, 'wolves');
+  const villager = actor(8, 'good');
+
+  assert.equal(resolveSeerFactionResult(ctx as never, hiddenWolf as never, undefined), '好人');
+  assert.deepEqual(resolveFoxInspectResult(ctx as never, 4), {
+    targetIds: [3, 4, 5],
+    hasWolf: false,
+  });
+  assert.equal(resolveBlackMerchantGiftSuccess(wolf as never), false);
+  assert.equal(resolveBlackMerchantGiftSuccess(villager as never), true);
+});
 
 test('reducers aggregate wolf kill choices and target ids', () => {
   const ctx = runtime();
@@ -255,7 +282,7 @@ test('dead players cannot contribute wolf or day votes', () => {
   assert.equal(ctx.agents[1].votes.length, 0);
 });
 
-test('divine action narration appends reasons only for effective actions', () => {
+test('divine action narration prefers natural action speech and falls back to deterministic results', () => {
   const ctx = runtime();
   applyActionResults(
     ctx as never,
@@ -264,17 +291,24 @@ test('divine action narration appends reasons only for effective actions', () =>
   );
   assert.equal(ctx.state.rounds[0].night.witchPoisonTarget, null);
 
-  const phase = getActionPhaseConfig('witch_poison');
-  assert.equal(phase?.buildMessages(1, { witchPoisonUsed: true, target: 5, reason: '判断5号是狼人' }).result, '女巫毒了5号。判断5号是狼人');
-  assert.equal(phase?.buildMessages(1, { witchPoisonUsed: true, target: 5 }).result, '女巫毒了5号。');
-  assert.equal(phase?.buildMessages(1, { witchPoisonUsed: false }).result, '');
   assert.equal(
-    getActionPhaseConfig('guard_protect')?.buildMessages(1, { guardTarget: 2, reason: '保护关键位' }).result,
-    '守卫守护了2号。保护关键位',
+    getActionPhaseConfig('witch_poison')?.buildMessages(
+      1,
+      { witchPoisonUsed: true, target: 5, reason: '我今晚选择毒掉5号，因为他的投票和发言明显矛盾。' },
+    ).result,
+    '我今晚选择毒掉5号，因为他的投票和发言明显矛盾。',
   );
   assert.equal(
-    getActionPhaseConfig('seer_check')?.buildMessages(1, { target: 3, seerResult: '好人', reason: '验证发言' }).result,
-    '3号玩家的身份是：好人。验证发言',
+    getActionPhaseConfig('witch_poison')?.buildMessages(1, { witchPoisonUsed: true, target: 5 }).result,
+    '女巫毒了5号。',
+  );
+  assert.equal(getActionPhaseConfig('witch_poison')?.buildMessages(1, { witchPoisonUsed: false }).result, '');
+  assert.equal(
+    getActionPhaseConfig('guard_protect')?.buildMessages(
+      1,
+      { guardTarget: 2, reason: '我今晚守护2号，他很可能是关键神职。' },
+    ).result,
+    '我今晚守护2号，他很可能是关键神职。',
   );
 });
 

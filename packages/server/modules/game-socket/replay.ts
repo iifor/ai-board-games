@@ -21,6 +21,7 @@ import {
   buildSheriffResultMessage,
   getWerewolfNightPrompt,
 } from '../werewolf/announcements';
+import { resolveActionSpeech } from '../werewolf/actionSpeech';
 
 // --- Interfaces ---
 
@@ -811,13 +812,15 @@ function appendWerewolfNightPlaybackEvents(
           actionType: 'seer_check',
           seerCheck: night.seerCheck,
           reason: night.seerCheck.reason || null,
-          speech: buildRoleSpeech(replayPlayers, 'seer', withReplayReason(
-            `${night.seerCheck.target}号玩家的身份是：${night.seerCheck.result || '未知'}`,
+          speech: buildRoleSpeech(replayPlayers, 'seer', resolveActionSpeech(
             night.seerCheck.reason,
+            '',
+            `${night.seerCheck.target}号玩家的身份是：${night.seerCheck.result || '未知'}。`,
           )),
-          message: withReplayReason(
-            `${night.seerCheck.target}号玩家的身份是：${night.seerCheck.result || '未知'}`,
+          message: resolveActionSpeech(
             night.seerCheck.reason,
+            '',
+            `${night.seerCheck.target}号玩家的身份是：${night.seerCheck.result || '未知'}。`,
           ),
         },
       );
@@ -851,7 +854,7 @@ function appendWerewolfNightPlaybackEvents(
           reason: night.guardTarget ? night.guardReason || null : null,
         },
         message: night.guardTarget
-          ? withReplayReason(`守卫守护了${night.guardTarget}号`, night.guardReason)
+          ? resolveActionSpeech(night.guardReason, '', `守卫守护了${night.guardTarget}号。`)
           : '守卫选择空守。',
       },
     );
@@ -889,14 +892,14 @@ function appendWerewolfNightPlaybackEvents(
           reason: night.witchSave ? night.witchSaveReason || null : null,
         },
         ...(night.witchSave ? {
-          speech: buildRoleSpeech(replayPlayers, 'witch', withReplayReason(
+          speech: buildRoleSpeech(replayPlayers, 'witch', resolveActionSpeech(
             night.witchSaveReason,
+            '',
+            '女巫使用了解药。',
           )),
         } : {}),
         message: night.witchSave
-          ? withReplayReason(
-              night.witchSaveReason,
-            )
+          ? resolveActionSpeech(night.witchSaveReason, '', '女巫使用了解药。')
           : '',
       },
     );
@@ -933,11 +936,19 @@ function appendWerewolfNightPlaybackEvents(
           speech: buildRoleSpeech(
             replayPlayers,
             'witch',
-            withReplayReason(night.witchPoisonReason),
+            resolveActionSpeech(
+              night.witchPoisonReason,
+              '',
+              `女巫毒了${night.witchPoisonTarget}号。`,
+            ),
           ),
         } : {}),
         message: night.witchPoisonTarget
-          ? withReplayReason(night.witchPoisonReason)
+          ? resolveActionSpeech(
+              night.witchPoisonReason,
+              '',
+              `女巫毒了${night.witchPoisonTarget}号。`,
+            )
           : '',
       },
     );
@@ -966,11 +977,6 @@ function getReplayPostgameSpeeches(game: ReplayGame): SpeechData[] {
     if (rightId === mvpId) return -1;
     return leftId - rightId;
   });
-}
-
-function withReplayReason(result: string, reason?: string | null): string {
-  const normalized = String(reason || '').trim();
-  return normalized ? `${result}。原因：${normalized}` : `${result}。`;
 }
 
 function getWerewolfReplayNightActions(game: ReplayGame = {}): Set<string> {

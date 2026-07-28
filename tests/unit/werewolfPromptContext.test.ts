@@ -170,6 +170,32 @@ test('witch poison prompt does not reveal the current wolf target', () => {
   assert.doesNotMatch(poisonPrompt, /今晚狼刀目标/);
 });
 
+test('natural action prompts require first-person reasons but day votes remain unchanged', () => {
+  const witch = player(1, 'witch', 'good');
+  const villager = player(2, 'villager', 'good');
+  const players = [witch, villager];
+  const round = { day: 1, night: {} };
+
+  const witchPrompt = buildWerewolfActionPrompt({
+    runtime: runtime(players, [round]) as never,
+    round: round as never,
+    actor: witch as never,
+    actionType: 'witch_poison',
+    validTargetIds: [2],
+  });
+  const dayVotePrompt = buildWerewolfActionPrompt({
+    runtime: runtime(players, [round]) as never,
+    round: round as never,
+    actor: villager as never,
+    actionType: 'day_vote',
+    validTargetIds: [1],
+  });
+
+  assert.match(witchPrompt, /执行行动时.*reason.*必须/);
+  assert.match(witchPrompt, /第一人称/);
+  assert.doesNotMatch(dayVotePrompt, /执行行动时.*reason.*必须/);
+});
+
 test('werewolf prompt context shows wolf teammate live and eliminated status only to wolves', () => {
   const wolf = player(1, 'werewolf', 'wolves');
   const deadWolf = player(2, 'werewolf', 'wolves', { alive: false, deathReason: '放逐' });

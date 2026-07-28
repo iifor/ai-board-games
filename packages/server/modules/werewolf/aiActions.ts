@@ -24,6 +24,19 @@ import { isWerewolfDebugMode, runDebugHunterAction, runDebugSheriffBadgeAction, 
 import { resolveActionChannel } from '@ai-presenter/shared/utils/channelResolution';
 import { serializeWerewolfState } from './runtime';
 import { normalizePostgameSpeechDecision } from './postgameRules';
+import {
+  buildActionSpeechPrompt,
+  isEffectiveActionPayload,
+  isNaturalActionSpeechType,
+  isResultDependentActionSpeechType,
+  normalizeActionSpeechForPayload,
+} from './actionSpeech';
+import {
+  resolveBlackMerchantGiftSuccess,
+  resolveFoxInspectResult,
+  resolveMagicianTarget,
+  resolveSeerFactionResult,
+} from './reducers';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Agent = any;
@@ -54,6 +67,14 @@ interface Task {
 interface ActionResult {
   eventType: string;
   rawOutput: unknown;
+  payload: Record<string, unknown>;
+}
+
+interface ResolveAiActionSpeechInput {
+  runtime: Runtime;
+  round: Round;
+  actor: Agent;
+  actionType: string;
   payload: Record<string, unknown>;
 }
 
@@ -135,21 +156,34 @@ async function runActionWindowAiTask({ match, step, task }: { match: Match; step
   const round: Round = ensureRound(runtime.state, step.config.day);
   const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
   if (!actor) throw Object.assign(new Error(`Actor not found: ${task.playerId}`), { severity: 'high' });
-  const payload = isWerewolfDebugMode(runtime)
+  const debugMode = isWerewolfDebugMode(runtime);
+  const payload = debugMode
     ? runDebugWerewolfAction(runtime, round, actor, step.config.actionType!)
     : await runWerewolfAiAction(runtime, round, actor, step.config.actionType!);
+  const payloadWithSpeech = debugMode || !isNaturalActionSpeechType(step.config.actionType!)
+    ? payload
+    : {
+        ...payload,
+        reason: await resolveAiActionSpeech({
+          runtime,
+          round,
+          actor,
+          actionType: step.config.actionType!,
+          payload,
+        }),
+      };
 
   // Phase 3: 通过 EventBus 发布 action-submitted 事件
-  publishActionSubmitted(runtime, match, step, actor.id, payload);
+  publishActionSubmitted(runtime, match, step, actor.id, payloadWithSpeech);
 
   return {
     eventType: 'werewolf_action_submitted',
-    rawOutput: payload,
+    rawOutput: payloadWithSpeech,
     payload: {
       actionType: step.config.actionType,
       day: step.config.day,
       actorId: actor.id,
-      ...payload
+      ...payloadWithSpeech
     }
   };
 }
@@ -1121,6 +1155,59 @@ function formatWolfSpeechLines(speeches: Array<Record<string, unknown>>, agents:
 function normalizeActionReason(value: unknown): string | null {
   const reason = String(value || '').trim().slice(0, 80);
   return reason || null;
+}
+
+export async function resolveAiActionSpeech(input: ResolveAiActionSpeechInput): Promise<string> {
+  const { runtime, round, actor, actionType, payload } = input;
+  if (!isEffectiveActionPayload(payload)) return '';
+
+  const witchSaveTarget = actionType === 'witch_save' ? resolveNightAttackTarget(round.night) : null;
+  if (actionType === 'witch_save' && !witchSaveTarget) return '';
+  const speechPayload = witchSaveTarget ? { ...payload, target: witchSaveTarget } : payload;
+  const existingReason = normalizeActionSpeechForPayload(actionType, speechPayload, payload.reason);
+  if (!isNaturalActionSpeechType(actionType)) return existingReason || '';
+  if (!isResultDependentActionSpeechType(actionType)) return existingReason;
+
+  const resolvedFact = resolveActionSpeechFact(runtime, round, actionType, payload);
+  if (isResultDependentActionSpeechType(actionType) && !resolvedFact) return '';
+
+  try {
+    const generated = await actor.playerAgent.askTextOnce(
+      buildActionSpeechPrompt({
+        actionType,
+        actorLabel: String(actor.roleLabel || actor.roleConfig?.name || `${actor.id}号玩家`),
+        actionSummary: describeActionSpeechTarget(actionType, payload),
+        decisionReason: existingReason,
+        resolvedFact,
+      }),
+      { limit: 80, maxTokens: 120, skillId: `action-speech:${actionType}`, phase: 'night' },
+    );
+    return normalizeActionSpeechForPayload(actionType, payload, generated);
+  } catch {
+    return '';
+  }
+}
+
+function resolveActionSpeechFact(runtime: Runtime, round: Round, actionType: string, payload: Record<string, unknown>): string | null {
+  const targetId = Number(payload.target ?? payload.targetSeat);
+  const target = runtime.agents.find((agent: Agent) => Number(agent.id) === targetId);
+  if (!target) return null;
+  if (actionType === 'seer_check' || actionType === 'lucky_seer_check') {
+    const actualTargetId = actionType === 'seer_check' ? resolveMagicianTarget(round.night, targetId) : targetId;
+    const actualTarget = runtime.agents.find((agent: Agent) => Number(agent.id) === actualTargetId) || target;
+    return `${targetId}号查验结果是${resolveSeerFactionResult(runtime, actualTarget, payload.result)}`;
+  }
+  if (actionType === 'fox_inspect') {
+    const inspection = resolveFoxInspectResult(runtime, targetId);
+    return inspection ? `${inspection.targetIds.join('、')}号三连查验结果${inspection.hasWolf ? '有狼' : '无狼'}` : null;
+  }
+  if (actionType === 'black_merchant_gift') return `${targetId}号赠技结果${resolveBlackMerchantGiftSuccess(target) ? '成功' : '失败'}`;
+  return null;
+}
+
+function describeActionSpeechTarget(actionType: string, payload: Record<string, unknown>): string {
+  const target = payload.target ?? payload.targetSeat;
+  return target == null ? actionType : `${actionType} ${target}号`;
 }
 
 /**

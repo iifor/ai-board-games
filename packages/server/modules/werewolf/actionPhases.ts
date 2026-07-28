@@ -3,6 +3,8 @@
  * 定义每个角色的播报流程：请睁眼 → 行动引导 → 结果播报 → 请闭眼
  */
 
+import { resolveActionSpeech } from './actionSpeech';
+
 interface PhaseMessages {
   start: string;
   result: string;
@@ -99,7 +101,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '占卜师',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `占卜师请睁眼，可以选择是否标记一名玩家。`,
-      result: context?.fortuneTellerMark?.target ? withReason(`占卜师标记了${context.fortuneTellerMark.target}号`, context.reason) : '',
+      result: context?.fortuneTellerMark?.target ? actionResultSpeech(`占卜师标记了${context.fortuneTellerMark.target}号`, context.reason) : '',
       end: `占卜师请闭眼。`,
     }),
   },
@@ -108,7 +110,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '大灰狼',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `大灰狼请睁眼，请选择击杀目标。`,
-      result: context?.bigBadWolfTarget ? withReason(`大灰狼袭击了${context.bigBadWolfTarget}号`, context.reason) : '',
+      result: context?.bigBadWolfTarget ? actionResultSpeech(`大灰狼袭击了${context.bigBadWolfTarget}号`, context.reason) : '',
       end: `大灰狼请闭眼。`,
     }),
   },
@@ -117,7 +119,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: 'Ghost Bride',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: 'Ghost Bride wakes and chooses a groom and witness.',
-      result: context?.ghostBrideLink?.partnerId ? withReason(`Ghost Bride linked ${context.ghostBrideLink.partnerId} and witness ${context.ghostBrideLink.witnessId}`, context.reason) : '',
+      result: context?.ghostBrideLink?.partnerId ? actionResultSpeech(`Ghost Bride linked ${context.ghostBrideLink.partnerId} and witness ${context.ghostBrideLink.witnessId}`, context.reason) : '',
       end: 'Ghost Bride closes eyes.',
     }),
   },
@@ -135,7 +137,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: 'Ghost Bride',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: 'Ghost Bride group chooses a kill target.',
-      result: context?.ghostBrideTarget ? withReason(`Ghost Bride group killed ${context.ghostBrideTarget}`, context.reason) : '',
+      result: context?.ghostBrideTarget ? actionResultSpeech(`Ghost Bride group killed ${context.ghostBrideTarget}`, context.reason) : '',
       end: 'Ghost Bride group closes eyes.',
     }),
   },
@@ -144,7 +146,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '猎魔人',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '猎魔人请睁眼，请选择狩猎目标。',
-      result: context?.demonHunterTarget ? withReason(`猎魔人狩猎了${context.demonHunterTarget}号`, context.reason) : '',
+      result: context?.demonHunterTarget ? actionResultSpeech(`猎魔人狩猎了${context.demonHunterTarget}号`, context.reason) : '',
       end: '猎魔人请闭眼。',
     }),
   },
@@ -153,7 +155,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '灵狼',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '灵狼请睁眼，请选择一名好人阵营玩家学习能力。',
-      result: context?.spiritWolfLearn?.targetId ? withReason(`灵狼学习了${context.spiritWolfLearn.targetId}号`, context.reason) : '',
+      result: context?.spiritWolfLearn?.targetId ? actionResultSpeech(`灵狼学习了${context.spiritWolfLearn.targetId}号`, context.reason) : '',
       end: '灵狼请闭眼。',
     }),
   },
@@ -171,7 +173,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '灵狼',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '灵狼请睁眼，请选择庇护目标。',
-      result: context?.spiritWolfGuardTarget ? withReason(`灵狼庇护了${context.spiritWolfGuardTarget}号`, context.reason) : '',
+      result: context?.spiritWolfGuardTarget ? actionResultSpeech(`灵狼庇护了${context.spiritWolfGuardTarget}号`, context.reason) : '',
       end: '灵狼请闭眼。',
     }),
   },
@@ -180,7 +182,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '灵狼',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '灵狼请睁眼，请选择是否使用解药。',
-      result: context?.spiritWolfAntidoteTarget ? withReason(`灵狼解救了${context.spiritWolfAntidoteTarget}号`, context.reason) : '',
+      result: context?.spiritWolfAntidoteTarget ? actionResultSpeech(`灵狼解救了${context.spiritWolfAntidoteTarget}号`, context.reason) : '',
       end: '灵狼请闭眼。',
     }),
   },
@@ -189,7 +191,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '狼巫',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '狼巫请睁眼，请选择诅咒目标。',
-      result: context?.wolfWitchCurse?.targetId ? withReason(`狼巫诅咒了${context.wolfWitchCurse.targetId}号`, context.reason) : '',
+      result: context?.wolfWitchCurse?.targetId ? actionResultSpeech(`狼巫诅咒了${context.wolfWitchCurse.targetId}号`, context.reason) : '',
       end: '狼巫请闭眼。',
     }),
   },
@@ -198,7 +200,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '幻术师',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '幻术师请睁眼，请选择幻象目标。',
-      result: context?.illusionTarget ? withReason(`幻术师选择${context.illusionTarget}号成为幻象`, context.reason) : '',
+      result: context?.illusionTarget ? actionResultSpeech(`幻术师选择${context.illusionTarget}号成为幻象`, context.reason) : '',
       end: '幻术师请闭眼。',
     }),
   },
@@ -207,7 +209,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '乌鸦',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `乌鸦请睁眼，请选择诅咒目标。`,
-      result: context?.crowCurse?.target ? withReason(`乌鸦诅咒了${context.crowCurse.target}号`, context.reason) : '',
+      result: context?.crowCurse?.target ? actionResultSpeech(`乌鸦诅咒了${context.crowCurse.target}号`, context.reason) : '',
       end: `乌鸦请闭眼。`,
     }),
   },
@@ -217,7 +219,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '黑商请睁眼，选择赠送技能的目标。',
       result: context?.blackMerchantGift?.targetId
-        ? withReason(`黑商赠技给${context.blackMerchantGift.targetId}号，结果${context.blackMerchantGift.success ? '成功' : '失败'}`, context.reason)
+        ? actionResultSpeech(`黑商赠技给${context.blackMerchantGift.targetId}号，结果${context.blackMerchantGift.success ? '成功' : '失败'}`, context.reason)
         : '',
       end: '黑商请闭眼。',
     }),
@@ -227,7 +229,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '幸运儿',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '获得查验的幸运儿请睁眼。',
-      result: context?.luckySeerCheck?.target ? withReason(`${context.luckySeerCheck.target}号查验结果：${context.luckySeerCheck.result || '未知'}`, context.reason) : '',
+      result: context?.luckySeerCheck?.target ? actionResultSpeech(`${context.luckySeerCheck.target}号查验结果：${context.luckySeerCheck.result || '未知'}`, context.reason) : '',
       end: '幸运儿请闭眼。',
     }),
   },
@@ -236,7 +238,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '幸运儿',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '获得毒药的幸运儿请睁眼。',
-      result: context?.luckyPoisonTarget ? withReason(`幸运儿毒了${context.luckyPoisonTarget}号`, context.reason) : '',
+      result: context?.luckyPoisonTarget ? actionResultSpeech(`幸运儿毒了${context.luckyPoisonTarget}号`, context.reason) : '',
       end: '幸运儿请闭眼。',
     }),
   },
@@ -245,7 +247,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '狼弟',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '狼弟请睁眼，选择独立击杀目标。',
-      result: context?.youngerBrotherTarget ? withReason(`狼弟选择击杀${context.youngerBrotherTarget}号`, context.reason) : '',
+      result: context?.youngerBrotherTarget ? actionResultSpeech(`狼弟选择击杀${context.youngerBrotherTarget}号`, context.reason) : '',
       end: '狼弟请闭眼。',
     }),
   },
@@ -254,7 +256,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '企鹅',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '企鹅请睁眼，请选择冰冻目标。',
-      result: context?.penguinFrozenId ? withReason(`企鹅冰冻了${context.penguinFrozenId}号`, context.reason) : '',
+      result: context?.penguinFrozenId ? actionResultSpeech(`企鹅冰冻了${context.penguinFrozenId}号`, context.reason) : '',
       end: '企鹅请闭眼。',
     }),
   },
@@ -264,7 +266,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: '狐狸请睁眼，请选择验三连中心位。',
       result: context?.foxInspect?.targetIds?.length
-        ? withReason(`狐狸查验三连结果：${context.foxInspect.hasWolf ? '有狼' : '无狼'}`, context.reason)
+        ? actionResultSpeech(`狐狸查验三连结果：${context.foxInspect.hasWolf ? '有狼' : '无狼'}`, context.reason)
         : '',
       end: '狐狸请闭眼。',
     }),
@@ -284,7 +286,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `预言家请睁眼，请选择查验的目标`,
       result: context?.seerResult
-        ? withReason(`${context.target || '?'}号玩家的身份是：${context.seerResult}`, context.reason)
+        ? actionResultSpeech(`${context.target || '?'}号玩家的身份是：${context.seerResult}`, context.reason)
         : '',
       end: `预言家请闭眼`,
     }),
@@ -295,7 +297,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context: PhaseContext = {}) => ({
       start: `女巫请睁眼。`,
       result: context.witchSaveUsed
-        ? withReason(`女巫使用了解药`, context.reason)
+        ? actionResultSpeech(`女巫使用了解药`, context.reason)
         : `女巫没有使用解药`,
       end: '',  // 女巫在毒药阶段后才闭眼
     }),
@@ -306,7 +308,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `女巫请睁眼。你有一瓶毒药，你要用吗？`,
       result: context?.witchPoisonUsed
-        ? withReason(`女巫毒了${context.target}号`, context.reason)
+        ? actionResultSpeech(`女巫毒了${context.target}号`, context.reason)
         : ``,
       end: `女巫请闭眼。`,
     }),
@@ -317,7 +319,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `守卫请睁眼，请选择今晚守护的目标。`,
       result: context?.guardTarget
-        ? withReason(`守卫守护了${context.guardTarget}号`, context.reason)
+        ? actionResultSpeech(`守卫守护了${context.guardTarget}号`, context.reason)
         : `守卫选择空守。`,
       end: `守卫请闭眼。`,
     }),
@@ -336,7 +338,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '花蝴蝶',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `花蝴蝶请睁眼，请选择要抱的玩家。`,
-      result: context?.butterflyTarget ? withReason(`花蝴蝶抱住了${context.butterflyTarget}号`, context.reason) : '',
+      result: context?.butterflyTarget ? actionResultSpeech(`花蝴蝶抱住了${context.butterflyTarget}号`, context.reason) : '',
       end: `花蝴蝶请闭眼。`,
     }),
   },
@@ -345,7 +347,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '潜行者',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `潜行者请睁眼，可以选择是否发动暗杀。`,
-      result: context?.stalkerTarget ? withReason(`潜行者暗杀了${context.stalkerTarget}号`, context.reason) : '',
+      result: context?.stalkerTarget ? actionResultSpeech(`潜行者暗杀了${context.stalkerTarget}号`, context.reason) : '',
       end: `潜行者请闭眼。`,
     }),
   },
@@ -354,7 +356,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '狼美人',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `狼美人请睁眼，请选择魅惑目标。`,
-      result: context?.wolfBeautyTarget ? withReason(`狼美人魅惑了${context.wolfBeautyTarget}号`, context.reason) : '',
+      result: context?.wolfBeautyTarget ? actionResultSpeech(`狼美人魅惑了${context.wolfBeautyTarget}号`, context.reason) : '',
       end: `狼美人请闭眼。`,
     }),
   },
@@ -372,7 +374,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '梦魇',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `梦魇请睁眼，请选择恐惧目标。`,
-      result: context?.nightmareTarget ? withReason(`梦魇恐惧了${context.nightmareTarget}号`, context.reason) : '',
+      result: context?.nightmareTarget ? actionResultSpeech(`梦魇恐惧了${context.nightmareTarget}号`, context.reason) : '',
       end: `梦魇请闭眼。`,
     }),
   },
@@ -381,7 +383,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     roleName: '摄梦人',
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `摄梦人请睁眼，请选择今夜摄梦的目标。`,
-      result: context?.dreamerTarget ? withReason(`摄梦人选择了${context.dreamerTarget}号`, context.reason) : '',
+      result: context?.dreamerTarget ? actionResultSpeech(`摄梦人选择了${context.dreamerTarget}号`, context.reason) : '',
       end: `摄梦人请闭眼。`,
     }),
   },
@@ -391,7 +393,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `魔术师请睁眼，请选择两名玩家交换号码。`,
       result: context?.magicianSwap?.firstTarget && context?.magicianSwap?.secondTarget
-        ? withReason(`魔术师交换了${context.magicianSwap.firstTarget}号和${context.magicianSwap.secondTarget}号`, context.reason)
+        ? actionResultSpeech(`魔术师交换了${context.magicianSwap.firstTarget}号和${context.magicianSwap.secondTarget}号`, context.reason)
         : '',
       end: `魔术师请闭眼。`,
     }),
@@ -402,7 +404,7 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
     buildMessages: (_day: number, context?: PhaseContext) => ({
       start: `禁言长老请睁眼，请选择禁言目标。`,
       result: context?.silencedPlayerId
-        ? withReason(`禁言长老禁言了${context.silencedPlayerId}号`, context.reason)
+        ? actionResultSpeech(`禁言长老禁言了${context.silencedPlayerId}号`, context.reason)
         : '',
       end: `禁言长老请闭眼。`,
     }),
@@ -438,9 +440,8 @@ const NIGHT_ACTION_PHASES: Record<string, NightActionPhaseConfig> = {
   },
 };
 
-function withReason(result: string, reason?: string | null): string {
-  const normalized = String(reason || '').trim();
-  return normalized ? `${result}。${normalized}` : `${result}。`;
+function actionResultSpeech(result: string, reason?: string | null): string {
+  return resolveActionSpeech(reason, '', `${result}。`);
 }
 
 /**

@@ -1,4 +1,5 @@
 import { WEREWOLF } from '@ai-presenter/shared/constants/gameLimits';
+import { actionSpeechContract, isNaturalActionSpeechType } from '../actionSpeech';
 import { getRoleLabel, getSeatNumber } from '../utils';
 
 interface PromptAgent {
@@ -93,6 +94,7 @@ interface WerewolfPromptBundle {
 
 function buildWerewolfPromptBundle(input: PromptBundleInput): WerewolfPromptBundle {
   const hasConversationHistory = Number(input.actor.playerAgent?.messages?.length || 0) > 1;
+  const actionSpeechRule = buildActionSpeechRule(input.actionType);
   return {
     systemRules: buildSystemRules(input),
     publicFacts: buildPublicFacts(input.runtime.state, input.runtime.agents, !hasConversationHistory),
@@ -100,9 +102,21 @@ function buildWerewolfPromptBundle(input: PromptBundleInput): WerewolfPromptBund
     recentContext: input.recentContext !== undefined
       ? input.recentContext
       : buildRecentContext(input.runtime.state.rounds || [], input.runtime.agents, input.actor),
-    taskInstruction: input.taskInstruction || '',
-    outputContract: input.outputContract || buildDefaultOutputContract(input.actionType, input.validTargetIds),
+    taskInstruction: appendActionSpeechRule(input.taskInstruction || '', actionSpeechRule),
+    outputContract: appendActionSpeechRule(input.outputContract || buildDefaultOutputContract(input.actionType, input.validTargetIds), actionSpeechRule),
   };
+}
+
+function buildActionSpeechRule(actionType: string): string {
+  if (!isNaturalActionSpeechType(actionType)) return '';
+  const contract = actionSpeechContract(actionType);
+  return contract
+    ? `执行行动时，${contract}\n旧示例中的“reason 可选”仅适用于跳过行动；有效行动必须给出完整的第一人称 reason。`
+    : '';
+}
+
+function appendActionSpeechRule(content: string, rule: string): string {
+  return [content, rule].filter(Boolean).join('\n');
 }
 
 function renderWerewolfPromptBundle(bundle: WerewolfPromptBundle): string {
