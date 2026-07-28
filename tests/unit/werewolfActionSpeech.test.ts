@@ -301,6 +301,38 @@ test('decision action rejects a reason that omits its authoritative target', asy
   assert.equal(calls, 0);
 });
 
+test('witch save speech uses the server-resolved night attack target without a correction call', async () => {
+  let calls = 0;
+  const actor = {
+    id: 2,
+    playerAgent: {
+      askTextOnce: async () => {
+        calls += 1;
+        return '不应调用';
+      },
+    },
+  };
+  const cases = [
+    { night: { wolfTarget: 5 }, reason: '我决定救5号。', expected: '我决定救5号。' },
+    { night: { wolfTarget: 5 }, reason: '我决定救2号。', expected: '' },
+    { night: {}, reason: '我决定救5号。', expected: '' },
+  ];
+  const actual: string[] = [];
+
+  for (const item of cases) {
+    actual.push(await resolveAiActionSpeech({
+      runtime: { agents: [actor] } as never,
+      round: { night: item.night } as never,
+      actor: actor as never,
+      actionType: 'witch_save',
+      payload: { use: true, reason: item.reason },
+    }));
+  }
+
+  assert.deepEqual(actual, cases.map((item) => item.expected));
+  assert.equal(calls, 0);
+});
+
 test('result action rejects generated speech that omits its authoritative target', async () => {
   let calls = 0;
   const actor = {

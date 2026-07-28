@@ -1161,7 +1161,10 @@ export async function resolveAiActionSpeech(input: ResolveAiActionSpeechInput): 
   const { runtime, round, actor, actionType, payload } = input;
   if (!isEffectiveActionPayload(payload)) return '';
 
-  const existingReason = normalizeActionSpeechForPayload(actionType, payload, payload.reason);
+  const witchSaveTarget = actionType === 'witch_save' ? resolveNightAttackTarget(round.night) : null;
+  if (actionType === 'witch_save' && !witchSaveTarget) return '';
+  const speechPayload = witchSaveTarget ? { ...payload, target: witchSaveTarget } : payload;
+  const existingReason = normalizeActionSpeechForPayload(actionType, speechPayload, payload.reason);
   if (!isNaturalActionSpeechType(actionType)) return existingReason || '';
   if (!isResultDependentActionSpeechType(actionType)) return existingReason;
 
