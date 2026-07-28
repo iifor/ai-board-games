@@ -86,6 +86,10 @@ test('scopes poster spotlight wiring to v2 game routes', () => {
     werewolfCss,
     /\[data-speech-active='true'\]\s+\.interaction-stage\s*\{\s*display:\s*none;/,
   );
+  assert.match(
+    werewolfCss,
+    /\.werewolf-v2-speaker-backdrop\s+\.player-poster-spotlight__card::after\s*\{\s*content:\s*none;/,
+  );
   assert.doesNotMatch(werewolfCss, /player-poster-spotlight__backdrop/);
   assert.match(undercoverGame, /variant = 'classic'/);
   assert.match(undercoverGame, /showPlayerPoster=\{variant === 'v2'\}/);

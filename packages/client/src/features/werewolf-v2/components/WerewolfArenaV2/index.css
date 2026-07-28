@@ -34,6 +34,7 @@
   filter: drop-shadow(0 24px 30px rgba(0, 0, 0, .34));
   transform: none;
 }
+.werewolf-v2-speaker-backdrop .player-poster-spotlight__card::after { content: none; }
 .werewolf-v2-speaker-backdrop .player-poster-spotlight__portrait {
   width: 100%;
   height: 100%;
