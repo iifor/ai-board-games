@@ -150,6 +150,35 @@ test('every result-dependent action asks once from its reducer-owned result', as
   assert.match(prompts[3], /5号赠技结果失败/);
 });
 
+test('magician swap changes only seer action speech, not lucky seer speech', async () => {
+  const prompts: string[] = [];
+  const actor = {
+    id: 2,
+    roleLabel: '行动者',
+    playerAgent: {
+      askTextOnce: async (prompt: string) => {
+        prompts.push(prompt);
+        return '我已根据今晚的结果完成行动。';
+      },
+    },
+  };
+  const runtime = {
+    agents: [
+      actor,
+      { id: 5, faction: 'wolves', alive: true },
+      { id: 6, faction: 'good', alive: true },
+    ],
+  };
+  const round = { night: { magicianSwap: { firstTarget: 5, secondTarget: 6 } } };
+
+  await resolveAiActionSpeech({ runtime: runtime as never, round: round as never, actor: actor as never, actionType: 'seer_check', payload: { target: 5 } });
+  await resolveAiActionSpeech({ runtime: runtime as never, round: round as never, actor: actor as never, actionType: 'lucky_seer_check', payload: { target: 5 } });
+
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[0], /5号查验结果是好人/);
+  assert.match(prompts[1], /5号查验结果是狼人/);
+});
+
 test('effective action speech keeps its existing reason without another model call', async () => {
   let calls = 0;
   const actor = {

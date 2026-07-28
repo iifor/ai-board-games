@@ -33,6 +33,7 @@ import {
 import {
   resolveBlackMerchantGiftSuccess,
   resolveFoxInspectResult,
+  resolveMagicianTarget,
   resolveSeerFactionResult,
 } from './reducers';
 
@@ -1187,9 +1188,7 @@ function resolveActionSpeechFact(runtime: Runtime, round: Round, actionType: str
   const target = runtime.agents.find((agent: Agent) => Number(agent.id) === targetId);
   if (!target) return null;
   if (actionType === 'seer_check' || actionType === 'lucky_seer_check') {
-    const firstTarget = Number(round.night?.magicianSwap?.firstTarget || 0);
-    const secondTarget = Number(round.night?.magicianSwap?.secondTarget || 0);
-    const actualTargetId = targetId === firstTarget ? secondTarget : targetId === secondTarget ? firstTarget : targetId;
+    const actualTargetId = actionType === 'seer_check' ? resolveMagicianTarget(round.night, targetId) : targetId;
     const actualTarget = runtime.agents.find((agent: Agent) => Number(agent.id) === actualTargetId) || target;
     return `${targetId}号查验结果是${resolveSeerFactionResult(runtime, actualTarget, payload.result)}`;
   }

@@ -1443,7 +1443,7 @@ function resolveOldRoguePendingDeaths(round: Round, agents: Agent[] = []): void 
   }
 }
 
-function resolveMagicianTarget(night: Night, target: unknown): number | null {
+export function resolveMagicianTarget(night: Night, target: unknown): number | null {
   const targetId = Number(target || 0);
   if (!targetId) return null;
   const first = Number(night.magicianSwap?.firstTarget || 0);
