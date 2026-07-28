@@ -58,3 +58,55 @@ test('werewolf replay reconstructs saved seer and guard speech unchanged', () =>
   assert.doesNotMatch(String(seerEvent?.message), /5号玩家的身份是/);
   assert.doesNotMatch(String(guardEvent?.message), /守卫守护了2号/);
 });
+
+test('werewolf replay keeps saved witch speech unchanged', () => {
+  const events = buildWerewolfReplayPlaybackEvents({
+    type: 'werewolf',
+    players: [{ id: 3, role: 'witch', alive: true }],
+    rounds: [{
+      day: 1,
+      night: {
+        wolfTarget: 5,
+        witchSave: true,
+        witchSaveTarget: 5,
+        witchSaveReason: '我今晚用解药救下5号。',
+        witchPoisonTarget: 6,
+        witchPoisonReason: '我确定6号是狼，所以毒他。',
+      },
+    }],
+  } as never);
+
+  const witchEvents = events.filter((event) => event.type === 'witch-action');
+  const saveEvent = witchEvents.find((event) => event.actionType === 'witch_save');
+  const poisonEvent = witchEvents.find((event) => event.actionType === 'witch_poison');
+
+  assert.equal(saveEvent?.message, '我今晚用解药救下5号。');
+  assert.equal((saveEvent?.speech as { text?: string } | undefined)?.text, '我今晚用解药救下5号。');
+  assert.equal(poisonEvent?.message, '我确定6号是狼，所以毒他。');
+  assert.equal((poisonEvent?.speech as { text?: string } | undefined)?.text, '我确定6号是狼，所以毒他。');
+});
+
+test('werewolf replay keeps fixed witch fallbacks without saved speech', () => {
+  const events = buildWerewolfReplayPlaybackEvents({
+    type: 'werewolf',
+    players: [{ id: 3, role: 'witch', alive: true }],
+    rounds: [{
+      day: 1,
+      night: {
+        wolfTarget: 5,
+        witchSave: true,
+        witchSaveTarget: 5,
+        witchPoisonTarget: 6,
+      },
+    }],
+  } as never);
+
+  const witchEvents = events.filter((event) => event.type === 'witch-action');
+  const saveEvent = witchEvents.find((event) => event.actionType === 'witch_save');
+  const poisonEvent = witchEvents.find((event) => event.actionType === 'witch_poison');
+
+  assert.equal(saveEvent?.message, '女巫使用了解药。');
+  assert.equal((saveEvent?.speech as { text?: string } | undefined)?.text, '女巫使用了解药。');
+  assert.equal(poisonEvent?.message, '女巫毒了6号。');
+  assert.equal((poisonEvent?.speech as { text?: string } | undefined)?.text, '女巫毒了6号。');
+});

@@ -892,10 +892,14 @@ function appendWerewolfNightPlaybackEvents(
           reason: night.witchSave ? night.witchSaveReason || null : null,
         },
         ...(night.witchSave ? {
-          speech: buildRoleSpeech(replayPlayers, 'witch', resolveActionSpeech(night.witchSaveReason, '', '')),
+          speech: buildRoleSpeech(replayPlayers, 'witch', resolveActionSpeech(
+            night.witchSaveReason,
+            '',
+            '女巫使用了解药。',
+          )),
         } : {}),
         message: night.witchSave
-          ? resolveActionSpeech(night.witchSaveReason, '', '')
+          ? resolveActionSpeech(night.witchSaveReason, '', '女巫使用了解药。')
           : '',
       },
     );
@@ -932,11 +936,19 @@ function appendWerewolfNightPlaybackEvents(
           speech: buildRoleSpeech(
             replayPlayers,
             'witch',
-            resolveActionSpeech(night.witchPoisonReason, '', ''),
+            resolveActionSpeech(
+              night.witchPoisonReason,
+              '',
+              `女巫毒了${night.witchPoisonTarget}号。`,
+            ),
           ),
         } : {}),
         message: night.witchPoisonTarget
-          ? resolveActionSpeech(night.witchPoisonReason, '', '')
+          ? resolveActionSpeech(
+              night.witchPoisonReason,
+              '',
+              `女巫毒了${night.witchPoisonTarget}号。`,
+            )
           : '',
       },
     );
