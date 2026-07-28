@@ -1,4 +1,4 @@
-const NATURAL_ACTION_SPEECH_TYPES = new Set([
+export const NATURAL_ACTION_SPEECH_TYPES = [
   'fortune_teller_mark',
   'big_bad_wolf_kill',
   'ghost_bride_link',
@@ -27,14 +27,17 @@ const NATURAL_ACTION_SPEECH_TYPES = new Set([
   'dreamer_dream',
   'magician_swap',
   'elder_silence',
-]);
+];
 
-const RESULT_DEPENDENT_ACTION_SPEECH_TYPES = new Set([
+export const RESULT_DEPENDENT_ACTION_SPEECH_TYPES = [
   'seer_check',
   'lucky_seer_check',
   'fox_inspect',
   'black_merchant_gift',
-]);
+];
+
+const naturalActionSpeechTypeSet = new Set<string>(NATURAL_ACTION_SPEECH_TYPES);
+const resultDependentActionSpeechTypeSet = new Set<string>(RESULT_DEPENDENT_ACTION_SPEECH_TYPES);
 
 export interface ActionSpeechPromptInput {
   actionType: string;
@@ -45,11 +48,11 @@ export interface ActionSpeechPromptInput {
 }
 
 export function isNaturalActionSpeechType(actionType: string): boolean {
-  return NATURAL_ACTION_SPEECH_TYPES.has(actionType);
+  return naturalActionSpeechTypeSet.has(actionType);
 }
 
 export function isResultDependentActionSpeechType(actionType: string): boolean {
-  return RESULT_DEPENDENT_ACTION_SPEECH_TYPES.has(actionType);
+  return resultDependentActionSpeechTypeSet.has(actionType);
 }
 
 export function isEffectiveActionPayload(payload: Record<string, unknown>): boolean {
@@ -60,7 +63,7 @@ export function isEffectiveActionPayload(payload: Record<string, unknown>): bool
 
 export function actionSpeechContract(actionType: string): string {
   if (!isNaturalActionSpeechType(actionType)) return '';
-  return '执行行动时，reason 必须是一句完整的第一人称中文台词，包含行动或目标和理由；不得使用 Markdown、系统说明或 JSON，不得修改目标或结果。';
+  return '外层仍必须按既有结构化响应输出 JSON；reason 字段必须以第一人称写成一句完整的中文台词，包含行动或目标和理由；reason 文本不得使用 Markdown、系统旁白或 JSON 内容，不得修改目标或结果。';
 }
 
 export function buildActionSpeechPrompt(input: ActionSpeechPromptInput): string {
