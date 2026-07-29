@@ -3,20 +3,24 @@ import { classNames } from '../../../../utils/classNames';
 interface DebateDialogFooterProps {
   captainEnabled: boolean;
   speechEnabled: boolean;
+  debugMode: boolean;
   replayLocked: boolean;
   canStart: boolean;
   onCaptainEnabledChange?: (enabled: boolean) => void;
   onSpeechEnabledChange: (enabled: boolean) => void;
+  onDebugModeChange: (enabled: boolean) => void;
   onStart: () => void;
 }
 
 export function DebateDialogFooter({
   captainEnabled,
   speechEnabled,
+  debugMode,
   replayLocked,
   canStart,
   onCaptainEnabledChange,
   onSpeechEnabledChange,
+  onDebugModeChange,
   onStart
 }: DebateDialogFooterProps) {
   return (
@@ -35,6 +39,16 @@ export function DebateDialogFooter({
         <button type="button" className={classNames('dialog-switch', speechEnabled && 'active')} onClick={() => onSpeechEnabledChange(!speechEnabled)}>
           <span className="switch-track"><i /></span>
           <strong>{speechEnabled ? '语音开启' : '语音关闭'}</strong>
+        </button>
+        <button
+          type="button"
+          className={classNames('dialog-switch', debugMode && 'active')}
+          onClick={() => onDebugModeChange(!debugMode)}
+          aria-pressed={debugMode}
+          title="使用固定发言与浏览器语音跑完整流程"
+        >
+          <span className="switch-track"><i /></span>
+          <strong>{debugMode ? '调试开启' : '调试关闭'}</strong>
         </button>
       </div>
       <button type="button" className="primary debate-start-submit" onClick={onStart} disabled={!canStart}>保存并开始</button>

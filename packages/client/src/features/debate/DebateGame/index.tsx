@@ -47,6 +47,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
   const [captainEnabled, setCaptainEnabled] = useState(true);
   const [debateTeamDraft, setDebateTeamDraft] = useState<DebateTeamDraft>(() => createDefaultDebateTeams([]));
   const [selectedHostId, setSelectedHostId] = useState<number | null>(null);
+  const [debugMode, setDebugMode] = useState(false);
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const speechPlaybackRef = useRef<ReturnType<typeof useDebateSpeechPlayback> | null>(null);
   const { speechEnabled, setSpeechEnabled, speak, unlock, cancel } = useSpeechQueue();
@@ -150,10 +151,13 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
     setTopicDialogOpen(true);
   }
 
-  function startGame(topic: DebateTopic = topicDraft, teams: DebateTeamDraft = debateTeamDraft, options: { replayGameId?: string; hostId?: number | null } = {}): void {
+  function startGame(topic: DebateTopic = topicDraft, teams: DebateTeamDraft = debateTeamDraft, options: { replayGameId?: string; hostId?: number | null; debugMode?: boolean } = {}): void {
     resetToIdle('');
     if (speechEnabled) unlock();
     const hostId = options.hostId ?? selectedHostId;
+    const nextDebugMode = options.replayGameId
+      ? false
+      : Boolean(options.debugMode ?? debugMode);
     const nextTopic = normalizeTopicDraft(topic);
     const playerIdsForTeams = availablePlayers.map((player) => player.id);
     const normalizedTeamsForStart = normalizeDebateTeamDraft(teams, playerIdsForTeams);
@@ -176,7 +180,8 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
       topic: nextTopic as unknown as Record<string, unknown>,
       hostId: hostId || undefined,
       debateTeams: shouldSendTeams ? (nextTeams as unknown as Record<string, unknown>) : null,
-      replayGameId: options.replayGameId || ''
+      replayGameId: options.replayGameId || '',
+      debugMode: nextDebugMode
     });
   }
 
@@ -317,10 +322,12 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
           captainEnabled={captainEnabled}
           onCaptainEnabledChange={setCaptainEnabled}
           speechEnabled={speechEnabled}
+          debugMode={debugMode}
           onSpeechEnabledChange={(value) => {
             setSpeechEnabled(value);
             if (value) unlock();
           }}
+          onDebugModeChange={setDebugMode}
           hostId={selectedHostId}
           onHostChange={(id) => setSelectedHostId(id ?? null)}
           onCancel={() => setTopicDialogOpen(false)}

@@ -24,10 +24,12 @@ interface DebateTopicDialogProps {
   onCaptainEnabledChange: (enabled: boolean) => void;
   speechEnabled: boolean;
   onSpeechEnabledChange: (enabled: boolean) => void;
+  debugMode: boolean;
+  onDebugModeChange: (enabled: boolean) => void;
   hostId: number | null;
   onHostChange: (id: number | null) => void;
   onCancel: () => void;
-  onStart: (topic: DebateTopic, teams: DebateTeamDraft, opts: { hostId: number | null }) => void;
+  onStart: (topic: DebateTopic, teams: DebateTeamDraft, opts: { hostId: number | null; debugMode: boolean }) => void;
 }
 
 export function DebateTopicDialog({
@@ -41,6 +43,8 @@ export function DebateTopicDialog({
   onCaptainEnabledChange,
   speechEnabled,
   onSpeechEnabledChange,
+  debugMode,
+  onDebugModeChange,
   hostId,
   onCancel,
   onStart
@@ -213,11 +217,13 @@ export function DebateTopicDialog({
         <DebateDialogFooter
           captainEnabled={captainEnabled}
           speechEnabled={speechEnabled}
+          debugMode={debugMode}
           replayLocked={isReplayLocked}
           canStart={canStart}
           onCaptainEnabledChange={onCaptainEnabledChange}
           onSpeechEnabledChange={onSpeechEnabledChange}
-          onStart={() => onStart(effectiveTopic, normalizedTeams, { hostId })}
+          onDebugModeChange={onDebugModeChange}
+          onStart={() => onStart(effectiveTopic, normalizedTeams, { hostId, debugMode })}
         />
       </section>
     </div>
