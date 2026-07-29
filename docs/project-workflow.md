@@ -276,6 +276,15 @@ Shadow audit 接入方式：
 - `applyAiTurnResult` 把 AI 输出写入 phase、speech、winner、mvp。
 - `serializeDebateState` 输出前端可展示状态。
 
+### 辩论赛调试模式
+
+- `debugMode` 会在 GameEngine 和直接 workflow 两条创建路径中保留。
+- 辩论技能层在调用模型前返回固定发言、合法裁判结果和合法 MVP 目标，
+  但仍执行正式阶段、事件、校验和结束流程。
+- 序列化快照包含 `debugMode: true`，因此通用媒体层不生成服务端 TTS；
+  客户端继续使用浏览器语音和字幕。
+- 通用 game-socket 保存逻辑已对调试对局跳过正式历史写入。
+
 ### 狼人杀流程
 
 入口：

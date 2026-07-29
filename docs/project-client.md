@@ -130,6 +130,9 @@ packages/client/
 - `utils/report.ts`：报告生成相关工具。
 - `constants.ts`：辩论赛常量。
 
+- 辩论赛开局弹窗提供“调试模式”开关。开启后仍通过现有 WebSocket `start`
+  消息发送 `debugMode: true`；回放入口强制关闭调试模式。
+- 调试模式沿用正式事件队列、字幕和浏览器语音，不新增独立页面或播放链路。
 ### 狼人杀模块
 
 目录：`packages/client/src/features/werewolf`
