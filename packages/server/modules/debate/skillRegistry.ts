@@ -38,17 +38,20 @@ function createDebateSkills(): Skill[] {
     {
       action: 'crossfire_question',
       prompt: '向对方提出尖锐问题。',
-      execute: ({ actor, phase, target }: SkillContext) => askDebateText(actor, { ...phase, limit: PHASE_LIMITS.crossfire_question }, `请向${getDebateRoleName(target || null)}提出一个尖锐问题。`, '请问对方如何解释本方标准下的关键风险？', 'crossfire_question'),
+      execute: ({ actor, phase, target, config }: SkillContext) => askDebateText(actor, { ...phase, limit: PHASE_LIMITS.crossfire_question }, `请向${getDebateRoleName(target || null)}提出一个尖锐问题。`, '请问对方如何解释本方标准下的关键风险？', 'crossfire_question', Boolean(config.debugMode)),
     },
     {
       action: 'crossfire_answer',
       prompt: '回应对方问题并反击。',
-      execute: ({ actor, phase, target }: SkillContext) => askDebateText(actor, phase, `请回应${getDebateRoleName(target || null)}刚才的问题，并反击一句。`, '这个问题忽略了前提差异，我方标准更能处理边界情况。', 'crossfire_answer'),
+      execute: ({ actor, phase, target, config }: SkillContext) => askDebateText(actor, phase, `请回应${getDebateRoleName(target || null)}刚才的问题，并反击一句。`, '这个问题忽略了前提差异，我方标准更能处理边界情况。', 'crossfire_answer', Boolean(config.debugMode)),
     },
     {
       action: 'judge_review',
       prompt: '点评双方表现并给出胜负倾向。',
-      async execute({ actor, state }: SkillContext) {
+      async execute({ actor, state, config }: SkillContext) {
+        if (config.debugMode) {
+          return { winner: 'pro', text: `${actor.name}调试判定：正方胜。` };
+        }
         const parsed = await (actor as unknown as { playerAgent: { askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null> } }).playerAgent.askJson([
           '请点评双方表现，并给出胜负倾向。',
           '公开赛况已通过上文增量同步。',
@@ -69,9 +72,15 @@ function createDebateSkills(): Skill[] {
     {
       action: 'vote_mvp',
       prompt: '评选最佳辩手。',
-      async execute({ actor, contestants, fallbackAudit }: SkillContext) {
-        const fallback = (contestants as DebatePlayer[])[Math.floor(Math.random() * (contestants as DebatePlayer[]).length)];
+      async execute({ actor, contestants, fallbackAudit, config }: SkillContext) {
         const contestantList = (contestants as DebatePlayer[]);
+        if (!contestantList.length) {
+          throw new Error('Debate MVP contestants are required');
+        }
+        if (config.debugMode) {
+          return { voterId: actor.id, target: contestantList[0].id };
+        }
+        const fallback = contestantList[Math.floor(Math.random() * contestantList.length)];
         const parsed = await (actor as unknown as { playerAgent: { askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null> } }).playerAgent.askJson([
           '请从正反方 8 位选手中评选最佳辩手。',
           `可选对象：${contestantList.map((agent) => `${seatLabel(agent.side, agent.sideIndex)}${agent.nickname}`).join('、')}`,
@@ -112,7 +121,7 @@ function textSkill(
   return {
     action,
     prompt: instruction,
-    execute: ({ actor, phase }: SkillContext) => askDebateText(actor, phase, instruction, fallbackFactory(actor), action),
+    execute: ({ actor, phase, config }: SkillContext) => askDebateText(actor, phase, instruction, fallbackFactory(actor), action, Boolean(config.debugMode)),
   };
 }
 
@@ -122,7 +131,9 @@ async function askDebateText(
   instruction: string,
   fallback: string,
   skillId: string,
+  debugMode = false,
 ): Promise<string | { content: string; thinking: string }> {
+  if (debugMode) return fallback;
   const limit = phase.limit || 200;
   const prompt = [
     `当前环节：${phase.name}`,

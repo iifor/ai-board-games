@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   buildDebateSpeechEvents,
   projectDebateOutboxEvent,
+  runDebateWorkflow,
 } from '../../packages/server/modules/debate/workflow';
+import { getAiConfig } from '../../packages/server/config';
 
 test('debate ai turn emits a playable speech event with game snapshot', () => {
   const match = createMatch({ debugMode: true });
@@ -93,6 +95,69 @@ test('debate judge review emits speech and mvp vote does not', () => {
 
   assert.deepEqual(mvpEvents, []);
 });
+
+test('debate debug mode completes without model credentials', async (t) => {
+  const base = getAiConfig();
+  const players = createDebugPlayers();
+  const aiConfigModule = require('../../packages/server/config/ai') as { getAiConfig: typeof getAiConfig };
+  const originalGetAiConfig = aiConfigModule.getAiConfig;
+  aiConfigModule.getAiConfig = () => ({ ...base, players, realReady: false, missingProviders: [] });
+  t.after(() => { aiConfigModule.getAiConfig = originalGetAiConfig; });
+  const proIds = players.slice(0, 4).map((player) => player.id);
+  const conIds = players.slice(4, 8).map((player) => player.id);
+  const judgeIds = players.slice(8, 12).map((player) => player.id);
+
+  const game = await runDebateWorkflow({
+    ...base,
+    players,
+    debugMode: true,
+    topic: {
+      title: '调试模式是否应复用正式流程？',
+      proPosition: '应该复用',
+      conPosition: '不应复用',
+    },
+    debateTeams: {
+      proIds,
+      conIds,
+      judgeIds,
+      captainEnabled: true,
+      proCaptainId: proIds[0],
+      conCaptainId: conIds[0],
+    },
+  });
+
+  assert.equal(game.debugMode, true);
+  assert.equal(game.winner, 'pro');
+  assert.ok(game.phases.length > 0);
+  assert.ok(game.phases.every((phase) =>
+    phase.speeches.every((speech) => speech.text.trim().length > 0)
+  ));
+  assert.ok(game.mvp);
+});
+
+function createDebugPlayers() {
+  return Array.from({ length: 12 }, (_, index) => ({
+    id: index + 1,
+    name: `Debug ${index + 1}`,
+    nickname: `Debug ${index + 1}`,
+    avatar: '',
+    avatarUrl: '',
+    provider: '__debug__',
+    providerName: '__debug__',
+    baseUrl: 'http://127.0.0.1:9',
+    apiKeyEnv: '__DEBUG__',
+    apiKey: '',
+    apiFormat: 'openai-compatible',
+    model: '__debug__',
+    modelId: null,
+    temperature: 0.5,
+    personality: 'test player',
+    sex: 'unknown',
+    voicePackageId: null,
+    thinkingEnabled: false,
+    fallbackModel: null,
+  }));
+}
 
 function createMatch(config: Record<string, unknown> = {}): Record<string, unknown> {
   return {
