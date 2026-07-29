@@ -44,6 +44,13 @@ test('resolves built-in player aliases to stable public poster paths', () => {
   assert.equal(resolvePlayerPoster({ nickname: '自定义玩家' }), null);
 });
 
+test('resolves transparent cutout paths without changing default poster paths', () => {
+  const player = { nickname: 'Claude Code' };
+  assert.equal(resolvePlayerPoster(player), '/player-posters/claude-code.webp');
+  assert.equal(resolvePlayerPoster(player, 'cutout'), '/player-poster-cutouts/claude-code.webp');
+  assert.equal(resolvePlayerPoster({ nickname: '自定义玩家' }, 'cutout'), null);
+});
+
 test('ships the exact 13 optimized poster assets', () => {
   const posterDir = path.join(process.cwd(), 'packages', 'client', 'public', 'player-posters');
   const posterFiles = fs.readdirSync(posterDir).filter((file) => file.endsWith('.webp')).sort();
@@ -53,16 +60,37 @@ test('ships the exact 13 optimized poster assets', () => {
   }
 });
 
+test('ships the exact 13 transparent speaker cutouts', () => {
+  const cutoutDir = path.join(process.cwd(), 'packages', 'client', 'public', 'player-poster-cutouts');
+  const cutoutFiles = fs.readdirSync(cutoutDir).filter((file) => file.endsWith('.webp')).sort();
+  assert.deepEqual(cutoutFiles, EXPECTED_POSTERS);
+  for (const file of cutoutFiles) {
+    assert.ok(fs.statSync(path.join(cutoutDir, file)).size > 20_000, `${file} should contain a real cutout`);
+  }
+});
+
 test('scopes poster spotlight wiring to v2 game routes', () => {
   const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), 'utf8');
   const debateGame = read('packages/client/src/features/debate/DebateGame/index.tsx');
   const werewolfArena = read('packages/client/src/features/werewolf-v2/components/WerewolfArenaV2/index.tsx');
+  const werewolfCss = read('packages/client/src/features/werewolf-v2/components/WerewolfArenaV2/index.css');
   const undercoverGame = read('packages/client/src/features/undercover/UndercoverGame/index.tsx');
   const app = read('packages/client/src/App.tsx');
 
   assert.match(debateGame, /variant = 'classic'/);
   assert.match(debateGame, /showPlayerPoster=\{variant === 'v2'\}/);
   assert.match(werewolfArena, /<PlayerPosterSpotlight/);
+  assert.match(werewolfArena, /variant="cutout"/);
+  assert.match(werewolfCss, /object-fit:\s*contain/);
+  assert.match(
+    werewolfCss,
+    /\[data-speech-active='true'\]\s+\.interaction-stage\s*\{\s*display:\s*none;/,
+  );
+  assert.match(
+    werewolfCss,
+    /\.werewolf-v2-speaker-backdrop\s+\.player-poster-spotlight__card::after\s*\{\s*content:\s*none;/,
+  );
+  assert.doesNotMatch(werewolfCss, /player-poster-spotlight__backdrop/);
   assert.match(undercoverGame, /variant = 'classic'/);
   assert.match(undercoverGame, /showPlayerPoster=\{variant === 'v2'\}/);
   assert.match(app, /variant=\{route\.version === 'v2' \? 'v2' : 'classic'\}/);
@@ -79,4 +107,8 @@ test('keeps the spotlight accessible and resilient', () => {
   assert.match(component, /onError=/);
   assert.match(component, /player-poster-spotlight__backdrop/);
   assert.match(component, /player-poster-spotlight__card/);
+  assert.match(component, /variant = 'poster'/);
+  assert.match(component, /resolvePlayerPoster\(player, variant\)/);
+  assert.match(component, /variant === 'cutout'/);
+  assert.match(component, /is-cutout/);
 });

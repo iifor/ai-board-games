@@ -40,12 +40,22 @@ const POSTER_SLUG_BY_ALIAS: Record<string, string> = {
   metaai: 'meta',
 };
 
-export function resolvePlayerPoster(player?: PosterPlayer | null): string | null {
+export type PlayerPosterVariant = 'poster' | 'cutout';
+
+const POSTER_DIRECTORY_BY_VARIANT: Record<PlayerPosterVariant, string> = {
+  poster: 'player-posters',
+  cutout: 'player-poster-cutouts',
+};
+
+export function resolvePlayerPoster(
+  player?: PosterPlayer | null,
+  variant: PlayerPosterVariant = 'poster',
+): string | null {
   const slug = [player?.nickname, player?.name]
     .map(normalizePlayerAlias)
     .map((alias) => POSTER_SLUG_BY_ALIAS[alias])
     .find(Boolean);
-  return slug ? `/player-posters/${slug}.webp` : null;
+  return slug ? `/${POSTER_DIRECTORY_BY_VARIANT[variant]}/${slug}.webp` : null;
 }
 
 export function getPosterPlayerName(player?: PosterPlayer | null): string {

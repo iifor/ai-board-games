@@ -26,7 +26,14 @@ export function WerewolfArenaV2(props: WerewolfGameArenaProps) {
   const viewProps = { ...props, activeEvent: foregroundEventRef.current, activeSpeech: foregroundSpeech };
   return <section className="werewolf-v2-arena" data-completed={props.game.winner ? 'true' : 'false'} data-phase={phase} data-speech-active={foregroundSpeech ? 'true' : 'false'}>
     <div className="werewolf-v2-background" aria-hidden="true"><i className="is-night" /><i className="is-day" /></div>
-    {speakingPlayer && <PlayerPosterSpotlight key={speakingPlayer.id} player={speakingPlayer} className="werewolf-v2-speaker-backdrop" />}
+    {speakingPlayer && (
+      <PlayerPosterSpotlight
+        key={speakingPlayer.id}
+        player={speakingPlayer}
+        className="werewolf-v2-speaker-backdrop"
+        variant="cutout"
+      />
+    )}
     {props.clientViewMode === 'player' ? <PlayerWerewolfView {...viewProps} /> : <GodWerewolfView {...viewProps} />}
     {foregroundSpeech && <WerewolfBottomSpeechBar speech={foregroundSpeech} players={players} streamMessage={props.streamMessage} />}
     <WerewolfResult game={props.game} />
