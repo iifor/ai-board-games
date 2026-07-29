@@ -367,6 +367,7 @@ type GameSocketStartPayload = {
   hostId?: number | string;
   topic?: unknown;
   debateTeams?: unknown;
+  debugMode?: boolean;
   werewolfMode?: string;
   clientViewMode?: string;
   replayView?: boolean;
