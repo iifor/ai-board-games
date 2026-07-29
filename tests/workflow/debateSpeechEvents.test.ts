@@ -133,6 +133,7 @@ test('debate debug mode completes without model credentials', async (t) => {
     phase.speeches.every((speech) => speech.text.trim().length > 0)
   ));
   assert.ok(game.mvp);
+  assert.deepEqual(game.fallbackAudit, []);
 });
 
 function createDebugPlayers() {
