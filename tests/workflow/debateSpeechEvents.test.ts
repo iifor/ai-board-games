@@ -6,7 +6,7 @@ import {
 } from '../../packages/server/modules/debate/workflow';
 
 test('debate ai turn emits a playable speech event with game snapshot', () => {
-  const match = createMatch();
+  const match = createMatch({ debugMode: true });
   const speech = {
     phaseId: 'opening',
     kind: 'opening',
@@ -41,6 +41,7 @@ test('debate ai turn emits a playable speech event with game snapshot', () => {
   assert.equal((payload.speech as Record<string, unknown>).playerId, 1);
   assert.equal((payload.phase as Record<string, unknown>).id, 'opening');
   assert.equal((payload.game as Record<string, unknown>).type, 'debate');
+  assert.equal((payload.game as Record<string, unknown>).debugMode, true);
 
   const projected = projectDebateOutboxEvent({
     id: 1,
@@ -93,10 +94,10 @@ test('debate judge review emits speech and mvp vote does not', () => {
   assert.deepEqual(mvpEvents, []);
 });
 
-function createMatch(): Record<string, unknown> {
+function createMatch(config: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'm-debate',
-    config: {},
+    config,
     state: {},
     status: 'running',
     createdAt: 'now',

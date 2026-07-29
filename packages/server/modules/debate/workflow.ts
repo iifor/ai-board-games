@@ -281,6 +281,7 @@ function createDebateWorkflowMatch(config: DebateConfig): WorkflowMatch {
     topic: config.topic,
     debateTeams: config.debateTeams,
     selectedPlayerIds: (config as Record<string, unknown>).selectedPlayerIds || (config.players || []).map((player) => player.id),
+    debugMode: Boolean(config.debugMode),
   };
   return _createWorkflowMatch({
     workflowId: DEBATE_WORKFLOW_ID,

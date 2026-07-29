@@ -239,6 +239,7 @@ function serializeDebateState(match: WorkflowMatch, state: WorkflowState): Recor
     gameType: 'debate',
     type: 'debate',
     mode: 'real',
+    debugMode: Boolean(match.config.debugMode),
     topic: state.topic,
     host: state.host,
     players: state.players || [],
@@ -288,6 +289,7 @@ function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): Debate
     topic: matchConfig.topic as Topic,
     debateTeams: matchConfig.debateTeams as DebateConfig['debateTeams'],
     selectedPlayerIds: [...selectedIds],
+    debugMode: Boolean(matchConfig.debugMode),
     host: base.host || {},
     players,
   };

@@ -91,6 +91,7 @@ interface DebateConfig {
   topic?: DebateTopic;
   debateTeams?: DebateTeamsConfig;
   host?: DebateHost;
+  debugMode?: boolean;
   [key: string]: unknown;
 }
 
@@ -99,6 +100,7 @@ interface SerializedGame {
   gameType: string;
   type: string;
   mode: string;
+  debugMode?: boolean;
   topic: DebateTopic;
   event: Record<string, unknown>;
   host: Record<string, unknown>;

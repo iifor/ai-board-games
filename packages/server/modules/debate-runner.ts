@@ -30,6 +30,7 @@ async function runDebateViaEngine(
     topic: config.topic,
     debateTeams: config.debateTeams,
     selectedPlayerIds: (config as Record<string, unknown>).selectedPlayerIds || (config.players || []).map((player) => player.id),
+    debugMode: Boolean(config.debugMode),
   };
   const matchResult = engine.createMatch({
     gameType: 'debate',
