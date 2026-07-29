@@ -128,10 +128,9 @@ test('debate debug mode completes without model credentials', async (t) => {
 
   assert.equal(game.debugMode, true);
   assert.equal(game.winner, 'pro');
-  assert.ok(game.phases.length > 0);
-  assert.ok(game.phases.every((phase) =>
-    phase.speeches.every((speech) => speech.text.trim().length > 0)
-  ));
+  const speeches = game.phases.flatMap((phase) => phase.speeches);
+  assert.ok(speeches.length > 0);
+  assert.ok(speeches.every((speech) => speech.text.trim().length > 0));
   assert.ok(game.mvp);
   assert.deepEqual(game.fallbackAudit, []);
 });
