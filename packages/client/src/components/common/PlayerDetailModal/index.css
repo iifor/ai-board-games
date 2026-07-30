@@ -1,0 +1,197 @@
+.player-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  padding: 24px;
+  background: rgba(0, 4, 18, 0.76);
+  backdrop-filter: blur(12px);
+  place-items: center;
+}
+
+.player-detail-modal {
+  position: relative;
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid rgba(105, 159, 239, 0.56);
+  border-radius: 18px;
+  color: #eef4ff;
+  background:
+    radial-gradient(circle at 24% 16%, rgba(73, 128, 255, 0.16), transparent 38%),
+    linear-gradient(145deg, rgba(8, 24, 58, 0.98), rgba(3, 10, 30, 0.98));
+  box-shadow: 0 28px 88px rgba(0, 0, 0, 0.58), inset 0 0 32px rgba(71, 132, 255, 0.08);
+}
+
+.player-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.15fr);
+  gap: 28px;
+}
+
+.player-detail-portrait {
+  position: relative;
+  min-height: 430px;
+  overflow: hidden;
+  border: 1px solid rgba(126, 181, 255, 0.16);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(78, 139, 255, 0.2), transparent 58%),
+    linear-gradient(180deg, rgba(16, 42, 88, 0.24), rgba(2, 9, 27, 0.3));
+}
+
+.player-detail-portrait::after {
+  position: absolute;
+  right: 10%;
+  bottom: 7%;
+  left: 10%;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(41, 101, 202, 0.24);
+  filter: blur(12px);
+  content: "";
+}
+
+.player-detail-avatar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 128px;
+  height: 128px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(126, 181, 255, 0.72);
+  border-radius: 50%;
+  color: #ffffff;
+  background: rgba(3, 13, 35, 0.9) center / cover;
+  box-shadow: 0 0 30px rgba(53, 127, 255, 0.26);
+  font-size: 42px;
+  font-weight: 900;
+  place-items: center;
+}
+
+.player-detail-cutout {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.player-detail-close {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(126, 181, 255, 0.3);
+  border-radius: 50%;
+  color: #eef4ff;
+  background: rgba(3, 13, 35, 0.72);
+  cursor: pointer;
+  place-items: center;
+}
+
+.player-detail-close:hover {
+  border-color: rgba(143, 232, 255, 0.7);
+  background: rgba(16, 48, 94, 0.9);
+}
+
+.player-detail-close:focus-visible {
+  outline: 2px solid #8fe8ff;
+  outline-offset: 3px;
+}
+
+.player-detail-content,
+.player-detail-section,
+.player-detail-section dl {
+  min-width: 0;
+}
+
+.player-detail-content {
+  align-self: center;
+  padding: 24px 8px 24px 0;
+}
+
+.player-detail-head h3,
+.player-detail-head p,
+.player-detail-section h4,
+.player-detail-section dl {
+  margin: 0;
+}
+
+.player-detail-head h3 {
+  padding-right: 44px;
+  color: #ffffff;
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.1;
+  text-shadow: 0 0 18px rgba(103, 170, 255, 0.32);
+}
+
+.player-detail-head p {
+  margin-top: 8px;
+  color: #9edcff;
+  font-weight: 700;
+}
+
+.player-detail-section {
+  margin-top: 24px;
+}
+
+.player-detail-section h4 {
+  margin-bottom: 8px;
+  color: rgba(158, 220, 255, 0.82);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+}
+
+.player-detail-section dl > div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid rgba(126, 163, 232, 0.18);
+}
+
+.player-detail-section dt {
+  color: rgba(205, 222, 250, 0.62);
+  font-weight: 700;
+}
+
+.player-detail-section dd {
+  margin: 0;
+  color: rgba(245, 248, 255, 0.94);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+@media (max-width: 640px) {
+  .player-detail-backdrop {
+    padding: 12px;
+  }
+
+  .player-detail-modal {
+    width: min(100%, 520px);
+    max-height: calc(100vh - 24px);
+    padding: 18px;
+  }
+
+  .player-detail-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .player-detail-portrait {
+    min-height: 260px;
+  }
+
+  .player-detail-content {
+    padding: 8px 0 4px;
+  }
+}

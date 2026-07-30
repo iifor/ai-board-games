@@ -303,9 +303,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
       {selectedPlayer && (
         <PlayerDetailModal
           player={selectedPlayer}
-          subtitle={getDebatePlayerLabel(displayGame.players || [], selectedPlayer.id)}
           fields={[
-            { label: '性格', value: selectedPlayer.personality || '暂无' },
             { label: '本局身份', value: getDebatePlayerLabel(displayGame.players || [], selectedPlayer.id) },
             { label: '身份说明', value: getDebateIdentityDescription(selectedPlayer) }
           ]}

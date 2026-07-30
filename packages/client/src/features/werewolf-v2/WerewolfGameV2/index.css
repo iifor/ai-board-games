@@ -93,11 +93,10 @@
 .werewolf-shell--v2 .werewolf-mode-dialog footer { min-height: 44px; padding-top: 12px; border-top: 1px solid rgba(119, 150, 225, .16); }
 .werewolf-shell--v2 .werewolf-mode-dialog footer .primary { min-width: 142px; border-color: rgba(104, 157, 255, .6); color: #f1f6ff; background: linear-gradient(180deg, rgba(43, 96, 196, .92), rgba(22, 54, 126, .92)); }
 .werewolf-shell--v2 .werewolf-setup-error { margin: -4px 0 0; padding: 8px 12px; border: 1px solid rgba(255, 105, 119, .28); border-radius: 9px; background: rgba(91, 19, 35, .32); font-size: 12px; }
-.werewolf-shell--v2 .thinking-backdrop, .werewolf-shell--v2 .player-detail-backdrop { z-index: 130; background: radial-gradient(circle at 50% 38%, rgba(18, 52, 111, .22), transparent 42%), rgba(1, 5, 17, .76); backdrop-filter: blur(14px); }
-.werewolf-shell--v2 .thinking-dialog, .werewolf-shell--v2 .player-detail-modal { border-color: rgba(92, 151, 255, .42); border-radius: 18px; background: linear-gradient(180deg, rgba(8, 24, 58, .96), rgba(3, 10, 30, .96)); box-shadow: 0 28px 88px rgba(0, 0, 0, .56), inset 0 0 32px rgba(71, 132, 255, .08); }
+.werewolf-shell--v2 .thinking-backdrop { z-index: 130; background: radial-gradient(circle at 50% 38%, rgba(18, 52, 111, .22), transparent 42%), rgba(1, 5, 17, .76); backdrop-filter: blur(14px); }
+.werewolf-shell--v2 .thinking-dialog { border-color: rgba(92, 151, 255, .42); border-radius: 18px; background: linear-gradient(180deg, rgba(8, 24, 58, .96), rgba(3, 10, 30, .96)); box-shadow: 0 28px 88px rgba(0, 0, 0, .56), inset 0 0 32px rgba(71, 132, 255, .08); }
 .werewolf-shell--v2 .thinking-header { border-color: rgba(102, 155, 255, .18); }
 .werewolf-shell--v2 .thinking-header strong { color: #e7f1ff; font-size: 18px; }
-.werewolf-shell--v2 .player-detail-avatar { border-color: rgba(110, 174, 255, .76); box-shadow: 0 0 24px rgba(53, 127, 255, .24); }
 @media (max-width: 1000px) {
   .werewolf-shell--v2 .werewolf-player-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
