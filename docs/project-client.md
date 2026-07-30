@@ -415,7 +415,7 @@ pnpm --filter @ai-presenter/client run check
 - The bottom speech bar and player poster are reserved for speech attributed to a real player. Host and system narration continue through the existing playback/stream message path without creating transient foreground panels.
 - `actionWindow.targetIds` is an eligibility set, not a resolved selection. The foreground target relation and seat target badges render only explicit submitted or resolved target fields from display events.
 - This is a client presentation rule only. WebSocket events, ACK timing, replay payloads and server-authoritative game state are unchanged.
-- 发言人物使用 `/player-poster-cutouts/` 下由 `resolvePlayerPoster` 映射的同名透明 WebP；只展示人物主体。
+- 发言人物使用 `/player-poster-cutouts/` 下由 `resolvePlayerPoster` 映射的同名透明全身 WebP；13 位人物均从头顶到鞋底完整入镜并保留透明安全边距。
 - 透明立绘失败时依次回退玩家头像和姓名首字母，不回退旧海报。
 - 发言期间中央交互层隐藏，人物位于顶部阶段栏与底部字幕之间的安全区。
 - 其他游戏模式继续使用 `/player-posters/` 下由 `resolvePlayerPoster` 映射的同名海报 WebP。
