@@ -35,12 +35,8 @@
 
 ```ts
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import test from 'node:test';
 import { normalizeRandomizedDebateTeams } from '../../packages/client/src/features/debate/debateUtils';
-
-const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), 'utf8');
 
 test('keeps any twelve players returned from a thirteen-player randomization request', () => {
   const result = normalizeRandomizedDebateTeams({
@@ -147,17 +143,38 @@ Expected: both commands pass.
 - `DebateTeamBoard` and `DebateTeamColumn` add `selectedPlayerId`, `onPlayerSelect`, and `onSlotClick`.
 - All assignment still ends in `DebateTopicDialog.assignPlayerToSlot`.
 
-- [ ] **Step 1: Add a focused source contract test**
+- [ ] **Step 1: Add a focused rendered-component test**
 
 ```ts
-test('exposes native button semantics for click and keyboard assignment', () => {
-  const playerCard = read('packages/client/src/features/debate/components/DraggableDebatePlayer/index.tsx');
-  const teamColumn = read('packages/client/src/features/debate/components/DebateTeamColumn/index.tsx');
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
-  assert.match(playerCard, /<button/);
-  assert.match(playerCard, /aria-pressed=/);
-  assert.match(teamColumn, /className="team-slot-empty"/);
-  assert.match(teamColumn, /onSlotClick/);
+const Module = require('node:module');
+Module._extensions['.css'] = () => undefined;
+const { DraggableDebatePlayer } = require('../../packages/client/src/features/debate/components/DraggableDebatePlayer');
+const { DebateTeamColumn } = require('../../packages/client/src/features/debate/components/DebateTeamColumn');
+
+test('renders player and empty-slot assignment as keyboard-operable buttons', () => {
+  const player = { id: 13, nickname: '主持人' };
+  const card = renderToStaticMarkup(
+    React.createElement(DraggableDebatePlayer, { player, selected: true, onClick: () => undefined }),
+  );
+  const column = renderToStaticMarkup(
+    React.createElement(DebateTeamColumn, {
+      title: '正方',
+      tone: 'pro',
+      ids: [],
+      slots: 1,
+      labelPrefix: '正方',
+      getPlayer: () => undefined,
+      onDrop: () => undefined,
+      onSlotClick: () => undefined,
+    }),
+  );
+
+  assert.match(card, /^<button/);
+  assert.match(card, /aria-pressed="true"/);
+  assert.match(column, /<button[^>]*class="team-slot-empty"/);
 });
 ```
 
@@ -167,7 +184,7 @@ Run:
 pnpm.cmd run test:unit -- tests/unit/debateSetup.test.ts
 ```
 
-Expected: FAIL because `DraggableDebatePlayer` is still a `<div>` and `DebateTeamColumn` has no click callback.
+Expected: FAIL because the new props do not exist and `DraggableDebatePlayer` is still a `<div>`.
 
 - [ ] **Step 2: Convert the player card root to a native button**
 
