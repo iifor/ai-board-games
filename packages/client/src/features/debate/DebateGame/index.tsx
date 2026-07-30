@@ -9,7 +9,7 @@ import { DebateControls } from '../components/DebateControls';
 import { ThinkingModal } from '../../../components/common/ThinkingModal';
 import { DebateTopicDialog } from '../components/DebateTopicDialog';
 import { DebateResultModal } from '../components/DebateResultModal';
-import bgDebate from '../../../asserts/debate.png';
+import bgDebate from '../../../asserts/debate-stage-v2.png';
 import { useDebateSpeechPlayback } from '../hooks/useDebateSpeechPlayback';
 import {
   normalizeTopicDraft,
@@ -19,6 +19,7 @@ import {
   createDefaultDebateTeams,
   getDebateSpeakerLabel,
   getDebatePlayerLabel,
+  getDebateSelectablePlayers,
   getDebateIdentityDescription,
   getDebateNarration
 } from '../utils';
@@ -63,7 +64,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
     fetchAiHealth()
       .then((data) => {
         if (cancelled) return;
-        setAvailablePlayers(data.players || []);
+        setAvailablePlayers(getDebateSelectablePlayers(data.players || [], data.defaultHostId));
       })
       .catch(() => {
         if (!cancelled) setAvailablePlayers([]);

@@ -8,7 +8,7 @@
 
 import { getGameEngine } from './engine-registry';
 import { drainAiTasks, listPendingOutbox, markOutboxSent, getDebugState } from './workflow-engine/service';
-import { serializeDebateState } from './debate/helpers';
+import { createInitialDebateState, serializeDebateState } from './debate/helpers';
 import type { DebateConfig, SerializedGame } from './debate/utils';
 import type { WorkflowMatch, WorkflowEvent } from './debate/helpers';
 
@@ -35,6 +35,7 @@ async function runDebateViaEngine(
   const matchResult = engine.createMatch({
     gameType: 'debate',
     config: runtimeConfig,
+    initialState: createInitialDebateState(config) as unknown as Record<string, unknown>,
   });
   const matchId = (matchResult as unknown as { id: string }).id;
 

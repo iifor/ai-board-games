@@ -190,6 +190,7 @@ flowchart TD
 `game-engine` 是所有游戏的统一注册入口。辩论赛和狼人杀通过兼容 runner 委托 `GameEngine` 创建对局；谁是卧底及后续定义型游戏直接运行 `GameDefinition.runtime`。
 
 - `GameEngine`：注册 `GameDefinition`、创建 match、tick、提交 action、解析 pending effect、运行自定义 runtime，并提供 `getDebugState(matchId)`。
+- `debate-runner` 创建 match 时复用 `createInitialDebateState(config)` 注入辩题、主持人和已分组玩家；仅保存 runtime config 不足以形成可播放的首帧状态。
 - `GameDefinitionRegistry`：按 `gameType@version` 注册和查询游戏定义。
 - `WorkflowRuntime`：包装现有 `workflow-engine` 创建和推进能力。
 - `ActionWindowManager`：校验 ActionWindow 是否存在、是否打开、actor/actionType 是否合法。
@@ -284,6 +285,9 @@ Shadow audit 接入方式：
 - 序列化快照包含 `debugMode: true`，因此通用媒体层不生成服务端 TTS；
   客户端继续使用浏览器语音和字幕。
 - 通用 game-socket 保存逻辑已对调试对局跳过正式历史写入。
+
+- 辩手系统提示统一要求现场口语化表达；除立论外先回应最新争点，再给出主张和事实、例子或因果支撑。
+- 立论、攻辩提问、攻辩回答、自由辩论、总结和评委点评在 `debate/skillRegistry.ts` 中保留各自的阶段指令，不改变技能 ID、结果结构或工作流顺序。
 
 ### 狼人杀流程
 
@@ -696,6 +700,7 @@ pnpm run test:workflow
 
 - 狼人杀和辩论的玩家 Agent 都继承共享 `BasePlayerAgent`，不在各游戏工作流内复制降级分支。
 - 调用顺序为：主模型现有瞬时重试 → 单次备选模型 → 现有规则级兜底。
+- 上游明确返回欠费、余额不足、免费额度耗尽或账单到期时，共享 LLM 边界立即将对应数据库模型设为禁用，并在当前进程内跳过后续调用；普通 429 限流仍按瞬时故障重试，不会误禁用模型。
 - 备选模型配置只传入 Agent 调用选项，不写入公开玩家状态，也不产生新的 WebSocket 事件。
 
 ## Werewolf action speech

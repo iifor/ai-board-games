@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   AgentRuntime,
   ChannelSystem,
@@ -31,6 +33,15 @@ test('GameEngine rejects duplicate GameDefinition registration', () => {
   engine.registerDefinition(definition);
 
   assert.throws(() => engine.registerDefinition(definition), /already registered/);
+});
+
+test('debate engine runner seeds matches with the configured initial state', () => {
+  const source = readFileSync(
+    resolve(process.cwd(), 'packages/server/modules/debate-runner.ts'),
+    'utf8',
+  );
+
+  assert.match(source, /initialState:\s*createInitialDebateState\(config\)/);
 });
 
 test('GameEngine rejects tick for terminal matches before workflow runtime is called', () => {

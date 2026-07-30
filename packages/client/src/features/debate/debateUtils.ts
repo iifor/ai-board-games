@@ -315,6 +315,39 @@ export function normalizeDebateTeamDraft(value: Partial<DebateTeamDraft> | null,
   };
 }
 
+export function normalizeRandomizedDebateTeams(value: Partial<DebateTeamDraft>): DebateTeamDraft {
+  const playerIds = uniquePlayerIds([
+    ...(value.proIds || []),
+    ...(value.conIds || []),
+    ...(value.judgeIds || [])
+  ]);
+  if (playerIds.length < 8) throw new Error('随机分配结果不完整');
+  return normalizeDebateTeamDraft(value, playerIds);
+}
+
+export function resolveDebateRosterPlayerIds(
+  rosterPlayerIds: (number | string)[] = [],
+  teams: Partial<DebateTeamDraft> = {},
+  fallbackPlayerIds: (number | string)[] = [],
+): number[] {
+  const roster = uniquePlayerIds(rosterPlayerIds).slice(0, 12);
+  if (roster.length >= 8) return roster;
+  const assigned = uniquePlayerIds([
+    ...(teams.proIds || []),
+    ...(teams.conIds || []),
+    ...(teams.judgeIds || []),
+  ]);
+  return assigned.length >= 8
+      ? uniquePlayerIds([...assigned, ...fallbackPlayerIds]).slice(0, 12)
+      : uniquePlayerIds(fallbackPlayerIds);
+}
+
+export function getDebateSelectablePlayers(players: Player[] = [], defaultHostId?: number): Player[] {
+  return defaultHostId
+    ? players.filter((player) => Number(player.id) !== Number(defaultHostId))
+    : players;
+}
+
 function normalizeDebateSlots(ids: (number | null | undefined)[] = [], size = 0, selectedSet = new Set<number>(), usedSet = new Set<number | null>()): (number | null)[] {
   const used = new Set(usedSet);
   return Array.from({ length: size }).map((_, index) => {

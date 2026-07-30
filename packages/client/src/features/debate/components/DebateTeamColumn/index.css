@@ -76,7 +76,7 @@
   color: #b56cff;
 }
 
-.team-drop-slot em {
+.team-slot-empty {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
@@ -89,4 +89,9 @@
   font-size: 12px;
   font-style: normal;
   font-weight: 600;
+}
+
+.team-slot-empty:focus-visible {
+  outline: 3px solid #f3d58a;
+  outline-offset: 2px;
 }

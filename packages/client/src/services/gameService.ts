@@ -3,6 +3,7 @@ import type { DebateTeamDraft, DebateTopic, GameEvent, GameState, Player, Werewo
 
 export interface AiHealth {
   players?: Player[];
+  defaultHostId?: number;
   [key: string]: unknown;
 }
 

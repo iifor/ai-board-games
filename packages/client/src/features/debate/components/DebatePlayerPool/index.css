@@ -25,6 +25,12 @@
   font-weight: 600;
 }
 
+.player-pool-return {
+  flex: 0 0 auto;
+  min-height: 44px;
+  margin-left: auto;
+}
+
 .player-pool-list {
   display: flex;
   flex-wrap: wrap;

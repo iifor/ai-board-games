@@ -171,6 +171,14 @@ WebSocket 协议以 `docs/project-workflow.md` 为唯一来源。C 端负责：
 
 ## 配置与部署
 
+### 辩论赛 v2 设置与舞台约定
+
+- 随机分配结果按接口实际返回的参与者集合归一化，避免候选人数超过 12 时合法辩手被截断。
+- 默认主持人不进入辩手候选池；随机分配后的 12 人名单保持固定，席位调整只改变阵营位置，不用候选池中的其他身份替换。
+- 阵营设置保留拖拽，同时支持先点击玩家、再点击辩位的鼠标与键盘操作；保存条件和随机分配错误在弹窗内可见。
+- v2 以直播 HUD 为唯一一级标题，人物、席位、发言状态与控制区样式均限制在 `.debate-shell--v2`。
+- 本次优化不改变 REST/WebSocket 结构、数据库、共享类型或辩论流程。
+
 常用命令：
 
 ```bash
@@ -238,6 +246,8 @@ pnpm --filter @ai-presenter/client run check
 - `components/PlayerPosterSpotlight` 是辩论、狼人杀、谁是卧底三种 v2 舞台共用的纯展示组件；只有当前公开发言事件能够匹配现有玩家时才出现，v1 路由不启用。
 - 海报按标准化后的玩家昵称映射到 `/player-posters/*.webp`，图片加载失败时依次降级为玩家头像和姓名标签；组件不推导发言顺序、身份或游戏规则。
 - 海报层位于舞台背景之上、席位与字幕等业务 UI 之下，不拦截操作；减少动态效果偏好下关闭过渡动画。
+- 辩论 v2 使用 `/player-poster-cutouts/*.webp` 透明立绘；舞台按完整源图等比包含，左右队伍、评委和底部字幕各自保留独立安全区，避免遮挡当前发言人物。
+- 辩论 v2 背景使用 `asserts/debate-stage-v2.png`，左右席位改为无外框队列；所有覆盖样式继续限定在 `.debate-shell--v2`。
 - 谁是卧底 v2 通过 `.undercover-stage--v2` 限定海报、环形席位和字幕覆盖；共享 `PlayerPosterSpotlight` 的默认标签仅在该舞台隐藏，辩论和狼人杀 v2 不受影响。
 - 该能力只消费现有前端玩家和公开发言状态，不新增 REST API、WebSocket 消息、TTS/ACK 队列或 shared 协议字段。
 
@@ -399,6 +409,7 @@ pnpm --filter @ai-presenter/client run check
 ## Werewolf v2 foreground projection
 
 - The foreground interaction stage retains the latest recognized gameplay action. Technical synchronization, phase narration, ACK and unknown workflow events update state without replacing the foreground card.
+- The desktop player rosters use enlarged circular avatars: 72px normally and 58px on viewports up to 1360px, with the seat row, status badge and speaking ring aligned to the same scale.
 - `werewolf_action_skipped` never replaces the foreground interaction. This also protects historical replays that already contain skipped events for roles absent from the selected board.
 - A day/night phase change clears the retained interaction before the next recognized action, so a night skill card cannot leak into the daytime stage or vice versa.
 - The bottom speech bar and player poster are reserved for speech attributed to a real player. Host and system narration continue through the existing playback/stream message path without creating transient foreground panels.

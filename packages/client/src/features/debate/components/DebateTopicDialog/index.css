@@ -294,6 +294,17 @@
   font-size: 16px;
 }
 
+.debate-setup-status {
+  margin: 12px 0 0;
+  color: #ffe2a3;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.debate-setup-status.error {
+  color: #ffb4c8;
+}
+
 .player-detail-modal {
   position: relative;
   width: 560px;

@@ -10,15 +10,21 @@ interface DraggableDebatePlayerProps {
   isCaptain?: boolean;
   onCaptainDrop?: (side: string, playerId: number) => void;
   disabled?: boolean;
+  selected?: boolean;
+  onClick?: () => void;
 }
 
-export function DraggableDebatePlayer({ player, compact = false, tone = '', isCaptain = false, onCaptainDrop, disabled = false }: DraggableDebatePlayerProps) {
+export function DraggableDebatePlayer({ player, compact = false, tone = '', isCaptain = false, onCaptainDrop, disabled = false, selected = false, onClick }: DraggableDebatePlayerProps) {
   const name = player.nickname || player.name || `${player.id}号`;
   const allowCaptainDrop = tone === 'pro' || tone === 'con';
   return (
-    <div
-      className={classNames('drag-player-card', compact && 'compact', isCaptain && 'captain', disabled && 'locked')}
+    <button
+      type="button"
+      className={classNames('drag-player-card', compact && 'compact', isCaptain && 'captain', selected && 'selected', disabled && 'locked')}
       draggable={!disabled}
+      disabled={disabled}
+      aria-pressed={selected}
+      onClick={onClick}
       onDragOver={(event) => {
         if (disabled) return;
         if (!allowCaptainDrop) return;
@@ -43,6 +49,6 @@ export function DraggableDebatePlayer({ player, compact = false, tone = '', isCa
       <strong>{name}</strong>
       {isCaptain && <span className="drag-captain-badge"><Crown size={14} />队长</span>}
       <GripVertical size={18} />
-    </div>
+    </button>
   );
 }

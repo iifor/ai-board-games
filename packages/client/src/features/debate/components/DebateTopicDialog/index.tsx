@@ -1,11 +1,15 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { MessageSquareText, X, Shuffle } from 'lucide-react';
+import { classNames } from '../../../../utils/classNames';
 import { DebateDialogFooter } from '../DebateDialogFooter';
 import { DebatePlayerPool } from '../DebatePlayerPool';
 import { DebateTeamBoard } from '../DebateTeamBoard';
 import { DebateTopicFields } from '../DebateTopicFields';
 import {
   normalizeDebateTeamDraft,
+  normalizeRandomizedDebateTeams,
+  resolveDebateRosterPlayerIds,
+  uniquePlayerIds,
   getDebateTeamKey,
   findDebateTeamSlot,
   removeDebatePlayerIds
@@ -49,9 +53,13 @@ export function DebateTopicDialog({
   onCancel,
   onStart
 }: DebateTopicDialogProps) {
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const isReplayLocked = false;
   const effectiveTopic = topic;
-  const effectivePlayerIds = selectedPlayerIds;
+  const [rosterPlayerIds, setRosterPlayerIds] = useState<number[]>(() =>
+    resolveDebateRosterPlayerIds([], teams, selectedPlayerIds)
+  );
+  const effectivePlayerIds = resolveDebateRosterPlayerIds(rosterPlayerIds, teams, selectedPlayerIds);
   const normalizedTeams = normalizeDebateTeamDraft(teams, effectivePlayerIds);
   const proIds = normalizedTeams.proIds;
   const conIds = normalizedTeams.conIds;
@@ -98,6 +106,17 @@ export function DebateTopicDialog({
     (next[targetKey] as (number | undefined)[])[index] = id;
     if (targetOccupant && source) (next[getDebateTeamKey(source.side)] as (number | undefined)[])[source.index] = targetOccupant;
     onTeamsChange(normalizeDebateTeamDraft(next as Partial<DebateTeamDraft>, effectivePlayerIds));
+    setRandomizeError('');
+  }
+
+  function selectPlayer(id: number): void {
+    setSelectedPlayerId((current) => Number(current) === Number(id) ? null : Number(id));
+  }
+
+  function assignSelectedPlayer(side: string, index: number): void {
+    if (!selectedPlayerId) return;
+    assignPlayerToSlot(selectedPlayerId, side, index);
+    setSelectedPlayerId(null);
   }
 
   function handleDrop(event: React.DragEvent, side: string, index: number): void {
@@ -108,10 +127,7 @@ export function DebateTopicDialog({
     assignPlayerToSlot(value, side, index);
   }
 
-  function returnPlayerToAudience(event: React.DragEvent): void {
-    if (isReplayLocked) return;
-    event.preventDefault();
-    const id = Number(event.dataTransfer.getData('text/plain'));
+  function removePlayerFromTeams(id: number): void {
     if (!id) return;
     onTeamsChange(normalizeDebateTeamDraft({
       ...normalizedTeams,
@@ -121,6 +137,14 @@ export function DebateTopicDialog({
       proCaptainId: Number(proCaptainId) === id ? null : proCaptainId,
       conCaptainId: Number(conCaptainId) === id ? null : conCaptainId
     }, effectivePlayerIds));
+    setSelectedPlayerId(null);
+    setRandomizeError('');
+  }
+
+  function returnPlayerToAudience(event: React.DragEvent): void {
+    if (isReplayLocked) return;
+    event.preventDefault();
+    removePlayerFromTeams(Number(event.dataTransfer.getData('text/plain')));
   }
 
   function setCaptain(side: string, playerId: number): void {
@@ -136,12 +160,14 @@ export function DebateTopicDialog({
   }
 
   const [randomizing, setRandomizing] = useState(false);
+  const [randomizeError, setRandomizeError] = useState('');
   const playerIdsRef = useRef(effectivePlayerIds);
   playerIdsRef.current = effectivePlayerIds;
 
   async function handleRandomize(): Promise<void> {
     if (isReplayLocked || randomizing) return;
     setRandomizing(true);
+    setRandomizeError('');
     const ids = playerIdsRef.current;
     try {
       const response = await fetch('/api/toc/randomize-debate-teams', {
@@ -151,28 +177,42 @@ export function DebateTopicDialog({
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({ message: '请求失败' }));
-        console.error('随机分配失败:', err.message);
-        return;
+        throw new Error(err.message || '随机分配失败，请重试');
       }
       const data = await response.json();
       // responseFormatter 会包装为 { code, message, data: { debateTeams } }
       const teams = data?.data?.debateTeams || data?.debateTeams;
-      if (teams) {
-        const dt = teams;
-        onTeamsChange(normalizeDebateTeamDraft({
-          proIds: dt.proIds || [],
-          conIds: dt.conIds || [],
-          judgeIds: dt.judgeIds || [],
-          proCaptainId: dt.captainEnabled ? dt.proCaptainId : null,
-          conCaptainId: dt.captainEnabled ? dt.conCaptainId : null,
-        }, ids));
-      }
+      if (!teams) throw new Error('随机分配结果不完整');
+      const dt = teams;
+      const nextTeams = normalizeRandomizedDebateTeams({
+        proIds: dt.proIds || [],
+        conIds: dt.conIds || [],
+        judgeIds: dt.judgeIds || [],
+        proCaptainId: dt.captainEnabled ? dt.proCaptainId : null,
+        conCaptainId: dt.captainEnabled ? dt.conCaptainId : null,
+      });
+      setRosterPlayerIds(uniquePlayerIds([
+        ...nextTeams.proIds,
+        ...nextTeams.conIds,
+        ...nextTeams.judgeIds,
+      ]));
+      onTeamsChange(nextTeams);
+      setSelectedPlayerId(null);
     } catch (error) {
-      console.error('随机分配请求失败:', error);
+      setRandomizeError(error instanceof Error && error.message ? error.message : '随机分配失败，请重试');
     } finally {
       setRandomizing(false);
     }
   }
+
+  const missingRequirements = [
+    !effectiveTopic.title?.trim() && '请填写辩题',
+    !effectiveTopic.proPosition?.trim() && '请填写正方立场',
+    !effectiveTopic.conPosition?.trim() && '请填写反方立场',
+    proIds.filter(Boolean).length < 4 && `还缺正方 ${4 - proIds.filter(Boolean).length} 人`,
+    conIds.filter(Boolean).length < 4 && `还缺反方 ${4 - conIds.filter(Boolean).length} 人`
+  ].filter(Boolean);
+  const validationMessage = randomizeError || missingRequirements.join('，');
 
   return (
     <div className="debate-topic-backdrop" role="presentation">
@@ -212,8 +252,24 @@ export function DebateTopicDialog({
           getPlayer={getPlayer}
           onCaptainDrop={setCaptain}
           onDrop={handleDrop}
+          selectedPlayerId={selectedPlayerId}
+          onPlayerSelect={selectPlayer}
+          onSlotClick={assignSelectedPlayer}
         />
-        <DebatePlayerPool players={audiencePlayers} disabled={isReplayLocked} onDrop={returnPlayerToAudience} />
+        <DebatePlayerPool
+          players={audiencePlayers}
+          disabled={isReplayLocked}
+          onDrop={returnPlayerToAudience}
+          selectedPlayerId={selectedPlayerId}
+          onPlayerSelect={selectPlayer}
+          canReturnSelected={Boolean(selectedPlayerId && assignedIds.has(Number(selectedPlayerId)))}
+          onReturnSelected={() => selectedPlayerId && removePlayerFromTeams(selectedPlayerId)}
+        />
+        {validationMessage && (
+          <p className={classNames('debate-setup-status', randomizeError && 'error')} role={randomizeError ? 'alert' : 'status'}>
+            {validationMessage}
+          </p>
+        )}
         <DebateDialogFooter
           captainEnabled={captainEnabled}
           speechEnabled={speechEnabled}

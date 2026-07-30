@@ -18,9 +18,12 @@ interface DebateTeamColumnProps {
   onDrop: (event: React.DragEvent, side: string, index: number) => void;
   disabled?: boolean;
   captainEnabled?: boolean;
+  selectedPlayerId?: number | null;
+  onPlayerSelect?: (id: number) => void;
+  onSlotClick?: (side: string, index: number) => void;
 }
 
-export function DebateTeamColumn({ title, tone, ids, slots, labelPrefix, getPlayer, captainId, onCaptainDrop, onDrop, disabled = false, captainEnabled = true }: DebateTeamColumnProps) {
+export function DebateTeamColumn({ title, tone, ids, slots, labelPrefix, getPlayer, captainId, onCaptainDrop, onDrop, disabled = false, captainEnabled = true, selectedPlayerId = null, onPlayerSelect, onSlotClick }: DebateTeamColumnProps) {
   const Icon = tone === 'judge' ? Users : Shield;
   return (
     <div className={`debate-team-column ${tone}`}>
@@ -50,8 +53,25 @@ export function DebateTeamColumn({ title, tone, ids, slots, labelPrefix, getPlay
                   isCaptain={captainEnabled && Number(captainId) === Number(player.id)}
                   onCaptainDrop={onCaptainDrop}
                   disabled={disabled}
+                  selected={Number(selectedPlayerId) === Number(player.id)}
+                  onClick={() => {
+                    if (selectedPlayerId && Number(selectedPlayerId) !== Number(player.id)) {
+                      onSlotClick?.(tone, index);
+                      return;
+                    }
+                    onPlayerSelect?.(player.id);
+                  }}
                 />
-              ) : <em>+ 拖拽选手到此处</em>}
+              ) : (
+                <button
+                  type="button"
+                  className="team-slot-empty"
+                  disabled={disabled || !selectedPlayerId}
+                  onClick={() => onSlotClick?.(tone, index)}
+                >
+                  {selectedPlayerId ? '+ 安排到此处' : '+ 先选择选手'}
+                </button>
+              )}
             </div>
           );
         })}

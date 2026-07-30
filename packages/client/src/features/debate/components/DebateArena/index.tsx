@@ -34,7 +34,12 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
   return (
     <section className="debate-arena" aria-label="辩论赛竞技场">
       {showPlayerPoster && currentSpeaker && (
-        <PlayerPosterSpotlight key={currentSpeaker.id} player={currentSpeaker} />
+        <PlayerPosterSpotlight
+          className="debate-speaker-spotlight"
+          key={currentSpeaker.id}
+          player={currentSpeaker}
+          variant="cutout"
+        />
       )}
       <DebateSide
         title="正方"
