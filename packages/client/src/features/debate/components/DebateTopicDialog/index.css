@@ -1,5 +1,4 @@
-.debate-topic-backdrop,
-.player-detail-backdrop {
+.debate-topic-backdrop {
   position: fixed;
   left: 0;
   top: 0;
@@ -13,8 +12,7 @@
   background: rgba(0, 4, 14, 0.76);
 }
 
-.debate-topic-dialog,
-.player-detail-modal {
+.debate-topic-dialog {
   width: 1500px;
   border: 1px solid rgba(95, 171, 255, 0.62);
   border-radius: 18px;
@@ -59,8 +57,7 @@
   box-shadow: inset 0 0 18px rgba(69, 161, 255, 0.18);
 }
 
-.debate-topic-dialog h2,
-.player-detail-modal h3 {
+.debate-topic-dialog h2 {
   margin: 0;
   color: #ffffff;
   font-size: 36px;
@@ -173,8 +170,7 @@
   margin-top: 20px;
 }
 
-.debate-topic-dialog button,
-.player-detail-close {
+.debate-topic-dialog button {
   border: 1px solid rgba(107, 180, 255, 0.48);
   border-radius: 6px;
   padding: 6px 12px;
@@ -303,76 +299,6 @@
 
 .debate-setup-status.error {
   color: #ffb4c8;
-}
-
-.player-detail-modal {
-  position: relative;
-  width: 560px;
-  padding: 28px;
-}
-
-.player-detail-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-}
-
-.player-detail-head {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.player-detail-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 60px;
-  height: 60px;
-  border: 2px solid rgba(72, 198, 255, 0.95);
-  border-radius: 60px;
-  background: rgba(1, 10, 28, 0.92);
-  background-position: center;
-  background-size: cover;
-  color: #ffffff;
-  font-size: 26px;
-  font-weight: 600;
-  box-shadow: 0 0 20px rgba(46, 169, 255, 0.56);
-}
-
-.player-detail-head p {
-  margin: 8px 0 0;
-  color: #9edcff;
-  font-weight: 600;
-}
-
-.player-detail-modal dl {
-  gap: 12px;
-  margin: 0;
-}
-
-.player-detail-modal dl div {
-  display: flex;
-  gap: 14px;
-  padding: 10px 0;
-  border-top: 1px solid rgba(112, 172, 255, 0.18);
-}
-
-.player-detail-modal dt {
-  min-width: 60px;
-  color: #89d7ff;
-  font-weight: 600;
-}
-
-.player-detail-modal dd {
-  margin: 0;
-  color: rgba(240, 247, 255, 0.9);
-  line-height: 20px;
-  user-select: text;
 }
 
 .debate-host-config {
