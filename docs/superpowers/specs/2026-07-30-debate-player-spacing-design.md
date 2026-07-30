@@ -8,7 +8,7 @@
 
 - 仅调整 `packages/client/src/features/debate-v2/DebateGameV2/index.css` 中 v2 玩家列表布局。
 - `.debate-shell--v2 .debate-seat-list` 使用 `justify-content: center`，避免卡片首尾贴近整列边界。
-- 四张玩家卡使用 `gap: clamp(52px, 7vh, 66px)` 保持响应式等距：
+- 四张玩家卡使用 `gap: clamp(52px, calc(13.44vh - 3.5vw), 78px)` 保持响应式等距，并抵消项目现有的 1920 基准像素转换：
   - 1280×720 目标间距约 52px；
   - 2048×1024 目标间距约 66px；
   - 对比当前实测约 104–105px 与 133px，缩小约 50%。
