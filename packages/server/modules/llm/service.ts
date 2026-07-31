@@ -30,6 +30,7 @@ interface LlmCallOptions {
   baseUrl?: string;
   provider?: string;
   model?: string;
+  modelId?: number | null;
   messages?: LlmMessage[];
   temperature?: number;
   maxTokens?: number;
@@ -47,6 +48,8 @@ interface LlmRawResult {
 }
 
 type CallableModel = LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] };
+
+const quotaDisabledModelIds = new Set<number>();
 
 interface TestConnectionResult {
   ok: boolean;
@@ -88,13 +91,14 @@ async function callOpenAIChatRawAttempt({
   temperature = 0.8,
   maxTokens = 1000,
   apiFormat = 'openai-compatible',
+  modelId,
   _gameId,
   _playerId,
   _playerRole,
   _playerFaction
 }: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] }): Promise<LlmRawResult> {
   if (apiFormat === 'anthropic-compatible') {
-    return callAnthropicChatRawAttempt({ apiKey, baseUrl, provider, model, messages, temperature, maxTokens, _gameId, _playerId, _playerRole, _playerFaction });
+    return callAnthropicChatRawAttempt({ apiKey, baseUrl, provider, model, modelId, messages, temperature, maxTokens, _gameId, _playerId, _playerRole, _playerFaction });
   }
 
   const obs = _getObs();
@@ -155,9 +159,10 @@ async function callOpenAIChatRawAttempt({
       span.addEvent('gen_ai.user.message', { content: JSON.stringify(messages || []) });
       obs!.endSpan(span, 'error', {}, new Error(errMsg));
     }
+    const quotaExhausted = disableQuotaExhaustedModel(response.status, body, modelId, provider, model);
     const error = new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
     if (response.status === 429) upstreamConcurrency.recordLlm429();
-    if (response.status === 429 || response.status >= 500) {
+    if (!quotaExhausted && (response.status === 429 || response.status >= 500)) {
       (error as RetryableLlmError).retryable = true;
     }
     throw error;
@@ -268,6 +273,7 @@ async function callAnthropicChatRawAttempt({
   messages,
   temperature = 0.8,
   maxTokens = 1000,
+  modelId,
   _gameId,
   _playerId,
   _playerRole,
@@ -341,9 +347,10 @@ async function callAnthropicChatRawAttempt({
       span.addEvent('gen_ai.user.message', { content: JSON.stringify(messages || []) });
       obs!.endSpan(span, 'error', {}, new Error(errMsg));
     }
+    const quotaExhausted = disableQuotaExhaustedModel(response.status, body, modelId, provider, model);
     const error = new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
     if (response.status === 429) upstreamConcurrency.recordLlm429();
-    if (response.status === 429 || response.status >= 500) {
+    if (!quotaExhausted && (response.status === 429 || response.status >= 500)) {
       (error as RetryableLlmError).retryable = true;
     }
     throw error;
@@ -486,7 +493,50 @@ async function callWithModelFallback<T>(
 
 function toCallableModel(target: LlmCallOptions | null | undefined): CallableModel | null {
   if (!target?.apiKey || !target.model) return null;
+  if (target.modelId && quotaDisabledModelIds.has(Number(target.modelId))) return null;
   return { ...target, messages: target.messages || [] } as CallableModel;
+}
+
+function disableQuotaExhaustedModel(
+  status: number,
+  body: string,
+  modelId: number | null | undefined,
+  provider: string,
+  model: string,
+): boolean {
+  if (!modelId || !isQuotaExhaustedResponse(status, body)) return false;
+  quotaDisabledModelIds.add(Number(modelId));
+  try {
+    const models = require('../models') as { disableModel: (id: number) => void };
+    models.disableModel(Number(modelId));
+    console.warn(`[llm] disabled ${provider}:${model} (modelId=${modelId}) after quota exhaustion`);
+  } catch (error) {
+    console.error(`[llm] failed to persist quota disable for modelId=${modelId}: ${errorMessage(error)}`);
+  }
+  return true;
+}
+
+function isQuotaExhaustedResponse(status: number, body: string): boolean {
+  if (status < 400 || status >= 500) return false;
+  const text = String(body || '').toLowerCase();
+  return [
+    'arrearage',
+    'allocationquota.freetieronly',
+    'prepaidbilloverdue',
+    'postpaidbilloverdue',
+    'accountoverdue',
+    'account balance is insufficient',
+    'insufficient balance',
+    'free allocated quota exceeded',
+    'free quota exhausted',
+    '余额不足',
+    '账户欠费',
+    '账号欠费',
+  ].some((marker) => text.includes(marker));
+}
+
+function clearQuotaDisabledModel(modelId: number): void {
+  quotaDisabledModelIds.delete(Number(modelId));
 }
 
 function isSameModel(primary: CallableModel | null, fallback: CallableModel): boolean {
@@ -606,6 +656,7 @@ export {
   callModelChatWithFallback,
   callModelChatWithThinking,
   callModelChatWithThinkingFallback,
+  clearQuotaDisabledModel,
   callOpenAIChat,
   callOpenAIChatRaw,
   testModelConnection,

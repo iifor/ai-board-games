@@ -25,13 +25,23 @@ function insertModel(row: ModelRowInput): number {
 function updateModel(row: ModelRowInput & { id: number }): void {
   getDb().prepare(`
     UPDATE models
-    SET provider_id = @provider_id, provider = @provider, name = @name, updated_at = CURRENT_TIMESTAMP
+    SET provider_id = @provider_id,
+        provider = @provider,
+        name = @name,
+        thinking_enabled = @thinking_enabled,
+        enabled = @enabled,
+        updated_at = CURRENT_TIMESTAMP
     WHERE id = @id
   `).run(row);
+}
+
+function updateModelEnabled(id: number | string, enabled: boolean): void {
+  getDb().prepare('UPDATE models SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(enabled ? 1 : 0, Number(id));
 }
 
 function deleteModelById(id: number | string): void {
   getDb().prepare('DELETE FROM models WHERE id = ?').run(Number(id));
 }
 
-export { findModelById, findAllModels, findModelsByProviderId, insertModel, updateModel, deleteModelById };
+export { findModelById, findAllModels, findModelsByProviderId, insertModel, updateModel, updateModelEnabled, deleteModelById };

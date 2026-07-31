@@ -123,6 +123,7 @@ function toDebugTarget(
   return {
     ...model,
     model: model.name,
+    modelId: model.id,
     messages,
     temperature: Number(player.temperature ?? 0.85),
     maxTokens: 260,

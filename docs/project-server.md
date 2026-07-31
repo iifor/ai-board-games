@@ -420,4 +420,5 @@ docker compose ps
 - `players.fallback_model_id` stores one optional backup model reference and is exposed as `fallbackModelId` only through the admin player API.
 - The shared LLM boundary keeps the existing single transient retry for network, timeout, 429 and 5xx failures, then invokes the configured backup model once.
 - Missing/disabled primary configuration, upstream errors and empty responses can fall back. Invalid JSON uses the backup for the existing correction attempt.
+- When an upstream response explicitly reports account arrears, insufficient balance, exhausted free quota, or an overdue bill, the shared LLM boundary immediately marks that model unavailable in memory and persists `models.enabled = 0`. Generic 429 rate limiting does not disable the model.
 - Werewolf, debate and player debug chat share this path. If both models fail, the existing game-level fallback behavior remains authoritative.

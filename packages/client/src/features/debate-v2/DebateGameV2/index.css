@@ -141,7 +141,8 @@
 
 .debate-shell--v2 .debate-seat-list {
   width: 100%;
-  gap: 8px;
+  justify-content: center;
+  gap: clamp(52px, calc(13.44vh - 3.5vw), 78px);
   overflow: hidden;
 }
 

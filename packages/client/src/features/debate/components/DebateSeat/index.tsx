@@ -31,16 +31,18 @@ export function DebateSeat({ player, currentSpeakerId, slotLabel, onPlayerSelect
   const modelName = getPlayerModelName(player);
   return (
     <article className={classNames('debate-seat', tone, isSpeaking && 'speaking', isMvp && 'mvp-seat', !player && 'empty')}>
-      <div
+      <button
+        type="button"
         className="debate-avatar player-detail-trigger"
         style={getPlayerAvatar(player) ? { backgroundImage: `url("${formatAvatarUrl(getPlayerAvatar(player))}")` } : undefined}
         onClick={() => player && onPlayerSelect?.(player)}
+        disabled={!player}
         aria-label={player ? `查看${name}信息` : `${slotLabel}席位空缺`}
       >
         {!getPlayerAvatar(player) && <span className="avatar-sprite" />}
         {isCaptain && <span className="captain-avatar-badge">队长</span>}
         {isMvp && <span className="mvp-avatar-badge"><Crown size={18} strokeWidth={3} />最佳</span>}
-      </div>
+      </button>
       <div className="debate-nameplate">
         <span className="seat-badge">{isJudge ? slotLabel : `${toChineseOrdinal(index + 1)}辩`}</span>
         <strong>

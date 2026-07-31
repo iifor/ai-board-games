@@ -11,11 +11,13 @@ test('uses the approved cutout speaker and debate stage hooks', () => {
   const arena = read('packages/client/src/features/debate/components/DebateArena/index.tsx');
   const arenaCss = read('packages/client/src/features/debate-v2/DebateGameV2/index.css');
   const game = read('packages/client/src/features/debate/DebateGame/index.tsx');
+  const seat = read('packages/client/src/features/debate/components/DebateSeat/index.tsx');
 
   assert.match(arena, /className="debate-speaker-spotlight"/);
   assert.match(arena, /variant="cutout"/);
   assert.match(arenaCss, /\.debate-speaker-spotlight/);
   assert.match(game, /debate-stage-v2\.png/);
+  assert.match(seat, /<button[\s\S]*?type="button"[\s\S]*?className="debate-avatar player-detail-trigger"/);
 });
 
 test('gives debate agents direct and phase-specific speaking rules', () => {

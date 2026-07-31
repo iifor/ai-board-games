@@ -18,6 +18,7 @@ interface ModelConfig {
   baseUrl?: string;
   provider?: string;
   model?: string;
+  modelId?: number | null;
   apiFormat?: string;
 }
 

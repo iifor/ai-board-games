@@ -7,3 +7,7 @@ audio/
 .worktrees/
 .pnpm-store/
 .superpowers
+artifacts
+tmp
+design-qa.md
+superpowers/

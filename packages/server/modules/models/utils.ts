@@ -81,7 +81,7 @@ function modelToRow(input: ModelInput, provider?: ModelProvider | ProviderLike |
     api_key_iv: existing?.api_key_iv || '',
     api_key_tag: existing?.api_key_tag || '',
     thinking_enabled: input.thinkingEnabled === true ? 1 : (input.thinkingEnabled === false ? 0 : (existing?.thinking_enabled === 1 ? 1 : 0)),
-    enabled: Number(input.enabled !== false && existing?.enabled !== 0)
+    enabled: input.enabled === true ? 1 : (input.enabled === false ? 0 : Number(existing?.enabled !== 0))
   };
 }
 

@@ -31,29 +31,29 @@ function createDebateSkillRegistry(): InstanceType<typeof AgentSkillRegistry> {
 function createDebateSkills(): Skill[] {
   return [
     textSkill('strategize', '请给本方队友做战术部署。', (actor) => `${actor.sideLabel}先稳住核心论点，抓住对方定义漏洞，队友分工补证据和反问。`),
-    textSkill('opening_argue', '请完成本方立论陈词。', (actor) => `${actor.sideLabel}认为本方立场更能兼顾现实约束与长期价值，核心标准应当先被清晰定义。`),
-    textSkill('free_speech', '请进行自由辩论发言，回应最近争点并推进本方论证。', (actor) => `${actor.sideLabel}补充一点：对方刚才回避了评判标准，我方才是在处理真实场景。`),
-    textSkill('closing_summary', '请以四辩身份完成本方总结陈词。', (actor) => `${actor.sideLabel}总结：我方完成了定义、风险和价值三层证明，对方关键反驳没有击穿核心标准。`),
+    textSkill('opening_argue', '请完成本方立论陈词：先明确评判标准，再提出核心主张并给出一个具体支撑。', (actor) => `${actor.sideLabel}认为本方立场更能兼顾现实约束与长期价值，核心标准应当先被清晰定义。`),
+    textSkill('free_speech', '请回应对方最新争点，明确指出漏洞，并用一个理由或例子推进本方论证。', (actor) => `${actor.sideLabel}补充一点：对方刚才回避了评判标准，我方才是在处理真实场景。`),
+    textSkill('closing_summary', '请以四辩身份完成总结陈词：回扣评判标准和关键交锋，不引入新的核心论点。', (actor) => `${actor.sideLabel}总结：我方完成了定义、风险和价值三层证明，对方关键反驳没有击穿核心标准。`),
     textSkill('postgame_speech', '请发表赛后感言：可以回应本场胜负、点评关键争点、感谢队友或回应对手。不要再投票。', (actor) => `${actor.sideLabel}赛后想说，本场最关键的是双方都把核心标准讲清楚了；无论结果如何，这场交锋很过瘾。`),
     {
       action: 'crossfire_question',
-      prompt: '向对方提出尖锐问题。',
-      execute: ({ actor, phase, target, config }: SkillContext) => askDebateText(actor, { ...phase, limit: PHASE_LIMITS.crossfire_question }, `请向${getDebateRoleName(target || null)}提出一个尖锐问题。`, '请问对方如何解释本方标准下的关键风险？', 'crossfire_question', Boolean(config.debugMode)),
+      prompt: '只问一个具体、可回答的问题，瞄准对方前提、证据或因果漏洞。',
+      execute: ({ actor, phase, target, config }: SkillContext) => askDebateText(actor, { ...phase, limit: PHASE_LIMITS.crossfire_question }, `请向${getDebateRoleName(target || null)}只问一个具体、可回答的问题，瞄准其前提、证据或因果漏洞。`, '请问对方如何解释本方标准下的关键风险？', 'crossfire_question', Boolean(config.debugMode)),
     },
     {
       action: 'crossfire_answer',
-      prompt: '回应对方问题并反击。',
-      execute: ({ actor, phase, target, config }: SkillContext) => askDebateText(actor, phase, `请回应${getDebateRoleName(target || null)}刚才的问题，并反击一句。`, '这个问题忽略了前提差异，我方标准更能处理边界情况。', 'crossfire_answer', Boolean(config.debugMode)),
+      prompt: '第一句直接回答对方问题，再指出其前提漏洞并反击一句。',
+      execute: ({ actor, phase, target, config }: SkillContext) => askDebateText(actor, phase, `第一句直接回答${getDebateRoleName(target || null)}刚才的问题，再指出其前提漏洞并反击一句。`, '这个问题忽略了前提差异，我方标准更能处理边界情况。', 'crossfire_answer', Boolean(config.debugMode)),
     },
     {
       action: 'judge_review',
-      prompt: '点评双方表现并给出胜负倾向。',
+      prompt: '围绕具体争点点评双方表现并给出胜负倾向。',
       async execute({ actor, state, config }: SkillContext) {
         if (config.debugMode) {
           return { winner: 'pro', text: `${actor.name}调试判定：正方胜。` };
         }
         const parsed = await (actor as unknown as { playerAgent: { askJson: (prompt: string, options: Record<string, unknown>) => Promise<Record<string, unknown> | null> } }).playerAgent.askJson([
-          '请点评双方表现，并给出胜负倾向。',
+          '请围绕具体争点点评双方表现，并给出胜负倾向。',
           '公开赛况已通过上文增量同步。',
           `只返回JSON对象：{"winner":"pro","text":"${PHASE_LIMITS.judges}字以内点评"}，winner 只能是 pro/con/draw。`,
         ].join('\n\n'), {

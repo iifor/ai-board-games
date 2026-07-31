@@ -10,8 +10,14 @@ function getModelProvidersService(): { createLegacyModelProvider: (input: Record
   return require('../model-providers') as { createLegacyModelProvider: (input: Record<string, unknown>) => ModelProvider; getRuntimeModelProvider: (id: number) => ModelProvider | null };
 }
 
-function getLlmService(): { callModelChat: (target: Record<string, unknown>) => Promise<string> } {
-  return require('../llm') as { callModelChat: (target: Record<string, unknown>) => Promise<string> };
+function getLlmService(): {
+  callModelChat: (target: Record<string, unknown>) => Promise<string>;
+  clearQuotaDisabledModel: (modelId: number) => void;
+} {
+  return require('../llm') as {
+    callModelChat: (target: Record<string, unknown>) => Promise<string>;
+    clearQuotaDisabledModel: (modelId: number) => void;
+  };
 }
 
 function listModels(): (Model | null)[] {
@@ -48,7 +54,12 @@ function updateModel(id: number | string, input: Record<string, unknown>): Model
   const row = { ...modelToRow(input as ModelInput, provider, existing), id: Number(id) };
   if (!row.name) throw new AppError(ErrorCodes.VALIDATION_ERROR, '模型名称必填', 400);
   repo.updateModel(row);
+  if (row.enabled) getLlmService().clearQuotaDisabledModel(Number(id));
   return getModel(Number(id));
+}
+
+function disableModel(id: number | string): void {
+  repo.updateModelEnabled(id, false);
 }
 
 function deleteModel(id: number | string): { ok: boolean } {
@@ -66,7 +77,7 @@ async function testModelConnection(id: number | string): Promise<{ ok: boolean; 
     ...model,
     model: model.name,
     messages: [{ role: 'user', content: '请只回复 pong' }],
-    temperature: 0, maxTokens: 16
+    temperature: 0, maxTokens: 16, modelId: model.id
   }).then((reply: string) => ({ ok: true, message: reply || '连接成功' }))
     .catch((err: Error) => ({ ok: false, message: err.message }));
 }
@@ -88,4 +99,4 @@ function getProvider(id: number | null | undefined, nullable?: boolean): ModelPr
   throw new AppError(ErrorCodes.NOT_FOUND, '供应商不存在', 404);
 }
 
-export { listModels, listModelsByProvider, getModel, getRuntimeModel, createModel, updateModel, deleteModel, testModelConnection };
+export { listModels, listModelsByProvider, getModel, getRuntimeModel, createModel, updateModel, disableModel, deleteModel, testModelConnection };
