@@ -54,19 +54,16 @@
 }
 
 .player-detail-avatar {
-  position: absolute;
-  top: 50%;
-  left: 50%;
   display: grid;
-  width: 128px;
-  height: 128px;
-  transform: translate(-50%, -50%);
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
   border: 2px solid rgba(126, 181, 255, 0.72);
   border-radius: 50%;
   color: #ffffff;
   background: rgba(3, 13, 35, 0.9) center / cover;
-  box-shadow: 0 0 30px rgba(53, 127, 255, 0.26);
-  font-size: 42px;
+  box-shadow: 0 0 22px rgba(53, 127, 255, 0.24);
+  font-size: 20px;
   font-weight: 900;
   place-items: center;
 }
@@ -125,7 +122,15 @@
   margin: 0;
 }
 
+.player-detail-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+}
+
 .player-detail-head h3 {
+  min-width: 0;
   padding-right: 44px;
   color: #ffffff;
   font-size: clamp(26px, 3vw, 36px);

@@ -45,7 +45,6 @@ export function PlayerDetailModal({
     >
       <div className="player-detail-layout">
         <div className="player-detail-portrait" aria-label={`${displayTitle}人物形象`}>
-          <PlayerAvatar player={player} className="player-detail-avatar" fallback={displayTitle} />
           {poster && (
             <img
               className="player-detail-cutout"
@@ -59,7 +58,10 @@ export function PlayerDetailModal({
         </div>
         <div className="player-detail-content">
           <header className="player-detail-head">
-            <h3>{displayTitle}</h3>
+            <div className="player-detail-title">
+              <PlayerAvatar player={player} className="player-detail-avatar" fallback={displayTitle} />
+              <h3>{displayTitle}</h3>
+            </div>
             {subtitle?.trim() && <p>{subtitle}</p>}
           </header>
           <section className="player-detail-section" aria-labelledby="player-profile-title">

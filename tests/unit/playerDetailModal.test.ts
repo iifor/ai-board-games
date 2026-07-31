@@ -29,6 +29,17 @@ test('player detail modal renders the shared profile and only populated match fi
     ],
   }));
 
+  const portraitMarkup = html.slice(
+    html.indexOf('player-detail-portrait'),
+    html.indexOf('player-detail-content'),
+  );
+  const titleMarkup = html.slice(
+    html.indexOf('player-detail-title'),
+    html.indexOf('</header>'),
+  );
+
+  assert.doesNotMatch(portraitMarkup, /player-detail-avatar/);
+  assert.match(titleMarkup, /player-detail-avatar[\s\S]*<h3>ChatGPT<\/h3>/);
   assert.match(html, /player-detail-cutout/);
   assert.match(html, /\/player-poster-cutouts\/chatgpt\.webp/);
   assert.match(html, />性别</);
