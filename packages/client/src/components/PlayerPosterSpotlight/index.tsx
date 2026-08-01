@@ -11,12 +11,16 @@ interface PlayerPosterSpotlightProps {
   player?: PosterPlayer | null;
   className?: string;
   variant?: PlayerPosterVariant;
+  fallback?: 'initials' | 'none';
+  decorative?: boolean;
 }
 
 export function PlayerPosterSpotlight({
   player,
   className = '',
   variant = 'poster',
+  fallback = 'initials',
+  decorative = false,
 }: PlayerPosterSpotlightProps) {
   const poster = resolvePlayerPoster(player, variant);
   const avatar = getPosterPlayerAvatar(player);
@@ -30,13 +34,14 @@ export function PlayerPosterSpotlight({
     setSourceIndex(0);
   }, [player?.id, player?.nickname, player?.name, poster, avatar]);
 
-  if (!player) return null;
+  if (!player || (!imageSource && fallback === 'none')) return null;
 
   return (
     <aside
       className={`player-poster-spotlight${className ? ` ${className}` : ''}`}
-      aria-label={`${playerName}正在发言`}
-      aria-live="polite"
+      aria-hidden={decorative || undefined}
+      aria-label={decorative ? undefined : `${playerName}正在发言`}
+      aria-live={decorative ? undefined : 'polite'}
     >
       {!isCutout && imageSource && (
         <img

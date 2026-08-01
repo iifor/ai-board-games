@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { resolvePlayerPoster } from '../../packages/client/src/components/PlayerPosterSpotlight/posters';
+import {
+  getHostPosterPlayer,
+  resolvePlayerPoster,
+} from '../../packages/client/src/components/PlayerPosterSpotlight/posters';
 
 
 const EXPECTED_POSTERS = [
@@ -12,6 +15,23 @@ const EXPECTED_POSTERS = [
   'doubao.webp',
   'gemini.webp',
   'grok.webp',
+  'kimi.webp',
+  'meta.webp',
+  'qwen.webp',
+  'wenxin.webp',
+  'xinghuo.webp',
+  'yuanbao.webp',
+  'zhipu.webp',
+];
+
+const EXPECTED_CUTOUTS = [
+  'chatgpt.webp',
+  'claude-code.webp',
+  'deepseek.webp',
+  'doubao.webp',
+  'gemini.webp',
+  'grok.webp',
+  'host.webp',
   'kimi.webp',
   'meta.webp',
   'qwen.webp',
@@ -51,6 +71,20 @@ test('resolves transparent cutout paths without changing default poster paths', 
   assert.equal(resolvePlayerPoster({ nickname: '自定义玩家' }, 'cutout'), null);
 });
 
+test('resolves a real default host cutout and preserves assigned host identity', () => {
+  const fallback = getHostPosterPlayer();
+  assert.equal(fallback.nickname, '主持人');
+  assert.equal(fallback.avatar, '/player-poster-cutouts/host.webp');
+
+  const assigned = getHostPosterPlayer({
+    id: 7,
+    nickname: '千问',
+    avatar: '/avatars/qwen.png',
+  });
+  assert.equal(assigned.id, 7);
+  assert.equal(resolvePlayerPoster(assigned, 'cutout'), '/player-poster-cutouts/qwen.webp');
+});
+
 test('ships the exact 13 optimized poster assets', () => {
   const posterDir = path.join(process.cwd(), 'packages', 'client', 'public', 'player-posters');
   const posterFiles = fs.readdirSync(posterDir).filter((file) => file.endsWith('.webp')).sort();
@@ -60,10 +94,10 @@ test('ships the exact 13 optimized poster assets', () => {
   }
 });
 
-test('ships the exact 13 transparent speaker cutouts', () => {
+test('ships the exact 14 transparent speaker cutouts', () => {
   const cutoutDir = path.join(process.cwd(), 'packages', 'client', 'public', 'player-poster-cutouts');
   const cutoutFiles = fs.readdirSync(cutoutDir).filter((file) => file.endsWith('.webp')).sort();
-  assert.deepEqual(cutoutFiles, EXPECTED_POSTERS);
+  assert.deepEqual(cutoutFiles, EXPECTED_CUTOUTS);
   for (const file of cutoutFiles) {
     assert.ok(fs.statSync(path.join(cutoutDir, file)).size > 20_000, `${file} should contain a real cutout`);
   }
@@ -102,7 +136,7 @@ test('keeps the spotlight accessible and resilient', () => {
     'utf8',
   );
 
-  assert.match(component, /aria-live="polite"/);
+  assert.match(component, /aria-live=\{decorative \? undefined : 'polite'\}/);
   assert.match(component, /正在发言/);
   assert.match(component, /onError=/);
   assert.match(component, /player-poster-spotlight__backdrop/);
@@ -111,4 +145,14 @@ test('keeps the spotlight accessible and resilient', () => {
   assert.match(component, /resolvePlayerPoster\(player, variant\)/);
   assert.match(component, /variant === 'cutout'/);
   assert.match(component, /is-cutout/);
+});
+
+test('supports an empty stage instead of initials when a host image fails', () => {
+  const component = fs.readFileSync(
+    path.join(process.cwd(), 'packages', 'client', 'src', 'components', 'PlayerPosterSpotlight', 'index.tsx'),
+    'utf8',
+  );
+  assert.match(component, /fallback = 'initials'/);
+  assert.match(component, /!imageSource && fallback === 'none'/);
+  assert.match(component, /aria-hidden=\{decorative \|\| undefined\}/);
 });

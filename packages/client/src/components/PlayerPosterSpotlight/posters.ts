@@ -7,6 +7,12 @@ export interface PosterPlayer {
   avatar_url?: string;
 }
 
+export const DEFAULT_HOST_POSTER: PosterPlayer = {
+  id: 'default-host',
+  nickname: '主持人',
+  avatar: '/player-poster-cutouts/host.webp',
+};
+
 const POSTER_SLUG_BY_ALIAS: Record<string, string> = {
   doubao: 'doubao',
   豆包: 'doubao',
@@ -46,6 +52,21 @@ const POSTER_DIRECTORY_BY_VARIANT: Record<PlayerPosterVariant, string> = {
   poster: 'player-posters',
   cutout: 'player-poster-cutouts',
 };
+
+export function getHostPosterPlayer(value?: unknown): PosterPlayer {
+  if (!value || typeof value !== 'object') return DEFAULT_HOST_POSTER;
+  const host = value as PosterPlayer;
+  return {
+    ...host,
+    id: host.id ?? DEFAULT_HOST_POSTER.id,
+    nickname: host.nickname || host.name || DEFAULT_HOST_POSTER.nickname,
+    avatar:
+      host.avatar
+      || host.avatarUrl
+      || host.avatar_url
+      || DEFAULT_HOST_POSTER.avatar,
+  };
+}
 
 export function resolvePlayerPoster(
   player?: PosterPlayer | null,
