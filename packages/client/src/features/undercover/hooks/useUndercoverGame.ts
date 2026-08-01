@@ -161,15 +161,15 @@ function projectUndercoverHost(value: unknown): UndercoverHost | null {
 }
 
 function getUndercoverActiveSpeech(event: GameEvent): SpeechState | null {
-  const text = String(event.subtitle?.text || '').trim();
-  const speakerRole = String(event.subtitle?.speakerRole || '').trim();
-  if (!text || !speakerRole) return null;
+  if (event.type === 'undercover-speech') return null;
+  const text = String(event.presentation?.speakableText || '').trim();
+  if (!text) return null;
   return {
     id: `${event.ackId || event.type}-undercover`,
-    playerId: event.speech?.playerId || null,
+    playerId: null,
     text,
-    speakerLabel: event.subtitle?.speakerLabel || '',
-    speakerRole,
+    speakerLabel: '主持人',
+    speakerRole: 'host',
     wordBoundaries: event.wordBoundaries || null,
     currentTimeMs: null,
   };

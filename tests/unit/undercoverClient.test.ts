@@ -205,12 +205,20 @@ test('Undercover client state hides secrets until completion and retains public 
   assert.equal(completed.game?.reveal?.undercoverPlayerId, 6);
 });
 
-test('Undercover retains only public host identity and host narration state', () => {
+test('Undercover derives host narration from an equivalent public presentation event', () => {
   const feature = require('../../packages/client/src/features/undercover/hooks/useUndercoverGame') as typeof import('../../packages/client/src/features/undercover/hooks/useUndercoverGame');
   const state = feature.reduceUndercoverViewState(feature.EMPTY_UNDERCOVER_VIEW_STATE, {
     type: 'undercover-round-start',
     ackId: 9,
-    subtitle: { text: '第一轮开始。', speakerRole: 'host', speakerLabel: '主持人' },
+    channel: 'public',
+    payload: { message: 'Round one begins.' },
+    presentation: {
+      speakableText: 'Round one begins.',
+      displayText: 'Round one begins.',
+      displayMode: 'status',
+      uiHint: 'undercover-round-start',
+      suppressSpeech: false,
+    },
     game: {
       id: 'undercover-host',
       gameType: 'undercover',
@@ -219,19 +227,30 @@ test('Undercover retains only public host identity and host narration state', ()
       round: 1,
       players: [],
       speeches: [],
-      host: {
-        id: 0,
-        nickname: '主持人',
-        avatar: '',
-        secretPrompt: 'must-not-leak',
-      },
     },
   });
 
   assert.equal(state.activeSpeech?.speakerRole, 'host');
-  assert.equal(state.activeSpeech?.text, '第一轮开始。');
-  assert.equal(state.host?.nickname, '主持人');
-  assert.equal('secretPrompt' in (state.host || {}), false);
+  assert.equal(state.activeSpeech?.speakerLabel, '主持人');
+  assert.equal(state.activeSpeech?.text, 'Round one begins.');
+  assert.equal(state.activeSpeech?.playerId, null);
+  assert.equal(state.host, null);
+
+  const playerSpeech = feature.reduceUndercoverViewState(state, {
+    type: 'undercover-speech',
+    ackId: 10,
+    channel: 'public',
+    payload: { message: '1: Player speech.', round: 1, playerId: 1, text: 'Player speech.' },
+    presentation: {
+      speakableText: '1: Player speech.',
+      displayText: '1: Player speech.',
+      displayMode: 'status',
+      uiHint: 'undercover-speech',
+      suppressSpeech: false,
+    },
+    game: speakingGame(1),
+  });
+  assert.equal(playerSpeech.activeSpeech, null);
 });
 
 test('Undercover session errors clear active host narration', () => {
@@ -251,7 +270,15 @@ test('Undercover session errors clear active host narration', () => {
       options.applyServerEvent({
         type: 'undercover-round-start',
         ackId: 10,
-        subtitle: { text: 'host narration', speakerRole: 'host', speakerLabel: 'Host' },
+        channel: 'public',
+        payload: { message: 'host narration' },
+        presentation: {
+          speakableText: 'host narration',
+          displayText: 'host narration',
+          displayMode: 'status',
+          uiHint: 'undercover-round-start',
+          suppressSpeech: false,
+        },
         game: {
           id: 'undercover-error',
           gameType: 'undercover',
@@ -260,7 +287,6 @@ test('Undercover session errors clear active host narration', () => {
           round: 1,
           players: [],
           speeches: [],
-          host: { id: 0, nickname: 'Host' },
         },
       });
     } else if (phase === 1) {
