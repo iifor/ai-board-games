@@ -65,6 +65,10 @@ export function getHostPosterPlayer(value?: unknown): PosterPlayer {
   };
 }
 
+export function isVisualQaHostEnabled(search: string, isDevelopment: boolean): boolean {
+  return isDevelopment && new URLSearchParams(search).get('visualQaHost') === '1';
+}
+
 export function resolvePlayerPoster(
   player?: PosterPlayer | null,
   variant: PlayerPosterVariant = 'poster',

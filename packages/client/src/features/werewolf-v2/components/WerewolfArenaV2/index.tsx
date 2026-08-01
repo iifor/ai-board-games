@@ -5,7 +5,7 @@ import { GodWerewolfView } from '../GodWerewolfView';
 import { PlayerWerewolfView } from '../PlayerWerewolfView';
 import { WerewolfBottomSpeechBar } from '../WerewolfBottomSpeechBar';
 import { PlayerPosterSpotlight } from '../../../../components/PlayerPosterSpotlight';
-import { getHostPosterPlayer } from '../../../../components/PlayerPosterSpotlight/posters';
+import { getHostPosterPlayer, isVisualQaHostEnabled } from '../../../../components/PlayerPosterSpotlight/posters';
 import { shouldProjectWerewolfInteraction } from '../../utils/interactionState';
 import './index.css';
 
@@ -25,11 +25,16 @@ export function WerewolfArenaV2(props: WerewolfGameArenaProps) {
     ? null
     : players.find((player) => Number(player.id) === Number(foregroundSpeech.playerId)) || null;
   const hostSpeaking = props.activeSpeech?.speakerRole === 'host' && Boolean(props.activeSpeech.text);
+  const visualQaHost = isVisualQaHostEnabled(
+    typeof window === 'undefined' ? '' : window.location.search,
+    typeof document !== 'undefined' && document.querySelector('script[src*="/@vite/client"]') !== null,
+  );
+  const showHostSpotlight = hostSpeaking || visualQaHost;
   const spotlightPlayer = speakingPlayer || (
-    hostSpeaking ? getHostPosterPlayer(props.game.host) : null
+    showHostSpotlight ? getHostPosterPlayer(props.game.host) : null
   );
   const viewProps = { ...props, activeEvent: foregroundEventRef.current, activeSpeech: foregroundSpeech };
-  return <section className="werewolf-v2-arena" data-completed={props.game.winner ? 'true' : 'false'} data-phase={phase} data-speech-active={foregroundSpeech || hostSpeaking ? 'true' : 'false'}>
+  return <section className="werewolf-v2-arena" data-completed={props.game.winner ? 'true' : 'false'} data-phase={phase} data-speech-active={foregroundSpeech || hostSpeaking || visualQaHost ? 'true' : 'false'}>
     <div className="werewolf-v2-background" aria-hidden="true"><i className="is-night" /><i className="is-day" /></div>
     {spotlightPlayer && (
       <PlayerPosterSpotlight
@@ -37,8 +42,8 @@ export function WerewolfArenaV2(props: WerewolfGameArenaProps) {
         player={spotlightPlayer}
         className="werewolf-v2-speaker-backdrop"
         variant="cutout"
-        fallback={hostSpeaking && !speakingPlayer ? 'none' : 'initials'}
-        decorative={hostSpeaking && !speakingPlayer}
+        fallback={showHostSpotlight && !speakingPlayer ? 'none' : 'initials'}
+        decorative={showHostSpotlight && !speakingPlayer}
       />
     )}
     {props.clientViewMode === 'player' ? <PlayerWerewolfView {...viewProps} /> : <GodWerewolfView {...viewProps} />}

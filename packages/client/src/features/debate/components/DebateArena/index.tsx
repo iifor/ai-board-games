@@ -4,7 +4,7 @@ import { DebateSeat } from '../DebateSeat';
 import { DebatePhaseTimeline } from '../DebatePhaseTimeline';
 import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
 import { PlayerPosterSpotlight } from '../../../../components/PlayerPosterSpotlight';
-import { getHostPosterPlayer } from '../../../../components/PlayerPosterSpotlight/posters';
+import { getHostPosterPlayer, isVisualQaHostEnabled } from '../../../../components/PlayerPosterSpotlight/posters';
 import { getDebatePhaseSteps, getActiveStageIndex, getStageTitle, getDebatePlayerLabel, getMvpVoteTargetMap } from '../../utils';
 import './index.css';
 import type { GameState, SpeechState, Player, DebatePhase } from '../../../../types';
@@ -33,8 +33,13 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
     ? (game.players || []).find((player) => Number(player.id) === Number(currentSpeakerId)) || null
     : null;
   const hostSpeaking = showPlayerPoster
-    && subtitleSpeech?.speakerRole === 'host'
-    && Boolean(subtitleSpeech.text);
+    && (
+      (subtitleSpeech?.speakerRole === 'host' && Boolean(subtitleSpeech.text))
+      || isVisualQaHostEnabled(
+        typeof window === 'undefined' ? '' : window.location.search,
+        typeof document !== 'undefined' && document.querySelector('script[src*="/@vite/client"]') !== null,
+      )
+    );
   const spotlightPlayer = currentSpeaker || (
     hostSpeaking ? getHostPosterPlayer(game.host) : null
   );

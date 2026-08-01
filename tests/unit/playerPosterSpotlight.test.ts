@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   getHostPosterPlayer,
+  isVisualQaHostEnabled,
   resolvePlayerPoster,
 } from '../../packages/client/src/components/PlayerPosterSpotlight/posters';
 
@@ -40,6 +41,14 @@ const EXPECTED_CUTOUTS = [
   'yuanbao.webp',
   'zhipu.webp',
 ];
+
+test('enables the host visual QA switch only for the exact development query', () => {
+  assert.equal(isVisualQaHostEnabled('?visualQaHost=1', true), true);
+  assert.equal(isVisualQaHostEnabled('?visualQaHost=1', false), false);
+  assert.equal(isVisualQaHostEnabled('', true), false);
+  assert.equal(isVisualQaHostEnabled('?visualQaHost=0', true), false);
+  assert.equal(isVisualQaHostEnabled('%', true), false);
+});
 
 test('resolves built-in player aliases to stable public poster paths', () => {
   const cases = [

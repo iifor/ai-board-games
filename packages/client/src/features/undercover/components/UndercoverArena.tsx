@@ -1,6 +1,6 @@
 import { AudioLines, Bot } from 'lucide-react';
 import { PlayerPosterSpotlight } from '../../../components/PlayerPosterSpotlight';
-import { getHostPosterPlayer } from '../../../components/PlayerPosterSpotlight/posters';
+import { getHostPosterPlayer, isVisualQaHostEnabled } from '../../../components/PlayerPosterSpotlight/posters';
 import type { SpeechState } from '../../../types';
 import type { UndercoverHost, UndercoverPublicState } from '../types';
 import { getUndercoverPlayerLabel, getUndercoverVoteSummary } from './undercoverVoteSummary';
@@ -29,7 +29,15 @@ export function UndercoverArena({ game, host, activeSpeech, variant, showPlayerP
   variant ??= showPlayerPoster ? 'v2' : 'classic';
   const view = getUndercoverArenaViewModel(game, variant);
   const voteSummary = getUndercoverVoteSummary(game);
-  const hostSpeaking = activeSpeech?.speakerRole === 'host' && Boolean(activeSpeech.text);
+  const hostSpeaking = (
+    activeSpeech?.speakerRole === 'host' && Boolean(activeSpeech.text)
+  ) || (
+    view.variant === 'v2'
+    && isVisualQaHostEnabled(
+      typeof window === 'undefined' ? '' : window.location.search,
+      typeof document !== 'undefined' && document.querySelector('script[src*="/@vite/client"]') !== null,
+    )
+  );
   const spotlightPlayer = hostSpeaking ? getHostPosterPlayer(host) : view.currentPlayer;
 
   if (view.variant === 'classic') {
