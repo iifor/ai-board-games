@@ -55,16 +55,13 @@ const POSTER_DIRECTORY_BY_VARIANT: Record<PlayerPosterVariant, string> = {
 
 export function getHostPosterPlayer(value?: unknown): PosterPlayer {
   if (!value || typeof value !== 'object') return DEFAULT_HOST_POSTER;
-  const host = value as PosterPlayer;
+  const host = value as Record<string, unknown>;
   return {
-    ...host,
-    id: host.id ?? DEFAULT_HOST_POSTER.id,
-    nickname: host.nickname || host.name || DEFAULT_HOST_POSTER.nickname,
-    avatar:
-      host.avatar
-      || host.avatarUrl
-      || host.avatar_url
-      || DEFAULT_HOST_POSTER.avatar,
+    id: typeof host.id === 'string' || typeof host.id === 'number'
+      ? host.id
+      : DEFAULT_HOST_POSTER.id,
+    nickname: getFirstString(host.nickname, host.name) || DEFAULT_HOST_POSTER.nickname,
+    avatar: getFirstString(host.avatar, host.avatarUrl, host.avatar_url) || DEFAULT_HOST_POSTER.avatar,
   };
 }
 
@@ -93,4 +90,8 @@ function normalizePlayerAlias(value: unknown): string {
     .trim()
     .toLowerCase()
     .replace(/[\s._\-·]/g, '');
+}
+
+function getFirstString(...values: unknown[]): string | undefined {
+  return values.find((value): value is string => typeof value === 'string' && Boolean(value));
 }

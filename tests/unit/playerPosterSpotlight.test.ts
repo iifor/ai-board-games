@@ -83,6 +83,18 @@ test('resolves a real default host cutout and preserves assigned host identity',
   });
   assert.equal(assigned.id, 7);
   assert.equal(resolvePlayerPoster(assigned, 'cutout'), '/player-poster-cutouts/qwen.webp');
+
+  const malformed = getHostPosterPlayer({
+    id: {},
+    nickname: 123,
+    name: false,
+    avatar: {},
+    avatarUrl: [],
+    avatar_url: 5,
+  });
+  assert.equal(malformed.id, 'default-host');
+  assert.equal(malformed.nickname, '主持人');
+  assert.equal(malformed.avatar, '/player-poster-cutouts/host.webp');
 });
 
 test('ships the exact 13 optimized poster assets', () => {
