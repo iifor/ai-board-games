@@ -295,8 +295,16 @@
 }
 
 .undercover-stage--v2 > .undercover-host-poster {
-  z-index: 2;
+  z-index: 3;
   pointer-events: none;
+}
+
+.undercover-stage--v2 .undercover-host-poster::after {
+  background: none;
+}
+
+.undercover-stage--v2 .undercover-host-poster .player-poster-spotlight__card {
+  opacity: 1;
 }
 
 .undercover-stage--v2 .undercover-host-poster .player-poster-spotlight__card.is-cutout {
