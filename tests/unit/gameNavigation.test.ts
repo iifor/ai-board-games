@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_GAME_ROUTE_VERSION, readStoredPlayerSelection } from '../../packages/client/src/hooks/useGameNavigation';
+import {
+  DEFAULT_GAME_ROUTE_VERSION,
+  preserveVisualQaHost,
+  readStoredPlayerSelection,
+} from '../../packages/client/src/hooks/useGameNavigation';
 import * as clientRouter from '../../packages/client/src/router/clientRouter';
 
 test('game selection defaults to v2 while v1 remains directly addressable', () => {
@@ -21,6 +25,20 @@ test('undercover routes are parsed as game routes', () => {
       searchParams: new URLSearchParams('gameId=history-1')
     }
   );
+});
+
+test('preserves the development host QA query through selection and v2 game navigation', () => {
+  assert.equal(
+    preserveVisualQaHost('/games', '?visualQaHost=1', true),
+    '/games?visualQaHost=1',
+  );
+  assert.equal(
+    preserveVisualQaHost('/game/v2/undercover?gameId=history-1', '?visualQaHost=1', true),
+    '/game/v2/undercover?gameId=history-1&visualQaHost=1',
+  );
+  assert.equal(preserveVisualQaHost('/games', '?visualQaHost=1', false), '/games');
+  assert.equal(preserveVisualQaHost('/games', '', true), '/games');
+  assert.equal(preserveVisualQaHost('/games', '?visualQaHost=0', true), '/games');
 });
 
 test('stored Undercover selection is consumed without changing the selected ids', (t) => {

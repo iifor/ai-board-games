@@ -8,9 +8,14 @@ export function useGameNavigation() {
   const { route, navigate } = useClientRouter();
   const replayGameId = route.name === 'game' ? route.searchParams.get('gameId') || '' : '';
   const selectedPlayerIds = route.name === 'game' ? readStoredPlayerSelection(route.gameKey) : [];
+  const preserveCurrentVisualQaHost = (path: string) => preserveVisualQaHost(
+    path,
+    route.searchParams.toString(),
+    typeof document !== 'undefined' && document.querySelector('script[src*="/@vite/client"]') !== null,
+  );
 
   function openSelectPage() {
-    navigate('/games');
+    navigate(preserveCurrentVisualQaHost('/games'));
   }
 
   function startGame(gameKey: string, playerIds: number[], gameId: string = '', version: GameRouteVersion = DEFAULT_GAME_ROUTE_VERSION) {
@@ -18,10 +23,16 @@ export function useGameNavigation() {
     const stored = readStoredSelections();
     stored[gameKey] = cleanIds;
     window.sessionStorage.setItem(PLAYER_SELECTION_STORAGE_KEY, JSON.stringify(stored));
-    navigate(buildGamePath(gameKey, { gameId, version }));
+    navigate(preserveCurrentVisualQaHost(buildGamePath(gameKey, { gameId, version })));
   }
 
   return { route, navigate, replayGameId, selectedPlayerIds, openSelectPage, startGame };
+}
+
+export function preserveVisualQaHost(path: string, search: string, isDevelopment: boolean): string {
+  return isDevelopment && new URLSearchParams(search).get('visualQaHost') === '1'
+    ? `${path}${path.includes('?') ? '&' : '?'}visualQaHost=1`
+    : path;
 }
 
 export function readStoredPlayerSelection(gameKey: string): number[] {
