@@ -299,14 +299,6 @@
   pointer-events: none;
 }
 
-.undercover-stage--v2 .undercover-host-poster::after {
-  background: none;
-}
-
-.undercover-stage--v2 .undercover-host-poster .player-poster-spotlight__card {
-  opacity: 1;
-}
-
 .undercover-stage--v2 .undercover-host-poster .player-poster-spotlight__card.is-cutout {
   position: absolute;
   inset: 9% 30% 22%;
@@ -345,6 +337,14 @@
 
 .undercover-stage--v2 .undercover-speaker-poster .player-poster-spotlight__caption {
   display: none;
+}
+
+.undercover-stage--v2 .undercover-host-poster::after {
+  background: none;
+}
+
+.undercover-stage--v2 .undercover-host-poster .player-poster-spotlight__card {
+  opacity: 1;
 }
 
 .undercover-stage--v2 .undercover-round-heading {
