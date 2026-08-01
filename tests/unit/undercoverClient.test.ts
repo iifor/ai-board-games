@@ -70,6 +70,18 @@ test('Undercover v2 swaps the player poster for a host cutout only during host n
 
   assert.match(markup, /undercover-host-poster/);
   assert.match(markup, /player-poster-cutouts\/host\.webp/);
+
+  for (const activeSpeech of [
+    { id: 'player-1', playerId: 1, text: '玩家发言。', speakerRole: 'player' },
+    { id: 'host-empty', playerId: null, text: '', speakerRole: 'host' },
+  ]) {
+    const inactiveMarkup = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
+      game: speakingGame(1),
+      variant: 'v2',
+      activeSpeech,
+    }));
+    assert.doesNotMatch(inactiveMarkup, /undercover-host-poster/);
+  }
 });
 
 test('Undercover controls keep classic behavior while v2 opts into the fixed control bar', () => {

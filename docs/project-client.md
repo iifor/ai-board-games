@@ -241,15 +241,16 @@ pnpm --filter @ai-presenter/client run check
 - `components/GameBroadcastHud` 供辩论 v2 等赛事页复用；狼人杀 v2 使用视角内的阶段标题，避免与双视角舞台重复。`styles/game-theme.css` 是 v2 共用视觉 token 入口。
 - v2 皮肤样式必须限定在 `.debate-shell--v2`、`.werewolf-shell--v2` 或 v2 模块 CSS 中，避免污染旧 `/games/*` 路由。
 
-### v2 玩家发言海报
+### v2 玩家与主持人立绘
 
-- `components/PlayerPosterSpotlight` 是辩论、狼人杀、谁是卧底三种 v2 舞台共用的纯展示组件；只有当前公开发言事件能够匹配现有玩家时才出现，v1 路由不启用。
-- 海报按标准化后的玩家昵称映射到 `/player-posters/*.webp`，图片加载失败时依次降级为玩家头像和姓名标签；组件不推导发言顺序、身份或游戏规则。
-- 海报层位于舞台背景之上、席位与字幕等业务 UI 之下，不拦截操作；减少动态效果偏好下关闭过渡动画。
+- `components/PlayerPosterSpotlight` 是辩论、狼人杀、谁是卧底三种 v2 舞台共用的纯展示组件；当前公开玩家发言匹配玩家立绘，主持播报匹配已选主持人或统一默认主持人立绘，v1 路由不启用。
+- 默认主持人使用 `/player-poster-cutouts/host.webp`；辩论赛和狼人杀已选择 AI 主持人时优先复用该玩家透明立绘，谁是卧底继续使用默认主持人。
+- 主持人只在现有字幕元数据标记 `speakerRole=host` 且存在可播放文本时出现；玩家发言、系统播报、等待和播放结束状态不显示主持人。
+- 立绘层位于舞台背景之上、席位与字幕等业务 UI 之下，不拦截操作；减少动态效果偏好下关闭入场动画。
+- 该能力只消费现有前端公开主持人、玩家和播放状态，不新增 REST API、WebSocket 消息、TTS/ACK 队列或 shared 协议字段。
 - 辩论 v2 使用 `/player-poster-cutouts/*.webp` 透明立绘；舞台按完整源图等比包含，左右队伍、评委和底部字幕各自保留独立安全区，避免遮挡当前发言人物。
 - 辩论 v2 背景使用 `asserts/debate-stage-v2.png`，左右席位改为无外框队列；所有覆盖样式继续限定在 `.debate-shell--v2`。
 - 谁是卧底 v2 通过 `.undercover-stage--v2` 限定海报、环形席位和字幕覆盖；共享 `PlayerPosterSpotlight` 的默认标签仅在该舞台隐藏，辩论和狼人杀 v2 不受影响。
-- 该能力只消费现有前端玩家和公开发言状态，不新增 REST API、WebSocket 消息、TTS/ACK 队列或 shared 协议字段。
 
 ## Werewolf v2 专用 Arena 边界
 
