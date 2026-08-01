@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useGameSocketSession } from '../../../hooks/useGameSocketSession';
 import { useSpeechQueue } from '../../../hooks/useSpeechQueue';
-import type { GameEvent, QueueItem } from '../../../types';
-import type { UndercoverPublicState, UndercoverStartOptions, UndercoverViewState, UndercoverVoteResult } from '../types';
+import type { GameEvent, QueueItem, SpeechState } from '../../../types';
+import type {
+  UndercoverHost,
+  UndercoverPublicState,
+  UndercoverStartOptions,
+  UndercoverViewState,
+  UndercoverVoteResult,
+} from '../types';
 
 export const EMPTY_UNDERCOVER_VIEW_STATE: UndercoverViewState = {
   game: null,
+  host: null,
+  activeSpeech: null,
   error: '',
   message: '已选择 6 位 AI 玩家，点击开始游戏。'
 };
@@ -29,13 +37,19 @@ export function buildUndercoverStartOptions(playerIds: number[], replayGameId: s
 }
 
 export function getUndercoverNarration(event: GameEvent): string {
-  return String(event.presentation?.speakableText || event.speech?.text || event.message || '');
+  return String(
+    event.subtitle?.text
+    || event.presentation?.speakableText
+    || event.speech?.text
+    || event.message
+    || '',
+  );
 }
 
 export function reduceUndercoverViewState(state: UndercoverViewState, event: GameEvent): UndercoverViewState {
   if (event.type === 'error') {
     const message = String(event.message || '游戏发生错误');
-    return { ...state, error: message, message };
+    return { ...state, activeSpeech: null, error: message, message };
   }
   if (event.game?.gameType !== 'undercover') {
     return event.message ? { ...state, message: event.message } : state;
@@ -46,6 +60,8 @@ export function reduceUndercoverViewState(state: UndercoverViewState, event: Gam
   if (voteResult) game.voteResult = { ...voteResult, votes: {} };
   return {
     game,
+    host: projectUndercoverHost(event.game.host) || state.host,
+    activeSpeech: getUndercoverActiveSpeech(event),
     error: '',
     message: String(event.message || state.message)
   };
@@ -69,8 +85,19 @@ export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercove
       setStarted(false);
       setView((current) => ({ ...current, error: message, message }));
     },
-    onAcknowledge: () => {},
-    onSkipPhase: (message) => setView((current) => ({ ...current, message: message || '正在跳过当前阶段...' }))
+    onAcknowledge: () => {
+      setView((current) => ({ ...current, activeSpeech: null }));
+    },
+    onAutoPlayStopped: () => {
+      setView((current) => ({ ...current, activeSpeech: null }));
+    },
+    onSkipPhase: (message) => {
+      setView((current) => ({
+        ...current,
+        activeSpeech: null,
+        message: message || '正在跳过当前阶段...'
+      }));
+    }
   });
 
   useEffect(() => {
@@ -96,6 +123,7 @@ export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercove
     session.resetSessionRefs();
     cancel();
     setStarted(false);
+    setView((current) => ({ ...current, activeSpeech: null }));
   }
 
   return {
@@ -117,6 +145,33 @@ function getSpeechOptions(event: GameEvent): Partial<QueueItem> {
     audioUrl: event.audioUrl,
     audioMimeType: event.audioMimeType,
     wordBoundaries: event.wordBoundaries || null
+  };
+}
+
+function projectUndercoverHost(value: unknown): UndercoverHost | null {
+  if (!value || typeof value !== 'object') return null;
+  const host = value as Record<string, unknown>;
+  return {
+    id: host.id as string | number | undefined,
+    name: String(host.name || ''),
+    nickname: String(host.nickname || host.name || '主持人'),
+    avatar: String(host.avatar || ''),
+    avatarUrl: String(host.avatarUrl || host.avatar || ''),
+  };
+}
+
+function getUndercoverActiveSpeech(event: GameEvent): SpeechState | null {
+  const text = String(event.subtitle?.text || '').trim();
+  const speakerRole = String(event.subtitle?.speakerRole || '').trim();
+  if (!text || !speakerRole) return null;
+  return {
+    id: `${event.ackId || event.type}-undercover`,
+    playerId: event.speech?.playerId || null,
+    text,
+    speakerLabel: event.subtitle?.speakerLabel || '',
+    speakerRole,
+    wordBoundaries: event.wordBoundaries || null,
+    currentTimeMs: null,
   };
 }
 

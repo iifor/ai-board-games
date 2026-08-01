@@ -1,11 +1,15 @@
 import { AudioLines, Bot } from 'lucide-react';
 import { PlayerPosterSpotlight } from '../../../components/PlayerPosterSpotlight';
-import type { UndercoverPublicState } from '../types';
+import { getHostPosterPlayer } from '../../../components/PlayerPosterSpotlight/posters';
+import type { SpeechState } from '../../../types';
+import type { UndercoverHost, UndercoverPublicState } from '../types';
 import { getUndercoverPlayerLabel, getUndercoverVoteSummary } from './undercoverVoteSummary';
 import './UndercoverArena.css';
 
 interface UndercoverArenaProps {
   game: UndercoverPublicState;
+  host?: UndercoverHost | null;
+  activeSpeech?: SpeechState | null;
   variant?: 'classic' | 'v2';
   showPlayerPoster?: boolean;
 }
@@ -21,10 +25,12 @@ export function getUndercoverArenaViewModel(game: UndercoverPublicState, variant
   return { variant, roundSpeeches, currentSpeech, currentSpeakerId, currentPlayer, alivePlayers, nextPlayer };
 }
 
-export function UndercoverArena({ game, variant, showPlayerPoster = false }: UndercoverArenaProps) {
+export function UndercoverArena({ game, host, activeSpeech, variant, showPlayerPoster = false }: UndercoverArenaProps) {
   variant ??= showPlayerPoster ? 'v2' : 'classic';
   const view = getUndercoverArenaViewModel(game, variant);
   const voteSummary = getUndercoverVoteSummary(game);
+  const hostSpeaking = activeSpeech?.speakerRole === 'host' && Boolean(activeSpeech.text);
+  const spotlightPlayer = hostSpeaking ? getHostPosterPlayer(host) : view.currentPlayer;
 
   if (view.variant === 'classic') {
     return (
@@ -100,8 +106,17 @@ export function UndercoverArena({ game, variant, showPlayerPoster = false }: Und
       className={`undercover-stage undercover-stage--${game.status} undercover-stage--v2`}
       aria-label="谁是卧底对局"
     >
-      {view.currentPlayer && (
-        <PlayerPosterSpotlight key={view.currentPlayer.id} player={view.currentPlayer} className="undercover-speaker-poster" />
+      {spotlightPlayer && (
+        <PlayerPosterSpotlight
+          key={spotlightPlayer.id}
+          player={spotlightPlayer}
+          className={hostSpeaking
+            ? 'undercover-speaker-poster undercover-host-poster'
+            : 'undercover-speaker-poster'}
+          variant={hostSpeaking ? 'cutout' : 'poster'}
+          fallback={hostSpeaking ? 'none' : 'initials'}
+          decorative={hostSpeaking}
+        />
       )}
       <header className="undercover-round-heading">
         <strong>第 <b>{game.round}</b> 轮</strong>

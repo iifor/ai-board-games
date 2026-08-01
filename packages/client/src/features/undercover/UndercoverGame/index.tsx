@@ -44,7 +44,12 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', variant = 'c
       />
 
       {controller.game ? (
-        <UndercoverArena game={controller.game} showPlayerPoster={variant === 'v2'} />
+        <UndercoverArena
+          game={controller.game}
+          host={controller.host}
+          activeSpeech={controller.activeSpeech}
+          showPlayerPoster={variant === 'v2'}
+        />
       ) : (
         <section className="undercover-empty" aria-label="等待开局">
           <h2>{replayGameId ? '正在载入回放' : '六人推理局'}</h2>

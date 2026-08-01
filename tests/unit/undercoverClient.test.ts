@@ -55,6 +55,23 @@ test('Undercover arena keeps classic DOM separate from the v2 spectator stage', 
   assert.doesNotMatch(v2, /class="undercover-arena"/);
 });
 
+test('Undercover v2 swaps the player poster for a host cutout only during host narration', () => {
+  const markup = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
+    game: { ...speakingGame(1), status: 'voting' },
+    variant: 'v2',
+    host: { id: 0, nickname: '主持人' },
+    activeSpeech: {
+      id: 'host-1',
+      playerId: null,
+      text: '请开始投票。',
+      speakerRole: 'host',
+    },
+  }));
+
+  assert.match(markup, /undercover-host-poster/);
+  assert.match(markup, /player-poster-cutouts\/host\.webp/);
+});
+
 test('Undercover controls keep classic behavior while v2 opts into the fixed control bar', () => {
   const props = {
     autoPlay: true,
@@ -174,6 +191,35 @@ test('Undercover client state hides secrets until completion and retains public 
   });
   assert.equal(completed.game?.reveal?.undercoverWord, '茶');
   assert.equal(completed.game?.reveal?.undercoverPlayerId, 6);
+});
+
+test('Undercover retains only public host identity and host narration state', () => {
+  const feature = require('../../packages/client/src/features/undercover/hooks/useUndercoverGame') as typeof import('../../packages/client/src/features/undercover/hooks/useUndercoverGame');
+  const state = feature.reduceUndercoverViewState(feature.EMPTY_UNDERCOVER_VIEW_STATE, {
+    type: 'undercover-round-start',
+    ackId: 9,
+    subtitle: { text: '第一轮开始。', speakerRole: 'host', speakerLabel: '主持人' },
+    game: {
+      id: 'undercover-host',
+      gameType: 'undercover',
+      mode: 'standard-6',
+      status: 'speaking',
+      round: 1,
+      players: [],
+      speeches: [],
+      host: {
+        id: 0,
+        nickname: '主持人',
+        avatar: '',
+        secretPrompt: 'must-not-leak',
+      },
+    },
+  });
+
+  assert.equal(state.activeSpeech?.speakerRole, 'host');
+  assert.equal(state.activeSpeech?.text, '第一轮开始。');
+  assert.equal(state.host?.nickname, '主持人');
+  assert.equal('secretPrompt' in (state.host || {}), false);
 });
 
 test('Undercover start config forwards exactly the selected six ids', () => {
