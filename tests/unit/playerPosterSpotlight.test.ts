@@ -118,6 +118,7 @@ test('ships the exact 14 transparent speaker cutouts', () => {
 test('scopes poster spotlight wiring to v2 game routes', () => {
   const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), 'utf8');
   const debateGame = read('packages/client/src/features/debate/DebateGame/index.tsx');
+  const werewolfPlayback = read('packages/client/src/features/werewolf/hooks/useWerewolfSpeechPlayback.ts');
   const werewolfArena = read('packages/client/src/features/werewolf-v2/components/WerewolfArenaV2/index.tsx');
   const werewolfCss = read('packages/client/src/features/werewolf-v2/components/WerewolfArenaV2/index.css');
   const undercoverGame = read('packages/client/src/features/undercover/UndercoverGame/index.tsx');
@@ -125,8 +126,12 @@ test('scopes poster spotlight wiring to v2 game routes', () => {
 
   assert.match(debateGame, /variant = 'classic'/);
   assert.match(debateGame, /showPlayerPoster=\{variant === 'v2'\}/);
+  assert.match(werewolfPlayback, /speakerRole:\s*event\?\.subtitle\?\.speakerRole \|\| ''/);
   assert.match(werewolfArena, /<PlayerPosterSpotlight/);
   assert.match(werewolfArena, /variant="cutout"/);
+  assert.match(werewolfArena, /const hostSpeaking = props\.activeSpeech\?\.speakerRole === 'host'/);
+  assert.match(werewolfArena, /getHostPosterPlayer\(props\.game\.host\)/);
+  assert.match(werewolfArena, /data-speech-active=\{foregroundSpeech \|\| hostSpeaking/);
   assert.match(werewolfCss, /object-fit:\s*contain/);
   assert.match(
     werewolfCss,

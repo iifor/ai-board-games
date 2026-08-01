@@ -5,6 +5,7 @@ import { GodWerewolfView } from '../GodWerewolfView';
 import { PlayerWerewolfView } from '../PlayerWerewolfView';
 import { WerewolfBottomSpeechBar } from '../WerewolfBottomSpeechBar';
 import { PlayerPosterSpotlight } from '../../../../components/PlayerPosterSpotlight';
+import { getHostPosterPlayer } from '../../../../components/PlayerPosterSpotlight/posters';
 import { shouldProjectWerewolfInteraction } from '../../utils/interactionState';
 import './index.css';
 
@@ -23,15 +24,21 @@ export function WerewolfArenaV2(props: WerewolfGameArenaProps) {
   const speakingPlayer = foregroundSpeech?.playerId == null
     ? null
     : players.find((player) => Number(player.id) === Number(foregroundSpeech.playerId)) || null;
+  const hostSpeaking = props.activeSpeech?.speakerRole === 'host' && Boolean(props.activeSpeech.text);
+  const spotlightPlayer = speakingPlayer || (
+    hostSpeaking ? getHostPosterPlayer(props.game.host) : null
+  );
   const viewProps = { ...props, activeEvent: foregroundEventRef.current, activeSpeech: foregroundSpeech };
-  return <section className="werewolf-v2-arena" data-completed={props.game.winner ? 'true' : 'false'} data-phase={phase} data-speech-active={foregroundSpeech ? 'true' : 'false'}>
+  return <section className="werewolf-v2-arena" data-completed={props.game.winner ? 'true' : 'false'} data-phase={phase} data-speech-active={foregroundSpeech || hostSpeaking ? 'true' : 'false'}>
     <div className="werewolf-v2-background" aria-hidden="true"><i className="is-night" /><i className="is-day" /></div>
-    {speakingPlayer && (
+    {spotlightPlayer && (
       <PlayerPosterSpotlight
-        key={speakingPlayer.id}
-        player={speakingPlayer}
+        key={spotlightPlayer.id}
+        player={spotlightPlayer}
         className="werewolf-v2-speaker-backdrop"
         variant="cutout"
+        fallback={hostSpeaking && !speakingPlayer ? 'none' : 'initials'}
+        decorative={hostSpeaking && !speakingPlayer}
       />
     )}
     {props.clientViewMode === 'player' ? <PlayerWerewolfView {...viewProps} /> : <GodWerewolfView {...viewProps} />}

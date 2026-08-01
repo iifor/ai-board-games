@@ -15,6 +15,8 @@ interface SpeechPlaybackControls {
 
 function getWerewolfExtraFields(event: GameEvent, text: string): Partial<SpeechState> {
   return {
+    speakerLabel: event?.subtitle?.speakerLabel || '',
+    speakerRole: event?.subtitle?.speakerRole || '',
     fullText: event?.speech?.fullText || event?.testimony?.fullText || text,
     thinking: event?.speech?.thinking || event?.testimony?.thinking || ''
   };
