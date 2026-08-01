@@ -4,6 +4,7 @@ import { DebateSeat } from '../DebateSeat';
 import { DebatePhaseTimeline } from '../DebatePhaseTimeline';
 import { SpeechSubtitle } from '../../../../components/SpeechSubtitle';
 import { PlayerPosterSpotlight } from '../../../../components/PlayerPosterSpotlight';
+import { getHostPosterPlayer } from '../../../../components/PlayerPosterSpotlight/posters';
 import { getDebatePhaseSteps, getActiveStageIndex, getStageTitle, getDebatePlayerLabel, getMvpVoteTargetMap } from '../../utils';
 import './index.css';
 import type { GameState, SpeechState, Player, DebatePhase } from '../../../../types';
@@ -31,14 +32,22 @@ export function DebateArena({ game, currentSpeakerId, currentPhase, streamMessag
   const currentSpeaker = currentSpeakerId
     ? (game.players || []).find((player) => Number(player.id) === Number(currentSpeakerId)) || null
     : null;
+  const hostSpeaking = showPlayerPoster
+    && subtitleSpeech?.speakerRole === 'host'
+    && Boolean(subtitleSpeech.text);
+  const spotlightPlayer = currentSpeaker || (
+    hostSpeaking ? getHostPosterPlayer(game.host) : null
+  );
   return (
     <section className="debate-arena" aria-label="辩论赛竞技场">
-      {showPlayerPoster && currentSpeaker && (
+      {showPlayerPoster && spotlightPlayer && (
         <PlayerPosterSpotlight
           className="debate-speaker-spotlight"
-          key={currentSpeaker.id}
-          player={currentSpeaker}
+          key={spotlightPlayer.id}
+          player={spotlightPlayer}
           variant="cutout"
+          fallback={hostSpeaking && !currentSpeaker ? 'none' : 'initials'}
+          decorative={hostSpeaking && !currentSpeaker}
         />
       )}
       <DebateSide
