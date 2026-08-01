@@ -83,7 +83,7 @@ export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercove
     onError: (error) => {
       const message = String(error.message || '游戏发生错误');
       setStarted(false);
-      setView((current) => ({ ...current, error: message, message }));
+      setView((current) => ({ ...current, activeSpeech: null, error: message, message }));
     },
     onAcknowledge: () => {
       setView((current) => ({ ...current, activeSpeech: null }));

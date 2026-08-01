@@ -222,6 +222,68 @@ test('Undercover retains only public host identity and host narration state', ()
   assert.equal('secretPrompt' in (state.host || {}), false);
 });
 
+test('Undercover session errors clear active host narration', () => {
+  const hookPath = require.resolve('../../packages/client/src/features/undercover/hooks/useUndercoverGame');
+  const sessionModule = require('../../packages/client/src/hooks/useGameSocketSession') as {
+    useGameSocketSession: (options: {
+      applyServerEvent: (event: Record<string, unknown>) => void;
+      onError: (error: Error) => void;
+    }) => Record<string, unknown>;
+  };
+  const originalUseGameSocketSession = sessionModule.useGameSocketSession;
+  let phase = 0;
+
+  sessionModule.useGameSocketSession = (options) => {
+    if (phase === 0) {
+      phase = 1;
+      options.applyServerEvent({
+        type: 'undercover-round-start',
+        ackId: 10,
+        subtitle: { text: 'host narration', speakerRole: 'host', speakerLabel: 'Host' },
+        game: {
+          id: 'undercover-error',
+          gameType: 'undercover',
+          mode: 'standard-6',
+          status: 'speaking',
+          round: 1,
+          players: [],
+          speeches: [],
+          host: { id: 0, nickname: 'Host' },
+        },
+      });
+    } else if (phase === 1) {
+      phase = 2;
+      options.onError(new Error('session failed'));
+    }
+    return {
+      autoPlay: true,
+      isReplayMode: false,
+      startSession: () => {},
+      closeSession: () => {},
+      clearPendingAckTimer: () => {},
+      resetSessionRefs: () => {},
+      setAutoPlayEnabled: () => {},
+      skipCurrentReplayPhase: () => {},
+    };
+  };
+  delete require.cache[hookPath];
+
+  try {
+    const feature = require(hookPath) as typeof import('../../packages/client/src/features/undercover/hooks/useUndercoverGame');
+    function HookState() {
+      const state = feature.useUndercoverGame({ playerIds: [] });
+      return createElement('output', null, `${state.activeSpeech?.text || 'cleared'}|${state.error}`);
+    }
+
+    const markup = renderToStaticMarkup(createElement(HookState));
+    assert.match(markup, /cleared\|session failed/);
+    assert.doesNotMatch(markup, /host narration/);
+  } finally {
+    sessionModule.useGameSocketSession = originalUseGameSocketSession;
+    delete require.cache[hookPath];
+  }
+});
+
 test('Undercover start config forwards exactly the selected six ids', () => {
   let feature: typeof import('../../packages/client/src/features/undercover/hooks/useUndercoverGame') | undefined;
   try {
