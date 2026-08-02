@@ -126,8 +126,8 @@
 
 .undercover-stage--v2 {
   position: relative;
-  width: min(100vw, calc((100vh - 24px) * 1.4055));
-  aspect-ratio: 1487 / 1058;
+  width: min(100vw, calc((100vh - 24px) * 1.7778));
+  aspect-ratio: 16 / 9;
   margin: 0 auto;
   overflow: hidden;
   background: #050918 url('/assets/undercover/stage-background.png') center / cover no-repeat;
@@ -179,17 +179,19 @@
 
 .undercover-stage--v2 .undercover-player-seat {
   position: absolute;
-  width: 15%;
-  min-width: 112px;
-  padding: 1.05%;
+  width: 17%;
+  min-width: 160px;
+  min-height: 18%;
+  padding: 0.8%;
   display: grid;
   justify-items: center;
-  gap: 0.45em;
+  gap: 0.35em;
   border: 1px solid rgba(81, 124, 232, 0.55);
-  border-radius: 18px;
+  border-radius: 14px;
   color: #fff;
   background: rgba(5, 10, 31, 0.91);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.48), inset 0 0 28px rgba(65, 92, 186, 0.1);
+  transition: opacity 240ms ease, border-color 240ms ease, box-shadow 240ms ease, transform 240ms ease;
 }
 
 .undercover-stage--v2 .undercover-player-icon {
@@ -208,10 +210,10 @@
 .undercover-stage--v2 .undercover-player-icon img { width: 82%; height: 82%; object-fit: contain; }
 .undercover-stage--v2 .undercover-player-icon svg { width: 54%; height: 54%; }
 
-.undercover-stage--v2 .undercover-player-name { display: flex; align-items: center; gap: 0.5em; font-size: clamp(11px, 1.08vw, 17px); }
+.undercover-stage--v2 .undercover-player-name { display: flex; align-items: center; gap: 0.5em; max-width: 100%; font-size: clamp(14px, 0.95vw, 17px); }
 .undercover-stage--v2 .undercover-player-name b { padding: 0.18em 0.42em; border: 1px solid #4c88e8; border-radius: 5px; color: #8bb9ff; }
-.undercover-stage--v2 .undercover-player-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
-.undercover-stage--v2 .undercover-player-seat em { color: #65e782; font-size: clamp(9px, 0.88vw, 14px); font-style: normal; }
+.undercover-stage--v2 .undercover-player-name strong { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; text-align: center; font-weight: 650; }
+.undercover-stage--v2 .undercover-player-seat em { color: #65e782; font-size: clamp(14px, 0.8vw, 15px); font-style: normal; }
 
 .undercover-stage--v2 .undercover-player-seat.is-speaking { transform: scale(1.08); border-color: #f06b9f; box-shadow: 0 0 34px rgba(239, 72, 142, 0.45); }
 .undercover-stage--v2 .undercover-player-seat.is-speaking .undercover-player-icon { border-color: #f36da3; box-shadow: 0 0 34px rgba(242, 78, 145, 0.75); }
@@ -262,16 +264,7 @@
 
 @media (max-width: 760px) {
   .undercover-stage--v2 .undercover-round-heading { width: 48%; }
-  .undercover-stage--v2 .undercover-player-seat { width: 18%; min-width: 82px; border-radius: 12px; }
-  .undercover-stage--v2 .undercover-player-seat.seat-1 { left: 9%; }
-  .undercover-stage--v2 .undercover-player-seat.seat-4 { right: 9%; }
   .undercover-stage--v2 .undercover-focus { width: 48%; }
-}
-
-.undercover-stage--v2 {
-  width: min(100vw, calc((100vh - 24px) * 1.7778));
-  aspect-ratio: 16 / 9;
-  background-position: center;
 }
 
 .undercover-stage--v2::before {
@@ -355,12 +348,11 @@
 }
 
 .undercover-stage--v2 .undercover-player-seat {
-  width: 12.5%;
-  min-width: 104px;
-  padding: 0.72%;
-  gap: 0.28em;
-  border-radius: 14px;
-  transition: opacity 240ms ease, border-color 240ms ease, box-shadow 240ms ease, transform 240ms ease;
+  width: 17%;
+  min-width: 160px;
+  min-height: 18%;
+  padding: 0.8%;
+  gap: 0.35em;
 }
 
 .undercover-stage--v2 .undercover-player-icon {
@@ -369,23 +361,23 @@
 
 .undercover-stage--v2 .undercover-player-name {
   max-width: 100%;
-  font-size: clamp(10px, 0.88vw, 15px);
+  font-size: clamp(14px, 0.95vw, 17px);
 }
 
 .undercover-stage--v2 .undercover-player-seat em {
-  font-size: clamp(9px, 0.72vw, 12px);
+  font-size: clamp(14px, 0.8vw, 15px);
 }
 
 .undercover-stage--v2 .undercover-player-seat.is-speaking {
   transform: scale(1.04);
 }
 
-.undercover-stage--v2 .seat-1 { top: 18%; left: 9%; }
-.undercover-stage--v2 .seat-2 { top: 10.5%; left: 25%; }
-.undercover-stage--v2 .seat-3 { top: 10.5%; right: 25%; left: auto; }
-.undercover-stage--v2 .seat-4 { top: 18%; right: 9%; left: auto; }
-.undercover-stage--v2 .seat-5 { top: 57%; right: 5%; left: auto; bottom: auto; }
-.undercover-stage--v2 .seat-6 { top: 57%; left: 5%; right: auto; bottom: auto; }
+.undercover-stage--v2 .seat-1 { top: 13%; left: 3%; }
+.undercover-stage--v2 .seat-2 { top: 38%; left: 3%; }
+.undercover-stage--v2 .seat-3 { top: 63%; left: 3%; }
+.undercover-stage--v2 .seat-4 { top: 13%; right: 3%; left: auto; }
+.undercover-stage--v2 .seat-5 { top: 38%; right: 3%; left: auto; }
+.undercover-stage--v2 .seat-6 { top: 63%; right: 3%; left: auto; }
 
 .undercover-stage--v2 .undercover-focus {
   top: 53%;
@@ -396,14 +388,15 @@
 
 .undercover-stage--v2.undercover-stage--speaking .undercover-focus {
   top: auto;
-  bottom: 11.5%;
-  width: 52%;
-  min-height: 13%;
-  padding: 1% 1.8%;
+  bottom: 3.2%;
+  left: 46%;
+  width: 50%;
+  min-height: 12%;
+  padding: 0;
   transform: translateX(-50%);
-  gap: 0.35em;
-  background: rgba(4, 8, 25, 0.88);
-  backdrop-filter: blur(12px);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .undercover-stage--v2.undercover-stage--speaking .undercover-focus h2 {
@@ -420,13 +413,43 @@
   text-align: center;
 }
 
-@media (max-width: 900px) {
-  .undercover-stage--v2 .undercover-player-seat {
-    width: 15%;
-    min-width: 78px;
-    border-radius: 10px;
-  }
+.undercover-stage--v2 .undercover-speaker-strip {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(0, 2.6fr) minmax(110px, 0.8fr);
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1px solid rgba(239, 84, 151, 0.72);
+  border-radius: 16px;
+  background: rgba(4, 8, 25, 0.9);
+  backdrop-filter: blur(12px);
+}
 
+.undercover-stage--v2 .undercover-speaker-identity,
+.undercover-stage--v2 .undercover-next-player {
+  display: grid;
+  gap: 4px;
+  color: #f8f8ff;
+  font-size: 14px;
+}
+
+.undercover-stage--v2 .undercover-speaker-identity small,
+.undercover-stage--v2 .undercover-next-player small {
+  color: #ef79a7;
+  font-size: 14px;
+}
+
+.undercover-stage--v2 .undercover-speaker-copy {
+  margin: 0;
+  color: #f8f8ff;
+  font-size: clamp(20px, 1.45vw, 24px);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+@media (max-width: 900px) {
   .undercover-stage--v2 .undercover-player-icon {
     width: clamp(38px, 6vw, 58px);
   }
@@ -435,9 +458,6 @@
     width: 48%;
   }
 
-  .undercover-stage--v2.undercover-stage--speaking .undercover-focus {
-    width: 58%;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

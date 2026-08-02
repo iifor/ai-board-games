@@ -153,22 +153,34 @@ test('Undercover next-player cue exists only for a real following alive player',
   assert.equal(undercoverComponents.getUndercoverArenaViewModel(speakingGame(99), 'v2').nextPlayer, undefined);
 });
 
-test('Undercover v2 layout CSS remains scoped to explicit v2 classes', () => {
-  const arenaStyles = readFileSync(resolve('packages/client/src/features/undercover/components/UndercoverArena.css'), 'utf8');
-  const gameStyles = readFileSync(resolve('packages/client/src/features/undercover/UndercoverGame/index.css'), 'utf8');
-  const controlStyles = readFileSync(resolve('packages/client/src/features/undercover/components/UndercoverControls.css'), 'utf8');
+test('Undercover v2 CSS defines side columns, one subtitle strip and a right control dock', () => {
+  const arenaStyles = readFileSync(
+    resolve('packages/client/src/features/undercover/components/UndercoverArena.css'),
+    'utf8',
+  );
+  const controlStyles = readFileSync(
+    resolve('packages/client/src/features/undercover/components/UndercoverControls.css'),
+    'utf8',
+  );
 
-  assert.match(arenaStyles, /\.undercover-stage--v2\s*\{/);
-  for (let seat = 1; seat <= 6; seat += 1) {
-    assert.match(arenaStyles, new RegExp(`undercover-stage--v2 \\.seat-${seat}`));
+  assert.equal(arenaStyles.match(/\.undercover-stage--v2\s*\{/g)?.length, 1);
+  for (const seat of [1, 2, 3]) {
+    assert.match(arenaStyles, new RegExp(`\\.undercover-stage--v2 \\.seat-${seat} \\{[^}]*left: 3%`, 's'));
   }
-  assert.doesNotMatch(arenaStyles, /^\.undercover-stage--v2 \.undercover-player-seat\.seat-\d+\s*\{/m);
-  assert.match(arenaStyles, /\.undercover-stage--v2 \.undercover-speaker-poster \.player-poster-spotlight__caption\s*\{\s*display: none;/);
+  for (const seat of [4, 5, 6]) {
+    assert.match(arenaStyles, new RegExp(`\\.undercover-stage--v2 \\.seat-${seat} \\{[^}]*right: 3%`, 's'));
+  }
   assert.match(arenaStyles, /\.undercover-stage--v2\.undercover-stage--speaking \.undercover-focus/);
+  assert.match(arenaStyles, /\.undercover-speaker-strip\s*\{[^}]*grid-template-columns:/s);
+  assert.match(arenaStyles, /\.undercover-speaker-copy\s*\{[^}]*font-size: clamp\(20px,/s);
+  assert.doesNotMatch(
+    arenaStyles,
+    /\.undercover-stage--v2 \.undercover-player-name strong\s*\{[^}]*text-overflow:\s*ellipsis/s,
+  );
+  assert.match(controlStyles, /\.undercover-controls--v2\s*\{[^}]*right: clamp\(/s);
+  assert.match(controlStyles, /\.undercover-controls--v2\s*\{[^}]*left: auto/s);
+  assert.match(controlStyles, /\.undercover-controls--v2 button\s*\{[^}]*min-height: 44px/s);
   assert.match(arenaStyles, /prefers-reduced-motion: reduce/);
-  assert.match(gameStyles, /\.undercover-shell--v2 \.undercover-status/);
-  assert.match(controlStyles, /\.undercover-controls--v2\s*\{[^}]*position: fixed;/s);
-  assert.match(controlStyles, /@media \(max-width: 760px\)\s*\{\s*\.undercover-controls--v2 button\s*\{\s*min-width: 0;/);
 });
 
 test('game selection exposes an accessible Undercover player editor entry', () => {

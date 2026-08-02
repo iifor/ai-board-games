@@ -33,9 +33,10 @@
   position: fixed;
   z-index: 10;
   top: auto;
-  left: 50%;
+  right: clamp(12px, 1.5vw, 28px);
   bottom: 12px;
-  transform: translateX(-50%);
+  left: auto;
+  transform: none;
   gap: 6px;
   padding: 6px;
   border: 1px solid rgba(88, 119, 198, 0.28);
@@ -45,9 +46,9 @@
 }
 
 .undercover-controls--v2 button {
-  min-width: 104px;
-  min-height: 40px;
-  padding: 0 15px;
+  min-width: 82px;
+  min-height: 44px;
+  padding: 0 12px;
   gap: 7px;
   display: inline-flex;
   align-items: center;
@@ -56,7 +57,7 @@
   border-radius: 999px;
   color: #f4f6ff;
   background: rgba(8, 20, 52, 0.9);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -81,8 +82,8 @@
 
 @media (max-width: 760px) {
   .undercover-controls--v2 button {
-    min-width: 0;
+    min-width: 44px;
     padding: 0 12px;
-    font-size: 12px;
+    font-size: 14px;
   }
 }
