@@ -2,409 +2,471 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将 `/game/v2/undercover` 实现为 16:9 环形推理剧场，同时保持经典页面、公开状态边界和现有播放链路不变。
+**Goal:** 将 `/game/v2/undercover` 优化为 16:9 聚光推理舞台：左右各三席、中央单一人物海报、底部单一字幕带和右下控制坞，同时修复回放跳过导致空白页的问题。
 
-**Architecture:** 使用现有 `variant`/`showPlayerPoster` 边界给 v2 shell 和 arena 增加修饰类，所有新布局都通过 v2 限定 CSS 实现。`UndercoverArena` 继续消费现有公开状态，`PlayerPosterSpotlight` 继续负责图片降级，控制行为和网络数据流不变。
+**Architecture:** 继续复用现有 `UndercoverGame`、`UndercoverArena`、`UndercoverControls`、`PlayerPosterSpotlight` 和公开状态 view model。只调整 v2 的 TSX 表达与 scoped CSS；回放问题在共享按钮边界把 React 点击事件转换为无参数调用，不修改 session、WebSocket 或服务端流程。
 
-**Tech Stack:** React 18、TypeScript、CSS、Node.js `node:test`、Vite、pnpm workspace
+**Tech Stack:** React 18、TypeScript、CSS、Lucide React、Node.js `node:test`、Vite、pnpm workspace
 
 ## Global Constraints
 
-- 只改变客户端布局、视觉状态和交互表达。
-- 不修改服务端事件、WebSocket、TTS、ACK、回放、游戏规则、API、数据库或共享类型。
-- 经典 `/games/undercover` 保持当前工作区视觉；新覆盖样式只能位于 `.undercover-shell--v2` 或 `.undercover-stage--v2` 下。
-- 六个席位在准备、发言、投票、淘汰和结束阶段保持固定位置。
-- 客户端只展示公开状态，不推断秘密词、卧底身份、合法票型、淘汰或胜负。
-- 不增加依赖、自动隐藏控制栏、移动端 JavaScript 布局或新业务组件。
-- 保留当前工作区已有改动；每次提交只暂存任务列出的文件，不暂存 `.superpowers/`、`artifacts/`、`.pnpm-store/` 或其他无关文件。
+- 只优化 `/game/v2/undercover`；经典 `/games/undercover` 的 DOM、视觉和行为保持不变。
+- 目标画幅为 16:9；必须验证 1280×720、1440×810 和 1920×1080。
+- 顶部只显示轮次、阶段和发言进度；左右各三席；中央只显示当前人物海报；底部只保留一条发言者/字幕/下一位信息带；控制坞位于右下角。
+- 正文与席位关键信息不小于 14px；字幕为 20–24px；可点击目标不小于 44×44px。
+- 字幕允许换行，不使用省略号，不遮挡人物面部或控制坞。
+- 发言、淘汰等状态同时使用文字与颜色；保留 `aria-live`、`role="alert"`、`aria-pressed`、键盘焦点和 reduced-motion。
+- 不修改服务端事件、WebSocket、TTS、ACK、回放协议、游戏规则、API、数据库、共享类型或 `PlayerPosterSpotlight` 共享实现。
+- 不增加依赖、新页面、新资产、新动画系统或移动端 JavaScript 布局。
+- 已确认视觉目标：`C:\Users\Administrator\.codex\generated_images\019fc045-4362-7d12-9ae1-6b9c68259fb3\call_O7n3X69yXI7XrsGnm3vZ7yQ1.png`。
+- 执行前已存在的用户改动必须保留；每次提交只暂存当前任务列出的文件。
 
 ---
 
 ## File Map
 
-- Modify: `packages/client/src/features/undercover/UndercoverGame/index.tsx` — 标记 v2 shell，保留状态播报语义。
-- Modify: `packages/client/src/features/undercover/UndercoverGame/index.css` — 仅在 v2 隐藏孤立状态胶囊的视觉，保留 `aria-live`。
-- Modify: `packages/client/src/features/undercover/components/UndercoverArena.tsx` — 标记 v2/阶段类，并为共享海报传入谁是卧底专用类名。
-- Modify: `packages/client/src/features/undercover/components/UndercoverArena.css` — 实现 16:9 环形席位、中央海报、下三分之一字幕和阶段布局。
-- Modify: `packages/client/src/features/undercover/components/UndercoverControls.css` — 在 v2 shell 内压缩底部控制栏。
-- Modify: `tests/unit/undercoverClient.test.ts` — 锁定 v2 样式隔离、唯一发言者标签、六席位和 reduced-motion。
-- Modify: `docs/project-client.md` — 记录 v2 环形观战舞台和展示边界。
+- Modify: `packages/client/src/features/undercover/components/UndercoverControls.tsx` — 把两个回放跳过按钮转换为无参数调用，阻止 React `MouseEvent` 进入状态消息。
+- Modify: `packages/client/src/features/undercover/components/UndercoverArena.tsx` — 将发言阶段的大卡片改为单一底部字幕带，保留准备、投票和终局分支。
+- Modify: `packages/client/src/features/undercover/components/UndercoverArena.css` — 合并重复 v2 覆盖，实现左右两列席位、中央海报、字幕带和 16:9 响应式约束。
+- Modify: `packages/client/src/features/undercover/components/UndercoverControls.css` — 将 v2 控制条移动到右下角并保持 44px 点击目标。
+- Modify: `tests/unit/undercoverClient.test.ts` — 锁定跳过按钮边界、单一字幕带、左右席位、控制坞和经典页面隔离。
+- Modify: `docs/project-client.md` — 把旧“环形席位”说明更新为已确认的“左右两列聚光舞台”。
+- Verify only: `packages/client/src/features/undercover/UndercoverGame/index.css` — 现有 v2 `aria-live` 状态保持视觉隐藏，`role="alert"` 错误继续可见；没有证据需要修改。
 
-不新增运行时代码文件。
+不新增或删除运行时代码文件。
 
 ---
 
-### Task 1: 建立 v2 样式隔离和阶段标记
+### Task 1: 修复回放跳过事件注入
 
 **Files:**
 
 - Modify: `tests/unit/undercoverClient.test.ts`
-- Modify: `packages/client/src/features/undercover/UndercoverGame/index.tsx`
-- Modify: `packages/client/src/features/undercover/components/UndercoverArena.tsx`
+- Modify: `packages/client/src/features/undercover/components/UndercoverControls.tsx:51-82`
 
 **Interfaces:**
 
-- Consumes: `UndercoverGameProps.variant?: 'classic' | 'v2'`、`UndercoverArenaProps.showPlayerPoster?: boolean`、`UndercoverPublicState['status']`
-- Produces: `.undercover-shell--v2`、`.undercover-stage--v2`、`.undercover-stage--<status>`、`.undercover-speaker-poster`
+- Consumes: `UndercoverControlsProps.onSkipPhase: () => void`
+- Produces: 两个按钮均执行 `() => onSkipPhase()`，不再把 React `MouseEvent` 传给 `skipCurrentReplayPhase(message?: string)`
 
 - [ ] **Step 1: 写入失败测试**
 
-在 `tests/unit/undercoverClient.test.ts` 的首个舞台测试后增加：
+在 `tests/unit/undercoverClient.test.ts` 的 controls 测试后增加：
 
 ```ts
-test('Undercover scopes the spectator theatre to v2 and exposes phase classes', () => {
-  const game = readFileSync(resolve('packages/client/src/features/undercover/UndercoverGame/index.tsx'), 'utf8');
-  const arena = readFileSync(resolve('packages/client/src/features/undercover/components/UndercoverArena.tsx'), 'utf8');
+test('Undercover replay skip buttons never forward React click events', () => {
+  const source = readFileSync(
+    resolve('packages/client/src/features/undercover/components/UndercoverControls.tsx'),
+    'utf8',
+  );
 
-  assert.match(game, /undercover-shell--v2/);
-  assert.match(arena, /undercover-stage--\$\{game\.status\}/);
-  assert.match(arena, /undercover-stage--v2/);
-  assert.match(arena, /className="undercover-speaker-poster"/);
+  assert.doesNotMatch(source, /onClick=\{onSkipPhase\}/);
+  assert.equal(
+    source.match(/onClick=\{\(\) => onSkipPhase\(\)\}/g)?.length,
+    2,
+  );
 });
 ```
 
-- [ ] **Step 2: 验证测试先失败**
+- [ ] **Step 2: 运行目标测试并确认失败**
 
 Run:
 
 ```powershell
-pnpm.cmd run test:unit
+pnpm.cmd run test:unit -- undercoverClient.test.ts
 ```
 
-Expected: FAIL，失败项为 `Undercover scopes the spectator theatre to v2 and exposes phase classes`，缺少 `undercover-shell--v2`。
+Expected: FAIL，`Undercover replay skip buttons never forward React click events` 匹配到 `onClick={onSkipPhase}`。
 
-- [ ] **Step 3: 添加最小 v2 修饰类**
+- [ ] **Step 3: 在按钮边界做最小修复**
 
-将 `UndercoverGame` 的 `<main>` 改为：
+将 classic 和 v2 两个跳过按钮的点击处理都改为：
 
 ```tsx
-<main className={variant === 'v2' ? 'undercover-shell undercover-shell--v2' : 'undercover-shell'}>
+onClick={() => onSkipPhase()}
 ```
 
-将 `UndercoverArena` 的根节点和海报调用改为：
+不要修改 `useGameSocketSession.skipCurrentReplayPhase(message?: string)`；该可选消息参数仍供程序调用者使用。
 
-```tsx
-<section
-  className={`undercover-stage undercover-stage--${game.status}${showPlayerPoster ? ' undercover-stage--v2' : ''}`}
-  aria-label="谁是卧底对局"
->
-  {showPlayerPoster && currentPlayer && (
-    <PlayerPosterSpotlight player={currentPlayer} className="undercover-speaker-poster" />
-  )}
-```
-
-不要改变 `useUndercoverGame`、`UndercoverControls` props 或任何公开状态计算。
-
-- [ ] **Step 4: 验证测试通过**
+- [ ] **Step 4: 运行目标测试并确认通过**
 
 Run:
 
 ```powershell
-pnpm.cmd run test:unit
+pnpm.cmd run test:unit -- undercoverClient.test.ts
 ```
 
-Expected: PASS，现有谁是卧底秘密信息和回放相关测试仍通过。
+Expected: `undercoverClient.test.ts` 全部 PASS，退出码 0。
 
-- [ ] **Step 5: 提交边界标记**
+- [ ] **Step 5: 提交根因修复**
 
 ```powershell
-git add -- packages/client/src/features/undercover/UndercoverGame/index.tsx packages/client/src/features/undercover/components/UndercoverArena.tsx tests/unit/undercoverClient.test.ts
-git commit -m "refactor(client): scope undercover spectator stage"
+git add -- packages/client/src/features/undercover/components/UndercoverControls.tsx tests/unit/undercoverClient.test.ts
+git commit -m "fix(client): guard undercover replay skip handler"
 ```
 
 ---
 
-### Task 2: 实现环形推理剧场布局
+### Task 2: 将发言内容收敛为单一字幕带
 
 **Files:**
 
 - Modify: `tests/unit/undercoverClient.test.ts`
-- Modify: `packages/client/src/features/undercover/UndercoverGame/index.css`
-- Modify: `packages/client/src/features/undercover/components/UndercoverArena.css`
-- Modify: `packages/client/src/features/undercover/components/UndercoverControls.css`
+- Modify: `packages/client/src/features/undercover/components/UndercoverArena.tsx:1-1`
+- Modify: `packages/client/src/features/undercover/components/UndercoverArena.tsx:158-167`
 
 **Interfaces:**
 
-- Consumes: Task 1 产生的 `.undercover-shell--v2`、`.undercover-stage--v2`、`.undercover-stage--speaking`、`.undercover-speaker-poster`
-- Produces: v2 限定的 16:9 舞台、六个固定席位、唯一发言者视觉、下三分之一字幕、紧凑控制栏
+- Consumes: `view.currentSpeakerId`、`view.currentSpeech?.text`、`view.nextPlayer`
+- Produces: `.undercover-speaker-strip`、`.undercover-speaker-identity`、`.undercover-speaker-copy`、`.undercover-next-player`
 
-- [ ] **Step 1: 写入失败的样式契约测试**
+- [ ] **Step 1: 写入失败的发言结构测试**
 
-在 `tests/unit/undercoverClient.test.ts` 增加：
+在 `tests/unit/undercoverClient.test.ts` 的 arena DOM 隔离测试后增加：
 
 ```ts
-test('Undercover v2 defines a six-seat ring, one speaker label and reduced motion', () => {
-  const arenaStyles = readFileSync(resolve('packages/client/src/features/undercover/components/UndercoverArena.css'), 'utf8');
-  const gameStyles = readFileSync(resolve('packages/client/src/features/undercover/UndercoverGame/index.css'), 'utf8');
-  const controlStyles = readFileSync(resolve('packages/client/src/features/undercover/components/UndercoverControls.css'), 'utf8');
+test('Undercover v2 speaking uses one lower-third strip without a duplicate speech card', () => {
+  const classic = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
+    game: speakingGame(1),
+    variant: 'classic',
+  }));
+  const v2 = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
+    game: speakingGame(1),
+    variant: 'v2',
+  }));
 
-  assert.match(arenaStyles, /\.undercover-stage--v2\s*\{/);
-  for (let seat = 1; seat <= 6; seat += 1) {
-    assert.match(arenaStyles, new RegExp(`undercover-stage--v2 \\.seat-${seat}`));
-  }
-  assert.match(arenaStyles, /\.undercover-stage--v2 \.undercover-speaker-poster > p\s*\{\s*display: none;/);
-  assert.match(arenaStyles, /\.undercover-stage--v2\.undercover-stage--speaking \.undercover-focus/);
-  assert.match(arenaStyles, /prefers-reduced-motion: reduce/);
-  assert.match(gameStyles, /\.undercover-shell--v2 \.undercover-status/);
-  assert.match(controlStyles, /\.undercover-shell--v2 \.undercover-controls/);
+  assert.match(v2, /class="undercover-speaker-strip"/);
+  assert.match(v2, /class="undercover-speaker-identity"/);
+  assert.match(v2, /class="undercover-speaker-copy"/);
+  assert.match(v2, /class="undercover-next-player"/);
+  assert.doesNotMatch(v2, /<h2>正在发言<\/h2>/);
+  assert.doesNotMatch(classic, /undercover-speaker-strip/);
 });
 ```
 
-- [ ] **Step 2: 验证样式测试先失败**
+- [ ] **Step 2: 运行目标测试并确认失败**
 
 Run:
 
 ```powershell
-pnpm.cmd run test:unit
+pnpm.cmd run test:unit -- undercoverClient.test.ts
 ```
 
-Expected: FAIL，缺少 `.undercover-stage--v2` CSS 契约。
+Expected: FAIL，v2 markup 缺少 `undercover-speaker-strip`。
 
-- [ ] **Step 3: 在 arena 样式末尾增加 v2 覆盖**
+- [ ] **Step 3: 替换 v2 speaking 分支**
 
-在 `UndercoverArena.css` 末尾追加以下完整区块；不要删除现有基础样式：
+从 `UndercoverArena.tsx` 删除未再使用的 `AudioLines` import，并将 `game.status === 'speaking'` 分支替换为：
+
+```tsx
+{game.status === 'speaking' && (
+  <div className="undercover-speaker-strip">
+    <span className="undercover-speaker-identity">
+      <small>当前发言</small>
+      <strong>
+        {view.currentSpeakerId
+          ? getUndercoverPlayerLabel(game, view.currentSpeakerId)
+          : '等待发言'}
+      </strong>
+    </span>
+    <blockquote className="undercover-speaker-copy">
+      {view.currentSpeech?.text || '首位玩家正在整理描述。'}
+    </blockquote>
+    <span className="undercover-next-player">
+      <small>{view.nextPlayer ? '下一位' : '发言顺序'}</small>
+      <strong>
+        {view.nextPlayer
+          ? getUndercoverPlayerLabel(game, view.nextPlayer.id)
+          : '本轮最后一位'}
+      </strong>
+    </span>
+  </div>
+)}
+```
+
+保留外层 `.undercover-focus[aria-live="polite"]`，并保持 setup、voting、completed 分支原有公开状态逻辑。
+
+- [ ] **Step 4: 运行目标测试并确认通过**
+
+Run:
+
+```powershell
+pnpm.cmd run test:unit -- undercoverClient.test.ts
+```
+
+Expected: `undercoverClient.test.ts` 全部 PASS，经典 markup 中没有新字幕带。
+
+- [ ] **Step 5: 提交字幕结构**
+
+```powershell
+git add -- packages/client/src/features/undercover/components/UndercoverArena.tsx tests/unit/undercoverClient.test.ts
+git commit -m "refactor(client): simplify undercover speaker strip"
+```
+
+---
+
+### Task 3: 实现左右两列舞台和右下控制坞
+
+**Files:**
+
+- Modify: `tests/unit/undercoverClient.test.ts`
+- Modify: `packages/client/src/features/undercover/components/UndercoverArena.css:109-449`
+- Modify: `packages/client/src/features/undercover/components/UndercoverControls.css:30-88`
+
+**Interfaces:**
+
+- Consumes: Task 2 的四个字幕类名和现有 `.seat-1` 至 `.seat-6`
+- Produces: 单一 `.undercover-stage--v2` 根规则、左侧 1–3 席、右侧 4–6 席、居中海报、底部字幕和右下控制坞
+
+- [ ] **Step 1: 更新失败的 CSS 契约测试**
+
+用下面的测试替换现有 `Undercover v2 layout CSS remains scoped to explicit v2 classes`：
+
+```ts
+test('Undercover v2 CSS defines side columns, one subtitle strip and a right control dock', () => {
+  const arenaStyles = readFileSync(
+    resolve('packages/client/src/features/undercover/components/UndercoverArena.css'),
+    'utf8',
+  );
+  const controlStyles = readFileSync(
+    resolve('packages/client/src/features/undercover/components/UndercoverControls.css'),
+    'utf8',
+  );
+
+  assert.equal(arenaStyles.match(/\.undercover-stage--v2\s*\{/g)?.length, 1);
+  for (const seat of [1, 2, 3]) {
+    assert.match(arenaStyles, new RegExp(`\\.undercover-stage--v2 \\.seat-${seat} \\{[^}]*left: 3%`, 's'));
+  }
+  for (const seat of [4, 5, 6]) {
+    assert.match(arenaStyles, new RegExp(`\\.undercover-stage--v2 \\.seat-${seat} \\{[^}]*right: 3%`, 's'));
+  }
+  assert.match(arenaStyles, /\.undercover-stage--v2\.undercover-stage--speaking \.undercover-focus/);
+  assert.match(arenaStyles, /\.undercover-speaker-strip\s*\{[^}]*grid-template-columns:/s);
+  assert.match(arenaStyles, /\.undercover-speaker-copy\s*\{[^}]*font-size: clamp\(20px,/s);
+  assert.doesNotMatch(
+    arenaStyles,
+    /\.undercover-stage--v2 \.undercover-player-name strong\s*\{[^}]*text-overflow:\s*ellipsis/s,
+  );
+  assert.match(controlStyles, /\.undercover-controls--v2\s*\{[^}]*right: clamp\(/s);
+  assert.match(controlStyles, /\.undercover-controls--v2\s*\{[^}]*left: auto/s);
+  assert.match(controlStyles, /\.undercover-controls--v2 button\s*\{[^}]*min-height: 44px/s);
+  assert.match(arenaStyles, /prefers-reduced-motion: reduce/);
+});
+```
+
+- [ ] **Step 2: 运行目标测试并确认失败**
+
+Run:
+
+```powershell
+pnpm.cmd run test:unit -- undercoverClient.test.ts
+```
+
+Expected: FAIL；当前 CSS 有两个 `.undercover-stage--v2` 根规则，席位仍为环形坐标，控制栏仍居中。
+
+- [ ] **Step 3: 合并 v2 舞台根规则并改为左右两列**
+
+保留 `UndercoverArena.css` 第 1–108 行的 classic 样式。把后续重复的 v2 根定义合并为一个，并使用以下布局值：
 
 ```css
 .undercover-stage--v2 {
+  position: relative;
   width: min(100vw, calc((100vh - 24px) * 1.7778));
   aspect-ratio: 16 / 9;
-  background-position: center;
-}
-
-.undercover-stage--v2::before {
-  content: '';
-  position: absolute;
-  z-index: 2;
-  left: 50%;
-  top: 54%;
-  width: 64%;
-  aspect-ratio: 2.15 / 1;
-  transform: translate(-50%, -50%);
-  border: 1px solid rgba(115, 108, 213, 0.42);
-  border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(89, 58, 145, 0.16), rgba(5, 9, 28, 0.08) 58%, transparent 72%);
-  box-shadow: inset 0 0 46px rgba(112, 74, 178, 0.18), 0 0 56px rgba(32, 47, 112, 0.18);
-  pointer-events: none;
-}
-
-.undercover-stage--v2 > .undercover-speaker-poster {
-  z-index: 2;
-}
-
-.undercover-stage--v2 .undercover-speaker-poster::after {
-  background: radial-gradient(circle at 50% 42%, transparent 16%, rgba(2, 5, 16, 0.24) 58%, rgba(2, 5, 16, 0.66) 100%);
-}
-
-.undercover-stage--v2 .undercover-speaker-poster .player-poster-spotlight__backdrop {
-  opacity: 0.22;
-}
-
-.undercover-stage--v2 .undercover-speaker-poster .player-poster-spotlight__card {
-  width: clamp(250px, 27%, 430px);
-  max-height: 67%;
-  opacity: 0.96;
-  object-position: center top;
-  transform: translateY(-4%);
-}
-
-.undercover-stage--v2 .undercover-speaker-poster > p {
-  display: none;
-}
-
-.undercover-stage--v2 .undercover-round-heading {
-  top: 2.4%;
-  width: 34%;
-  min-height: 6.5%;
-  font-size: clamp(15px, 1.55vw, 27px);
+  margin: 0 auto;
+  overflow: hidden;
+  background: #050918 url('/assets/undercover/stage-background.png') center / cover no-repeat;
+  box-shadow: 0 0 80px rgba(41, 69, 156, 0.28);
 }
 
 .undercover-stage--v2 .undercover-player-seat {
-  width: 12.5%;
-  min-width: 104px;
-  padding: 0.72%;
-  gap: 0.28em;
+  width: 17%;
+  min-width: 160px;
+  min-height: 18%;
+  padding: 0.8%;
+  gap: 0.35em;
   border-radius: 14px;
   transition: opacity 240ms ease, border-color 240ms ease, box-shadow 240ms ease, transform 240ms ease;
 }
 
-.undercover-stage--v2 .undercover-player-icon {
-  width: clamp(48px, 5.4vw, 86px);
-}
+.undercover-stage--v2 .seat-1 { top: 13%; left: 3%; }
+.undercover-stage--v2 .seat-2 { top: 38%; left: 3%; }
+.undercover-stage--v2 .seat-3 { top: 63%; left: 3%; }
+.undercover-stage--v2 .seat-4 { top: 13%; right: 3%; left: auto; }
+.undercover-stage--v2 .seat-5 { top: 38%; right: 3%; left: auto; }
+.undercover-stage--v2 .seat-6 { top: 63%; right: 3%; left: auto; }
 
 .undercover-stage--v2 .undercover-player-name {
   max-width: 100%;
-  font-size: clamp(10px, 0.88vw, 15px);
+  font-size: clamp(14px, 0.95vw, 17px);
 }
 
-.undercover-stage--v2 .undercover-player-seat em {
-  font-size: clamp(9px, 0.72vw, 12px);
-}
-
-.undercover-stage--v2 .undercover-player-seat.is-speaking {
-  transform: scale(1.04);
-}
-
-.undercover-stage--v2 .seat-1 { top: 18%; left: 9%; }
-.undercover-stage--v2 .seat-2 { top: 10.5%; left: 25%; }
-.undercover-stage--v2 .seat-3 { top: 10.5%; right: 25%; left: auto; }
-.undercover-stage--v2 .seat-4 { top: 18%; right: 9%; left: auto; }
-.undercover-stage--v2 .seat-5 { top: 57%; right: 5%; left: auto; bottom: auto; }
-.undercover-stage--v2 .seat-6 { top: 57%; left: 5%; right: auto; bottom: auto; }
-
-.undercover-stage--v2 .undercover-focus {
-  top: 53%;
-  width: 44%;
-  min-height: 24%;
-  padding: 1.4% 2.2%;
-}
-
-.undercover-stage--v2.undercover-stage--speaking .undercover-focus {
-  top: auto;
-  bottom: 11.5%;
-  width: 52%;
-  min-height: 13%;
-  padding: 1% 1.8%;
-  transform: translateX(-50%);
-  gap: 0.35em;
-  background: rgba(4, 8, 25, 0.88);
-  backdrop-filter: blur(12px);
-}
-
-.undercover-stage--v2.undercover-stage--speaking .undercover-focus h2 {
-  font-size: clamp(18px, 1.8vw, 30px);
-}
-
-.undercover-stage--v2.undercover-stage--speaking .undercover-focus > svg {
-  height: 14px;
-}
-
-.undercover-stage--v2.undercover-stage--speaking .undercover-focus blockquote {
-  padding: 0.62em 0.9em;
-  font-size: clamp(12px, 1.02vw, 17px);
+.undercover-stage--v2 .undercover-player-name strong {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
   text-align: center;
 }
 
-@media (max-width: 900px) {
-  .undercover-stage--v2 .undercover-player-seat {
-    width: 15%;
-    min-width: 78px;
-    border-radius: 10px;
-  }
-
-  .undercover-stage--v2 .undercover-player-icon {
-    width: clamp(38px, 6vw, 58px);
-  }
-
-  .undercover-stage--v2 .undercover-focus {
-    width: 48%;
-  }
-
-  .undercover-stage--v2.undercover-stage--speaking .undercover-focus {
-    width: 58%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .undercover-stage--v2 .undercover-player-seat,
-  .undercover-stage--v2 .player-poster-spotlight__card {
-    transition: none;
-    transform: none;
-  }
+.undercover-stage--v2 .undercover-player-seat em {
+  font-size: clamp(14px, 0.8vw, 15px);
 }
 ```
 
-- [ ] **Step 4: 隐藏 v2 孤立状态胶囊但保留播报语义**
+继续复用现有背景、遮罩、海报、主持人 cutout、投票 tally、终局 reveal 和 reduced-motion 规则；删除被合并根规则覆盖的旧 1487/1058 比例与环形坐标。
 
-在 `UndercoverGame/index.css` 末尾追加：
+- [ ] **Step 4: 样式化单一底部字幕带**
+
+将 speaking 状态的 `.undercover-focus` 变成无独立大卡片的容器，并增加：
 
 ```css
-.undercover-shell--v2 .undercover-status {
-  width: 1px;
-  height: 1px;
+.undercover-stage--v2.undercover-stage--speaking .undercover-focus {
+  top: auto;
+  bottom: 3.2%;
+  left: 46%;
+  width: 50%;
+  min-height: 12%;
   padding: 0;
-  overflow: hidden;
+  transform: translateX(-50%);
   border: 0;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  background: transparent;
+  box-shadow: none;
+}
+
+.undercover-stage--v2 .undercover-speaker-strip {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(0, 2.6fr) minmax(110px, 0.8fr);
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1px solid rgba(239, 84, 151, 0.72);
+  border-radius: 16px;
+  background: rgba(4, 8, 25, 0.9);
+  backdrop-filter: blur(12px);
+}
+
+.undercover-stage--v2 .undercover-speaker-identity,
+.undercover-stage--v2 .undercover-next-player {
+  display: grid;
+  gap: 4px;
+  color: #f8f8ff;
+  font-size: 14px;
+}
+
+.undercover-stage--v2 .undercover-speaker-identity small,
+.undercover-stage--v2 .undercover-next-player small {
+  color: #ef79a7;
+  font-size: 14px;
+}
+
+.undercover-stage--v2 .undercover-speaker-copy {
+  margin: 0;
+  color: #f8f8ff;
+  font-size: clamp(20px, 1.45vw, 24px);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 ```
 
-不要从 JSX 删除 `aria-live="polite"`。
+海报继续隐藏共享 caption；不要修改 `PlayerPosterSpotlight`。
 
-- [ ] **Step 5: 压缩 v2 控制栏**
+- [ ] **Step 5: 将 v2 控制栏移动到右下角**
 
-在 `UndercoverControls.css` 末尾追加：
+把 `.undercover-controls--v2` 和按钮规则改为：
 
 ```css
-.undercover-shell--v2 .undercover-controls {
+.undercover-controls--v2 {
+  position: fixed;
+  z-index: 10;
+  top: auto;
+  right: clamp(12px, 1.5vw, 28px);
   bottom: 12px;
+  left: auto;
+  transform: none;
   gap: 6px;
   padding: 6px;
+  border: 1px solid rgba(88, 119, 198, 0.28);
+  border-radius: 999px;
   background: rgba(3, 8, 25, 0.8);
+  backdrop-filter: blur(12px);
 }
 
-.undercover-shell--v2 .undercover-controls button {
-  min-width: 104px;
-  min-height: 40px;
-  padding: 0 15px;
+.undercover-controls--v2 button {
+  min-width: 82px;
+  min-height: 44px;
+  padding: 0 12px;
   gap: 7px;
-  font-size: 13px;
-}
-
-.undercover-shell--v2 .undercover-controls button svg {
-  width: 17px;
-  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: rgba(117, 151, 231, 0.62);
+  border-radius: 999px;
+  color: #f4f6ff;
+  background: rgba(8, 20, 52, 0.9);
+  font-size: 14px;
+  font-weight: 700;
 }
 ```
 
-保留现有 `:focus-visible`、`aria-pressed` 和 disabled 行为。
+保留已有 `:hover`、`:focus-visible`、disabled、primary 和图标规则。窄屏 media query 只把按钮 `min-width` 降到 `44px`，字号仍保持 `14px`。
 
-- [ ] **Step 6: 运行单元测试和客户端静态检查**
+- [ ] **Step 6: 运行目标测试和客户端类型检查**
 
 Run:
 
 ```powershell
-pnpm.cmd run test:unit
+pnpm.cmd run test:unit -- undercoverClient.test.ts
 pnpm.cmd --filter @ai-presenter/client run check
 ```
 
-Expected: 两条命令均退出码 0。
+Expected: 两条命令退出码均为 0。
 
-- [ ] **Step 7: 提交剧场布局**
+- [ ] **Step 7: 提交 v2 视觉布局**
 
 ```powershell
-git add -- packages/client/src/features/undercover/UndercoverGame/index.css packages/client/src/features/undercover/components/UndercoverArena.css packages/client/src/features/undercover/components/UndercoverControls.css tests/unit/undercoverClient.test.ts
-git commit -m "style(client): redesign undercover spectator stage"
+git add -- packages/client/src/features/undercover/components/UndercoverArena.css packages/client/src/features/undercover/components/UndercoverControls.css tests/unit/undercoverClient.test.ts
+git commit -m "style(client): optimize undercover v2 stage"
 ```
 
 ---
 
-### Task 3: 文档、构建和视觉验收
+### Task 4: 更新文档并完成运行页面验收
 
 **Files:**
 
-- Modify: `docs/project-client.md`
+- Modify: `docs/project-client.md:150-159`
+- Modify: `docs/project-client.md:245-253`
+- Verify: `packages/client/src/features/undercover/UndercoverGame/index.css`
 
 **Interfaces:**
 
-- Consumes: Task 1–2 完成的 v2 舞台
-- Produces: 项目文档记录和完整验证证据
+- Consumes: Tasks 1–3 的 v2 舞台和现有 classic/v2 路由
+- Produces: 当前代码一致的客户端文档、构建结果、三种 16:9 视口截图和无控制台错误证据
 
-- [ ] **Step 1: 更新客户端项目文档**
+- [ ] **Step 1: 更新谁是卧底模块说明**
 
-在 `docs/project-client.md` 的谁是卧底说明中，将 `UndercoverArena` 条目补充为：
-
-```markdown
-- `UndercoverArena`：经典页面保持当前布局；v2 使用 16:9 环形观战舞台，六席位在所有阶段保持固定坐标，发言阶段只显示一个中央人物海报和一处姓名/状态，下三分之一承载字幕与下一位提示。准备、投票和终局复用中央区域，并且只展示服务端公开状态。
-```
-
-在 `v2 玩家发言海报` 小节补充：
+将 `docs/project-client.md` 中 `UndercoverArena` 条目改为：
 
 ```markdown
-- 谁是卧底 v2 通过 `.undercover-stage--v2` 限定海报、环形席位和字幕覆盖；共享 `PlayerPosterSpotlight` 的默认标签仅在该舞台隐藏，辩论和狼人杀 v2 不受影响。
+- `UndercoverArena`：经典页面保持当前布局；v2 使用 16:9 聚光推理舞台，六席位固定为左右各三席。发言阶段中央只显示一个人物海报，底部单一字幕带承载发言者、完整公开字幕和下一位提示；准备、投票和终局复用中央区域，并且只展示服务端公开状态。
 ```
 
-- [ ] **Step 2: 运行完整客户端验证**
+将 v2 海报小节中的谁是卧底条目改为：
+
+```markdown
+- 谁是卧底 v2 通过 `.undercover-stage--v2` 限定中央海报、左右席位和字幕覆盖；共享 `PlayerPosterSpotlight` 的默认 caption 只在该舞台隐藏，辩论和狼人杀 v2 不受影响。
+```
+
+在 `UndercoverControls` 条目后增加：
+
+```markdown
+- 回放跳过按钮通过无参数包装调用现有 session 控制函数，避免 React 点击事件进入公开状态消息；WebSocket 仍只发送既有 `skip-phase` 控制消息。
+```
+
+- [ ] **Step 2: 运行完整静态验证**
 
 Run:
 
@@ -412,11 +474,12 @@ Run:
 pnpm.cmd run test:unit
 pnpm.cmd --filter @ai-presenter/client run check
 pnpm.cmd run build:client
+git diff --check
 ```
 
-Expected: 单元测试全部 PASS，TypeScript 检查退出码 0，Vite 客户端生产构建成功。
+Expected: 单元测试全部 PASS；TypeScript 检查退出码 0；Vite 客户端生产构建成功；`git diff --check` 无输出。
 
-- [ ] **Step 3: 启动固定端口视觉验证**
+- [ ] **Step 3: 启动本地页面**
 
 Run:
 
@@ -424,43 +487,57 @@ Run:
 pnpm.cmd --filter @ai-presenter/client run dev -- --port 5180 --strictPort
 ```
 
-在浏览器打开 `http://localhost:5180/game/v2/undercover`，选择六名玩家并开始对局。使用 1920×1080 视口，将页面与已确认参考图 `.superpowers/brainstorm/1865-1784904306/content/design-2.png` 并排检查。
+使用本次审计已采用的应用内浏览器打开 `/game/v2/undercover`。从游戏选择页选择六名玩家，进入真实实时对局；再从历史记录入口验证一场回放。不要用伪造字段替代生产事件。
+
+- [ ] **Step 4: 在三种 16:9 视口做视觉对比**
+
+分别使用 1280×720、1440×810 和 1920×1080，对照 Global Constraints 中的已确认参考图检查 setup、speaking、voting、completed 和 replay。
 
 Expected:
 
-- 六个席位均在安全边距内，且环形位置对称稳定。
-- 顶部 HUD、中央完整海报、下三分之一字幕和底部控制栏互不遮挡。
-- 当前发言者只有一个大型主视觉和一处主姓名/状态。
-- 发言者切换不引起席位重排。
-- 投票和终局阶段不显示发言海报，只显示已有公开结果。
-- 经典 `/games/undercover` 未获得 `.undercover-shell--v2` 或 `.undercover-stage--v2` 覆盖。
-- 键盘焦点清晰，淘汰和发言状态包含文字。
+- 左右各三席，头像、姓名和文字状态可读；切换阶段和发言者时席位不重排。
+- 当前发言席位有洋红描边；淘汰席位同时有文字和去色表现。
+- 中央只有一个人物海报，没有独立“正在发言”大卡片。
+- 底部字幕完整换行，字号 20–24px，不遮挡人物面部或右下控制坞。
+- 顶部 HUD、海报、字幕和控制坞互不遮挡。
+- setup、voting、completed 的中央公开信息可读，秘密信息只在 completed reveal 出现。
+- 经典 `/games/undercover` 的 DOM 和视觉与修改前一致。
 
-- [ ] **Step 4: 检查最终差异**
+- [ ] **Step 5: 验证回放跳过和可访问性**
+
+在 replay 中点击“跳过阶段”，再连续操作暂停/继续与语音开关。
+
+Expected:
+
+- 跳过后进入下一公开阶段，不出现空白页。
+- 控制台没有 `Objects are not valid as a React child` 或其他 React 错误。
+- `aria-live` 继续播报状态，错误使用可见 `role="alert"`。
+- `aria-pressed` 正确反映播放与语音状态；Tab 焦点可见；所有控制目标至少 44×44px。
+- reduced-motion 环境下没有席位或海报过渡。
+
+- [ ] **Step 6: 检查范围并提交文档**
 
 Run:
 
 ```powershell
 git diff --check
 git status --short
+git diff --name-only HEAD~3
 ```
 
-Expected: `git diff --check` 无输出；状态中只包含本任务文档改动和执行前已存在的用户改动，不包含新增依赖或服务端文件。
-
-- [ ] **Step 5: 提交文档**
+Expected: 本实现只涉及 File Map 中的客户端、测试和文档文件；不包含 server、shared、数据库、依赖清单或执行前用户改动。
 
 ```powershell
 git add -- docs/project-client.md
-git commit -m "docs(client): document undercover spectator stage"
+git commit -m "docs(client): document undercover v2 stage"
 ```
 
 ---
 
 ## Completion Check
 
-执行结束前再次确认：
-
-- `git diff HEAD~3 --name-only` 不包含 server、shared、数据库或依赖清单。
-- `PlayerPosterSpotlight` 的默认 TSX 和共享 CSS 未被修改，其他 v2 游戏不受影响。
-- 所有新样式都以 `.undercover-shell--v2` 或 `.undercover-stage--v2` 开头。
-- 实时与回放继续通过同一 `UndercoverGame`、`useUndercoverGame` 和公开状态渲染。
+- `pnpm.cmd run test:unit`、client `check`、`build:client` 和 `git diff --check` 均通过。
+- 1280×720、1440×810、1920×1080 的五种状态均有运行页面证据。
+- 回放跳过使用真实事件验证，页面不空白且控制台无 React 错误。
+- classic 路由无 v2 新类和新样式影响。
+- `PlayerPosterSpotlight`、server、shared、API、数据库、依赖清单均未修改。
