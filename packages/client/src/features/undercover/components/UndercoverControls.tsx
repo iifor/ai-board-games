@@ -49,7 +49,7 @@ export function UndercoverControls({
           {speechEnabled ? '关闭语音' : '开启语音'}
         </button>
         {replayMode && (
-          <button type="button" title="跳过当前回放阶段" disabled={!started} onClick={onSkipPhase}>跳过阶段</button>
+          <button type="button" title="跳过当前回放阶段" disabled={!started} onClick={() => onSkipPhase()}>跳过阶段</button>
         )}
       </nav>
     );
@@ -79,7 +79,7 @@ export function UndercoverControls({
         {speechEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
         {speechEnabled ? '语音开启' : '语音关闭'}
       </button>
-      {replayMode && <button type="button" title="跳过当前回放阶段" disabled={!started} onClick={onSkipPhase}><FastForward aria-hidden="true" />跳过阶段</button>}
+      {replayMode && <button type="button" title="跳过当前回放阶段" disabled={!started} onClick={() => onSkipPhase()}><FastForward aria-hidden="true" />跳过阶段</button>}
     </nav>
   );
 }

@@ -115,6 +115,19 @@ test('Undercover controls keep classic behavior while v2 opts into the fixed con
   assert.doesNotMatch(v2, /title="暂停自动播放"/);
 });
 
+test('Undercover replay skip buttons never forward React click events', () => {
+  const source = readFileSync(
+    resolve('packages/client/src/features/undercover/components/UndercoverControls.tsx'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(source, /onClick=\{onSkipPhase\}/);
+  assert.equal(
+    source.match(/onClick=\{\(\) => onSkipPhase\(\)\}/g)?.length,
+    2,
+  );
+});
+
 test('Undercover next-player cue exists only for a real following alive player', () => {
   assert.equal(undercoverComponents.getUndercoverArenaViewModel(speakingGame(1), 'v2').nextPlayer?.id, 2);
   assert.equal(undercoverComponents.getUndercoverArenaViewModel(speakingGame(2), 'v2').nextPlayer?.id, 3);
