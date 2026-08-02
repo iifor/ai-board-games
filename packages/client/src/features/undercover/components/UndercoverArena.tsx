@@ -1,4 +1,4 @@
-import { AudioLines, Bot } from 'lucide-react';
+import { Bot } from 'lucide-react';
 import { PlayerPosterSpotlight } from '../../../components/PlayerPosterSpotlight';
 import { getHostPosterPlayer, isVisualQaHostEnabled } from '../../../components/PlayerPosterSpotlight/posters';
 import type { SpeechState } from '../../../types';
@@ -157,13 +157,27 @@ export function UndercoverArena({ game, host, activeSpeech, variant, showPlayerP
 
       <section className="undercover-focus" aria-live="polite">
         {game.status === 'speaking' && (
-          <>
-            <p>{view.currentSpeakerId ? getUndercoverPlayerLabel(game, view.currentSpeakerId) : '等待发言'}</p>
-            <h2>{view.currentSpeech ? '正在发言' : '准备发言'}</h2>
-            <AudioLines aria-hidden="true" />
-            <blockquote>{view.currentSpeech?.text || '首位玩家正在整理描述。'}</blockquote>
-            {view.nextPlayer && <small>下一位：{getUndercoverPlayerLabel(game, view.nextPlayer.id)}</small>}
-          </>
+          <div className="undercover-speaker-strip">
+            <span className="undercover-speaker-identity">
+              <small>当前发言</small>
+              <strong>
+                {view.currentSpeakerId
+                  ? getUndercoverPlayerLabel(game, view.currentSpeakerId)
+                  : '等待发言'}
+              </strong>
+            </span>
+            <blockquote className="undercover-speaker-copy">
+              {view.currentSpeech?.text || '首位玩家正在整理描述。'}
+            </blockquote>
+            <span className="undercover-next-player">
+              <small>{view.nextPlayer ? '下一位' : '发言顺序'}</small>
+              <strong>
+                {view.nextPlayer
+                  ? getUndercoverPlayerLabel(game, view.nextPlayer.id)
+                  : '本轮最后一位'}
+              </strong>
+            </span>
+          </div>
         )}
 
         {game.status === 'voting' && (

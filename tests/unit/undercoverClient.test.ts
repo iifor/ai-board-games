@@ -55,6 +55,24 @@ test('Undercover arena keeps classic DOM separate from the v2 spectator stage', 
   assert.doesNotMatch(v2, /class="undercover-arena"/);
 });
 
+test('Undercover v2 speaking uses one lower-third strip without a duplicate speech card', () => {
+  const classic = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
+    game: speakingGame(1),
+    variant: 'classic',
+  }));
+  const v2 = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
+    game: speakingGame(1),
+    variant: 'v2',
+  }));
+
+  assert.match(v2, /class="undercover-speaker-strip"/);
+  assert.match(v2, /class="undercover-speaker-identity"/);
+  assert.match(v2, /class="undercover-speaker-copy"/);
+  assert.match(v2, /class="undercover-next-player"/);
+  assert.doesNotMatch(v2, /<h2>正在发言<\/h2>/);
+  assert.doesNotMatch(classic, /undercover-speaker-strip/);
+});
+
 test('Undercover v2 swaps the player poster for a host cutout only during host narration', () => {
   const markup = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
     game: { ...speakingGame(1), status: 'voting' },
