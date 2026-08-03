@@ -153,8 +153,9 @@ packages/client/
 
 - `UndercoverGame`：`standard-6` 实时与历史回放共用的单页容器，只组合控制区、公开竞技场和错误状态；游戏选择页和开局前再次校验恰好 6 个唯一玩家 ID。
 - `useUndercoverGame`：消费通用 WebSocket session、语音队列和 ACK；仅保存服务端公开状态，票型事件只归一化轮次、加赛、汇总计数、平票候选和淘汰玩家，逐人投票始终归一为空对象；开局复用导航 sessionStorage 中已选择的 6 个玩家 ID。
-- `UndercoverArena`：经典页面保持当前布局；v2 使用 16:9 环形观战舞台，六席位在所有阶段保持固定坐标，发言阶段只显示一个中央人物海报和一处姓名/状态，下三分之一承载字幕与下一位提示。准备、投票和终局复用中央区域，并且只展示服务端公开状态。
+- `UndercoverArena`：经典页面保持当前布局；v2 使用 16:9 聚光推理舞台，六席位固定为左右各三席。发言阶段中央只显示一个人物海报，底部单一字幕带承载发言者、完整公开字幕和下一位提示；准备、投票和终局复用中央区域，并且只展示服务端公开状态。
 - `UndercoverControls`：使用底部悬浮控制条复用开始、暂停/继续、独立语音开关和回放跳过控制语义，不增加新 WebSocket 消息；实时 AI 对局不提供人工投票或跳阶段能力。
+- 回放跳过按钮通过无参数包装调用现有 session 控制函数，避免 React 点击事件进入公开状态消息；WebSocket 仍只发送既有 `skip-phase` 控制消息。
 - C 端不接收或推导词对、玩家私词、卧底身份、合法投票目标、胜负或淘汰规则；终局前即使收到异常 secret 字段也会清除，只有 completed 结果保留 `reveal`。
 - 首版不增加谁是卧底后台管理页、词库/人数/轮数配置、真人行动、MVP 或独立复盘 UI；需求确认后再扩展 shared 公共契约和 feature。
 
@@ -250,7 +251,7 @@ pnpm --filter @ai-presenter/client run check
 - 该能力只消费现有前端公开主持人、玩家和播放状态，不新增 REST API、WebSocket 消息、TTS/ACK 队列或 shared 协议字段。
 - 辩论 v2 使用 `/player-poster-cutouts/*.webp` 透明立绘；舞台按完整源图等比包含，左右队伍、评委和底部字幕各自保留独立安全区，避免遮挡当前发言人物。
 - 辩论 v2 背景使用 `asserts/debate-stage-v2.png`，左右席位改为无外框队列；所有覆盖样式继续限定在 `.debate-shell--v2`。
-- 谁是卧底 v2 通过 `.undercover-stage--v2` 限定海报、环形席位和字幕覆盖；共享 `PlayerPosterSpotlight` 的默认标签仅在该舞台隐藏，辩论和狼人杀 v2 不受影响。
+- 谁是卧底 v2 通过 `.undercover-stage--v2` 限定中央海报、左右席位和字幕覆盖；共享 `PlayerPosterSpotlight` 的默认 caption 只在该舞台隐藏，辩论和狼人杀 v2 不受影响。
 
 ## Werewolf v2 专用 Arena 边界
 
