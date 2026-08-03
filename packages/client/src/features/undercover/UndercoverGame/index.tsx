@@ -20,7 +20,7 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', variant = 'c
 
   return (
     <main className={variant === 'v2' ? 'undercover-shell undercover-shell--v2' : 'undercover-shell'}>
-      {(variant === 'classic' || !controller.game) && (
+      {variant === 'classic' && (
         <header className="undercover-heading">
           <p>AI Social Deduction</p>
           <h1>AI 谁是卧底</h1>
@@ -28,7 +28,7 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', variant = 'c
         </header>
       )}
 
-      {variant === 'v2' && controller.game && <p className="undercover-status" aria-live="polite">{controller.message}</p>}
+      {variant === 'v2' && <p className="undercover-status" aria-live="polite">{controller.message}</p>}
 
       <UndercoverControls
         variant={variant}

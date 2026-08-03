@@ -133,6 +133,21 @@ test('Undercover controls keep classic behavior while v2 opts into the fixed con
   assert.doesNotMatch(v2, /title="暂停自动播放"/);
 });
 
+test('Undercover v2 pregame keeps classic marketing and v2 status gates separate', () => {
+  const source = readFileSync(
+    resolve('packages/client/src/features/undercover/UndercoverGame/index.tsx'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(source, /\(variant === 'classic' \|\| !controller\.game\)/);
+  assert.match(source, /\{variant === 'classic' && \(/);
+  assert.match(
+    source,
+    /\{variant === 'v2' && <p className="undercover-status" aria-live="polite">\{controller\.message\}<\/p>\}/,
+  );
+  assert.equal(source.match(/role="alert"/g)?.length, 1);
+});
+
 test('Undercover replay skip buttons never forward React click events', () => {
   const source = readFileSync(
     resolve('packages/client/src/features/undercover/components/UndercoverControls.tsx'),
