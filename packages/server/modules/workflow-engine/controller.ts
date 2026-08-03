@@ -88,6 +88,19 @@ function resolveInterrupt(req: Request, res: Response, next: NextFunction): void
   }
 }
 
+function controlUndercoverDebug(req: Request, res: Response, next: NextFunction): void {
+  try {
+    const matchId = String(req.params.matchId);
+    const action = String(req.body?.action || '');
+    res.json(formatSuccess(service.controlUndercoverDebugMatch(
+      matchId,
+      action as service.UndercoverDebugAction,
+    )));
+  } catch (error) {
+    next(error);
+  }
+}
+
 export {
   getMatchDebug,
   wakeMatch,
@@ -97,4 +110,5 @@ export {
   manualCompleteAiTask,
   createInterrupt,
   resolveInterrupt,
+  controlUndercoverDebug,
 };

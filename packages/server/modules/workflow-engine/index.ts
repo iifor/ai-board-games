@@ -13,11 +13,13 @@ export {
   manualCompleteAiTask,
   submitPendingAction,
   commitWorkflowChange,
+  controlUndercoverDebugMatch,
   getDebugState,
   listPendingOutbox,
   markOutboxSent,
   initializeWorkflowMaintenance,
 } from './service';
+export type { UndercoverDebugAction } from './service';
 
 export * as repository from './repository';
 

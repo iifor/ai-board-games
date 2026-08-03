@@ -146,6 +146,12 @@ WebSocket：
 - `workflow-engine`：工作流调试 API。
 - `player-memory`：跨局玩家画像、本局 AI 会话快照、记忆统计与清除。
 
+谁是卧底调试对局通过已鉴权的
+`POST /api/admin/workflow/matches/:matchId/debug-control` 接受
+`continue`、`skip`、`continuous` 三种动作。服务端只允许控制当前
+Undercover 调试断点；普通对局、其他游戏、缺失对局、非当前断点和重复动作均拒绝。
+该能力复用现有 `workflow_interrupts` 与 `matches.config_json`，不新增数据库表。
+
 大多数资源模块遵循：
 
 ```txt

@@ -326,6 +326,15 @@ Shadow audit 接入方式：
 
 实时与回放复用现有 PlaybackPipeline、TTS/字幕、ACK、outbox 和对局保存。首版不增加数据库表、REST API、WebSocket start/control/ack 消息，也不提供可配置人数/轮数/卧底数量、自定义词库管理、通用游戏 DSL、真人行动、赛后 MVP 或独立复盘流程；浏览器级实时 WebSocket E2E 作为后续验收工作明确延后。
 
+谁是卧底调试断点只在持久化 `debugMode === true` 时启用，覆盖每轮开始、逐人发言、
+投票、复投、结算和最终结果步骤，setup 不设断点。当前步骤首次到达时写入一个
+`undercover_debug_breakpoint`；正常等待状态使用 `waiting`，不使用
+`paused_debug`。已鉴权的后台控制 API 可继续、跳过当前步骤或切换为连续运行；
+跳过只写一条 system `step_skipped`，连续运行把内部 `debugRunMode` 写入
+`config_json`。运行时每 100ms 重新读取持久化状态，不同步忙等，也不自动解除断点。
+setup 会为调试对局写入公开 `undercover-debug-ready` outbox 事件，该事件仍通过
+`toUndercoverPublicState` 投影，不包含词对、逐人私词或卧底座位。
+
 ### agent-core
 
 - `playerAgent`：玩家 agent。
@@ -408,6 +417,7 @@ pnpm run test:workflow
 
 - `GET /workflow/matches/:matchId/debug`
 - `POST /workflow/matches/:matchId/tick`
+- `POST /workflow/matches/:matchId/debug-control`
 - `POST /workflow/matches/:matchId/actions/:actionId/submit`
 - `POST /workflow/ai-tasks/:taskId/retry`
 - `POST /workflow/ai-tasks/:taskId/cancel`

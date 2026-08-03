@@ -37,7 +37,17 @@ function createUndercoverHandlers(): Record<string, StepHandler> {
         const current = state as unknown as WorkflowState;
         if (isComplete(current, step.id)) return done(current);
         const next = completeStep(current, step.id);
-        return done(next);
+        const debugMode = (match as { config?: { debugMode?: boolean } }).config?.debugMode === true;
+        return done(next, debugMode
+          ? [publicEvent(
+              match.id as string,
+              step.id,
+              'undercover-debug-ready',
+              next,
+              '调试对局已就绪',
+              { matchId: match.id },
+            )]
+          : []);
       },
     },
     'undercover.round_start': {

@@ -18,6 +18,8 @@ import { createInitialUndercoverState } from './rules';
 import type { UndercoverPlayerInput } from './types';
 
 const UNDERCOVER_WORKFLOW_ID = 'undercover.workflow.standard.v1';
+const UNDERCOVER_DEBUG_POLL_INTERVAL_MS = 100;
+const TERMINAL_MATCH_STATUSES = new Set(['completed', 'failed', 'paused_debug']);
 
 interface UndercoverRuntimeConfig extends Record<string, unknown> {
   selectedPlayerIds?: number[];
@@ -34,18 +36,18 @@ interface UndercoverRuntimeConfig extends Record<string, unknown> {
 const steps: Workflow['steps'] = [
   { id: 'setup', type: 'undercover.setup', name: '初始化', config: {} },
   ...[1, 2, 3].flatMap((round) => [
-    { id: `round_${round}_start`, type: 'undercover.round_start', name: `第${round}轮开始`, config: { round } },
+    { id: `round_${round}_start`, type: 'undercover.round_start', name: `第${round}轮开始`, config: { round, debugBreakpoint: true } },
     ...Array.from({ length: 6 }, (_, orderIndex) => ({
       id: `round_${round}_speech_${orderIndex}`,
       type: 'undercover.speech',
       name: `第${round}轮发言${orderIndex + 1}`,
-      config: { round, orderIndex },
+      config: { round, orderIndex, debugBreakpoint: true },
     })),
-    { id: `round_${round}_vote`, type: 'undercover.vote', name: `第${round}轮投票`, config: { round, runoff: false } },
-    { id: `round_${round}_runoff`, type: 'undercover.vote', name: `第${round}轮复投`, config: { round, runoff: true } },
-    { id: `round_${round}_resolve`, type: 'undercover.resolve', name: `第${round}轮结算`, config: { round } },
+    { id: `round_${round}_vote`, type: 'undercover.vote', name: `第${round}轮投票`, config: { round, runoff: false, debugBreakpoint: true } },
+    { id: `round_${round}_runoff`, type: 'undercover.vote', name: `第${round}轮复投`, config: { round, runoff: true, debugBreakpoint: true } },
+    { id: `round_${round}_resolve`, type: 'undercover.resolve', name: `第${round}轮结算`, config: { round, debugBreakpoint: true } },
   ]),
-  { id: 'result', type: 'undercover.result', name: '结果揭晓', config: {} },
+  { id: 'result', type: 'undercover.result', name: '结果揭晓', config: { debugBreakpoint: true } },
 ];
 
 const undercoverWorkflow: Workflow = {
@@ -97,7 +99,8 @@ async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunCon
     while (true) {
       const { processed, match } = await drainAiTasks(matchId, { maxTasks: 1 });
       await flushOutbox(matchId, context.onEvent);
-      if (match && ['completed', 'failed', 'paused_debug'].includes(match.status)) break;
+      if (match && TERMINAL_MATCH_STATUSES.has(match.status)) break;
+      if (!processed && await waitForUndercoverDebugControl(matchId, match)) continue;
       if (!processed) throw new Error(`Undercover workflow stalled: ${matchId}`);
     }
     const finalMatch = getDebugState(matchId)?.match;
@@ -116,6 +119,31 @@ async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunCon
     }
     throw error;
   }
+}
+
+async function waitForUndercoverDebugControl(matchId: string, match: Match | null): Promise<boolean> {
+  if (
+    match?.gameType !== 'undercover'
+    || match.config.debugMode !== true
+    || match.status !== 'waiting'
+  ) {
+    return false;
+  }
+  const state = getDebugState(matchId);
+  const pending = state?.interrupts.some((item) =>
+    item.interruptType === 'undercover_debug_breakpoint'
+    && item.status === 'pending'
+    && item.stepId === undercoverWorkflow.steps[match.currentStepIndex]?.id
+  );
+  if (!pending) return false;
+
+  const observedVersion = match.version;
+  await new Promise<void>((resolve) => setTimeout(resolve, UNDERCOVER_DEBUG_POLL_INTERVAL_MS));
+  const refreshed = getDebugState(matchId)?.match;
+  if (!refreshed) throw new Error(`Undercover match disappeared: ${matchId}`);
+  return TERMINAL_MATCH_STATUSES.has(refreshed.status)
+    || refreshed.status === 'waiting'
+    || refreshed.version !== observedVersion;
 }
 
 function assertUndercoverWorkflowCompleted(match: Match): void {

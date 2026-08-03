@@ -6,6 +6,7 @@ import { flushTrace, getActiveTrace, markTraceError } from '../../packages/serve
 import { UNDERCOVER_WORD_PAIRS, seededIndex } from '../../packages/server/modules/undercover/rules';
 import {
   createUndercoverWorkflowMatch,
+  undercoverWorkflow,
   registerUndercoverWorkflow,
   runUndercoverWorkflow,
   type UndercoverRuntimeConfig,
@@ -14,7 +15,10 @@ import {
   claimNextAiTask,
   commitWorkflowChange,
   completeAiTask,
+  controlUndercoverDebugMatch,
+  createWorkflowMatch,
   getDebugState,
+  registerWorkflow,
 } from '../../packages/server/modules/workflow-engine';
 
 function createDebugMatch() {
@@ -26,9 +30,183 @@ function createDebugMatch() {
   });
 }
 
+function createBreakpointMatch() {
+  return createUndercoverWorkflowMatch({
+    players: Array.from({ length: 6 }, (_, index) => ({ id: index + 1, nickname: `${index + 1}号` })),
+    debugMode: true,
+    debug: { seed: 42, civilianWord: '咖啡', undercoverWord: '奶茶', undercoverPlayerId: 2 },
+  });
+}
+
+test('undercover debug match pauses once at each marked step', () => {
+  const match = createBreakpointMatch();
+
+  const ready = getDebugState(match.id)!;
+  const pending = ready.interrupts.filter((item) =>
+    item.interruptType === 'undercover_debug_breakpoint' && item.status === 'pending'
+  );
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].stepId, 'round_1_start');
+
+  controlUndercoverDebugMatch(match.id, 'continue');
+  const advanced = getDebugState(match.id)!;
+  assert.equal(advanced.interrupts.filter((item) => item.stepId === 'round_1_start').length, 1);
+  assert.equal(
+    advanced.interrupts.filter((item) =>
+      item.interruptType === 'undercover_debug_breakpoint' && item.status === 'pending'
+    ).length,
+    1,
+  );
+});
+
+test('undercover debug skip records one system event and moves to the next step', () => {
+  const match = createBreakpointMatch();
+
+  controlUndercoverDebugMatch(match.id, 'skip');
+
+  const current = getDebugState(match.id)!;
+  const skipped = current.events.filter((event) =>
+    event.type === 'step_skipped'
+    && event.stepId === 'round_1_start'
+    && (event.payload as { reason?: string }).reason === 'undercover_debug_skip'
+  );
+  assert.equal(skipped.length, 1);
+  assert.equal(skipped[0].visibility, 'system');
+  assert.equal(undercoverWorkflow.steps[current.match.currentStepIndex]?.id, 'round_1_speech_0');
+});
+
+test('undercover continuous debug control completes without further breakpoints', async () => {
+  const match = createBreakpointMatch();
+
+  controlUndercoverDebugMatch(match.id, 'continuous');
+  await runUndercoverWorkflow(match.id);
+
+  const completed = getDebugState(match.id)!;
+  assert.equal(completed.match.config.debugRunMode, 'continuous');
+  assert.equal(completed.match.status, 'completed');
+  assert.equal(completed.interrupts.filter((item) => item.status === 'pending').length, 0);
+});
+
+test('undercover debug runtime waits for admin control without auto-resolving the breakpoint', async () => {
+  const match = createBreakpointMatch();
+  let settled = false;
+  const runtime = runUndercoverWorkflow(match.id).finally(() => { settled = true; });
+
+  await new Promise<void>((resolve) => setTimeout(resolve, 120));
+  assert.equal(settled, false);
+  assert.equal(
+    getDebugState(match.id)!.interrupts.filter((item) => item.status === 'pending').length,
+    1,
+  );
+
+  controlUndercoverDebugMatch(match.id, 'continuous');
+  await runtime;
+  assert.equal(getDebugState(match.id)!.match.status, 'completed');
+});
+
+test('normal undercover matches never create debug breakpoints', () => {
+  const match = createUndercoverWorkflowMatch({
+    players: Array.from({ length: 6 }, (_, index) => ({ id: index + 1, nickname: `${index + 1}号` })),
+    debugMode: false,
+  });
+
+  const current = getDebugState(match.id)!;
+  assert.equal(current.interrupts.some((item) => item.interruptType === 'undercover_debug_breakpoint'), false);
+  assert.notEqual(current.match.status, 'paused_debug');
+});
+
+test('undercover debug control rejects missing, non-debug, non-undercover, non-current, invalid and repeated requests', () => {
+  assert.throws(
+    () => controlUndercoverDebugMatch('missing-undercover-match', 'continue'),
+    /Undercover debug match not found/,
+  );
+
+  const normal = createUndercoverWorkflowMatch({
+    players: Array.from({ length: 6 }, (_, index) => ({ id: index + 1, nickname: `${index + 1}号` })),
+    debugMode: false,
+  });
+  assert.throws(
+    () => controlUndercoverDebugMatch(normal.id, 'continue'),
+    /not a debug match/,
+  );
+
+  const workflowId = `test.non-undercover-debug.${Date.now()}`;
+  registerWorkflow({
+    id: workflowId,
+    gameType: 'debate',
+    steps: [{ id: 'done', type: 'test.done' }],
+  }, {
+    'test.done': {
+      execute: ({ state }) => ({ status: 'COMPLETED', state, matchStatus: 'completed' }),
+    },
+  });
+  const otherGame = createWorkflowMatch({
+    workflowId,
+    gameType: 'debate',
+    config: { debugMode: true },
+    initialState: {},
+  });
+  assert.throws(
+    () => controlUndercoverDebugMatch(otherGame.id, 'continue'),
+    /not an Undercover match/,
+  );
+
+  const nonCurrent = createBreakpointMatch();
+  commitWorkflowChange({
+    matchId: nonCurrent.id,
+    matchPatch: { current_step_index: 2 },
+  });
+  assert.throws(
+    () => controlUndercoverDebugMatch(nonCurrent.id, 'continue'),
+    /current step/,
+  );
+
+  const invalid = createBreakpointMatch();
+  assert.throws(
+    () => controlUndercoverDebugMatch(invalid.id, 'invalid' as never),
+    /Invalid Undercover debug action/,
+  );
+
+  const repeated = createBreakpointMatch();
+  controlUndercoverDebugMatch(repeated.id, 'continuous');
+  assert.throws(
+    () => controlUndercoverDebugMatch(repeated.id, 'continuous'),
+    /already running continuously/,
+  );
+});
+
+test('undercover breakpoint flow never uses paused_debug', () => {
+  const match = createBreakpointMatch();
+  assert.equal(getDebugState(match.id)!.match.status, 'waiting');
+
+  controlUndercoverDebugMatch(match.id, 'continue');
+  assert.equal(getDebugState(match.id)!.match.status, 'waiting');
+  assert.equal(
+    getDebugState(match.id)!.events.some((event) =>
+      JSON.stringify(event.payload).includes('paused_debug')
+    ),
+    false,
+  );
+});
+
+test('undercover debug-ready outbox event exposes the real public game id without secrets', () => {
+  const match = createBreakpointMatch();
+  const ready = getDebugState(match.id)!;
+  const outbox = ready.outbox.find((message) =>
+    (message.payload as { type?: string }).type === 'undercover-debug-ready'
+  );
+  assert.ok(outbox);
+
+  const payload = (outbox.payload as { payload?: Record<string, unknown> }).payload || {};
+  assert.equal((payload.game as { id?: string }).id, match.id);
+  assert.equal((payload.payload as { matchId?: string }).matchId, match.id);
+  assert.doesNotMatch(JSON.stringify(payload), /wordPair|playerWords|undercoverPlayerId|咖啡|奶茶/);
+});
+
 test('undercover workflow completes a civilian win and persists public events', () => {
   registerUndercoverWorkflow();
   const match = createDebugMatch();
+  controlUndercoverDebugMatch(match.id, 'continuous');
 
   for (let guard = 0; guard < 80; guard += 1) {
     const current = getDebugState(match.id).match;
@@ -49,6 +227,7 @@ test('undercover workflow completes a civilian win and persists public events', 
 
 test('persisted speech results are leak-guarded before public emission', () => {
   const match = createDebugMatch();
+  controlUndercoverDebugMatch(match.id, 'continuous');
   const task = claimNextAiTask({ matchId: match.id, workerId: 'undercover-leak-test' });
   assert.equal(task?.action, 'undercover_speech');
   completeAiTask(task!.id, { payload: { action: task!.action, speech: '我喜欢咖啡' } });
@@ -60,6 +239,7 @@ test('persisted speech results are leak-guarded before public emission', () => {
 
 test('persisted ballots are omitted from the public vote result', () => {
   const match = createDebugMatch();
+  controlUndercoverDebugMatch(match.id, 'continuous');
   for (let index = 0; index < 6; index += 1) {
     const task = claimNextAiTask({ matchId: match.id, workerId: 'undercover-ballot-test' });
     assert.equal(task?.action, 'undercover_speech');

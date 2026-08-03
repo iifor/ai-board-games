@@ -13,6 +13,9 @@ import { cleanupTerminalDebugMatches, scheduleWorkflowMaintenance } from './debu
 const MAX_AI_ATTEMPTS = 2;
 
 const TERMINAL_STATUSES: string[] = [MATCH_STATUS.COMPLETED, MATCH_STATUS.FAILED, MATCH_STATUS.PAUSED_DEBUG];
+const UNDERCOVER_DEBUG_ACTIONS = new Set(['continue', 'skip', 'continuous']);
+
+type UndercoverDebugAction = 'continue' | 'skip' | 'continuous';
 
 interface CreateMatchInput {
   workflowId: string;
@@ -312,6 +315,56 @@ function resolveWorkflowInterrupt(interruptId: string, status: string, resolutio
   return resolveInterrupt(interruptId, status, resolution);
 }
 
+function controlUndercoverDebugMatch(matchId: string, action: UndercoverDebugAction): Match {
+  if (!UNDERCOVER_DEBUG_ACTIONS.has(action)) {
+    throw new Error(`Invalid Undercover debug action: ${String(action)}`);
+  }
+  const execute = getDb().transaction(() => {
+    const match = repo.getMatch(matchId);
+    if (!match) throw new Error(`Undercover debug match not found: ${matchId}`);
+    if (match.gameType !== 'undercover') throw new Error(`Match is not an Undercover match: ${matchId}`);
+    if (match.config.debugMode !== true) throw new Error(`Undercover match is not a debug match: ${matchId}`);
+    if (action === 'continuous' && match.config.debugRunMode === 'continuous') {
+      throw new Error(`Undercover debug match is already running continuously: ${matchId}`);
+    }
+
+    const workflow = getWorkflow(match.workflowId);
+    const currentStep = workflow.steps[match.currentStepIndex];
+    const pending = repo.listWorkflowInterrupts(matchId).filter((item) =>
+      item.interruptType === 'undercover_debug_breakpoint' && item.status === 'pending'
+    );
+    if (pending.length !== 1) {
+      throw new Error(`Undercover debug match must have exactly one pending breakpoint: ${matchId}`);
+    }
+    const interrupt = pending[0];
+    if (!currentStep || interrupt.stepId !== currentStep.id) {
+      throw new Error(`Undercover debug breakpoint does not belong to the current step: ${matchId}`);
+    }
+
+    const status = action === 'skip' ? 'skipped' : 'resolved';
+    const updated = repo.updateWorkflowInterrupt(interrupt.id, {
+      status,
+      resolution_json: toJson({ action }),
+    });
+    if (!updated) throw new Error(`Undercover debug breakpoint not found: ${interrupt.id}`);
+    repo.commitWorkflowChange({
+      matchId,
+      events: [{
+        stepId: interrupt.stepId,
+        type: 'workflow_interrupt_resolved',
+        payload: updated,
+        visibility: 'system',
+        idempotencyKey: `${interrupt.id}:debug-control:${action}`,
+      }],
+      matchPatch: action === 'continuous'
+        ? { config_json: toJson({ ...match.config, debugRunMode: 'continuous' }) }
+        : null,
+    });
+  });
+  execute();
+  return wakeTick(matchId);
+}
+
 function listPendingOutbox(matchId: string) {
   return repo.listPendingOutbox(matchId);
 }
@@ -354,9 +407,11 @@ export {
   commitWorkflowChange,
   createInterrupt,
   resolveWorkflowInterrupt,
+  controlUndercoverDebugMatch,
   getDebugState,
   listPendingOutbox,
   listOutboxMessages,
   markOutboxSent,
   initializeWorkflowMaintenance,
 };
+export type { UndercoverDebugAction };

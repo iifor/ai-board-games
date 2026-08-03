@@ -6,6 +6,7 @@ import { evaluateCondition } from './condition';
 import { hydrateMatchFromEventStore } from './projection';
 import { buildStateTransitionEvents } from './stateTransition';
 import { resolveBlockers } from './blockerResolution';
+import { evaluateDebugBreakpoint } from './debugBreakpoint';
 import type { ConditionContext } from './condition';
 import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { toJson } from './utils';
@@ -97,6 +98,27 @@ function tickMatch(matchId: string, budget: TickBudget = {}): Match {
             idempotencyKey: `${matchId}:${step.id}:skipped`,
           }],
           timing: { correlationId, operation: 'stepSkipped', debugMode: Boolean(match.config?.debugMode) },
+        });
+        currentStepIndex += 1;
+        stepsProcessed += 1;
+        continue;
+      }
+
+      const breakpoint = evaluateDebugBreakpoint(match, step);
+      if (breakpoint.kind === 'pause') {
+        status = MATCH_STATUS.WAITING;
+        break;
+      }
+      if (breakpoint.kind === 'skip') {
+        repo.commitWorkflowChange({
+          matchId,
+          events: [{
+            type: 'step_skipped',
+            stepId: step.id,
+            payload: { reason: 'undercover_debug_skip' },
+            visibility: 'system',
+            idempotencyKey: `${matchId}:${step.id}:debug-skipped`,
+          }],
         });
         currentStepIndex += 1;
         stepsProcessed += 1;
