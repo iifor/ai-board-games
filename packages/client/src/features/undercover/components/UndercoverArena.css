@@ -248,7 +248,6 @@
 .undercover-stage--v2 .undercover-focus p { color: #ef79a7; font-size: clamp(11px, 1.2vw, 18px); font-weight: 800; }
 .undercover-stage--v2 .undercover-focus h2 { font-size: clamp(22px, 2.5vw, 38px); }
 .undercover-stage--v2 .undercover-focus > svg { width: 34%; height: 20px; color: #ff6ca5; }
-.undercover-stage--v2 .undercover-focus blockquote { width: 100%; padding: 0.9em 1.15em; border: 1px solid rgba(95, 116, 189, 0.45); border-radius: 10px; color: #eef1ff; font-size: clamp(10px, 1.13vw, 17px); line-height: 1.6; text-align: left; }
 .undercover-stage--v2 .undercover-focus small { color: #a9b2d0; font-size: clamp(9px, 0.95vw, 14px); }
 
 .undercover-stage--v2 .undercover-tally { width: 100%; max-height: 90px; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4em; list-style: none; }
@@ -389,28 +388,14 @@
 .undercover-stage--v2.undercover-stage--speaking .undercover-focus {
   top: auto;
   bottom: 3.2%;
-  left: 46%;
-  width: 50%;
+  left: 39%;
+  width: 38%;
   min-height: 12%;
   padding: 0;
   transform: translateX(-50%);
   border: 0;
   background: transparent;
   box-shadow: none;
-}
-
-.undercover-stage--v2.undercover-stage--speaking .undercover-focus h2 {
-  font-size: clamp(18px, 1.8vw, 30px);
-}
-
-.undercover-stage--v2.undercover-stage--speaking .undercover-focus > svg {
-  height: 14px;
-}
-
-.undercover-stage--v2.undercover-stage--speaking .undercover-focus blockquote {
-  padding: 0.62em 0.9em;
-  font-size: clamp(12px, 1.02vw, 17px);
-  text-align: center;
 }
 
 .undercover-stage--v2 .undercover-speaker-strip {

@@ -171,8 +171,16 @@ test('Undercover v2 CSS defines side columns, one subtitle strip and a right con
     assert.match(arenaStyles, new RegExp(`\\.undercover-stage--v2 \\.seat-${seat} \\{[^}]*right: 3%`, 's'));
   }
   assert.match(arenaStyles, /\.undercover-stage--v2\.undercover-stage--speaking \.undercover-focus/);
+  assert.match(
+    arenaStyles,
+    /\.undercover-stage--v2\.undercover-stage--speaking \.undercover-focus\s*\{[^}]*left: 39%[^}]*width: 38%/s,
+  );
   assert.match(arenaStyles, /\.undercover-speaker-strip\s*\{[^}]*grid-template-columns:/s);
   assert.match(arenaStyles, /\.undercover-speaker-copy\s*\{[^}]*font-size: clamp\(20px,/s);
+  assert.doesNotMatch(
+    arenaStyles,
+    /\.undercover-focus blockquote\s*\{[^}]*font-size:/s,
+  );
   assert.doesNotMatch(
     arenaStyles,
     /\.undercover-stage--v2 \.undercover-player-name strong\s*\{[^}]*text-overflow:\s*ellipsis/s,
