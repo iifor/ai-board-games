@@ -14,6 +14,7 @@ import {
   toPlaybackEvent,
 } from '../../packages/server/modules/game-socket/playback';
 import { deleteGame, saveGameRecord } from '../../packages/server/modules/games';
+import { createGameCapacity, createSessionStartGuard } from '../../packages/server/modules/game-socket/capacity';
 
 interface SentPayload {
   type?: string;
@@ -42,7 +43,13 @@ function createMockSocket() {
     },
   };
 
-  return { socket, sent };
+  return {
+    socket,
+    sent,
+    emit(event: string, ...args: unknown[]) {
+      emitter.emit(event, ...args);
+    },
+  };
 }
 
 test('GameSession.send sends immediate events without ackId', () => {
@@ -64,6 +71,21 @@ test('GameSession.sendAndWait injects ackId and resolves on ack', async () => {
   assert.equal(sent[0].ackId, 1);
   session.resolveAck(String(sent[0].ackId));
   await pending;
+});
+
+test('GameSession aborts its runtime signal on socket close and error', () => {
+  const closed = createMockSocket();
+  const closedSession = createSession(closed.socket as never);
+  assert.equal(closedSession.signal.aborted, false);
+  closed.socket.close();
+  assert.equal(closedSession.signal.aborted, true);
+  assert.match(String(closedSession.signal.reason), /game-session-cancelled/);
+
+  const failed = createMockSocket();
+  const failedSession = createSession(failed.socket as never);
+  failed.emit('error', new Error('socket failed'));
+  assert.equal(failedSession.signal.aborted, true);
+  assert.match(String(failedSession.signal.reason), /game-session-cancelled/);
 });
 
 test('GameSession treats rule intro as long playback wait payload', () => {
@@ -165,6 +187,75 @@ test('runSession keeps debugMode on runtime and completed payloads', async (t) =
 
   assert.equal(sent.find((event) => event.type === 'fixture-runtime')?.debugMode, true);
   assert.equal(sent.find((event) => event.type === 'done')?.debugMode, true);
+});
+
+test('runSession propagates socket cancellation to runtime and releases game capacity', async (t) => {
+  resetGameEngine();
+  const gameType = 'abort-session-fixture';
+  let receivedSignal: unknown;
+  let runtimeStarted!: () => void;
+  const started = new Promise<void>((resolve) => { runtimeStarted = resolve; });
+  getGameEngine().registerDefinition({
+    gameType,
+    version: '1.0.0',
+    workflowId: `${gameType}-v1`,
+    actionSchemas: {},
+    metadata: {
+      session: {
+        startMessage: 'fixture start',
+        doneMessage: 'fixture done',
+        playerSelection: { min: 1, max: 1, errorMessage: 'select one fixture player' },
+      },
+    },
+    runtime: {
+      createMatch: () => ({ id: 'abort-session-match' }),
+      run: async (_matchId, context) => {
+        receivedSignal = context?.signal;
+        runtimeStarted();
+        if (!context?.signal) throw new Error('runtime signal missing');
+        await new Promise<void>((_resolve, reject) => {
+          context.signal!.addEventListener('abort', () => reject(context.signal!.reason), { once: true });
+        });
+        return { id: 'abort-session-match', gameType, players: [] };
+      },
+    },
+  });
+  const aiConfigModule = require('../../packages/server/config/ai') as { getAiConfig: () => unknown };
+  const settingsModule = require('../../packages/server/modules/settings/service') as { getSpectatorMode: () => boolean };
+  const originalGetAiConfig = aiConfigModule.getAiConfig;
+  const originalGetSpectatorMode = settingsModule.getSpectatorMode;
+  aiConfigModule.getAiConfig = () => ({
+    host: { id: 0, name: 'host', nickname: 'host' },
+    players: [{ id: 1, name: 'fixture', nickname: 'fixture' }],
+    missingProviders: [],
+    realReady: true,
+  });
+  settingsModule.getSpectatorMode = () => false;
+  t.after(() => {
+    aiConfigModule.getAiConfig = originalGetAiConfig;
+    settingsModule.getSpectatorMode = originalGetSpectatorMode;
+    resetGameEngine();
+  });
+
+  const fixture = createMockSocket();
+  const session = createSession(fixture.socket as never);
+  const capacity = createGameCapacity(1);
+  const guard = createSessionStartGuard(capacity);
+  const running = guard.run(session, false, () =>
+    runSession(session, 'real', [1], gameType, { debugMode: true })
+  );
+  const outcome = running.then(
+    () => null,
+    (error: unknown) => error,
+  );
+  await started;
+
+  assert.equal(receivedSignal, session.signal);
+  assert.equal(capacity.stats().active, 1);
+  fixture.socket.close();
+  assert.match(String(await outcome), /game-session-cancelled/);
+  assert.equal(capacity.stats().active, 0);
+  assert.equal(await guard.run({}, false, async () => 'released'), 'released');
 });
 
 test('parseMessage rejects malformed and unknown commands', () => {

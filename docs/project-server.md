@@ -148,8 +148,10 @@ WebSocket：
 
 谁是卧底调试对局通过已鉴权的
 `POST /api/admin/workflow/matches/:matchId/debug-control` 接受
-`continue`、`skip`、`continuous` 三种动作。服务端只允许控制当前
-Undercover 调试断点；普通对局、其他游戏、缺失对局、非当前断点和重复动作均拒绝。
+`{ interruptId, action }`，其中 action 为 `continue`、`skip`、`continuous`
+之一。`interruptId` 必须来自 debug state 中调用方实际看到的当前 pending
+Undercover 调试断点；服务端在事务内校验其 match、step、类型和状态，因此旧 ID、
+重复动作、普通对局、其他游戏、缺失对局与非当前断点均拒绝。
 该能力复用现有 `workflow_interrupts` 与 `matches.config_json`，不新增数据库表。
 
 大多数资源模块遵循：

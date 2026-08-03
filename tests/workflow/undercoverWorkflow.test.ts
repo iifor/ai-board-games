@@ -18,8 +18,10 @@ import {
   controlUndercoverDebugMatch,
   createWorkflowMatch,
   getDebugState,
+  repository,
   registerWorkflow,
 } from '../../packages/server/modules/workflow-engine';
+import { evaluateDebugBreakpoint } from '../../packages/server/modules/workflow-engine/debugBreakpoint';
 
 function createDebugMatch() {
   return createUndercoverWorkflowMatch({
@@ -38,6 +40,22 @@ function createBreakpointMatch() {
   });
 }
 
+function pendingBreakpointId(matchId: string): string {
+  const interrupt = getDebugState(matchId)!.interrupts.find((item) =>
+    item.interruptType === 'undercover_debug_breakpoint' && item.status === 'pending'
+  );
+  assert.ok(interrupt);
+  return interrupt.id;
+}
+
+function controlBreakpoint(matchId: string, action: 'continue' | 'skip' | 'continuous') {
+  return controlUndercoverDebugMatch({
+    matchId,
+    interruptId: pendingBreakpointId(matchId),
+    action,
+  });
+}
+
 test('undercover debug match pauses once at each marked step', () => {
   const match = createBreakpointMatch();
 
@@ -48,7 +66,7 @@ test('undercover debug match pauses once at each marked step', () => {
   assert.equal(pending.length, 1);
   assert.equal(pending[0].stepId, 'round_1_start');
 
-  controlUndercoverDebugMatch(match.id, 'continue');
+  controlBreakpoint(match.id, 'continue');
   const advanced = getDebugState(match.id)!;
   assert.equal(advanced.interrupts.filter((item) => item.stepId === 'round_1_start').length, 1);
   assert.equal(
@@ -62,7 +80,7 @@ test('undercover debug match pauses once at each marked step', () => {
 test('undercover debug skip records one system event and moves to the next step', () => {
   const match = createBreakpointMatch();
 
-  controlUndercoverDebugMatch(match.id, 'skip');
+  controlBreakpoint(match.id, 'skip');
 
   const current = getDebugState(match.id)!;
   const skipped = current.events.filter((event) =>
@@ -78,7 +96,7 @@ test('undercover debug skip records one system event and moves to the next step'
 test('undercover continuous debug control completes without further breakpoints', async () => {
   const match = createBreakpointMatch();
 
-  controlUndercoverDebugMatch(match.id, 'continuous');
+  controlBreakpoint(match.id, 'continuous');
   await runUndercoverWorkflow(match.id);
 
   const completed = getDebugState(match.id)!;
@@ -99,9 +117,47 @@ test('undercover debug runtime waits for admin control without auto-resolving th
     1,
   );
 
-  controlUndercoverDebugMatch(match.id, 'continuous');
+  controlBreakpoint(match.id, 'continuous');
   await runtime;
   assert.equal(getDebugState(match.id)!.match.status, 'completed');
+});
+
+test('undercover debug runtime aborts promptly without resolving its pending breakpoint', async () => {
+  const match = createBreakpointMatch();
+  const controller = new AbortController();
+  let settled = false;
+  const runtime = runUndercoverWorkflow(match.id, { signal: controller.signal })
+    .then(
+      () => ({ kind: 'resolved' as const, error: null }),
+      (error: unknown) => ({ kind: 'rejected' as const, error }),
+    )
+    .finally(() => { settled = true; });
+
+  controller.abort(new Error('undercover-session-disconnected'));
+  const outcome = await Promise.race([
+    runtime,
+    new Promise<{ kind: 'timeout'; error: null }>((resolve) =>
+      setTimeout(() => resolve({ kind: 'timeout', error: null }), 250)
+    ),
+  ]);
+
+  try {
+    assert.equal(outcome.kind, 'rejected');
+    assert.match(String(outcome.error), /undercover-session-disconnected/);
+    assert.equal(pendingBreakpointId(match.id).includes('round_1_start'), true);
+  } finally {
+    if (!settled) {
+      try {
+        controlBreakpoint(match.id, 'continuous');
+      } catch {
+        (controlUndercoverDebugMatch as unknown as (
+          matchId: string,
+          action: 'continuous',
+        ) => unknown)(match.id, 'continuous');
+      }
+      await runtime;
+    }
+  }
 });
 
 test('normal undercover matches never create debug breakpoints', () => {
@@ -115,9 +171,13 @@ test('normal undercover matches never create debug breakpoints', () => {
   assert.notEqual(current.match.status, 'paused_debug');
 });
 
-test('undercover debug control rejects missing, non-debug, non-undercover, non-current, invalid and repeated requests', () => {
+test('undercover debug control validates match, interrupt type, step and action', () => {
   assert.throws(
-    () => controlUndercoverDebugMatch('missing-undercover-match', 'continue'),
+    () => controlUndercoverDebugMatch({
+      matchId: 'missing-undercover-match',
+      interruptId: 'missing-interrupt',
+      action: 'continue',
+    }),
     /Undercover debug match not found/,
   );
 
@@ -126,7 +186,11 @@ test('undercover debug control rejects missing, non-debug, non-undercover, non-c
     debugMode: false,
   });
   assert.throws(
-    () => controlUndercoverDebugMatch(normal.id, 'continue'),
+    () => controlUndercoverDebugMatch({
+      matchId: normal.id,
+      interruptId: 'missing-interrupt',
+      action: 'continue',
+    }),
     /not a debug match/,
   );
 
@@ -147,31 +211,111 @@ test('undercover debug control rejects missing, non-debug, non-undercover, non-c
     initialState: {},
   });
   assert.throws(
-    () => controlUndercoverDebugMatch(otherGame.id, 'continue'),
+    () => controlUndercoverDebugMatch({
+      matchId: otherGame.id,
+      interruptId: 'missing-interrupt',
+      action: 'continue',
+    }),
     /not an Undercover match/,
   );
 
+  const foreignTarget = createBreakpointMatch();
+  const foreignSource = createBreakpointMatch();
+  assert.throws(
+    () => controlUndercoverDebugMatch({
+      matchId: foreignTarget.id,
+      interruptId: pendingBreakpointId(foreignSource.id),
+      action: 'continue',
+    }),
+    /does not belong to match/,
+  );
+
+  const wrongType = createBreakpointMatch();
+  const wrongTypeState = getDebugState(wrongType.id)!;
+  repository.createWorkflowInterrupt({
+    id: `${wrongType.id}:manual-debug`,
+    matchId: wrongType.id,
+    stepId: undercoverWorkflow.steps[wrongTypeState.match.currentStepIndex].id,
+    interruptType: 'manual_debug',
+    status: 'pending',
+    payload: {},
+  });
+  assert.throws(
+    () => controlUndercoverDebugMatch({
+      matchId: wrongType.id,
+      interruptId: `${wrongType.id}:manual-debug`,
+      action: 'continue',
+    }),
+    /not an Undercover debug breakpoint/,
+  );
+
   const nonCurrent = createBreakpointMatch();
+  const nonCurrentInterruptId = pendingBreakpointId(nonCurrent.id);
   commitWorkflowChange({
     matchId: nonCurrent.id,
     matchPatch: { current_step_index: 2 },
   });
   assert.throws(
-    () => controlUndercoverDebugMatch(nonCurrent.id, 'continue'),
+    () => controlUndercoverDebugMatch({
+      matchId: nonCurrent.id,
+      interruptId: nonCurrentInterruptId,
+      action: 'continue',
+    }),
     /current step/,
   );
 
   const invalid = createBreakpointMatch();
   assert.throws(
-    () => controlUndercoverDebugMatch(invalid.id, 'invalid' as never),
+    () => controlUndercoverDebugMatch({
+      matchId: invalid.id,
+      interruptId: '',
+      action: 'continue',
+    }),
+    /interruptId is required/,
+  );
+  assert.throws(
+    () => controlUndercoverDebugMatch({
+      matchId: invalid.id,
+      interruptId: pendingBreakpointId(invalid.id),
+      action: 'invalid' as never,
+    }),
     /Invalid Undercover debug action/,
   );
+});
 
-  const repeated = createBreakpointMatch();
-  controlUndercoverDebugMatch(repeated.id, 'continuous');
+test('undercover debug control rejects a stale interrupt id for every action', () => {
+  for (const action of ['continue', 'skip', 'continuous'] as const) {
+    const match = createBreakpointMatch();
+    const staleInterruptId = pendingBreakpointId(match.id);
+    controlUndercoverDebugMatch({
+      matchId: match.id,
+      interruptId: staleInterruptId,
+      action: 'continue',
+    });
+    const currentInterruptId = pendingBreakpointId(match.id);
+
+    assert.throws(
+      () => controlUndercoverDebugMatch({
+        matchId: match.id,
+        interruptId: staleInterruptId,
+        action,
+      }),
+      /not pending/,
+    );
+    assert.equal(pendingBreakpointId(match.id), currentInterruptId);
+  }
+});
+
+test('undercover debug breakpoint rejects unknown persisted statuses', () => {
+  const match = createBreakpointMatch();
+  const interruptId = pendingBreakpointId(match.id);
+  repository.updateWorkflowInterrupt(interruptId, { status: 'unexpected_status' });
+  const state = getDebugState(match.id)!;
+  const step = undercoverWorkflow.steps[state.match.currentStepIndex];
+
   assert.throws(
-    () => controlUndercoverDebugMatch(repeated.id, 'continuous'),
-    /already running continuously/,
+    () => evaluateDebugBreakpoint(state.match, step),
+    /Unknown Undercover debug breakpoint status/,
   );
 });
 
@@ -179,7 +323,7 @@ test('undercover breakpoint flow never uses paused_debug', () => {
   const match = createBreakpointMatch();
   assert.equal(getDebugState(match.id)!.match.status, 'waiting');
 
-  controlUndercoverDebugMatch(match.id, 'continue');
+  controlBreakpoint(match.id, 'continue');
   assert.equal(getDebugState(match.id)!.match.status, 'waiting');
   assert.equal(
     getDebugState(match.id)!.events.some((event) =>
@@ -206,7 +350,7 @@ test('undercover debug-ready outbox event exposes the real public game id withou
 test('undercover workflow completes a civilian win and persists public events', () => {
   registerUndercoverWorkflow();
   const match = createDebugMatch();
-  controlUndercoverDebugMatch(match.id, 'continuous');
+  controlBreakpoint(match.id, 'continuous');
 
   for (let guard = 0; guard < 80; guard += 1) {
     const current = getDebugState(match.id).match;
@@ -227,7 +371,7 @@ test('undercover workflow completes a civilian win and persists public events', 
 
 test('persisted speech results are leak-guarded before public emission', () => {
   const match = createDebugMatch();
-  controlUndercoverDebugMatch(match.id, 'continuous');
+  controlBreakpoint(match.id, 'continuous');
   const task = claimNextAiTask({ matchId: match.id, workerId: 'undercover-leak-test' });
   assert.equal(task?.action, 'undercover_speech');
   completeAiTask(task!.id, { payload: { action: task!.action, speech: '我喜欢咖啡' } });
@@ -239,7 +383,7 @@ test('persisted speech results are leak-guarded before public emission', () => {
 
 test('persisted ballots are omitted from the public vote result', () => {
   const match = createDebugMatch();
-  controlUndercoverDebugMatch(match.id, 'continuous');
+  controlBreakpoint(match.id, 'continuous');
   for (let index = 0; index < 6; index += 1) {
     const task = claimNextAiTask({ matchId: match.id, workerId: 'undercover-ballot-test' });
     assert.equal(task?.action, 'undercover_speech');

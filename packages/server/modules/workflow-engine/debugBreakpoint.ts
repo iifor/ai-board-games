@@ -34,9 +34,18 @@ function evaluateDebugBreakpoint(match: Match, step: WorkflowStep): DebugBreakpo
     }) || undefined;
   }
   if (!interrupt) throw new Error(`Failed to create Undercover debug breakpoint: ${step.id}`);
-  if (interrupt.status === 'pending') return { kind: 'pause', interruptId: interrupt.id };
-  if (interrupt.status === 'skipped') return { kind: 'skip', interruptId: interrupt.id };
-  return { kind: 'run' };
+  switch (interrupt.status) {
+    case 'pending':
+      return { kind: 'pause', interruptId: interrupt.id };
+    case 'skipped':
+      return { kind: 'skip', interruptId: interrupt.id };
+    case 'resolved':
+      return { kind: 'run' };
+    default:
+      throw new Error(
+        `Unknown Undercover debug breakpoint status: ${interrupt.status}`,
+      );
+  }
 }
 
 export { UNDERCOVER_DEBUG_BREAKPOINT, evaluateDebugBreakpoint };

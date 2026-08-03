@@ -324,14 +324,20 @@ Shadow audit 接入方式：
 - 结构化输出先按 schema/contract 校验；失败后只追加一次纠错指令并重试，即最多两次结构化模型输出尝试。两次仍不合规时，描述使用固定中性文本，投票按当前合法目标与服务端种子稳定兜底。该契约重试独立于单次调用内部复用的主模型/备选模型 provider 故障转移，两者不得混为额外规则重试。
 - 只有 `undercover-game-result` 的 completed 投影携带 `winner/winReason/reveal`，其中 reveal 含双方词语和卧底座位。保存的精确播放序列同样只允许最终结果事件携带揭示数据。
 
-实时与回放复用现有 PlaybackPipeline、TTS/字幕、ACK、outbox 和对局保存。首版不增加数据库表、REST API、WebSocket start/control/ack 消息，也不提供可配置人数/轮数/卧底数量、自定义词库管理、通用游戏 DSL、真人行动、赛后 MVP 或独立复盘流程；浏览器级实时 WebSocket E2E 作为后续验收工作明确延后。
+实时与回放复用现有 PlaybackPipeline、TTS/字幕、ACK、outbox 和对局保存。首版不增加数据库表或 WebSocket start/control/ack 消息，也不提供可配置人数/轮数/卧底数量、自定义词库管理、通用游戏 DSL、真人行动、赛后 MVP 或独立复盘流程；后台调试控制 API 仅作用于持久化调试对局。浏览器级实时 WebSocket E2E 作为后续验收工作明确延后。
 
 谁是卧底调试断点只在持久化 `debugMode === true` 时启用，覆盖每轮开始、逐人发言、
 投票、复投、结算和最终结果步骤，setup 不设断点。当前步骤首次到达时写入一个
 `undercover_debug_breakpoint`；正常等待状态使用 `waiting`，不使用
-`paused_debug`。已鉴权的后台控制 API 可继续、跳过当前步骤或切换为连续运行；
+`paused_debug`。已鉴权的后台控制 API 必须携带 debug state 中当前 pending
+断点的 `interruptId`，服务端在事务内校验 match、step、类型和状态后，才可继续、
+跳过当前步骤或切换为连续运行；旧 ID 和重复请求不得落到后续断点。
 跳过只写一条 system `step_skipped`，连续运行把内部 `debugRunMode` 写入
 `config_json`。运行时每 100ms 重新读取持久化状态，不同步忙等，也不自动解除断点。
+`game-socket` 为每个真实连接创建标准 `AbortSignal`，在 WebSocket close/error
+时触发并透传至 `GameRuntimeRunContext`；谁是卧底在每轮循环和断点等待中检查该
+信号，使断开连接的运行及时退出，随后由现有 session capacity `finally` 释放占用。
+断点状态仅接受 `pending`、`skipped`、`resolved`，未知持久化状态直接报错。
 setup 会为调试对局写入公开 `undercover-debug-ready` outbox 事件，该事件仍通过
 `toUndercoverPublicState` 投影，不包含词对、逐人私词或卧底座位。
 

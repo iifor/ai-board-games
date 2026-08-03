@@ -67,6 +67,7 @@ interface SessionEvent {
 }
 
 interface GameSession {
+  readonly signal?: AbortSignal;
   send: (payload: Record<string, unknown>) => void;
   sendAndWait: (payload: Record<string, unknown>) => Promise<void>;
   resolveAck: (ackId: number | string) => void;
@@ -76,20 +77,26 @@ interface GameSession {
 }
 
 function createSession(socket: WebSocket): GameSession {
+  const abortController = new AbortController();
   let nextId = 1;
   const pending = new Map<number, PendingItem>();
   let closed = false;
   let paused = false;
   let skipPhaseKey = '';
 
-  socket.on('close', () => {
+  function cancel(): void {
+    if (closed) return;
     closed = true;
+    abortController.abort(createSessionCancelledError());
     for (const { reject, timer } of pending.values()) {
       if (timer) clearTimeout(timer);
       reject(createSessionCancelledError());
     }
     pending.clear();
-  });
+  }
+
+  socket.on('close', cancel);
+  socket.on('error', cancel);
 
   function send(payload: Record<string, unknown>): void {
     if (socket.readyState !== socket.OPEN) return;
@@ -206,7 +213,15 @@ function createSession(socket: WebSocket): GameSession {
     item.resolve();
   }
 
-  return { send, sendAndWait, resolveAck, close, setPaused, skipCurrentPhase };
+  return {
+    signal: abortController.signal,
+    send,
+    sendAndWait,
+    resolveAck,
+    close,
+    setPaused,
+    skipCurrentPhase,
+  };
 }
 
 function isSpeechWaitPayload(payload: Record<string, unknown>): boolean {

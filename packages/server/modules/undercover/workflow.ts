@@ -1,5 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import type { GameRuntimeRunContext } from '../../../shared/types/gameEngine';
+import type {
+  GameRuntimeAbortSignal,
+  GameRuntimeRunContext,
+} from '../../../shared/types/gameEngine';
 import { getAiConfig } from '../../config/ai';
 import type { Match } from '../../types/workflow';
 import { createTraceContext, flushTrace, getActiveTrace, markTraceComplete, markTraceError } from '../observability';
@@ -95,12 +98,15 @@ async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunCon
     ? null
     : getActiveTrace(matchId) || createTraceContext(matchId, 'undercover', 'standard-6', initial.state.players as Array<Record<string, unknown>>);
   try {
+    throwIfAborted(context.signal);
     await flushOutbox(matchId, context.onEvent);
     while (true) {
+      throwIfAborted(context.signal);
       const { processed, match } = await drainAiTasks(matchId, { maxTasks: 1 });
       await flushOutbox(matchId, context.onEvent);
+      throwIfAborted(context.signal);
       if (match && TERMINAL_MATCH_STATUSES.has(match.status)) break;
-      if (!processed && await waitForUndercoverDebugControl(matchId, match)) continue;
+      if (!processed && await waitForUndercoverDebugControl(matchId, match, context.signal)) continue;
       if (!processed) throw new Error(`Undercover workflow stalled: ${matchId}`);
     }
     const finalMatch = getDebugState(matchId)?.match;
@@ -121,7 +127,11 @@ async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunCon
   }
 }
 
-async function waitForUndercoverDebugControl(matchId: string, match: Match | null): Promise<boolean> {
+async function waitForUndercoverDebugControl(
+  matchId: string,
+  match: Match | null,
+  signal?: GameRuntimeAbortSignal,
+): Promise<boolean> {
   if (
     match?.gameType !== 'undercover'
     || match.config.debugMode !== true
@@ -138,12 +148,43 @@ async function waitForUndercoverDebugControl(matchId: string, match: Match | nul
   if (!pending) return false;
 
   const observedVersion = match.version;
-  await new Promise<void>((resolve) => setTimeout(resolve, UNDERCOVER_DEBUG_POLL_INTERVAL_MS));
+  await waitForUndercoverDebugPoll(signal);
   const refreshed = getDebugState(matchId)?.match;
   if (!refreshed) throw new Error(`Undercover match disappeared: ${matchId}`);
   return TERMINAL_MATCH_STATUSES.has(refreshed.status)
     || refreshed.status === 'waiting'
     || refreshed.version !== observedVersion;
+}
+
+function waitForUndercoverDebugPoll(signal?: GameRuntimeAbortSignal): Promise<void> {
+  throwIfAborted(signal);
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (callback: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      callback();
+    };
+    const onAbort = (): void => finish(() => reject(abortReason(signal)));
+    const timer = setTimeout(
+      () => finish(resolve),
+      UNDERCOVER_DEBUG_POLL_INTERVAL_MS,
+    );
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+  });
+}
+
+function throwIfAborted(signal?: GameRuntimeAbortSignal): void {
+  if (signal?.aborted) throw abortReason(signal);
+}
+
+function abortReason(signal?: GameRuntimeAbortSignal): Error {
+  return signal?.reason instanceof Error
+    ? signal.reason
+    : new Error('Undercover runtime aborted');
 }
 
 function assertUndercoverWorkflowCompleted(match: Match): void {

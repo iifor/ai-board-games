@@ -142,8 +142,20 @@ interface SkillDefinition {
   visibility?: GameEngineChannel;
 }
 
+interface GameRuntimeAbortSignal {
+  readonly aborted: boolean;
+  readonly reason?: unknown;
+  addEventListener(
+    type: 'abort',
+    listener: () => void,
+    options?: { once?: boolean },
+  ): void;
+  removeEventListener(type: 'abort', listener: () => void): void;
+}
+
 interface GameRuntimeRunContext {
   onEvent?: (event: Record<string, unknown>) => void;
+  signal?: GameRuntimeAbortSignal;
 }
 
 interface GameRuntime {
@@ -232,6 +244,7 @@ export type {
   StateProjectionContext,
   ProjectStateFromEvent,
   SkillDefinition,
+  GameRuntimeAbortSignal,
   GameRuntimeRunContext,
   GameRuntime,
   GameSessionMetadata,

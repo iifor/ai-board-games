@@ -276,6 +276,7 @@ async function runSession(
   let runnerError: unknown = null;
   try {
     game = (await runner(config, {
+      signal: session.signal,
       onEvent: (event: Record<string, unknown>) => {
         if (liveSource) {
           if (safeGameType !== 'werewolf') {

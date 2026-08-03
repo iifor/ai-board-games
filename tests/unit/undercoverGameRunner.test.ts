@@ -7,6 +7,10 @@ import { runSession, selectPlayersForGame } from '../../packages/server/modules/
 import { buildUndercoverDebugSpeech, buildUndercoverDebugVote } from '../../packages/server/modules/undercover/debug';
 import { createInitialUndercoverState, validatePublicSpeech } from '../../packages/server/modules/undercover/rules';
 import {
+  controlUndercoverDebugMatch,
+  getDebugState,
+} from '../../packages/server/modules/workflow-engine';
+import {
   normalizeGameType,
   validatePlayerSelection,
 } from '../../packages/server/routes/gameRoutes';
@@ -172,13 +176,26 @@ test('debug Undercover completes its first speech without calling the player mod
     skipCurrentPhase() {},
   };
 
-  await runSession(
+  const running = runSession(
     session as never,
     'real',
     players.map((player) => player.id),
     'undercover',
     { debugMode: true },
   );
+  await waitForCondition(() => sent.some((event) => event.type === 'undercover-debug-ready'));
+  const ready = sent.find((event) => event.type === 'undercover-debug-ready')!;
+  const matchId = String((ready.payload as { matchId?: string }).matchId);
+  const interrupt = getDebugState(matchId)!.interrupts.find((item) =>
+    item.interruptType === 'undercover_debug_breakpoint' && item.status === 'pending'
+  );
+  assert.ok(interrupt);
+  controlUndercoverDebugMatch({
+    matchId,
+    interruptId: interrupt.id,
+    action: 'continuous',
+  });
+  await running;
 
   const starts = sent.filter((event) => event.message === '谁是卧底开始');
   assert.equal(starts.length, 1);
@@ -411,4 +428,12 @@ function deferred<T>() {
     resolve = done as (value?: T | PromiseLike<T>) => void;
   });
   return { promise, resolve };
+}
+
+async function waitForCondition(predicate: () => boolean): Promise<void> {
+  for (let index = 0; index < 50; index += 1) {
+    if (predicate()) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  }
+  assert.equal(predicate(), true);
 }
