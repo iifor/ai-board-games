@@ -1,5 +1,6 @@
 import type { QueueItem } from '../../types';
 import {
+  clampFinite,
   getProfileForItem,
   getSpeechPlaybackText,
   getVoiceForItem,
@@ -13,7 +14,12 @@ export function createBrowserSpeechUtterance(item: QueueItem, voices: SpeechSynt
   const profile = normalizeVoiceProfile(getProfileForItem(item));
   const voice = getVoiceForItem(item, voices, profile);
   utterance.lang = 'zh-CN';
-  utterance.rate = profile.rate;
+  utterance.rate = clampFinite(
+    profile.rate * clampFinite(item.playbackRate, 1, 1, 4),
+    profile.rate,
+    0.1,
+    10,
+  );
   utterance.pitch = profile.pitch;
   utterance.volume = profile.volume;
   if (voice) {

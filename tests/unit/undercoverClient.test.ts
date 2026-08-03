@@ -148,6 +148,31 @@ test('Undercover v2 pregame keeps classic marketing and v2 status gates separate
   assert.equal(source.match(/role="alert"/g)?.length, 1);
 });
 
+test('Undercover debug controls stay in live v2 and default to 2x playback', () => {
+  const source = readFileSync(
+    resolve('packages/client/src/features/undercover/UndercoverGame/index.tsx'),
+    'utf8',
+  );
+  const hook = readFileSync(
+    resolve('packages/client/src/features/undercover/hooks/useUndercoverGame.ts'),
+    'utf8',
+  );
+
+  assert.match(source, /const \[debugMode, setDebugMode\] = useState\(false\)/);
+  assert.match(source, /debugMode: variant === 'v2' && !replayGameId && debugMode/);
+  assert.match(source, /variant === 'v2' && !replayGameId && !controller\.started/);
+  assert.match(source, /role="switch"[\s\S]*?调试模式/);
+  assert.match(source, /variant === 'v2' && !replayGameId && debugMode && controller\.started/);
+  assert.match(source, /调试中/);
+  assert.match(source, /Match ID/);
+  assert.match(source, /role="group"[\s\S]*?1×[\s\S]*?2×[\s\S]*?4×/);
+  assert.match(hook, /useState<UndercoverPlaybackRate>\(2\)/);
+  assert.match(
+    hook,
+    /getSpeechOptions: \(event\) => getSpeechOptions\(event, debugMode && !replayGameId \? playbackRate : undefined\)/,
+  );
+});
+
 test('Undercover replay skip buttons never forward React click events', () => {
   const source = readFileSync(
     resolve('packages/client/src/features/undercover/components/UndercoverControls.tsx'),
@@ -171,6 +196,10 @@ test('Undercover next-player cue exists only for a real following alive player',
 test('Undercover v2 CSS defines side columns, one subtitle strip and a right control dock', () => {
   const arenaStyles = readFileSync(
     resolve('packages/client/src/features/undercover/components/UndercoverArena.css'),
+    'utf8',
+  );
+  const shellStyles = readFileSync(
+    resolve('packages/client/src/features/undercover/UndercoverGame/index.css'),
     'utf8',
   );
   const controlStyles = readFileSync(
@@ -203,6 +232,12 @@ test('Undercover v2 CSS defines side columns, one subtitle strip and a right con
   assert.match(controlStyles, /\.undercover-controls--v2\s*\{[^}]*right: clamp\(/s);
   assert.match(controlStyles, /\.undercover-controls--v2\s*\{[^}]*left: auto/s);
   assert.match(controlStyles, /\.undercover-controls--v2 button\s*\{[^}]*min-height: 44px/s);
+  assert.match(
+    shellStyles,
+    /\.undercover-debug-panel\s*\{[^}]*position: fixed[^}]*z-index: 11[^}]*top: 16px[^}]*left: 20px[^}]*max-width: min\(360px, 32vw\)/s,
+  );
+  assert.match(shellStyles, /\.undercover-debug-panel button\s*\{[^}]*min-height: 44px/s);
+  assert.match(shellStyles, /\.undercover-debug-panel button:focus-visible/);
   assert.match(arenaStyles, /prefers-reduced-motion: reduce/);
 });
 
@@ -397,7 +432,12 @@ test('Undercover start config forwards exactly the selected six ids', () => {
   }
   assert.equal(typeof feature?.buildUndercoverStartOptions, 'function');
   assert.deepEqual(feature!.buildUndercoverStartOptions([9, 4, 7, 2, 8, 1], ''), { playerIds: [9, 4, 7, 2, 8, 1] });
+  assert.deepEqual(
+    feature!.buildUndercoverStartOptions([9, 4, 7, 2, 8, 1], '', true),
+    { playerIds: [9, 4, 7, 2, 8, 1], debugMode: true },
+  );
   assert.deepEqual(feature!.buildUndercoverStartOptions([], 'history-1'), { replayGameId: 'history-1' });
+  assert.deepEqual(feature!.buildUndercoverStartOptions([], 'history-1', true), { replayGameId: 'history-1' });
   assert.throws(() => feature!.buildUndercoverStartOptions([1, 2, 3, 4, 5], ''), /固定选择 6 位 AI 玩家/);
   assert.throws(() => feature!.buildUndercoverStartOptions([1, 2, 3, 4, 5, 5], ''), /固定选择 6 位 AI 玩家/);
 });

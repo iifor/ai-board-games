@@ -17,6 +17,10 @@ export interface UndercoverViewState {
   message: string;
 }
 
-export type UndercoverStartOptions = { playerIds: number[] } | { replayGameId: string };
+export type UndercoverPlaybackRate = 1 | 2 | 4;
+
+export type UndercoverStartOptions =
+  | { playerIds: number[]; debugMode?: boolean }
+  | { replayGameId: string };
 
 export type { UndercoverPublicState, UndercoverVoteResult };

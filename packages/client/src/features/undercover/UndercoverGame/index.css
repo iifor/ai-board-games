@@ -92,6 +92,110 @@
   color: #aeb9d7;
 }
 
+.undercover-debug-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 20px;
+  gap: 10px;
+  color: #dce5ff;
+  cursor: pointer;
+}
+
+.undercover-debug-toggle input {
+  width: 22px;
+  height: 22px;
+  accent-color: #778cff;
+}
+
+.undercover-debug-toggle span,
+.undercover-debug-panel header {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.undercover-debug-toggle svg,
+.undercover-debug-panel svg {
+  width: 18px;
+  height: 18px;
+}
+
+.undercover-debug-panel {
+  position: fixed;
+  z-index: 11;
+  top: 16px;
+  left: 20px;
+  display: grid;
+  max-width: min(360px, 32vw);
+  padding: 12px;
+  gap: 10px;
+  border: 1px solid rgba(128, 151, 238, 0.42);
+  border-radius: 14px;
+  background: rgba(3, 8, 25, 0.88);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.undercover-debug-panel header {
+  color: #aebfff;
+}
+
+.undercover-debug-match {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.undercover-debug-match span {
+  color: #8fa1ce;
+  font-size: 12px;
+}
+
+.undercover-debug-match code {
+  min-width: 0;
+  overflow: hidden;
+  color: #eff2ff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undercover-debug-panel button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid rgba(128, 151, 238, 0.36);
+  border-radius: 10px;
+  color: #dce5ff;
+  background: rgba(89, 108, 184, 0.2);
+  cursor: pointer;
+}
+
+.undercover-debug-panel button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.undercover-debug-panel button:focus-visible,
+.undercover-debug-toggle input:focus-visible {
+  outline: 3px solid #b8c5ff;
+  outline-offset: 2px;
+}
+
+.undercover-debug-speeds {
+  display: flex;
+  gap: 6px;
+}
+
+.undercover-debug-speeds button {
+  flex: 1 1 44px;
+}
+
+.undercover-debug-speeds button[aria-pressed='true'] {
+  border-color: #aab8ff;
+  color: #ffffff;
+  background: rgba(105, 124, 230, 0.62);
+}
+
 .undercover-shell--v2 .undercover-status {
   position: fixed;
   z-index: 9;
@@ -120,4 +224,18 @@
   margin: 0;
   color: #ff9caa;
   text-align: left;
+}
+
+@media (max-width: 760px) {
+  .undercover-debug-panel {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
+  }
+
+  .undercover-debug-match,
+  .undercover-debug-speeds {
+    flex-wrap: wrap;
+  }
 }

@@ -4,6 +4,7 @@ import { useSpeechQueue } from '../../../hooks/useSpeechQueue';
 import type { GameEvent, QueueItem, SpeechState } from '../../../types';
 import type {
   UndercoverHost,
+  UndercoverPlaybackRate,
   UndercoverPublicState,
   UndercoverStartOptions,
   UndercoverViewState,
@@ -21,9 +22,14 @@ export const EMPTY_UNDERCOVER_VIEW_STATE: UndercoverViewState = {
 interface UseUndercoverGameParams {
   playerIds: number[];
   replayGameId?: string;
+  debugMode?: boolean;
 }
 
-export function buildUndercoverStartOptions(playerIds: number[], replayGameId: string): UndercoverStartOptions {
+export function buildUndercoverStartOptions(
+  playerIds: number[],
+  replayGameId: string,
+  debugMode = false,
+): UndercoverStartOptions {
   if (replayGameId) return { replayGameId };
   const normalizedIds = playerIds.map(Number);
   if (
@@ -33,7 +39,10 @@ export function buildUndercoverStartOptions(playerIds: number[], replayGameId: s
   ) {
     throw new Error('谁是卧底需固定选择 6 位 AI 玩家');
   }
-  return { playerIds: normalizedIds };
+  return {
+    playerIds: normalizedIds,
+    ...(debugMode ? { debugMode: true } : {}),
+  };
 }
 
 export function getUndercoverNarration(event: GameEvent): string {
@@ -67,9 +76,11 @@ export function reduceUndercoverViewState(state: UndercoverViewState, event: Gam
   };
 }
 
-export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercoverGameParams) {
+export function useUndercoverGame({ playerIds, replayGameId = '', debugMode = false }: UseUndercoverGameParams) {
   const [view, setView] = useState<UndercoverViewState>(EMPTY_UNDERCOVER_VIEW_STATE);
   const [started, setStarted] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<UndercoverPlaybackRate>(2);
+  const matchId = view.game?.id || '';
   const { speechEnabled, setSpeechEnabled, speak, unlock, cancel } = useSpeechQueue();
   const session = useGameSocketSession({
     gameType: 'undercover',
@@ -78,7 +89,8 @@ export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercove
     cancel,
     applyServerEvent: (event) => setView((current) => reduceUndercoverViewState(current, event)),
     getNarration: getUndercoverNarration,
-    getSpeechOptions: getSpeechOptions,
+    getSpeechOptions: (event) => getSpeechOptions(event, debugMode && !replayGameId ? playbackRate : undefined),
+    getAckDelay: () => debugMode && !replayGameId ? Math.max(60, 120 / playbackRate) : 120,
     playPendingEvent: () => false,
     onError: (error) => {
       const message = String(error.message || '游戏发生错误');
@@ -106,7 +118,7 @@ export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercove
 
   function startGame(): void {
     try {
-      const options = buildUndercoverStartOptions(playerIds, replayGameId);
+      const options = buildUndercoverStartOptions(playerIds, replayGameId, debugMode);
       setView({ ...EMPTY_UNDERCOVER_VIEW_STATE, message: replayGameId ? '正在加载历史对局...' : '游戏准备中...' });
       setStarted(true);
       if (speechEnabled) unlock();
@@ -131,6 +143,9 @@ export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercove
     autoPlay: session.autoPlay,
     replayMode: session.isReplayMode,
     started,
+    matchId,
+    playbackRate,
+    setPlaybackRate,
     speechEnabled,
     setSpeechEnabled,
     startGame,
@@ -140,11 +155,12 @@ export function useUndercoverGame({ playerIds, replayGameId = '' }: UseUndercove
   };
 }
 
-function getSpeechOptions(event: GameEvent): Partial<QueueItem> {
+function getSpeechOptions(event: GameEvent, playbackRate?: UndercoverPlaybackRate): Partial<QueueItem> {
   return {
     audioUrl: event.audioUrl,
     audioMimeType: event.audioMimeType,
-    wordBoundaries: event.wordBoundaries || null
+    wordBoundaries: event.wordBoundaries || null,
+    ...(playbackRate ? { playbackRate } : {}),
   };
 }
 

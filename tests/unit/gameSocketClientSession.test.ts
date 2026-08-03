@@ -1,9 +1,32 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createBrowserSpeechUtterance } from '../../packages/client/src/hooks/speech/browserSpeech';
+import { getProfileForItem, normalizeVoiceProfile } from '../../packages/client/src/utils/speech';
 
 type Cleanup = void | (() => void);
 type HookParams = Record<string, unknown>;
 type SessionHook = (params: HookParams) => Record<string, (...args: never[]) => unknown>;
+
+test('browser speech multiplies and clamps the debug playback rate', (t) => {
+  const originalSpeechSynthesisUtterance = globalThis.SpeechSynthesisUtterance;
+  globalThis.SpeechSynthesisUtterance = FakeSpeechUtterance as unknown as typeof SpeechSynthesisUtterance;
+  t.after(() => {
+    globalThis.SpeechSynthesisUtterance = originalSpeechSynthesisUtterance;
+  });
+
+  const profile = normalizeVoiceProfile(getProfileForItem({ text: '测试', playerId: '1' }));
+  const utterance = createBrowserSpeechUtterance(
+    { text: '测试', playerId: '1', playbackRate: 2 },
+    [],
+  )!;
+  const clamped = createBrowserSpeechUtterance(
+    { text: '测试', playerId: '1', playbackRate: 4 },
+    [],
+  )!;
+
+  assert.equal(utterance.rate, profile.rate * 2);
+  assert.equal(clamped.rate, Math.min(profile.rate * 4, 10));
+});
 
 test('active speech restarts after pause and advances each ACK exactly once', (t) => {
   const fixture = createSessionFixture(t);
