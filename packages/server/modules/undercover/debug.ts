@@ -16,8 +16,11 @@ function buildUndercoverDebugSpeech(state: UndercoverState, actorId: number): { 
   );
   const candidate = DEBUG_SPEECH_TEMPLATES[index];
   const validated = validatePublicSpeech(candidate, state.wordPair);
+  const speech = validated.ok ? validated.text : '这个事物在生活中并不少见';
+  const finalSpeech = validatePublicSpeech(speech, state.wordPair);
+  if (!finalSpeech.ok) throw new Error('Undercover debug cannot produce public speech');
   return undercoverSpeechSchema.parse({
-    speech: validated.ok ? validated.text : '这个事物在生活中并不少见',
+    speech: finalSpeech.text,
   });
 }
 

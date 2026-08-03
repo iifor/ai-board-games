@@ -33,6 +33,25 @@ test('undercover debug generation is deterministic and legal', () => {
   assert.equal([2, 3, 4].includes(vote.targetId), true);
 });
 
+test('undercover debug speech rejects a fallback that leaks a secret word', () => {
+  const players = Array.from({ length: 6 }, (_, index) => ({
+    id: index + 1,
+    nickname: `${index + 1}号`,
+    avatar: '',
+  }));
+  const state = createInitialUndercoverState(players, {
+    seed: 42,
+    wordPair: { civilian: '生活', undercover: '奶茶' },
+    undercoverPlayerId: 2,
+  });
+  state.round = 2;
+
+  assert.throws(
+    () => buildUndercoverDebugSpeech(state, 1),
+    /cannot produce public speech/,
+  );
+});
+
 test('registered undercover resolves through generic runtime metadata', () => {
   resetGameEngine();
   const resolved = resolveGameRunner('undercover');
