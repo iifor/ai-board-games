@@ -109,7 +109,7 @@ packages/admin/
 狼人杀模式的 `winCondition` 只允许 `side/gods/villagers/all`，分别对应屠边、屠神、屠民和屠城。历史 `single` 数据由服务端读取时兼容映射为 `side`，管理端不再提交 `single`。
 - `SkinManager`：皮肤资源管理。
 - `TraceExplorer`：AI trace、span、LLM 调用、agent 决策查看。
-- `WorkflowDebugConsole`：工作流调试控制台，包含 match 事件、任务、pending action、effect、interrupt，以及狼人杀夜间结算 Shadow Audit 汇总。谁是卧底 match 仅在 `config.debugMode === true` 时显示继续一步、跳过当前步骤和连续运行；三项操作只提交已加载状态中当前待处理的 `undercover_debug_breakpoint` 的真实 ID。
+- `WorkflowDebugConsole`：工作流调试控制台，包含 match 事件、任务、pending action、effect、interrupt，以及狼人杀夜间结算 Shadow Audit 汇总。谁是卧底 match 仅在 `config.debugMode === true`、输入值仍等于已加载的 match ID 时显示继续一步、跳过当前步骤和连续运行；三项操作只提交已加载状态中当前待处理的 `undercover_debug_breakpoint` 的真实 ID。
 - `MemoryManager`：展示分游戏长期画像数量和最后更新时间，提供狼人杀、辩论赛、全部游戏三个危险清除操作。确认弹窗明确删除条数和不受影响的数据范围。
 
 ### 观测组件

@@ -35,6 +35,7 @@ interface DebugRecord {
 
 export function WorkflowDebugConsole() {
   const [matchId, setMatchId] = useState('');
+  const [loadedMatchId, setLoadedMatchId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [debug, setDebug] = useState<Record<string, unknown> | null>(null);
   const [form] = Form.useForm();
@@ -43,7 +44,7 @@ export function WorkflowDebugConsole() {
   const matchConfig = (match?.config || {}) as Record<string, unknown>;
   const isUndercoverDebug = match?.gameType === 'undercover' && matchConfig.debugMode === true;
   const interrupts = Array.isArray(data.interrupts) ? data.interrupts as DebugRecord[] : [];
-  const currentUndercoverBreakpoint = isUndercoverDebug
+  const currentUndercoverBreakpoint = isUndercoverDebug && matchId === loadedMatchId
     ? interrupts.find((interrupt) =>
       interrupt.interruptType === 'undercover_debug_breakpoint'
       && interrupt.status === 'pending'
@@ -60,7 +61,9 @@ export function WorkflowDebugConsole() {
     setLoading(true);
     try {
       const next = await getWorkflowDebug(id.trim());
+      const loadedMatch = next.match as Record<string, unknown> | undefined;
       setDebug(next);
+      setLoadedMatchId(typeof loadedMatch?.id === 'string' ? loadedMatch.id : id.trim());
       setMatchId(id.trim());
     } catch (error) {
       message.error(error instanceof Error ? error.message : '加载失败');

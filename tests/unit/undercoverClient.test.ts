@@ -536,3 +536,163 @@ test('Admin Undercover debug controls bind each action to a pending breakpoint',
   assert.match(consolePage, /跳过当前步骤/);
   assert.match(consolePage, /连续运行/);
 });
+
+test('Admin Undercover debug controls disappear after the loaded match id is edited', async () => {
+  const controlCalls: unknown[][] = [];
+  const harness = loadWorkflowDebugConsoleHarness({
+    getWorkflowDebug: async () => ({
+      match: { id: 'undercover-debug-match', gameType: 'undercover', config: { debugMode: true } },
+      interrupts: [{
+        id: 'undercover-debug-match:round_1_start:debug-breakpoint',
+        interruptType: 'undercover_debug_breakpoint',
+        status: 'pending',
+      }],
+    }),
+    controlUndercoverDebugMatch: (...args: unknown[]) => {
+      controlCalls.push(args);
+      return Promise.resolve({});
+    },
+  });
+
+  try {
+    let tree = harness.render();
+    findElement(tree, (element) => element.type === 'input' && element.props.placeholder === '输入 Match ID')
+      .props.onChange({ target: { value: 'undercover-debug-match' } });
+    tree = harness.render();
+    await findElement(tree, (element) => element.type === 'button' && element.props.children === '加载').props.onClick();
+
+    tree = harness.render();
+    assert.ok(findOptionalElement(tree, (element) => element.type === 'button' && element.props.children === '继续一步'));
+
+    findElement(tree, (element) => element.type === 'input' && element.props.placeholder === '输入 Match ID')
+      .props.onChange({ target: { value: 'another-match' } });
+    tree = harness.render();
+
+    assert.equal(findOptionalElement(tree, (element) => element.type === 'button' && element.props.children === '继续一步'), undefined);
+    assert.deepEqual(controlCalls, []);
+  } finally {
+    harness.restore();
+  }
+});
+
+interface TestElement {
+  type: unknown;
+  props: Record<string, unknown>;
+}
+
+function loadWorkflowDebugConsoleHarness(api: Record<string, (...args: never[]) => unknown>) {
+  const pagePath = resolve('packages/admin/src/pages/WorkflowDebugConsole/index.tsx');
+  const adminApiPath = resolve('packages/admin/src/services/adminApi.ts');
+  const reactPath = require.resolve('../../packages/admin/node_modules/react');
+  const antdPath = require.resolve('../../packages/admin/node_modules/antd');
+  const originalPage = require.cache[pagePath];
+  const originalAdminApi = require(adminApiPath);
+  const originalReact = require(reactPath);
+  const originalAntd = require.cache[antdPath];
+  const state: unknown[] = [];
+  let cursor = 0;
+
+  require.cache[adminApiPath]!.exports = { ...originalAdminApi, ...api };
+  require.cache[reactPath]!.exports = {
+    ...originalReact,
+    useState(initial: unknown) {
+      const index = cursor++;
+      if (!(index in state)) state[index] = initial;
+      return [state[index], (value: unknown) => { state[index] = value; }];
+    },
+    useMemo(factory: () => unknown) {
+      return factory();
+    },
+  };
+  require.cache[antdPath] = { exports: createAntdTestStubs() } as NodeModule;
+  const { WorkflowDebugConsole } = requireWorkflowDebugConsole(pagePath);
+
+  return {
+    render(): TestElement {
+      cursor = 0;
+      return WorkflowDebugConsole();
+    },
+    restore(): void {
+      require.cache[adminApiPath]!.exports = originalAdminApi;
+      require.cache[reactPath]!.exports = originalReact;
+      if (originalAntd) require.cache[antdPath] = originalAntd;
+      else delete require.cache[antdPath];
+      if (originalPage) require.cache[pagePath] = originalPage;
+      else delete require.cache[pagePath];
+    },
+  };
+}
+
+function requireWorkflowDebugConsole(pagePath: string): { WorkflowDebugConsole: () => TestElement } {
+  const Module = require('node:module');
+  const ts = require('../../packages/server/node_modules/typescript') as typeof import('typescript');
+  const originalTsLoader = Module._extensions['.ts'];
+  const originalTsxLoader = Module._extensions['.tsx'];
+  const loadTypeScript = (module: NodeModule, filename: string) => {
+    const output = ts.transpileModule(readFileSync(filename, 'utf8'), {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+        moduleResolution: ts.ModuleResolutionKind.Node10,
+        jsx: ts.JsxEmit.ReactJSX,
+      },
+      fileName: filename,
+    }).outputText;
+    module._compile(output, filename);
+  };
+
+  Module._extensions['.ts'] = loadTypeScript;
+  Module._extensions['.tsx'] = loadTypeScript;
+  delete require.cache[pagePath];
+  try {
+    return require(pagePath) as { WorkflowDebugConsole: () => TestElement };
+  } finally {
+    if (originalTsLoader) Module._extensions['.ts'] = originalTsLoader;
+    else delete Module._extensions['.ts'];
+    if (originalTsxLoader) Module._extensions['.tsx'] = originalTsxLoader;
+    else delete Module._extensions['.tsx'];
+  }
+}
+
+function createAntdTestStubs() {
+  const Form = Object.assign(() => null, { Item: () => null, useForm: () => [{}] });
+  const Space = Object.assign(() => null, { Compact: () => null });
+  return {
+    Alert: 'alert',
+    Button: 'button',
+    Card: 'card',
+    Col: 'col',
+    Form,
+    Input: 'input',
+    InputNumber: 'input-number',
+    Row: 'row',
+    Space,
+    Table: 'table',
+    Tabs: 'tabs',
+    Tag: 'tag',
+    Typography: { Text: 'text', Paragraph: 'paragraph' },
+    message: { error: () => {}, success: () => {} },
+  };
+}
+
+function findElement(tree: unknown, predicate: (element: TestElement) => boolean): TestElement {
+  const element = findOptionalElement(tree, predicate);
+  assert.ok(element, 'expected element was not rendered');
+  return element;
+}
+
+function findOptionalElement(tree: unknown, predicate: (element: TestElement) => boolean): TestElement | undefined {
+  if (Array.isArray(tree)) {
+    for (const child of tree) {
+      const element = findOptionalElement(child, predicate);
+      if (element) return element;
+    }
+    return undefined;
+  }
+  if (!tree || typeof tree !== 'object' || !('props' in tree)) return undefined;
+  const element = tree as TestElement;
+  if (predicate(element)) return element;
+  return findOptionalElement(element.props.children, predicate);
+}
