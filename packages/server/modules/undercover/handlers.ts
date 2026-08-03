@@ -6,6 +6,7 @@ import * as repository from '../workflow-engine/repository';
 import { stableTaskId } from '../workflow-engine/utils';
 import type { StepHandler, WorkflowStep } from '../workflow-engine/workflowRegistry';
 import { createUndercoverPresentationEvent } from './presentation';
+import { buildUndercoverDebugSpeech, buildUndercoverDebugVote } from './debug';
 import { buildUndercoverSpeechPrompt, buildUndercoverSystemPrompt, buildUndercoverVotePrompt } from './prompts';
 import {
   checkWinner,
@@ -123,6 +124,8 @@ function createSpeechHandler(): StepHandler {
     async runAiTask({ match, task }) {
       const current = (match as unknown as MatchContext).state;
       const actorId = Number(task.playerId);
+      const debugMode = (match as { config?: { debugMode?: boolean } }).config?.debugMode === true;
+      if (debugMode) return aiResult(task.action as string, buildUndercoverDebugSpeech(current, actorId));
       const agent = createAgent(match.id as string, current, actorId);
       const prompt = buildUndercoverSpeechPrompt(current, actorId);
       const schema = undercoverSpeechSchema.refine(
@@ -218,6 +221,8 @@ function createVoteHandler(): StepHandler {
       const context = task.promptContextSnapshot as { legalIds?: number[]; runoff?: boolean };
       const legalIds = (context.legalIds || []).map(Number);
       if (!legalIds.length) throw new Error(`Undercover voter ${actorId} has no legal targets`);
+      const debugMode = (match as { config?: { debugMode?: boolean } }).config?.debugMode === true;
+      if (debugMode) return aiResult(task.action as string, buildUndercoverDebugVote(current, actorId, legalIds, context.runoff === true));
       const agent = createAgent(match.id as string, current, actorId);
       const prompt = buildUndercoverVotePrompt(current, actorId, legalIds);
       const schema = undercoverVoteSchema.refine(

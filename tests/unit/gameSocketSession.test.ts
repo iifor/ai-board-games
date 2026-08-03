@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { getGameEngine, resetGameEngine } from '../../packages/server/modules/engine-registry';
 import { createSession, isSpeechWaitPayload, parseMessage } from '../../packages/server/modules/game-socket/session';
 import { createPreparedSender, isImmediateEvent, isRuleIntroEvent } from '../../packages/server/modules/game-socket/sender';
+import { runSession } from '../../packages/server/modules/game-socket/service';
 import { replayGameSession } from '../../packages/server/modules/game-socket/replay';
 import {
   createLivePlaybackSource,
@@ -111,6 +113,58 @@ test('parseMessage preserves the existing client start payload', () => {
   };
 
   assert.deepEqual(parseMessage(JSON.stringify(payload)), payload);
+});
+
+test('runSession keeps debugMode on runtime and completed payloads', async (t) => {
+  resetGameEngine();
+  const gameType = 'debug-session-fixture';
+  getGameEngine().registerDefinition({
+    gameType,
+    version: '1.0.0',
+    workflowId: `${gameType}-v1`,
+    actionSchemas: {},
+    metadata: {
+      session: {
+        startMessage: 'fixture start',
+        doneMessage: 'fixture done',
+        playerSelection: { min: 1, max: 1, errorMessage: 'select one fixture player' },
+      },
+    },
+    runtime: {
+      createMatch: () => ({ id: 'debug-session-match' }),
+      run: async (_matchId, context) => {
+        context?.onEvent?.({
+          type: 'fixture-runtime',
+          message: 'fixture runtime',
+          presentation: { speakableText: 'fixture runtime', requiresAck: false },
+        });
+        return { id: 'debug-session-match', gameType, players: [{ id: 1, nickname: 'fixture' }] };
+      },
+    },
+  });
+  const aiConfigModule = require('../../packages/server/config/ai') as { getAiConfig: () => unknown };
+  const settingsModule = require('../../packages/server/modules/settings/service') as { getSpectatorMode: () => boolean };
+  const originalGetAiConfig = aiConfigModule.getAiConfig;
+  const originalGetSpectatorMode = settingsModule.getSpectatorMode;
+  aiConfigModule.getAiConfig = () => ({
+    host: { id: 0, name: 'host', nickname: 'host' },
+    players: [{ id: 1, name: 'fixture', nickname: 'fixture' }],
+    missingProviders: [],
+    realReady: true,
+  });
+  settingsModule.getSpectatorMode = () => false;
+  t.after(() => {
+    aiConfigModule.getAiConfig = originalGetAiConfig;
+    settingsModule.getSpectatorMode = originalGetSpectatorMode;
+    resetGameEngine();
+  });
+
+  const sent: SentPayload[] = [];
+  const session = createImmediateSession(sent);
+  await runSession(session as never, 'real', [1], gameType, { debugMode: true });
+
+  assert.equal(sent.find((event) => event.type === 'fixture-runtime')?.debugMode, true);
+  assert.equal(sent.find((event) => event.type === 'done')?.debugMode, true);
 });
 
 test('parseMessage rejects malformed and unknown commands', () => {

@@ -122,6 +122,13 @@ interface GameSocketHandle {
   close: () => Promise<void>;
 }
 
+function withSessionDebugMode(
+  event: Record<string, unknown>,
+  debugMode: boolean,
+): Record<string, unknown> {
+  return debugMode ? { ...event, debugMode: true } : event;
+}
+
 // --- Socket attachment ---
 
 function attachGameSocket(server: import('http').Server): GameSocketHandle {
@@ -220,6 +227,7 @@ async function runSession(
     return;
   }
   const config = getRequestConfig(mode, playerIds, safeGameType, options);
+  const debugMode = Boolean(config.debugMode);
 
   const viewMode = String((config as Record<string, unknown>).clientViewMode || 'god');
   const playbackPipeline = createPlaybackPipeline(session, {
@@ -271,8 +279,9 @@ async function runSession(
       onEvent: (event: Record<string, unknown>) => {
         if (liveSource) {
           if (safeGameType !== 'werewolf') {
-            if (isDisplayEvent(event)) playbackSourceEvents.push(event);
-            liveSource.push(event);
+            const sessionEvent = withSessionDebugMode(event, debugMode);
+            if (isDisplayEvent(sessionEvent)) playbackSourceEvents.push(sessionEvent);
+            liveSource.push(sessionEvent);
             return;
           }
           // 过滤 system channel / visibility 事件，不推送到 C 端
@@ -296,8 +305,9 @@ async function runSession(
               ) as Record<string, unknown> | null
             : event;
           if (projected) {
-            if (isDisplayEvent(projected)) playbackSourceEvents.push(projected);
-            liveSource.push(projected);
+            const sessionEvent = withSessionDebugMode(projected, debugMode);
+            if (isDisplayEvent(sessionEvent)) playbackSourceEvents.push(sessionEvent);
+            liveSource.push(sessionEvent);
           }
         }
       },
@@ -309,7 +319,7 @@ async function runSession(
   }
   if (runnerError) throw runnerError;
   if (!game) throw new Error('游戏流程未返回对局结果。');
-  const completedEvent: SessionEvent = {
+  const completedEvent = withSessionDebugMode({
     type:
       safeGameType === 'debate' || safeGameType === 'werewolf'
         ? 'workflow-completed'
@@ -319,7 +329,7 @@ async function runSession(
       safeGameType === 'werewolf'
         ? projectWerewolfGame(game, createProjectionContext(game))
         : game,
-  };
+  }, debugMode) as SessionEvent;
   const capturedRuntimeEvents = playbackPipeline
     .freezeCapture()
     .slice(capturedBeforeRuntimeCount);

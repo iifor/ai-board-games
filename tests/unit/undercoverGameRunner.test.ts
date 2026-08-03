@@ -4,10 +4,34 @@ import { BasePlayerAgent } from '../../packages/server/modules/agent-core/player
 import { getGameEngine, resetGameEngine } from '../../packages/server/modules/engine-registry';
 import { resolveGameRunner } from '../../packages/server/modules/game-socket/gameRunner';
 import { runSession, selectPlayersForGame } from '../../packages/server/modules/game-socket/service';
+import { buildUndercoverDebugSpeech, buildUndercoverDebugVote } from '../../packages/server/modules/undercover/debug';
+import { createInitialUndercoverState, validatePublicSpeech } from '../../packages/server/modules/undercover/rules';
 import {
   normalizeGameType,
   validatePlayerSelection,
 } from '../../packages/server/routes/gameRoutes';
+
+test('undercover debug generation is deterministic and legal', () => {
+  const players = Array.from({ length: 6 }, (_, index) => ({
+    id: index + 1,
+    nickname: `${index + 1}号`,
+    avatar: '',
+  }));
+  const state = createInitialUndercoverState(players, {
+    seed: 42,
+    wordPair: { civilian: '咖啡', undercover: '奶茶' },
+    undercoverPlayerId: 2,
+  });
+  state.round = 2;
+
+  const first = buildUndercoverDebugSpeech(state, 1);
+  const second = buildUndercoverDebugSpeech(state, 1);
+  assert.deepEqual(second, first);
+  assert.equal(validatePublicSpeech(first.speech, state.wordPair).ok, true);
+
+  const vote = buildUndercoverDebugVote(state, 1, [2, 3, 4], false);
+  assert.equal([2, 3, 4].includes(vote.targetId), true);
+});
 
 test('registered undercover resolves through generic runtime metadata', () => {
   resetGameEngine();
@@ -71,7 +95,7 @@ test('legacy runners preserve definition-backed session metadata', () => {
   assert.deepEqual(werewolf.session.playback, { prefetchCount: 2 });
 });
 
-test('runSession delivers definition-backed Undercover start once and completes the generic runtime', async (t) => {
+test('debug Undercover completes its first speech without calling the player model', async (t) => {
   resetGameEngine();
   const aiConfigModule = require('../../packages/server/config/ai') as { getAiConfig: () => unknown };
   const settingsModule = require('../../packages/server/modules/settings/service') as { getSpectatorMode: () => boolean };
@@ -86,11 +110,11 @@ test('runSession delivers definition-backed Undercover start once and completes 
     avatarUrl: '',
     provider: 'test',
     providerName: 'test',
-    baseUrl: 'https://undercover.test/v1',
+    baseUrl: '',
     apiKeyEnv: 'TEST_KEY',
-    apiKey: 'test-key',
+    apiKey: '',
     apiFormat: 'openai-compatible',
-    model: 'test-model',
+    model: '',
     modelId: 1,
     temperature: 0.5,
     personality: '测试玩家',
@@ -107,7 +131,11 @@ test('runSession delivers definition-backed Undercover start once and completes 
     realReady: true,
   });
   settingsModule.getSpectatorMode = () => false;
-  BasePlayerAgent.prototype.askJson = async () => null;
+  let askJsonCalls = 0;
+  BasePlayerAgent.prototype.askJson = async () => {
+    askJsonCalls += 1;
+    return null;
+  };
   t.after(() => {
     aiConfigModule.getAiConfig = originalGetAiConfig;
     settingsModule.getSpectatorMode = originalGetSpectatorMode;
@@ -140,6 +168,8 @@ test('runSession delivers definition-backed Undercover start once and completes 
   const completed = sent.find((event) => event.type === 'done');
   assert.equal(completed?.message, '谁是卧底结束，身份已经揭晓。');
   assert.equal((completed?.game as Record<string, unknown>).gameType, 'undercover');
+  assert.equal(sent.some((event) => event.type === 'undercover-speech'), true);
+  assert.equal(askJsonCalls, 0);
   assert.equal(closed, true);
 });
 
