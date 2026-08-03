@@ -91,6 +91,19 @@ export function tickWorkflowMatch(matchId: string) {
   return adminRequest<Record<string, unknown>>(`/workflow/matches/${encodeURIComponent(matchId)}/tick`, { method: 'POST' });
 }
 
+export type UndercoverDebugAction = 'continue' | 'skip' | 'continuous';
+
+export function controlUndercoverDebugMatch(
+  matchId: string,
+  interruptId: string,
+  action: UndercoverDebugAction,
+) {
+  return adminRequest<Record<string, unknown>>(`/workflow/matches/${encodeURIComponent(matchId)}/debug-control`, {
+    method: 'POST',
+    body: JSON.stringify({ interruptId, action }),
+  });
+}
+
 export function retryWorkflowAiTask(taskId: string) {
   return adminRequest<Record<string, unknown>>(`/workflow/ai-tasks/${encodeURIComponent(taskId)}/retry`, { method: 'POST' });
 }

@@ -517,3 +517,22 @@ test('Undercover reducer normalizes aggregate vote payloads without retaining ba
   });
   assert.equal(eliminated.game?.voteResult?.eliminatedPlayerId, 4);
 });
+
+test('Admin Undercover debug controls bind each action to a pending breakpoint', () => {
+  const adminApi = readFileSync(resolve('packages/admin/src/services/adminApi.ts'), 'utf8');
+  const consolePage = readFileSync(resolve('packages/admin/src/pages/WorkflowDebugConsole/index.tsx'), 'utf8');
+
+  assert.match(adminApi, /export type UndercoverDebugAction = 'continue' \| 'skip' \| 'continuous';/);
+  assert.match(
+    adminApi,
+    /controlUndercoverDebugMatch\(\s*matchId: string,\s*interruptId: string,\s*action: UndercoverDebugAction,?\s*\)[\s\S]*?`\/workflow\/matches\/\$\{encodeURIComponent\(matchId\)\}\/debug-control`[\s\S]*?method: 'POST',[\s\S]*?body: JSON\.stringify\(\{ interruptId, action \}\)/,
+  );
+  assert.match(consolePage, /match\?\.gameType === 'undercover' && matchConfig\.debugMode === true/);
+  assert.match(consolePage, /interruptType === 'undercover_debug_breakpoint'[\s\S]*?status === 'pending'/);
+  assert.match(consolePage, /controlUndercoverDebugMatch\(matchId, currentUndercoverBreakpointId, 'continue'\)/);
+  assert.match(consolePage, /controlUndercoverDebugMatch\(matchId, currentUndercoverBreakpointId, 'skip'\)/);
+  assert.match(consolePage, /controlUndercoverDebugMatch\(matchId, currentUndercoverBreakpointId, 'continuous'\)/);
+  assert.match(consolePage, /继续一步/);
+  assert.match(consolePage, /跳过当前步骤/);
+  assert.match(consolePage, /连续运行/);
+});

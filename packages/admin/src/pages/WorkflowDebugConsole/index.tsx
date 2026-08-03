@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, Form, Input, InputNumber, Row, Space, Table, 
 import type { ColumnsType } from 'antd/es/table';
 import {
   cancelWorkflowAiTask,
+  controlUndercoverDebugMatch,
   createWorkflowInterrupt,
   getWorkflowDebug,
   resolveWorkflowInterrupt,
@@ -39,6 +40,18 @@ export function WorkflowDebugConsole() {
   const [form] = Form.useForm();
   const data = debug || {};
   const match = data.match as Record<string, unknown> | undefined;
+  const matchConfig = (match?.config || {}) as Record<string, unknown>;
+  const isUndercoverDebug = match?.gameType === 'undercover' && matchConfig.debugMode === true;
+  const interrupts = Array.isArray(data.interrupts) ? data.interrupts as DebugRecord[] : [];
+  const currentUndercoverBreakpoint = isUndercoverDebug
+    ? interrupts.find((interrupt) =>
+      interrupt.interruptType === 'undercover_debug_breakpoint'
+      && interrupt.status === 'pending'
+    )
+    : undefined;
+  const currentUndercoverBreakpointId = typeof currentUndercoverBreakpoint?.id === 'string'
+    ? currentUndercoverBreakpoint.id
+    : undefined;
   const auditRows = useMemo(() => getNightResolutionAuditRows(data.events as DebugRecord[]), [data.events]);
   const auditSummary = useMemo(() => summarizeNightResolutionAudits(auditRows), [auditRows]);
 
@@ -84,6 +97,13 @@ export function WorkflowDebugConsole() {
             <Input value={matchId} onChange={(event) => setMatchId(event.target.value)} placeholder="输入 Match ID" onPressEnter={() => load()} />
             <Button type="primary" loading={loading} onClick={() => load()}>加载</Button>
             <Button disabled={!matchId} onClick={() => runAction(() => tickWorkflowMatch(matchId))}>推进</Button>
+            {currentUndercoverBreakpointId && (
+              <>
+                <Button onClick={() => runAction(() => controlUndercoverDebugMatch(matchId, currentUndercoverBreakpointId, 'continue'))}>继续一步</Button>
+                <Button onClick={() => runAction(() => controlUndercoverDebugMatch(matchId, currentUndercoverBreakpointId, 'skip'))}>跳过当前步骤</Button>
+                <Button onClick={() => runAction(() => controlUndercoverDebugMatch(matchId, currentUndercoverBreakpointId, 'continuous'))}>连续运行</Button>
+              </>
+            )}
           </Space.Compact>
         </Card>
 
