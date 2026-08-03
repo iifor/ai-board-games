@@ -153,11 +153,6 @@ test('Undercover debug controls stay in live v2 and default to 2x playback', () 
     resolve('packages/client/src/features/undercover/UndercoverGame/index.tsx'),
     'utf8',
   );
-  const hook = readFileSync(
-    resolve('packages/client/src/features/undercover/hooks/useUndercoverGame.ts'),
-    'utf8',
-  );
-
   assert.match(source, /const \[debugMode, setDebugMode\] = useState\(false\)/);
   assert.match(source, /debugMode: variant === 'v2' && !replayGameId && debugMode/);
   assert.match(source, /variant === 'v2' && !replayGameId && !controller\.started/);
@@ -166,11 +161,54 @@ test('Undercover debug controls stay in live v2 and default to 2x playback', () 
   assert.match(source, /调试中/);
   assert.match(source, /Match ID/);
   assert.match(source, /role="group"[\s\S]*?1×[\s\S]*?2×[\s\S]*?4×/);
-  assert.match(hook, /useState<UndercoverPlaybackRate>\(2\)/);
-  assert.match(
-    hook,
-    /getSpeechOptions: \(event\) => getSpeechOptions\(event, debugMode && !replayGameId \? playbackRate : undefined\)/,
-  );
+});
+
+test('Undercover playback callbacks isolate debug sessions and refresh after rate changes', () => {
+  const harness = loadUndercoverGameHarness();
+  const event: GameEvent = {
+    type: 'undercover-round-start',
+    presentation: {
+      displayText: 'Round one begins.',
+      speakableText: 'Round one begins.',
+      displayMode: 'status',
+      uiHint: 'undercover-round-start',
+      suppressSpeech: false,
+    },
+  };
+  const playerIds = [1, 2, 3, 4, 5, 6];
+
+  try {
+    let rendered = harness.render({ playerIds, debugMode: true });
+    assert.equal(rendered.session.getSpeechOptions(event).playbackRate, 2);
+    assert.equal(rendered.session.getAckDelay(event, ''), 60);
+
+    rendered = harness.render({ playerIds });
+    assert.equal(
+      Object.hasOwn(rendered.session.getSpeechOptions(event), 'playbackRate'),
+      false,
+    );
+    assert.equal(rendered.session.getAckDelay(event, ''), 120);
+
+    rendered = harness.render({
+      playerIds: [],
+      replayGameId: 'undercover-history-1',
+      debugMode: true,
+    });
+    assert.equal(
+      Object.hasOwn(rendered.session.getSpeechOptions(event), 'playbackRate'),
+      false,
+    );
+    assert.equal(rendered.session.getAckDelay(event, ''), 120);
+
+    rendered = harness.render({ playerIds, debugMode: true });
+    rendered.controller.setPlaybackRate(4);
+    rendered = harness.render({ playerIds, debugMode: true });
+    assert.equal(rendered.controller.playbackRate, 4);
+    assert.equal(rendered.session.getSpeechOptions(event).playbackRate, 4);
+    assert.equal(rendered.session.getAckDelay(event, ''), 60);
+  } finally {
+    harness.restore();
+  }
 });
 
 test('Undercover replay skip buttons never forward React click events', () => {
@@ -614,6 +652,96 @@ test('Admin Undercover debug controls disappear after the loaded match id is edi
     harness.restore();
   }
 });
+
+type GameEvent = import('../../packages/client/src/types').GameEvent;
+type QueueItem = import('../../packages/client/src/types').QueueItem;
+
+interface UndercoverSessionCallbacks {
+  getSpeechOptions: (event: GameEvent) => Partial<QueueItem>;
+  getAckDelay: (event: GameEvent, narration: string) => number;
+}
+
+function loadUndercoverGameHarness() {
+  const hookPath = require.resolve(
+    '../../packages/client/src/features/undercover/hooks/useUndercoverGame',
+  );
+  const sessionPath = require.resolve('../../packages/client/src/hooks/useGameSocketSession');
+  const speechPath = require.resolve('../../packages/client/src/hooks/useSpeechQueue');
+  const reactPath = require.resolve('../../packages/client/node_modules/react');
+  const originalHookModule = require.cache[hookPath];
+  const originalSessionExports = require(sessionPath);
+  const originalSpeechExports = require(speechPath);
+  const originalReactExports = require(reactPath);
+  const state: unknown[] = [];
+  let stateCursor = 0;
+  let latestSession: UndercoverSessionCallbacks | null = null;
+
+  require.cache[reactPath]!.exports = {
+    ...originalReactExports,
+    useEffect() {},
+    useState<T>(initialValue: T) {
+      const index = stateCursor++;
+      if (!(index in state)) state[index] = initialValue;
+      return [
+        state[index] as T,
+        (nextValue: T | ((currentValue: T) => T)) => {
+          state[index] = typeof nextValue === 'function'
+            ? (nextValue as (currentValue: T) => T)(state[index] as T)
+            : nextValue;
+        },
+      ] as const;
+    },
+  };
+  require.cache[sessionPath]!.exports = {
+    ...originalSessionExports,
+    useGameSocketSession(options: UndercoverSessionCallbacks) {
+      latestSession = options;
+      return {
+        autoPlay: true,
+        isReplayMode: false,
+        startSession() {},
+        closeSession() {},
+        clearPendingAckTimer() {},
+        resetSessionRefs() {},
+        setAutoPlayEnabled() {},
+        skipCurrentReplayPhase() {},
+      };
+    },
+  };
+  require.cache[speechPath]!.exports = {
+    ...originalSpeechExports,
+    useSpeechQueue() {
+      return {
+        speechEnabled: true,
+        setSpeechEnabled() {},
+        speak() {
+          return true;
+        },
+        unlock() {},
+        cancel() {},
+      };
+    },
+  };
+  delete require.cache[hookPath];
+  const hookModule = require(hookPath) as typeof import('../../packages/client/src/features/undercover/hooks/useUndercoverGame');
+
+  return {
+    render(params: Parameters<typeof hookModule.useUndercoverGame>[0]) {
+      stateCursor = 0;
+      latestSession = null;
+      const controller = hookModule.useUndercoverGame(params);
+      assert.ok(latestSession);
+      return { controller, session: latestSession };
+    },
+    restore() {
+      require.cache[reactPath]!.exports = originalReactExports;
+      require.cache[sessionPath]!.exports = originalSessionExports;
+      require.cache[speechPath]!.exports = originalSpeechExports;
+      if (originalHookModule) require.cache[hookPath] = originalHookModule;
+      else delete require.cache[hookPath];
+    },
+  };
+}
 
 interface TestElement {
   type: unknown;
