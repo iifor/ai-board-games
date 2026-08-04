@@ -44,6 +44,7 @@ export function useSpeechQueue() {
     speakingRef.current = true;
 
     let finished = false;
+    let fallbackPending = false;
     const finish = () => {
       if (finished) return;
       finished = true;
@@ -56,6 +57,15 @@ export function useSpeechQueue() {
       if (shouldRunEnd) item.onEnd?.();
       if (shouldRunEnd) playNext();
     };
+    const finishAfterFallback = () => {
+      if (finished || fallbackPending) return;
+      fallbackPending = true;
+      clearWindowTimeout(endTimerRef);
+      const fallbackDelay = Number.isFinite(item.fallbackDelayMs)
+        ? Math.max(0, Number(item.fallbackDelayMs))
+        : 0;
+      endTimerRef.current = window.setTimeout(finish, fallbackDelay);
+    };
 
     const playBrowserSpeech = () => {
       if (cancellingRef.current || !enabledRef.current) {
@@ -63,7 +73,7 @@ export function useSpeechQueue() {
         return;
       }
       if (!window.speechSynthesis) {
-        window.setTimeout(finish, 0);
+        finishAfterFallback();
         return;
       }
       if (voicesRef.current.length === 0) voicesRef.current = getChineseVoices();
@@ -77,14 +87,16 @@ export function useSpeechQueue() {
       const utterance = createBrowserSpeechUtterance(item, voicesRef.current);
       if (!utterance) {
         item.onStart?.();
-        window.setTimeout(finish, 0);
+        finishAfterFallback();
         return;
       }
       utterance.onstart = () => {
         if (!cancellingRef.current) item.onStart?.();
       };
-      utterance.onend = finish;
-      utterance.onerror = finish;
+      utterance.onend = () => {
+        if (!fallbackPending) finish();
+      };
+      utterance.onerror = finishAfterFallback;
       try {
         if (cancellingRef.current || !enabledRef.current) {
           window.setTimeout(finish, 0);
@@ -93,9 +105,10 @@ export function useSpeechQueue() {
         window.speechSynthesis.resume?.();
         window.speechSynthesis.speak(utterance);
       } catch {
-        window.setTimeout(finish, 0);
+        finishAfterFallback();
         return;
       }
+      if (fallbackPending) return;
       resumeTimerRef.current = window.setInterval(() => {
         if (window.speechSynthesis?.paused) window.speechSynthesis.resume?.();
       }, 1000);

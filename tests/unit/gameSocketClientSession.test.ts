@@ -6,6 +6,7 @@ import { getProfileForItem, normalizeVoiceProfile } from '../../packages/client/
 type Cleanup = void | (() => void);
 type HookParams = Record<string, unknown>;
 type SessionHook = (params: HookParams) => Record<string, (...args: never[]) => unknown>;
+type SpeechFailure = 'missing-api' | 'utterance-error' | 'speak-throw';
 
 test('browser speech multiplies and clamps the debug playback rate', (t) => {
   const originalSpeechSynthesisUtterance = globalThis.SpeechSynthesisUtterance;
@@ -26,6 +27,52 @@ test('browser speech multiplies and clamps the debug playback rate', (t) => {
 
   assert.equal(utterance.rate, profile.rate * 2);
   assert.equal(clamped.rate, Math.min(profile.rate * 4, 10));
+});
+
+for (const playbackRate of [2, 4]) {
+  for (const failure of ['missing-api', 'utterance-error', 'speak-throw'] as const) {
+    test(`Undercover ${playbackRate}x fallback delays ${failure} and ACKs once`, (t) => {
+      const fallbackDelay = Math.max(60, 120 / playbackRate);
+      const fixture = createSessionFixture(t, 'default', {
+        realSpeech: true,
+        speechFailure: failure,
+        ackDelay: fallbackDelay,
+      });
+
+      fixture.start();
+      fixture.emit(createAckEvent(playbackRate * 10, `${failure} narration`));
+      if (failure === 'utterance-error') {
+        assert.equal(fixture.utterances.length, 1);
+        fixture.utterances[0].onerror?.();
+      }
+
+      assert.deepEqual(fixture.ackIds(), []);
+      assert.ok(fixture.timers.delays().includes(fallbackDelay));
+      fixture.timers.runDelay(fallbackDelay);
+      assert.deepEqual(fixture.ackIds(), [playbackRate * 10]);
+
+      fixture.utterances[0]?.onerror?.();
+      fixture.timers.runAll();
+      assert.deepEqual(fixture.ackIds(), [playbackRate * 10]);
+      assert.equal(fixture.acknowledgedCount(), 1);
+    });
+  }
+}
+
+test('Undercover browser speech onend ACKs immediately without fallback delay', (t) => {
+  const fixture = createSessionFixture(t, 'default', {
+    realSpeech: true,
+    ackDelay: 60,
+  });
+
+  fixture.start();
+  fixture.emit(createAckEvent(60, 'successful narration'));
+  assert.deepEqual(fixture.ackIds(), []);
+  fixture.utterances[0].onend?.();
+
+  assert.deepEqual(fixture.ackIds(), [60]);
+  assert.equal(fixture.acknowledgedCount(), 1);
+  assert.equal(fixture.timers.pendingCount(), 0);
 });
 
 test('active speech restarts after pause and advances each ACK exactly once', (t) => {
@@ -165,7 +212,15 @@ test('a stale completion cannot settle a new session that reuses the same ACK id
 
 type PlaybackKind = 'default' | 'debate' | 'werewolf';
 
-function createSessionFixture(t: { after(callback: () => void): void }, playbackKind: PlaybackKind = 'default') {
+function createSessionFixture(
+  t: { after(callback: () => void): void },
+  playbackKind: PlaybackKind = 'default',
+  options: {
+    realSpeech?: boolean;
+    speechFailure?: SpeechFailure;
+    ackDelay?: number;
+  } = {},
+) {
   const timers = createFakeTimers();
   const spokenTexts: string[] = [];
   const speechEnds: Array<() => void> = [];
@@ -178,13 +233,24 @@ function createSessionFixture(t: { after(callback: () => void): void }, playback
   const originalWindow = globalThis.window;
   const originalWebSocket = globalThis.WebSocket;
   const originalSpeechSynthesisUtterance = globalThis.SpeechSynthesisUtterance;
+  const speechSynthesis = options.speechFailure === 'missing-api'
+    ? undefined
+    : {
+      getVoices: () => [],
+      cancel() {},
+      resume() {},
+      speak(utterance: FakeSpeechUtterance) {
+        if (options.speechFailure === 'speak-throw') throw new Error('speech failed');
+        utterances.push(utterance);
+      },
+    };
   Object.assign(globalThis, {
     window: {
       setTimeout: timers.setTimeout,
       clearTimeout: timers.clearTimeout,
-      speechSynthesis: {
-        speak(utterance: FakeSpeechUtterance) { utterances.push(utterance); },
-      },
+      setInterval: () => 1,
+      clearInterval() {},
+      speechSynthesis,
     },
     WebSocket: class FakeWebSocket { static OPEN = 1; },
     SpeechSynthesisUtterance: FakeSpeechUtterance,
@@ -221,17 +287,23 @@ function createSessionFixture(t: { after(callback: () => void): void }, playback
     },
     getNarration(event: Record<string, unknown>) { return String(event.message || ''); },
     getSpeechOptions() { return {}; },
-    getAckDelay() { return 25; },
+    getAckDelay() { return options.ackDelay ?? 25; },
     onError() {},
     onAcknowledge() { acknowledged += 1; },
     onSkipPhase() {},
   };
   const useFixtureSession: SessionHook = (hookParams) => {
+    const speech = options.realSpeech ? clientHooks.useSpeechQueue() : null;
     const playbackRef = hooks.react.useRef(null) as {
       current: null | ((event: Record<string, unknown>, controls: Record<string, unknown>) => boolean);
     };
     const session = clientHooks.useGameSocketSession({
       ...hookParams,
+      ...(speech ? {
+        speechEnabled: speech.speechEnabled,
+        speak: speech.speak,
+        cancel: speech.cancel,
+      } : {}),
       playPendingEvent(event: Record<string, unknown>, controls: Record<string, unknown>) {
         return playbackRef.current?.(event, controls) || false;
       },
@@ -321,21 +393,35 @@ class FakeSpeechUtterance {
 
 function createFakeTimers() {
   let nextId = 1;
-  const pending = new Map<number, () => void>();
+  const pending = new Map<number, { callback: () => void; delay: number }>();
   return {
-    setTimeout(callback: () => void) {
+    setTimeout(callback: () => void, delay = 0) {
       const id = nextId;
       nextId += 1;
-      pending.set(id, callback);
+      pending.set(id, { callback, delay });
       return id;
     },
     clearTimeout(id: number) { pending.delete(id); },
     pendingCount() { return pending.size; },
+    delays() { return [...pending.values()].map((timer) => timer.delay); },
     runNext() {
-      const next = pending.entries().next().value as [number, () => void] | undefined;
+      const next = pending.entries().next().value as [number, { callback: () => void }] | undefined;
       assert.ok(next);
       pending.delete(next[0]);
-      next[1]();
+      next[1].callback();
+    },
+    runDelay(delay: number) {
+      const next = [...pending.entries()].find(([, timer]) => timer.delay === delay);
+      assert.ok(next);
+      pending.delete(next[0]);
+      next[1].callback();
+    },
+    runAll() {
+      while (pending.size) {
+        const next = pending.entries().next().value as [number, { callback: () => void }];
+        pending.delete(next[0]);
+        next[1].callback();
+      }
     },
   };
 }
@@ -359,6 +445,20 @@ function createHookHarness() {
       const index = cursor;
       cursor += 1;
       return slots[index] || (slots[index] = { current: initialValue });
+    },
+    useCallback(callback: unknown, dependencies: unknown[] = []) {
+      const index = cursor;
+      cursor += 1;
+      const slot = slots[index] || (slots[index] = {});
+      const previous = slot.dependencies as unknown[] | undefined;
+      const changed = !previous
+        || previous.length !== dependencies.length
+        || dependencies.some((dependency, dependencyIndex) => !Object.is(dependency, previous[dependencyIndex]));
+      if (changed) {
+        slot.value = callback;
+        slot.dependencies = [...dependencies];
+      }
+      return slot.value;
     },
     useEffect(effect: () => Cleanup, dependencies: unknown[] = []) {
       const index = cursor;
@@ -393,11 +493,12 @@ function createHookHarness() {
 function loadClientHooks(react: Record<string, unknown>, openGameSocket: (options: never) => unknown) {
   const hookPaths = [
     require.resolve('../../packages/client/src/hooks/useGameSocketSession'),
+    require.resolve('../../packages/client/src/hooks/useSpeechQueue'),
     require.resolve('../../packages/client/src/hooks/useSpeechPlayback'),
     require.resolve('../../packages/client/src/features/debate/hooks/useDebateSpeechPlayback'),
     require.resolve('../../packages/client/src/features/werewolf/hooks/useWerewolfSpeechPlayback'),
   ];
-  const [sessionHookPath, sharedPlaybackPath, debatePlaybackPath, werewolfPlaybackPath] = hookPaths;
+  const [sessionHookPath, speechQueuePath, sharedPlaybackPath, debatePlaybackPath, werewolfPlaybackPath] = hookPaths;
   const createRequire = require('node:module').createRequire as (filename: string) => NodeRequire;
   const reactPaths = [...new Set(hookPaths.map((hookPath) => createRequire(hookPath).resolve('react')))];
   const servicePath = require.resolve('../../packages/client/src/services/gameService');
@@ -424,6 +525,11 @@ function loadClientHooks(react: Record<string, unknown>, openGameSocket: (option
     require(sharedPlaybackPath);
     return {
       useGameSocketSession: require(sessionHookPath).useGameSocketSession as SessionHook,
+      useSpeechQueue: require(speechQueuePath).useSpeechQueue as () => {
+        speechEnabled: boolean;
+        speak: (text: string, onEnd?: () => void, options?: Record<string, unknown>) => boolean;
+        cancel: () => void;
+      },
       useDebateSpeechPlayback: require(debatePlaybackPath).useDebateSpeechPlayback as SessionHook,
       useWerewolfSpeechPlayback: require(werewolfPlaybackPath).useWerewolfSpeechPlayback as SessionHook,
     };

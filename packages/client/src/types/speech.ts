@@ -32,6 +32,7 @@ export interface QueueItem {
   wordBoundaries?: SpeechWordBoundary[] | null;
   volume?: number;
   playbackRate?: number;
+  fallbackDelayMs?: number;
   onStart?: (media?: SpeechMedia) => void;
   onTimeChange?: (currentTimeMs: number | null) => void;
 }

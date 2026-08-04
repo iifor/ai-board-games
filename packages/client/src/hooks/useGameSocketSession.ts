@@ -215,7 +215,10 @@ export function useGameSocketSession({
     const speechOptions = latestRef.current.getSpeechOptions?.(event) || {};
     const delay = latestRef.current.getAckDelay?.(event, narration) || 120;
     if (latestRef.current.speechEnabled && narration) {
-      latestRef.current.speak?.(narration, acknowledgeCurrent, speechOptions);
+      latestRef.current.speak?.(narration, acknowledgeCurrent, {
+        ...speechOptions,
+        fallbackDelayMs: delay
+      });
     } else {
       ackTimerRef.current = window.setTimeout(acknowledgeCurrent, delay);
     }
