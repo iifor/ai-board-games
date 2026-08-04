@@ -130,7 +130,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   box-sizing: border-box;
-  width: min(400px, calc(100vw - 40px));
+  width: min(600px, calc(100vw - 40px));
   padding: 6px;
   gap: 8px;
   border: 1px solid rgba(128, 151, 238, 0.42);

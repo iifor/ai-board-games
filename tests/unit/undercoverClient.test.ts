@@ -272,7 +272,7 @@ test('Undercover v2 CSS defines side columns, one subtitle strip and a right con
   assert.match(controlStyles, /\.undercover-controls--v2 button\s*\{[^}]*min-height: 44px/s);
   assert.match(
     shellStyles,
-    /\.undercover-debug-panel\s*\{[^}]*position: fixed[^}]*z-index: 11[^}]*top: 16px[^}]*left: 20px[^}]*grid-template-columns: auto minmax\(0, 1fr\) auto[^}]*box-sizing: border-box[^}]*width: min\(400px, calc\(100vw - 40px\)\)/s,
+    /\.undercover-debug-panel\s*\{[^}]*position: fixed[^}]*z-index: 11[^}]*top: 16px[^}]*left: 20px[^}]*grid-template-columns: auto minmax\(0, 1fr\) auto[^}]*box-sizing: border-box[^}]*width: min\(600px, calc\(100vw - 40px\)\)/s,
   );
   assert.match(shellStyles, /\.undercover-debug-panel button\s*\{[^}]*min-height: 44px/s);
   assert.match(shellStyles, /\.undercover-debug-panel button:focus-visible/);
