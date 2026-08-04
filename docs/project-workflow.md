@@ -333,8 +333,8 @@ Shadow audit 接入方式：
 断点的 `interruptId`，服务端在事务内校验 match、step、类型和状态后，才可继续、
 跳过当前步骤或切换为连续运行；旧 ID 和重复请求不得落到后续断点。
 调试 AI task 不调用模型，发言和投票由服务端种子生成确定性且通过正式 schema
-校验的合法结果。`continue` 只解决当前断点，下一标记步骤仍暂停；`skip` 只跳过当前
-步骤并写一条 system `step_skipped`；`continuous` 解决当前断点并把内部
+校验的合法结果。`continue` 只解决当前断点，下一标记步骤仍暂停；`skip` 仅允许跳过
+`undercover.speech` 发言步骤并写一条 system `step_skipped`，其余步骤必须继续执行；`continuous` 解决当前断点并把内部
 `debugRunMode` 写入 `config_json`，此后不再创建调试停点。运行时每 100ms
 重新读取持久化状态，不同步忙等，也不自动解除断点。
 `game-socket` 为每个真实连接创建标准 `AbortSignal`，在 WebSocket close/error

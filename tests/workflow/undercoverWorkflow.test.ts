@@ -20,6 +20,7 @@ import {
   getDebugState,
   repository,
   registerWorkflow,
+  wakeTick,
 } from '../../packages/server/modules/workflow-engine';
 import { evaluateDebugBreakpoint } from '../../packages/server/modules/workflow-engine/debugBreakpoint';
 
@@ -77,20 +78,60 @@ test('undercover debug match pauses once at each marked step', () => {
   );
 });
 
-test('undercover debug skip records one system event and moves to the next step', () => {
+test('undercover debug skip records one system event and moves past a speech step', () => {
   const match = createBreakpointMatch();
+  controlBreakpoint(match.id, 'continue');
 
   controlBreakpoint(match.id, 'skip');
 
   const current = getDebugState(match.id)!;
   const skipped = current.events.filter((event) =>
     event.type === 'step_skipped'
-    && event.stepId === 'round_1_start'
+    && event.stepId === 'round_1_speech_0'
     && (event.payload as { reason?: string }).reason === 'undercover_debug_skip'
   );
   assert.equal(skipped.length, 1);
   assert.equal(skipped[0].visibility, 'system');
-  assert.equal(undercoverWorkflow.steps[current.match.currentStepIndex]?.id, 'round_1_speech_0');
+  assert.equal(undercoverWorkflow.steps[current.match.currentStepIndex]?.id, 'round_1_speech_1');
+});
+
+test('undercover debug skip rejects a round start breakpoint', () => {
+  const match = createBreakpointMatch();
+
+  assert.throws(
+    () => controlBreakpoint(match.id, 'skip'),
+    /only supports speech steps/,
+  );
+});
+
+test('undercover debug skip rejects the final result breakpoint', () => {
+  const match = createBreakpointMatch();
+  const resultIndex = undercoverWorkflow.steps.length - 1;
+  commitWorkflowChange({
+    matchId: match.id,
+    matchPatch: {
+      current_step_index: resultIndex,
+      status: 'running',
+      blockers_json: '[]',
+    },
+    snapshot: true,
+  });
+  wakeTick(match.id);
+  const interrupt = getDebugState(match.id)!.interrupts.find((item) =>
+    item.stepId === 'result'
+    && item.interruptType === 'undercover_debug_breakpoint'
+    && item.status === 'pending'
+  );
+  assert.ok(interrupt);
+
+  assert.throws(
+    () => controlUndercoverDebugMatch({
+      matchId: match.id,
+      interruptId: interrupt.id,
+      action: 'skip',
+    }),
+    /only supports speech steps/,
+  );
 });
 
 test('undercover continuous debug control completes without further breakpoints', async () => {

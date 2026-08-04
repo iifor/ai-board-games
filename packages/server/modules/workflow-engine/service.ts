@@ -356,6 +356,9 @@ function controlUndercoverDebugMatch({
     if (!currentStep || interrupt.stepId !== currentStep.id) {
       throw new Error(`Undercover debug breakpoint does not belong to the current step: ${matchId}`);
     }
+    if (action === 'skip' && currentStep.type !== 'undercover.speech') {
+      throw new Error(`Undercover debug skip only supports speech steps: ${matchId}`);
+    }
     if (action === 'continuous' && match.config.debugRunMode === 'continuous') {
       throw new Error(`Undercover debug match is already running continuously: ${matchId}`);
     }
