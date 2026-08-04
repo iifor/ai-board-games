@@ -332,14 +332,19 @@ Shadow audit 接入方式：
 `paused_debug`。已鉴权的后台控制 API 必须携带 debug state 中当前 pending
 断点的 `interruptId`，服务端在事务内校验 match、step、类型和状态后，才可继续、
 跳过当前步骤或切换为连续运行；旧 ID 和重复请求不得落到后续断点。
-跳过只写一条 system `step_skipped`，连续运行把内部 `debugRunMode` 写入
-`config_json`。运行时每 100ms 重新读取持久化状态，不同步忙等，也不自动解除断点。
+调试 AI task 不调用模型，发言和投票由服务端种子生成确定性且通过正式 schema
+校验的合法结果。`continue` 只解决当前断点，下一标记步骤仍暂停；`skip` 只跳过当前
+步骤并写一条 system `step_skipped`；`continuous` 解决当前断点并把内部
+`debugRunMode` 写入 `config_json`，此后不再创建调试停点。运行时每 100ms
+重新读取持久化状态，不同步忙等，也不自动解除断点。
 `game-socket` 为每个真实连接创建标准 `AbortSignal`，在 WebSocket close/error
 时触发并透传至 `GameRuntimeRunContext`；谁是卧底在每轮循环和断点等待中检查该
 信号，使断开连接的运行及时退出，随后由现有 session capacity `finally` 释放占用。
 断点状态仅接受 `pending`、`skipped`、`resolved`，未知持久化状态直接报错。
 setup 会为调试对局写入公开 `undercover-debug-ready` outbox 事件，该事件仍通过
 `toUndercoverPublicState` 投影，不包含词对、逐人私词或卧底座位。
+`paused_debug` 继续作为失败终态处理，不是正常调试停点；调试对局不写正式 history，
+也不创建正式 Undercover trace。
 
 ### agent-core
 
