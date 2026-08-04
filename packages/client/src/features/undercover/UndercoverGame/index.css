@@ -127,9 +127,12 @@
   top: 16px;
   left: 20px;
   display: grid;
-  max-width: min(360px, 32vw);
-  padding: 12px;
-  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 40px));
+  padding: 6px;
+  gap: 8px;
   border: 1px solid rgba(128, 151, 238, 0.42);
   border-radius: 14px;
   background: rgba(3, 8, 25, 0.88);
@@ -138,6 +141,7 @@
 
 .undercover-debug-panel header {
   color: #aebfff;
+  white-space: nowrap;
 }
 
 .undercover-debug-match {
@@ -231,6 +235,8 @@
     top: 12px;
     right: 12px;
     left: 12px;
+    grid-template-columns: 1fr;
+    width: auto;
     max-width: none;
   }
 
