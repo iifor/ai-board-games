@@ -23,6 +23,7 @@ import {
   wakeTick,
 } from '../../packages/server/modules/workflow-engine';
 import { evaluateDebugBreakpoint } from '../../packages/server/modules/workflow-engine/debugBreakpoint';
+import { resolveWorkflowInterrupt } from '../../packages/server/modules/workflow-engine/service';
 
 function createDebugMatch() {
   return createUndercoverWorkflowMatch({
@@ -66,6 +67,7 @@ test('undercover debug match pauses once at each marked step', () => {
   );
   assert.equal(pending.length, 1);
   assert.equal(pending[0].stepId, 'round_1_start');
+  assert.deepEqual(pending[0].payload, { stepType: 'undercover.round_start' });
 
   controlBreakpoint(match.id, 'continue');
   const advanced = getDebugState(match.id)!;
@@ -75,6 +77,20 @@ test('undercover debug match pauses once at each marked step', () => {
       item.interruptType === 'undercover_debug_breakpoint' && item.status === 'pending'
     ).length,
     1,
+  );
+});
+
+test('generic interrupt resolution cannot bypass an undercover debug breakpoint', () => {
+  const match = createBreakpointMatch();
+  const interruptId = pendingBreakpointId(match.id);
+
+  assert.throws(
+    () => resolveWorkflowInterrupt(interruptId, 'rejected', { manual: true }),
+    /dedicated Undercover debug control/,
+  );
+  assert.equal(
+    getDebugState(match.id)!.interrupts.find((item) => item.id === interruptId)?.status,
+    'pending',
   );
 });
 

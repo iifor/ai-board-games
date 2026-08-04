@@ -30,7 +30,7 @@ function evaluateDebugBreakpoint(match: Match, step: WorkflowStep): DebugBreakpo
       stepId: step.id,
       interruptType: UNDERCOVER_DEBUG_BREAKPOINT,
       status: 'pending',
-      payload: {},
+      payload: { stepType: step.type },
     }) || undefined;
   }
   if (!interrupt) throw new Error(`Failed to create Undercover debug breakpoint: ${step.id}`);

@@ -53,6 +53,9 @@ export function WorkflowDebugConsole() {
   const currentUndercoverBreakpointId = typeof currentUndercoverBreakpoint?.id === 'string'
     ? currentUndercoverBreakpoint.id
     : undefined;
+  const canSkipCurrentUndercoverBreakpoint = (
+    currentUndercoverBreakpoint?.payload as Record<string, unknown> | undefined
+  )?.stepType === 'undercover.speech';
   const auditRows = useMemo(() => getNightResolutionAuditRows(data.events as DebugRecord[]), [data.events]);
   const auditSummary = useMemo(() => summarizeNightResolutionAudits(auditRows), [auditRows]);
 
@@ -103,7 +106,9 @@ export function WorkflowDebugConsole() {
             {currentUndercoverBreakpointId && (
               <>
                 <Button onClick={() => runAction(() => controlUndercoverDebugMatch(matchId, currentUndercoverBreakpointId, 'continue'))}>继续一步</Button>
-                <Button onClick={() => runAction(() => controlUndercoverDebugMatch(matchId, currentUndercoverBreakpointId, 'skip'))}>跳过当前步骤</Button>
+                {canSkipCurrentUndercoverBreakpoint && (
+                  <Button onClick={() => runAction(() => controlUndercoverDebugMatch(matchId, currentUndercoverBreakpointId, 'skip'))}>跳过当前步骤</Button>
+                )}
                 <Button onClick={() => runAction(() => controlUndercoverDebugMatch(matchId, currentUndercoverBreakpointId, 'continuous'))}>连续运行</Button>
               </>
             )}
@@ -261,7 +266,7 @@ function interruptColumns(runAction: (action: () => Promise<unknown>) => Promise
     { title: '数据', render: (_, row) => <JsonCell value={row.payload} /> },
     {
       title: '操作',
-      render: (_, row) => (
+      render: (_, row) => row.interruptType === 'undercover_debug_breakpoint' ? null : (
         <Space>
           <Button size="small" onClick={() => runAction(() => resolveWorkflowInterrupt(String(row.id), { status: 'resolved', resolution: { manual: true } }))}>通过</Button>
           <Button size="small" onClick={() => runAction(() => resolveWorkflowInterrupt(String(row.id), { status: 'rejected', resolution: { manual: true } }))}>拒绝</Button>

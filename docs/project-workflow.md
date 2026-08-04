@@ -328,10 +328,11 @@ Shadow audit 接入方式：
 
 谁是卧底调试断点只在持久化 `debugMode === true` 时启用，覆盖每轮开始、逐人发言、
 投票、复投、结算和最终结果步骤，setup 不设断点。当前步骤首次到达时写入一个
-`undercover_debug_breakpoint`；正常等待状态使用 `waiting`，不使用
+`undercover_debug_breakpoint`，其 payload 记录当前 `stepType`；正常等待状态使用 `waiting`，不使用
 `paused_debug`。已鉴权的后台控制 API 必须携带 debug state 中当前 pending
 断点的 `interruptId`，服务端在事务内校验 match、step、类型和状态后，才可继续、
-跳过当前步骤或切换为连续运行；旧 ID 和重复请求不得落到后续断点。
+跳过当前步骤或切换为连续运行；旧 ID 和重复请求不得落到后续断点。通用 interrupt
+resolve API 拒绝处理该专用断点，避免绕过上述校验或写入其状态机不认识的状态。
 调试 AI task 不调用模型，发言和投票由服务端种子生成确定性且通过正式 schema
 校验的合法结果。`continue` 只解决当前断点，下一标记步骤仍暂停；`skip` 仅允许跳过
 `undercover.speech` 发言步骤并写一条 system `step_skipped`，其余步骤必须继续执行；`continuous` 解决当前断点并把内部

@@ -615,6 +615,83 @@ test('Admin Undercover debug controls bind each action to a pending breakpoint',
   assert.match(consolePage, /连续运行/);
 });
 
+test('Admin hides generic interrupt actions for Undercover debug breakpoints', async () => {
+  const harness = loadWorkflowDebugConsoleHarness({
+    getWorkflowDebug: async () => ({
+      match: { id: 'undercover-debug-match', gameType: 'undercover', config: { debugMode: true } },
+      interrupts: [{
+        id: 'undercover-debug-match:round_1_start:debug-breakpoint',
+        interruptType: 'undercover_debug_breakpoint',
+        status: 'pending',
+        payload: { stepType: 'undercover.round_start' },
+      }],
+    }),
+  });
+
+  try {
+    let tree = harness.render();
+    findElement(tree, (element) => element.type === 'input' && element.props.placeholder === '输入 Match ID')
+      .props.onChange({ target: { value: 'undercover-debug-match' } });
+    tree = harness.render();
+    await findElement(tree, (element) => element.type === 'button' && element.props.children === '加载').props.onClick();
+
+    tree = harness.render();
+    const tabs = findElement(tree, (element) => element.type === 'tabs');
+    const items = tabs.props.items as Array<{ key: string; children: TestElement }>;
+    const interrupts = items.find((item) => item.key === 'interrupts');
+    assert.ok(interrupts);
+    const columns = interrupts.children.props.columns as Array<{
+      render?: (value: unknown, row: Record<string, unknown>) => unknown;
+    }>;
+    const renderActions = columns.at(-1)?.render;
+    assert.ok(renderActions);
+    assert.equal(renderActions(null, {
+      id: 'undercover-debug-match:round_1_start:debug-breakpoint',
+      interruptType: 'undercover_debug_breakpoint',
+    }), null);
+  } finally {
+    harness.restore();
+  }
+});
+
+test('Admin shows Undercover debug skip only for speech breakpoints', async () => {
+  for (const [stepType, shouldShowSkip] of [
+    ['undercover.round_start', false],
+    ['undercover.result', false],
+    ['undercover.speech', true],
+  ] as const) {
+    const harness = loadWorkflowDebugConsoleHarness({
+      getWorkflowDebug: async () => ({
+        match: { id: 'undercover-debug-match', gameType: 'undercover', config: { debugMode: true } },
+        interrupts: [{
+          id: `undercover-debug-match:${stepType}:debug-breakpoint`,
+          interruptType: 'undercover_debug_breakpoint',
+          status: 'pending',
+          payload: { stepType },
+        }],
+      }),
+    });
+
+    try {
+      let tree = harness.render();
+      findElement(tree, (element) => element.type === 'input' && element.props.placeholder === '输入 Match ID')
+        .props.onChange({ target: { value: 'undercover-debug-match' } });
+      tree = harness.render();
+      await findElement(tree, (element) => element.type === 'button' && element.props.children === '加载').props.onClick();
+
+      tree = harness.render();
+      assert.ok(findOptionalElement(tree, (element) => element.type === 'button' && element.props.children === '继续一步'));
+      assert.ok(findOptionalElement(tree, (element) => element.type === 'button' && element.props.children === '连续运行'));
+      assert.equal(
+        Boolean(findOptionalElement(tree, (element) => element.type === 'button' && element.props.children === '跳过当前步骤')),
+        shouldShowSkip,
+      );
+    } finally {
+      harness.restore();
+    }
+  }
+});
+
 test('Admin Undercover debug controls disappear after the loaded match id is edited', async () => {
   const controlCalls: unknown[][] = [];
   const harness = loadWorkflowDebugConsoleHarness({

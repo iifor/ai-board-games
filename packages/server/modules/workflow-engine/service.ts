@@ -9,6 +9,7 @@ import { createId, nowIso, toJson } from './utils';
 import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import type { Match, AiTask } from '../../types/workflow';
 import { cleanupTerminalDebugMatches, scheduleWorkflowMaintenance } from './debugRetention';
+import { UNDERCOVER_DEBUG_BREAKPOINT } from './debugBreakpoint';
 
 const MAX_AI_ATTEMPTS = 2;
 
@@ -318,6 +319,9 @@ function createInterrupt(input: {
 }
 
 function resolveWorkflowInterrupt(interruptId: string, status: string, resolution: unknown = {}) {
+  if (repo.getWorkflowInterrupt(interruptId)?.interruptType === UNDERCOVER_DEBUG_BREAKPOINT) {
+    throw new Error('Undercover debug breakpoints require the dedicated Undercover debug control');
+  }
   return resolveInterrupt(interruptId, status, resolution);
 }
 
@@ -347,7 +351,7 @@ function controlUndercoverDebugMatch({
     if (interrupt.matchId !== matchId) {
       throw new Error(`Undercover debug breakpoint does not belong to match: ${matchId}`);
     }
-    if (interrupt.interruptType !== 'undercover_debug_breakpoint') {
+    if (interrupt.interruptType !== UNDERCOVER_DEBUG_BREAKPOINT) {
       throw new Error(`Workflow interrupt is not an Undercover debug breakpoint: ${interruptId}`);
     }
     if (interrupt.status !== 'pending') {
