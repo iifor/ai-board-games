@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
 import { migrate } from '../../packages/server/db/migrations';
@@ -66,6 +68,29 @@ test('complete deletion returns 404 for an unknown match', () => {
       (error: unknown) => getHttpStatus(error) === 404,
     );
   });
+});
+
+test('admin requires a terminal loaded match and exact id confirmation', () => {
+  const adminApi = readFileSync(resolve('packages/admin/src/services/adminApi.ts'), 'utf8');
+  const consolePage = readFileSync(
+    resolve('packages/admin/src/pages/WorkflowDebugConsole/index.tsx'),
+    'utf8',
+  );
+
+  assert.match(
+    adminApi,
+    /deleteWorkflowMatch\(matchId: string\)[\s\S]*?method: 'DELETE'/,
+  );
+  assert.match(
+    consolePage,
+    /DELETABLE_MATCH_STATUSES = new Set\(\['completed', 'failed', 'paused_debug'\]\)/,
+  );
+  assert.match(consolePage, /loadedMatchId === matchId\.trim\(\)/);
+  assert.match(consolePage, /deleteConfirmation !== loadedMatchId/);
+  assert.match(consolePage, /彻底删除对局数据/);
+  assert.match(consolePage, /setDebug\(null\)/);
+  assert.match(consolePage, /setLoadedMatchId\(null\)/);
+  assert.match(consolePage, /setMatchId\(''\)/);
 });
 
 function withDatabase(run: (db: Database.Database) => void): void {

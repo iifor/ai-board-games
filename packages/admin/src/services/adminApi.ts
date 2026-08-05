@@ -87,6 +87,22 @@ export function getWorkflowDebug(matchId: string) {
   return adminRequest<Record<string, unknown>>(`/workflow/matches/${encodeURIComponent(matchId)}/debug`);
 }
 
+export interface WorkflowMatchDeletionResult {
+  matchId: string;
+  deleted: {
+    match: boolean;
+    game: boolean;
+    traces: number;
+  };
+}
+
+export function deleteWorkflowMatch(matchId: string) {
+  return adminRequest<WorkflowMatchDeletionResult>(
+    `/workflow/matches/${encodeURIComponent(matchId)}`,
+    { method: 'DELETE' },
+  );
+}
+
 export function tickWorkflowMatch(matchId: string) {
   return adminRequest<Record<string, unknown>>(`/workflow/matches/${encodeURIComponent(matchId)}/tick`, { method: 'POST' });
 }
