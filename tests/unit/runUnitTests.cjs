@@ -56,6 +56,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   ,'debateSetup.test.ts'
   ,'werewolfDefaultConfig.test.ts'
   ,'edgeTts.test.ts'
+  ,'workflowMatchDeletion.test.ts'
 ]).map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];
