@@ -10,6 +10,14 @@ import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import type { Match, AiTask } from '../../types/workflow';
 import { cleanupTerminalDebugMatches, scheduleWorkflowMaintenance } from './debugRetention';
 import { UNDERCOVER_DEBUG_BREAKPOINT } from './debugBreakpoint';
+import { AppError, ErrorCodes } from '../../utils/errors';
+import { deleteMatchCascade } from './debugRetentionRepository';
+import { deleteTracesByGameId } from '../observability/db';
+import {
+  cleanupGameFiles,
+  deleteGameRecords,
+  prepareGameDeletion,
+} from '../games/service';
 
 const MAX_AI_ATTEMPTS = 2;
 
@@ -54,6 +62,15 @@ interface SubmitPendingActionInput {
 interface DrainOptions {
   maxTasks?: number;
   workerId?: string;
+}
+
+interface WorkflowMatchDeletionResult {
+  matchId: string;
+  deleted: {
+    match: boolean;
+    game: boolean;
+    traces: number;
+  };
 }
 
 function createWorkflowMatch({ workflowId, gameType, config, initialState, matchId }: CreateMatchInput): Match {
@@ -307,6 +324,35 @@ function getDebugState(matchId: string) {
   return repo.getDebugState(matchId);
 }
 
+function deleteWorkflowMatch(matchId: string): WorkflowMatchDeletionResult {
+  const match = repo.getMatch(matchId);
+  if (!match) throw new AppError(ErrorCodes.NOT_FOUND, 'Match 不存在', 404);
+  if (!TERMINAL_STATUSES.includes(match.status)) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, '进行中的 Match 不可删除', 409);
+  }
+
+  const gamePlan = prepareGameDeletion(matchId);
+  let gameDeleted = false;
+  let tracesDeleted = 0;
+  let matchDeleted = false;
+  getDb().transaction(() => {
+    gameDeleted = deleteGameRecords(matchId);
+    tracesDeleted = deleteTracesByGameId(matchId);
+    matchDeleted = deleteMatchCascade(matchId);
+    if (!matchDeleted) throw new AppError(ErrorCodes.NOT_FOUND, 'Match 不存在', 404);
+  })();
+
+  if (gamePlan && gameDeleted) cleanupGameFiles(gamePlan);
+  return {
+    matchId,
+    deleted: {
+      match: matchDeleted,
+      game: gameDeleted,
+      traces: tracesDeleted,
+    },
+  };
+}
+
 function createInterrupt(input: {
   matchId: string;
   stepId?: string | null;
@@ -435,9 +481,14 @@ export {
   resolveWorkflowInterrupt,
   controlUndercoverDebugMatch,
   getDebugState,
+  deleteWorkflowMatch,
   listPendingOutbox,
   listOutboxMessages,
   markOutboxSent,
   initializeWorkflowMaintenance,
 };
-export type { UndercoverDebugAction, UndercoverDebugControlInput };
+export type {
+  UndercoverDebugAction,
+  UndercoverDebugControlInput,
+  WorkflowMatchDeletionResult,
+};

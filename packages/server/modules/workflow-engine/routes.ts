@@ -4,6 +4,7 @@ import * as controller from './controller';
 const router = Router();
 
 router.get('/workflow/matches/:matchId/debug', controller.getMatchDebug);
+router.delete('/workflow/matches/:matchId', controller.deleteMatch);
 router.post('/workflow/matches/:matchId/tick', controller.wakeMatch);
 router.post('/workflow/matches/:matchId/debug-control', controller.controlUndercoverDebug);
 router.post('/workflow/matches/:matchId/actions/:actionId/submit', controller.submitPendingAction);

@@ -36,6 +36,11 @@ interface AdminStats {
   typeCounts: { gameType: string; count: number }[];
 }
 
+interface GameDeletionPlan {
+  gameId: string;
+  generatedAudioUrls: string[];
+}
+
 function saveGameRecord(game: SaveGameInput): GameSummary[] {
   const row: GameRow = {
     id: game.id,
@@ -95,24 +100,47 @@ function getGame(id: string): Game | null {
 }
 
 function deleteGame(id: string): { ok: boolean } {
-  const game = getGame(id);
-  if (!game) throw new AppError(ErrorCodes.NOT_FOUND, '游戏记录不存在', 404);
+  const plan = prepareGameDeletion(id);
+  if (!plan) throw new AppError(ErrorCodes.NOT_FOUND, '游戏记录不存在', 404);
 
-  upload.deleteGameAudioDirectory(game.id);
-
-  if (Array.isArray(game.audioResources)) {
-    game.audioResources.forEach((url) => {
-      if (typeof url === 'string' && shouldCleanAudioUrl(url, id)) {
-        upload.deleteGeneratedAudioByUrl(url);
-      }
-    });
-  }
-  const tx = getDb().transaction(() => {
-    deletePlaybackEvents(id);
-    repo.deleteGameById(id);
-  });
-  tx();
+  getDb().transaction(() => deleteGameRecords(id))();
+  cleanupGameFiles(plan);
   return { ok: true };
+}
+
+function prepareGameDeletion(id: string): GameDeletionPlan | null {
+  const game = getGame(id);
+  if (!game) return null;
+  return {
+    gameId: game.id,
+    generatedAudioUrls: Array.isArray(game.audioResources)
+      ? game.audioResources.filter(
+        (url): url is string => typeof url === 'string' && shouldCleanAudioUrl(url, id),
+      )
+      : [],
+  };
+}
+
+function deleteGameRecords(id: string): boolean {
+  if (!repo.findGameById(id)) return false;
+  deletePlaybackEvents(id);
+  repo.deleteGameById(id);
+  return true;
+}
+
+function cleanupGameFiles(plan: GameDeletionPlan): void {
+  try {
+    upload.deleteGameAudioDirectory(plan.gameId);
+  } catch (error) {
+    console.error(`[deleteGame] audio directory cleanup failed for ${plan.gameId}:`, (error as Error).message);
+  }
+  plan.generatedAudioUrls.forEach((url) => {
+    try {
+      upload.deleteGeneratedAudioByUrl(url);
+    } catch (error) {
+      console.error(`[deleteGame] audio cleanup failed for ${url}:`, (error as Error).message);
+    }
+  });
 }
 
 function shouldCleanAudioUrl(url: string, excludeGameId: string): boolean {
@@ -133,5 +161,14 @@ function getAdminStats(): AdminStats {
   };
 }
 
-export { saveGameRecord, listGames, getGame, deleteGame, getAdminStats };
-export type { SaveGameInput, AdminStats };
+export {
+  saveGameRecord,
+  listGames,
+  getGame,
+  deleteGame,
+  prepareGameDeletion,
+  deleteGameRecords,
+  cleanupGameFiles,
+  getAdminStats,
+};
+export type { SaveGameInput, AdminStats, GameDeletionPlan };

@@ -154,6 +154,14 @@ Undercover 调试断点；服务端在事务内校验其 match、step、类型�
 重复动作、普通对局、其他游戏、缺失对局与非当前断点均拒绝。
 该能力复用现有 `workflow_interrupts` 与 `matches.config_json`，不新增数据库表。
 
+工作流调试控制台通过已鉴权的
+`DELETE /api/admin/workflow/matches/:matchId` 彻底删除终态 Match。服务端仅接受
+`completed`、`failed`、`paused_debug`，缺失 Match 返回 404，活动 Match 返回 409。
+删除事务关联清理 workflow 外键子表、同 ID 历史对局与回放，以及根 Span
+`game.id` 对应的 Trace 树；事务提交后复用 games 模块清理未被其他对局引用的音频。
+接口返回 `{ matchId, deleted: { match, game, traces } }`，不删除
+`player_game_memories`，也不执行 `VACUUM`。
+
 大多数资源模块遵循：
 
 ```txt
@@ -197,7 +205,7 @@ C 端 REST 路由挂载到 `/api/toc`，主要能力包括：
 
 ### 数据库层
 
-数据库默认使用 SQLite，文件在 `data/consensus-mist.sqlite`。核心入口：
+数据库默认使用 SQLite，文件在 `packages/data/ai-presenter.sqlite`。核心入口：
 
 - `db/index.ts`：初始化数据库连接。
 - `db/migrations.ts`：创建表和字段补齐。

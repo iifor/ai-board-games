@@ -333,6 +333,20 @@ function deleteTrace(id: string): void {
   db.prepare('DELETE FROM game_traces WHERE id = @id').run({ id });
 }
 
+function deleteTracesByGameId(gameId: string): number {
+  const db = getDb();
+  if (db.isJsonFallback) return 0;
+  return db.prepare(`
+    DELETE FROM game_traces
+    WHERE id IN (
+      SELECT DISTINCT trace_id
+      FROM trace_spans
+      WHERE parent_span_id IS NULL
+        AND json_extract(attributes_json, '$."game.id"') = @gameId
+    )
+  `).run({ gameId }).changes;
+}
+
 interface CountRow {
   cnt: number;
 }
@@ -458,7 +472,7 @@ export type {
 };
 
 export {
-  insertTrace, updateTraceStatus, findTraces, findTraceById, deleteTrace, deleteOldTraces,
+  insertTrace, updateTraceStatus, findTraces, findTraceById, deleteTrace, deleteTracesByGameId, deleteOldTraces,
   resolveTraceParticipants,
   readParticipantsFromState,
   insertSpan, updateSpan, findSpansByTrace,

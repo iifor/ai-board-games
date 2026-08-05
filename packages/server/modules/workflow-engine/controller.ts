@@ -17,6 +17,14 @@ function wakeMatch(req: Request, res: Response): void {
   res.json(formatSuccess(service.wakeTick(matchId)));
 }
 
+function deleteMatch(req: Request, res: Response, next: NextFunction): void {
+  try {
+    res.json(formatSuccess(service.deleteWorkflowMatch(String(req.params.matchId))));
+  } catch (error) {
+    next(error);
+  }
+}
+
 function submitPendingAction(req: Request, res: Response, next: NextFunction): void {
   try {
     const matchId = String(req.params.matchId);
@@ -106,6 +114,7 @@ function controlUndercoverDebug(req: Request, res: Response, next: NextFunction)
 export {
   getMatchDebug,
   wakeMatch,
+  deleteMatch,
   submitPendingAction,
   retryAiTask,
   cancelAiTask,

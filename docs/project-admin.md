@@ -111,6 +111,8 @@ packages/admin/
 - `TraceExplorer`：AI trace、span、LLM 调用、agent 决策查看。
 - `WorkflowDebugConsole`：工作流调试控制台，包含 match 事件、任务、pending action、effect、interrupt，以及狼人杀夜间结算 Shadow Audit 汇总。谁是卧底 match 仅在 `config.debugMode === true`、输入值仍等于已加载的 match ID 时显示专用控制；继续一步和连续运行适用于所有断点，跳过当前步骤仅在断点 payload 的 `stepType === 'undercover.speech'` 时显示。专用断点在通用 interrupt 表中不显示“通过/拒绝”，所有控制只提交已加载状态中当前待处理的真实断点 ID。
 - 谁是卧底三项控制复用已鉴权的 `POST /api/admin/workflow/matches/:matchId/debug-control`，请求体固定为 `{ interruptId, action }`，`action` 只允许 `continue`、`skip`、`continuous`。服务端拒绝普通对局、非谁是卧底对局、缺失 match、缺失或旧断点、非当前 step 断点及重复操作；B 端不自行推导或缓存后续断点 ID。
+- `WorkflowDebugConsole` 仅对已加载、输入框 ID 未变化且状态为 `completed`、`failed`、`paused_debug` 的 Match 开放“彻底删除对局数据”。用户必须在危险确认弹窗中重新输入完整 Match ID；活动 Match 保持禁用，服务端仍会再次校验状态。
+- 删除成功后清空输入框、统计和调试 Tab，并展示实际删除的历史对局与 Trace 数量；删除失败时保留当前页面数据和错误信息。
 - `MemoryManager`：展示分游戏长期画像数量和最后更新时间，提供狼人杀、辩论赛、全部游戏三个危险清除操作。确认弹窗明确删除条数和不受影响的数据范围。
 
 ### 观测组件

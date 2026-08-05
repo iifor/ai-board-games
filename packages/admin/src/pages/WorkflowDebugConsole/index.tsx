@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Alert, Button, Card, Col, Form, Input, InputNumber, Row, Space, Table, Tabs, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   cancelWorkflowAiTask,
   controlUndercoverDebugMatch,
   createWorkflowInterrupt,
+  deleteWorkflowMatch,
   getWorkflowDebug,
   resolveWorkflowInterrupt,
   retryWorkflowAiTask,
@@ -17,6 +18,7 @@ import {
 import type { NightResolutionAuditRow, NightResolutionAuditStatus } from './nightResolutionAudit';
 
 const { Text, Paragraph } = Typography;
+const DELETABLE_MATCH_STATUSES = new Set(['completed', 'failed', 'paused_debug']);
 
 interface DebugRecord {
   id?: string | number;
@@ -38,6 +40,9 @@ export function WorkflowDebugConsole() {
   const [loadedMatchId, setLoadedMatchId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [debug, setDebug] = useState<Record<string, unknown> | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [form] = Form.useForm();
   const data = debug || {};
   const match = data.match as Record<string, unknown> | undefined;
@@ -56,6 +61,18 @@ export function WorkflowDebugConsole() {
   const canSkipCurrentUndercoverBreakpoint = (
     currentUndercoverBreakpoint?.payload as Record<string, unknown> | undefined
   )?.stepType === 'undercover.speech';
+  const loadedStatus = typeof match?.status === 'string' ? match.status : '';
+  const canDeleteLoadedMatch = Boolean(
+    match
+    && loadedMatchId
+    && loadedMatchId === matchId.trim()
+    && DELETABLE_MATCH_STATUSES.has(loadedStatus)
+  );
+  const deleteDisabledReason = loadedMatchId !== matchId.trim()
+    ? 'Match ID 已变更，请重新加载'
+    : DELETABLE_MATCH_STATUSES.has(loadedStatus)
+      ? ''
+      : '进行中的 Match 不可删除';
   const auditRows = useMemo(() => getNightResolutionAuditRows(data.events as DebugRecord[]), [data.events]);
   const auditSummary = useMemo(() => summarizeNightResolutionAudits(auditRows), [auditRows]);
 
@@ -85,6 +102,26 @@ export function WorkflowDebugConsole() {
     }
   }
 
+  async function deleteLoadedMatch(): Promise<void> {
+    if (!canDeleteLoadedMatch || !loadedMatchId || deleteConfirmation !== loadedMatchId) return;
+    setDeleting(true);
+    try {
+      const result = await deleteWorkflowMatch(loadedMatchId);
+      setDebug(null);
+      setLoadedMatchId(null);
+      setMatchId('');
+      setDeleteOpen(false);
+      setDeleteConfirmation('');
+      message.success(
+        `已删除 Match；历史对局 ${result.deleted.game ? 1 : 0} 条，Trace ${result.deleted.traces} 条`
+      );
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '删除失败');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const tabs = useMemo(() => [
     tableTab('events', '事件', data.events as DebugRecord[], eventColumns),
     tableTab('aiTasks', 'AI 任务', data.aiTasks as DebugRecord[], aiTaskColumns(runAction)),
@@ -103,6 +140,16 @@ export function WorkflowDebugConsole() {
             <Input value={matchId} onChange={(event) => setMatchId(event.target.value)} placeholder="输入 Match ID" onPressEnter={() => load()} />
             <Button type="primary" loading={loading} onClick={() => load()}>加载</Button>
             <Button disabled={!matchId} onClick={() => runAction(() => tickWorkflowMatch(matchId))}>推进</Button>
+            {match && (
+              <Button
+                danger
+                disabled={!canDeleteLoadedMatch}
+                title={deleteDisabledReason}
+                onClick={() => setDeleteOpen(true)}
+              >
+                彻底删除对局数据
+              </Button>
+            )}
             {currentUndercoverBreakpointId && (
               <>
                 <Button onClick={() => runAction(() => controlUndercoverDebugMatch(matchId, currentUndercoverBreakpointId, 'continue'))}>继续一步</Button>
@@ -146,6 +193,37 @@ export function WorkflowDebugConsole() {
 
         {match && <Tabs items={tabs} />}
       </Space>
+      <Modal
+        title="彻底删除对局数据"
+        open={deleteOpen}
+        okText="确认彻底删除"
+        cancelText="取消"
+        okButtonProps={{
+          danger: true,
+          disabled: deleteConfirmation !== loadedMatchId,
+        }}
+        confirmLoading={deleting}
+        onOk={deleteLoadedMatch}
+        onCancel={() => {
+          setDeleteOpen(false);
+          setDeleteConfirmation('');
+        }}
+      >
+        <Alert
+          type="error"
+          showIcon
+          message="此操作不可恢复"
+          description="将删除该 Match 的工作流、历史回放、AI 观测数据和专属音频；不会删除跨局玩家记忆。"
+        />
+        <Paragraph style={{ marginTop: 16 }}>
+          请输入完整 Match ID：<Text code>{loadedMatchId}</Text>
+        </Paragraph>
+        <Input
+          value={deleteConfirmation}
+          onChange={(event) => setDeleteConfirmation(event.target.value)}
+          placeholder="输入完整 Match ID"
+        />
+      </Modal>
     </section>
   );
 }
