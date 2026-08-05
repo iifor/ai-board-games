@@ -79,7 +79,7 @@ DELETE /api/admin/workflow/matches/:matchId
 - `routes.ts`：绑定 DELETE 路由。
 - `controller.ts`：读取路径参数、调用 service、返回统一响应。
 - `service.ts`：校验 Match、状态和删除顺序，编排 games、observability 与 workflow repository。
-- `repository.ts`：只执行 `DELETE FROM matches WHERE id = ?` 并返回变更数。
+- `debugRetentionRepository.ts`：复用现有 `deleteMatchCascade()` 执行 `DELETE FROM matches WHERE id = ?` 并返回是否删除。
 - games service/repository：复用现有历史、回放和音频清理规则；轻量拆分数据库删除与提交后文件清理，避免复制逻辑。
 - observability db：按 Trace 根 Span 的 `game.id` 删除关联 `game_traces` 并返回数量。
 
@@ -130,7 +130,6 @@ B 端当前没有通用 React 组件测试基线。本次执行 admin 类型检�
 - `packages/server/modules/workflow-engine/routes.ts`
 - `packages/server/modules/workflow-engine/controller.ts`
 - `packages/server/modules/workflow-engine/service.ts`
-- `packages/server/modules/workflow-engine/repository.ts`
 - `packages/server/modules/games/service.ts`
 - `packages/server/modules/observability/db.ts`
 - `docs/project-admin.md`
