@@ -137,6 +137,11 @@ packages/server/modules/
   并在持续运行期间每 24 小时再次清理；刚好 7 天的 match 保留。
 - 两类清理都硬删除 `matches` 并依赖外键级联，不会在在线服务中自动执行阻塞式
   `VACUUM`。
+- B 端可对 `completed`、`failed`、`paused_debug` Match 发起单条彻底删除。服务端在
+  一个事务中删除同 ID game/playback、根 Span `game.id` 对应的 Trace 树和 Match
+  workflow 外键子表；`player_game_memories` 保留，专属音频在事务提交后清理。
+- 删除只释放 SQLite 可复用页面，不保证数据库文件立即缩小；checkpoint、备份和
+  `VACUUM` 继续限定在停服维护窗口。
 - 狼人杀调试模式只跳过真实模型与语音依赖，不跳过玩法分支。禁言长老、骑士、
   花蝴蝶、潜行者、狼美人、噩梦之影、摄梦人、魔术师等特殊技能，以及白狼王自爆，会按调试
   随机概率决定是否发动，结果继续进入原有 reducer、死亡链和播放管线。
@@ -428,6 +433,7 @@ pnpm run test:workflow
 调试 API 挂载在 `/api/admin` 下：
 
 - `GET /workflow/matches/:matchId/debug`
+- `DELETE /workflow/matches/:matchId`
 - `POST /workflow/matches/:matchId/tick`
 - `POST /workflow/matches/:matchId/debug-control`
 - `POST /workflow/matches/:matchId/actions/:actionId/submit`

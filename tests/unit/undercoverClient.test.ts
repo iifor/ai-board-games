@@ -912,6 +912,7 @@ function createAntdTestStubs() {
     Form,
     Input: 'input',
     InputNumber: 'input-number',
+    Modal: 'modal',
     Row: 'row',
     Space,
     Table: 'table',
