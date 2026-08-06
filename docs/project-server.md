@@ -136,7 +136,9 @@ WebSocket：
 
 - `players`：AI 玩家资料、模型、音色、人格、排序、启用状态。
 - `model-providers`：模型供应商、baseUrl、apiFormat、加密 key。
-- `models`：具体模型配置。
+- `models`：具体模型配置。`models.name` 始终是发送给供应商的模型 ID；可选的
+  `models.display_name` 是仅供人阅读的标签，并通过管理 API 暴露为 `displayName`。
+  创建和更新时 `displayName` 必须是字符串，会去除首尾空白，且最多 120 个字符。
 - `voices`：语音包。
 - `werewolf-config`：狼人杀角色和模式。
 - `games`：对局历史和详情。

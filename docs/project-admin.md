@@ -99,9 +99,11 @@ packages/admin/
 - `ChangePassword`：首次登录时强制展示；改密成功后才允许进入后台页面。
 - `Dashboard`：后台概览。
 - `GameHistory`：历史对局列表和详情入口。
-- `PlayerManager`：玩家资料、头像、人格、模型、音色、启用状态。
+- `PlayerManager`：玩家资料、头像、人格、模型、音色、启用状态。主模型、备选模型、列表和
+  调试弹窗的模型标签使用“名称（ID）”；展示名称为空或与 ID 相同时只显示 ID，避免空括号或重复内容。
 - `ModelProviderManager`：模型供应商配置。
-- `ModelManager`：供应商下模型配置。
+- `ModelManager`：供应商下模型配置。模型管理同时编辑“模型名称”和“模型 ID”，列表中分列
+  显示，并可按任一字段搜索；模型名称是面向人的展示名称，模型 ID 保持为供应商请求使用的 ID。
 - `VoiceManager`：音色配置。
 - `WerewolfRoleManager`：狼人杀角色管理。
 - `WerewolfModeManager`：狼人杀模式和角色配置。
