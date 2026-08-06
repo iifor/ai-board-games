@@ -66,6 +66,7 @@ interface ModelRow {
   provider_id: number | null;
   provider: string;
   name: string;
+  display_name: string;
   base_url: string;
   api_format: string;
   api_key_cipher: string;

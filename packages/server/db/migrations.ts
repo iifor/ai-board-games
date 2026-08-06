@@ -73,6 +73,7 @@ function migrate(db: Database | JsonDb): void {
       provider_id INTEGER,
       provider TEXT NOT NULL,
       name TEXT NOT NULL,
+      display_name TEXT NOT NULL DEFAULT '',
       base_url TEXT NOT NULL DEFAULT '',
       api_format TEXT NOT NULL DEFAULT 'openai-compatible',
       api_key_cipher TEXT NOT NULL DEFAULT '',
@@ -391,6 +392,7 @@ function migrate(db: Database | JsonDb): void {
   ensureColumn(db, 'werewolf_modes', 'win_condition', "TEXT NOT NULL DEFAULT 'side'");
   ensureColumn(db, 'werewolf_roles', 'play_style_advice', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'models', 'thinking_enabled', "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, 'models', 'display_name', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'ai_tasks', 'worker_id', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'ai_tasks', 'claimed_at', 'TEXT');
   ensureColumn(db, 'match_snapshots', 'last_event_seq', 'INTEGER');

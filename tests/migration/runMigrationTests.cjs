@@ -8,6 +8,7 @@ const serverRoot = path.join(root, 'packages', 'server');
 const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
 const testFiles = [
   'eventMapping.test.ts',
+  'modelDisplayName.test.ts',
   'snapshotWatermark.test.ts',
 ].map((file) => path.join(__dirname, file));
 
