@@ -54,6 +54,7 @@ interface Model {
   provider: string;
   providerName: string;
   name: string;
+  displayName: string;
   baseUrl: string;
   apiFormat: string;
   hasApiKey: boolean;

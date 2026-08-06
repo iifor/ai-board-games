@@ -1,6 +1,7 @@
 import type { Model, RuntimeModel } from '../../types/api';
 import type { ModelRow } from '../../types/database';
 import type { ModelProvider } from '../../types/api';
+import { AppError, ErrorCodes } from '../../utils/errors';
 
 interface ProviderLike {
   id?: number;
@@ -18,6 +19,7 @@ interface ModelInput {
   provider?: string;
   name?: string;
   modelName?: string;
+  displayName?: unknown;
   baseUrl?: string;
   base_url?: string;
   apiFormat?: string;
@@ -30,6 +32,7 @@ interface ModelRowInput {
   provider_id: number | null;
   provider: string;
   name: string;
+  display_name: string;
   base_url: string;
   api_format: string;
   api_key_cipher: string;
@@ -47,6 +50,7 @@ function rowToModel(row: ModelRow | null | undefined, provider?: ModelProvider |
     provider: provider?.name || row.provider,
     providerName: provider?.name || row.provider,
     name: row.name,
+    displayName: row.display_name || '',
     baseUrl: provider?.baseUrl || row.base_url,
     apiFormat: provider?.apiFormat || row.api_format,
     hasApiKey: provider ? Boolean(provider.hasApiKey) : Boolean(row.api_key_cipher),
@@ -70,11 +74,24 @@ function normalizeApiFormat(value: unknown): string {
   return text === 'anthropic-compatible' ? text : 'openai-compatible';
 }
 
+function normalizeDisplayName(value: unknown, existing = ''): string {
+  if (value === undefined) return existing;
+  if (typeof value !== 'string') {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, '模型名称必须是字符串', 400);
+  }
+  const text = value.trim();
+  if (text.length > 120) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, '模型名称不能超过 120 个字符', 400);
+  }
+  return text;
+}
+
 function modelToRow(input: ModelInput, provider?: ModelProvider | ProviderLike | null, existing?: ModelRow | null): ModelRowInput {
   return {
     provider_id: Number(input.providerId || input.provider_id || existing?.provider_id || provider?.id || 0) || null,
     provider: String(provider?.name || input.provider || existing?.provider || '').trim(),
     name: String(input.name || input.modelName || existing?.name || '').trim(),
+    display_name: normalizeDisplayName(input.displayName, existing?.display_name || ''),
     base_url: String(provider?.baseUrl || input.baseUrl || input.base_url || existing?.base_url || '').trim(),
     api_format: normalizeApiFormat(provider?.apiFormat || input.apiFormat || input.api_format || existing?.api_format),
     api_key_cipher: existing?.api_key_cipher || '',

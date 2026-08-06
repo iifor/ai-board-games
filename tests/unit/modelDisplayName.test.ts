@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { AppError } from '../../packages/server/utils/errors';
+import { modelToRow, rowToModel } from '../../packages/server/modules/models/utils';
+import type { ModelRow } from '../../packages/server/types/database';
+
+const existing: ModelRow = {
+  id: 1,
+  provider_id: 2,
+  provider: '阿里云百炼',
+  name: 'qwen3.7-plus',
+  display_name: 'Qwen3.7 Plus',
+  base_url: '',
+  api_format: 'openai-compatible',
+  api_key_cipher: '',
+  api_key_iv: '',
+  api_key_tag: '',
+  thinking_enabled: 0,
+  enabled: 1,
+  created_at: '2026-08-06',
+  updated_at: '2026-08-06',
+};
+
+test('maps the display name without replacing the provider model ID', () => {
+  const model = rowToModel(existing);
+  assert.equal(model?.name, 'qwen3.7-plus');
+  assert.equal(model?.displayName, 'Qwen3.7 Plus');
+});
+
+test('trims a supplied display name and preserves it on unrelated updates', () => {
+  assert.equal(modelToRow({ displayName: '  Qwen3.7 Plus  ' }, null, existing).display_name, 'Qwen3.7 Plus');
+  assert.equal(modelToRow({ enabled: false }, null, existing).display_name, 'Qwen3.7 Plus');
+});
+
+test('rejects invalid display names with HTTP 400', () => {
+  for (const displayName of [42, 'x'.repeat(121)]) {
+    assert.throws(
+      () => modelToRow({ displayName } as never, null, existing),
+      (error: unknown) => error instanceof AppError && error.httpStatus === 400,
+    );
+  }
+});
