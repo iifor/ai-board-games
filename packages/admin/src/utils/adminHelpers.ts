@@ -16,9 +16,19 @@ export function getGameTitle(game: { topic?: string | { title?: string }; event?
   return (topic as { title?: string })?.title || game?.event?.name || game?.skinName || '-';
 }
 
-export function modelName(player: { modelId?: number | null; model?: string }, models: Array<{ id: number; provider: string; name: string }>): string {
+export function formatModelLabel(model: { name: string; displayName?: string }): string {
+  const displayName = String(model.displayName || '').trim();
+  return displayName && displayName !== model.name
+    ? `${displayName}（${model.name}）`
+    : model.name;
+}
+
+export function modelName(
+  player: { modelId?: number | null; model?: string },
+  models: Array<{ id: number; provider: string; name: string; displayName?: string }>,
+): string {
   const linked = models.find((model) => model.id === player.modelId);
-  if (linked) return `${linked.provider}/${linked.name}`;
+  if (linked) return `${linked.provider}/${formatModelLabel(linked)}`;
   return player.model || '-';
 }
 

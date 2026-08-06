@@ -16,6 +16,7 @@ export interface Player {
 export interface Model {
   id: number;
   name: string;
+  displayName: string;
   provider: string;
   enabled: boolean;
   thinkingEnabled?: boolean;

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AppError } from '../../packages/server/utils/errors';
 import { modelToRow, rowToModel } from '../../packages/server/modules/models/utils';
+import { formatModelLabel } from '../../packages/admin/src/utils/adminHelpers';
 import type { ModelRow } from '../../packages/server/types/database';
 
 const existing: ModelRow = {
@@ -39,4 +40,19 @@ test('rejects invalid display names with HTTP 400', () => {
       (error: unknown) => error instanceof AppError && error.httpStatus === 400,
     );
   }
+});
+
+test('formats a model label once for every admin surface', () => {
+  assert.equal(
+    formatModelLabel({ name: 'qwen3.7-plus', displayName: 'Qwen3.7 Plus' }),
+    'Qwen3.7 Plus（qwen3.7-plus）',
+  );
+  assert.equal(
+    formatModelLabel({ name: 'qwen3.7-plus', displayName: '' }),
+    'qwen3.7-plus',
+  );
+  assert.equal(
+    formatModelLabel({ name: 'qwen3.7-plus', displayName: 'qwen3.7-plus' }),
+    'qwen3.7-plus',
+  );
 });

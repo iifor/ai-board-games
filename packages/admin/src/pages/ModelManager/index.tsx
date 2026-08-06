@@ -3,7 +3,7 @@ import { App as AntApp, Button, Card, Descriptions, Form, Input, Modal, Space, S
 import { ApiOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { adminRequest } from '../../services/adminApi';
-import { filterByQuery, formatApiFormat } from '../../utils/adminHelpers';
+import { filterByQuery, formatApiFormat, formatModelLabel } from '../../utils/adminHelpers';
 import { EntityModal } from '../../components/shared/EntityModal';
 import { TableActions } from '../../components/shared/TableActions';
 import { ListFilterBar } from '../../components/shared/ListFilterBar';
@@ -22,7 +22,7 @@ export function ModelManager() {
 
   useEffect(() => { refresh(); }, [providerId]);
 
-  const filteredModels = filterByQuery(models, filters.q, ['name']);
+  const filteredModels = filterByQuery(models, filters.q, ['displayName', 'name']);
 
   async function refresh() {
     try {
@@ -53,7 +53,7 @@ export function ModelManager() {
   function confirmRemove(model: Model) {
     Modal.confirm({
       title: '删除模型',
-      content: `确认删除"${model.name}"吗？绑定该模型的玩家会解除模型绑定。`,
+      content: `确认删除"${formatModelLabel(model)}"吗？绑定该模型的玩家会解除模型绑定。`,
       okText: '删除',
       okButtonProps: { danger: true },
       cancelText: '取消',
@@ -92,7 +92,8 @@ export function ModelManager() {
         )}
         <ListFilterBar value={filters} onChange={setFilters} searchPlaceholder="搜索模型名称" />
         <Table rowKey="id" dataSource={filteredModels} columns={[
-          { title: '模型名称', dataIndex: 'name' },
+          { title: '模型名称', dataIndex: 'displayName', render: (_: unknown, model: Model) => model.displayName || model.name },
+          { title: '模型 ID', dataIndex: 'name' },
           {
             title: '操作',
             width: 240,
@@ -120,7 +121,19 @@ interface ModelModalProps {
 function ModelModal({ open, initialValues, onCancel, onSave }: ModelModalProps) {
   return (
     <EntityModal open={open} title={initialValues?.id ? '编辑模型' : '新增模型'} initialValues={initialValues?.id ? (initialValues as unknown as Record<string, unknown>) : { thinkingEnabled: false }} onCancel={onCancel} onSave={onSave}>
-      <Form.Item name="name" label="模型名称" rules={[{ required: true, message: '请输入模型名称' }]}><Input /></Form.Item>
+      <Form.Item
+        name="displayName"
+        label="模型名称"
+        rules={[
+          { required: true, whitespace: true, message: '请输入模型名称' },
+          { max: 120, message: '模型名称不能超过 120 个字符' },
+        ]}
+      >
+        <Input />
+      </Form.Item>
+      <Form.Item name="name" label="模型 ID" rules={[{ required: true, message: '请输入模型 ID' }]}>
+        <Input />
+      </Form.Item>
       <Form.Item name="thinkingEnabled" label="Think 模式" valuePropName="checked">
         <Switch checkedChildren="开" unCheckedChildren="关" />
       </Form.Item>

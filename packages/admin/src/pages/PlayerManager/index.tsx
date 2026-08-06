@@ -3,7 +3,7 @@ import { App as AntApp, Avatar, Button, Card, Descriptions, Form, Input, Modal, 
 import { MessageOutlined, PlayCircleOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
 import { adminRequest } from '../../services/adminApi';
 import { emptyPlayer } from '../../constants/adminConstants';
-import { filterByQuery, uniqueOptions, booleanOptions, modelName, playVoicePackage } from '../../utils/adminHelpers';
+import { filterByQuery, uniqueOptions, booleanOptions, formatModelLabel, modelName, playVoicePackage } from '../../utils/adminHelpers';
 import { EntityModal } from '../../components/shared/EntityModal';
 import { AvatarUpload } from '../../components/shared/AvatarUpload';
 import { TableActions } from '../../components/shared/TableActions';
@@ -39,7 +39,7 @@ export function PlayerManager() {
 
   const modelOptions = models.map((model) => ({
     value: model.id,
-    label: `${model.provider}/${model.name}`,
+    label: `${model.provider}/${formatModelLabel(model)}`,
     disabled: !model.enabled
   }));
   const voiceOptions = voices.map((voice) => ({ value: voice.id, label: voice.name }));
@@ -288,8 +288,8 @@ function PlayerDebugModal({ open, player, models, voices, onCancel }: PlayerDebu
         <Descriptions bordered size="small" column={1}>
           <Descriptions.Item label="昵称">{player.nickname || '-'}</Descriptions.Item>
           <Descriptions.Item label="人格">{player.personality || '-'}</Descriptions.Item>
-          <Descriptions.Item label="模型">{model ? `${model.provider}/${model.name}` : '未绑定'}</Descriptions.Item>
-          <Descriptions.Item label="备选模型">{fallbackModel ? `${fallbackModel.provider}/${fallbackModel.name}` : '未配置'}</Descriptions.Item>
+          <Descriptions.Item label="模型">{model ? `${model.provider}/${formatModelLabel(model)}` : '未绑定'}</Descriptions.Item>
+          <Descriptions.Item label="备选模型">{fallbackModel ? `${fallbackModel.provider}/${formatModelLabel(fallbackModel)}` : '未配置'}</Descriptions.Item>
           <Descriptions.Item label="语音包">{voice?.name || '未绑定'}</Descriptions.Item>
         </Descriptions>
         <div className="admin-chat-log">
