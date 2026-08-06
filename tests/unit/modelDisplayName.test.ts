@@ -59,6 +59,16 @@ test('model request schemas preserve optional display names and reject invalid v
   }
 });
 
+test('model request schemas allow a 120-character display name with outer whitespace', () => {
+  const displayName = ` ${'x'.repeat(120)} `;
+
+  assert.equal(
+    createModelSchema.safeParse({ name: 'qwen3.7-plus', displayName }).success,
+    true,
+  );
+  assert.equal(updateModelSchema.safeParse({ displayName }).success, true);
+});
+
 test('formats a model label once for every admin surface', () => {
   assert.equal(
     formatModelLabel({ name: 'qwen3.7-plus', displayName: 'Qwen3.7 Plus' }),
