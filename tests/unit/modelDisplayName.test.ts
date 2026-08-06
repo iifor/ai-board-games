@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AppError } from '../../packages/server/utils/errors';
 import { modelToRow, rowToModel } from '../../packages/server/modules/models/utils';
+import { createModelSchema, updateModelSchema } from '../../packages/server/modules/models/validator';
 import { formatModelLabel } from '../../packages/admin/src/utils/adminHelpers';
 import type { ModelRow } from '../../packages/server/types/database';
 
@@ -39,6 +40,22 @@ test('rejects invalid display names with HTTP 400', () => {
       () => modelToRow({ displayName } as never, null, existing),
       (error: unknown) => error instanceof AppError && error.httpStatus === 400,
     );
+  }
+});
+
+test('model request schemas preserve optional display names and reject invalid values', () => {
+  const create = createModelSchema.parse({
+    providerId: 2,
+    name: 'qwen3.7-plus',
+    displayName: '  Qwen3.7 Plus  ',
+  });
+  assert.equal(create.displayName, '  Qwen3.7 Plus  ');
+  assert.deepEqual(updateModelSchema.parse({ displayName: '' }), { displayName: '' });
+  assert.deepEqual(updateModelSchema.parse({}), {});
+
+  for (const displayName of [42, 'x'.repeat(121)]) {
+    assert.equal(createModelSchema.safeParse({ name: 'qwen3.7-plus', displayName }).success, false);
+    assert.equal(updateModelSchema.safeParse({ displayName }).success, false);
   }
 });
 
