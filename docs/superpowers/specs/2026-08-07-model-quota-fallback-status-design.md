@@ -40,11 +40,11 @@ disabled_at TEXT NULL
 
 `disableQuotaExhaustedModel()` 识别到明确额度错误后：
 
-1. 将模型 ID 加入进程内禁用集合，防止并发请求继续调用。
+1. 将模型 ID 加入进程内禁用集合；已排队请求和瞬时重试在取得 limiter 执行权后、每次实际请求前重新检查该集合。
 2. 在一次数据库更新中写入：
    - `enabled = 0`
    - `disabled_reason = 'quota_exhausted'`
-   - `disabled_at = CURRENT_TIMESTAMP`
+   - `disabled_at =` 明确带 `Z` 的 UTC ISO 8601 时间
 3. 保留供应商错误日志。
 4. 将当前调用交给现有备用模型链路。
 
@@ -72,7 +72,7 @@ disabled_at TEXT NULL
 
 后台重新启用额度耗尽模型时采用现有接口组合：
 
-1. 调用现有模型连接测试接口。
+1. 调用现有模型连接测试接口；只有该受控路径可探测进程内已熔断模型，且 HTTP 200 响应内容非空才算成功。
 2. 测试失败：保持停用和原标记，展示供应商错误。
 3. 测试成功：调用现有模型更新接口设置 `enabled = true`。
 4. 后端在启用成功时清空 `disabled_reason`、`disabled_at` 和进程内禁用集合。
@@ -117,7 +117,7 @@ disabled_at: string | null;
 
 - 进程内禁用集合先更新，数据库持久化随后执行，优先阻止继续消耗或扣费。
 - 数据库写入失败必须记录错误，不返回假成功；当前请求仍可尝试备用模型。
-- 服务重启后以数据库 `enabled = 0` 为准，不会重新调度已耗尽模型。
+- SQLite 与 JSON fallback 均持久化同一 availability 字段；服务重启和 JSON 迁入 SQLite 后以数据库 `enabled = 0` 为准，不会重新调度已耗尽模型。
 - 管理员重新启用时清理进程内标记，确保恢复立即生效。
 
 ## 验证
@@ -133,6 +133,10 @@ disabled_at: string | null;
 7. 测试失败时不能重新启用。
 8. 测试成功并启用后清除数据库和内存标记。
 9. 数据库迁移重复执行不报错。
+10. limiter 队列中的旧请求在额度熔断后不再调用该模型。
+11. JSON fallback 重启及迁入 SQLite 后保留额度状态且不追加脏行。
+12. HTTP 200 空内容连接测试失败，`disabled_at` 在 Asia/Shanghai 正确显示。
+13. 旧 `models` 表补列时保留已有数据。
 
 验证命令包括目标单元测试、迁移测试、服务端和管理端类型检查与构建。
 

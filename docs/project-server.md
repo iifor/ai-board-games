@@ -435,9 +435,10 @@ docker compose ps
 
 ## Player Model Fallback
 
-- 明确的额度耗尽、余额不足或欠费响应会将模型持久化为 `enabled = 0`、`disabled_reason = quota_exhausted`，并记录 `disabled_at`。当前请求继续使用玩家配置的单一备用模型；普通限流、超时和 5xx 不写入额度耗尽标记。
+- 明确的额度耗尽、余额不足或欠费响应会将模型持久化为 `enabled = 0`、`disabled_reason = quota_exhausted`，并以带 `Z` 的 UTC ISO 8601 记录 `disabled_at`。SQLite、JSON fallback 及 JSON 迁入 SQLite 保持相同字段；当前请求继续使用玩家配置的单一备用模型，普通限流、超时和 5xx 不写入额度耗尽标记。
 - `players.fallback_model_id` stores one optional backup model reference and is exposed as `fallbackModelId` only through the admin player API.
 - The shared LLM boundary keeps the existing single transient retry for network, timeout, 429 and 5xx failures, then invokes the configured backup model once.
+- Queued and retried LLM attempts recheck the in-process quota breaker after acquiring limiter capacity. Only the existing model connection test uses an internal probe path; ordinary calls cannot bypass the breaker.
 - Missing/disabled primary configuration, upstream errors and empty responses can fall back. Invalid JSON uses the backup for the existing correction attempt.
 - When an upstream response explicitly reports account arrears, insufficient balance, exhausted free quota, or an overdue bill, the shared LLM boundary immediately marks that model unavailable in memory and persists `models.enabled = 0`. Generic 429 rate limiting does not disable the model.
 - Werewolf, debate and player debug chat share this path. If both models fail, the existing game-level fallback behavior remains authoritative.

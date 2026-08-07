@@ -11,11 +11,19 @@ function getModelProvidersService(): { createLegacyModelProvider: (input: Record
 }
 
 function getLlmService(): {
-  callModelChat: (target: Record<string, unknown>) => Promise<string>;
+  testModelConnection: (target: Record<string, unknown>) => Promise<{
+    ok: boolean;
+    latencyMs?: number;
+    message?: string;
+  }>;
   clearQuotaDisabledModel: (modelId: number) => void;
 } {
   return require('../llm') as {
-    callModelChat: (target: Record<string, unknown>) => Promise<string>;
+    testModelConnection: (target: Record<string, unknown>) => Promise<{
+      ok: boolean;
+      latencyMs?: number;
+      message?: string;
+    }>;
     clearQuotaDisabledModel: (modelId: number) => void;
   };
 }
@@ -72,17 +80,18 @@ function deleteModel(id: number | string): { ok: boolean } {
   return { ok: true };
 }
 
-async function testModelConnection(id: number | string): Promise<{ ok: boolean; message: string }> {
+async function testModelConnection(id: number | string): Promise<{ ok: boolean; latencyMs?: number; message: string }> {
   const model = getRuntimeModel(Number(id));
   if (!model) throw new AppError(ErrorCodes.NOT_FOUND, '模型不存在', 404);
-  const llm = getLlmService();
-  return llm.callModelChat({
+  const result = await getLlmService().testModelConnection({
     ...model,
     model: model.name,
-    messages: [{ role: 'user', content: '请只回复 pong' }],
-    temperature: 0, maxTokens: 16, modelId: model.id
-  }).then((reply: string) => ({ ok: true, message: reply || '连接成功' }))
-    .catch((err: Error) => ({ ok: false, message: err.message }));
+    modelId: model.id,
+  });
+  return {
+    ...result,
+    message: result.message || (result.ok ? '连接成功' : '连接失败'),
+  };
 }
 
 function toModel(row: ModelRow | null | undefined): Model | null {

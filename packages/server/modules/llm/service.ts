@@ -428,16 +428,51 @@ async function withSingleTransientRetry<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
+function runLimitedModelCall<T>(
+  modelId: number | null | undefined,
+  call: () => Promise<T>,
+  allowQuotaDisabled = false,
+): Promise<T> {
+  return upstreamConcurrency.llmLimiter.run(() => withSingleTransientRetry(() => {
+    if (!allowQuotaDisabled && modelId && quotaDisabledModelIds.has(Number(modelId))) {
+      throw new Error(`Model ${modelId} is disabled after quota exhaustion`);
+    }
+    return call();
+  }));
+}
+
+async function callOpenAIChatRawInternal(
+  options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] },
+  allowQuotaDisabled = false,
+): Promise<LlmRawResult> {
+  return runLimitedModelCall(
+    options.modelId,
+    () => callOpenAIChatRawAttempt(options),
+    allowQuotaDisabled,
+  );
+}
+
 async function callOpenAIChatRaw(
   options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] },
 ): Promise<LlmRawResult> {
-  return upstreamConcurrency.llmLimiter.run(() => withSingleTransientRetry(() => callOpenAIChatRawAttempt(options)));
+  return callOpenAIChatRawInternal(options);
+}
+
+async function callAnthropicChatRawInternal(
+  options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] },
+  allowQuotaDisabled = false,
+): Promise<LlmRawResult> {
+  return runLimitedModelCall(
+    options.modelId,
+    () => callAnthropicChatRawAttempt(options),
+    allowQuotaDisabled,
+  );
 }
 
 async function callAnthropicChatRaw(
   options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] },
 ): Promise<LlmRawResult> {
-  return upstreamConcurrency.llmLimiter.run(() => withSingleTransientRetry(() => callAnthropicChatRawAttempt(options)));
+  return callAnthropicChatRawInternal(options);
 }
 
 async function callAnthropicChat(options: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] }): Promise<string> {
@@ -448,6 +483,15 @@ async function callAnthropicChat(options: LlmCallOptions & { apiKey: string; mod
 async function callModelChat(target: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] }): Promise<string> {
   if (target.apiFormat === 'anthropic-compatible') return callAnthropicChat(target);
   return callOpenAIChat(target);
+}
+
+async function callModelChatForConnectionTest(
+  target: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] },
+): Promise<string> {
+  const result = target.apiFormat === 'anthropic-compatible'
+    ? await callAnthropicChatRawInternal(target, true)
+    : await callOpenAIChatRawInternal(target, true);
+  return result.content;
 }
 
 async function callModelChatWithThinking(target: LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] }): Promise<LlmRawResult> {
@@ -583,20 +627,31 @@ async function testModelConnection(target: LlmCallOptions): Promise<TestConnecti
   }
 
   try {
-    const reply = await callModelChat({
+    const reply = await callModelChatForConnectionTest({
       ...target,
       model: target.model || target.name!,
       messages: [{ role: 'user', content: '请只回复 pong' }],
       temperature: 0,
       maxTokens: 16
     } as LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] });
+    const latencyMs = Date.now() - startedAt;
+    if (!reply.trim()) {
+      return {
+        ok: false,
+        latencyMs,
+        provider: target.provider,
+        model: target.model || target.name,
+        apiFormat: target.apiFormat || 'openai-compatible',
+        message: '模型返回空响应'
+      };
+    }
     return {
       ok: true,
-      latencyMs: Date.now() - startedAt,
+      latencyMs,
       provider: target.provider,
       model: target.model || target.name,
       apiFormat: target.apiFormat || 'openai-compatible',
-      message: reply || '连接成功'
+      message: reply
     };
   } catch (error) {
     return {

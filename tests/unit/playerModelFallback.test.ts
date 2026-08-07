@@ -6,6 +6,8 @@ import { createPlayerSchema } from '../../packages/server/modules/players/valida
 import { playerToRow, rowToPlayer } from '../../packages/server/modules/players/utils';
 import { getDb } from '../../packages/server/db';
 import * as modelsService from '../../packages/server/modules/models/service';
+import * as modelProvidersService from '../../packages/server/modules/model-providers/service';
+import { upstreamConcurrency } from '../../packages/server/utils/concurrency';
 import { z } from 'zod';
 
 const messages = [{ role: 'user', content: 'hello' }];
@@ -78,6 +80,14 @@ async function withFetch(
   }
 }
 
+async function waitFor(predicate: () => boolean, message: string): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (predicate()) return;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  throw new Error(message);
+}
+
 test('uses the primary model without calling the fallback model', async () => {
   const urls: string[] = [];
   await withFetch((url) => {
@@ -134,7 +144,7 @@ test('disables and skips a model after the provider reports exhausted balance', 
       const exhausted = readModelStatus(modelId);
       assert.equal(exhausted.enabled, 0);
       assert.equal(exhausted.disabled_reason, 'quota_exhausted');
-      assert.ok(exhausted.disabled_at);
+      assert.match(exhausted.disabled_at || '', /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
       assert.equal(await callModelChatWithFallback(primary, fallback), 'fallback reply');
     });
     assert.deepEqual(urls, [
@@ -169,6 +179,60 @@ test('does not disable a model for ordinary rate limiting', async () => {
     assert.equal(limited.disabled_reason, null);
     assert.equal(limited.disabled_at, null);
   } finally {
+    getDb().prepare('DELETE FROM models WHERE id = ?').run(modelId);
+  }
+});
+
+test('queued LLM work rechecks the quota circuit breaker before fetching', async () => {
+  const modelId = insertEnabledModel(`queued-quota-${Date.now()}`);
+  const limit = upstreamConcurrency.llmLimiter.stats().limit;
+  let primaryFetches = 0;
+  let releaseQuotaResponse!: () => void;
+  let releaseOtherResponses!: () => void;
+  const quotaResponseGate = new Promise<void>((resolve) => { releaseQuotaResponse = resolve; });
+  const otherResponsesGate = new Promise<void>((resolve) => { releaseOtherResponses = resolve; });
+
+  try {
+    let queuedReply = '';
+    await withFetch(async (url) => {
+      if (url.includes('fallback.test')) return openAiResponse('fallback reply');
+      primaryFetches += 1;
+      if (primaryFetches === 1) {
+        await quotaResponseGate;
+        return openAiResponse(JSON.stringify({
+          error: {
+            code: 'PostpaidBillOverdue',
+            message: 'The postpaid bill is overdue.',
+          },
+        }), 429);
+      }
+      await otherResponsesGate;
+      return openAiResponse('already-started primary reply');
+    }, async () => {
+      const primary = model('https://primary.test/v1', 'primary', modelId);
+      const fallback = model('https://fallback.test/v1', 'fallback');
+      const activeCalls = Array.from({ length: limit }, () => callModelChatWithFallback(primary, fallback));
+
+      await waitFor(
+        () => primaryFetches === limit,
+        `expected ${limit} active primary requests, received ${primaryFetches}`,
+      );
+      const queuedCall = callModelChatWithFallback(primary, fallback);
+      await waitFor(
+        () => upstreamConcurrency.llmLimiter.stats().queued > 0,
+        'expected one LLM request to wait in the limiter queue',
+      );
+
+      releaseQuotaResponse();
+      releaseOtherResponses();
+      [queuedReply] = await Promise.all([queuedCall, Promise.all(activeCalls).then(() => '')]);
+    });
+
+    assert.equal(queuedReply, 'fallback reply');
+    assert.equal(primaryFetches, limit);
+  } finally {
+    releaseQuotaResponse();
+    releaseOtherResponses();
     getDb().prepare('DELETE FROM models WHERE id = ?').run(modelId);
   }
 });
@@ -326,5 +390,73 @@ test('allows an explicitly re-enabled model to recover after quota is restored',
   } finally {
     getDb().prepare('DELETE FROM models WHERE id = ?').run(modelId);
     getDb().prepare('DELETE FROM model_providers WHERE id = ?').run(providerId);
+  }
+});
+
+test('connection test alone can probe a quota-disabled model without enabling ordinary calls', async () => {
+  const provider = modelProvidersService.createModelProvider({
+    name: `connection-provider-${Date.now()}`,
+    baseUrl: 'https://primary.test/v1',
+    apiKey: 'connection-key',
+  });
+  const configuredModel = modelsService.createModel({
+    providerId: provider.id,
+    name: 'primary',
+    enabled: true,
+  });
+  assert.ok(configuredModel);
+  const modelId = configuredModel.id;
+  let exhausted = true;
+  let primaryFetches = 0;
+  try {
+    await withFetch((url) => {
+      if (url.includes('fallback.test')) return openAiResponse('fallback reply');
+      primaryFetches += 1;
+      return exhausted
+        ? openAiResponse(JSON.stringify({
+          error: { code: 'AllocationQuota.FreeTierOnly', message: 'Free allocated quota exceeded.' },
+        }), 429)
+        : openAiResponse('pong');
+    }, async () => {
+      const primary = model('https://primary.test/v1', 'primary', modelId);
+      const fallback = model('https://fallback.test/v1', 'fallback');
+      assert.equal(await callModelChatWithFallback(primary, fallback), 'fallback reply');
+
+      exhausted = false;
+      const result = await modelsService.testModelConnection(modelId);
+      assert.equal(result.ok, true);
+      assert.equal(result.message, 'pong');
+      assert.equal(readModelStatus(modelId).enabled, 0);
+
+      assert.equal(await callModelChatWithFallback(primary, fallback), 'fallback reply');
+    });
+    assert.equal(primaryFetches, 2);
+  } finally {
+    getDb().prepare('DELETE FROM models WHERE id = ?').run(modelId);
+    getDb().prepare('DELETE FROM model_providers WHERE id = ?').run(provider.id);
+  }
+});
+
+test('model service rejects a successful HTTP response with empty model content', async () => {
+  const provider = modelProvidersService.createModelProvider({
+    name: `empty-response-provider-${Date.now()}`,
+    baseUrl: 'https://primary.test/v1',
+    apiKey: 'empty-response-key',
+  });
+  const configuredModel = modelsService.createModel({
+    providerId: provider.id,
+    name: 'primary',
+    enabled: true,
+  });
+  assert.ok(configuredModel);
+  try {
+    await withFetch(() => openAiResponse('   '), async () => {
+      const result = await modelsService.testModelConnection(configuredModel.id);
+      assert.equal(result.ok, false);
+      assert.equal(result.message, '模型返回空响应');
+    });
+  } finally {
+    getDb().prepare('DELETE FROM models WHERE id = ?').run(configuredModel.id);
+    getDb().prepare('DELETE FROM model_providers WHERE id = ?').run(provider.id);
   }
 });

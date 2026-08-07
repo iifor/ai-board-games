@@ -45,12 +45,17 @@ function updateModelAvailability(
 ): void {
   getDb().prepare(`
     UPDATE models
-    SET enabled = ?,
-        disabled_reason = ?,
-        disabled_at = CASE WHEN ? IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
+    SET enabled = @enabled,
+        disabled_reason = @disabled_reason,
+        disabled_at = @disabled_at,
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(enabled ? 1 : 0, disabledReason, disabledReason, Number(id));
+    WHERE id = @id
+  `).run({
+    id: Number(id),
+    enabled: enabled ? 1 : 0,
+    disabled_reason: disabledReason,
+    disabled_at: disabledReason ? new Date().toISOString() : null,
+  });
 }
 
 function deleteModelById(id: number | string): void {

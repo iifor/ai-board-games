@@ -103,7 +103,7 @@ function main(): void {
 const SKIN_COLS = ['id', 'name', 'version', 'source', 'terms_json', 'background', 'truth', 'clues_json', 'noises_json', 'memory_examples_json', 'enabled', 'created_at', 'updated_at'];
 const PLAYER_COLS = ['id', 'nickname', 'name', 'avatar', 'sex', 'personality', 'provider', 'model', 'model_id', 'voice_package_id', 'temperature', 'enabled', 'sort_order', 'created_at', 'updated_at'];
 const PROVIDER_COLS = ['id', 'name', 'base_url', 'api_format', 'api_key_cipher', 'api_key_iv', 'api_key_tag', 'enabled', 'created_at', 'updated_at'];
-const MODEL_COLS = ['id', 'provider_id', 'provider', 'name', 'base_url', 'api_format', 'api_key_cipher', 'api_key_iv', 'api_key_tag', 'enabled', 'created_at', 'updated_at'];
+const MODEL_COLS = ['id', 'provider_id', 'provider', 'name', 'base_url', 'api_format', 'api_key_cipher', 'api_key_iv', 'api_key_tag', 'enabled', 'disabled_reason', 'disabled_at', 'created_at', 'updated_at'];
 const VOICE_COLS = ['id', 'name', 'provider', 'voice_id', 'language', 'gender', 'style', 'rate', 'pitch', 'sample_text', 'description', 'enabled', 'created_at', 'updated_at'];
 const ROLE_COLS = ['id', 'name', 'faction', 'role_type', 'responsibility', 'ability', 'play_style_advice', 'key_info', 'rule_json', 'enabled', 'sort_order', 'created_at', 'updated_at'];
 const MODE_COLS = ['id', 'name', 'description', 'roles_json', 'rules_json', 'sheriff_json', 'win_condition', 'enabled', 'sort_order', 'created_at', 'updated_at'];
@@ -137,4 +137,6 @@ function upsertGamePlayerSelections(db: Database, rows: Record<string, unknown>[
 function upsertAppSettings(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'app_settings', SETTINGS_COLS, rows); }
 function upsertPlayerGameMemories(db: Database, rows: Record<string, unknown>[]): void { upsert(db, 'player_game_memories', PLAYER_GAME_MEMORY_COLS, rows); }
 
-main();
+if (require.main === module) main();
+
+export { upsertModels };
