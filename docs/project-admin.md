@@ -104,6 +104,7 @@ packages/admin/
 - `ModelProviderManager`：模型供应商配置。
 - `ModelManager`：供应商下模型配置。模型管理同时编辑“模型名称”和“模型 ID”，列表中分列
   显示，并可按任一字段搜索；模型名称是面向人的展示名称，模型 ID 保持为供应商请求使用的 ID。
+  模型列表区分“已停用”和“额度已用完”，并显示额度耗尽时间；额度耗尽模型只能由管理员手动恢复：后台先调用现有连接测试，成功后再通过现有模型更新接口启用并清除标记。
 - `VoiceManager`：音色配置。
 - `WerewolfRoleManager`：狼人杀角色管理。
 - `WerewolfModeManager`：狼人杀模式和角色配置。

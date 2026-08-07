@@ -435,6 +435,7 @@ docker compose ps
 
 ## Player Model Fallback
 
+- 明确的额度耗尽、余额不足或欠费响应会将模型持久化为 `enabled = 0`、`disabled_reason = quota_exhausted`，并记录 `disabled_at`。当前请求继续使用玩家配置的单一备用模型；普通限流、超时和 5xx 不写入额度耗尽标记。
 - `players.fallback_model_id` stores one optional backup model reference and is exposed as `fallbackModelId` only through the admin player API.
 - The shared LLM boundary keeps the existing single transient retry for network, timeout, 429 and 5xx failures, then invokes the configured backup model once.
 - Missing/disabled primary configuration, upstream errors and empty responses can fall back. Invalid JSON uses the backup for the existing correction attempt.
