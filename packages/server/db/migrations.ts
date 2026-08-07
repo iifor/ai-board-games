@@ -64,8 +64,6 @@ function migrate(db: Database | JsonDb): void {
       api_key_iv TEXT NOT NULL DEFAULT '',
       api_key_tag TEXT NOT NULL DEFAULT '',
       enabled INTEGER NOT NULL DEFAULT 1,
-      disabled_reason TEXT,
-      disabled_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -82,6 +80,8 @@ function migrate(db: Database | JsonDb): void {
       api_key_iv TEXT NOT NULL DEFAULT '',
       api_key_tag TEXT NOT NULL DEFAULT '',
       enabled INTEGER NOT NULL DEFAULT 1,
+      disabled_reason TEXT,
+      disabled_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (provider_id) REFERENCES model_providers(id) ON DELETE RESTRICT

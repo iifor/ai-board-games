@@ -22,6 +22,13 @@ test('SQLite migration adds nullable model quota status fields idempotently', ()
         ['disabled_at', 0, null],
       ],
     );
+    const providerColumns = db.prepare("PRAGMA table_info('model_providers')").all() as Array<{ name: string }>;
+    assert.deepEqual(
+      providerColumns
+        .filter((column) => ['disabled_reason', 'disabled_at'].includes(column.name))
+        .map((column) => column.name),
+      [],
+    );
   } finally {
     db.close();
   }
