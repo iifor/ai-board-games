@@ -4,8 +4,8 @@ import { BasePlayerAgent } from '../../packages/server/modules/agent-core/player
 import { callModelChatWithFallback } from '../../packages/server/modules/llm/service';
 import { createPlayerSchema } from '../../packages/server/modules/players/validator';
 import { playerToRow, rowToPlayer } from '../../packages/server/modules/players/utils';
-import { modelToRow } from '../../packages/server/modules/models/utils';
 import { getDb } from '../../packages/server/db';
+import * as modelsService from '../../packages/server/modules/models/service';
 import { z } from 'zod';
 
 const messages = [{ role: 'user', content: 'hello' }];
@@ -22,23 +22,40 @@ function model(baseUrl: string, name: string, modelId?: number) {
   };
 }
 
-function insertEnabledModel(name: string): number {
+function insertEnabledModel(name: string, providerId: number | null = null): number {
   const result = getDb().prepare(`
     INSERT INTO models (
       provider_id, provider, name, base_url, api_format,
       api_key_cipher, api_key_iv, api_key_tag,
       thinking_enabled, enabled, created_at, updated_at
     ) VALUES (
-      NULL, 'test', ?, '', 'openai-compatible',
+      ?, 'test', ?, '', 'openai-compatible',
       '', '', '',
       0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     )
+  `).run(providerId, name);
+  return Number(result.lastInsertRowid);
+}
+
+function insertEnabledModelProvider(name: string): number {
+  const result = getDb().prepare(`
+    INSERT INTO model_providers (
+      name, base_url, api_format,
+      api_key_cipher, api_key_iv, api_key_tag,
+      enabled, created_at, updated_at
+    ) VALUES (?, '', 'openai-compatible', '', '', '', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   `).run(name);
   return Number(result.lastInsertRowid);
 }
 
-function readModelEnabled(modelId: number): number {
-  return Number((getDb().prepare('SELECT enabled FROM models WHERE id = ?').get(modelId) as { enabled: number }).enabled);
+function readModelStatus(id: number) {
+  return getDb().prepare(
+    'SELECT enabled, disabled_reason, disabled_at FROM models WHERE id = ?',
+  ).get(id) as {
+    enabled: number;
+    disabled_reason: string | null;
+    disabled_at: string | null;
+  };
 }
 
 function openAiResponse(content: string, status = 200): Response {
@@ -114,7 +131,10 @@ test('disables and skips a model after the provider reports exhausted balance', 
       const primary = model('https://primary.test/v1', 'primary', modelId);
       const fallback = model('https://fallback.test/v1', 'fallback');
       assert.equal(await callModelChatWithFallback(primary, fallback), 'fallback reply');
-      assert.equal(readModelEnabled(modelId), 0);
+      const exhausted = readModelStatus(modelId);
+      assert.equal(exhausted.enabled, 0);
+      assert.equal(exhausted.disabled_reason, 'quota_exhausted');
+      assert.ok(exhausted.disabled_at);
       assert.equal(await callModelChatWithFallback(primary, fallback), 'fallback reply');
     });
     assert.deepEqual(urls, [
@@ -144,9 +164,74 @@ test('does not disable a model for ordinary rate limiting', async () => {
       );
       assert.equal(reply, 'fallback reply');
     });
-    assert.equal(readModelEnabled(modelId), 1);
+    const limited = readModelStatus(modelId);
+    assert.equal(limited.enabled, 1);
+    assert.equal(limited.disabled_reason, null);
+    assert.equal(limited.disabled_at, null);
   } finally {
     getDb().prepare('DELETE FROM models WHERE id = ?').run(modelId);
+  }
+});
+
+test('marks both models quota exhausted when the fallback is also exhausted', async () => {
+  const primaryId = insertEnabledModel(`primary-quota-${Date.now()}`);
+  const fallbackId = insertEnabledModel(`fallback-quota-${Date.now()}`);
+  try {
+    await withFetch(() => openAiResponse(JSON.stringify({
+      error: {
+        code: 'AllocationQuota.FreeTierOnly',
+        message: 'Free allocated quota exceeded.',
+      },
+    }), 429), async () => {
+      await assert.rejects(
+        callModelChatWithFallback(
+          model('https://primary.test/v1', 'primary', primaryId),
+          model('https://fallback.test/v1', 'fallback', fallbackId),
+        ),
+        AggregateError,
+      );
+    });
+
+    for (const modelId of [primaryId, fallbackId]) {
+      const exhausted = readModelStatus(modelId);
+      assert.equal(exhausted.enabled, 0);
+      assert.equal(exhausted.disabled_reason, 'quota_exhausted');
+      assert.ok(exhausted.disabled_at);
+    }
+  } finally {
+    getDb().prepare('DELETE FROM models WHERE id IN (?, ?)').run(primaryId, fallbackId);
+  }
+});
+
+test('keeps models available for non-quota failures', async () => {
+  const cases = [
+    ['server error', () => openAiResponse('upstream failed', 500)],
+    ['validation error', () => openAiResponse('invalid request', 400)],
+    ['network error', () => { throw new TypeError('fetch failed'); }],
+  ] as const;
+
+  for (const [name, failure] of cases) {
+    const modelId = insertEnabledModel(`non-quota-${name}-${Date.now()}`);
+    try {
+      await withFetch((url) => url.includes('primary.test')
+        ? failure()
+        : openAiResponse('fallback reply'), async () => {
+        assert.equal(
+          await callModelChatWithFallback(
+            model('https://primary.test/v1', 'primary', modelId),
+            model('https://fallback.test/v1', 'fallback'),
+          ),
+          'fallback reply',
+        );
+      });
+      assert.deepEqual(readModelStatus(modelId), {
+        enabled: 1,
+        disabled_reason: null,
+        disabled_at: null,
+      });
+    } finally {
+      getDb().prepare('DELETE FROM models WHERE id = ?').run(modelId);
+    }
   }
 });
 
@@ -205,25 +290,35 @@ test('maps and validates a distinct fallback model', () => {
   assert.equal(result.success, false);
 });
 
-test('allows an explicitly re-enabled model to recover after quota is restored', () => {
-  const row = modelToRow(
-    { enabled: true },
-    { id: 1, name: 'test', enabled: true },
-    {
-      id: 9,
-      provider_id: 1,
-      provider: 'test',
-      name: 'test-model',
-      base_url: '',
-      api_format: 'openai-compatible',
-      api_key_cipher: '',
-      api_key_iv: '',
-      api_key_tag: '',
-      thinking_enabled: 0,
-      enabled: 0,
-      created_at: '2026-01-01',
-      updated_at: '2026-01-01',
-    },
-  );
-  assert.equal(row.enabled, 1);
+test('allows an explicitly re-enabled model to recover after quota is restored', async () => {
+  const providerId = insertEnabledModelProvider(`recovery-provider-${Date.now()}`);
+  const modelId = insertEnabledModel(`recovery-model-${Date.now()}`, providerId);
+  let restored = false;
+  try {
+    await withFetch((url) => {
+      if (!url.includes('primary.test')) return openAiResponse('fallback reply');
+      return restored
+        ? openAiResponse('restored')
+        : openAiResponse(JSON.stringify({
+          error: { code: 'AllocationQuota.FreeTierOnly', message: 'Free allocated quota exceeded.' },
+        }), 429);
+    }, async () => {
+      const primary = model('https://primary.test/v1', 'primary', modelId);
+      const fallback = model('https://fallback.test/v1', 'fallback');
+      assert.equal(await callModelChatWithFallback(primary, fallback), 'fallback reply');
+
+      modelsService.updateModel(modelId, { enabled: true });
+      assert.deepEqual(readModelStatus(modelId), {
+        enabled: 1,
+        disabled_reason: null,
+        disabled_at: null,
+      });
+
+      restored = true;
+      assert.equal(await callModelChatWithFallback(primary, fallback), 'restored');
+    });
+  } finally {
+    getDb().prepare('DELETE FROM models WHERE id = ?').run(modelId);
+    getDb().prepare('DELETE FROM model_providers WHERE id = ?').run(providerId);
+  }
 });

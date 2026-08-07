@@ -507,8 +507,10 @@ function disableQuotaExhaustedModel(
   if (!modelId || !isQuotaExhaustedResponse(status, body)) return false;
   quotaDisabledModelIds.add(Number(modelId));
   try {
-    const models = require('../models') as { disableModel: (id: number) => void };
-    models.disableModel(Number(modelId));
+    const models = require('../models') as {
+      disableModel: (id: number, reason?: 'quota_exhausted' | null) => void;
+    };
+    models.disableModel(Number(modelId), 'quota_exhausted');
     console.warn(`[llm] disabled ${provider}:${model} (modelId=${modelId}) after quota exhaustion`);
   } catch (error) {
     console.error(`[llm] failed to persist quota disable for modelId=${modelId}: ${errorMessage(error)}`);

@@ -58,8 +58,11 @@ function updateModel(id: number | string, input: Record<string, unknown>): Model
   return getModel(Number(id));
 }
 
-function disableModel(id: number | string): void {
-  repo.updateModelEnabled(id, false);
+function disableModel(
+  id: number | string,
+  reason: 'quota_exhausted' | null = null,
+): void {
+  repo.updateModelAvailability(id, false, reason);
 }
 
 function deleteModel(id: number | string): { ok: boolean } {

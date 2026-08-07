@@ -38,13 +38,23 @@ function updateModel(row: ModelRowInput & { id: number }): void {
   `).run(row);
 }
 
-function updateModelEnabled(id: number | string, enabled: boolean): void {
-  getDb().prepare('UPDATE models SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .run(enabled ? 1 : 0, Number(id));
+function updateModelAvailability(
+  id: number | string,
+  enabled: boolean,
+  disabledReason: 'quota_exhausted' | null = null,
+): void {
+  getDb().prepare(`
+    UPDATE models
+    SET enabled = ?,
+        disabled_reason = ?,
+        disabled_at = CASE WHEN ? IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(enabled ? 1 : 0, disabledReason, disabledReason, Number(id));
 }
 
 function deleteModelById(id: number | string): void {
   getDb().prepare('DELETE FROM models WHERE id = ?').run(Number(id));
 }
 
-export { findModelById, findAllModels, findModelsByProviderId, insertModel, updateModel, updateModelEnabled, deleteModelById };
+export { findModelById, findAllModels, findModelsByProviderId, insertModel, updateModel, updateModelAvailability, deleteModelById };
