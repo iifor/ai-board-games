@@ -50,6 +50,13 @@ interface LlmRawResult {
 type CallableModel = LlmCallOptions & { apiKey: string; model: string; messages: LlmMessage[] };
 
 const quotaDisabledModelIds = new Set<number>();
+const quotaExhaustedErrorCodes = new Set([
+  'arrearage',
+  'allocationquota.freetieronly',
+  'prepaidbilloverdue',
+  'postpaidbilloverdue',
+  'accountoverdue',
+]);
 
 interface TestConnectionResult {
   ok: boolean;
@@ -520,21 +527,13 @@ function disableQuotaExhaustedModel(
 
 function isQuotaExhaustedResponse(status: number, body: string): boolean {
   if (status < 400 || status >= 500) return false;
-  const text = String(body || '').toLowerCase();
-  return [
-    'arrearage',
-    'allocationquota.freetieronly',
-    'prepaidbilloverdue',
-    'postpaidbilloverdue',
-    'accountoverdue',
-    'account balance is insufficient',
-    'insufficient balance',
-    'free allocated quota exceeded',
-    'free quota exhausted',
-    '余额不足',
-    '账户欠费',
-    '账号欠费',
-  ].some((marker) => text.includes(marker));
+  try {
+    const payload = JSON.parse(String(body || '')) as { code?: unknown; error?: { code?: unknown } };
+    const code = payload.error?.code ?? payload.code;
+    return typeof code === 'string' && quotaExhaustedErrorCodes.has(code.trim().toLowerCase());
+  } catch {
+    return false;
+  }
 }
 
 function clearQuotaDisabledModel(modelId: number): void {

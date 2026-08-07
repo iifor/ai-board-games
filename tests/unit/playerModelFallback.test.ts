@@ -207,6 +207,12 @@ test('keeps models available for non-quota failures', async () => {
   const cases = [
     ['server error', () => openAiResponse('upstream failed', 500)],
     ['validation error', () => openAiResponse('invalid request', 400)],
+    ['unrelated 400 balance message', () => openAiResponse(JSON.stringify({
+      error: { code: 'BadRequest', message: 'The prompt quotes 余额不足.' },
+    }), 400)],
+    ['unrelated 403 balance message', () => openAiResponse(JSON.stringify({
+      error: { code: 'PermissionDenied', message: 'The prompt quotes insufficient balance.' },
+    }), 403)],
     ['network error', () => { throw new TypeError('fetch failed'); }],
   ] as const;
 

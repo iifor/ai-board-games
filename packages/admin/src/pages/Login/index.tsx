@@ -45,7 +45,7 @@ export function Login() {
       background: '#f0f2f5',
     }}>
       {contextHolder}
-      <Card style={{ width: 380, borderRadius: 8 }} bordered={false}>
+      <Card style={{ width: 380, borderRadius: 8 }} variant="borderless">
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <Title level={3} style={{ marginBottom: 4 }}>B 端管理后台</Title>
           <Typography.Text type="secondary">请登录以继续</Typography.Text>
