@@ -397,6 +397,12 @@ function migrate(db: Database | JsonDb): void {
   ensureColumn(db, 'models', 'display_name', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'models', 'disabled_reason', 'TEXT');
   ensureColumn(db, 'models', 'disabled_at', 'TEXT');
+  const modelProviderColumns = db.prepare("PRAGMA table_info('model_providers')").all() as Array<{ name: string }>;
+  for (const column of ['disabled_reason', 'disabled_at']) {
+    if (modelProviderColumns.some((existingColumn) => existingColumn.name === column)) {
+      db.exec(`ALTER TABLE model_providers DROP COLUMN ${column}`);
+    }
+  }
   ensureColumn(db, 'ai_tasks', 'worker_id', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'ai_tasks', 'claimed_at', 'TEXT');
   ensureColumn(db, 'match_snapshots', 'last_event_seq', 'INTEGER');
