@@ -64,6 +64,8 @@ function migrate(db: Database | JsonDb): void {
       api_key_iv TEXT NOT NULL DEFAULT '',
       api_key_tag TEXT NOT NULL DEFAULT '',
       enabled INTEGER NOT NULL DEFAULT 1,
+      disabled_reason TEXT,
+      disabled_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -393,6 +395,8 @@ function migrate(db: Database | JsonDb): void {
   ensureColumn(db, 'werewolf_roles', 'play_style_advice', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'models', 'thinking_enabled', "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, 'models', 'display_name', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'models', 'disabled_reason', 'TEXT');
+  ensureColumn(db, 'models', 'disabled_at', 'TEXT');
   ensureColumn(db, 'ai_tasks', 'worker_id', "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'ai_tasks', 'claimed_at', 'TEXT');
   ensureColumn(db, 'match_snapshots', 'last_event_seq', 'INTEGER');

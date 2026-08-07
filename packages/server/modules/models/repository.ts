@@ -16,8 +16,8 @@ function findModelsByProviderId(providerId: number | string): ModelRow[] {
 
 function insertModel(row: ModelRowInput): number {
   const result = getDb().prepare(`
-    INSERT INTO models (provider_id, provider, name, display_name, base_url, api_format, api_key_cipher, api_key_iv, api_key_tag, enabled, created_at, updated_at)
-    VALUES (@provider_id, @provider, @name, @display_name, @base_url, @api_format, @api_key_cipher, @api_key_iv, @api_key_tag, @enabled, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    INSERT INTO models (provider_id, provider, name, display_name, base_url, api_format, api_key_cipher, api_key_iv, api_key_tag, enabled, disabled_reason, disabled_at, created_at, updated_at)
+    VALUES (@provider_id, @provider, @name, @display_name, @base_url, @api_format, @api_key_cipher, @api_key_iv, @api_key_tag, @enabled, @disabled_reason, @disabled_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   `).run(row);
   return result.lastInsertRowid as number;
 }
@@ -31,6 +31,8 @@ function updateModel(row: ModelRowInput & { id: number }): void {
         display_name = @display_name,
         thinking_enabled = @thinking_enabled,
         enabled = @enabled,
+        disabled_reason = @disabled_reason,
+        disabled_at = @disabled_at,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = @id
   `).run(row);

@@ -61,6 +61,8 @@ interface Model {
   providerEnabled: boolean;
   thinkingEnabled: boolean;
   enabled: boolean;
+  disabledReason: 'quota_exhausted' | null;
+  disabledAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

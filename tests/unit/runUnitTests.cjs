@@ -42,6 +42,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'gameNavigation.test.ts',
   'llmRetry.test.ts',
   'modelDisplayName.test.ts',
+  'modelQuotaStatus.test.ts',
   'playerModelFallback.test.ts',
   'traceParticipants.test.ts',
   'nightResolutionAuditViewModel.test.ts',

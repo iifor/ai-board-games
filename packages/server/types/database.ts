@@ -74,6 +74,8 @@ interface ModelRow {
   api_key_tag: string;
   enabled: number;
   thinking_enabled: number;
+  disabled_reason: string | null;
+  disabled_at: string | null;
   created_at: string;
   updated_at: string;
 }

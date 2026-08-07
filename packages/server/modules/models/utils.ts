@@ -40,6 +40,8 @@ interface ModelRowInput {
   api_key_tag: string;
   thinking_enabled: number;
   enabled: number;
+  disabled_reason: string | null;
+  disabled_at: string | null;
 }
 
 function rowToModel(row: ModelRow | null | undefined, provider?: ModelProvider | ProviderLike | null): Model | null {
@@ -57,6 +59,8 @@ function rowToModel(row: ModelRow | null | undefined, provider?: ModelProvider |
     providerEnabled: provider ? Boolean(provider.enabled) : Boolean(row.enabled),
     thinkingEnabled: Boolean(Number(row.thinking_enabled)),
     enabled: Boolean(row.enabled) && (provider ? Boolean(provider.enabled) : true),
+    disabledReason: row.disabled_reason === 'quota_exhausted' ? 'quota_exhausted' : null,
+    disabledAt: row.disabled_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -87,6 +91,7 @@ function normalizeDisplayName(value: unknown, existing = ''): string {
 }
 
 function modelToRow(input: ModelInput, provider?: ModelProvider | ProviderLike | null, existing?: ModelRow | null): ModelRowInput {
+  const enabledChanged = typeof input.enabled === 'boolean';
   return {
     provider_id: Number(input.providerId || input.provider_id || existing?.provider_id || provider?.id || 0) || null,
     provider: String(provider?.name || input.provider || existing?.provider || '').trim(),
@@ -98,7 +103,9 @@ function modelToRow(input: ModelInput, provider?: ModelProvider | ProviderLike |
     api_key_iv: existing?.api_key_iv || '',
     api_key_tag: existing?.api_key_tag || '',
     thinking_enabled: input.thinkingEnabled === true ? 1 : (input.thinkingEnabled === false ? 0 : (existing?.thinking_enabled === 1 ? 1 : 0)),
-    enabled: input.enabled === true ? 1 : (input.enabled === false ? 0 : Number(existing?.enabled !== 0))
+    enabled: input.enabled === true ? 1 : (input.enabled === false ? 0 : Number(existing?.enabled !== 0)),
+    disabled_reason: enabledChanged ? null : existing?.disabled_reason || null,
+    disabled_at: enabledChanged ? null : existing?.disabled_at || null,
   };
 }
 
