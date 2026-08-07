@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { modelToRow, rowToModel } from '../../packages/server/modules/models/utils';
 
 test('maps persisted quota status to the model API', () => {
@@ -49,4 +51,16 @@ test('preserves quota status on unrelated edits and clears it on explicit enable
   assert.equal(modelToRow({ displayName: 'Renamed' }, null, existing).disabled_reason, 'quota_exhausted');
   assert.equal(modelToRow({ enabled: true }, null, existing).disabled_reason, null);
   assert.equal(modelToRow({ enabled: false }, null, existing).disabled_reason, null);
+});
+
+test('admin shows exhausted status and tests before enabling', () => {
+  const source = fs.readFileSync(
+    path.resolve('packages/admin/src/pages/ModelManager/index.tsx'),
+    'utf8',
+  );
+  assert.match(source, /额度已用完/);
+  assert.match(source, /disabledReason === 'quota_exhausted'/);
+  const testCall = source.indexOf('/test');
+  const enableCall = source.indexOf('JSON.stringify({ enabled: true })');
+  assert.ok(testCall >= 0 && enableCall > testCall);
 });

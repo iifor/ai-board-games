@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { App as AntApp, Button, Card, Descriptions, Form, Input, Modal, Space, Switch, Table } from 'antd';
+import { App as AntApp, Button, Card, Descriptions, Form, Input, Modal, Space, Switch, Table, Tag, Typography } from 'antd';
 import { ApiOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { adminRequest } from '../../services/adminApi';
-import { filterByQuery, formatApiFormat, formatModelLabel } from '../../utils/adminHelpers';
+import { filterByQuery, formatApiFormat, formatModelLabel, formatTime } from '../../utils/adminHelpers';
 import { EntityModal } from '../../components/shared/EntityModal';
 import { TableActions } from '../../components/shared/TableActions';
 import { ListFilterBar } from '../../components/shared/ListFilterBar';
@@ -65,12 +65,22 @@ export function ModelManager() {
     });
   }
 
-  async function testModel(model: Model) {
+  async function testModel(model: Model, enableOnSuccess = false) {
     setTestingId(model.id);
     try {
       const result = await adminRequest<{ ok: boolean; latencyMs?: number; message?: string }>(`/models/${model.id}/test`, { method: 'POST', body: JSON.stringify({}) });
-      if (result.ok) message.success(`连接成功：${result.latencyMs || 0}ms，${result.message || '模型可用'}`);
-      else message.error(`连接失败：${result.message}`);
+      if (result.ok) {
+        if (enableOnSuccess) {
+          await adminRequest(`/models/${model.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ enabled: true }),
+          });
+          message.success('模型已重新启用');
+          await refresh();
+          return;
+        }
+        message.success(`连接成功：${result.latencyMs || 0}ms，${result.message || '模型可用'}`);
+      } else message.error(`连接失败：${result.message}`);
     } catch (error) {
       message.error((error as Error).message);
     } finally {
@@ -95,11 +105,29 @@ export function ModelManager() {
           { title: '模型名称', dataIndex: 'displayName', render: (_: unknown, model: Model) => model.displayName || model.name },
           { title: '模型 ID', dataIndex: 'name' },
           {
+            title: '状态',
+            render: (_: unknown, model: Model) => model.disabledReason === 'quota_exhausted'
+              ? (
+                <Space direction="vertical" size={0}>
+                  <Tag color="error">额度已用完</Tag>
+                  <Typography.Text type="secondary">
+                    {formatTime(model.disabledAt || undefined)}
+                  </Typography.Text>
+                </Space>
+              )
+              : <Tag color={model.enabled ? 'success' : 'default'}>{model.enabled ? '已启用' : '已停用'}</Tag>
+          },
+          {
             title: '操作',
             width: 240,
             render: (_: unknown, model: Model) => (
               <Space>
                 <Button size="small" icon={<ApiOutlined />} loading={testingId === model.id} onClick={() => testModel(model)}>测试</Button>
+                {model.disabledReason === 'quota_exhausted' && (
+                  <Button size="small" loading={testingId === model.id} onClick={() => testModel(model, true)}>
+                    重新启用
+                  </Button>
+                )}
                 <TableActions onEdit={() => setEditing(model)} onDelete={() => confirmRemove(model)} />
               </Space>
             )

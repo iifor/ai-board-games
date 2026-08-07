@@ -19,6 +19,8 @@ export interface Model {
   displayName: string;
   provider: string;
   enabled: boolean;
+  disabledReason: 'quota_exhausted' | null;
+  disabledAt: string | null;
   thinkingEnabled?: boolean;
   apiFormat?: string;
   temperature?: number;
