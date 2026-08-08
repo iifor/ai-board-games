@@ -152,7 +152,7 @@ async function runWerewolfAiAction(runtime: Runtime, round: Round, actor: Agent,
 // ============================================================
 
 async function runActionWindowAiTask({ match, step, task }: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
-  const runtime: Runtime = await createRuntime((await repo.getMatch(match.id)) || match);
+  const runtime: Runtime = await createRuntime(match);
   const round: Round = ensureRound(runtime.state, step.config.day);
   const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
   if (!actor) throw Object.assign(new Error(`Actor not found: ${task.playerId}`), { severity: 'high' });
@@ -189,7 +189,7 @@ async function runActionWindowAiTask({ match, step, task }: { match: Match; step
 }
 
 async function runHunterAiTask({ match, step, task }: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
-  const runtime: Runtime = await createRuntime((await repo.getMatch(match.id)) || match);
+  const runtime: Runtime = await createRuntime(match);
   const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
   if (!actor) throw Object.assign(new Error(`Hunter not found: ${task.playerId}`), { severity: 'high' });
   if (isWerewolfDebugMode(runtime)) {
@@ -247,7 +247,7 @@ async function runHunterAiTask({ match, step, task }: { match: Match; step: Step
 }
 
 async function runSheriffBadgeAiTask({ match, step, task }: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
-  const runtime: Runtime = await createRuntime((await repo.getMatch(match.id)) || match);
+  const runtime: Runtime = await createRuntime(match);
   const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
   if (!actor) throw Object.assign(new Error(`Sheriff not found: ${task.playerId}`), { severity: 'high' });
   const aliveTargets = runtime.agents
@@ -302,7 +302,7 @@ async function runDeathActionAiTask(input: { match: Match; step: Step; task: Tas
 }
 
 async function runLastWordsAiTask({ match, step, task }: { match: Match; step: Step; task: Task }): Promise<ActionResult> {
-  const runtime: Runtime = await createRuntime((await repo.getMatch(match.id)) || match);
+  const runtime: Runtime = await createRuntime(match);
   const round = ensureRound(runtime.state, step.config.day || 1);
   const actor = runtime.agents.find((agent) => Number(agent.id) === Number(task.playerId));
   if (!actor) throw Object.assign(new Error(`Last words actor not found: ${task.playerId}`), { severity: 'high' });

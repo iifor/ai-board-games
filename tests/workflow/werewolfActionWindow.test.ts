@@ -10,7 +10,7 @@ import {
 
 type RepoPatch = Pick<typeof repo, 'upsertActionWindowEpoch' | 'listEvents' | 'listAiTasks' | 'listPendingActions'>;
 
-test('action window creates AI task and human pending action blockers', () => {
+test('action window creates AI task and human pending action blockers', async () => {
   const original = snapshotRepo(repo);
   const epochs: unknown[] = [];
   try {
@@ -24,8 +24,8 @@ test('action window creates AI task and human pending action blockers', () => {
     const match = { id: 'm1' };
     const step = { id: 'wolf_kill_1', config: { day: 1, phase: 'night' } };
     const actors = [{ id: 1 }, { id: 2, actorType: 'human' }];
-    const window = buildActionWindow({ match, step, actionType: 'wolf_kill', actors, targetIds: [3, 4] } as never);
-    const work = createActionBlockers({ match, step, window, actors } as never);
+    const window = await buildActionWindow({ match, step, actionType: 'wolf_kill', actors, targetIds: [3, 4] } as never);
+    const work = await createActionBlockers({ match, step, window, actors } as never);
 
     assert.equal(epochs.length, 1);
     assert.equal(work.tasks.length, 1);
@@ -38,7 +38,7 @@ test('action window creates AI task and human pending action blockers', () => {
   }
 });
 
-test('action window result collection merges AI and human submissions', () => {
+test('action window result collection merges AI and human submissions', async () => {
   const original = snapshotRepo(repo);
   try {
     patchRepo(repo, {
@@ -58,9 +58,9 @@ test('action window result collection merges AI and human submissions', () => {
       }] as never
     });
 
-    const results = collectActionResults('m1', 'day_vote_1', 'day_vote');
+    const results = await collectActionResults('m1', 'day_vote_1', 'day_vote');
     assert.deepEqual(results.map((item) => item.actorId), [1, 2]);
-    assert.equal(allActionWorkSucceeded('m1', 'day_vote_1', 'day_vote', 2), true);
+    assert.equal(await allActionWorkSucceeded('m1', 'day_vote_1', 'day_vote', 2), true);
   } finally {
     patchRepo(repo, original);
   }

@@ -35,7 +35,7 @@ async function runDebateViaEngine(
   const matchResult = await engine.createMatch({
     gameType: 'debate',
     config: runtimeConfig,
-    initialState: createInitialDebateState(config) as unknown as Record<string, unknown>,
+    initialState: await createInitialDebateState(config) as unknown as Record<string, unknown>,
   });
   const matchId = (matchResult as unknown as { id: string }).id;
 

@@ -41,10 +41,10 @@ test('debate engine runner seeds matches with the configured initial state', () 
     'utf8',
   );
 
-  assert.match(source, /initialState:\s*createInitialDebateState\(config\)/);
+  assert.match(source, /initialState:\s*await createInitialDebateState\(config\)/);
 });
 
-test('GameEngine rejects tick for terminal matches before workflow runtime is called', () => {
+test('GameEngine rejects tick for terminal matches before workflow runtime is called', async () => {
   const store = new MemoryMatchStateStore();
   store.addMatch(createMatch({
     gameType: 'test-game',
@@ -54,7 +54,7 @@ test('GameEngine rejects tick for terminal matches before workflow runtime is ca
   const engine = new GameEngine({ store });
   engine.registerDefinition(createDefinition());
 
-  assert.throws(() => engine.tick('match-test'), /completed/);
+  await assert.rejects(engine.tick('match-test'), /completed/);
 });
 
 test('GameEngine delegates run-until-blocked to its workflow runtime', async () => {
@@ -165,7 +165,7 @@ test('ActionWindow outside action is rejected before effect creation', async () 
   assert.equal(result.error?.code, 'ACTION_WINDOW_NOT_FOUND');
 });
 
-test('Memory store keeps event idempotency keys unique', () => {
+test('Memory store keeps event idempotency keys unique', async () => {
   const store = new MemoryMatchStateStore();
   const event = {
     id: 'event-1',
@@ -176,24 +176,24 @@ test('Memory store keeps event idempotency keys unique', () => {
     idempotencyKey: 'same-key',
   };
 
-  store.appendEvents([event]);
-  store.appendEvents([{ ...event, id: 'event-2' }]);
+  await store.appendEvents([event]);
+  await store.appendEvents([{ ...event, id: 'event-2' }]);
 
-  assert.equal(store.listEvents('match-test').length, 1);
+  assert.equal((await store.listEvents('match-test')).length, 1);
 });
 
-test('GameEngine debug state aggregates match, windows, effects, events, definitions and invariants', () => {
+test('GameEngine debug state aggregates match, windows, effects, events, definitions and invariants', async () => {
   const store = new MemoryMatchStateStore();
   store.addMatch(createMatch({ gameType: 'test-game', workflowId: 'test.workflow' }));
   store.addActionWindow(createWindow({ actionType: 'seer_check' }));
-  store.enqueueEffect({
+  await store.enqueueEffect({
     id: 'effect-1',
     matchId: 'match-test',
     effectType: 'inspect',
     status: 'proposed',
     payload: {},
   });
-  store.appendEvents([{
+  await store.appendEvents([{
     id: 'event-1',
     matchId: 'match-test',
     type: 'test-event',
@@ -204,7 +204,7 @@ test('GameEngine debug state aggregates match, windows, effects, events, definit
 
   const engine = new GameEngine({ store });
   engine.registerDefinition(createDefinition());
-  const debug = engine.getDebugState('match-test');
+  const debug = await engine.getDebugState('match-test');
 
   assert.equal(debug.match?.id, 'match-test');
   assert.equal(debug.actionWindows.length, 1);

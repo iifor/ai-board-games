@@ -28,6 +28,26 @@ function fixture(skinJson = '["valid"]'): string {
   return file;
 }
 
+function orphanFixture(): string {
+  const file = path.join(os.tmpdir(), `consensus-migrator-orphan-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
+  const db = new Database(file);
+  db.exec(`
+    CREATE TABLE games (id TEXT PRIMARY KEY, game_type TEXT NOT NULL, mode TEXT NOT NULL,
+      skin_id TEXT, skin_name TEXT NOT NULL, winner TEXT, win_reason TEXT NOT NULL,
+      topic_json TEXT NOT NULL, players_json TEXT NOT NULL, rounds_json TEXT NOT NULL,
+      event_json TEXT NOT NULL, audio_resources_json TEXT NOT NULL, created_at TEXT NOT NULL);
+    CREATE TABLE game_players (game_id TEXT NOT NULL, player_id INTEGER NOT NULL,
+      player_snapshot_json TEXT NOT NULL, PRIMARY KEY (game_id, player_id));
+  `);
+  db.prepare('INSERT INTO games VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+    'game-1', 'werewolf', 'standard', null, '', null, '', '{}', '[]', '[]', '[]', '[]',
+    '2026-08-08T00:00:00.000Z',
+  );
+  db.prepare('INSERT INTO game_players VALUES (?,?,?)').run('game-1', 999, '{}');
+  db.close();
+  return file;
+}
+
 test('SQLite importer validates rows, skips runtime history and resets identities', async () => {
   await withTestSchema(async (database, schema) => {
     await migratePostgres(database);
@@ -56,5 +76,21 @@ test('SQLite importer rolls back every table when JSON is invalid', async () => 
       assert.equal(Number((await database.queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM skins'))?.count), 0);
       assert.equal(Number((await database.queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM model_providers'))?.count), 0);
     } finally { fs.unlinkSync(sourcePath); }
+  });
+});
+
+test('SQLite importer rejects orphan foreign keys and rolls back the game', async () => {
+  await withTestSchema(async (database, schema) => {
+    await migratePostgres(database);
+    const sourcePath = orphanFixture();
+    try {
+      await assert.rejects(
+        migrateSqliteToPostgres({ sourcePath, targetUrl: process.env.TEST_DATABASE_URL!, targetSchema: schema }),
+        /foreign key constraint/,
+      );
+      assert.equal(Number((await database.queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM games'))?.count), 0);
+    } finally {
+      fs.unlinkSync(sourcePath);
+    }
   });
 });

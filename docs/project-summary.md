@@ -209,3 +209,6 @@ GitHub 仓库需要配置以下 Secrets：
 - Default werewolf mode coverage now includes mode 30 `magic-wolf-demon-hunter-12`.
 - Mode 29 remains skipped because the local rule list is insufficient for executable workflow rules.
 - Mode 30 reuses the existing werewolf workflow, event, snapshot, debug and seed mechanisms; no new package, database table or deployment command was added.
+# 持久化基线（2026-08-08）
+
+生产持久化已统一为 PostgreSQL 16；服务端通过异步 `DbExecutor` 访问数据库，应用启动前完成 schema migration 和种子数据初始化。SQLite 仅由独立的一次性迁移工具只读访问，用于把配置、管理员、玩家、游戏历史、回放和长期记忆导入空 PostgreSQL 目标库；旧 workflow 和观测历史不迁移。

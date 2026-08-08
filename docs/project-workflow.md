@@ -738,3 +738,6 @@ pnpm run test:workflow
 - The speech remains on the existing `reason -> werewolf_phase_result -> presentation.speakableText` delivery path.
 - Deterministic text is used only as the human, debug, or model-failure fallback.
 - This changes no API, database, shared type, C-end layout, or channel visibility contract.
+# PostgreSQL 并发语义（2026-08-08）
+
+`tickMatch` 在 serializable 事务中通过 `SELECT ... FOR UPDATE` 锁定 Match，事件序号在锁内计算；Match、事件、快照和 outbox 同事务提交。AI task 与 outbox 使用 `FOR UPDATE SKIP LOCKED` 原子领取，支持后续多实例而不重复消费。工作流 repository、service、controller、GameEngine adapter、狼人杀、辩论赛和谁是卧底调用链均为异步。

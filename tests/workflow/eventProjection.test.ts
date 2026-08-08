@@ -7,7 +7,7 @@ import type { Match, WorkflowEvent } from '../../packages/server/types/workflow'
 
 type RepoPatch = Pick<typeof repo, 'getLatestSnapshot' | 'listEvents' | 'listEventsAfter'>;
 
-test('event projection hydrates from snapshot watermark and incremental state patch', () => {
+test('event projection hydrates from snapshot watermark and incremental state patch', async () => {
   const original = snapshotRepo(repo);
   let requestedAfterSeq = -1;
   try {
@@ -35,7 +35,7 @@ test('event projection hydrates from snapshot watermark and incremental state pa
       },
     });
 
-    const hydrated = hydrateMatchFromEventStore(matchWithState({
+    const hydrated = await hydrateMatchFromEventStore(matchWithState({
       source: 'event',
       score: 2,
     }));
@@ -48,7 +48,7 @@ test('event projection hydrates from snapshot watermark and incremental state pa
   }
 });
 
-test('legacy snapshots without watermark continue using timestamp filtering', () => {
+test('legacy snapshots without watermark continue using timestamp filtering', async () => {
   const original = snapshotRepo(repo);
   try {
     patchRepo(repo, {
@@ -68,14 +68,14 @@ test('legacy snapshots without watermark continue using timestamp filtering', ()
       ],
     });
 
-    const hydrated = hydrateMatchFromEventStore(matchWithState({ score: 2 }));
+    const hydrated = await hydrateMatchFromEventStore(matchWithState({ score: 2 }));
     assert.deepEqual(hydrated.state, { score: 2 });
   } finally {
     patchRepo(repo, original);
   }
 });
 
-test('projection mismatch falls back to matches.state_json', () => {
+test('projection mismatch falls back to matches.state_json', async () => {
   const original = snapshotRepo(repo);
   try {
     patchRepo(repo, {
@@ -93,7 +93,7 @@ test('projection mismatch falls back to matches.state_json', () => {
       listEventsAfter: () => [],
     });
 
-    const hydrated = hydrateMatchFromEventStore(matchWithState({ score: 9 }));
+    const hydrated = await hydrateMatchFromEventStore(matchWithState({ score: 9 }));
     assert.deepEqual(hydrated.state, { score: 9 });
   } finally {
     patchRepo(repo, original);

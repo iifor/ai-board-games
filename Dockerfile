@@ -26,6 +26,11 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Re-link workspace package dependencies after the source copy. On Windows
+# build contexts, package-level node_modules junctions may otherwise mask the
+# links created by the manifest-only install layer.
+RUN pnpm install --frozen-lockfile --offline
+
 # Build order: shared → client → admin (server runs from TS at runtime)
 RUN pnpm run build:shared \
     && pnpm run build:client \
@@ -45,12 +50,14 @@ COPY packages/client/package.json  packages/client/package.json
 COPY packages/admin/package.json   packages/admin/package.json
 COPY packages/server/package.json  packages/server/package.json
 
-# Production deps only (--prod not needed since pnpm filters by workspace)
-RUN pnpm install --frozen-lockfile --prod --filter @ai-presenter/server...
-
 # Copy server source (runs from TS via dev-runtime.cjs)
 COPY packages/server ./packages/server
 COPY packages/shared ./packages/shared
+
+# Production deps only. Installing after source copy also guarantees that
+# workspace links point at the final package directories.
+RUN pnpm install --frozen-lockfile --prod --filter @ai-presenter/server...
+
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 
 # Copy built static assets from builder

@@ -166,7 +166,7 @@ async function callOpenAIChatRawAttempt({
       span.addEvent('gen_ai.user.message', { content: JSON.stringify(messages || []) });
       obs!.endSpan(span, 'error', {}, new Error(errMsg));
     }
-    const quotaExhausted = disableQuotaExhaustedModel(response.status, body, modelId, provider, model);
+    const quotaExhausted = await disableQuotaExhaustedModel(response.status, body, modelId, provider, model);
     const error = new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
     if (response.status === 429) upstreamConcurrency.recordLlm429();
     if (!quotaExhausted && (response.status === 429 || response.status >= 500)) {
@@ -354,7 +354,7 @@ async function callAnthropicChatRawAttempt({
       span.addEvent('gen_ai.user.message', { content: JSON.stringify(messages || []) });
       obs!.endSpan(span, 'error', {}, new Error(errMsg));
     }
-    const quotaExhausted = disableQuotaExhaustedModel(response.status, body, modelId, provider, model);
+    const quotaExhausted = await disableQuotaExhaustedModel(response.status, body, modelId, provider, model);
     const error = new Error(`[${provider}:${model}] ${response.status} ${endpoint}: ${body}`);
     if (response.status === 429) upstreamConcurrency.recordLlm429();
     if (!quotaExhausted && (response.status === 429 || response.status >= 500)) {
@@ -548,20 +548,20 @@ function toCallableModel(target: LlmCallOptions | null | undefined): CallableMod
   return { ...target, messages: target.messages || [] } as CallableModel;
 }
 
-function disableQuotaExhaustedModel(
+async function disableQuotaExhaustedModel(
   status: number,
   body: string,
   modelId: number | null | undefined,
   provider: string,
   model: string,
-): boolean {
+): Promise<boolean> {
   if (!modelId || !isQuotaExhaustedResponse(status, body)) return false;
   quotaDisabledModelIds.add(Number(modelId));
   try {
     const models = require('../models') as {
-      disableModel: (id: number, reason?: 'quota_exhausted' | null) => void;
+      disableModel: (id: number, reason?: 'quota_exhausted' | null) => Promise<void>;
     };
-    models.disableModel(Number(modelId), 'quota_exhausted');
+    await models.disableModel(Number(modelId), 'quota_exhausted');
     console.warn(`[llm] disabled ${provider}:${model} (modelId=${modelId}) after quota exhaustion`);
   } catch (error) {
     console.error(`[llm] failed to persist quota disable for modelId=${modelId}: ${errorMessage(error)}`);

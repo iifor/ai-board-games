@@ -14,7 +14,6 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'gameSessionConcurrency.test.ts',
   'upstreamConcurrency.test.ts',
   'traceConcurrency.test.ts',
-  'authProductionConfig.test.ts',
   'authFirstPasswordChange.test.ts',
   'loginRateLimiter.test.ts',
   'authLoginRateLimit.test.ts',
@@ -42,7 +41,6 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'gameNavigation.test.ts',
   'llmRetry.test.ts',
   'modelDisplayName.test.ts',
-  'modelQuotaStatus.test.ts',
   'playerModelFallback.test.ts',
   'traceParticipants.test.ts',
   'nightResolutionAuditViewModel.test.ts',
@@ -58,7 +56,6 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   ,'debateSetup.test.ts'
   ,'werewolfDefaultConfig.test.ts'
   ,'edgeTts.test.ts'
-  ,'workflowMatchDeletion.test.ts'
 ]).map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];

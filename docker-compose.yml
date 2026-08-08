@@ -16,7 +16,8 @@ services:
       - consensus-resources:/app/packages/server/resources # Uploaded images and generated audio
       - ./avatars:/app/avatars          # Avatar images
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       - NODE_ENV=production
       - PORT=3001

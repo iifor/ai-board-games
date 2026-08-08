@@ -103,7 +103,7 @@ class GameEngine {
     if (!definition.runtime) {
       throw new Error(`GameDefinition "${gameType}" does not have a runtime. Use createMatch() + tick() instead.`);
     }
-    const match = definition.runtime.createMatch(input);
+    const match = await definition.runtime.createMatch(input);
     return definition.runtime.run(match.id, context);
   }
 

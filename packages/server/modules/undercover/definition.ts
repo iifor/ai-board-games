@@ -32,7 +32,7 @@ function createUndercoverGameDefinition(): GameDefinition {
       },
     },
     runtime: {
-      createMatch: ({ config }) => createUndercoverWorkflowMatch((config || {}) as UndercoverRuntimeConfig) as unknown as { id: string; [key: string]: unknown },
+      createMatch: ({ config }) => createUndercoverWorkflowMatch((config || {}) as UndercoverRuntimeConfig),
       run: (matchId, context) => runUndercoverWorkflow(matchId, context),
     },
   };

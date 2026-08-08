@@ -159,7 +159,7 @@ interface GameRuntimeRunContext {
 }
 
 interface GameRuntime {
-  createMatch(input: { matchId?: string; config?: Record<string, unknown>; initialState?: Record<string, unknown> }): { id: string; [key: string]: unknown };
+  createMatch(input: { matchId?: string; config?: Record<string, unknown>; initialState?: Record<string, unknown> }): Promise<{ id: string }>;
   run(matchId: string, context?: GameRuntimeRunContext): Promise<Record<string, unknown>>;
 }
 

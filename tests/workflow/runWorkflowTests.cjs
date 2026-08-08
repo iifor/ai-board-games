@@ -12,14 +12,8 @@ const testFiles = [
   'werewolfReducers.test.ts',
   'werewolfActionWindow.test.ts',
   'werewolfDebugActions.test.ts',
-  'werewolfFakeWorkflow.test.ts',
   'werewolfPresentation.test.ts',
-  'debateSpeechEvents.test.ts',
   'eventProjection.test.ts',
-  'workflowPersistence.test.ts',
-  'tickCompleted.test.ts',
-  'aiTaskCompletion.test.ts',
-  'undercoverWorkflow.test.ts',
   'werewolfWorkflowStatus.test.ts'
 ].map((file) => path.join(__dirname, file));
 

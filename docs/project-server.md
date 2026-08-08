@@ -442,3 +442,8 @@ docker compose ps
 - Missing/disabled primary configuration, upstream errors and empty responses can fall back. Invalid JSON uses the backup for the existing correction attempt.
 - When an upstream response explicitly reports account arrears, insufficient balance, exhausted free quota, or an overdue bill, the shared LLM boundary immediately marks that model unavailable in memory and persists `models.enabled = 0`. Generic 429 rate limiting does not disable the model.
 - Werewolf, debate and player debug chat share this path. If both models fail, the existing game-level fallback behavior remains authoritative.
+# PostgreSQL 16 当前实现（2026-08-08）
+
+生产唯一业务数据库为 PostgreSQL 16。`db/index.ts` 异步初始化 `pg` 连接池并执行带 advisory lock 和校验和的版本化 SQL migration；所有 repository 通过异步 `DbExecutor` 访问数据库。SQLite 只存在于独立的 `packages/db-migrator` 一次性导入工具中，服务端没有 SQLite 或 JSON fallback。
+
+`createApp()` 在注册路由前完成数据库 migration 和幂等 seed，失败时不会监听端口。`/api/toc/health` 执行真实数据库查询，数据库不可用时返回 503。配置使用 `DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_SSL`、`DATABASE_CA_PATH`、`DATABASE_POOL_MAX`、`DATABASE_CONNECTION_TIMEOUT_MS` 和 `DATABASE_STATEMENT_TIMEOUT_MS`。部署、备份、恢复和正式切换见 `docs/postgresql-deployment.md`。
