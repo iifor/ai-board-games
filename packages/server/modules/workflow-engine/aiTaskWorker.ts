@@ -4,16 +4,16 @@ import type { AiTask, Match } from '../../types/workflow';
 import type { Workflow, WorkflowStep } from './workflowRegistry';
 
 async function processNextAiTask(matchId: string): Promise<AiTask | null> {
-  const task = repo.claimNextAiTask({ matchId, workerId: 'inline-worker' });
+  const task = await repo.claimNextAiTask({ matchId, workerId: 'inline-worker' });
   if (!task) return null;
   return processClaimedAiTask(task.id);
 }
 
 async function processAiTask(taskId: string): Promise<AiTask | null> {
-  const task = repo.getAiTask(taskId);
+  const task = await repo.getAiTask(taskId);
   if (!task) return null;
   if (task.status === 'queued' || task.status === 'retrying') {
-    const claimed = repo.claimNextAiTask({ matchId: task.matchId, workerId: 'direct-worker' });
+    const claimed = await repo.claimNextAiTask({ matchId: task.matchId, workerId: 'direct-worker' });
     if (!claimed || claimed.id !== task.id) return claimed;
   }
   return processClaimedAiTask(taskId);
@@ -22,10 +22,10 @@ async function processAiTask(taskId: string): Promise<AiTask | null> {
 async function processClaimedAiTask(taskId: string): Promise<AiTask | null> {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const service = require('./service') as typeof import('./service');
-  const task = repo.getAiTask(taskId);
+  const task = await repo.getAiTask(taskId);
   if (!task) return null;
   if (task.status !== 'running') return task;
-  const match = repo.getMatch(task.matchId);
+  const match = await repo.getMatch(task.matchId);
   if (!match) return null;
   const workflow: Workflow = getWorkflow(match.workflowId);
   const step: WorkflowStep | undefined = workflow.steps.find((item: WorkflowStep) => item.id === task.stepId);
@@ -50,10 +50,10 @@ async function processClaimedAiTask(taskId: string): Promise<AiTask | null> {
     } else if (!result?.payload || (typeof result.payload === 'object' && !Object.keys(result.payload as object).length)) {
       throw Object.assign(new Error('AI result payload is empty'), { severity: 'high' });
     }
-    service.completeAiTask(task.id, result);
+    await service.completeAiTask(task.id, result);
   } catch (error: unknown) {
     const err = error as Error & { severity?: string };
-    const persistedTask = repo.getAiTask(task.id);
+    const persistedTask = await repo.getAiTask(task.id);
     if (persistedTask?.status === 'succeeded') {
       console.error('[workflow-engine] workflow advance failed after AI task success', {
         taskId: task.id,
@@ -62,7 +62,7 @@ async function processClaimedAiTask(taskId: string): Promise<AiTask | null> {
       });
       return persistedTask;
     }
-    service.failAiTask(task.id, { message: err.message, severity: err.severity || 'medium' });
+    await service.failAiTask(task.id, { message: err.message, severity: err.severity || 'medium' });
   }
   return repo.getAiTask(taskId);
 }

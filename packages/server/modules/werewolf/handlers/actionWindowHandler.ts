@@ -107,12 +107,12 @@ function createActionWindowHandler() {
       const actors = getActorsForStep(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, round as unknown as ReducerRound);
       if (!actors.length) return skipAction(match, step, runtime, { systemOnly: true });
 
-      if (!hasOpenWork(match.id, step.id, step.config.actionType)) {
-        return openActionWindow({ match, step, state, runtime, round, actors });
+      if (!await hasOpenWork(match.id, step.id, step.config.actionType)) {
+        return await openActionWindow({ match, step, state, runtime, round, actors });
       }
 
       const eligibleActorIds = new Set(actors.map((actor) => Number(actor.id)));
-      const partialResults = (collectActionResults(
+      const partialResults = (await collectActionResults(
         match.id,
         step.id,
         step.config.actionType!,
@@ -137,12 +137,12 @@ function createActionWindowHandler() {
         }
         if (hasSelfDestruct(round as unknown as ReducerRound)) {
           applySelfDestruct(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound);
-          return completeSelfDestructWindow({ match, step, runtime, round, state });
+          return await completeSelfDestructWindow({ match, step, runtime, round, state });
         }
       }
 
       if (partialResults.length < actors.length) {
-        return waitForActionWindow({ match, step, state: partialApplied ? { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: state.currentActionWindow } : state, round, actors });
+        return await waitForActionWindow({ match, step, state: partialApplied ? { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: state.currentActionWindow } : state, round, actors });
       }
 
       const shouldUseEngineBridge = !partialApplied && canUseWerewolfActionEngineBridge(step.config.actionType);
@@ -174,7 +174,7 @@ function createActionWindowHandler() {
         });
       }
       const nextState = markStepComplete({ ...actionState, currentStep: step.id, currentActionWindow: null }, step.id);
-      resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
+      await resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
       const resolvedChannel = resolveActionChannel(step.config.actionType || '');
       const completedEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType }, resolvedChannel)];
       if (engineBridgeResult?.audit) {
@@ -270,19 +270,19 @@ function shouldApplyPartialResults(step: Step): boolean {
   ));
 }
 
-function completeSelfDestructWindow({ match, step, runtime, round, state }: {
+async function completeSelfDestructWindow({ match, step, runtime, round, state }: {
   match: Match;
   step: Step;
   runtime: Runtime;
   round: Record<string, unknown>;
   state: StepState;
-}): HandlerResult {
+}): Promise<HandlerResult> {
   const nextState = markStepComplete({
     ...syncRuntimeState(runtime),
     currentStep: step.id,
     currentActionWindow: null,
   }, step.id);
-  resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
+  await resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
   const selfDestruct = (round as { selfDestruct?: Record<string, unknown> }).selfDestruct || {};
   const actorId = Number(selfDestruct.playerId || 0);
   const targetId = Number(selfDestruct.targetId || 0) || null;
@@ -432,18 +432,18 @@ function skipAction(
   };
 }
 
-function openActionWindow({ match, step, state, runtime, round, actors }: {
+async function openActionWindow({ match, step, state, runtime, round, actors }: {
   match: Match;
   step: Step;
   state: StepState;
   runtime: Runtime;
   round: Record<string, unknown>;
   actors: unknown[];
-}): HandlerResult {
+}): Promise<HandlerResult> {
   if (step.config.actionType === 'wolf_kill' || step.config.actionType === 'wolf_speech' || step.config.actionType === 'wolf_vote') {
     ensureWolfTeamContext(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound);
   }
-  const window = buildActionWindow({
+  const window = await buildActionWindow({
     match,
     step,
     state: state as unknown as Record<string, unknown>,
@@ -455,7 +455,7 @@ function openActionWindow({ match, step, state, runtime, round, actors }: {
   const nextState = step.config.actionType === 'wolf_kill' || step.config.actionType === 'wolf_speech' || step.config.actionType === 'wolf_vote'
     ? { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: window }
     : { ...state, currentStep: step.id, currentActionWindow: window };
-  const work = createActionBlockers({
+  const work = await createActionBlockers({
     match,
     step,
     window,
@@ -1048,15 +1048,15 @@ function cloneActionWindow(window: ActionWindow): Record<string, unknown> {
   };
 }
 
-function waitForActionWindow({ match, step, state, round, actors }: {
+async function waitForActionWindow({ match, step, state, round, actors }: {
   match: Match;
   step: Step;
   state: StepState;
   round: Record<string, unknown>;
   actors: unknown[];
-}): HandlerResult {
+}): Promise<HandlerResult> {
   const existingWindow = state.currentActionWindow || { id: `${match.id}:${step.id}:${step.config.actionType}` };
-  const work = createActionBlockers({
+  const work = await createActionBlockers({
     match,
     step,
     window: existingWindow as Parameters<typeof createActionBlockers>[0]['window'],

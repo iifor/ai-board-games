@@ -16,7 +16,9 @@ export {
   controlUndercoverDebugMatch,
   getDebugState,
   listPendingOutbox,
+  claimPendingOutbox,
   markOutboxSent,
+  releaseOutboxClaim,
   initializeWorkflowMaintenance,
 } from './service';
 export type {

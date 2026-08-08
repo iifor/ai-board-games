@@ -7,7 +7,7 @@
  */
 
 import { getGameEngine } from './engine-registry';
-import { drainAiTasks, listPendingOutbox, markOutboxSent, getDebugState } from './workflow-engine/service';
+import { claimPendingOutbox, drainAiTasks, markOutboxSent, releaseOutboxClaim, getDebugState } from './workflow-engine/service';
 import { createInitialDebateState, serializeDebateState } from './debate/helpers';
 import type { DebateConfig, SerializedGame } from './debate/utils';
 import type { WorkflowMatch, WorkflowEvent } from './debate/helpers';
@@ -32,7 +32,7 @@ async function runDebateViaEngine(
     selectedPlayerIds: (config as Record<string, unknown>).selectedPlayerIds || (config.players || []).map((player) => player.id),
     debugMode: Boolean(config.debugMode),
   };
-  const matchResult = engine.createMatch({
+  const matchResult = await engine.createMatch({
     gameType: 'debate',
     config: runtimeConfig,
     initialState: createInitialDebateState(config) as unknown as Record<string, unknown>,
@@ -50,16 +50,22 @@ async function runDebateViaEngine(
   }
 
   // 获取最终状态并序列化
-  const debugState = getDebugState(matchId) as unknown as { match: WorkflowMatch };
+  const debugState = await getDebugState(matchId) as unknown as { match: WorkflowMatch };
   const finalMatch = debugState?.match;
   return serializeDebateState(finalMatch, finalMatch.state) as unknown as SerializedGame;
 }
 
 async function flushOutbox(matchId: string, onEvent?: (event: Record<string, unknown>) => void): Promise<void> {
-  const messages = listPendingOutbox(matchId) as unknown as WorkflowEvent[];
-  for (const message of messages) {
-    await onEvent?.(projectDebateOutboxEvent(message, matchId));
-    markOutboxSent(message.id as unknown as number);
+  while (true) {
+    const message = await claimPendingOutbox(matchId) as unknown as WorkflowEvent | null;
+    if (!message) return;
+    try {
+      await onEvent?.(projectDebateOutboxEvent(message, matchId));
+      await markOutboxSent(message.id as unknown as number);
+    } catch (error) {
+      await releaseOutboxClaim(message.id as unknown as number);
+      throw error;
+    }
   }
 }
 

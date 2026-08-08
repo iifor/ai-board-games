@@ -14,17 +14,17 @@ import type {
 } from '../../../types/workflow';
 import type { MatchStateStore } from './matchStateStore';
 
-class SqliteMatchStateStore implements MatchStateStore {
-  loadMatch(matchId: string): MatchSnapshot | null {
-    return toMatchSnapshot(repo.getMatch(matchId));
+class PostgresMatchStateStore implements MatchStateStore {
+  async loadMatch(matchId: string): Promise<MatchSnapshot | null> {
+    return toMatchSnapshot(await repo.getMatch(matchId));
   }
 
-  appendEvents(events: DomainEvent[]): DomainEvent[] {
+  async appendEvents(events: DomainEvent[]): Promise<DomainEvent[]> {
     if (!events.length) return [];
     const matchIds = new Set(events.map((event) => event.matchId));
     if (matchIds.size !== 1) throw new Error('appendEvents requires one matchId per batch');
 
-    const { events: rows } = repo.commitWorkflowChange({
+    const { events: rows } = await repo.commitWorkflowChange({
       matchId: events[0].matchId,
       events: events.map((event) => ({
         type: event.type,
@@ -40,27 +40,27 @@ class SqliteMatchStateStore implements MatchStateStore {
     return rows.map(toDomainEvent);
   }
 
-  listEvents(matchId: string): DomainEvent[] {
-    return repo.listEvents(matchId).map(toDomainEvent);
+  async listEvents(matchId: string): Promise<DomainEvent[]> {
+    return (await repo.listEvents(matchId)).map(toDomainEvent);
   }
 
-  listActionWindows(matchId: string): ActionWindowSnapshot[] {
-    return repo.listActionWindowEpochs(matchId).map(toActionWindowSnapshot);
+  async listActionWindows(matchId: string): Promise<ActionWindowSnapshot[]> {
+    return (await repo.listActionWindowEpochs(matchId)).map(toActionWindowSnapshot);
   }
 
-  getActionWindow(matchId: string, windowId: string): ActionWindowSnapshot | null {
-    return this.listActionWindows(matchId).find((window) => window.id === windowId) || null;
+  async getActionWindow(matchId: string, windowId: string): Promise<ActionWindowSnapshot | null> {
+    return (await this.listActionWindows(matchId)).find((window) => window.id === windowId) || null;
   }
 
-  saveMatchState(matchId: string, state: Record<string, unknown>): MatchSnapshot | null {
-    repo.updateMatch(matchId, {
+  async saveMatchState(matchId: string, state: Record<string, unknown>): Promise<MatchSnapshot | null> {
+    await repo.updateMatch(matchId, {
       state_json: JSON.stringify(state),
     });
     return this.loadMatch(matchId);
   }
 
-  enqueueEffect(effect: EngineWorkflowEffect): EngineWorkflowEffect {
-    const stored = repo.createWorkflowEffect({
+  async enqueueEffect(effect: EngineWorkflowEffect): Promise<EngineWorkflowEffect> {
+    const stored = await repo.createWorkflowEffect({
       id: effect.id,
       matchId: effect.matchId,
       stepId: effect.stepId,
@@ -75,14 +75,14 @@ class SqliteMatchStateStore implements MatchStateStore {
     return toEngineEffect(stored);
   }
 
-  listEffects(matchId: string, status?: string): EngineWorkflowEffect[] {
-    return repo.listWorkflowEffects(matchId)
+  async listEffects(matchId: string, status?: string): Promise<EngineWorkflowEffect[]> {
+    return (await repo.listWorkflowEffects(matchId))
       .filter((effect) => !status || effect.status === status)
       .map(toEngineEffect);
   }
 
-  updateEffect(effectId: string, patch: Partial<EngineWorkflowEffect>): EngineWorkflowEffect | null {
-    const stored = repo.updateWorkflowEffect(effectId, {
+  async updateEffect(effectId: string, patch: Partial<EngineWorkflowEffect>): Promise<EngineWorkflowEffect | null> {
+    const stored = await repo.updateWorkflowEffect(effectId, {
       status: patch.status,
       priority: patch.priority,
       payload_json: patch.payload === undefined ? undefined : JSON.stringify(patch.payload),
@@ -91,12 +91,12 @@ class SqliteMatchStateStore implements MatchStateStore {
     return stored ? toEngineEffect(stored) : null;
   }
 
-  getDebugState(matchId: string): EngineStoreDebugState {
+  async getDebugState(matchId: string): Promise<EngineStoreDebugState> {
     return {
-      match: this.loadMatch(matchId),
-      actionWindows: this.listActionWindows(matchId),
-      effects: this.listEffects(matchId),
-      events: this.listEvents(matchId),
+      match: await this.loadMatch(matchId),
+      actionWindows: await this.listActionWindows(matchId),
+      effects: await this.listEffects(matchId),
+      events: await this.listEvents(matchId),
       generatedAt: new Date().toISOString(),
     };
   }
@@ -180,4 +180,4 @@ function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {};
 }
 
-export { SqliteMatchStateStore };
+export { PostgresMatchStateStore };

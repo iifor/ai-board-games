@@ -9,7 +9,7 @@ type DebugBreakpointDecision =
 
 const UNDERCOVER_DEBUG_BREAKPOINT = 'undercover_debug_breakpoint';
 
-function evaluateDebugBreakpoint(match: Match, step: WorkflowStep): DebugBreakpointDecision {
+async function evaluateDebugBreakpoint(match: Match, step: WorkflowStep): Promise<DebugBreakpointDecision> {
   const config = (step.config || {}) as Record<string, unknown>;
   if (
     match.gameType !== 'undercover'
@@ -20,11 +20,11 @@ function evaluateDebugBreakpoint(match: Match, step: WorkflowStep): DebugBreakpo
     return { kind: 'run' };
   }
 
-  let interrupt = repo.listWorkflowInterrupts(match.id).find((item) =>
+  let interrupt = (await repo.listWorkflowInterrupts(match.id)).find((item) =>
     item.interruptType === UNDERCOVER_DEBUG_BREAKPOINT && item.stepId === step.id
   );
   if (!interrupt) {
-    interrupt = repo.createWorkflowInterrupt({
+    interrupt = await repo.createWorkflowInterrupt({
       id: `${match.id}:${step.id}:debug-breakpoint`,
       matchId: match.id,
       stepId: step.id,

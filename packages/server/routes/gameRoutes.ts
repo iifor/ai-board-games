@@ -19,10 +19,16 @@ interface PlayerSelectionRow {
 }
 
 router.get('/health', async (_request: Request, response: Response) => {
+  const databaseHealthy = await getDbExecutor().healthCheck().catch(() => false);
+  if (!databaseHealthy) {
+    response.status(503).json({ ok: false, service: 'ai-presenter-api', database: 'unavailable' });
+    return;
+  }
   const config = await getAiConfig();
   const skins = await listSkins(true);
   response.json({
     ok: true,
+    database: 'healthy',
     service: 'ai-presenter-api',
     modeControl: 'frontend-query',
     realReady: config.realReady,

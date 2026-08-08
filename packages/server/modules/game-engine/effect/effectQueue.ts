@@ -8,7 +8,7 @@ class EffectQueue {
     this.store = store;
   }
 
-  enqueue(effect: WorkflowEffect): WorkflowEffect {
+  async enqueue(effect: WorkflowEffect): Promise<WorkflowEffect> {
     if (!effect.id || !effect.matchId || !effect.effectType) {
       throw new Error('WorkflowEffect requires id, matchId, and effectType.');
     }
@@ -19,11 +19,11 @@ class EffectQueue {
     });
   }
 
-  enqueueMany(effects: WorkflowEffect[]): WorkflowEffect[] {
-    return effects.map((effect) => this.enqueue(effect));
+  async enqueueMany(effects: WorkflowEffect[]): Promise<WorkflowEffect[]> {
+    return Promise.all(effects.map((effect) => this.enqueue(effect)));
   }
 
-  listProposed(matchId: string): WorkflowEffect[] {
+  async listProposed(matchId: string): Promise<WorkflowEffect[]> {
     return this.store.listEffects(matchId, 'proposed');
   }
 }

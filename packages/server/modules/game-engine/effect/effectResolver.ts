@@ -49,34 +49,36 @@ class EffectResolutionService {
   }
 
   async resolvePending(matchId: string, state?: Record<string, unknown>): Promise<DomainEvent[]> {
-    const match = this.store.loadMatch(matchId);
-    const effects = this.store.listEffects(matchId, 'proposed');
+    const match = await this.store.loadMatch(matchId);
+    const effects = await this.store.listEffects(matchId, 'proposed');
     const resolved: DomainEvent[] = [];
     let currentState = cloneState(state || match?.state || {});
     for (const effect of effects) {
       const events = await this.resolveEffect(effect, match, currentState);
       resolved.push(...events);
-      currentState = cloneState(this.store.loadMatch(matchId)?.state || currentState);
+      currentState = cloneState((await this.store.loadMatch(matchId))?.state || currentState);
     }
     return resolved;
   }
 
   async resolveEffect(
     effect: WorkflowEffect,
-    match: MatchSnapshot | null = this.store.loadMatch(effect.matchId),
-    state: Record<string, unknown> = match?.state || {},
+    match?: MatchSnapshot | null,
+    state?: Record<string, unknown>,
   ): Promise<DomainEvent[]> {
+    match = match === undefined ? await this.store.loadMatch(effect.matchId) : match;
+    state = state || match?.state || {};
     const resolver = this.registry.get(effect.effectType);
     if (!resolver) throw new Error(`EffectResolver not registered: ${effect.effectType}`);
     const events = await resolver.resolve({ match, state, effect });
     events.forEach((event) => this.channelSystem.assertValidEvent(event));
-    const appended = this.store.appendEvents(events);
+    const appended = await this.store.appendEvents(events);
     const projectedState = this.applyStateProjection(match, state, appended);
     if (projectedState) {
-      this.store.saveMatchState(effect.matchId, projectedState);
+      await this.store.saveMatchState(effect.matchId, projectedState);
     }
     const firstSeq = appended[0]?.seq;
-    this.store.updateEffect(effect.id, {
+    await this.store.updateEffect(effect.id, {
       status: 'applied',
       appliedEventSeq: firstSeq,
     });

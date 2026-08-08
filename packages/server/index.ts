@@ -7,7 +7,8 @@ import { shutdownObservability } from './modules/observability';
 import { createGracefulShutdownHandler } from './lifecycle';
 
 const port = Number(process.env.API_PORT || (process.env.NODE_ENV === 'production' ? process.env.PORT : undefined) || 3001);
-const app = createApp();
+async function start(): Promise<void> {
+const app = await createApp();
 const server = http.createServer(app);
 
 const gameSocket = attachGameSocket(server);
@@ -15,7 +16,7 @@ const shutdown = createGracefulShutdownHandler(server, {
   cleanup: async () => {
     await gameSocket.close();
     await shutdownObservability();
-    closeDb();
+    await closeDb();
   },
 });
 process.once('SIGTERM', () => shutdown('SIGTERM'));
@@ -31,4 +32,11 @@ server.listen(port, async () => {
   if (config.missingProviders.length) {
     console.log(`缺少 API Key：${config.missingProviders.map((item: Record<string, unknown>) => `${item.provider}(${item.apiKeyEnv})`).join('；')}`);
   }
+});
+}
+
+void start().catch(async (error) => {
+  console.error(`Server startup failed: ${(error as Error).message}`);
+  await closeDb().catch(() => undefined);
+  process.exitCode = 1;
 });

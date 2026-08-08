@@ -1,6 +1,7 @@
 import * as repo from './repository';
 import { applyStatePatch, createStatePatch, deepEqual, isStatePatch } from './statePatch';
 import type { Match, MatchSnapshot, StepBlocker, WorkflowEvent } from '../../types/workflow';
+import type { DbExecutor } from '../../db/types';
 
 interface ProjectedPayload {
   projectedState?: Record<string, unknown>;
@@ -12,10 +13,10 @@ interface ProjectedPayload {
   [key: string]: unknown;
 }
 
-function hydrateMatchFromEventStore(match: Match): Match {
-  const snapshot = repo.getLatestSnapshot(match.id);
+async function hydrateMatchFromEventStore(match: Match, db?: DbExecutor): Promise<Match> {
+  const snapshot = await repo.getLatestSnapshot(match.id, db);
   if (!snapshot) return match;
-  const events = eventsAfterSnapshot(match.id, snapshot);
+  const events = await eventsAfterSnapshot(match.id, snapshot, db);
   const hydrated = events.reduce(applyProjectionEvent, {
     ...match,
     status: snapshot.status || match.status,
@@ -43,11 +44,11 @@ function hydrateMatchFromEventStore(match: Match): Match {
   return hydrated;
 }
 
-function eventsAfterSnapshot(matchId: string, snapshot: MatchSnapshot): WorkflowEvent[] {
+async function eventsAfterSnapshot(matchId: string, snapshot: MatchSnapshot, db?: DbExecutor): Promise<WorkflowEvent[]> {
   if (snapshot.lastEventSeq != null) {
-    return repo.listEventsAfter(matchId, snapshot.lastEventSeq);
+    return repo.listEventsAfter(matchId, snapshot.lastEventSeq, db);
   }
-  return repo.listEvents(matchId).filter((event) => {
+  return (await repo.listEvents(matchId, db)).filter((event) => {
     if (!snapshot.createdAt) return true;
     return String(event.createdAt || '') > String(snapshot.createdAt);
   });

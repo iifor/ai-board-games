@@ -1,71 +1,43 @@
-import { getDb } from '../../db';
-import { parseJson } from './utils';
+import { getDbExecutor } from '../../db';
+import type { DbExecutor } from '../../db/types';
 
-interface RetentionMatch {
-  id: string;
-}
+interface RetentionMatch { id: string }
 
-function listTerminalDebugMatches(): RetentionMatch[] {
-  const rows = getDb().prepare(`
-    SELECT id, config_json, created_at FROM matches
-    WHERE status IN ('completed', 'failed', 'paused_debug')
-    ORDER BY created_at DESC, id DESC
-  `).all() as Array<{ id: string; config_json: string; created_at: string }>;
-  return rows
-    .filter((row) => Boolean(parseJson<Record<string, unknown>>(row.config_json, {}).debugMode))
-    .map((row) => ({ id: row.id }));
-}
-
-function listStaleActiveMatches(cutoffIso: string): RetentionMatch[] {
-  return getDb().prepare(`
+async function listTerminalDebugMatches(db: DbExecutor = getDbExecutor()): Promise<RetentionMatch[]> {
+  return db.queryMany<RetentionMatch>(`
     SELECT id FROM matches
-    WHERE status IN ('running', 'waiting')
-      AND updated_at < ?
+    WHERE status IN ('completed', 'failed', 'paused_debug')
+      AND COALESCE((config_json::jsonb ->> 'debugMode')::boolean, false)
+    ORDER BY created_at DESC, id DESC
+  `);
+}
+
+async function listStaleActiveMatches(cutoffIso: string, db: DbExecutor = getDbExecutor()): Promise<RetentionMatch[]> {
+  return db.queryMany<RetentionMatch>(`
+    SELECT id FROM matches
+    WHERE status IN ('running', 'waiting') AND updated_at < $1
     ORDER BY updated_at ASC, id ASC
-  `).all(cutoffIso) as RetentionMatch[];
+  `, [cutoffIso]);
 }
 
-function deleteMatchCascade(matchId: string): boolean {
-  return getDb().prepare('DELETE FROM matches WHERE id = ?').run(matchId).changes > 0;
+async function deleteMatchCascade(matchId: string, db: DbExecutor = getDbExecutor()): Promise<boolean> {
+  return (await db.execute('DELETE FROM matches WHERE id = $1', [matchId])).rowCount > 0;
 }
 
-function getMatchLogicalBytes(matchId: string): number {
-  const db = getDb() as unknown as {
-    isJsonFallback?: boolean;
-    data?: Record<string, Array<Record<string, unknown>>>;
-  };
-  if (db.isJsonFallback && db.data) {
-    const related = Object.entries(db.data).flatMap(([table, rows]) =>
-      rows.filter((row) =>
-        (table === 'matches' && row.id === matchId)
-        || row.match_id === matchId
-      )
+async function getMatchLogicalBytes(matchId: string, db: DbExecutor = getDbExecutor()): Promise<number> {
+  const tables = ['matches', 'match_snapshots', 'workflow_events', 'ai_tasks', 'pending_actions',
+    'outbox_messages', 'action_window_epochs', 'workflow_effects', 'workflow_interrupts'];
+  let total = 0;
+  for (const table of tables) {
+    const key = table === 'matches' ? 'id' : 'match_id';
+    const row = await db.queryOne<{ bytes: number }>(
+      `SELECT COALESCE(SUM(pg_column_size(t)), 0)::bigint AS bytes FROM ${table} t WHERE ${key} = $1`,
+      [matchId],
     );
-    return Buffer.byteLength(JSON.stringify(related));
+    total += Number(row?.bytes || 0);
   }
-  const sources = [
-    ['matches', "config_json || state_json || blockers_json || error_json", 'id'],
-    ['match_snapshots', "state_json || blockers_json", 'match_id'],
-    ['workflow_events', "payload_json || visible_to_player_ids_json", 'match_id'],
-    ['ai_tasks', "prompt_json || context_json || raw_output || result_json || error_json", 'match_id'],
-    ['pending_actions', 'payload_json', 'match_id'],
-    ['outbox_messages', 'payload_json', 'match_id'],
-    ['action_window_epochs', 'window_json', 'match_id'],
-    ['workflow_effects', 'payload_json', 'match_id'],
-    ['workflow_interrupts', "payload_json || resolution_json", 'match_id'],
-  ] as const;
-  return sources.reduce((total, [table, expression, key]) => {
-    const row = getDb().prepare(
-      `SELECT COALESCE(SUM(LENGTH(${expression})), 0) AS bytes FROM ${table} WHERE ${key} = ?`,
-    ).get(matchId) as { bytes?: number } | undefined;
-    return total + Number(row?.bytes || 0);
-  }, 0);
+  return total;
 }
 
-export {
-  listTerminalDebugMatches,
-  listStaleActiveMatches,
-  deleteMatchCascade,
-  getMatchLogicalBytes,
-};
+export { listTerminalDebugMatches, listStaleActiveMatches, deleteMatchCascade, getMatchLogicalBytes };
 export type { RetentionMatch };

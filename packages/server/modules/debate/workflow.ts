@@ -5,7 +5,7 @@
  * 共享逻辑（agent 创建、序列化、投票、事件构建）已提取到 helpers.ts。
  */
 
-import { createWorkflowMatch as _createWorkflowMatch, drainAiTasks, getDebugState, listPendingOutbox, markOutboxSent } from '../workflow-engine/service';
+import { createWorkflowMatch as _createWorkflowMatch, claimPendingOutbox, drainAiTasks, getDebugState, markOutboxSent, releaseOutboxClaim } from '../workflow-engine/service';
 import { registerWorkflow } from '../workflow-engine/workflowRegistry';
 import { createFallbackAudit, executeSkillWithTrace } from '../agent-core';
 import { createDebateSkillRegistry } from './skillRegistry';
@@ -99,12 +99,14 @@ const debateWorkflow: WorkflowDefinition = {
 // ---- Handlers ----
 
 const handlers: Record<string, {
-  execute: (ctx: HandlerContext) => HandlerResult & { status: string; state: WorkflowState; blockers?: unknown[]; tasks?: unknown[]; matchStatus?: string };
+  execute: (ctx: HandlerContext) =>
+    | (HandlerResult & { status: string; state: WorkflowState; blockers?: unknown[]; tasks?: unknown[]; matchStatus?: string })
+    | Promise<HandlerResult & { status: string; state: WorkflowState; blockers?: unknown[]; tasks?: unknown[]; matchStatus?: string }>;
   runAiTask?: (ctx: { match: WorkflowMatch; task: AiTask }) => Promise<RuntimeResult>;
   validateAiResult?: (ctx: { task: AiTask; result: { payload?: Record<string, unknown> } }) => void;
 }> = {
   'debate.topic_reveal': {
-    execute({ match, step, state }: HandlerContext) {
+    async execute({ match, step, state }: HandlerContext) {
       if (state.completedSteps?.[step.id]) return { status: 'COMPLETED', state };
       const nextState = markStepComplete({
         ...state,
@@ -128,13 +130,13 @@ const handlers: Record<string, {
     },
   },
   'debate.ai_turn': {
-    execute({ match, step, state }: HandlerContext) {
+    async execute({ match, step, state }: HandlerContext) {
       if (state.completedSteps?.[step.id]) return { status: 'COMPLETED', state };
       const phase = createPhaseFromStep(step);
       const taskSpecs = createTaskSpecs(step, state);
       const tasks: AiTask[] = [];
       const blockers: HandlerResult['blockers'] = [];
-      const existing = (listAiTasks(match.id) as unknown as AiTask[]).filter((task) => task.stepId === step.id);
+      const existing = ((await listAiTasks(match.id)) as unknown as AiTask[]).filter((task) => task.stepId === step.id);
       const byKey = new Map(existing.map((task) => [task.taskKey, task]));
 
       for (const spec of taskSpecs) {
@@ -151,7 +153,7 @@ const handlers: Record<string, {
             status: 'queued',
             prompt: { phase: phase.id, action: spec.action },
             promptContextSnapshot: { ...spec, phase, topic: state.topic },
-            visibleEventSeqMax: Math.max(0, ...(listEvents(match.id) as Array<{ seq?: number }>).map((event) => event.seq || 0)),
+            visibleEventSeqMax: Math.max(0, ...((await listEvents(match.id)) as Array<{ seq?: number }>).map((event) => event.seq || 0)),
             visibleEventIds: [],
           });
         }
@@ -299,7 +301,7 @@ async function runDebateWorkflow(config: DebateConfig, options: { onEvent?: (eve
     await flushOutbox(match.id, options.onEvent);
     if (!processed || ['completed', 'failed', 'paused_debug'].includes(current?.status)) break;
   }
-  const finalMatch = (getDebugState(match.id) as unknown as { match: WorkflowMatch })?.match;
+  const finalMatch = (await getDebugState(match.id) as unknown as { match: WorkflowMatch })?.match;
   return serializeDebateState(finalMatch, finalMatch.state) as unknown as SerializedGame;
 }
 
@@ -457,10 +459,16 @@ function applyAiTurnResult(
 }
 
 async function flushOutbox(matchId: string, onEvent?: (event: Record<string, unknown>) => void): Promise<void> {
-  const messages = listPendingOutbox(matchId) as unknown as WorkflowEvent[];
-  for (const message of messages) {
-    await onEvent?.(projectDebateOutboxEvent(message, matchId));
-    markOutboxSent(message.id as unknown as number);
+  while (true) {
+    const message = await claimPendingOutbox(matchId) as unknown as WorkflowEvent | null;
+    if (!message) return;
+    try {
+      await onEvent?.(projectDebateOutboxEvent(message, matchId));
+      await markOutboxSent(message.id as unknown as number);
+    } catch (error) {
+      await releaseOutboxClaim(message.id as unknown as number);
+      throw error;
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'path';
-import { getDb } from './db';
+import { getDb, initializeDb } from './db';
 import { errorHandler } from './middlewares/errorHandler';
 import { responseFormatter } from './middlewares/responseFormatter';
 import * as upload from './modules/upload';
@@ -25,30 +25,36 @@ import type { AdminBootstrapConfig } from './modules/auth/config';
 // Game module
 import * as gameSocket from './modules/game-socket';
 
-function seedData(admin: AdminBootstrapConfig | null): void {
+async function seedData(admin: AdminBootstrapConfig | null): Promise<void> {
   const db = getDb();
-  if ((db.prepare('SELECT COUNT(*) AS count FROM skins').get() as { count: number }).count === 0) {
-    skins.importMarkdownSkins();
+  if (await tableIsEmpty(db, 'skins')) {
+    await skins.importMarkdownSkins();
   }
-  if ((db.prepare('SELECT COUNT(*) AS count FROM players').get() as { count: number }).count === 0) {
-    players.seedPlayers();
+  if (await tableIsEmpty(db, 'players')) {
+    await players.seedPlayers();
   }
-  if ((db.prepare('SELECT COUNT(*) AS count FROM models').get() as { count: number }).count === 0) {
+  if (await tableIsEmpty(db, 'models')) {
     const { DEFAULT_MODELS } = require('./db/seed');
-    DEFAULT_MODELS.forEach((m: Record<string, unknown>) => models.createModel(m));
+    for (const model of DEFAULT_MODELS) await models.createModel(model);
   }
-  if ((db.prepare('SELECT COUNT(*) AS count FROM voice_packages').get() as { count: number }).count === 0) {
-    voices.seedVoicePackages();
+  if (await tableIsEmpty(db, 'voice_packages')) {
+    await voices.seedVoicePackages();
   }
-  voices.seedMissingAzureVoices();
-  voices.seedMissingMimoVoices();
+  await voices.seedMissingAzureVoices();
+  await voices.seedMissingMimoVoices();
   const { DEFAULT_WEREWOLF_ROLES, DEFAULT_WEREWOLF_MODES } = require('./db/seed');
-  DEFAULT_WEREWOLF_ROLES.forEach((r: Record<string, unknown>) => werewolfConfig.upsertWerewolfRole(r));
-  DEFAULT_WEREWOLF_MODES.forEach((m: Record<string, unknown>) => werewolfConfig.upsertWerewolfMode(m));
-  void seedAdminUser(admin);
+  for (const role of DEFAULT_WEREWOLF_ROLES) await werewolfConfig.upsertWerewolfRole(role);
+  for (const mode of DEFAULT_WEREWOLF_MODES) await werewolfConfig.upsertWerewolfMode(mode);
+  await seedAdminUser(admin);
 }
 
-function createApp(): express.Application {
+async function tableIsEmpty(db: ReturnType<typeof getDb>, table: string): Promise<boolean> {
+  const row = await db.queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`);
+  return Number(row?.count || 0) === 0;
+}
+
+async function createApp(): Promise<express.Application> {
+  await initializeDb();
   const authConfig = readAuthConfig();
   const app = express();
   app.set('trust proxy', 1);
@@ -56,7 +62,7 @@ function createApp(): express.Application {
   const adminDistDir = path.join(__dirname, '..', '..', 'dist', 'admin');
 
   registerDebateWorkflow();
-  seedData(authConfig.admin);
+  await seedData(authConfig.admin);
   workflowEngine.initializeWorkflowMaintenance();
 
   app.use(express.json({ limit: '8mb' }));

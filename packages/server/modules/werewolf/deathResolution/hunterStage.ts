@@ -20,7 +20,7 @@ import { enqueueNightLastWords } from '../lastWordsWorkflow';
 import { appendUnique } from './types';
 import type { DeathResolutionContext, StageResult } from './types';
 
-function advanceHunterStage(context: DeathResolutionContext, playerId: number): StageResult {
+async function advanceHunterStage(context: DeathResolutionContext, playerId: number): Promise<StageResult> {
   const hunter = findPendingDeathHunter(context, playerId);
   if (!hunter) return { kind: 'idle' };
 
@@ -28,8 +28,8 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
   const actorId = Number(hunter.id);
   const currentWindow = context.state.currentActionWindow as ActionWindow | null | undefined;
   const actorActionKey = `${actionType}:${actorId}`;
-  const hasActorWork = hasOpenWork(context.match.id, context.step.id, actorActionKey);
-  const hasLegacyWork = hasOpenWork(context.match.id, context.step.id, actionType);
+  const hasActorWork = await hasOpenWork(context.match.id, context.step.id, actorActionKey);
+  const hasLegacyWork = await hasOpenWork(context.match.id, context.step.id, actionType);
   const resumesLegacyWindow = !hasActorWork
     && hasLegacyWork
     && currentWindow?.actionType === actionType
@@ -38,8 +38,8 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
   const legacyEpochId = `${context.match.id}:${context.step.id}:${actionType}`;
   const epochActionKey = currentWindow?.id === legacyEpochId ? actionType : actorActionKey;
   const actionStep = { ...context.step, config: { ...context.step.config, actionType } };
-  if (!hasOpenWork(context.match.id, context.step.id, taskActionKey)) {
-    const window = buildActionWindow({
+  if (!await hasOpenWork(context.match.id, context.step.id, taskActionKey)) {
+    const window = await buildActionWindow({
       match: context.match,
       step: actionStep,
       state: context.state as unknown as Record<string, unknown>,
@@ -49,7 +49,7 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
       targetIds: context.runtime.agents.filter((agent) => agent.alive).map((agent) => agent.id),
       optional: false,
     });
-    const work = createActionBlockers({
+    const work = await createActionBlockers({
       match: context.match,
       step: actionStep,
       window,
@@ -81,13 +81,13 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
     };
   }
 
-  if (!allActionWorkSucceeded(context.match.id, context.step.id, taskActionKey, 1)) {
+  if (!await allActionWorkSucceeded(context.match.id, context.step.id, taskActionKey, 1)) {
     const window = context.state.currentActionWindow || {
       id: `${context.match.id}:${context.step.id}:${epochActionKey}`,
       actionType,
       epochActionType: epochActionKey,
     };
-    const work = createActionBlockers({
+    const work = await createActionBlockers({
       match: context.match,
       step: actionStep,
       window: window as Parameters<typeof createActionBlockers>[0]['window'],
@@ -107,7 +107,7 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
     };
   }
 
-  const result = collectActionResults(context.match.id, context.step.id, taskActionKey)
+  const result = (await collectActionResults(context.match.id, context.step.id, taskActionKey))
     .find((item) => Number(item.actorId) === actorId);
   const target = Number(result?.payload?.target);
   const effect = applyHunterShot(context.runtime.agents as never, context.round as never, {
@@ -130,14 +130,14 @@ function advanceHunterStage(context: DeathResolutionContext, playerId: number): 
     phase: String(context.round.phase || context.step.config.phase || ''),
     reason: String(context.round.phase || ''),
   });
-  resolveActionWindow(
+  await resolveActionWindow(
     context.match.id,
     context.step.id,
     epochActionKey,
     context.state.currentActionWindow as unknown as ActionWindow,
   );
   if (effect) {
-    recordWorkflowEffects({
+    await recordWorkflowEffects({
       matchId: context.match.id,
       stepId: context.step.id,
       effects: [{

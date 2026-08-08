@@ -1,11 +1,12 @@
 import { BLOCKER_STATUS, BLOCKER_TYPES } from '@ai-presenter/shared/types/workflowTypes';
 import * as repo from './repository';
 import type { AiTask, PendingAction, StepBlocker } from '../../types/workflow';
+import type { DbExecutor } from '../../db/types';
 
-function resolveBlockers(matchId: string, blockers: StepBlocker[]): StepBlocker[] {
-  const tasks = new Map(repo.listAiTasks(matchId).map((task: AiTask) => [task.id, task]));
+async function resolveBlockers(matchId: string, blockers: StepBlocker[], db?: DbExecutor): Promise<StepBlocker[]> {
+  const tasks = new Map((await repo.listAiTasks(matchId, null, db)).map((task: AiTask) => [task.id, task]));
   const actions = new Map(
-    repo.listPendingActions(matchId).map((action: PendingAction) => [action.id, action]),
+    (await repo.listPendingActions(matchId, db)).map((action: PendingAction) => [action.id, action]),
   );
   return blockers.map((blocker) => {
     if (blocker.type === BLOCKER_TYPES.AI_TASK && blocker.taskId) {

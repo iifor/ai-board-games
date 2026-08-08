@@ -11,7 +11,7 @@ import { ActionWindowManager } from '../action-window/actionWindowManager';
 import { ChannelSystem } from '../channel/channelSystem';
 import { EffectQueue } from '../effect/effectQueue';
 import { EffectResolutionService, EffectResolverRegistry } from '../effect/effectResolver';
-import { SqliteMatchStateStore } from '../state/sqliteMatchStateStore';
+import { PostgresMatchStateStore } from '../state/postgresMatchStateStore';
 import type { MatchStateStore } from '../state/matchStateStore';
 import { WorkflowRuntime } from '../workflow/workflowRuntime';
 import type { RunUntilBlockedOptions } from '../workflow/workflowRuntime';
@@ -45,7 +45,7 @@ class GameEngine {
   private channelSystem: ChannelSystem;
 
   constructor(options: GameEngineOptions = {}) {
-    this.store = options.store || new SqliteMatchStateStore();
+    this.store = options.store || new PostgresMatchStateStore();
     this.workflowRuntime = options.workflowRuntime || new WorkflowRuntime();
     this.actionWindowManager = options.actionWindowManager || new ActionWindowManager(this.store);
     this.effectQueue = options.effectQueue || new EffectQueue(this.store);
@@ -81,8 +81,8 @@ class GameEngine {
     });
   }
 
-  tick(matchId: string) {
-    assertCanTick(this.store.loadMatch(matchId));
+  async tick(matchId: string) {
+    assertCanTick(await this.store.loadMatch(matchId));
     return this.workflowRuntime.tick(matchId);
   }
 
@@ -111,7 +111,7 @@ class GameEngine {
     const shapeError = validateDomainAction(action);
     if (shapeError) return failure(shapeError.code, shapeError.message);
 
-    const actionResult = this.actionWindowManager.submitAction(action);
+    const actionResult = await this.actionWindowManager.submitAction(action);
     if (!actionResult.ok) {
       return failure(
         actionResult.error?.code || 'ACTION_REJECTED',
@@ -120,7 +120,7 @@ class GameEngine {
       );
     }
 
-    const match = this.store.loadMatch(action.matchId);
+    const match = await this.store.loadMatch(action.matchId);
     const definition = this.requireDefinitionForMatch(match?.gameType || '', match?.config?.gameDefinitionVersion as string | undefined);
     const payloadValidation = validateActionPayload(definition.actionSchemas?.[action.actionType], action.payload);
     if (!payloadValidation.ok) return failure(payloadValidation.error!.code, payloadValidation.error!.message, payloadValidation.error!.details);
@@ -129,7 +129,7 @@ class GameEngine {
       ...action,
       payload: payloadValidation.data || action.payload,
     };
-    const actionWindow = this.store.getActionWindow(action.matchId, action.windowId);
+    const actionWindow = await this.store.getActionWindow(action.matchId, action.windowId);
     const effects = definition.createEffectsFromAction
       ? await definition.createEffectsFromAction(normalizedAction, {
           match,
@@ -137,12 +137,12 @@ class GameEngine {
           actionWindow,
         })
       : [];
-    const storedEffects = this.effectQueue.enqueueMany(effects);
+    const storedEffects = await this.effectQueue.enqueueMany(effects);
     return { ok: true, data: { action: normalizedAction, effects: storedEffects } };
   }
 
   async resolveEffects(matchId: string): Promise<EngineResult<{ events: unknown[] }>> {
-    const match = this.store.loadMatch(matchId);
+    const match = await this.store.loadMatch(matchId);
     if (!match) return failure('MATCH_NOT_FOUND', `Match not found: ${matchId}`);
     const definition = this.requireDefinitionForMatch(match.gameType, match.config?.gameDefinitionVersion as string | undefined);
     const service = new EffectResolutionService(this.store, this.effectResolverRegistry, this.channelSystem, {
@@ -152,8 +152,8 @@ class GameEngine {
     return { ok: true, data: { events } };
   }
 
-  getDebugState(matchId: string): EngineDebugState {
-    const storeState = this.store.getDebugState(matchId);
+  async getDebugState(matchId: string): Promise<EngineDebugState> {
+    const storeState = await this.store.getDebugState(matchId);
     return {
       ...storeState,
       definitions: this.listDefinitions().map(toDefinitionSummary),

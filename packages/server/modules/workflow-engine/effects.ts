@@ -19,8 +19,8 @@ interface InterruptInput {
   payload?: Record<string, unknown>;
 }
 
-function recordWorkflowEffects({ matchId, stepId = null, sourceEventSeq = null, effects = [] }: RecordEffectsInput): WorkflowEffect[] {
-  return effects.map((effect, index) => repo.createWorkflowEffect({
+async function recordWorkflowEffects({ matchId, stepId = null, sourceEventSeq = null, effects = [] }: RecordEffectsInput): Promise<WorkflowEffect[]> {
+  const stored = await Promise.all(effects.map((effect, index) => repo.createWorkflowEffect({
     id: String(effect.id || createId('effect')),
     matchId,
     stepId,
@@ -30,11 +30,12 @@ function recordWorkflowEffects({ matchId, stepId = null, sourceEventSeq = null, 
     priority: Number(effect.priority || effects.length - index),
     payload: effect,
     appliedEventSeq: sourceEventSeq,
-  })).filter((item): item is WorkflowEffect => item !== null);
+  })));
+  return stored.filter((item): item is WorkflowEffect => item !== null);
 }
 
-function requestInterrupt(input: InterruptInput): WorkflowInterrupt {
-  const interrupt = repo.createWorkflowInterrupt({
+async function requestInterrupt(input: InterruptInput): Promise<WorkflowInterrupt> {
+  const interrupt = await repo.createWorkflowInterrupt({
     id: createId('interrupt'),
     matchId: input.matchId,
     stepId: input.stepId || null,
@@ -45,7 +46,7 @@ function requestInterrupt(input: InterruptInput): WorkflowInterrupt {
     payload: input.payload || {},
   });
   if (!interrupt) throw new Error('Failed to create workflow interrupt');
-  repo.commitWorkflowChange({
+  await repo.commitWorkflowChange({
     matchId: input.matchId,
     events: [{
       stepId: input.stepId || undefined,
@@ -58,13 +59,13 @@ function requestInterrupt(input: InterruptInput): WorkflowInterrupt {
   return interrupt;
 }
 
-function resolveInterrupt(interruptId: string, status: string, resolution: unknown = {}): WorkflowInterrupt {
-  const interrupt = repo.updateWorkflowInterrupt(interruptId, {
+async function resolveInterrupt(interruptId: string, status: string, resolution: unknown = {}): Promise<WorkflowInterrupt> {
+  const interrupt = await repo.updateWorkflowInterrupt(interruptId, {
     status,
     resolution_json: toJson(resolution),
   });
   if (!interrupt) throw new Error(`Workflow interrupt not found: ${interruptId}`);
-  repo.commitWorkflowChange({
+  await repo.commitWorkflowChange({
     matchId: interrupt.matchId,
     events: [{
       stepId: interrupt.stepId,

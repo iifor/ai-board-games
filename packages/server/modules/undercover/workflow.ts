@@ -10,8 +10,9 @@ import {
   createWorkflowMatch,
   drainAiTasks,
   getDebugState,
-  listPendingOutbox,
+  claimPendingOutbox,
   markOutboxSent,
+  releaseOutboxClaim,
   registerWorkflow,
 } from '../workflow-engine';
 import type { Workflow } from '../workflow-engine/workflowRegistry';
@@ -92,7 +93,7 @@ async function createUndercoverWorkflowMatch(config: UndercoverRuntimeConfig): P
 }
 
 async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunContext = {}): Promise<Record<string, unknown>> {
-  const initial = getDebugState(matchId)?.match;
+  const initial = (await getDebugState(matchId))?.match;
   if (!initial) throw new Error(`Undercover match not found: ${matchId}`);
   const trace = initial.config.debugMode
     ? null
@@ -109,7 +110,7 @@ async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunCon
       if (!processed && await waitForUndercoverDebugControl(matchId, match, context.signal)) continue;
       if (!processed) throw new Error(`Undercover workflow stalled: ${matchId}`);
     }
-    const finalMatch = getDebugState(matchId)?.match;
+    const finalMatch = (await getDebugState(matchId))?.match;
     if (!finalMatch) throw new Error(`Undercover match disappeared: ${matchId}`);
     assertUndercoverWorkflowCompleted(finalMatch);
     const publicState = toUndercoverPublicState(finalMatch.state as unknown as Parameters<typeof toUndercoverPublicState>[0]) as unknown as Record<string, unknown>;
@@ -139,7 +140,7 @@ async function waitForUndercoverDebugControl(
   ) {
     return false;
   }
-  const state = getDebugState(matchId);
+  const state = await getDebugState(matchId);
   const pending = state?.interrupts.some((item) =>
     item.interruptType === 'undercover_debug_breakpoint'
     && item.status === 'pending'
@@ -149,7 +150,7 @@ async function waitForUndercoverDebugControl(
 
   const observedVersion = match.version;
   await waitForUndercoverDebugPoll(signal);
-  const refreshed = getDebugState(matchId)?.match;
+  const refreshed = (await getDebugState(matchId))?.match;
   if (!refreshed) throw new Error(`Undercover match disappeared: ${matchId}`);
   return TERMINAL_MATCH_STATUSES.has(refreshed.status)
     || refreshed.status === 'waiting'
@@ -205,10 +206,17 @@ async function resolvePlayers(config: UndercoverRuntimeConfig): Promise<Undercov
 }
 
 async function flushOutbox(matchId: string, onEvent?: (event: Record<string, unknown>) => void): Promise<void> {
-  for (const message of listPendingOutbox(matchId)) {
-    const storedEvent = message.payload as { payload?: Record<string, unknown> };
-    if (storedEvent.payload) await onEvent?.(storedEvent.payload);
-    markOutboxSent(message.id as number);
+  while (true) {
+    const message = await claimPendingOutbox(matchId);
+    if (!message) return;
+    try {
+      const storedEvent = message.payload as { payload?: Record<string, unknown> };
+      if (storedEvent.payload) await onEvent?.(storedEvent.payload);
+      await markOutboxSent(message.id as number);
+    } catch (error) {
+      await releaseOutboxClaim(message.id as number);
+      throw error;
+    }
   }
 }
 

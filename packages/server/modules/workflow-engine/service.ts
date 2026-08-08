@@ -1,7 +1,7 @@
 import * as repo from './repository';
 import type { CommitChangeInput, CommitChangeResult } from './repository';
 import { requestInterrupt, resolveInterrupt } from './effects';
-import { getDb, getDbExecutor } from '../../db';
+import { getDbExecutor } from '../../db';
 import { tickMatch } from './tick';
 import { processClaimedAiTask } from './aiTaskWorker';
 import { getWorkflow } from './workflowRegistry';
@@ -73,10 +73,10 @@ interface WorkflowMatchDeletionResult {
   };
 }
 
-function createWorkflowMatch({ workflowId, gameType, config, initialState, matchId }: CreateMatchInput): Match {
+async function createWorkflowMatch({ workflowId, gameType, config, initialState, matchId }: CreateMatchInput): Promise<Match> {
   const workflow = getWorkflow(workflowId);
   const id = matchId || createId(gameType || workflow.gameType || 'match');
-  repo.createMatch({
+  await repo.createMatch({
     id,
     game_type: gameType || workflow.gameType || 'unknown',
     workflow_id: workflowId,
@@ -91,7 +91,7 @@ function createWorkflowMatch({ workflowId, gameType, config, initialState, match
     updated_at: nowIso(),
     completed_at: null,
   });
-  repo.commitWorkflowChange({
+  await repo.commitWorkflowChange({
     matchId: id,
     events: [{
       type: 'match_created',
@@ -99,11 +99,11 @@ function createWorkflowMatch({ workflowId, gameType, config, initialState, match
       idempotencyKey: `${id}:created`,
     }],
   });
-  return afterTick(tickMatch(id));
+  return await afterTick(await tickMatch(id));
 }
 
-function wakeTick(matchId: string): Match {
-  return afterTick(tickMatch(matchId));
+async function wakeTick(matchId: string): Promise<Match> {
+  return await afterTick(await tickMatch(matchId));
 }
 
 async function drainAiTasks(matchId: string, options: DrainOptions = {}): Promise<{ processed: number; match: Match | null }> {
@@ -111,11 +111,11 @@ async function drainAiTasks(matchId: string, options: DrainOptions = {}): Promis
   const workerId = options.workerId || 'inline-worker';
   let processed = 0;
   while (processed < maxTasks) {
-    const task = claimNextAiTask({ matchId, workerId });
+    const task = await claimNextAiTask({ matchId, workerId });
     if (!task) {
-      const current = repo.getMatch(matchId);
+      const current = await repo.getMatch(matchId);
       if (!current || current.status !== MATCH_STATUS.RUNNING || current.blockers.length) break;
-      const advanced = wakeTick(matchId);
+      const advanced = await wakeTick(matchId);
       if (advanced.status === current.status && advanced.currentStepIndex === current.currentStepIndex) break;
       processed += 1;
       if (TERMINAL_STATUSES.includes(advanced.status)) break;
@@ -123,38 +123,38 @@ async function drainAiTasks(matchId: string, options: DrainOptions = {}): Promis
     }
     await processClaimedAiTask(task.id);
     processed += 1;
-    const match = repo.getMatch(matchId);
+    const match = await repo.getMatch(matchId);
     if (!match || TERMINAL_STATUSES.includes(match.status)) break;
   }
-  return { processed, match: repo.getMatch(matchId) };
+  return { processed, match: await repo.getMatch(matchId) };
 }
 
-function enqueueAiTask(task: Record<string, unknown>): AiTask | null {
-  repo.createAiTask(task as never);
+async function enqueueAiTask(task: Record<string, unknown>): Promise<AiTask | null> {
+  await repo.createAiTask(task as never);
   return repo.getAiTask(task.id as string);
 }
 
-function claimNextAiTask({ matchId = null, workerId = 'worker' }: { matchId?: string | null; workerId?: string } = {}): AiTask | null {
+async function claimNextAiTask({ matchId = null, workerId = 'worker' }: { matchId?: string | null; workerId?: string } = {}): Promise<AiTask | null> {
   return repo.claimNextAiTask({ matchId, workerId });
 }
 
-function completeAiTask(taskId: string, result: AiTaskResult | Record<string, unknown>): Match {
-  const task = repo.getAiTask(taskId);
+async function completeAiTask(taskId: string, result: AiTaskResult | Record<string, unknown>): Promise<Match> {
+  const task = await repo.getAiTask(taskId);
   if (!task) throw new Error(`AI task not found: ${taskId}`);
-  if (task.status === 'succeeded') return repo.getMatch(task.matchId) as Match;
+  if (task.status === 'succeeded') return await repo.getMatch(task.matchId) as Match;
   if (task.status === 'cancelled') throw new Error('AI task was cancelled');
   const payload = (result as AiTaskResult).payload || result;
   if (!payload || (typeof payload === 'object' && !Object.keys(payload as object).length)) {
-    return failAiTask(taskId, { message: 'AI task result payload is empty', severity: 'high' }) as Match;
+    return await failAiTask(taskId, { message: 'AI task result payload is empty', severity: 'high' }) as Match;
   }
-  repo.updateAiTask(task.id, {
+  await repo.updateAiTask(task.id, {
     status: 'succeeded',
     raw_output: typeof (result as AiTaskResult).rawOutput === 'string'
       ? (result as AiTaskResult).rawOutput
       : JSON.stringify((result as AiTaskResult).rawOutput ?? payload),
     result_json: toJson(result),
   });
-  repo.commitWorkflowChange({
+  await repo.commitWorkflowChange({
     matchId: task.matchId,
     events: [{
       stepId: task.stepId,
@@ -166,13 +166,13 @@ function completeAiTask(taskId: string, result: AiTaskResult | Record<string, un
     }],
   });
   try {
-    return wakeTick(task.matchId);
+    return await wakeTick(task.matchId);
   } catch (error) {
     return pauseAfterSuccessfulAiAdvanceFailure(task, error);
   }
 }
 
-function pauseAfterSuccessfulAiAdvanceFailure(task: AiTask, error: unknown): Match {
+async function pauseAfterSuccessfulAiAdvanceFailure(task: AiTask, error: unknown): Promise<Match> {
   const message = error instanceof Error ? error.message : String(error);
   const failure = {
     message,
@@ -180,7 +180,7 @@ function pauseAfterSuccessfulAiAdvanceFailure(task: AiTask, error: unknown): Mat
     severity: 'high',
     stage: 'wake_tick_after_ai_success',
   };
-  const result = repo.commitWorkflowChange({
+  const result = await repo.commitWorkflowChange({
     matchId: task.matchId,
     events: [{
       stepId: task.stepId,
@@ -197,21 +197,21 @@ function pauseAfterSuccessfulAiAdvanceFailure(task: AiTask, error: unknown): Mat
     snapshot: true,
   });
   console.error('[workflow-engine] AI result persisted but workflow advance failed', failure);
-  maybeCleanupTerminalDebugMatch(result.match);
+  await maybeCleanupTerminalDebugMatch(result.match);
   return result.match;
 }
 
-function failAiTask(taskId: string, error: AiTaskError = {}): Match | AiTask {
-  const task = repo.getAiTask(taskId);
+async function failAiTask(taskId: string, error: AiTaskError = {}): Promise<Match | AiTask> {
+  const task = await repo.getAiTask(taskId);
   if (!task) throw new Error(`AI task not found: ${taskId}`);
   const message = error.message || String(error || 'AI task failed');
   const severity = error.severity || 'medium';
   const shouldPause = severity === 'critical' || severity === 'high' || Number(task.attempts || 0) >= MAX_AI_ATTEMPTS;
-  repo.updateAiTask(task.id, {
+  await repo.updateAiTask(task.id, {
     status: shouldPause ? 'failed' : 'retrying',
     error_json: toJson({ message, severity }),
   });
-  repo.commitWorkflowChange({
+  await repo.commitWorkflowChange({
     matchId: task.matchId,
     events: [{
       stepId: task.stepId,
@@ -227,21 +227,21 @@ function failAiTask(taskId: string, error: AiTaskError = {}): Match | AiTask {
     snapshot: shouldPause,
   });
   if (shouldPause) {
-    const match = repo.getMatch(task.matchId)!;
-    maybeCleanupTerminalDebugMatch(match);
+    const match = (await repo.getMatch(task.matchId))!;
+    await maybeCleanupTerminalDebugMatch(match);
     return match;
   }
-  return repo.getAiTask(task.id) as AiTask;
+  return await repo.getAiTask(task.id) as AiTask;
 }
 
-function retryAiTask(taskId: string): Match {
-  const task = repo.retryAiTask(taskId);
+async function retryAiTask(taskId: string): Promise<Match> {
+  const task = await repo.retryAiTask(taskId);
   if (!task) throw new Error(`AI task not found: ${taskId}`);
-  const match = repo.getMatch(task.matchId);
+  const match = await repo.getMatch(task.matchId);
   if (match?.status === MATCH_STATUS.PAUSED_DEBUG) {
-    repo.updateMatch(task.matchId, { status: MATCH_STATUS.WAITING, error_json: 'null' });
+    await repo.updateMatch(task.matchId, { status: MATCH_STATUS.WAITING, error_json: 'null' });
   }
-  repo.commitWorkflowChange({
+  await repo.commitWorkflowChange({
     matchId: task.matchId,
     events: [{
       stepId: task.stepId,
@@ -255,10 +255,10 @@ function retryAiTask(taskId: string): Match {
   return wakeTick(task.matchId);
 }
 
-function cancelAiTask(taskId: string, reason: string = 'cancelled'): Match {
-  const task = repo.cancelAiTask(taskId, reason);
+async function cancelAiTask(taskId: string, reason: string = 'cancelled'): Promise<Match> {
+  const task = await repo.cancelAiTask(taskId, reason);
   if (!task) throw new Error(`AI task not found: ${taskId}`);
-  repo.commitWorkflowChange({
+  await repo.commitWorkflowChange({
     matchId: task.matchId,
     events: [{
       stepId: task.stepId,
@@ -272,7 +272,7 @@ function cancelAiTask(taskId: string, reason: string = 'cancelled'): Match {
   return wakeTick(task.matchId);
 }
 
-function manualCompleteAiTask(taskId: string, payload: Record<string, unknown> = {}): Match {
+async function manualCompleteAiTask(taskId: string, payload: Record<string, unknown> = {}): Promise<Match> {
   return completeAiTask(taskId, {
     eventType: 'ai_task_manual_completed',
     rawOutput: payload,
@@ -280,14 +280,14 @@ function manualCompleteAiTask(taskId: string, payload: Record<string, unknown> =
   });
 }
 
-function submitPendingAction({ matchId, actionId, payload = {}, idempotencyKey = '' }: SubmitPendingActionInput): Match {
-  getDb().transaction(() => {
-    const match = repo.getMatch(matchId);
+async function submitPendingAction({ matchId, actionId, payload = {}, idempotencyKey = '' }: SubmitPendingActionInput): Promise<Match> {
+  await getDbExecutor().withTransaction(async (transaction) => {
+    const match = await repo.getMatch(matchId, transaction, true);
     if (!match) throw new Error(`Match not found: ${matchId}`);
     if (TERMINAL_STATUSES.includes(match.status)) {
       throw new Error(`Match cannot accept actions while status is ${match.status}`);
     }
-    const action = repo.getPendingAction(actionId);
+    const action = await repo.getPendingAction(actionId, transaction);
     if (!action || action.matchId !== matchId) throw new Error(`Pending action not found: ${actionId}`);
     if (action.status === 'submitted') return;
     if (action.status !== 'pending') throw new Error(`Pending action cannot be submitted while status is ${action.status}`);
@@ -295,7 +295,7 @@ function submitPendingAction({ matchId, actionId, payload = {}, idempotencyKey =
     const currentStep = workflow.steps[Number(match.currentStepIndex || 0)];
     if (currentStep?.id !== action.stepId) throw new Error('Pending action does not belong to the current step');
     const eventKey = idempotencyKey || `${action.id}:submitted`;
-    const { events } = repo.commitWorkflowChange({
+    const { events } = await repo.commitWorkflowChange({
       matchId,
       events: [{
         stepId: action.stepId,
@@ -309,23 +309,23 @@ function submitPendingAction({ matchId, actionId, payload = {}, idempotencyKey =
         },
         idempotencyKey: eventKey,
       }],
-    });
+    }, transaction);
     const eventSeq = events[0]?.seq || null;
-    repo.submitPendingAction(action.id, { payload, resultEventSeq: eventSeq, idempotencyKey: action.idempotencyKey || eventKey });
-  })();
+    await repo.submitPendingAction(action.id, { payload, resultEventSeq: eventSeq, idempotencyKey: action.idempotencyKey || eventKey }, transaction);
+  });
   return wakeTick(matchId);
 }
 
-function commitWorkflowChange(change: CommitChangeInput): CommitChangeResult {
+async function commitWorkflowChange(change: CommitChangeInput): Promise<CommitChangeResult> {
   return repo.commitWorkflowChange(change);
 }
 
-function getDebugState(matchId: string) {
+async function getDebugState(matchId: string) {
   return repo.getDebugState(matchId);
 }
 
 async function deleteWorkflowMatch(matchId: string): Promise<WorkflowMatchDeletionResult> {
-  const match = repo.getMatch(matchId);
+  const match = await repo.getMatch(matchId);
   if (!match) throw new AppError(ErrorCodes.NOT_FOUND, 'Match 不存在', 404);
   if (!TERMINAL_STATUSES.includes(match.status)) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, '进行中的 Match 不可删除', 409);
@@ -337,8 +337,8 @@ async function deleteWorkflowMatch(matchId: string): Promise<WorkflowMatchDeleti
   let matchDeleted = false;
   await getDbExecutor().withTransaction(async (transaction) => {
     gameDeleted = await deleteGameRecords(matchId, transaction);
-    tracesDeleted = await deleteTracesByGameId(matchId);
-    matchDeleted = deleteMatchCascade(matchId);
+    tracesDeleted = await deleteTracesByGameId(matchId, transaction);
+    matchDeleted = await deleteMatchCascade(matchId, transaction);
     if (!matchDeleted) throw new AppError(ErrorCodes.NOT_FOUND, 'Match 不存在', 404);
   });
 
@@ -353,7 +353,7 @@ async function deleteWorkflowMatch(matchId: string): Promise<WorkflowMatchDeleti
   };
 }
 
-function createInterrupt(input: {
+async function createInterrupt(input: {
   matchId: string;
   stepId?: string | null;
   effectId?: string | null;
@@ -364,33 +364,33 @@ function createInterrupt(input: {
   return requestInterrupt(input);
 }
 
-function resolveWorkflowInterrupt(interruptId: string, status: string, resolution: unknown = {}) {
-  if (repo.getWorkflowInterrupt(interruptId)?.interruptType === UNDERCOVER_DEBUG_BREAKPOINT) {
+async function resolveWorkflowInterrupt(interruptId: string, status: string, resolution: unknown = {}) {
+  if ((await repo.getWorkflowInterrupt(interruptId))?.interruptType === UNDERCOVER_DEBUG_BREAKPOINT) {
     throw new Error('Undercover debug breakpoints require the dedicated Undercover debug control');
   }
   return resolveInterrupt(interruptId, status, resolution);
 }
 
-function controlUndercoverDebugMatch({
+async function controlUndercoverDebugMatch({
   matchId,
   interruptId,
   action,
-}: UndercoverDebugControlInput): Match {
+}: UndercoverDebugControlInput): Promise<Match> {
   if (!UNDERCOVER_DEBUG_ACTIONS.has(action)) {
     throw new Error(`Invalid Undercover debug action: ${String(action)}`);
   }
   if (!interruptId) {
     throw new Error('Undercover debug breakpoint interruptId is required');
   }
-  const execute = getDb().transaction(() => {
-    const match = repo.getMatch(matchId);
+  await getDbExecutor().withTransaction(async (transaction) => {
+    const match = await repo.getMatch(matchId, transaction, true);
     if (!match) throw new Error(`Undercover debug match not found: ${matchId}`);
     if (match.gameType !== 'undercover') throw new Error(`Match is not an Undercover match: ${matchId}`);
     if (match.config.debugMode !== true) throw new Error(`Undercover match is not a debug match: ${matchId}`);
 
     const workflow = getWorkflow(match.workflowId);
     const currentStep = workflow.steps[match.currentStepIndex];
-    const interrupt = repo.getWorkflowInterrupt(interruptId);
+    const interrupt = await repo.getWorkflowInterrupt(interruptId, transaction);
     if (!interrupt) {
       throw new Error(`Undercover debug breakpoint not found: ${interruptId}`);
     }
@@ -414,12 +414,12 @@ function controlUndercoverDebugMatch({
     }
 
     const status = action === 'skip' ? 'skipped' : 'resolved';
-    const updated = repo.updateWorkflowInterrupt(interrupt.id, {
+    const updated = await repo.updateWorkflowInterrupt(interrupt.id, {
       status,
       resolution_json: toJson({ action }),
-    });
+    }, transaction);
     if (!updated) throw new Error(`Undercover debug breakpoint not found: ${interrupt.id}`);
-    repo.commitWorkflowChange({
+    await repo.commitWorkflowChange({
       matchId,
       events: [{
         stepId: interrupt.stepId,
@@ -431,9 +431,8 @@ function controlUndercoverDebugMatch({
       matchPatch: action === 'continuous'
         ? { config_json: toJson({ ...match.config, debugRunMode: 'continuous' }) }
         : null,
-    });
+    }, transaction);
   });
-  execute();
   return wakeTick(matchId);
 }
 
@@ -441,27 +440,35 @@ function listPendingOutbox(matchId: string) {
   return repo.listPendingOutbox(matchId);
 }
 
+function claimPendingOutbox(matchId: string) {
+  return repo.claimPendingOutbox(matchId);
+}
+
 function listOutboxMessages(matchId: string, limit?: number) {
   return repo.listOutboxMessages(matchId, limit);
 }
 
-function markOutboxSent(id: number): void {
+async function markOutboxSent(id: number): Promise<void> {
   return repo.markOutboxSent(id);
+}
+
+async function releaseOutboxClaim(id: number): Promise<void> {
+  return repo.releaseOutboxClaim(id);
 }
 
 function initializeWorkflowMaintenance(): void {
   scheduleWorkflowMaintenance();
 }
 
-function afterTick(match: Match): Match {
-  maybeCleanupTerminalDebugMatch(match);
+async function afterTick(match: Match): Promise<Match> {
+  await maybeCleanupTerminalDebugMatch(match);
   return match;
 }
 
-function maybeCleanupTerminalDebugMatch(match: Match | null): void {
+async function maybeCleanupTerminalDebugMatch(match: Match | null): Promise<void> {
   if (!match?.config?.debugMode) return;
   if (!TERMINAL_STATUSES.includes(match.status)) return;
-  cleanupTerminalDebugMatches();
+  await cleanupTerminalDebugMatches();
 }
 
 export {
@@ -483,8 +490,10 @@ export {
   getDebugState,
   deleteWorkflowMatch,
   listPendingOutbox,
+  claimPendingOutbox,
   listOutboxMessages,
   markOutboxSent,
+  releaseOutboxClaim,
   initializeWorkflowMaintenance,
 };
 export type {

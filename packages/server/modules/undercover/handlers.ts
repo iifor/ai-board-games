@@ -105,7 +105,7 @@ function createUndercoverHandlers(): Record<string, StepHandler> {
 
 function createSpeechHandler(): StepHandler {
   return {
-    execute({ match, step, state }) {
+    async execute({ match, step, state }) {
       const current = state as unknown as WorkflowState;
       const typedMatch = match as unknown as MatchContext;
       if (isComplete(current, step.id)) return done(current);
@@ -114,9 +114,9 @@ function createSpeechHandler(): StepHandler {
       const speaker = current.players[(round - 1 + orderIndex) % current.players.length];
       if (!speaker?.alive) return done(completeStep(current, step.id));
 
-      const task = findTask(typedMatch.id, step.id, `speech:${speaker.id}`);
+      const task = await findTask(typedMatch.id, step.id, `speech:${speaker.id}`);
       if (!task || task.status !== 'succeeded') {
-        return wait(current, typedMatch.id, step, speaker.id, 'undercover_speech', task, { actorId: speaker.id, round });
+        return await wait(current, typedMatch.id, step, speaker.id, 'undercover_speech', task, { actorId: speaker.id, round });
       }
       const parsed = undercoverSpeechSchema.parse(taskPayload(task));
       const validated = validatePublicSpeech(parsed.speech, current.wordPair);
@@ -161,7 +161,7 @@ function createSpeechHandler(): StepHandler {
 
 function createVoteHandler(): StepHandler {
   return {
-    execute({ match, step, state }) {
+    async execute({ match, step, state }) {
       const current = state as unknown as WorkflowState;
       const matchId = match.id as string;
       if (isComplete(current, step.id)) return done(current);
@@ -169,11 +169,11 @@ function createVoteHandler(): StepHandler {
       if (runoff && !current.runoffCandidateIds.length) return done(completeStep(current, step.id));
 
       const voters = current.players.filter((player) => player.alive);
-      const tasks = voters.map((voter) => {
+      const tasks = await Promise.all(voters.map(async (voter) => {
         const legalIds = getLegalVoteTargets(current, voter.id, runoff ? current.runoffCandidateIds : []);
-        const existing = findTask(matchId, step.id, `vote:${voter.id}`);
+        const existing = await findTask(matchId, step.id, `vote:${voter.id}`);
         return { voter, legalIds, existing };
-      }).filter(({ legalIds }) => legalIds.length > 0);
+      })).then((items) => items.filter(({ legalIds }) => legalIds.length > 0));
       const pending = tasks.filter(({ existing }) => existing?.status !== 'succeeded');
       if (pending.length) {
         const next = { ...current, status: 'voting' as const };
@@ -185,12 +185,12 @@ function createVoteHandler(): StepHandler {
           status: 'WAITING',
           state: next,
           events,
-          tasks: pending.filter(({ existing }) => !existing).map(({ voter, legalIds }) => taskSpec(matchId, step, voter.id, 'undercover_vote', {
+          tasks: await Promise.all(pending.filter(({ existing }) => !existing).map(({ voter, legalIds }) => taskSpec(matchId, step, voter.id, 'undercover_vote', {
             actorId: voter.id,
             round: current.round,
             runoff,
             legalIds,
-          })),
+          }))),
           blockers: pending.map(({ voter, existing }) => blocker(
             step.id,
             `vote:${voter.id}`,
@@ -269,17 +269,17 @@ async function createAgent(matchId: string, state: WorkflowState, actorId: numbe
   });
 }
 
-function wait(state: WorkflowState, matchId: string, step: WorkflowStep, playerId: number, action: string, existing: AiTask | null, context: EventDetails) {
+async function wait(state: WorkflowState, matchId: string, step: WorkflowStep, playerId: number, action: string, existing: AiTask | null, context: EventDetails) {
   const taskKey = action === 'undercover_speech' ? `speech:${playerId}` : `vote:${playerId}`;
   return {
     status: 'WAITING',
     state,
-    tasks: existing ? [] : [taskSpec(matchId, step, playerId, action, context)],
+    tasks: existing ? [] : [await taskSpec(matchId, step, playerId, action, context)],
     blockers: [blocker(step.id, taskKey, playerId, existing?.id || stableTaskId(matchId, step.id, taskKey), existing?.status)],
   };
 }
 
-function taskSpec(matchId: string, step: WorkflowStep, playerId: number, action: string, context: EventDetails) {
+async function taskSpec(matchId: string, step: WorkflowStep, playerId: number, action: string, context: EventDetails) {
   const taskKey = action === 'undercover_speech' ? `speech:${playerId}` : `vote:${playerId}`;
   return {
     id: stableTaskId(matchId, step.id, taskKey),
@@ -291,7 +291,7 @@ function taskSpec(matchId: string, step: WorkflowStep, playerId: number, action:
     status: 'queued',
     prompt: { action },
     promptContextSnapshot: context,
-    visibleEventSeqMax: Math.max(0, ...repository.listEvents(matchId).map((event) => event.seq)),
+    visibleEventSeqMax: Math.max(0, ...(await repository.listEvents(matchId)).map((event) => event.seq)),
     visibleEventIds: [],
   };
 }
@@ -307,8 +307,8 @@ function blocker(stepId: string, taskKey: string, playerId: number, taskId: stri
   };
 }
 
-function findTask(matchId: string, stepId: string, taskKey: string): AiTask | null {
-  return repository.listAiTasks(matchId).find((task) => task.stepId === stepId && task.taskKey === taskKey) || null;
+async function findTask(matchId: string, stepId: string, taskKey: string): Promise<AiTask | null> {
+  return (await repository.listAiTasks(matchId)).find((task) => task.stepId === stepId && task.taskKey === taskKey) || null;
 }
 
 function taskPayload(task: AiTask): Record<string, unknown> {

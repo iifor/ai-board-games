@@ -19,7 +19,7 @@ import type {
 } from './types';
 import { WEREWOLF_POSTGAME_DAYBREAK_STEP_ID } from '../postgame';
 
-function advanceDeathResolution(context: DeathResolutionContext): HandlerResult {
+async function advanceDeathResolution(context: DeathResolutionContext): Promise<HandlerResult> {
   for (let index = 0; index < 64; index += 1) {
     const death = getCurrentDeath(context);
     if (!death) return finalizeDeathResolution(context);
@@ -29,7 +29,7 @@ function advanceDeathResolution(context: DeathResolutionContext): HandlerResult 
         death.wordsCompleted = true;
         continue;
       }
-      const words = advanceLastWordsStage(context, death.playerId);
+      const words = await advanceLastWordsStage(context, death.playerId);
       if (words.kind === 'waiting') return mergeWaiting(context, words.result);
       if (words.kind === 'advanced') context.events.push(...(words.events || []));
       death.wordsCompleted = true;
@@ -37,7 +37,7 @@ function advanceDeathResolution(context: DeathResolutionContext): HandlerResult 
     }
 
     if (!death.skillCompleted) {
-      const hunter = advanceHunterStage(context, death.playerId);
+      const hunter = await advanceHunterStage(context, death.playerId);
       if (hunter.kind === 'waiting') return mergeWaiting(context, hunter.result);
       if (hunter.kind === 'advanced') context.events.push(...(hunter.events || []));
       death.skillCompleted = true;
@@ -45,7 +45,7 @@ function advanceDeathResolution(context: DeathResolutionContext): HandlerResult 
     }
 
     if (!death.badgeCompleted) {
-      const sheriff = advanceSheriffBadgeStage(context, death.playerId);
+      const sheriff = await advanceSheriffBadgeStage(context, death.playerId);
       if (sheriff.kind === 'waiting') return mergeWaiting(context, sheriff.result);
       if (sheriff.kind === 'advanced') context.events.push(...(sheriff.events || []));
       death.badgeCompleted = true;
@@ -55,7 +55,7 @@ function advanceDeathResolution(context: DeathResolutionContext): HandlerResult 
   throw new Error(`Death resolution exceeded stage limit: ${context.match.id}:${context.step.id}`);
 }
 
-function recordInitialEffects(context: DeathResolutionContext, effects: Array<Record<string, unknown>>): void {
+async function recordInitialEffects(context: DeathResolutionContext, effects: Array<Record<string, unknown>>): Promise<void> {
   const stableEffects = effects.map((effect, index) => ({
     ...effect,
     id: String(effect.id || [
@@ -67,7 +67,7 @@ function recordInitialEffects(context: DeathResolutionContext, effects: Array<Re
       effect.target ?? 'none',
     ].join(':')),
   }));
-  recordWorkflowEffects({
+  await recordWorkflowEffects({
     matchId: context.match.id,
     stepId: context.step.id,
     effects: stableEffects,

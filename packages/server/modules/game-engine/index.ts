@@ -25,5 +25,5 @@ export { EffectResolverRegistry, EffectResolutionService } from './effect/effect
 export { GameEngineEventBus } from './event/eventBus';
 export type { EventFilter, EventHandler, EventSubscriptionOptions } from './event/eventBus';
 export { ChannelSystem } from './channel/channelSystem';
-export { SqliteMatchStateStore } from './state/sqliteMatchStateStore';
+export { PostgresMatchStateStore } from './state/postgresMatchStateStore';
 export type { MatchStateStore } from './state/matchStateStore';

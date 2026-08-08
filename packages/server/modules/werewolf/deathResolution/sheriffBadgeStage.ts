@@ -19,7 +19,7 @@ import { CHANNEL_TYPES } from '@ai-presenter/shared/types/channelTypes';
 import { appendUnique } from './types';
 import type { DeathResolutionContext, StageResult } from './types';
 
-function advanceSheriffBadgeStage(context: DeathResolutionContext, playerId: number): StageResult {
+async function advanceSheriffBadgeStage(context: DeathResolutionContext, playerId: number): Promise<StageResult> {
   const sheriff = findPendingSheriffBadgeDisposition(context.runtime as never, context.round as never);
   if (!sheriff || Number(sheriff.id) !== Number(playerId)) return { kind: 'idle' };
 
@@ -38,8 +38,8 @@ function advanceSheriffBadgeStage(context: DeathResolutionContext, playerId: num
   }
 
   const actionStep = { ...context.step, config: { ...context.step.config, actionType } };
-  if (!hasOpenWork(context.match.id, context.step.id, actorActionKey)) {
-    const window = buildActionWindow({
+  if (!await hasOpenWork(context.match.id, context.step.id, actorActionKey)) {
+    const window = await buildActionWindow({
       match: context.match,
       step: actionStep,
       state: context.state as unknown as Record<string, unknown>,
@@ -49,7 +49,7 @@ function advanceSheriffBadgeStage(context: DeathResolutionContext, playerId: num
       targetIds,
       optional: false,
     });
-    const work = createActionBlockers({
+    const work = await createActionBlockers({
       match: context.match,
       step: actionStep,
       window,
@@ -81,13 +81,13 @@ function advanceSheriffBadgeStage(context: DeathResolutionContext, playerId: num
     };
   }
 
-  if (!allActionWorkSucceeded(context.match.id, context.step.id, actorActionKey, 1)) {
+  if (!await allActionWorkSucceeded(context.match.id, context.step.id, actorActionKey, 1)) {
     const window = context.state.currentActionWindow || {
       id: `${context.match.id}:${context.step.id}:${actorActionKey}`,
       actionType,
       epochActionType: actorActionKey,
     };
-    const work = createActionBlockers({
+    const work = await createActionBlockers({
       match: context.match,
       step: actionStep,
       window: window as Parameters<typeof createActionBlockers>[0]['window'],
@@ -106,9 +106,9 @@ function advanceSheriffBadgeStage(context: DeathResolutionContext, playerId: num
       },
     };
   }
-  const result = collectActionResults(context.match.id, context.step.id, actorActionKey)
+  const result = (await collectActionResults(context.match.id, context.step.id, actorActionKey))
     .find((item) => Number(item.actorId) === actorId);
-  resolveActionWindow(
+  await resolveActionWindow(
     context.match.id,
     context.step.id,
     actorActionKey,

@@ -2,19 +2,27 @@ import type { Request, Response, NextFunction } from 'express';
 import * as service from './service';
 import { formatSuccess } from '../../utils/response';
 
-function getMatchDebug(req: Request, res: Response): void {
-  const matchId = String(req.params.matchId);
-  const state = service.getDebugState(matchId);
-  if (!state) {
-    res.status(404).json({ code: 'NOT_FOUND', message: 'Match not found' });
-    return;
+async function getMatchDebug(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const matchId = String(req.params.matchId);
+    const state = await service.getDebugState(matchId);
+    if (!state) {
+      res.status(404).json({ code: 'NOT_FOUND', message: 'Match not found' });
+      return;
+    }
+    res.json(formatSuccess(state));
+  } catch (error) {
+    next(error);
   }
-  res.json(formatSuccess(state));
 }
 
-function wakeMatch(req: Request, res: Response): void {
-  const matchId = String(req.params.matchId);
-  res.json(formatSuccess(service.wakeTick(matchId)));
+async function wakeMatch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const matchId = String(req.params.matchId);
+    res.json(formatSuccess(await service.wakeTick(matchId)));
+  } catch (error) {
+    next(error);
+  }
 }
 
 async function deleteMatch(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -25,11 +33,11 @@ async function deleteMatch(req: Request, res: Response, next: NextFunction): Pro
   }
 }
 
-function submitPendingAction(req: Request, res: Response, next: NextFunction): void {
+async function submitPendingAction(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const matchId = String(req.params.matchId);
     const actionId = String(req.params.actionId);
-    res.json(formatSuccess(service.submitPendingAction({
+    res.json(formatSuccess(await service.submitPendingAction({
       matchId,
       actionId,
       payload: (req.body?.payload || req.body || {}) as Record<string, unknown>,
@@ -40,37 +48,37 @@ function submitPendingAction(req: Request, res: Response, next: NextFunction): v
   }
 }
 
-function retryAiTask(req: Request, res: Response, next: NextFunction): void {
+async function retryAiTask(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const taskId = String(req.params.taskId);
-    res.json(formatSuccess(service.retryAiTask(taskId)));
+    res.json(formatSuccess(await service.retryAiTask(taskId)));
   } catch (error) {
     next(error);
   }
 }
 
-function cancelAiTask(req: Request, res: Response, next: NextFunction): void {
+async function cancelAiTask(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const taskId = String(req.params.taskId);
-    res.json(formatSuccess(service.cancelAiTask(taskId, req.body?.reason || 'cancelled')));
+    res.json(formatSuccess(await service.cancelAiTask(taskId, req.body?.reason || 'cancelled')));
   } catch (error) {
     next(error);
   }
 }
 
-function manualCompleteAiTask(req: Request, res: Response, next: NextFunction): void {
+async function manualCompleteAiTask(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const taskId = String(req.params.taskId);
-    res.json(formatSuccess(service.manualCompleteAiTask(taskId, (req.body?.payload || req.body || {}) as Record<string, unknown>)));
+    res.json(formatSuccess(await service.manualCompleteAiTask(taskId, (req.body?.payload || req.body || {}) as Record<string, unknown>)));
   } catch (error) {
     next(error);
   }
 }
 
-function createInterrupt(req: Request, res: Response, next: NextFunction): void {
+async function createInterrupt(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const matchId = String(req.params.matchId);
-    res.json(formatSuccess(service.createInterrupt({
+    res.json(formatSuccess(await service.createInterrupt({
       matchId,
       stepId: req.body?.stepId || null,
       effectId: req.body?.effectId || null,
@@ -83,10 +91,10 @@ function createInterrupt(req: Request, res: Response, next: NextFunction): void 
   }
 }
 
-function resolveInterrupt(req: Request, res: Response, next: NextFunction): void {
+async function resolveInterrupt(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const interruptId = String(req.params.interruptId);
-    res.json(formatSuccess(service.resolveWorkflowInterrupt(
+    res.json(formatSuccess(await service.resolveWorkflowInterrupt(
       interruptId,
       String(req.body?.status || 'resolved'),
       req.body?.resolution || {},
@@ -96,12 +104,12 @@ function resolveInterrupt(req: Request, res: Response, next: NextFunction): void
   }
 }
 
-function controlUndercoverDebug(req: Request, res: Response, next: NextFunction): void {
+async function controlUndercoverDebug(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const matchId = String(req.params.matchId);
     const interruptId = String(req.body?.interruptId || '');
     const action = String(req.body?.action || '');
-    res.json(formatSuccess(service.controlUndercoverDebugMatch({
+    res.json(formatSuccess(await service.controlUndercoverDebugMatch({
       matchId,
       interruptId,
       action: action as service.UndercoverDebugAction,

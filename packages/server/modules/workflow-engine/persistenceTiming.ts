@@ -1,6 +1,4 @@
-import fs from 'fs';
 import { performance } from 'perf_hooks';
-import { getDatabasePath } from '../../db';
 
 const SLOW_PERSISTENCE_MS = 500;
 
@@ -34,7 +32,7 @@ function createPersistenceTiming(
     startedAt: performance.now(),
     stages: {},
     bytes: {},
-    databaseBefore: readDatabaseFileSizes(),
+    databaseBefore: { databaseBytes: 0, walBytes: 0 },
   };
 }
 
@@ -61,7 +59,7 @@ function finishPersistenceTiming(
 ): void {
   if (!timing.debugMode) return;
   const totalMs = roundMs(performance.now() - timing.startedAt);
-  const databaseAfter = readDatabaseFileSizes();
+  const databaseAfter = { databaseBytes: 0, walBytes: 0 };
   const payload = {
     type: 'workflow-persistence-timing',
     correlationId: timing.correlationId,
@@ -81,22 +79,6 @@ function finishPersistenceTiming(
   const serialized = JSON.stringify(payload);
   if (totalMs >= SLOW_PERSISTENCE_MS) console.warn(serialized);
   else console.info(serialized);
-}
-
-function readDatabaseFileSizes(): DatabaseFileSizes {
-  const databasePath = getDatabasePath();
-  return {
-    databaseBytes: readFileSize(databasePath),
-    walBytes: readFileSize(`${databasePath}-wal`),
-  };
-}
-
-function readFileSize(filePath: string): number {
-  try {
-    return fs.statSync(filePath).size;
-  } catch {
-    return 0;
-  }
 }
 
 function roundMs(value: number): number {

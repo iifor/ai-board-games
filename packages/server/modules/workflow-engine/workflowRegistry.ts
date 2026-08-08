@@ -39,7 +39,7 @@ interface StepHandlerAiTaskParams {
 }
 
 interface StepHandler {
-  execute: (params: StepHandlerExecuteParams) => StepHandlerExecuteResult;
+  execute: (params: StepHandlerExecuteParams) => StepHandlerExecuteResult | Promise<StepHandlerExecuteResult>;
   runAiTask?: (params: StepHandlerAiTaskParams) => Promise<Record<string, unknown>>;
   validateAiResult?: (params: StepHandlerAiTaskParams & { result: Record<string, unknown> }) => void;
 }

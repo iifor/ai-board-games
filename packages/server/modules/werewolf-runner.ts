@@ -46,7 +46,7 @@ async function runWerewolfViaEngine(
 
   // 通过 GameEngine 创建对局
   const state = await createInitialWerewolfState(config);
-  const matchResult = engine.createMatch({
+  const matchResult = await engine.createMatch({
     gameType: 'werewolf',
     matchId,
     config: {
@@ -69,7 +69,7 @@ async function runWerewolfViaEngine(
 
   try {
     const { match: drivenMatch } = await engine.runUntilBlocked(actualMatchId);
-    const finalMatch = drivenMatch || engine.getDebugState(actualMatchId).match || matchResult;
+    const finalMatch = drivenMatch || (await engine.getDebugState(actualMatchId)).match || matchResult;
     await flushMatchEventPublishes(actualMatchId);
     assertWerewolfWorkflowCompleted(finalMatch as unknown as Record<string, unknown>, { allowPausedDebug: isDebug });
     if (trace) { markTraceComplete(trace); }

@@ -73,7 +73,7 @@ function createNightResolveHandler() {
           }, serializeWerewolfState(match, syncRuntimeState(runtime)));
         }
         checkpoint.initialDeathIds = resolved.deaths.map((death) => Number(death.id));
-        recordInitialEffects(context, resolved.effects as unknown as Array<Record<string, unknown>>);
+        await recordInitialEffects(context, resolved.effects as unknown as Array<Record<string, unknown>>);
         enqueueNightLastWords(round, checkpoint.initialDeathIds);
         if (!checkpoint.shadowAudited) {
           const audit = auditNightResolutionShadow({
@@ -96,7 +96,7 @@ function createNightResolveHandler() {
         currentActionWindow: state.currentActionWindow || null,
       };
       publishNightResultOnce(context);
-      const result = advanceDeathResolution(context);
+      const result = await advanceDeathResolution(context);
       if (shadowAuditEvent) result.events = [...(result.events || []), shadowAuditEvent];
       if (result.status === 'COMPLETED') {
         recordGameSnapshotIfTrace(match.id, runtime as unknown as Record<string, unknown>, 'night_resolve');
@@ -126,7 +126,7 @@ function createExileResolveHandler() {
       if (!checkpoint.initialEffectsApplied) {
         const resolved = resolveExileEffects(runtime.agents as never, round as never, runtime.modeConfig as never);
         checkpoint.initialDeathIds = resolved.exile ? [Number(resolved.exile.id)] : [];
-        recordInitialEffects(context, resolved.effects as unknown as Array<Record<string, unknown>>);
+        await recordInitialEffects(context, resolved.effects as unknown as Array<Record<string, unknown>>);
         enqueueExileLastWords(round, resolved.exile?.id);
         // 白痴翻牌：发布播报事件到 EventBus（携带 game snapshot 供 C 端更新 round.idiotReveal）
         if (round.idiotReveal) {
@@ -151,7 +151,7 @@ function createExileResolveHandler() {
         currentActionWindow: state.currentActionWindow || null,
       };
       publishExileResultOnce(context);
-      const result = advanceDeathResolution(context);
+      const result = await advanceDeathResolution(context);
       if (result.status === 'COMPLETED') {
         recordGameSnapshotIfTrace(match.id, runtime as unknown as Record<string, unknown>, 'exile_resolve');
       }
@@ -194,7 +194,7 @@ function createSelfDestructResolveHandler() {
         const actorId = Number(selfDestruct.playerId);
         const targetId = Number(selfDestruct.targetId);
         checkpoint.initialDeathIds = [actorId, targetId].filter((id, index, ids) => id > 0 && ids.indexOf(id) === index);
-        recordInitialEffects(context, checkpoint.initialDeathIds.map((id) => ({
+        await recordInitialEffects(context, checkpoint.initialDeathIds.map((id) => ({
           type: id === actorId ? 'self_destruct' : 'white_wolf_king_self_destruct',
           source: actorId,
           target: id,
@@ -206,7 +206,7 @@ function createSelfDestructResolveHandler() {
         currentStep: step.id,
         currentActionWindow: state.currentActionWindow || null,
       };
-      return advanceDeathResolution(context);
+      return await advanceDeathResolution(context);
     },
     runAiTask: runDeathActionAiTask,
     validateAiResult: validateDeathActionAiResult,

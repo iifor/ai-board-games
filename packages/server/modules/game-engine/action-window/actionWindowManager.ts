@@ -8,8 +8,8 @@ class ActionWindowManager {
     this.store = store;
   }
 
-  submitAction(action: DomainAction): EngineResult<DomainAction> {
-    const window = this.store.getActionWindow(action.matchId, action.windowId);
+  async submitAction(action: DomainAction): Promise<EngineResult<DomainAction>> {
+    const window = await this.store.getActionWindow(action.matchId, action.windowId);
     if (!window) {
       return failure('ACTION_WINDOW_NOT_FOUND', `ActionWindow not found: ${action.windowId}`);
     }

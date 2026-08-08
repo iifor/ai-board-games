@@ -69,7 +69,7 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
   );
   try {
     const { match: drivenMatch } = await new WorkflowRuntime().runUntilBlocked(match.id as string);
-    const finalMatch = drivenMatch || workflowService.getDebugState(match.id as string)?.match || match;
+    const finalMatch = drivenMatch || (await workflowService.getDebugState(match.id as string))?.match || match;
     await flushMatchEventPublishes(match.id as string);
     assertWerewolfWorkflowCompleted(finalMatch as Record<string, unknown>, { allowPausedDebug: isDebug });
     if (trace) { markTraceComplete(trace); /* flushTrace 推迟到 runSession 中 saveGameRecord 之后 */ }

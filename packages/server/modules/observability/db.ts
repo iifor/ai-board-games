@@ -1,4 +1,5 @@
 import { getDbExecutor } from '../../db';
+import type { DbExecutor } from '../../db/types';
 
 // ── Row types (match DB schema) ──────────────────────────────────────
 
@@ -332,8 +333,8 @@ async function deleteTrace(id: string): Promise<void> {
   await getDbExecutor().execute('DELETE FROM game_traces WHERE id = $1', [id]);
 }
 
-async function deleteTracesByGameId(gameId: string): Promise<number> {
-  const result = await getDbExecutor().execute(`
+async function deleteTracesByGameId(gameId: string, db: DbExecutor = getDbExecutor()): Promise<number> {
+  const result = await db.execute(`
     DELETE FROM game_traces
     WHERE id IN (
       SELECT DISTINCT trace_id

@@ -1,0 +1,22 @@
+{
+  "name": "@ai-presenter/db-migrator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "migrate": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.9.1",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  }
+}

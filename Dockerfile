@@ -18,6 +18,7 @@ COPY packages/shared/package.json  packages/shared/package.json
 COPY packages/client/package.json  packages/client/package.json
 COPY packages/admin/package.json   packages/admin/package.json
 COPY packages/server/package.json  packages/server/package.json
+COPY packages/db-migrator/package.json packages/db-migrator/package.json
 
 # Install all deps (--frozen-lockfile for reproducible builds)
 RUN pnpm install --frozen-lockfile
@@ -45,7 +46,7 @@ COPY packages/admin/package.json   packages/admin/package.json
 COPY packages/server/package.json  packages/server/package.json
 
 # Production deps only (--prod not needed since pnpm filters by workspace)
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --filter @ai-presenter/server...
 
 # Copy server source (runs from TS via dev-runtime.cjs)
 COPY packages/server ./packages/server
@@ -54,9 +55,6 @@ COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 
 # Copy built static assets from builder
 COPY --from=builder /app/dist ./dist
-
-# Copy data directory template (SQLite DB will be mounted as volume)
-RUN mkdir -p /app/data
 
 # Expose server port
 EXPOSE 3001

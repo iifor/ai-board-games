@@ -21,11 +21,11 @@ interface RunUntilBlockedOptions {
 }
 
 class WorkflowRuntime {
-  createMatch(input: CreateRuntimeMatchInput): Match {
+  async createMatch(input: CreateRuntimeMatchInput): Promise<Match> {
     return createWorkflowMatch(input);
   }
 
-  tick(matchId: string): Match {
+  async tick(matchId: string): Promise<Match> {
     return wakeTick(matchId);
   }
 
@@ -47,11 +47,11 @@ class WorkflowRuntime {
     actionId: string;
     payload?: Record<string, unknown>;
     idempotencyKey?: string;
-  }): Match {
+  }): Promise<Match> {
     return submitPendingAction(input);
   }
 
-  getDebugState(matchId: string): unknown {
+  async getDebugState(matchId: string): Promise<unknown> {
     return getDebugState(matchId);
   }
 }
