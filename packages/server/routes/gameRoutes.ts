@@ -218,19 +218,19 @@ router.get('/diagnostics/openai', async (request: Request, response: Response, n
   }
 });
 
-router.get('/games/recent', (request: Request, response: Response, next: NextFunction) => {
+router.get('/games/recent', async (request: Request, response: Response, next: NextFunction) => {
   try {
     const gameType = normalizeGameType(String(request.query.gameType || 'werewolf'));
     const limit = Math.min(50, Math.max(1, Number(request.query.limit) || 10));
-    response.json({ gameType, games: listGames({ gameType }).slice(0, limit) });
+    response.json({ gameType, games: (await listGames({ gameType })).slice(0, limit) });
   } catch (error) {
     next(error);
   }
 });
 
-router.get('/games/:id', (request: Request, response: Response, next: NextFunction) => {
+router.get('/games/:id', async (request: Request, response: Response, next: NextFunction) => {
   try {
-    const game = getGame(String(request.params.id));
+    const game = await getGame(String(request.params.id));
     if (!game) {
       response.status(404).json({ error: 'GAME_NOT_FOUND', message: '历史对局不存在' });
       return;

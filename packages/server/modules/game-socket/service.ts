@@ -360,7 +360,7 @@ async function runSession(
   if (!(config as Record<string, unknown>).debugMode) {
     const audioResources = collectPlaybackAudioResources(playbackEvents);
     try {
-      saveGameRecord({
+      await saveGameRecord({
         ...game,
         players: withSourcePlayerIds(
           game.players as Array<Record<string, unknown>> | undefined,

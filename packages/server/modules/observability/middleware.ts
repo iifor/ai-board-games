@@ -15,10 +15,10 @@ function createRouter(): Router {
   const router = Router();
 
   // GET /api/admin/traces — list traces
-  router.get('/traces', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/traces', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { gameType, status, limit, offset } = req.query;
-      const rows = db.findTraces({
+      const rows = await db.findTraces({
         gameType: String(gameType || '') || null,
         status: String(status || '') || null,
         limit: Number(limit) || 50,
@@ -29,67 +29,69 @@ function createRouter(): Router {
   });
 
   // GET /api/admin/traces/:id — full trace detail with spans
-  router.get('/traces/:id', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/traces/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = String(req.params.id);
-      const trace = db.findTraceById(id);
+      const trace = await db.findTraceById(id);
       if (!trace) return res.status(404).json({ code: 'NOT_FOUND', message: 'Trace not found' });
-      const spans = db.findSpansByTrace(id);
-      const participants = db.resolveTraceParticipants(id);
+      const spans = await db.findSpansByTrace(id);
+      const participants = await db.resolveTraceParticipants(id);
       res.json(success({ ...trace, participants, spans }));
     } catch (err) { next(err); }
   });
 
   // DELETE /api/admin/traces/:id
-  router.delete('/traces/:id', (req: Request, res: Response, next: NextFunction) => {
+  router.delete('/traces/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      db.deleteTrace(String(req.params.id));
+      await db.deleteTrace(String(req.params.id));
       res.json(success({ ok: true }, 'deleted'));
     } catch (err) { next(err); }
   });
 
   // GET /api/admin/traces/:id/llm — LLM calls for a trace
-  router.get('/traces/:id/llm', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/traces/:id/llm', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rows = db.findLlmRecordsByTrace(String(req.params.id));
+      const rows = await db.findLlmRecordsByTrace(String(req.params.id));
       res.json(success(rows));
     } catch (err) { next(err); }
   });
 
   // GET /api/admin/traces/:id/decisions — agent decisions for a trace
-  router.get('/traces/:id/decisions', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/traces/:id/decisions', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rows = db.findDecisionsByTrace(String(req.params.id));
+      const rows = await db.findDecisionsByTrace(String(req.params.id));
       res.json(success(rows));
     } catch (err) { next(err); }
   });
 
   // GET /api/admin/traces/:id/snapshots — state snapshots for a trace
-  router.get('/traces/:id/snapshots', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/traces/:id/snapshots', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rows = db.findSnapshotsByTrace(String(req.params.id));
+      const rows = await db.findSnapshotsByTrace(String(req.params.id));
       res.json(success(rows));
     } catch (err) { next(err); }
   });
 
   // GET /api/admin/traces/:id/events — event stream for a trace
-  router.get('/traces/:id/events', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/traces/:id/events', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rows = db.findEventsByTrace(String(req.params.id));
+      const rows = await db.findEventsByTrace(String(req.params.id));
       res.json(success(rows));
     } catch (err) { next(err); }
   });
 
   // GET /api/admin/traces/:id/player/:playerId — per-player trace analysis
-  router.get('/traces/:id/player/:playerId', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/traces/:id/player/:playerId', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = String(req.params.id);
       const playerId = Number(req.params.playerId);
-      const trace = db.findTraceById(id);
+      const trace = await db.findTraceById(id);
       if (!trace) return res.status(404).json({ code: 'NOT_FOUND', message: 'Trace not found' });
-      const llmCalls = db.findLlmRecordsByPlayer(id, playerId);
-      const decisions = db.findDecisionsByPlayer(id, playerId);
-      const snapshots = db.findSnapshotsByTrace(id);
+      const [llmCalls, decisions, snapshots] = await Promise.all([
+        db.findLlmRecordsByPlayer(id, playerId),
+        db.findDecisionsByPlayer(id, playerId),
+        db.findSnapshotsByTrace(id),
+      ]);
       res.json(success({ trace, llmCalls, decisions, snapshots }));
     } catch (err) { next(err); }
   });

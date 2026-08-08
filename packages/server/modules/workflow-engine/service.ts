@@ -1,7 +1,7 @@
 import * as repo from './repository';
 import type { CommitChangeInput, CommitChangeResult } from './repository';
 import { requestInterrupt, resolveInterrupt } from './effects';
-import { getDb } from '../../db';
+import { getDb, getDbExecutor } from '../../db';
 import { tickMatch } from './tick';
 import { processClaimedAiTask } from './aiTaskWorker';
 import { getWorkflow } from './workflowRegistry';
@@ -324,23 +324,23 @@ function getDebugState(matchId: string) {
   return repo.getDebugState(matchId);
 }
 
-function deleteWorkflowMatch(matchId: string): WorkflowMatchDeletionResult {
+async function deleteWorkflowMatch(matchId: string): Promise<WorkflowMatchDeletionResult> {
   const match = repo.getMatch(matchId);
   if (!match) throw new AppError(ErrorCodes.NOT_FOUND, 'Match 不存在', 404);
   if (!TERMINAL_STATUSES.includes(match.status)) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, '进行中的 Match 不可删除', 409);
   }
 
-  const gamePlan = prepareGameDeletion(matchId);
+  const gamePlan = await prepareGameDeletion(matchId);
   let gameDeleted = false;
   let tracesDeleted = 0;
   let matchDeleted = false;
-  getDb().transaction(() => {
-    gameDeleted = deleteGameRecords(matchId);
-    tracesDeleted = deleteTracesByGameId(matchId);
+  await getDbExecutor().withTransaction(async (transaction) => {
+    gameDeleted = await deleteGameRecords(matchId, transaction);
+    tracesDeleted = await deleteTracesByGameId(matchId);
     matchDeleted = deleteMatchCascade(matchId);
     if (!matchDeleted) throw new AppError(ErrorCodes.NOT_FOUND, 'Match 不存在', 404);
-  })();
+  });
 
   if (gamePlan && gameDeleted) cleanupGameFiles(gamePlan);
   return {

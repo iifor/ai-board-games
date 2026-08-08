@@ -1,4 +1,5 @@
-import { getDb } from '../../db';
+import { getDbExecutor } from '../../db';
+import type { DbExecutor } from '../../db/types';
 import * as repo from './repository';
 import { rowToGame, rowToGameSummary, parseJson, toJson } from './utils';
 import { AppError, ErrorCodes } from '../../utils/errors';
@@ -41,7 +42,7 @@ interface GameDeletionPlan {
   generatedAudioUrls: string[];
 }
 
-function saveGameRecord(game: SaveGameInput): GameSummary[] {
+async function saveGameRecord(game: SaveGameInput): Promise<GameSummary[]> {
   const row: GameRow = {
     id: game.id,
     game_type: game.gameType || game.type || 'werewolf',
@@ -63,18 +64,16 @@ function saveGameRecord(game: SaveGameInput): GameSummary[] {
     created_at: game.createdAt || new Date().toISOString()
   };
 
-  const db = getDb();
-  const tx = db.transaction(() => {
-    repo.insertOrReplaceGame(row);
-    repo.deleteGamePlayers(row.id);
+  await getDbExecutor().withTransaction(async (transaction) => {
+    await repo.insertOrReplaceGame(row, transaction);
+    await repo.deleteGamePlayers(row.id, transaction);
     if (Array.isArray(game.players)) {
-      game.players.forEach((p) => {
-        repo.insertGamePlayer(row.id, p.sourcePlayerId || p.playerId || p.id || 0, toJson(p));
-      });
+      for (const player of game.players) {
+        await repo.insertGamePlayer(row.id, player.sourcePlayerId || player.playerId || player.id || 0, toJson(player), transaction);
+      }
     }
-    replacePlaybackEvents(row.id, game.playbackEvents || []);
+    await replacePlaybackEvents(row.id, game.playbackEvents || [], transaction);
   });
-  tx();
 
   // 异步生成记忆（LLM 调用），不阻塞对局保存
   recordCompletedGameMemories(game).catch((error: unknown) => {
@@ -84,47 +83,41 @@ function saveGameRecord(game: SaveGameInput): GameSummary[] {
   return listGames();
 }
 
-function listGames(filters: GameListFilters = {}): GameSummary[] {
-  let rows = repo.findAllGames(filters);
-  if (filters.playerId) {
-    const gameIds = new Set(
-      repo.findGamePlayersByPlayerId(filters.playerId).map(r => r.game_id)
-    );
-    rows = rows.filter(r => gameIds.has(r.id));
-  }
+async function listGames(filters: GameListFilters = {}): Promise<GameSummary[]> {
+  const rows = await repo.findAllGames(filters);
   return rows.map(rowToGameSummary).filter((g): g is GameSummary => g !== null);
 }
 
-function getGame(id: string): Game | null {
-  return rowToGame(repo.findGameById(id));
+async function getGame(id: string): Promise<Game | null> {
+  return rowToGame(await repo.findGameById(id));
 }
 
-function deleteGame(id: string): { ok: boolean } {
-  const plan = prepareGameDeletion(id);
+async function deleteGame(id: string): Promise<{ ok: boolean }> {
+  const plan = await prepareGameDeletion(id);
   if (!plan) throw new AppError(ErrorCodes.NOT_FOUND, '游戏记录不存在', 404);
 
-  getDb().transaction(() => deleteGameRecords(id))();
+  await getDbExecutor().withTransaction((transaction) => deleteGameRecords(id, transaction));
   cleanupGameFiles(plan);
   return { ok: true };
 }
 
-function prepareGameDeletion(id: string): GameDeletionPlan | null {
-  const game = getGame(id);
+async function prepareGameDeletion(id: string): Promise<GameDeletionPlan | null> {
+  const game = await getGame(id);
   if (!game) return null;
+  const generatedAudioUrls: string[] = [];
+  for (const url of Array.isArray(game.audioResources) ? game.audioResources : []) {
+    if (typeof url === 'string' && await shouldCleanAudioUrl(url, id)) generatedAudioUrls.push(url);
+  }
   return {
     gameId: game.id,
-    generatedAudioUrls: Array.isArray(game.audioResources)
-      ? game.audioResources.filter(
-        (url): url is string => typeof url === 'string' && shouldCleanAudioUrl(url, id),
-      )
-      : [],
+    generatedAudioUrls,
   };
 }
 
-function deleteGameRecords(id: string): boolean {
-  if (!repo.findGameById(id)) return false;
-  deletePlaybackEvents(id);
-  repo.deleteGameById(id);
+async function deleteGameRecords(id: string, transaction: DbExecutor = getDbExecutor()): Promise<boolean> {
+  if (!await repo.findGameById(id, transaction)) return false;
+  await deletePlaybackEvents(id, transaction);
+  await repo.deleteGameById(id, transaction);
   return true;
 }
 
@@ -143,8 +136,8 @@ function cleanupGameFiles(plan: GameDeletionPlan): void {
   });
 }
 
-function shouldCleanAudioUrl(url: string, excludeGameId: string): boolean {
-  const otherGames = repo.findAudioResourcesExceptGame(excludeGameId || '');
+async function shouldCleanAudioUrl(url: string, excludeGameId: string): Promise<boolean> {
+  const otherGames = await repo.findAudioResourcesExceptGame(excludeGameId || '');
   const otherUrls = new Set<string>();
   otherGames.forEach((json) => {
     const resources = parseJson<string[]>(json, []);
@@ -153,10 +146,10 @@ function shouldCleanAudioUrl(url: string, excludeGameId: string): boolean {
   return !otherUrls.has(url);
 }
 
-function getAdminStats(): AdminStats {
-  const typeCounts = repo.countGamesByType();
+async function getAdminStats(): Promise<AdminStats> {
+  const typeCounts = await repo.countGamesByType();
   return {
-    totalGames: repo.countAllGames(),
+    totalGames: await repo.countAllGames(),
     typeCounts
   };
 }

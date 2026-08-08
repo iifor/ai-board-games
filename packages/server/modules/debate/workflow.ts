@@ -274,9 +274,9 @@ function registerDebateWorkflow(): void {
   registerWorkflow(debateWorkflow as never, handlers as never);
 }
 
-function createDebateWorkflowMatch(config: DebateConfig): WorkflowMatch {
+async function createDebateWorkflowMatch(config: DebateConfig): Promise<WorkflowMatch> {
   registerDebateWorkflow();
-  const initialState = createInitialDebateState(config);
+  const initialState = await createInitialDebateState(config);
   const runtimeConfig = {
     topic: config.topic,
     debateTeams: config.debateTeams,
@@ -292,7 +292,7 @@ function createDebateWorkflowMatch(config: DebateConfig): WorkflowMatch {
 }
 
 async function runDebateWorkflow(config: DebateConfig, options: { onEvent?: (event: Record<string, unknown>) => void } = {}): Promise<SerializedGame> {
-  const match = createDebateWorkflowMatch(config);
+  const match = await createDebateWorkflowMatch(config);
   await flushOutbox(match.id, options.onEvent);
   while (true) {
     const { processed, match: current } = await drainAiTasks(match.id, { maxTasks: 1 }) as unknown as { processed: boolean; match: WorkflowMatch };
@@ -346,7 +346,7 @@ async function createRuntime(match: WorkflowMatch, state: WorkflowState): Promis
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration: AgentSkillRegistry -> SkillRegistry
   const roleSkillRegistry = createDebateRoleSkillRegistry(skillRegistry as any);
   const fallbackAudit = createFallbackAudit(match.id, 'debate', { gameType: 'debate' });
-  const agents = createDebateAgents(config, topic, fallbackAudit, match.id, roleSkillRegistry, { sessionPersistence: true });
+  const agents = await createDebateAgents(config, topic, fallbackAudit, match.id, roleSkillRegistry, { sessionPersistence: true });
   const runtimeState = {
     gameId: match.id,
     mode: 'real',

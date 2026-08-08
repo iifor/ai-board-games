@@ -58,7 +58,7 @@ class DebateGameAgent extends BaseGameAgent {
       gameType: 'debate',
       onRecord: (event: AgentFallbackEvent) => this.recordFallback(event),
     });
-    this.agents = createDebateAgents(config, this.topic, this.fallbackAudit, this.gameId, this.roleSkillRegistry, { sessionPersistence: false });
+    this.agents = [];
     this.phases = [];
     this.host = config.host || null;
     this.winner = null;
@@ -79,6 +79,7 @@ class DebateGameAgent extends BaseGameAgent {
 
   async run(): Promise<SerializedGame> {
     try {
+      this.agents = await createDebateAgents(this.config, this.topic, this.fallbackAudit, this.gameId, this.roleSkillRegistry, { sessionPersistence: false });
       recordSnapshot(this.trace, 'game-start', this.serialize() as unknown as Parameters<typeof recordSnapshot>[2], { phase: 'init' });
       await this.emit({ type: 'players', players: this.serialize().players, game: this.serialize() });
       const ctx = this.buildCtx();

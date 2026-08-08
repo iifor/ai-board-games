@@ -86,10 +86,21 @@ interface OTelAttributeValue {
 
 let tracerProvider: BasicTracerProvider | null = null;
 let otelTracer: ReturnType<BasicTracerProvider['getTracer']> | null = null;
+const traceWriteQueues = new Map<string, Promise<void>>();
+
+function enqueueTraceWrite(traceId: string, operation: () => Promise<void>): Promise<void> {
+  const queued = (traceWriteQueues.get(traceId) || Promise.resolve())
+    .then(operation)
+    .catch((error: unknown) => {
+      console.error(`[observability] PostgreSQL write failed for ${traceId}:`, (error as Error).message);
+    });
+  traceWriteQueues.set(traceId, queued);
+  return queued;
+}
 
 function ensureOtel(): void {
   if (otelTracer) return;
-  const exporter = new SqliteSpanExporter();
+  const exporter = new PostgresSpanExporter();
   tracerProvider = new BasicTracerProvider({
     spanProcessors: [new BatchSpanProcessor(exporter, {
       maxQueueSize: 2048,
@@ -103,10 +114,9 @@ function ensureOtel(): void {
 
 // ── SqliteSpanExporter ──────────────────────────────────────────────
 
-class SqliteSpanExporter implements SpanExporter {
+class PostgresSpanExporter implements SpanExporter {
   export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
-    try {
-      for (const span of spans) {
+    void Promise.all(spans.map(async (span) => {
         const sctx = span.spanContext();
         // parentSpanId is undefined for root spans; store null instead
         const parentSpanId = span.parentSpanContext?.spanId || null;
@@ -117,11 +127,7 @@ class SqliteSpanExporter implements SpanExporter {
         const errJson = (span.status && span.status.code === SpanStatusCode.ERROR && span.status.message)
           ? JSON.stringify({ message: span.status.message }) : null;
 
-        if (!db.findTraceById(sctx.traceId)) {
-          continue;
-        }
-
-        db.insertSpan({
+        await enqueueTraceWrite(sctx.traceId, () => db.insertSpan({
           id: sctx.spanId,
           trace_id: sctx.traceId,
           parent_span_id: parentSpanId || null,
@@ -133,13 +139,11 @@ class SqliteSpanExporter implements SpanExporter {
           attributes_json: safeJson(attrs),
           error_json: errJson,
           created_at: new Date().toISOString(),
-        });
-      }
-      resultCallback({ code: ExportResultCode.SUCCESS });
-    } catch (error: unknown) {
-      console.error('[SqliteSpanExporter] export failed:', (error as Error).message);
+        }));
+      })).then(() => resultCallback({ code: ExportResultCode.SUCCESS })).catch((error: unknown) => {
+      console.error('[PostgresSpanExporter] export failed:', (error as Error).message);
       resultCallback({ code: ExportResultCode.FAILED, error: error as Error });
-    }
+    });
   }
 
   shutdown(): Promise<void> {
@@ -241,7 +245,7 @@ function createTraceContext(
   const startedAt = now();
 
   // Immediately INSERT game_traces row for real-time tracking
-  db.insertTrace({
+  void enqueueTraceWrite(traceId, () => db.insertTrace({
     id: traceId,
     game_type: gameType,
     game_mode: safeAttrValue(gameMode) as string,
@@ -258,7 +262,7 @@ function createTraceContext(
       sourcePlayerId: Number(player.sourcePlayerId || player.id),
       nickname: String(player.nickname || player.name || `${player.seatNumber || player.id}号`),
     }))),
-  });
+  }));
 
   const ctx: TraceContext = {
     traceId,
@@ -361,7 +365,7 @@ function recordLlmCall(ctx: TraceContext, record: LlmRecordInput): string {
     ? calcCost(record.model || '', promptTokens || 0, completionTokens || 0)
     : null;
 
-  db.insertLlmRecord({
+  void enqueueTraceWrite(ctx.traceId, () => db.insertLlmRecord({
     id,
     trace_id: ctx.traceId,
     span_id: safeStr(record.spanId) || null,
@@ -383,21 +387,17 @@ function recordLlmCall(ctx: TraceContext, record: LlmRecordInput): string {
     status: safeStr(record.status, 'success'),
     error_message: safeStr(record.errorMessage) || null,
     created_at: now(),
-  });
+  }));
 
   // Increment game_traces counter
-  try {
-    const current = db.findTraceById(ctx.traceId);
-    const prevCount = current?.llm_call_count || 0;
-    db.updateTraceStatus(ctx.traceId, { llm_call_count: prevCount + 1 });
-  } catch { /* best-effort */ }
+  void enqueueTraceWrite(ctx.traceId, () => db.incrementTraceCounter(ctx.traceId, 'llm_call_count'));
 
   return id;
 }
 
 function recordDecision(ctx: TraceContext, decision: DecisionInput): string {
   const id = uuid();
-  db.insertDecision({
+  void enqueueTraceWrite(ctx.traceId, () => db.insertDecision({
     id,
     trace_id: ctx.traceId,
     span_id: safeStr(decision.spanId) || null,
@@ -415,19 +415,15 @@ function recordDecision(ctx: TraceContext, decision: DecisionInput): string {
     fallback_reason: safeStr(decision.fallbackReason) || null,
     skill_id: safeStr(decision.skillId) || null,
     created_at: now(),
-  });
+  }));
 
-  try {
-    const current = db.findTraceById(ctx.traceId);
-    const prevCount = current?.agent_decision_count || 0;
-    db.updateTraceStatus(ctx.traceId, { agent_decision_count: prevCount + 1 });
-  } catch { /* best-effort */ }
+  void enqueueTraceWrite(ctx.traceId, () => db.incrementTraceCounter(ctx.traceId, 'agent_decision_count'));
 
   return id;
 }
 
 function recordEvent(ctx: TraceContext, event: EventInput): void {
-  db.insertEvent({
+  void enqueueTraceWrite(ctx.traceId, () => db.insertEvent({
     trace_id: ctx.traceId,
     span_id: safeStr(event.spanId) || null,
     event_type: safeStr(event.type, 'unknown'),
@@ -435,19 +431,15 @@ function recordEvent(ctx: TraceContext, event: EventInput): void {
     day: safeInt(event.day),
     event_json: safeJson(event),
     received_at: now(),
-  });
+  }));
 
-  try {
-    const current = db.findTraceById(ctx.traceId);
-    const prevCount = current?.event_count || 0;
-    db.updateTraceStatus(ctx.traceId, { event_count: prevCount + 1 });
-  } catch { /* best-effort */ }
+  void enqueueTraceWrite(ctx.traceId, () => db.incrementTraceCounter(ctx.traceId, 'event_count'));
 }
 
 function recordSnapshot(ctx: TraceContext, checkpoint: string, snapshot: SnapshotInput, meta: SnapshotMeta = {}): void {
   const players = snapshot.players || [];
   const alive = players.filter((p) => p.alive);
-  db.insertSnapshot({
+  void enqueueTraceWrite(ctx.traceId, () => db.insertSnapshot({
     trace_id: ctx.traceId,
     checkpoint: safeStr(checkpoint, 'unknown'),
     day: safeInt(meta.day),
@@ -456,7 +448,7 @@ function recordSnapshot(ctx: TraceContext, checkpoint: string, snapshot: Snapsho
     alive_count: Number.isFinite(alive.length) ? alive.length : 0,
     snapshot_json: safeJson(snapshot),
     created_at: now(),
-  });
+  }));
 }
 
 function flushTrace(ctx: TraceContext | null): void {
@@ -476,12 +468,12 @@ function flushTrace(ctx: TraceContext | null): void {
   }
 
   try {
-    db.updateTraceStatus(ctx.traceId, {
+    void enqueueTraceWrite(ctx.traceId, () => db.updateTraceStatus(ctx.traceId, {
       status: safeStr(ctx.status, 'completed'),
       error_message: safeStr(ctx.errorMessage) || null,
       completed_at: ctx.completedAt || null,
       duration_ms: Number.isFinite(durationMs) ? durationMs : null,
-    });
+    }));
   } catch (error: unknown) {
     console.error('[observability] flush update failed:', (error as Error).message);
   }

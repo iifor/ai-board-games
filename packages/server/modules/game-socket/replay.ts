@@ -213,11 +213,11 @@ async function replayGameSession(
   replayGameId: string,
   options: ReplayOptions = {},
 ): Promise<void> {
-  const game = getGame(replayGameId) as unknown as ReplayGame | null;
+  const game = await getGame(replayGameId) as unknown as ReplayGame | null;
   if (!game) throw new Error('历史对局不存在。');
   if (normalizeGameType(game.gameType || game.type) !== gameType)
     throw new Error('历史对局类型与当前游戏不匹配。');
-  const storedEvents = listPlaybackEvents(replayGameId);
+  const storedEvents = await listPlaybackEvents(replayGameId);
   if (storedEvents.length) {
     if (gameType === 'werewolf') {
       const storedViewMode = storedEvents[0].viewMode || 'god';

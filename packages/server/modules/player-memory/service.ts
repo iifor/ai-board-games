@@ -45,8 +45,8 @@ interface CompletedGame {
 // 跨局玩家画像（长期记忆）
 // ============================================================
 
-function getPlayerGameMemories(gameType: string, ownerPlayerId: number, participantIds: number[]): PlayerGameMemory[] {
-  return repo.findMemories(gameType, ownerPlayerId, participantIds.filter((id) => id !== ownerPlayerId))
+async function getPlayerGameMemories(gameType: string, ownerPlayerId: number, participantIds: number[]): Promise<PlayerGameMemory[]> {
+  return (await repo.findMemories(gameType, ownerPlayerId, participantIds.filter((id) => id !== ownerPlayerId)))
     .map((row) => ({
       gameType: row.game_type,
       ownerPlayerId: row.owner_player_id,
@@ -57,13 +57,13 @@ function getPlayerGameMemories(gameType: string, ownerPlayerId: number, particip
     }));
 }
 
-function formatRelationshipMemoryForPrompt(
+async function formatRelationshipMemoryForPrompt(
   gameType: string,
   ownerPlayerId: number,
   participants: Participant[],
-): string {
+): Promise<string> {
   const participantIds = participants.map(resolvePlayerId).filter((id): id is number => Boolean(id));
-  const memories = getPlayerGameMemories(gameType, ownerPlayerId, participantIds);
+  const memories = await getPlayerGameMemories(gameType, ownerPlayerId, participantIds);
   return formatRelationshipMemoryList(memories, participants);
 }
 
@@ -118,7 +118,7 @@ async function recordCompletedGameMemories(game: CompletedGame): Promise<void> {
       const subjectId = resolvePlayerId(subject)!;
       if (ownerId === subjectId) continue;
 
-      const previous = repo.findMemory(gameType, ownerId, subjectId);
+      const previous = await repo.findMemory(gameType, ownerId, subjectId);
       const prevData = parseJson<MemoryData>(previous?.traits_json, {});
       if (prevData.lastGameId === game.id) continue;
 
@@ -129,7 +129,7 @@ async function recordCompletedGameMemories(game: CompletedGame): Promise<void> {
         : newObservation;
 
       const gamesPlayed = Number(previous?.games_played || 0) + 1;
-      repo.upsertMemory({
+      await repo.upsertMemory({
         gameType,
         ownerPlayerId: ownerId,
         subjectPlayerId: subjectId,
@@ -287,21 +287,21 @@ function parseObservationResponse(
 // 局内会话持久化
 // ============================================================
 
-function loadPlayerSession(gameType: string, matchId: string, playerId: number, basePromptHash: string): ChatMessage[] | null {
-  const row = repo.loadLatestSession(matchId, `${gameType}_session`, String(playerId));
+async function loadPlayerSession(gameType: string, matchId: string, playerId: number, basePromptHash: string): Promise<ChatMessage[] | null> {
+  const row = await repo.loadLatestSession(matchId, `${gameType}_session`, String(playerId));
   if (!row) return null;
   const snapshot = parseJson<SessionSnapshot | null>(row.snapshot_json, null);
   if (!snapshot || snapshot.basePromptHash !== basePromptHash || !Array.isArray(snapshot.messages)) return null;
   return snapshot.messages.filter(isChatMessage);
 }
 
-function savePlayerSession(
+async function savePlayerSession(
   gameType: string,
   matchId: string,
   playerId: number,
   basePromptHash: string,
   messages: ChatMessage[],
-): void {
+): Promise<void> {
   const compacted = compactMessages(messages);
   const snapshot: SessionSnapshot = {
     gameType,
@@ -311,15 +311,15 @@ function savePlayerSession(
     messages: compacted,
     updatedAt: new Date().toISOString(),
   };
-  repo.replaceSession(matchId, `${gameType}_session`, String(playerId), JSON.stringify(snapshot));
+  await repo.replaceSession(matchId, `${gameType}_session`, String(playerId), JSON.stringify(snapshot));
 }
 
 // ============================================================
 // 查询/管理
 // ============================================================
 
-function getMemoryStats(): MemoryStats {
-  const rows = repo.getMemoryStats();
+async function getMemoryStats(): Promise<MemoryStats> {
+  const rows = await repo.getMemoryStats();
   const games = SUPPORTED_MEMORY_GAME_TYPES.map((gameType) => {
     const row = rows.find((item) => item.gameType === gameType);
     return { gameType, count: Number(row?.count || 0), lastUpdatedAt: row?.lastUpdatedAt || null };
@@ -331,13 +331,13 @@ function getMemoryStats(): MemoryStats {
   };
 }
 
-function listPlayerMemories(
+async function listPlayerMemories(
   gameType?: string,
   page = 1,
   pageSize = 20,
-): PaginatedMemories {
-  const total = repo.countPlayerMemories(gameType);
-  const rows = repo.findAllPlayerMemories(gameType, page, pageSize);
+): Promise<PaginatedMemories> {
+  const total = await repo.countPlayerMemories(gameType);
+  const rows = await repo.findAllPlayerMemories(gameType, page, pageSize);
   const items = rows.map((row) => ({
     id: row.id,
     gameType: row.game_type,
@@ -355,10 +355,10 @@ function listPlayerMemories(
   return { items, total, page, pageSize };
 }
 
-function clearPlayerMemories(gameType: 'werewolf' | 'debate' | 'all'): { gameType: string; deletedCount: number } {
+async function clearPlayerMemories(gameType: 'werewolf' | 'debate' | 'all'): Promise<{ gameType: string; deletedCount: number }> {
   return {
     gameType,
-    deletedCount: repo.runInTransaction(() => repo.clearMemories(gameType === 'all' ? undefined : gameType)),
+    deletedCount: await repo.runInTransaction(() => repo.clearMemories(gameType === 'all' ? undefined : gameType)),
   };
 }
 

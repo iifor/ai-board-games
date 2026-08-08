@@ -1,35 +1,22 @@
-import { getDb } from '../../db';
+import { getDbExecutor } from '../../db';
+import type { DbExecutor } from '../../db/types';
 import { parseJson, toJson } from '../games/utils';
 import type { GamePlaybackEventRow } from '../../types/database';
 import type { PlaybackEvent } from '@ai-presenter/shared/types/playbackTypes';
 
-function replacePlaybackEvents(gameId: string, events: PlaybackEvent[]): void {
-  const db = getDb();
-  db.prepare('DELETE FROM game_playback_events WHERE game_id = ?').run(gameId);
-  const insert = db.prepare(`
-    INSERT INTO game_playback_events (
-      game_id, sequence, protocol_version, event_type, view_mode, payload_json, media_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
+async function replacePlaybackEvents(gameId: string, events: PlaybackEvent[], db: DbExecutor = getDbExecutor()): Promise<void> {
+  await db.execute('DELETE FROM game_playback_events WHERE game_id = $1', [gameId]);
   for (const event of events) {
-    insert.run(
-      gameId,
-      event.sequence,
-      event.protocolVersion,
-      event.eventType,
-      event.viewMode,
-      toJson(event.payload),
-      toJson(event.media),
-    );
+    await db.execute(`INSERT INTO game_playback_events
+      (game_id, sequence, protocol_version, event_type, view_mode, payload_json, media_json)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)`, [gameId, event.sequence, event.protocolVersion,
+      event.eventType, event.viewMode, toJson(event.payload), toJson(event.media)]);
   }
 }
 
-function listPlaybackEvents(gameId: string): PlaybackEvent[] {
-  const rows = getDb().prepare(`
-    SELECT * FROM game_playback_events
-    WHERE game_id = ?
-    ORDER BY sequence ASC
-  `).all(gameId) as GamePlaybackEventRow[];
+async function listPlaybackEvents(gameId: string): Promise<PlaybackEvent[]> {
+  const rows = await getDbExecutor().queryMany<GamePlaybackEventRow>(`
+    SELECT * FROM game_playback_events WHERE game_id = $1 ORDER BY sequence ASC`, [gameId]);
   return rows.map((row) => ({
     protocolVersion: row.protocol_version,
     sequence: row.sequence,
@@ -40,8 +27,8 @@ function listPlaybackEvents(gameId: string): PlaybackEvent[] {
   }));
 }
 
-function deletePlaybackEvents(gameId: string): void {
-  getDb().prepare('DELETE FROM game_playback_events WHERE game_id = ?').run(gameId);
+async function deletePlaybackEvents(gameId: string, db: DbExecutor = getDbExecutor()): Promise<void> {
+  await db.execute('DELETE FROM game_playback_events WHERE game_id = $1', [gameId]);
 }
 
 export { replacePlaybackEvents, listPlaybackEvents, deletePlaybackEvents };

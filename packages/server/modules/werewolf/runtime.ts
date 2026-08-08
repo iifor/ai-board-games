@@ -211,11 +211,11 @@ async function createInitialWerewolfState(config: Record<string, unknown>): Prom
   const selected = toSeatPlayers((config.players as Player[]).slice(0, roleSlots.length));
   const shuffledRoles = shuffle(roleSlots);
   const wolves = selected.filter((_: Player, index: number) => getRoleConfig(modeConfig, roleIdOf(shuffledRoles[index])).faction === 'wolves').map((player: Player) => player.id);
-  const agents = selected.map((player: Player, index: number) => {
+  const agents = await Promise.all(selected.map(async (player: Player, index: number) => {
     const roleId = roleIdOf(shuffledRoles[index]);
     const roleConfig = getRoleConfig(modeConfig, roleId);
     return createRuntimeAgent(player, roleId, roleConfig, wolves, modeConfig, skillRegistry, fallbackAudit, `werewolf-${Date.now()}`, roleSkillRegistry, selected);
-  });
+  }));
   return {
     werewolfMode: modeConfig,
     modeConfig,
@@ -255,12 +255,12 @@ async function createRuntime(
   const roleSkillRegistry = createWerewolfRoleSkillRegistry(modeConfig, skillRegistry);
   const fallbackAudit = createFallbackAudit(match.id, 'werewolf', { gameType: 'werewolf' });
   const wolves = ((sourceState.players || []) as Record<string, unknown>[]).filter((player) => player.faction === 'wolves').map((player) => player.id as number);
-  const agents: Agent[] = ((sourceState.players || []) as Record<string, unknown>[]).map((snapshot) => {
+  const agents: Agent[] = await Promise.all(((sourceState.players || []) as Record<string, unknown>[]).map(async (snapshot) => {
     const source = ((config.players || []) as Record<string, unknown>[]).find((player) =>
       Number(player.id) === Number(snapshot.sourcePlayerId || snapshot.id)
     ) || snapshot;
     return createRuntimeAgent({ ...source, ...snapshot } as unknown as Player, snapshot.role as string, (snapshot.roleConfig as RoleConfig) || getRoleConfig(modeConfig, snapshot.role as string), wolves, modeConfig, skillRegistry, fallbackAudit, match.id, roleSkillRegistry, (sourceState.players || []) as Array<{ id: number; nickname?: string; name?: string; sex?: string }>);
-  });
+  }));
   const state: WerewolfState = {
     ...sourceState,
     modeConfig,
@@ -296,7 +296,7 @@ async function createRuntime(
   };
 }
 
-function createRuntimeAgent(
+async function createRuntimeAgent(
   player: Player,
   roleId: string,
   roleConfig: RoleConfig,
@@ -316,7 +316,7 @@ function createRuntimeAgent(
     faction?: string;
     alive?: boolean;
   }>
-): Agent {
+): Promise<Agent> {
   const agent: Agent = {
     ...player,
     id: Number(player.seatNumber || player.id),
@@ -340,7 +340,7 @@ function createRuntimeAgent(
     votes: Array.isArray(player.votes) ? player.votes : []
   };
   const stablePlayerId = Number(agent.sourcePlayerId || agent.id);
-  const relationshipMemory = formatRelationshipMemoryForPrompt(
+  const relationshipMemory = await formatRelationshipMemoryForPrompt(
     'werewolf',
     stablePlayerId,
     allPlayers || [],
@@ -348,12 +348,12 @@ function createRuntimeAgent(
   agent.baseSystemPrompt = buildSystemPrompt(agent, wolves, skillRegistry, allPlayers, modeConfig, relationshipMemory);
   const basePromptHash = hashText(buildSystemPrompt(agent, wolves, skillRegistry, allPlayers, modeConfig));
   agent.baseSystemPromptHash = basePromptHash;
-  const initialMessages = loadPlayerSession('werewolf', gameId, stablePlayerId, basePromptHash) || undefined;
+  const initialMessages = await loadPlayerSession('werewolf', gameId, stablePlayerId, basePromptHash) || undefined;
   agent.playerAgent = new PlayerAgent(agent, agent.baseSystemPrompt, {
     onError: (entry: unknown) => (fallbackAudit as { record: (entry: unknown) => void }).record(entry),
     gameId,
     initialMessages,
-    onMessagesChanged: (messages) => savePlayerSession(
+    onMessagesChanged: (messages) => void savePlayerSession(
       'werewolf',
       gameId,
       stablePlayerId,

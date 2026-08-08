@@ -17,9 +17,9 @@ function wakeMatch(req: Request, res: Response): void {
   res.json(formatSuccess(service.wakeTick(matchId)));
 }
 
-function deleteMatch(req: Request, res: Response, next: NextFunction): void {
+async function deleteMatch(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    res.json(formatSuccess(service.deleteWorkflowMatch(String(req.params.matchId))));
+    res.json(formatSuccess(await service.deleteWorkflowMatch(String(req.params.matchId))));
   } catch (error) {
     next(error);
   }

@@ -288,21 +288,21 @@ interface PublicPlayer {
 // 创建 AI 智能体
 // ============================================================
 
-function createWerewolfAgents(
+async function createWerewolfAgents(
   config: CreateAgentsConfig,
   modeConfig: ModeConfig,
   skillRegistry: SkillRegistryLike,
   fallbackAudit: FallbackAudit,
   gameId: string,
   roleSkillRegistry: RoleSkillRegistry | null = null
-): WerewolfAgent[] {
+): Promise<WerewolfAgent[]> {
   const roleSlots = expandModeRoleSlots(modeConfig.roles);
   const selected = toSeatPlayers(config.players.slice(0, roleSlots.length));
   const roles = shuffle(roleSlots);
   const resolveRoleId = (entry: string | ModeRoleEntry): string => typeof entry === 'string' ? entry : (entry?.roleId || entry?.id || '');
   const wolves = selected.filter((_, index) => getRoleConfig(modeConfig, resolveRoleId(roles[index])).faction === 'wolves').map((player) => player.id);
 
-  return selected.map((player, index) => {
+  return Promise.all(selected.map(async (player, index) => {
     const { fallbackModel, ...publicPlayer } = player;
     const roleId = resolveRoleId(roles[index]);
     const roleConfig = getRoleConfig(modeConfig, roleId);
@@ -347,7 +347,7 @@ function createWerewolfAgents(
       seerChecks: [],
       votes: []
     };
-    const relationshipMemory = formatRelationshipMemoryForPrompt(
+    const relationshipMemory = await formatRelationshipMemoryForPrompt(
       'werewolf',
       Number(agent.sourcePlayerId || agent.id),
       selected,
@@ -361,7 +361,7 @@ function createWerewolfAgents(
     });
     roleSkillRegistry?.applyToPlayer(agent.playerAgent, roleId);
     return agent;
-  });
+  }));
 }
 
 function expandModeRoleSlots(roles: Array<string | ModeRoleEntry> = []): Array<string | ModeRoleEntry> {

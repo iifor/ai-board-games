@@ -1,4 +1,4 @@
-import { getDb } from '../../db';
+import { getDbExecutor } from '../../db';
 
 // ── Row types (match DB schema) ──────────────────────────────────────
 
@@ -217,40 +217,40 @@ interface InsertSnapshotInput {
 
 // ── Traces ───────────────────────────────────────────────────────────
 
-function insertTrace(row: InsertTraceInput): void {
-  const db = getDb();
-  db.prepare(`
+async function insertTrace(row: InsertTraceInput): Promise<void> {
+  await getDbExecutor().execute(`
     INSERT INTO game_traces (id, game_type, game_mode, status, llm_call_count, agent_decision_count, event_count, error_message, created_at, completed_at, duration_ms, participants_json)
-    VALUES (@id, @game_type, @game_mode, @status, @llm_call_count, @agent_decision_count, @event_count, @error_message, @created_at, @completed_at, @duration_ms, @participants_json)
-  `).run(row);
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+  `, [row.id, row.game_type, row.game_mode, row.status, row.llm_call_count, row.agent_decision_count,
+    row.event_count, row.error_message, row.created_at, row.completed_at, row.duration_ms, row.participants_json]);
 }
 
-function updateTraceStatus(id: string, updates: UpdateTraceInput): void {
-  const db = getDb();
+async function updateTraceStatus(id: string, updates: UpdateTraceInput): Promise<void> {
   const sets: string[] = [];
-  const params: Record<string, string | number | null | undefined> = { id };
+  const params: unknown[] = [];
+  const allowed = new Set(['status', 'error_message', 'completed_at', 'duration_ms', 'llm_call_count', 'agent_decision_count', 'event_count']);
   for (const [key, value] of Object.entries(updates)) {
-    if (value === undefined) continue;
-    sets.push(`${key} = @${key}`);
-    params[key] = value;
+    if (value === undefined || !allowed.has(key)) continue;
+    params.push(value);
+    sets.push(`${key} = $${params.length}`);
   }
   if (!sets.length) return;
-  db.prepare(`UPDATE game_traces SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  params.push(id);
+  await getDbExecutor().execute(`UPDATE game_traces SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
 }
 
-function findTraces({ gameType, status, limit = 50, offset = 0 }: FindTracesParams = {}): GameTraceRow[] {
-  const db = getDb();
-  const clauses: string[] = [];
-  const params: Record<string, string | number> = {};
-  if (gameType) { clauses.push('game_type = @gameType'); params.gameType = gameType; }
-  if (status) { clauses.push('status = @status'); params.status = status; }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  return db.prepare(`SELECT * FROM game_traces ${where} ORDER BY created_at DESC LIMIT @limit OFFSET @offset`).all({ ...params, limit, offset }) as GameTraceRow[];
+async function incrementTraceCounter(id: string, counter: 'llm_call_count' | 'agent_decision_count' | 'event_count'): Promise<void> {
+  await getDbExecutor().execute(`UPDATE game_traces SET ${counter} = ${counter} + 1 WHERE id = $1`, [id]);
 }
 
-function findTraceById(id: string): GameTraceRow | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM game_traces WHERE id = @id').get({ id }) as GameTraceRow | undefined;
+async function findTraces({ gameType, status, limit = 50, offset = 0 }: FindTracesParams = {}): Promise<GameTraceRow[]> {
+  return getDbExecutor().queryMany<GameTraceRow>(`SELECT * FROM game_traces
+    WHERE ($1::text IS NULL OR game_type = $1) AND ($2::text IS NULL OR status = $2)
+    ORDER BY created_at DESC LIMIT $3 OFFSET $4`, [gameType || null, status || null, limit, offset]);
+}
+
+async function findTraceById(id: string): Promise<GameTraceRow | undefined> {
+  return (await getDbExecutor().queryOne<GameTraceRow>('SELECT * FROM game_traces WHERE id = $1', [id])) || undefined;
 }
 
 interface TraceParticipant {
@@ -259,30 +259,30 @@ interface TraceParticipant {
   nickname: string;
 }
 
-function resolveTraceParticipants(traceId: string): TraceParticipant[] {
-  const db = getDb();
-  const trace = findTraceById(traceId);
+async function resolveTraceParticipants(traceId: string): Promise<TraceParticipant[]> {
+  const db = getDbExecutor();
+  const trace = await findTraceById(traceId);
   const stored = parseParticipants(trace?.participants_json);
   if (stored.length) return stored;
 
-  const rootSpan = db.prepare(`
+  const rootSpan = await db.queryOne<{ attributes_json?: string }>(`
     SELECT attributes_json FROM trace_spans
-    WHERE trace_id = @traceId AND span_name = 'game-root'
+    WHERE trace_id = $1 AND span_name = 'game-root'
     ORDER BY created_at ASC LIMIT 1
-  `).get({ traceId }) as { attributes_json?: string } | undefined;
+  `, [traceId]);
   const gameId = readGameId(rootSpan?.attributes_json);
   if (gameId) {
-    const match = db.prepare('SELECT state_json FROM matches WHERE id = @gameId').get({ gameId }) as { state_json?: string } | undefined;
+    const match = await db.queryOne<{ state_json?: string }>('SELECT state_json FROM matches WHERE id = $1', [gameId]);
     const participants = readParticipantsFromState(match?.state_json);
     if (participants.length) return participants;
   }
 
-  const ids = db.prepare(`
-    SELECT player_id FROM llm_records WHERE trace_id = @traceId AND player_id IS NOT NULL
+  const ids = await db.queryMany<{ player_id: number }>(`
+    SELECT player_id FROM llm_records WHERE trace_id = $1 AND player_id IS NOT NULL
     UNION
-    SELECT player_id FROM agent_decisions WHERE trace_id = @traceId
+    SELECT player_id FROM agent_decisions WHERE trace_id = $1
     ORDER BY player_id
-  `).all({ traceId }) as Array<{ player_id: number }>;
+  `, [traceId]);
   return ids.map(({ player_id }) => ({
     seatId: Number(player_id),
     sourcePlayerId: Number(player_id),
@@ -328,137 +328,133 @@ function isTraceParticipant(value: unknown): value is TraceParticipant {
     && Boolean(participant?.nickname);
 }
 
-function deleteTrace(id: string): void {
-  const db = getDb();
-  db.prepare('DELETE FROM game_traces WHERE id = @id').run({ id });
+async function deleteTrace(id: string): Promise<void> {
+  await getDbExecutor().execute('DELETE FROM game_traces WHERE id = $1', [id]);
 }
 
-function deleteTracesByGameId(gameId: string): number {
-  const db = getDb();
-  if (db.isJsonFallback) return 0;
-  return db.prepare(`
+async function deleteTracesByGameId(gameId: string): Promise<number> {
+  const result = await getDbExecutor().execute(`
     DELETE FROM game_traces
     WHERE id IN (
       SELECT DISTINCT trace_id
       FROM trace_spans
       WHERE parent_span_id IS NULL
-        AND json_extract(attributes_json, '$."game.id"') = @gameId
+        AND attributes_json ->> 'game.id' = $1
     )
-  `).run({ gameId }).changes;
+  `, [gameId]);
+  return result.rowCount;
 }
 
 interface CountRow {
   cnt: number;
 }
 
-function deleteOldTraces(beforeDate: string, maxCount: number): void {
-  const db = getDb();
-  db.transaction(() => {
-    db.prepare('DELETE FROM game_traces WHERE created_at < @before').run({ before: beforeDate });
-    const row = db.prepare('SELECT COUNT(*) AS cnt FROM game_traces').get() as CountRow;
+async function deleteOldTraces(beforeDate: string, maxCount: number): Promise<void> {
+  await getDbExecutor().withTransaction(async (db) => {
+    await db.execute('DELETE FROM game_traces WHERE created_at < $1', [beforeDate]);
+    const row = await db.queryOne<CountRow>('SELECT COUNT(*) AS cnt FROM game_traces');
+    if (!row) return;
     const count = row.cnt;
     if (count > maxCount) {
       const excess = count - maxCount;
-      db.prepare(`DELETE FROM game_traces WHERE id IN (SELECT id FROM game_traces ORDER BY created_at ASC LIMIT @excess)`).run({ excess });
+      await db.execute(`DELETE FROM game_traces WHERE id IN
+        (SELECT id FROM game_traces ORDER BY created_at ASC LIMIT $1)`, [excess]);
     }
-  })();
+  });
 }
 
 // ── Spans ────────────────────────────────────────────────────────────
 
-function insertSpan(row: InsertSpanInput): void {
-  const db = getDb();
-  db.prepare(`
+async function insertSpan(row: InsertSpanInput): Promise<void> {
+  await getDbExecutor().execute(`
     INSERT INTO trace_spans (id, trace_id, parent_span_id, span_type, span_name, start_time, end_time, status, attributes_json, error_json, created_at)
-    VALUES (@id, @trace_id, @parent_span_id, @span_type, @span_name, @start_time, @end_time, @status, @attributes_json, @error_json, @created_at)
-  `).run(row);
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+  `, [row.id, row.trace_id, row.parent_span_id, row.span_type, row.span_name, row.start_time,
+    row.end_time, row.status, row.attributes_json, row.error_json, row.created_at]);
 }
 
-function updateSpan(id: string, updates: UpdateSpanInput): void {
-  const db = getDb();
+async function updateSpan(id: string, updates: UpdateSpanInput): Promise<void> {
   const sets: string[] = [];
-  const params: Record<string, string | number | null | undefined> = { id };
+  const params: unknown[] = [];
+  const allowed = new Set(['parent_span_id', 'span_type', 'span_name', 'start_time', 'end_time', 'status', 'attributes_json', 'error_json']);
   for (const [key, value] of Object.entries(updates)) {
-    sets.push(`${key} = @${key}`);
-    params[key] = value;
+    if (!allowed.has(key)) continue;
+    params.push(value);
+    sets.push(`${key} = $${params.length}`);
   }
   if (!sets.length) return;
-  db.prepare(`UPDATE trace_spans SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  params.push(id);
+  await getDbExecutor().execute(`UPDATE trace_spans SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
 }
 
-function findSpansByTrace(traceId: string): TraceSpanRow[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM trace_spans WHERE trace_id = @traceId ORDER BY start_time ASC').all({ traceId }) as TraceSpanRow[];
+async function findSpansByTrace(traceId: string): Promise<TraceSpanRow[]> {
+  return getDbExecutor().queryMany<TraceSpanRow>('SELECT * FROM trace_spans WHERE trace_id = $1 ORDER BY start_time ASC', [traceId]);
 }
 
 // ── LLM records ──────────────────────────────────────────────────────
 
-function insertLlmRecord(row: InsertLlmRecordInput): void {
-  const db = getDb();
-  db.prepare(`
+async function insertLlmRecord(row: InsertLlmRecordInput): Promise<void> {
+  await getDbExecutor().execute(`
     INSERT INTO llm_records (id, trace_id, span_id, game_type, provider, model, api_format, player_id, player_role, player_faction, messages_json, response_text, thinking_text, temperature, max_tokens, prompt_tokens, completion_tokens, latency_ms, status, error_message, created_at)
-    VALUES (@id, @trace_id, @span_id, @game_type, @provider, @model, @api_format, @player_id, @player_role, @player_faction, @messages_json, @response_text, @thinking_text, @temperature, @max_tokens, @prompt_tokens, @completion_tokens, @latency_ms, @status, @error_message, @created_at)
-  `).run(row);
+    VALUES (${Array.from({ length: 21 }, (_, index) => `$${index + 1}`).join(', ')})
+  `, [row.id, row.trace_id, row.span_id, row.game_type, row.provider, row.model, row.api_format,
+    row.player_id, row.player_role, row.player_faction, row.messages_json, row.response_text,
+    row.thinking_text, row.temperature, row.max_tokens, row.prompt_tokens, row.completion_tokens,
+    row.latency_ms, row.status, row.error_message, row.created_at]);
 }
 
-function findLlmRecordsByTrace(traceId: string): LlmRecordRow[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM llm_records WHERE trace_id = @traceId ORDER BY created_at ASC').all({ traceId }) as LlmRecordRow[];
+async function findLlmRecordsByTrace(traceId: string): Promise<LlmRecordRow[]> {
+  return getDbExecutor().queryMany<LlmRecordRow>('SELECT * FROM llm_records WHERE trace_id = $1 ORDER BY created_at ASC', [traceId]);
 }
 
-function findLlmRecordsByPlayer(traceId: string, playerId: number): LlmRecordRow[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM llm_records WHERE trace_id = @traceId AND player_id = @playerId ORDER BY created_at ASC').all({ traceId, playerId }) as LlmRecordRow[];
+async function findLlmRecordsByPlayer(traceId: string, playerId: number): Promise<LlmRecordRow[]> {
+  return getDbExecutor().queryMany<LlmRecordRow>('SELECT * FROM llm_records WHERE trace_id = $1 AND player_id = $2 ORDER BY created_at ASC', [traceId, playerId]);
 }
 
 // ── Agent decisions ──────────────────────────────────────────────────
 
-function insertDecision(row: InsertDecisionInput): void {
-  const db = getDb();
-  db.prepare(`
+async function insertDecision(row: InsertDecisionInput): Promise<void> {
+  await getDbExecutor().execute(`
     INSERT INTO agent_decisions (id, trace_id, span_id, game_type, player_id, player_role, player_faction, decision_type, phase, day, prompt_text, response_text, chosen_target, fallback_used, fallback_reason, skill_id, created_at)
-    VALUES (@id, @trace_id, @span_id, @game_type, @player_id, @player_role, @player_faction, @decision_type, @phase, @day, @prompt_text, @response_text, @chosen_target, @fallback_used, @fallback_reason, @skill_id, @created_at)
-  `).run(row);
+    VALUES (${Array.from({ length: 17 }, (_, index) => `$${index + 1}`).join(', ')})
+  `, [row.id, row.trace_id, row.span_id, row.game_type, row.player_id, row.player_role,
+    row.player_faction, row.decision_type, row.phase, row.day, row.prompt_text, row.response_text,
+    row.chosen_target, row.fallback_used, row.fallback_reason, row.skill_id, row.created_at]);
 }
 
-function findDecisionsByTrace(traceId: string): AgentDecisionRow[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM agent_decisions WHERE trace_id = @traceId ORDER BY created_at ASC').all({ traceId }) as AgentDecisionRow[];
+async function findDecisionsByTrace(traceId: string): Promise<AgentDecisionRow[]> {
+  return getDbExecutor().queryMany<AgentDecisionRow>('SELECT * FROM agent_decisions WHERE trace_id = $1 ORDER BY created_at ASC', [traceId]);
 }
 
-function findDecisionsByPlayer(traceId: string, playerId: number): AgentDecisionRow[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM agent_decisions WHERE trace_id = @traceId AND player_id = @playerId ORDER BY created_at ASC').all({ traceId, playerId }) as AgentDecisionRow[];
+async function findDecisionsByPlayer(traceId: string, playerId: number): Promise<AgentDecisionRow[]> {
+  return getDbExecutor().queryMany<AgentDecisionRow>('SELECT * FROM agent_decisions WHERE trace_id = $1 AND player_id = $2 ORDER BY created_at ASC', [traceId, playerId]);
 }
 
 // ── Game events ──────────────────────────────────────────────────────
 
-function insertEvent(row: InsertEventInput): void {
-  const db = getDb();
-  db.prepare(`
+async function insertEvent(row: InsertEventInput): Promise<void> {
+  await getDbExecutor().execute(`
     INSERT INTO game_events (trace_id, span_id, event_type, phase, day, event_json, received_at)
-    VALUES (@trace_id, @span_id, @event_type, @phase, @day, @event_json, @received_at)
-  `).run(row);
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+  `, [row.trace_id, row.span_id, row.event_type, row.phase, row.day, row.event_json, row.received_at]);
 }
 
-function findEventsByTrace(traceId: string): GameEventRow[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM game_events WHERE trace_id = @traceId ORDER BY id ASC').all({ traceId }) as GameEventRow[];
+async function findEventsByTrace(traceId: string): Promise<GameEventRow[]> {
+  return getDbExecutor().queryMany<GameEventRow>('SELECT * FROM game_events WHERE trace_id = $1 ORDER BY id ASC', [traceId]);
 }
 
 // ── State snapshots ──────────────────────────────────────────────────
 
-function insertSnapshot(row: InsertSnapshotInput): void {
-  const db = getDb();
-  db.prepare(`
+async function insertSnapshot(row: InsertSnapshotInput): Promise<void> {
+  await getDbExecutor().execute(`
     INSERT INTO state_snapshots (trace_id, checkpoint, day, phase, player_count, alive_count, snapshot_json, created_at)
-    VALUES (@trace_id, @checkpoint, @day, @phase, @player_count, @alive_count, @snapshot_json, @created_at)
-  `).run(row);
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  `, [row.trace_id, row.checkpoint, row.day, row.phase, row.player_count, row.alive_count,
+    row.snapshot_json, row.created_at]);
 }
 
-function findSnapshotsByTrace(traceId: string): StateSnapshotRow[] {
-  const db = getDb();
-  return db.prepare('SELECT * FROM state_snapshots WHERE trace_id = @traceId ORDER BY id ASC').all({ traceId }) as StateSnapshotRow[];
+async function findSnapshotsByTrace(traceId: string): Promise<StateSnapshotRow[]> {
+  return getDbExecutor().queryMany<StateSnapshotRow>('SELECT * FROM state_snapshots WHERE trace_id = $1 ORDER BY id ASC', [traceId]);
 }
 
 export type {
@@ -472,7 +468,7 @@ export type {
 };
 
 export {
-  insertTrace, updateTraceStatus, findTraces, findTraceById, deleteTrace, deleteTracesByGameId, deleteOldTraces,
+  insertTrace, updateTraceStatus, incrementTraceCounter, findTraces, findTraceById, deleteTrace, deleteTracesByGameId, deleteOldTraces,
   resolveTraceParticipants,
   readParticipantsFromState,
   insertSpan, updateSpan, findSpansByTrace,

@@ -3,24 +3,24 @@ import * as service from './service';
 import { formatSuccess } from '../../utils/response';
 import type { GameListFilters } from './repository';
 
-function listGames(req: Request, res: Response): void {
-  res.json(formatSuccess(service.listGames(req.query as unknown as GameListFilters)));
+async function listGames(req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.listGames(req.query as unknown as GameListFilters)));
 }
 
-function getGame(req: Request, res: Response): void {
-  res.json(formatSuccess(service.getGame(req.params.id as string)));
+async function getGame(req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.getGame(req.params.id as string)));
 }
 
-function deleteGame(req: Request, res: Response): void {
-  res.json(formatSuccess(service.deleteGame(req.params.id as string)));
+async function deleteGame(req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.deleteGame(req.params.id as string)));
 }
 
-function importGame(req: Request, res: Response): void {
-  res.json(formatSuccess(service.saveGameRecord(req.body)));
+async function importGame(req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.saveGameRecord(req.body)));
 }
 
-function getStats(_req: Request, res: Response): void {
-  res.json(formatSuccess(service.getAdminStats()));
+async function getStats(_req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.getAdminStats()));
 }
 
 export { listGames, getGame, deleteGame, importGame, getStats };

@@ -107,16 +107,16 @@ interface WorkflowEvent {
  * @param roleSkillRegistry 角色技能注册表
  * @param options.sessionPersistence 是否启用会话持久化（workflow 模式需要）
  */
-function createDebateAgents(
+async function createDebateAgents(
   config: DebateConfig,
   topic: Topic,
   fallbackAudit: ReturnType<typeof createFallbackAudit>,
   gameId: string,
   roleSkillRegistry: ReturnType<typeof createDebateRoleSkillRegistry> | null = null,
   options: { sessionPersistence?: boolean } = {},
-): DebatePlayer[] {
+): Promise<DebatePlayer[]> {
   const setup = getConfiguredDebateSetup(config);
-  return setup.players.map((player, index) => {
+  return Promise.all(setup.players.map(async (player, index) => {
     const { fallbackModel, ...publicPlayer } = player as DebatePlayer & {
       fallbackModel?: { apiKey?: string; baseUrl?: string; provider?: string; model?: string; apiFormat?: string } | null;
     };
@@ -137,17 +137,17 @@ function createDebateAgents(
       messages: [],
     };
     const stablePlayerId = Number((agent as Record<string, unknown>).sourcePlayerId || agent.id);
-    const relationshipMemory = formatRelationshipMemoryForPrompt('debate', stablePlayerId, setup.players);
+    const relationshipMemory = await formatRelationshipMemoryForPrompt('debate', stablePlayerId, setup.players);
     agent.baseSystemPrompt = buildSystemPrompt(agent, topic, PHASES[0], relationshipMemory);
     const basePromptHash = buildAgentHash(agent.baseSystemPrompt as string);
     agent.baseSystemPromptHash = basePromptHash;
 
     const sessionOptions: Record<string, unknown> = {};
     if (options.sessionPersistence) {
-      const initialMessages = loadPlayerSession('debate', gameId, stablePlayerId, basePromptHash) || undefined;
+      const initialMessages = await loadPlayerSession('debate', gameId, stablePlayerId, basePromptHash) || undefined;
       sessionOptions.initialMessages = initialMessages;
       sessionOptions.onMessagesChanged = (messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>) =>
-        savePlayerSession('debate', gameId, stablePlayerId, basePromptHash, messages);
+        void savePlayerSession('debate', gameId, stablePlayerId, basePromptHash, messages);
     }
 
     agent.playerAgent = new DebateAgent(agent, agent.baseSystemPrompt as string, {
@@ -159,7 +159,7 @@ function createDebateAgents(
     roleSkillRegistry?.applyToPlayer(agent.playerAgent as never, debateRole);
     agent.messages = (agent.playerAgent as unknown as { messages: DebatePlayer['messages'] }).messages;
     return agent;
-  });
+  }));
 }
 
 // ---- State Helpers ----
@@ -167,10 +167,10 @@ function createDebateAgents(
 /**
  * 创建辩论赛初始状态（workflow 模式使用）
  */
-function createInitialDebateState(config: DebateConfig): WorkflowState {
+async function createInitialDebateState(config: DebateConfig): Promise<WorkflowState> {
   const topic = normalizeTopic(config.topic) || choose(TOPICS);
   const fallbackAudit = createFallbackAudit(`debate-${Date.now()}`, 'debate', { gameType: 'debate' });
-  const agents = createDebateAgents(config, topic, fallbackAudit, `debate-${Date.now()}`, null, { sessionPersistence: false });
+  const agents = await createDebateAgents(config, topic, fallbackAudit, `debate-${Date.now()}`, null, { sessionPersistence: false });
   return {
     topic,
     host: publicHost(config.host),
