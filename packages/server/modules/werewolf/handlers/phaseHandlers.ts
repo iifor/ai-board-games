@@ -33,9 +33,9 @@ interface HandlerResult {
 
 function createNightStartHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!);
       round.phase = 'night';
       const nextState = syncRuntimeState(runtime);
@@ -65,9 +65,9 @@ function createNightStartHandler() {
 
 function createDayStartHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!);
       round.phase = 'day';
       const nextState = syncRuntimeState(runtime);
@@ -101,12 +101,12 @@ function createInstantHandler(
   options: { audienceCue?: boolean } = {},
 ) {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id)) return completed(state, step.id);
       const nextState = markStepComplete({ ...state, currentStep: step.id }, step.id);
       if (options.audienceCue) {
-        const runtime = createRuntime(match, nextState);
-        const modeConfig = runtime.modeConfig || loadModeConfig(match);
+        const runtime = await createRuntime(match, nextState);
+        const modeConfig = runtime.modeConfig || await loadModeConfig(match);
         if (modeConfig) {
           const text = buildWerewolfRuleIntro(modeConfig);
           publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
@@ -146,10 +146,10 @@ function createInstantHandler(
   };
 }
 
-function loadModeConfig(match: Match): Record<string, unknown> | null {
+async function loadModeConfig(match: Match): Promise<Record<string, unknown> | null> {
   try {
     const { getWerewolfModeConfig } = require('../../werewolf-config/service');
-    return getWerewolfModeConfig(match.config?.werewolfMode || 'standard');
+    return await getWerewolfModeConfig(match.config?.werewolfMode || 'standard');
   } catch {
     return null;
   }

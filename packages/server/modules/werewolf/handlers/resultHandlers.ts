@@ -30,7 +30,7 @@ interface HandlerResult {
 
 function createCheckWinHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id)) return completed(state, step.id);
       if (state.winner) {
         return {
@@ -39,7 +39,7 @@ function createCheckWinHandler() {
           nextStepId: WEREWOLF_POSTGAME_DAYBREAK_STEP_ID,
         };
       }
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
       const day = step.config.day || 1;
       const round = ensureRound(runtime.state, day);
       const result = checkDayWin(

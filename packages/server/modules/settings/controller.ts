@@ -2,22 +2,22 @@ import { Request, Response } from 'express';
 import * as service from './service';
 import { formatSuccess } from '../../utils/response';
 
-function getSettings(_req: Request, res: Response): void {
-  res.json(formatSuccess(service.getAppSettings()));
+async function getSettings(_req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.getAppSettings()));
 }
 
-function setDefaultHost(req: Request, res: Response): void {
+async function setDefaultHost(req: Request, res: Response): Promise<void> {
   const body = req.body as Record<string, unknown>;
-  res.json(formatSuccess(service.setDefaultHostPlayerId(body.defaultHostPlayerId ?? body.playerId)));
+  res.json(formatSuccess(await service.setDefaultHostPlayerId(body.defaultHostPlayerId ?? body.playerId)));
 }
 
-function getSpectatorMode(_req: Request, res: Response): void {
-  res.json(formatSuccess({ spectatorMode: service.getSpectatorMode() }));
+async function getSpectatorMode(_req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess({ spectatorMode: await service.getSpectatorMode() }));
 }
 
-function setSpectatorMode(req: Request, res: Response): void {
+async function setSpectatorMode(req: Request, res: Response): Promise<void> {
   const body = req.body as Record<string, unknown>;
-  res.json(formatSuccess(service.setSpectatorMode(body.enabled)));
+  res.json(formatSuccess(await service.setSpectatorMode(body.enabled)));
 }
 
 export { getSettings, setDefaultHost, getSpectatorMode, setSpectatorMode };

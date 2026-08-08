@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from './service';
 import * as repo from './repository';
 
-function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ code: 'AUTH_REQUIRED', message: '请先登录' });
@@ -16,7 +16,7 @@ function authMiddleware(req: Request, res: Response, next: NextFunction): void {
     return;
   }
 
-  const user = repo.findById(payload.sub);
+  const user = await repo.findById(payload.sub);
   if (!user || !user.enabled) {
     res.status(401).json({ code: 'AUTH_REQUIRED', message: '请先登录' });
     return;

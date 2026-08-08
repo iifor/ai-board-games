@@ -6,68 +6,55 @@ import { synthesizeVoicePreview } from '../tts';
 import type { VoicePackage } from '../../types/api';
 import type { VoicePackageInput } from './utils';
 
-interface VoicePreviewResult {
-  buffer: Buffer;
-  mimeType: string;
+interface VoicePreviewResult { buffer: Buffer; mimeType: string }
+async function listVoicePackages(): Promise<VoicePackage[]> {
+  return (await repo.findAllVoices()).map(rowToVoicePackage).filter((voice): voice is VoicePackage => voice !== null);
 }
-
-function listVoicePackages(): VoicePackage[] {
-  return repo.findAllVoices().map(rowToVoicePackage).filter((v): v is VoicePackage => v !== null);
+async function getVoicePackage(id: string | number): Promise<VoicePackage | null> {
+  return rowToVoicePackage(await repo.findVoiceById(id));
 }
-
-function getVoicePackage(id: string | number): VoicePackage | null {
-  return rowToVoicePackage(repo.findVoiceById(id));
-}
-
-function createVoicePackage(input: VoicePackageInput): VoicePackage {
+async function createVoicePackage(input: VoicePackageInput): Promise<VoicePackage> {
   const row = voicePackageToRow(input);
   if (!row.name) throw new AppError(ErrorCodes.VALIDATION_ERROR, '语音包名称必填', 400);
-  const id = repo.insertVoice(row);
-  return getVoicePackage(id)!;
+  return (await getVoicePackage(await repo.insertVoice(row)))!;
 }
-
-function updateVoicePackage(id: string | number, input: VoicePackageInput): VoicePackage {
-  if (!repo.findVoiceById(id)) throw new AppError(ErrorCodes.NOT_FOUND, '语音包不存在', 404);
-  const row = { ...voicePackageToRow(input), id: Number(id) };
-  repo.updateVoice(row);
-  return getVoicePackage(id)!;
+async function updateVoicePackage(id: string | number, input: VoicePackageInput): Promise<VoicePackage> {
+  if (!await repo.findVoiceById(id)) throw new AppError(ErrorCodes.NOT_FOUND, '语音包不存在', 404);
+  await repo.updateVoice({ ...voicePackageToRow(input), id: Number(id) });
+  return (await getVoicePackage(id))!;
 }
-
-function deleteVoicePackage(id: string | number): { ok: boolean } {
-  const players = require('../players/repository') as { nullifyPlayerVoiceRefs: (id: string | number) => void };
-  players.nullifyPlayerVoiceRefs(id);
-  repo.deleteVoiceById(id);
+async function deleteVoicePackage(id: string | number): Promise<{ ok: boolean }> {
+  const players = require('../players/repository') as typeof import('../players/repository');
+  await players.nullifyPlayerVoiceRefs(id);
+  await repo.deleteVoiceById(id);
   return { ok: true };
 }
-
 async function previewVoice(id: string | number, text?: string): Promise<VoicePreviewResult> {
-  const voice = getVoicePackage(id);
+  const voice = await getVoicePackage(id);
   if (!voice) throw new AppError(ErrorCodes.NOT_FOUND, '语音包不存在', 404);
   return synthesizeVoicePreview(voice, text) as Promise<VoicePreviewResult>;
 }
-
-function seedMissingAzureVoices(): void {
-  const existingIds = new Set(repo.findAzureVoiceIds());
-  DEFAULT_AZURE_VOICE_PACKAGES.forEach((voice) => {
+async function seedMissingAzureVoices(): Promise<void> {
+  const existingIds = new Set(await repo.findAzureVoiceIds());
+  for (const voice of DEFAULT_AZURE_VOICE_PACKAGES) {
     const voiceId = String(voice.voiceId || '').toLowerCase();
-    if (!voiceId || existingIds.has(voiceId)) return;
-    createVoicePackage(voice);
+    if (!voiceId || existingIds.has(voiceId)) continue;
+    await createVoicePackage(voice);
     existingIds.add(voiceId);
-  });
+  }
 }
-
-function seedMissingMimoVoices(): void {
-  const existingSignatures = new Set(repo.findVoiceSignaturesByProvider('mimo'));
-  DEFAULT_MIMO_VOICE_PACKAGES.forEach((voice) => {
+async function seedMissingMimoVoices(): Promise<void> {
+  const existingSignatures = new Set(await repo.findVoiceSignaturesByProvider('mimo'));
+  for (const voice of DEFAULT_MIMO_VOICE_PACKAGES) {
     const signature = repo.buildVoiceSignature(voice.voiceId, voice.style);
-    if (!signature || existingSignatures.has(signature)) return;
-    createVoicePackage(voice);
+    if (!signature || existingSignatures.has(signature)) continue;
+    await createVoicePackage(voice);
     existingSignatures.add(signature);
-  });
+  }
+}
+async function seedVoicePackages(): Promise<void> {
+  for (const voice of DEFAULT_VOICE_PACKAGES) await createVoicePackage(voice);
 }
 
-function seedVoicePackages(): void {
-  DEFAULT_VOICE_PACKAGES.forEach((v) => createVoicePackage(v));
-}
-
-export { listVoicePackages, getVoicePackage, createVoicePackage, updateVoicePackage, deleteVoicePackage, previewVoice, seedMissingAzureVoices, seedMissingMimoVoices, seedVoicePackages };
+export { listVoicePackages, getVoicePackage, createVoicePackage, updateVoicePackage,
+  deleteVoicePackage, previewVoice, seedMissingAzureVoices, seedMissingMimoVoices, seedVoicePackages };

@@ -42,9 +42,9 @@ import type {
 } from '../deathResolution/types';
 function createNightResolveHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!) as DeathResolutionContext['round'];
       const checkpoint = ensureDeathResolutionCheckpoint(round, step, 'night');
       const context: DeathResolutionContext = {
@@ -109,9 +109,9 @@ function createNightResolveHandler() {
 }
 function createExileResolveHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!) as DeathResolutionContext['round'];
       const checkpoint = ensureDeathResolutionCheckpoint(round, step, 'exile');
       const context: DeathResolutionContext = {
@@ -164,9 +164,9 @@ function createExileResolveHandler() {
 
 function createSelfDestructResolveHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!) as DeathResolutionContext['round'];
       const selfDestruct = round.selfDestruct as { playerId?: unknown; targetId?: unknown } | null | undefined;
       if (!selfDestruct?.playerId) {
@@ -241,9 +241,9 @@ function publishNightResultOnce(context: DeathResolutionContext): void {
 }
 function createSheriffResolveHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!);
       if (shouldRunSheriffElection(runtime as never, round as never) && isSheriffResolveReady(round as never)) {
         resolveSheriffElection(runtime as never, round as never);

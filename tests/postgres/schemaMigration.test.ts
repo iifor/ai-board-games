@@ -56,3 +56,19 @@ test('migration refuses a modified checksum for an applied file', async () => {
     await assert.rejects(migratePostgres(database), /checksum/i);
   });
 });
+
+test('driver preserves repository-compatible JSON, timestamp and bigint values', async () => {
+  await withTestSchema(async (database) => {
+    await migratePostgres(database);
+    await database.execute(`INSERT INTO app_settings (key, value_json) VALUES ('shape', '{"enabled":true}')`);
+    const row = await database.queryOne<{ value_json: string; updated_at: string; count: number }>(`
+      SELECT value_json, updated_at, COUNT(*) OVER () AS count
+      FROM app_settings
+      WHERE key = 'shape'
+    `);
+
+    assert.equal(row?.value_json, '{"enabled": true}');
+    assert.equal(typeof row?.updated_at, 'string');
+    assert.equal(typeof row?.count, 'number');
+  });
+});

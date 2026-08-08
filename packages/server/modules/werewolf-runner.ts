@@ -45,7 +45,7 @@ async function runWerewolfViaEngine(
   }
 
   // 通过 GameEngine 创建对局
-  const state = createInitialWerewolfState(config);
+  const state = await createInitialWerewolfState(config);
   const matchResult = engine.createMatch({
     gameType: 'werewolf',
     matchId,

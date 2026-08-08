@@ -1,30 +1,25 @@
 import crypto from 'crypto';
-import type { Database } from '../../db/migrations';
 import type { AdminBootstrapConfig } from './config';
+import * as repository from './repository';
 import { hashPasswordSync } from './service';
 
 export { default as authRouter, authMiddleware } from './routes';
 
-/** 将明文密码转为 MD5 hex，与客户端传输格式一致 */
 function md5(plain: string): string {
   return crypto.createHash('md5').update(plain).digest('hex');
 }
 
-function seedAdminUser(db: Database, admin: AdminBootstrapConfig | null): void {
-  const existingCount = db.prepare('SELECT COUNT(*) AS count FROM admin_users').get() as { count: number };
-  if (existingCount.count > 0) {
+async function seedAdminUser(admin: AdminBootstrapConfig | null): Promise<void> {
+  if (await repository.countAll() > 0) {
     console.log('[auth] 已存在管理员账号，跳过初始化。');
     return;
   }
-
   if (!admin) {
     console.warn('[auth] 未配置管理员初始化凭据，跳过管理员账号初始化。');
     return;
   }
-
   const passwordHash = hashPasswordSync(md5(admin.password));
-  db.prepare('INSERT INTO admin_users (username, password_hash, display_name, must_change_password) VALUES (?, ?, ?, 1)')
-    .run(admin.username, passwordHash, '管理员');
+  await repository.create(admin.username, passwordHash, '管理员', true);
   console.log(`[auth] 管理员账号已创建: ${admin.username}`);
 }
 

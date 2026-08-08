@@ -2,73 +2,61 @@ import * as repo from './repository';
 import { skinToRow, rowToSkin, slugifyId, normalizeImportedSkin } from './utils';
 import { BUILTIN_TEMPLATE } from './constants';
 import { AppError, ErrorCodes } from '../../utils/errors';
-import { getDb } from '../../db';
+import { getDbExecutor } from '../../db';
 import type { Skin } from '../../types/api';
 import type { SkinTemplateInput } from './utils';
 import { getMarkdownSkinTemplates } from '../skin-engine';
 
-function listSkins(enabledOnly = false): Skin[] {
-  return repo.findAllSkins(enabledOnly).map(rowToSkin).filter((s): s is Skin => s !== null);
+async function listSkins(enabledOnly = false): Promise<Skin[]> {
+  return (await repo.findAllSkins(enabledOnly)).map(rowToSkin).filter((skin): skin is Skin => skin !== null);
 }
-
-function getSkin(id: string): Skin {
-  const skin = rowToSkin(repo.findSkinById(id));
+async function getSkin(id: string): Promise<Skin> {
+  const skin = rowToSkin(await repo.findSkinById(id));
   if (!skin) throw new AppError(ErrorCodes.NOT_FOUND, '皮肤不存在', 404);
   return skin;
 }
-
-function getRandomEnabledSkin(rng: () => number = Math.random): Skin {
-  const skins = listSkins(true);
+async function getRandomEnabledSkin(rng: () => number = Math.random): Promise<Skin> {
+  const skins = await listSkins(true);
   const pool = skins.length ? skins : [BUILTIN_TEMPLATE as unknown as Skin];
   return pool[Math.floor(rng() * pool.length)];
 }
-
-function createSkin(input: Partial<SkinTemplateInput>): Skin {
+async function createSkin(input: Partial<SkinTemplateInput>): Promise<Skin> {
   const id = input.id || slugifyId(input.name);
-  if (repo.findSkinById(id)) throw new AppError(ErrorCodes.ALREADY_EXISTS, `皮肤已存在：${id}`, 409);
-  const row = skinToRow({ ...input, id, source: input.source || 'admin', enabled: input.enabled !== false } as SkinTemplateInput);
-  repo.insertSkin(row);
+  if (await repo.findSkinById(id)) throw new AppError(ErrorCodes.ALREADY_EXISTS, `皮肤已存在：${id}`, 409);
+  await repo.insertSkin(skinToRow({ ...input, id, source: input.source || 'admin', enabled: input.enabled !== false } as SkinTemplateInput));
   return getSkin(id);
 }
-
-function updateSkin(id: string, input: Partial<SkinTemplateInput>): Skin {
-  if (!repo.findSkinById(id)) throw new AppError(ErrorCodes.NOT_FOUND, '皮肤不存在', 404);
-  const row = skinToRow({ ...input, id, source: input.source || 'admin', enabled: input.enabled !== false } as SkinTemplateInput);
-  repo.insertSkin(row);
+async function updateSkin(id: string, input: Partial<SkinTemplateInput>): Promise<Skin> {
+  if (!await repo.findSkinById(id)) throw new AppError(ErrorCodes.NOT_FOUND, '皮肤不存在', 404);
+  await repo.insertSkin(skinToRow({ ...input, id, source: input.source || 'admin', enabled: input.enabled !== false } as SkinTemplateInput));
   return getSkin(id);
 }
-
-function setSkinEnabled(id: string, enabled: boolean): Skin {
-  if (!repo.findSkinById(id)) throw new AppError(ErrorCodes.NOT_FOUND, '皮肤不存在', 404);
-  repo.updateSkinEnabled(id, enabled);
+async function setSkinEnabled(id: string, enabled: boolean): Promise<Skin> {
+  if (!await repo.findSkinById(id)) throw new AppError(ErrorCodes.NOT_FOUND, '皮肤不存在', 404);
+  await repo.updateSkinEnabled(id, enabled);
   return getSkin(id);
 }
-
-function deleteSkin(id: string): { ok: boolean } {
-  const refs = repo.countGamesBySkin(id);
-  if (refs > 0) throw new AppError('REFERENCED', '该皮肤已被历史对局引用，不能删除', 409);
-  repo.deleteSkinById(id);
+async function deleteSkin(id: string): Promise<{ ok: boolean }> {
+  if (await repo.countGamesBySkin(id) > 0) throw new AppError('REFERENCED', '该皮肤已被历史对局引用，不能删除', 409);
+  await repo.deleteSkinById(id);
   return { ok: true };
 }
-
-function importMarkdownSkins(): Skin[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const templates: any[] = getMarkdownSkinTemplates();
-  const skins: SkinTemplateInput[] = templates.length ? templates : [BUILTIN_TEMPLATE as unknown as SkinTemplateInput];
-  const db = getDb();
-  const tx = db.transaction(() => skins.forEach((skin) => repo.insertSkin(skinToRow(skin))));
-  tx();
+async function importMarkdownSkins(): Promise<Skin[]> {
+  const templates = getMarkdownSkinTemplates() as unknown as SkinTemplateInput[];
+  const skins = templates.length ? templates : [BUILTIN_TEMPLATE as unknown as SkinTemplateInput];
+  await getDbExecutor().withTransaction(async (transaction) => {
+    for (const skin of skins) await repo.insertSkin(skinToRow(skin), transaction);
+  });
   return listSkins();
 }
-
-function importSkinJson(input: { raw?: string; [key: string]: unknown } | Record<string, unknown>): Skin[] {
+async function importSkinJson(input: { raw?: string; [key: string]: unknown } | Record<string, unknown>): Promise<Skin[]> {
   const rawObj = input as { raw?: string };
   const skin = typeof rawObj?.raw === 'string' ? (() => {
     try { return JSON.parse(rawObj.raw); } catch { throw new AppError('IMPORT_ERROR', '皮肤导入失败：JSON 格式不正确。', 400); }
   })() : input;
-  const normalized = normalizeImportedSkin(skin);
-  repo.insertSkin(skinToRow(normalized));
+  await repo.insertSkin(skinToRow(normalizeImportedSkin(skin)));
   return listSkins();
 }
 
-export { listSkins, getSkin, getRandomEnabledSkin, createSkin, updateSkin, setSkinEnabled, deleteSkin, importMarkdownSkins, importSkinJson };
+export { listSkins, getSkin, getRandomEnabledSkin, createSkin, updateSkin, setSkinEnabled,
+  deleteSkin, importMarkdownSkins, importSkinJson };

@@ -63,9 +63,9 @@ function registerUndercoverWorkflow(): void {
   registerWorkflow(undercoverWorkflow, createUndercoverHandlers());
 }
 
-function createUndercoverWorkflowMatch(config: UndercoverRuntimeConfig): Match {
+async function createUndercoverWorkflowMatch(config: UndercoverRuntimeConfig): Promise<Match> {
   registerUndercoverWorkflow();
-  const players = resolvePlayers(config);
+  const players = await resolvePlayers(config);
   const debugMode = config.debugMode === true;
   const debug = debugMode ? config.debug || {} : {};
   const seed = Number.isInteger(debug.seed) ? Number(debug.seed) : randomBytes(4).readUInt32BE(0);
@@ -196,10 +196,10 @@ function assertUndercoverWorkflowCompleted(match: Match): void {
   throw new Error(`谁是卧底工作流异常停止（${match.status || 'unknown'}）：${detail}`);
 }
 
-function resolvePlayers(config: UndercoverRuntimeConfig): UndercoverPlayerInput[] {
+async function resolvePlayers(config: UndercoverRuntimeConfig): Promise<UndercoverPlayerInput[]> {
   if (Array.isArray(config.players) && config.players.length) return config.players;
   const ids = (config.selectedPlayerIds || []).map(Number);
-  return getAiConfig().players
+  return (await getAiConfig()).players
     .filter((player) => ids.includes(Number(player.id)))
     .map((player) => ({ id: player.id, nickname: player.nickname, avatar: player.avatar }));
 }

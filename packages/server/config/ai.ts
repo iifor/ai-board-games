@@ -64,21 +64,21 @@ interface AppSettings {
   defaultHostPlayerId: number | null;
 }
 
-function getAiConfig(): AiConfig {
+async function getAiConfig(): Promise<AiConfig> {
   loadEnvFile();
 
   const models = require('../modules/models');
   const players = require('../modules/players');
   const settings = require('../modules/settings');
 
-  const modelSummaries = models.listModels().filter((model: Record<string, unknown>) => model.enabled);
-  const runtimeModels = modelSummaries
-    .map((model: Record<string, unknown>) => models.getRuntimeModel(model.id))
-    .filter(Boolean);
+  const modelSummaries = (await models.listModels()).filter((model: Record<string, unknown>) => model?.enabled);
+  const runtimeModels = (await Promise.all(
+    modelSummaries.map((model: Record<string, unknown>) => models.getRuntimeModel(model.id)),
+  )).filter(Boolean);
   const defaultModel = runtimeModels[0] || null;
-  const rawPlayers = players.listPlayers(true);
+  const rawPlayers = await players.listPlayers(true);
   const aiPlayers = rawPlayers.map((player: Record<string, unknown>, index: number) => normalizePlayer(player, runtimeModels, defaultModel, index));
-  const appSettings = settings.getAppSettings() as AppSettings;
+  const appSettings = await settings.getAppSettings() as AppSettings;
   const host = normalizeHost({
     players: aiPlayers,
     defaultHostPlayerId: appSettings.defaultHostPlayerId

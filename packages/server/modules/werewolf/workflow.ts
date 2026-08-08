@@ -25,9 +25,9 @@ function registerWerewolfWorkflow(): void {
   registerWorkflow(werewolfWorkflow, createWerewolfHandlers() as unknown as Record<string, StepHandler>);
 }
 
-function createWerewolfWorkflowMatch(config: Record<string, unknown>, matchId?: string): Record<string, unknown> {
+async function createWerewolfWorkflowMatch(config: Record<string, unknown>, matchId?: string): Promise<Record<string, unknown>> {
   registerWerewolfWorkflow();
-  const state = createInitialWerewolfState(config);
+  const state = await createInitialWerewolfState(config);
   return workflowService.createWorkflowMatch({
     workflowId: WEREWOLF_WORKFLOW_ID,
     gameType: 'werewolf',
@@ -59,7 +59,7 @@ async function runWerewolfWorkflow(config: Record<string, unknown>, options: { o
     deliverySubscriber.start();
   }
 
-  const match = createWerewolfWorkflowMatch(config, matchId);
+  const match = await createWerewolfWorkflowMatch(config, matchId);
   const isDebug = Boolean(config.debugMode);
   const trace = isDebug ? null : createTraceContext(
     match.id as string,

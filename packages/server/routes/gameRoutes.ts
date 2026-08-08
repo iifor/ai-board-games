@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { getAiConfig } from '../config';
-import { getDb } from '../db';
+import { getDbExecutor } from '../db';
 import { testOpenAIConnection } from '../modules/llm';
 import { getGame, listGames } from '../modules/games';
 import { getVoicePackage } from '../modules/voices';
@@ -18,9 +18,9 @@ interface PlayerSelectionRow {
   playerIdsJson: string;
 }
 
-router.get('/health', (_request: Request, response: Response) => {
-  const config = getAiConfig();
-  const skins = listSkins(true);
+router.get('/health', async (_request: Request, response: Response) => {
+  const config = await getAiConfig();
+  const skins = await listSkins(true);
   response.json({
     ok: true,
     service: 'ai-presenter-api',
@@ -60,8 +60,8 @@ router.get('/health', (_request: Request, response: Response) => {
   });
 });
 
-router.get('/spectator-mode', (_request: Request, response: Response) => {
-  response.json({ spectatorMode: getSpectatorMode() });
+router.get('/spectator-mode', async (_request: Request, response: Response) => {
+  response.json({ spectatorMode: await getSpectatorMode() });
 });
 
 router.post('/voice/synthesize', async (request: Request, response: Response, next: NextFunction) => {
@@ -72,7 +72,7 @@ router.post('/voice/synthesize', async (request: Request, response: Response, ne
       response.status(400).json({ error: 'EMPTY_TEXT', message: '语音文本不能为空' });
       return;
     }
-    const voice = getVoicePackage(voicePackageId as number);
+    const voice = await getVoicePackage(voicePackageId as number);
     if (!voice || !voice.enabled) {
       response.status(404).json({ error: 'VOICE_PACKAGE_NOT_FOUND', message: '语音包不存在或未启用' });
       return;
@@ -92,7 +92,7 @@ router.post('/voice/synthesize-media', async (request: Request, response: Respon
     const voicePackageId = (request.body as Record<string, unknown>)?.voicePackageId;
     if (!text) throw new AppError(ErrorCodes.VALIDATION_ERROR, '语音文本不能为空', 400);
 
-    const voice = getVoicePackage(voicePackageId as number);
+    const voice = await getVoicePackage(voicePackageId as number);
     if (!voice || !voice.enabled) throw new AppError(ErrorCodes.NOT_FOUND, '语音包不存在或未启用', 404);
     if (!isServerTtsVoice(voice)) {
       response.status(422).json({
@@ -111,34 +111,34 @@ router.post('/voice/synthesize-media', async (request: Request, response: Respon
   }
 });
 
-router.get('/player-selections', (_request: Request, response: Response, next: NextFunction) => {
+router.get('/player-selections', async (_request: Request, response: Response, next: NextFunction) => {
   try {
-    response.json({ selections: getPlayerSelections() });
+    response.json({ selections: await getPlayerSelections() });
   } catch (error) {
     next(error);
   }
 });
 
-router.get('/werewolf-modes', (_request: Request, response: Response, next: NextFunction) => {
+router.get('/werewolf-modes', async (_request: Request, response: Response, next: NextFunction) => {
   try {
-    response.json(listWerewolfModes().filter((mode: { enabled: boolean }) => mode.enabled));
+    response.json((await listWerewolfModes()).filter((mode: { enabled: boolean }) => mode.enabled));
   } catch (error) {
     next(error);
   }
 });
 
-router.put('/player-selections/:gameType', express.json(), (request: Request, response: Response, next: NextFunction) => {
+router.put('/player-selections/:gameType', express.json(), async (request: Request, response: Response, next: NextFunction) => {
   try {
     const gameType = normalizeGameType(String(request.params.gameType));
     const playerIds = normalizePlayerIds((request.body as Record<string, unknown>)?.playerIds);
     validatePlayerSelection(gameType, playerIds);
-    getDb().prepare(`
+    await getDbExecutor().execute(`
       INSERT INTO game_player_selections (game_type, player_ids_json, updated_at)
-      VALUES (?, ?, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, CURRENT_TIMESTAMP)
       ON CONFLICT(game_type) DO UPDATE SET
         player_ids_json = excluded.player_ids_json,
         updated_at = CURRENT_TIMESTAMP
-    `).run(gameType, JSON.stringify(playerIds));
+    `, [gameType, JSON.stringify(playerIds)]);
     response.json({ gameType, playerIds });
   } catch (error) {
     next(error);
@@ -149,9 +149,9 @@ router.put('/player-selections/:gameType', express.json(), (request: Request, re
 // 辩论赛随机分配
 // ============================================================
 
-router.post('/randomize-debate-teams', express.json(), (request: Request, response: Response, next: NextFunction) => {
+router.post('/randomize-debate-teams', express.json(), async (request: Request, response: Response, next: NextFunction) => {
   try {
-    const config = getAiConfig();
+    const config = await getAiConfig();
     const allPlayers = config.players || [];
     const body = request.body as Record<string, unknown> | undefined;
     const requestedIds: number[] = Array.isArray(body?.playerIds)
@@ -205,7 +205,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 router.get('/diagnostics/openai', async (request: Request, response: Response, next: NextFunction) => {
   try {
-    const config = getAiConfig();
+    const config = await getAiConfig();
     const providerName = request.query.provider as string;
     const targets = providerName
       ? [resolveDiagnosticProvider(config as unknown as Record<string, unknown>, providerName)]
@@ -259,8 +259,10 @@ function resolveDiagnosticProvider(config: Record<string, unknown>, providerName
   throw new Error(`未知 provider：${providerName}`);
 }
 
-function getPlayerSelections(): Record<string, number[]> {
-  const rows = getDb().prepare('SELECT game_type AS gameType, player_ids_json AS playerIdsJson FROM game_player_selections').all() as PlayerSelectionRow[];
+async function getPlayerSelections(): Promise<Record<string, number[]>> {
+  const rows = await getDbExecutor().queryMany<PlayerSelectionRow>(
+    'SELECT game_type AS "gameType", player_ids_json AS "playerIdsJson" FROM game_player_selections',
+  );
   return rows.reduce<Record<string, number[]>>((result, row) => {
     result[row.gameType] = safeParseJson(row.playerIdsJson, []);
     return result;

@@ -2,24 +2,24 @@ import { Request, Response, NextFunction } from 'express';
 import * as service from './service';
 import { formatSuccess } from '../../utils/response';
 
-function getVoices(_req: Request, res: Response): void {
-  res.json(formatSuccess(service.listVoicePackages()));
+async function getVoices(_req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.listVoicePackages()));
 }
 
-function getVoice(req: Request, res: Response): void {
-  res.json(formatSuccess(service.getVoicePackage(req.params.id as string)));
+async function getVoice(req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.getVoicePackage(req.params.id as string)));
 }
 
-function createVoice(req: Request, res: Response): void {
-  res.status(201).json(formatSuccess(service.createVoicePackage(req.body)));
+async function createVoice(req: Request, res: Response): Promise<void> {
+  res.status(201).json(formatSuccess(await service.createVoicePackage(req.body)));
 }
 
-function updateVoice(req: Request, res: Response): void {
-  res.json(formatSuccess(service.updateVoicePackage(req.params.id as string, req.body)));
+async function updateVoice(req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.updateVoicePackage(req.params.id as string, req.body)));
 }
 
-function deleteVoice(req: Request, res: Response): void {
-  res.json(formatSuccess(service.deleteVoicePackage(req.params.id as string)));
+async function deleteVoice(req: Request, res: Response): Promise<void> {
+  res.json(formatSuccess(await service.deleteVoicePackage(req.params.id as string)));
 }
 
 async function previewVoice(req: Request, res: Response, next: NextFunction): Promise<void> {

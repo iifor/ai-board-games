@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
 import type { PoolClient, QueryResult, QueryResultRow } from 'pg';
 import type { DatabaseConfig } from './config';
 import type { DbExecutor, DbParams, DbRow, ExecuteResult, TransactionOptions } from './types';
@@ -16,6 +16,12 @@ const RETRYABLE_TRANSACTION_CODES = new Set([
   '57P01',
 ]);
 
+// Preserve the repository contracts used throughout the existing application.
+types.setTypeParser(20, (value) => Number(value));
+types.setTypeParser(114, (value) => value);
+types.setTypeParser(1184, (value) => value);
+types.setTypeParser(3802, (value) => value);
+
 function isRetryableTransactionError(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   return typeof code === 'string' && RETRYABLE_TRANSACTION_CODES.has(code);
@@ -31,12 +37,12 @@ class PostgresExecutor implements DbExecutor {
     return this.client || this.pool;
   }
 
-  async queryOne<T extends DbRow>(sql: string, params: DbParams = []): Promise<T | null> {
+  async queryOne<T extends object>(sql: string, params: DbParams = []): Promise<T | null> {
     const result = await this.target.query<T & QueryResultRow>(sql, [...params]);
     return result.rows[0] || null;
   }
 
-  async queryMany<T extends DbRow>(sql: string, params: DbParams = []): Promise<T[]> {
+  async queryMany<T extends object>(sql: string, params: DbParams = []): Promise<T[]> {
     const result = await this.target.query<T & QueryResultRow>(sql, [...params]);
     return result.rows;
   }

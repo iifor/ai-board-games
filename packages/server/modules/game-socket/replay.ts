@@ -236,7 +236,7 @@ async function replayGameSession(
     session.close();
     return;
   }
-  const replayGame = enrichReplayPlayers(normalizeReplayGame(game));
+  const replayGame = await enrichReplayPlayers(normalizeReplayGame(game));
   const sender = createPreparedSender(
     session,
     gameType === 'debate' ? { phaseLookahead: 1 } : { prefetchCount: 2 },
@@ -299,9 +299,9 @@ function normalizeReplayGame(game: ReplayGame): ReplayGame {
   return { ...game, type: game.gameType || game.type || 'werewolf' };
 }
 
-function enrichReplayPlayers(game: ReplayGame): ReplayGame {
+async function enrichReplayPlayers(game: ReplayGame): Promise<ReplayGame> {
   const latestPlayers = new Map(
-    listPlayers().map((player) => [Number(player.id), player]),
+    (await listPlayers()).map((player) => [Number(player.id), player]),
   );
   const players = (game.players || []).map((player) => {
     const latest = latestPlayers.get(Number(player.id));

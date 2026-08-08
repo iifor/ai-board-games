@@ -194,7 +194,7 @@ const handlers: Record<string, {
       };
     },
     async runAiTask({ match, task }) {
-      const runtime = createRuntime(match, match.state);
+      const runtime = await createRuntime(match, match.state);
       const spec = task.promptContextSnapshot as Record<string, unknown>;
       const actor = runtime.agents.find((agent) => Number(agent.id) === Number(spec.actorId));
       if (!actor) throw new Error(`Debate actor not found: ${spec.actorId}`);
@@ -338,8 +338,8 @@ interface Runtime {
   };
 }
 
-function createRuntime(match: WorkflowMatch, state: WorkflowState): Runtime {
-  const config = resolveRuntimeConfig(match.config as Record<string, unknown>);
+async function createRuntime(match: WorkflowMatch, state: WorkflowState): Promise<Runtime> {
+  const config = await resolveRuntimeConfig(match.config as Record<string, unknown>);
   config._gameId = match.id;
   const topic = state.topic || normalizeTopic(config.topic) || choose(TOPICS);
   const skillRegistry = createDebateSkillRegistry();

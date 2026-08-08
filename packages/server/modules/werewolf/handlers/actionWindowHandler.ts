@@ -73,10 +73,10 @@ interface HandlerResult {
 
 function createActionWindowHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       const isPostgameAction = step.config.actionType === 'mvp_vote' || step.config.actionType === 'postgame_speech';
       if (isDone(state, step.id) || (state.winner && !isPostgameAction)) return completed(state, step.id);
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
       // Phase 4 fix: 将游戏状态快照注入 builder，使后续事件携带 game.players
       if (runtime.gameEventBuilder) {
         const snapshot = serializeWerewolfState(match, state as unknown as Record<string, unknown>);
@@ -147,7 +147,7 @@ function createActionWindowHandler() {
 
       const shouldUseEngineBridge = !partialApplied && canUseWerewolfActionEngineBridge(step.config.actionType);
       const engineBridgeResult = shouldUseEngineBridge
-        ? runWerewolfActionEngineBridge({
+        ? await runWerewolfActionEngineBridge({
             match,
             step,
             state: state as unknown as Record<string, unknown>,

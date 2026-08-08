@@ -47,9 +47,9 @@ function canUseWerewolfActionEngineBridge(actionType?: string): boolean {
   return ENGINE_ACTIONS.has(actionType || '');
 }
 
-function runWerewolfActionEngineBridge(input: ActionEngineBridgeInput): ActionEngineBridgeResult {
+async function runWerewolfActionEngineBridge(input: ActionEngineBridgeInput): Promise<ActionEngineBridgeResult> {
   const actionType = input.step.config.actionType || '';
-  const legacyState = runLegacyActionState(input);
+  const legacyState = await runLegacyActionState(input);
   const legacySnapshot = snapshotNightActionState(legacyState, input.step.config.day);
 
   try {
@@ -178,8 +178,8 @@ function validateAndNormalizeAction(action: DomainAction, schema: unknown): Doma
   return action;
 }
 
-function runLegacyActionState(input: ActionEngineBridgeInput): Record<string, unknown> {
-  const runtime = createRuntime(input.match as never, clone(input.state));
+async function runLegacyActionState(input: ActionEngineBridgeInput): Promise<Record<string, unknown>> {
+  const runtime = await createRuntime(input.match as never, clone(input.state));
   const round = ensureRound(runtime.state, input.step.config.day!);
   applyActionResults(runtime as unknown as ReducerRuntime, input.step as unknown as ReducerStep, input.results);
   void round;

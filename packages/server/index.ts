@@ -21,8 +21,8 @@ const shutdown = createGracefulShutdownHandler(server, {
 process.once('SIGTERM', () => shutdown('SIGTERM'));
 process.once('SIGINT', () => shutdown('SIGINT'));
 
-server.listen(port, () => {
-  const config = getAiConfig();
+server.listen(port, async () => {
+  const config = await getAiConfig();
   console.log(`Express API 已启动：http://localhost:${port}`);
   console.log(`WebSocket 已启动：ws://localhost:${port}/api/toc/ws/game`);
   console.log('主持人：流程化控制（不接入模型）');

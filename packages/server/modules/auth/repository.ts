@@ -1,30 +1,33 @@
-import { getDb } from '../../db';
+import { getDbExecutor } from '../../db';
 import type { AdminUser } from './types';
 
-function findByUsername(username: string): AdminUser | undefined {
-  return getDb().prepare('SELECT * FROM admin_users WHERE username = ?').get(username) as AdminUser | undefined;
+async function findByUsername(username: string): Promise<AdminUser | undefined> {
+  return (await getDbExecutor().queryOne<AdminUser>('SELECT * FROM admin_users WHERE username = $1', [username])) || undefined;
 }
 
-function findById(id: number): AdminUser | undefined {
-  return getDb().prepare('SELECT * FROM admin_users WHERE id = ?').get(id) as AdminUser | undefined;
+async function findById(id: number): Promise<AdminUser | undefined> {
+  return (await getDbExecutor().queryOne<AdminUser>('SELECT * FROM admin_users WHERE id = $1', [id])) || undefined;
 }
 
-function create(username: string, passwordHash: string, displayName: string): number {
-  const result = getDb().prepare(
-    'INSERT INTO admin_users (username, password_hash, display_name) VALUES (?, ?, ?)'
-  ).run(username, passwordHash, displayName);
-  return Number(result.lastInsertRowid);
+async function create(username: string, passwordHash: string, displayName: string, mustChangePassword = false): Promise<number> {
+  const row = await getDbExecutor().queryOne<{ id: number }>(
+    'INSERT INTO admin_users (username, password_hash, display_name, must_change_password) VALUES ($1, $2, $3, $4) RETURNING id',
+    [username, passwordHash, displayName, mustChangePassword ? 1 : 0],
+  );
+  if (!row) throw new Error('Failed to create admin user');
+  return row.id;
 }
 
-function updatePassword(id: number, newPasswordHash: string): void {
-  getDb().prepare(
-    'UPDATE admin_users SET password_hash = ?, must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-  ).run(newPasswordHash, id);
+async function updatePassword(id: number, newPasswordHash: string): Promise<void> {
+  await getDbExecutor().execute(
+    'UPDATE admin_users SET password_hash = $1, must_change_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+    [newPasswordHash, id],
+  );
 }
 
-function countAll(): number {
-  const row = getDb().prepare('SELECT COUNT(*) AS cnt FROM admin_users').get() as { cnt: number };
-  return row.cnt;
+async function countAll(): Promise<number> {
+  const row = await getDbExecutor().queryOne<{ cnt: number }>('SELECT COUNT(*) AS cnt FROM admin_users');
+  return row?.cnt || 0;
 }
 
 export { findByUsername, findById, create, updatePassword, countAll };

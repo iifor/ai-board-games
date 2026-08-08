@@ -10,9 +10,9 @@ const WEREWOLF_POSTGAME_DAYBREAK_STEP_ID = 'postgame_daybreak';
 
 function createPostgameResetHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id)) return { status: 'COMPLETED', state };
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
 
       // 重置所有玩家为存活状态（纯展示用途，不影响胜负结果）
       for (const agent of runtime.agents) {
@@ -53,13 +53,13 @@ function createPostgameResetHandler() {
 
 function createPostgameDaybreakHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id)) return { status: 'COMPLETED', state };
       const rounds = [...((state.rounds || []) as Array<Record<string, unknown>>)];
       const lastIndex = rounds.length - 1;
       if (lastIndex >= 0) rounds[lastIndex] = { ...rounds[lastIndex], phase: 'day' };
       const nextState = markStepComplete({ ...state, rounds, currentStep: step.id }, step.id);
-      const runtime = createRuntime(match, nextState);
+      const runtime = await createRuntime(match, nextState);
       publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
         builder.setStep(step.id).setPhase('day').setDay(resolveLastDay(nextState));
         return builder.build('day-start', { message: '天亮了' }, CHANNEL_TYPES.PUBLIC, undefined, { message: '天亮了' });
@@ -75,11 +75,11 @@ function createPostgameDaybreakHandler() {
 
 function createPostgameMvpIntroHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id)) return { status: 'COMPLETED', state };
       const message = '现在进行MVP评选，请评选本局MVP。';
       const nextState = markStepComplete({ ...state, currentStep: step.id }, step.id);
-      const runtime = createRuntime(match, nextState);
+      const runtime = await createRuntime(match, nextState);
       publishGameEvent(runtime.eventBus, runtime.gameEventBuilder, (builder) => {
         builder.setStep(step.id).setPhase('postgame').setDay(resolveLastDay(nextState));
         return builder.build('mvp-start', { message }, CHANNEL_TYPES.PUBLIC, undefined, { message });
@@ -122,11 +122,11 @@ interface HandlerResult {
 
 function createMvpResultHandler() {
   return {
-    execute({ match, step, state }: { match: Match; step: Step; state: StepState }): HandlerResult {
+    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
       if (isDone(state, step.id)) {
         return { status: 'COMPLETED', state };
       }
-      const runtime = createRuntime(match, state);
+      const runtime = await createRuntime(match, state);
       const rawVotes = Object.entries((state.mvpVotes || {}) as Record<string, unknown>)
         .map(([voterId, targetId]) => ({
           voterId: Number(voterId),

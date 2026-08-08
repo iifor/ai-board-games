@@ -136,7 +136,7 @@ function createSpeechHandler(): StepHandler {
       const actorId = Number(task.playerId);
       const debugMode = (match as { config?: { debugMode?: boolean } }).config?.debugMode === true;
       if (debugMode) return aiResult(task.action as string, buildUndercoverDebugSpeech(current, actorId));
-      const agent = createAgent(match.id as string, current, actorId);
+      const agent = await createAgent(match.id as string, current, actorId);
       const prompt = buildUndercoverSpeechPrompt(current, actorId);
       const schema = undercoverSpeechSchema.refine(
         ({ speech }) => validatePublicSpeech(speech, current.wordPair).ok,
@@ -233,7 +233,7 @@ function createVoteHandler(): StepHandler {
       if (!legalIds.length) throw new Error(`Undercover voter ${actorId} has no legal targets`);
       const debugMode = (match as { config?: { debugMode?: boolean } }).config?.debugMode === true;
       if (debugMode) return aiResult(task.action as string, buildUndercoverDebugVote(current, actorId, legalIds, context.runoff === true));
-      const agent = createAgent(match.id as string, current, actorId);
+      const agent = await createAgent(match.id as string, current, actorId);
       const prompt = buildUndercoverVotePrompt(current, actorId, legalIds);
       const schema = undercoverVoteSchema.refine(
         ({ targetId }) => legalIds.includes(targetId),
@@ -259,8 +259,8 @@ function createVoteHandler(): StepHandler {
   };
 }
 
-function createAgent(matchId: string, state: WorkflowState, actorId: number): BasePlayerAgent {
-  const player = getAiConfig().players.find((candidate) => Number(candidate.id) === actorId);
+async function createAgent(matchId: string, state: WorkflowState, actorId: number): Promise<BasePlayerAgent> {
+  const player = (await getAiConfig()).players.find((candidate) => Number(candidate.id) === actorId);
   if (!player) throw new Error(`Configured undercover player not found: ${actorId}`);
   return new BasePlayerAgent(player as unknown as ConstructorParameters<typeof BasePlayerAgent>[0], buildUndercoverSystemPrompt(state, actorId), {
     gameId: matchId,

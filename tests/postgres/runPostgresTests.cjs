@@ -6,7 +6,7 @@ const ts = require('../../packages/server/node_modules/typescript');
 const root = path.resolve(__dirname, '../..');
 const serverRoot = path.join(root, 'packages', 'server');
 const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
-const testFiles = ['dbExecutor.test.ts', 'schemaMigration.test.ts']
+const testFiles = ['dbExecutor.test.ts', 'schemaMigration.test.ts', 'coreRepositories.test.ts']
   .map((file) => path.join(__dirname, file));
 const originalTsLoader = Module._extensions['.ts'];
 

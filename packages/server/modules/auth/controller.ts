@@ -24,7 +24,7 @@ async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const user = repo.findByUsername(username);
+  const user = await repo.findByUsername(username);
   if (!user || !user.enabled) {
     res.status(401).json({ code: 401, message: '用户名或密码错误' });
     return;
@@ -63,13 +63,13 @@ async function changePassword(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const current = repo.findById(user.id);
+  const current = await repo.findById(user.id);
   if (!current || !current.enabled) {
     res.status(401).json({ code: 'AUTH_REQUIRED', message: '请先登录' });
     return;
   }
 
-  repo.updatePassword(current.id, await hashPassword(password));
+  await repo.updatePassword(current.id, await hashPassword(password));
   const token = signToken({ sub: current.id, username: current.username });
   res.json({
     code: 0,

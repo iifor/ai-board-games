@@ -45,7 +45,7 @@ function seedData(admin: AdminBootstrapConfig | null): void {
   const { DEFAULT_WEREWOLF_ROLES, DEFAULT_WEREWOLF_MODES } = require('./db/seed');
   DEFAULT_WEREWOLF_ROLES.forEach((r: Record<string, unknown>) => werewolfConfig.upsertWerewolfRole(r));
   DEFAULT_WEREWOLF_MODES.forEach((m: Record<string, unknown>) => werewolfConfig.upsertWerewolfMode(m));
-  seedAdminUser(db, admin);
+  void seedAdminUser(admin);
 }
 
 function createApp(): express.Application {

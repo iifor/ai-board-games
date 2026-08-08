@@ -11,8 +11,8 @@ interface TransactionOptions {
 }
 
 interface DbExecutor {
-  queryOne<T extends DbRow>(sql: string, params?: DbParams): Promise<T | null>;
-  queryMany<T extends DbRow>(sql: string, params?: DbParams): Promise<T[]>;
+  queryOne<T extends object>(sql: string, params?: DbParams): Promise<T | null>;
+  queryMany<T extends object>(sql: string, params?: DbParams): Promise<T[]>;
   execute(sql: string, params?: DbParams): Promise<ExecuteResult>;
   withTransaction<T>(
     operation: (transaction: DbExecutor) => Promise<T>,

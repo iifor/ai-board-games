@@ -201,9 +201,9 @@ interface Runtime {
   skillEventEmitter?: SkillEventEmitter;
 }
 
-function createInitialWerewolfState(config: Record<string, unknown>): WerewolfState {
+async function createInitialWerewolfState(config: Record<string, unknown>): Promise<WerewolfState> {
   const { getWerewolfModeConfig } = require('../werewolf-config/service');
-  const modeConfig: ModeConfig = getWerewolfModeConfig(config.werewolfMode);
+  const modeConfig: ModeConfig = await getWerewolfModeConfig(config.werewolfMode);
   const skillRegistry = createWerewolfSkillRegistry();
   const roleSkillRegistry = createWerewolfRoleSkillRegistry(modeConfig, skillRegistry);
   const fallbackAudit = createFallbackAudit(`werewolf-${Date.now()}`, 'werewolf', { gameType: 'werewolf' });
@@ -234,13 +234,13 @@ function createInitialWerewolfState(config: Record<string, unknown>): WerewolfSt
   };
 }
 
-function createRuntime(
+async function createRuntime(
   match: Match,
   stateOverride: WerewolfState | null = null,
   _eventBus?: WerewolfEventBus,
   _gameEventBuilder?: GameEventBuilder,
   _skillEventEmitter?: SkillEventEmitter,
-): Runtime {
+): Promise<Runtime> {
   const sourceState: WerewolfState = stateOverride || match.state || {};
 
   // 从注册表获取事件基础设施（优先于直接传入的参数）
@@ -249,8 +249,8 @@ function createRuntime(
   const gameEventBuilder = _gameEventBuilder || infra?.gameEventBuilder;
   const skillEventEmitter = _skillEventEmitter || infra?.skillEventEmitter;
 
-  const config = resolveRuntimeConfig(match.config);
-  const modeConfig: ModeConfig = sourceState.modeConfig || require('../werewolf-config/service').getWerewolfModeConfig(match.config?.werewolfMode);
+  const config = await resolveRuntimeConfig(match.config);
+  const modeConfig: ModeConfig = sourceState.modeConfig || await require('../werewolf-config/service').getWerewolfModeConfig(match.config?.werewolfMode);
   const skillRegistry = createWerewolfSkillRegistry();
   const roleSkillRegistry = createWerewolfRoleSkillRegistry(modeConfig, skillRegistry);
   const fallbackAudit = createFallbackAudit(match.id, 'werewolf', { gameType: 'werewolf' });
@@ -438,7 +438,7 @@ function syncRuntimeState(runtime: Runtime): WerewolfState {
   return runtime.state;
 }
 
-function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): Record<string, unknown> {
+async function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
   if (Array.isArray(matchConfig.players)) {
     return {
       mode: 'real',
@@ -450,7 +450,7 @@ function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): Record
     };
   }
   const { getAiConfig } = require('../../config');
-  const base = getAiConfig();
+  const base = await getAiConfig();
   const selectedIds = new Set(((matchConfig.selectedPlayerIds || []) as number[]).map(Number));
   return {
     ...base,

@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { getDb } from '../../db';
+import { getDbExecutor } from '../../db';
 import { createSession, isSessionCancelled, parseMessage } from './session';
 import { isDisplayEvent } from './sender';
 import {
@@ -153,12 +153,12 @@ function attachGameSocket(server: import('http').Server): GameSocketHandle {
       }
 
       if (message.type === 'randomize-teams') {
-        handleRandomizeTeams(session, message.playerIds);
+        await handleRandomizeTeams(session, message.playerIds);
       }
 
       if (message.type === 'start') {
         // 观战模式拦截：在消息入口处第一时间拒绝，非回放请求不允许启动新游戏
-        if (!message.replayGameId && getSpectatorMode()) {
+        if (!message.replayGameId && await getSpectatorMode()) {
           session.send({ type: 'error', message: '当前处于观战模式，无法开始新游戏。请联系管理员关闭观战模式。' });
           return;
         }
@@ -222,11 +222,11 @@ async function runSession(
     return;
   }
   // Spectator mode check (defense-in-depth, 入口层已有前置检查)
-  if (getSpectatorMode()) {
+  if (await getSpectatorMode()) {
     session.send({ type: 'error', message: '当前处于观战模式，无法开始新游戏。请联系管理员关闭观战模式。' });
     return;
   }
-  const config = getRequestConfig(mode, playerIds, safeGameType, options);
+  const config = await getRequestConfig(mode, playerIds, safeGameType, options);
   const debugMode = Boolean(config.debugMode);
 
   const viewMode = String((config as Record<string, unknown>).clientViewMode || 'god');
@@ -423,17 +423,17 @@ function normalizeSelectedPlayerIds(value: unknown): number[] {
 
 // --- Helpers ---
 
-function getRequestConfig(
+async function getRequestConfig(
   mode: string,
   playerIds: (number | string)[] | undefined,
   gameType = 'werewolf',
   options: RunSessionOptions = {},
-): AiConfig & { mode: string } {
-  const config = getAiConfig() as unknown as AiConfig;
+): Promise<AiConfig & { mode: string }> {
+  const config = await getAiConfig() as unknown as AiConfig;
   const selected =
     gameType === 'debate' && hasDebateTeamConfig(options.debateTeams)
       ? selectDebateTeamPlayers(config, options.debateTeams!)
-      : selectPlayersForGame(config, playerIds, gameType, options);
+      : await selectPlayersForGame(config, playerIds, gameType, options);
   const host = config.host; // 不再需要指定主持人席位，使用全局默认主持人
   const selectedProviders = new Set([
     ...selected.map((player: AiConfigPlayer) => player.provider),
@@ -523,22 +523,22 @@ function normalizeIdList(value: unknown): number[] {
   return value.map(Number).filter(Boolean);
 }
 
-function selectPlayersForGame(
+async function selectPlayersForGame(
   config: AiConfig,
   playerIds: (number | string)[] | undefined,
   gameType: string,
   options: RunSessionOptions = {},
-): AiConfigPlayer[] {
+): Promise<AiConfigPlayer[]> {
   const explicitIds = Array.isArray(playerIds)
     ? playerIds.map(Number).filter(Boolean)
     : [];
-  const ids = explicitIds.length ? explicitIds : getSavedPlayerIds(gameType);
+  const ids = explicitIds.length ? explicitIds : await getSavedPlayerIds(gameType);
   const selection = getGameEngine()
     .getDefinition(gameType)
     ?.metadata?.session?.playerSelection;
   const expectedWerewolfCount =
     gameType === 'werewolf'
-      ? getWerewolfModeConfig(options.werewolfMode).totalPlayers
+      ? (await getWerewolfModeConfig(options.werewolfMode)).totalPlayers
       : 12;
 
   const selected = ids.length
@@ -572,13 +572,12 @@ function selectPlayersForGame(
   return selected;
 }
 
-function getSavedPlayerIds(gameType: string): number[] {
+async function getSavedPlayerIds(gameType: string): Promise<number[]> {
   try {
-    const row = getDb()
-      .prepare(
-        'SELECT player_ids_json AS playerIdsJson FROM game_player_selections WHERE game_type = ?',
-      )
-      .get(gameType) as PlayerSelectionRow | undefined;
+    const row = await getDbExecutor().queryOne<PlayerSelectionRow>(
+      'SELECT player_ids_json AS "playerIdsJson" FROM game_player_selections WHERE game_type = $1',
+      [gameType],
+    );
     if (!row) return [];
     const parsed: unknown = JSON.parse(row.playerIdsJson);
     return Array.isArray(parsed) ? parsed.map(Number).filter(Boolean) : [];
@@ -600,10 +599,10 @@ function shuffle<T>(arr: T[]): T[] {
   return result;
 }
 
-function handleRandomizeTeams(session: GameSession, playerIds?: (number | string)[]): void {
+async function handleRandomizeTeams(session: GameSession, playerIds?: (number | string)[]): Promise<void> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const config = getAiConfig() as any;
+    const config = await getAiConfig() as unknown as AiConfig;
     const allPlayers = config.players || [];
     const ids = (playerIds || []).map(Number).filter((n) => n > 0);
 

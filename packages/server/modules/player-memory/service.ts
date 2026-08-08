@@ -148,7 +148,7 @@ async function analyzeGameObservations(
   participants: Participant[],
 ): Promise<Map<number, string>> {
   const result = new Map<number, string>();
-  const config = getLlmConfig();
+  const config = await getLlmConfig();
   if (!config) return result;
 
   const gameContext = buildGameContext(gameType, game, participants);
@@ -175,7 +175,7 @@ async function mergeMemorySummary(
   existing: string,
   newObservation: string,
 ): Promise<string> {
-  const config = getLlmConfig();
+  const config = await getLlmConfig();
   if (!config) return newObservation || existing;
 
   const prompt = `你是一个记忆整理助手。请将以下"历史印象"和"最新观察"合并为一段简洁的玩家画像摘要。
@@ -423,9 +423,9 @@ function serializeRounds(rounds: unknown[], maxChars: number): string {
   return parts.join('\n').slice(0, maxChars);
 }
 
-function getLlmConfig(): { apiKey: string; model: string; baseUrl?: string; apiFormat?: string } | null {
+async function getLlmConfig(): Promise<{ apiKey: string; model: string; baseUrl?: string; apiFormat?: string } | null> {
   try {
-    const config = getAiConfig();
+    const config = await getAiConfig();
     const host = config.host;
     if (!host?.apiKey || !host?.model) return null;
     return {

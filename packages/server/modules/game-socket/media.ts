@@ -110,7 +110,7 @@ async function prepareEventMedia(event: NarrationEvent): Promise<MediaEvent> {
     : withPlayableDetails(event, text);
   if (!text) return result;
 
-  const voice = resolveEventVoice(event);
+  const voice = await resolveEventVoice(event);
   if (!isServerTtsVoice(voice))
     return result;
 
@@ -238,7 +238,7 @@ function withPlayableDetails(event: NarrationEvent, fullText: string): MediaEven
   return event as MediaEvent;
 }
 
-function resolveEventVoice(event: NarrationEvent): VoicePackage | null {
+async function resolveEventVoice(event: NarrationEvent): Promise<VoicePackage | null> {
   if ((event as Record<string, unknown>)?.debugMode || event.game?.debugMode) return null;
   const playerId = event.speech?.playerId || event.testimony?.playerId;
   if (playerId) {

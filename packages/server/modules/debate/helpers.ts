@@ -277,8 +277,8 @@ function topWinner(votes: Record<string, string>): string {
 
 // ---- Workflow Helpers ----
 
-function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): DebateConfig {
-  const base = getAiConfig() as unknown as DebateConfig;
+async function resolveRuntimeConfig(matchConfig: Record<string, unknown> = {}): Promise<DebateConfig> {
+  const base = await getAiConfig() as unknown as DebateConfig;
   const selectedIds = new Set(((matchConfig.selectedPlayerIds as number[]) || []).map(Number));
   const players = selectedIds.size
     ? base.players.filter((player) => selectedIds.has(Number(player.id)))
