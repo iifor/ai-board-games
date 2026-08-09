@@ -1,6 +1,9 @@
 name: Deploy master to Tencent Cloud
 
 on:
+  pull_request:
+    branches:
+      - master
   push:
     branches:
       - master
@@ -11,10 +14,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: Build and deploy
+  verify:
+    name: Verify release gates
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/consensus_test
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: consensus_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d consensus_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -32,15 +52,23 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Verify release gates
-        run: |
-          pnpm run check
-          pnpm run build
-          pnpm run test:unit
-          pnpm run test:workflow
-          pnpm run test:migration
+        run: pnpm run verify:release # includes pnpm run test:postgres
 
       - name: Validate Docker runtime image
-        run: docker build -t consensus-runtime-check:${{ github.sha }} .
+        run: |
+          docker build -t consensus-runtime-check:${{ github.sha }} .
+          docker run --rm "consensus-runtime-check:${{ github.sha }}" node -e "try { require.resolve('better-sqlite3'); process.exit(1) } catch { process.exit(0) }"
+
+  deploy:
+    name: Build and deploy
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Configure SSH
         env:

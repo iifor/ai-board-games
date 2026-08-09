@@ -19,6 +19,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'authLoginRateLimit.test.ts',
   'serverLifecycle.test.ts',
   'deploymentConfig.test.ts',
+  'releaseGateConfig.test.ts',
   'gameEventBuilder.test.ts',
   'eventBus.test.ts',
   'audienceStream.test.ts',

@@ -20,9 +20,10 @@
     "check:shared": "pnpm --filter @ai-presenter/shared run check",
     "test:workflow": "node --preserve-symlinks --preserve-symlinks-main ./tests/workflow/runWorkflowTests.cjs",
     "test:unit": "node --preserve-symlinks --preserve-symlinks-main ./tests/unit/runUnitTests.cjs",
-    "test:migration": "node --preserve-symlinks --preserve-symlinks-main ./tests/migration/runMigrationTests.cjs"
-    ,"test:postgres": "node --preserve-symlinks --preserve-symlinks-main ./tests/postgres/runPostgresTests.cjs"
-    ,"test:concurrency": "node ./tests/load/fiveConcurrentGames.cjs"
+    "test:migration": "node --preserve-symlinks --preserve-symlinks-main ./tests/migration/runMigrationTests.cjs",
+    "test:postgres": "node --preserve-symlinks --preserve-symlinks-main ./tests/postgres/runPostgresTests.cjs",
+    "test:concurrency": "node ./tests/load/fiveConcurrentGames.cjs",
+    "verify:release": "pnpm run check && pnpm run build && pnpm run test:unit && pnpm run test:workflow && pnpm run test:migration && pnpm run test:postgres"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"
