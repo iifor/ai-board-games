@@ -52,7 +52,7 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Verify release gates
-        run: pnpm run verify:release # includes pnpm run test:postgres
+        run: pnpm run verify:release
 
       - name: Validate Docker runtime image
         run: |
@@ -102,13 +102,15 @@ jobs:
             -i ~/.ssh/tencent-cloud-deploy-key \
             -p "${TENCENT_CLOUD_SSH_PORT}" \
             "${TENCENT_CLOUD_USER}@${TENCENT_CLOUD_HOST}" \
-            "bash -s -- '${PROJECT_PATH_B64}'" <<'REMOTE'
+            "bash -s -- '${PROJECT_PATH_B64}' '${{ github.sha }}'" <<'REMOTE'
           set -euo pipefail
 
-          PROJECT_PATH="$(printf '%s' "$1" | base64 -d)"
+          PROJECT_PATH_B64="$1"
+          DEPLOY_SHA="$2"
+          PROJECT_PATH="$(printf '%s' "${PROJECT_PATH_B64}" | base64 -d)"
           cd "${PROJECT_PATH}"
           git fetch origin master
-          git reset --hard origin/master
+          git reset --hard "${DEPLOY_SHA}"
 
           if docker compose version >/dev/null 2>&1; then
             docker compose up -d --build
