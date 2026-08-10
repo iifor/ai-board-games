@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { migrateSqliteToPostgres } from './importer';
+import { runPreflight } from './commands/preflight';
 import { parseCommandLine, type ParsedCommand } from './cli/arguments';
 import { readinessReportExitCode, redactSecrets, sanitizeForOutput } from './reporting/reportWriter';
 import type { ReadinessReport } from './reporting/reportTypes';
@@ -20,6 +21,32 @@ const defaultDependencies: CliDependencies = {
   setExitCode: (code) => { process.exitCode = code; },
 };
 
+async function runBuiltInReadinessCommand(
+  command: Exclude<ParsedCommand['command'], 'migrate'>,
+  parsed: ParsedCommand,
+): Promise<ReadinessReport> {
+  if (command !== 'preflight') throw commandNotImplemented(command);
+  const sourcePath = parsed.values.get('source') || '';
+  const targetUrl = parsed.values.get('target') || process.env.DATABASE_URL || '';
+  const targetSchema = parsed.values.get('schema') || process.env.DATABASE_SCHEMA || 'consensus';
+  const outputDirectory = parsed.values.get('output') || '';
+  const resources = parsed.values.get('resources');
+  const requireTls = parsed.values.get('require-tls');
+  if (!sourcePath || !targetUrl || !outputDirectory || requireTls === undefined) {
+    throw new Error('Usage: pnpm migrate -- preflight --source <sqlite> --target <postgres-url> --schema <schema> --output <dir> --resources <dir1,dir2> --require-tls <true|false>');
+  }
+  if (requireTls !== 'true' && requireTls !== 'false') throw new Error('--require-tls must be true or false');
+  return runPreflight({
+    runId: parsed.values.get('run-id') || `preflight-${Date.now()}`,
+    sourcePath: path.resolve(sourcePath),
+    targetUrl,
+    targetSchema,
+    outputDirectory: path.resolve(outputDirectory),
+    resourceDirectories: resources ? resources.split(',').map((entry) => path.resolve(entry.trim())).filter(Boolean) : [],
+    requireTls: requireTls === 'true',
+  });
+}
+
 function commandNotImplemented(command: string): Error & { code: 'COMMAND_NOT_IMPLEMENTED' } {
   return Object.assign(new Error(`Command is not implemented: ${command}`), { code: 'COMMAND_NOT_IMPLEMENTED' as const });
 }
@@ -32,8 +59,7 @@ async function main(argv = process.argv.slice(2), overrides: Partial<CliDependen
   const dependencies = { ...defaultDependencies, ...overrides };
   const parsed = parseCommandLine(argv);
   if (parsed.command !== 'migrate') {
-    if (!dependencies.runReadinessCommand) throw commandNotImplemented(parsed.command);
-    const report = await dependencies.runReadinessCommand(parsed.command, parsed);
+    const report = await (dependencies.runReadinessCommand || runBuiltInReadinessCommand)(parsed.command, parsed);
     writeJson(dependencies.stdout, report);
     dependencies.setExitCode(readinessReportExitCode(report));
     return;
