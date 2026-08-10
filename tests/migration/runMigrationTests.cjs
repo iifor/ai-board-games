@@ -10,6 +10,7 @@ const testFiles = [
   'eventMapping.test.ts',
   'readinessReport.test.ts',
   'backupCommand.test.ts',
+  'releaseReadiness.test.ts',
 ].map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];

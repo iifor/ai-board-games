@@ -4,6 +4,7 @@ import { runBackup } from './commands/backup';
 import { runPreflight } from './commands/preflight';
 import { runRehearsal } from './commands/rehearse';
 import { runValidation } from './commands/validate';
+import { runReleaseReadiness } from './commands/release-readiness';
 import { parseCommandLine, type ParsedCommand } from './cli/arguments';
 import { readinessReportExitCode, redactSecrets, sanitizeForOutput } from './reporting/reportWriter';
 import type { ReadinessReport } from './reporting/reportTypes';
@@ -88,6 +89,22 @@ async function runBuiltInReadinessCommand(
       outputDirectory: path.resolve(outputDirectory),
       execute: parsed.execute,
     })).report;
+  }
+  if (command === 'release-readiness') {
+    if (parsed.execute) throw new Error('release-readiness is read-only and does not accept --execute');
+    const reports = parsed.values.get('reports') || '';
+    const operatorSignoffPath = parsed.values.get('operator-signoff') || '';
+    const outputDirectory = parsed.values.get('output') || '';
+    const runId = parsed.values.get('run-id') || '';
+    if (!reports || !operatorSignoffPath || !outputDirectory || !runId) {
+      throw new Error('Usage: release-readiness --reports <comma-separated-json> --operator-signoff <json> --output <dir> --run-id <id>');
+    }
+    return runReleaseReadiness({
+      runId,
+      reportPaths: reports.split(',').map((entry) => path.resolve(entry.trim())).filter(Boolean),
+      outputDirectory: path.resolve(outputDirectory),
+      operatorSignoffPath: path.resolve(operatorSignoffPath),
+    });
   }
   if (command !== 'preflight') throw commandNotImplemented(command);
   const sourcePath = parsed.values.get('source') || '';

@@ -6,7 +6,12 @@
   "scripts": {
     "build": "tsc",
     "check": "tsc --noEmit",
-    "migrate": "tsx src/cli.ts"
+    "migrate": "tsx src/cli.ts",
+    "preflight": "tsx src/cli.ts preflight",
+    "backup": "tsx src/cli.ts backup",
+    "validate": "tsx src/cli.ts validate",
+    "rehearse": "tsx src/cli.ts rehearse",
+    "release-readiness": "tsx src/cli.ts release-readiness"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",

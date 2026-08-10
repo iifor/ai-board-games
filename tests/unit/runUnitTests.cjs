@@ -20,6 +20,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'serverLifecycle.test.ts',
   'deploymentConfig.test.ts',
   'releaseGateConfig.test.ts',
+  'postgresOpsScripts.test.ts',
   'gameEventBuilder.test.ts',
   'eventBus.test.ts',
   'audienceStream.test.ts',
