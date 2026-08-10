@@ -13,6 +13,7 @@ import {
 import { writeJsonArtifactExclusive, writeReadinessReport } from '../reporting/reportWriter';
 import type { ReadinessArtifact, ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
 import type { MigrationReport } from '../types';
+import { runApplicationSmoke } from '../smoke/applicationSmoke';
 import { runValidation } from './validate';
 
 export interface RehearsalOptions {
@@ -29,6 +30,7 @@ export interface RehearsalResult {
   report: ReadinessReport;
   migrationReportPath?: string;
   validationReportPath?: string;
+  smokeReportPath?: string;
 }
 
 export interface RehearsalDependencies {
@@ -38,6 +40,7 @@ export interface RehearsalDependencies {
   createSchema(targetUrl: string, schema: string): Promise<void>;
   migrate: typeof migrateSqliteToPostgres;
   validate: typeof runValidation;
+  smoke: typeof runApplicationSmoke;
 }
 
 const defaultDependencies: RehearsalDependencies = {
@@ -47,6 +50,7 @@ const defaultDependencies: RehearsalDependencies = {
   createSchema: createRehearsalSchema,
   migrate: migrateSqliteToPostgres,
   validate: runValidation,
+  smoke: runApplicationSmoke,
 };
 
 function createReport(
@@ -114,6 +118,8 @@ async function rehearsalRunAlreadyPublished(options: RehearsalOptions): Promise<
     path.join(options.outputDirectory, `${options.runId}-rehearsal.md`),
     path.join(options.outputDirectory, `${options.runId}-migration.json`),
     path.join(options.outputDirectory, `${options.runId}-validation.json`),
+    path.join(options.outputDirectory, `${options.runId}-smoke.json`),
+    path.join(options.outputDirectory, `${options.runId}-smoke.md`),
   ];
   const states = await Promise.all(candidates.map(async (candidate) => {
     try {
@@ -142,6 +148,7 @@ export async function runRehearsal(
   const schema = buildRehearsalSchema(options.runId, resolved.now());
   let migrationReportPath: string | undefined;
   let validationReportPath: string | undefined;
+  let smokeReportPath: string | undefined;
 
   try {
     const sourceHash = await readAndVerifySource(options);
@@ -210,6 +217,20 @@ export async function runRehearsal(
       checks.push({ id: 'validation', status: 'failed', message: 'Formal post-import validation failed' });
     } else {
       checks.push({ id: 'validation', status: 'passed', message: 'Formal post-import validation passed' });
+      const smoke = await resolved.smoke({
+        runId: options.runId,
+        targetUrl: options.targetUrl,
+        targetSchema: schema,
+        outputDirectory: options.outputDirectory,
+      });
+      smokeReportPath = path.join(options.outputDirectory, `${options.runId}-smoke.json`);
+      artifacts.push({ type: 'smoke-report', path: smokeReportPath });
+      if (smoke.status !== 'passed') {
+        errors.push({ code: 'REHEARSAL_SMOKE_FAILED', message: 'Compiled application smoke failed' });
+        checks.push({ id: 'smoke', status: 'failed', message: 'Compiled application smoke failed' });
+      } else {
+        checks.push({ id: 'smoke', status: 'passed', message: 'Compiled application smoke passed' });
+      }
     }
   } catch (error) {
     const failure = (error as { code?: unknown } | null)?.code === 'REHEARSAL_IMPORT_FAILED'
@@ -223,5 +244,5 @@ export async function runRehearsal(
 
   const report = createReport(options, schema, started, checks, artifacts, errors);
   await persistSummary(options, report);
-  return { schema, report, migrationReportPath, validationReportPath };
+  return { schema, report, migrationReportPath, validationReportPath, smokeReportPath };
 }

@@ -4,8 +4,8 @@
     "allowJs": false,
     "declaration": false,
     "noEmit": false,
-    "rootDir": ".",
-    "outDir": "dist"
+    "rootDir": "..",
+    "outDir": "dist/ops"
   },
   "include": [
     "db/config.ts",
@@ -13,6 +13,8 @@
     "db/postgres.ts",
     "db/postgres/migrate.ts",
     "db/postgres/rehearsalAdapter.ts",
+    "db/seed.ts",
+    "smoke/applicationSmokeAdapter.ts",
     "../shared/types/dbExecutor.d.ts"
   ],
   "exclude": ["node_modules", "dist"]

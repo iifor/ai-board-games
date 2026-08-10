@@ -1,5 +1,11 @@
 # PostgreSQL 16 部署与切换
 
+## Rehearsal application smoke
+
+An executed `rehearse` command now uses the same imported schema for a compiled application smoke after validation. The target URL enters db-migrator through `DATABASE_URL` and is forwarded to the server adapter through child stdin only; it is absent from argv, stdout, and readiness reports. The smoke report is published atomically as `<run-id>-smoke.json` and `<run-id>-smoke.md` without overwriting existing evidence.
+
+The smoke checks the live database health route (including a real disconnected probe), bootstrap administrator login and forced password change, configuration reads plus skin CRUD, a persisted non-debug Undercover game with zero external model/TTS calls, detail and replay ordering, memory create/update, and formal terminal-match deletion. On failure, the rehearsal schema and all migration, validation, smoke, and rehearsal reports remain. Use a new run ID for the next attempt; investigate the preserved schema before test-only cleanup.
+
 生产应用只连接独立部署的 PostgreSQL 16，不由应用 Compose 创建数据库。应用账号只需要目标 schema 的连接、读写、sequence 使用权限；迁移账号还需要创建 schema 与 DDL 权限。TLS 必须校验证书，使用 `DATABASE_SSL=require` 和 `DATABASE_CA_PATH` 指向 CA 文件。
 
 ## 首次准备

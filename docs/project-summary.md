@@ -1,5 +1,9 @@
 # 项目总体架构
 
+## PostgreSQL rehearsal smoke gate (2026-08-10)
+
+Every executed migration rehearsal now runs post-import validation and then a compiled, server-owned application smoke against that same schema. The gate verifies real health/auth/config/history/replay/memory/workflow/observability/delete paths while replacing paid runner, LLM, and TTS dependencies inside a typed server-only seam. A failed smoke marks rehearsal failed while preserving the schema plus migration, validation, smoke, and rehearsal reports for diagnosis.
+
 ## 项目概述
 
 本项目是一个 AI 桌游/互动游戏原型，提供 C 端游戏前台、B 端管理后台、Express API、WebSocket 实时推进、AI 玩家调度、工作流持久化、历史回放和观测调试能力。

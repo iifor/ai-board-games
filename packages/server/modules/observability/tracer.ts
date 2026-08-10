@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { trace, context, SpanKind, SpanStatusCode } from '@opentelemetry/api';
+import { trace, context, INVALID_SPAN_CONTEXT, SpanKind, SpanStatusCode } from '@opentelemetry/api';
 import type { Span, Context, Attributes, AttributeValue, SpanStatus } from '@opentelemetry/api';
 import { BasicTracerProvider, BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import type { SpanExporter, ReadableSpan } from '@opentelemetry/sdk-trace-base';
@@ -95,7 +95,27 @@ function enqueueTraceWrite(traceId: string, operation: () => Promise<void>): Pro
       console.error(`[observability] PostgreSQL write failed for ${traceId}:`, (error as Error).message);
     });
   traceWriteQueues.set(traceId, queued);
+  void queued.then(() => {
+    if (traceWriteQueues.get(traceId) === queued) traceWriteQueues.delete(traceId);
+  });
   return queued;
+}
+
+async function drainTraceWrites(): Promise<void> {
+  // Yield before each snapshot so writes queued synchronously during shutdown are included.
+  for (;;) {
+    await Promise.resolve();
+    const snapshot = [...traceWriteQueues.entries()];
+    if (!snapshot.length) {
+      await Promise.resolve();
+      if (!traceWriteQueues.size) return;
+      continue;
+    }
+    await Promise.all(snapshot.map(([, pending]) => pending));
+    for (const [traceId, pending] of snapshot) {
+      if (traceWriteQueues.get(traceId) === pending) traceWriteQueues.delete(traceId);
+    }
+  }
 }
 
 function ensureOtel(): void {
@@ -312,6 +332,7 @@ function startSkillSpan(name: string, attributes: Attributes = {}): Span {
 }
 
 function startLlmSpan(attributes: Attributes = {}): Span {
+  if (!getCurrentTraceContext()) return trace.wrapSpanContext(INVALID_SPAN_CONTEXT);
   ensureOtel();
   return otelTracer!.startSpan('chat', {
     kind: SpanKind.CLIENT,
@@ -498,7 +519,17 @@ async function shutdownObservability(): Promise<void> {
   const provider = tracerProvider;
   tracerProvider = null;
   otelTracer = null;
-  if (provider) await provider.shutdown();
+  if (provider) {
+    await provider.forceFlush();
+    await provider.shutdown();
+  }
+  await drainTraceWrites();
+}
+
+async function flushObservability(): Promise<void> {
+  const provider = tracerProvider;
+  if (provider) await provider.forceFlush();
+  await drainTraceWrites();
 }
 
 export type {
@@ -528,6 +559,7 @@ export {
   markTraceError,
   markTraceComplete,
   ensureOtel,
+  flushObservability,
   shutdownObservability,
   getTracerProvider,
   runWithTraceContext,

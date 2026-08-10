@@ -1,5 +1,13 @@
 # 后端服务架构
 
+## PostgreSQL application smoke gate (2026-08-10)
+
+The server owns both compiled operations adapters. One `tsconfig.rehearsal.json` compilation emits the migration rehearsal adapter and the application smoke adapter under `packages/server/dist/ops`; the existing rehearsal entry remains available for compatibility. `packages/db-migrator` starts the compiled smoke adapter as a child process and sends the target URL only through stdin. It never imports server TypeScript, and the server never imports db-migrator.
+
+The application smoke runtime starts the real Express app against the already-imported rehearsal schema. Its source is split into lifecycle, HTTP, fixture, scenario, adapter, and type responsibilities. The internal `runSession` dependency seam is server-only and is not present in HTTP or WebSocket input. It persists a non-debug Undercover game with deterministic fake runner/config dependencies, empty speech, and a network-call guard, so no paid LLM or TTS call can occur.
+
+Observability shutdown first flushes and shuts down the provider, then drains queued PostgreSQL writes until the queue is stably empty. Queue entries are deleted only when the map still points to the same settled promise. Teardown order is HTTP close, observability shutdown/drain, executor restore and pool close, then test-only schema drop. LLM spans created without a current game trace are standard non-recording spans and do not create orphan `trace_spans` rows.
+
 ## 项目概述
 
 后端位于 `packages/server`，负责 Express REST API、WebSocket 游戏会话、工作流推进、数据库访问、模型/音色/玩家配置、AI 与 TTS 调用、静态资源托管和统一错误处理。

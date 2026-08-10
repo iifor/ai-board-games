@@ -1,5 +1,11 @@
 # 游戏工作流与 AI 调度
 
+## Application smoke and observability shutdown (2026-08-10)
+
+The PostgreSQL rehearsal smoke persists a deterministic `debugMode: false` Undercover session through the normal `runSession`, game service, repositories, playback pipeline, and formal workflow-match delete API. It creates workflow and observability fixtures before deletion, verifies ordered detail/replay data, confirms match-owned rows are removed, and confirms cross-game `player_game_memories` remains.
+
+Observability writes are serialized per trace and can be awaited through `flushObservability`/`shutdownObservability`. Shutdown does not use sleeps or retries: it flushes and shuts down the provider, then repeatedly awaits a snapshot of queued writes until the map is stably empty. Standalone LLM probes without a game trace use a non-recording OpenTelemetry span, preventing an orphan span from violating the `game_traces` foreign key.
+
 ## 项目概述
 
 游戏工作流是服务端最复杂的部分，负责把辩论赛、狼人杀、谁是卧底等游戏拆成可持久化、可调试、可重放的步骤，并通过 WebSocket 按播放节奏推送给 C 端。

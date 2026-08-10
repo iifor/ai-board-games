@@ -107,6 +107,11 @@ interface RunSessionOptions {
   replayView?: Record<string, unknown>;
 }
 
+interface RunSessionDependencies {
+  resolveRunner: typeof resolveGameRunner;
+  getRequestConfig: typeof getRequestConfig;
+}
+
 interface PlayerSelectionRow {
   playerIdsJson: string;
 }
@@ -121,6 +126,11 @@ interface GameRecord {
 interface GameSocketHandle {
   close: () => Promise<void>;
 }
+
+const defaultRunSessionDependencies: RunSessionDependencies = {
+  resolveRunner: resolveGameRunner,
+  getRequestConfig,
+};
 
 function withSessionDebugMode(
   event: Record<string, unknown>,
@@ -213,8 +223,9 @@ async function runSession(
   playerIds?: (number | string)[],
   gameType = 'werewolf',
   options: RunSessionOptions = {},
+  dependencies: RunSessionDependencies = defaultRunSessionDependencies,
 ): Promise<void> {
-  const resolved = resolveGameRunner(gameType);
+  const resolved = dependencies.resolveRunner(gameType);
   const safeGameType = resolved.gameType;
   if (mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
   if (options.replayGameId) {
@@ -226,7 +237,7 @@ async function runSession(
     session.send({ type: 'error', message: '当前处于观战模式，无法开始新游戏。请联系管理员关闭观战模式。' });
     return;
   }
-  const config = await getRequestConfig(mode, playerIds, safeGameType, options);
+  const config = await dependencies.getRequestConfig(mode, playerIds, safeGameType, options);
   const debugMode = Boolean(config.debugMode);
 
   const viewMode = String((config as Record<string, unknown>).clientViewMode || 'god');
@@ -652,4 +663,4 @@ export {
   getSavedPlayerIds,
   handleRandomizeTeams,
 };
-export type { GameSocketHandle };
+export type { GameSocketHandle, RunSessionDependencies, RunSessionOptions };

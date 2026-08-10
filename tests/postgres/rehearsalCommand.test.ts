@@ -9,7 +9,8 @@ import { buildManifest } from '../../packages/db-migrator/src/backup/manifest';
 import { main } from '../../packages/db-migrator/src/cli';
 import { runRehearsal } from '../../packages/db-migrator/src/commands/rehearse';
 import { migrateSqliteToPostgres } from '../../packages/db-migrator/src/importer';
-import { writeJsonArtifactExclusive } from '../../packages/db-migrator/src/reporting/reportWriter';
+import { writeJsonArtifactExclusive, writeReadinessReport } from '../../packages/db-migrator/src/reporting/reportWriter';
+import type { ReadinessReport } from '../../packages/db-migrator/src/reporting/reportTypes';
 import {
   assertRehearsalDatabase,
   buildRehearsalSchema,
@@ -21,6 +22,27 @@ import { createPostgresExecutor } from '../../packages/server/db/postgres';
 import { executeRequest } from '../../packages/server/db/postgres/rehearsalAdapter';
 import type { DbExecutor } from '../../packages/server/db/types';
 import type { MigrationClient, MigrationReport } from '../../packages/db-migrator/src/types';
+
+async function writePassedSmoke(options: {
+  runId: string;
+  targetSchema: string;
+  outputDirectory: string;
+}): Promise<ReadinessReport> {
+  const report: ReadinessReport = {
+    runId: options.runId,
+    schema: options.targetSchema,
+    stage: 'smoke',
+    status: 'passed',
+    startedAt: '2026-08-10T00:00:00.000Z',
+    finishedAt: '2026-08-10T00:00:00.000Z',
+    durationMs: 0,
+    checks: [{ id: 'application.smoke', status: 'passed', message: 'Injected rehearsal smoke passed' }],
+    artifacts: [],
+    errors: [],
+  };
+  await writeReadinessReport({ outputDirectory: options.outputDirectory, report });
+  return report;
+}
 
 function prepareRehearsalFixture(): {
   root: string;
@@ -296,6 +318,7 @@ test('rehearsal dry-run is non-mutating and two executions are isolated with the
       execute: true,
     }, {
       now: () => new Date('2026-08-10T01:00:00.000Z'),
+      smoke: writePassedSmoke,
     });
     schemas.push(first.schema);
     assert.equal(first.report.status, 'passed');
@@ -337,6 +360,8 @@ test('rehearsal dry-run is non-mutating and two executions are isolated with the
       runId: `second-${process.pid}-${Date.now()}`,
       outputDirectory: path.join(fixture.root, 'second-reports'),
       execute: true,
+    }, {
+      smoke: writePassedSmoke,
     });
     schemas.push(second.schema);
     assert.equal(second.report.status, 'passed');
