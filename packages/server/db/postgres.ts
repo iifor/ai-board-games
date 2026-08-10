@@ -16,10 +16,15 @@ const RETRYABLE_TRANSACTION_CODES = new Set([
   '57P01',
 ]);
 
+function parseTimestampWithTimezone(value: string): string {
+  const timestamp = new Date(value);
+  return Number.isNaN(timestamp.getTime()) ? value : timestamp.toISOString();
+}
+
 // Preserve the repository contracts used throughout the existing application.
 types.setTypeParser(20, (value) => Number(value));
 types.setTypeParser(114, (value) => value);
-types.setTypeParser(1184, (value) => value);
+types.setTypeParser(1184, parseTimestampWithTimezone);
 types.setTypeParser(3802, (value) => value);
 
 function isRetryableTransactionError(error: unknown): boolean {

@@ -284,8 +284,11 @@ async function listWorkflowEffects(matchId: string): Promise<WorkflowEffect[]> {
 async function updateWorkflowEffect(id: string, patch: Record<string, unknown>): Promise<WorkflowEffect | null> {
   await updateRow(getDbExecutor(),'workflow_effects','id',id,patch,EFFECT_COLUMNS); return getWorkflowEffect(id);
 }
-async function createWorkflowInterrupt(item: WorkflowInterruptInput): Promise<WorkflowInterrupt | null> {
-  await getDbExecutor().execute(`INSERT INTO workflow_interrupts
+async function createWorkflowInterrupt(
+  item: WorkflowInterruptInput,
+  db: DbExecutor = getDbExecutor(),
+): Promise<WorkflowInterrupt | null> {
+  await db.execute(`INSERT INTO workflow_interrupts
     (id,match_id,step_id,effect_id,interrupt_type,status,priority,payload_json,resolution_json,created_at,updated_at)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)
     ON CONFLICT(id) DO UPDATE SET step_id=excluded.step_id,effect_id=excluded.effect_id,
@@ -293,13 +296,16 @@ async function createWorkflowInterrupt(item: WorkflowInterruptInput): Promise<Wo
       payload_json=excluded.payload_json,resolution_json=excluded.resolution_json,updated_at=excluded.updated_at`,
   [item.id,item.matchId,item.stepId||null,item.effectId||null,item.interruptType,item.status||'pending',item.priority||0,
     toJson(item.payload||{}),toJson(item.resolution??null),nowIso()]);
-  return getWorkflowInterrupt(item.id);
+  return getWorkflowInterrupt(item.id, db);
 }
 async function getWorkflowInterrupt(id: string, db: DbExecutor = getDbExecutor()): Promise<WorkflowInterrupt | null> {
   return rowToWorkflowInterrupt((await db.queryOne<WorkflowInterruptRow>('SELECT * FROM workflow_interrupts WHERE id=$1',[id])) || undefined);
 }
-async function listWorkflowInterrupts(matchId: string): Promise<WorkflowInterrupt[]> {
-  return (await getDbExecutor().queryMany<WorkflowInterruptRow>('SELECT * FROM workflow_interrupts WHERE match_id=$1 ORDER BY priority DESC,created_at ASC',[matchId])).map(rowToWorkflowInterrupt).filter((item): item is WorkflowInterrupt => item !== null);
+async function listWorkflowInterrupts(
+  matchId: string,
+  db: DbExecutor = getDbExecutor(),
+): Promise<WorkflowInterrupt[]> {
+  return (await db.queryMany<WorkflowInterruptRow>('SELECT * FROM workflow_interrupts WHERE match_id=$1 ORDER BY priority DESC,created_at ASC',[matchId])).map(rowToWorkflowInterrupt).filter((item): item is WorkflowInterrupt => item !== null);
 }
 async function updateWorkflowInterrupt(id: string, patch: Record<string, unknown>, db: DbExecutor = getDbExecutor()): Promise<WorkflowInterrupt | null> {
   await updateRow(db,'workflow_interrupts','id',id,patch,INTERRUPT_COLUMNS); return getWorkflowInterrupt(id, db);

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { types } from 'pg';
 import type { Pool, PoolClient, QueryResult } from 'pg';
 import { readDatabaseConfig } from '../../packages/server/db/config';
 import { PostgresExecutor } from '../../packages/server/db/postgres';
@@ -58,6 +59,14 @@ test('database config rejects an unsafe schema identifier', () => {
     () => readDatabaseConfig({ DATABASE_URL: 'postgres://localhost/consensus', DATABASE_SCHEMA: 'bad-name' }),
     /DATABASE_SCHEMA/,
   );
+});
+
+test('timestamptz parser preserves the repository ISO timestamp contract', () => {
+  const parseTimestamp = types.getTypeParser(1184, 'text');
+  assert.equal(parseTimestamp('2026-08-10 07:31:46.84+00'), '2026-08-10T07:31:46.840Z');
+  assert.equal(parseTimestamp('2026-08-10 15:31:46.84+08'), '2026-08-10T07:31:46.840Z');
+  assert.equal(parseTimestamp('infinity'), 'infinity');
+  assert.equal(parseTimestamp('not-a-timestamp'), 'not-a-timestamp');
 });
 
 test('transaction commits queries through the acquired client', async () => {

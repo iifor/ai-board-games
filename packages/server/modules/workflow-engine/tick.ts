@@ -51,7 +51,7 @@ async function tickMatch(matchId: string, budget: TickBudget = {}): Promise<Matc
         currentStepIndex += 1; stepsProcessed += 1; continue;
       }
 
-      const breakpoint = await evaluateDebugBreakpoint(match, step);
+      const breakpoint = await evaluateDebugBreakpoint(match, step, transaction);
       if (breakpoint.kind === 'pause') { status = MATCH_STATUS.WAITING; break; }
       if (breakpoint.kind === 'skip') {
         await repo.commitWorkflowChange({ matchId, events: [{ type: 'step_skipped', stepId: step.id,

@@ -741,3 +741,4 @@ pnpm run test:workflow
 # PostgreSQL 并发语义（2026-08-08）
 
 `tickMatch` 在 serializable 事务中通过 `SELECT ... FOR UPDATE` 锁定 Match，事件序号在锁内计算；Match、事件、快照和 outbox 同事务提交。AI task 与 outbox 使用 `FOR UPDATE SKIP LOCKED` 原子领取，支持后续多实例而不重复消费。工作流 repository、service、controller、GameEngine adapter、狼人杀、辩论赛和谁是卧底调用链均为异步。
+谁是卧底调试断点在 `tickMatch` 持有 Match 行锁时，查询和创建 `workflow_interrupts` 必须复用当前事务 executor，不得绕回连接池产生外键锁等待。

@@ -1,6 +1,21 @@
-import test from 'node:test';
+import { afterEach, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildDomainAction, runWerewolfActionEngineBridge } from '../../packages/server/modules/werewolf/actionEngineBridge';
+import { setDbExecutorForTests } from '../../packages/server/db';
+import type { DbExecutor } from '../../packages/server/db/types';
+
+describe('Werewolf action engine bridge', { concurrency: false }, () => {
+const memoryDb: DbExecutor = {
+  queryOne: async () => null,
+  queryMany: async () => [],
+  execute: async () => ({ rowCount: 0 }),
+  withTransaction: async (operation) => operation(memoryDb),
+  healthCheck: async () => true,
+  close: async () => {},
+};
+
+beforeEach(() => setDbExecutorForTests(memoryDb));
+afterEach(() => setDbExecutorForTests(null));
 
 test('Werewolf action engine bridge builds stable DomainAction from action result', () => {
   const action = buildDomainAction({
@@ -24,7 +39,7 @@ test('Werewolf action engine bridge builds stable DomainAction from action resul
   assert.equal(action.idempotencyKey, action.id);
 });
 
-test.skip('Werewolf action engine bridge projects seer check and matches legacy shadow (covered by PostgreSQL workflow integration)', async () => {
+test('Werewolf action engine bridge projects seer check and matches legacy shadow', async () => {
   const state = createState([
     player(1, 'werewolf', 'wolves'),
     player(2, 'villager', 'good'),
@@ -45,7 +60,7 @@ test.skip('Werewolf action engine bridge projects seer check and matches legacy 
   assert.equal(result.state.rounds?.[0]?.night?.seerCheck?.target, 2);
 });
 
-test.skip('Werewolf action engine bridge projects wolf vote tally and target (covered by PostgreSQL workflow integration)', async () => {
+test('Werewolf action engine bridge projects wolf vote tally and target', async () => {
   const state = createState([
     player(1, 'werewolf', 'wolves', ['kill']),
     player(2, 'werewolf', 'wolves', ['kill']),
@@ -71,7 +86,7 @@ test.skip('Werewolf action engine bridge projects wolf vote tally and target (co
   assert.equal(result.state.rounds?.[0]?.night?.wolfTarget, 3);
 });
 
-test.skip('Werewolf action engine bridge uses wolf_kill compatibility path (covered by PostgreSQL workflow integration)', async () => {
+test('Werewolf action engine bridge uses wolf_kill compatibility path', async () => {
   const state = createState([
     player(1, 'werewolf', 'wolves', ['kill']),
     player(2, 'villager', 'good'),
@@ -89,7 +104,7 @@ test.skip('Werewolf action engine bridge uses wolf_kill compatibility path (cove
   assert.equal(result.state.rounds?.[0]?.night?.wolfTarget, 2);
 });
 
-test.skip('Werewolf action engine bridge projects guard protect state (covered by PostgreSQL workflow integration)', async () => {
+test('Werewolf action engine bridge projects guard protect state', async () => {
   const state = createState([
     player(1, 'werewolf', 'wolves', ['kill']),
     player(2, 'villager', 'good'),
@@ -110,7 +125,7 @@ test.skip('Werewolf action engine bridge projects guard protect state (covered b
   assert.equal(result.state.players?.find((item: Record<string, unknown>) => Number(item.id) === 5)?.lastGuardTarget, 2);
 });
 
-test.skip('Werewolf action engine bridge projects witch save state (covered by PostgreSQL workflow integration)', async () => {
+test('Werewolf action engine bridge projects witch save state', async () => {
   const state = createState([
     player(1, 'werewolf', 'wolves', ['kill']),
     player(2, 'villager', 'good'),
@@ -133,7 +148,7 @@ test.skip('Werewolf action engine bridge projects witch save state (covered by P
   assert.equal(result.state.rounds?.[0]?.night?.witchSaveTarget, 2);
 });
 
-test.skip('Werewolf action engine bridge projects witch poison state (covered by PostgreSQL workflow integration)', async () => {
+test('Werewolf action engine bridge projects witch poison state', async () => {
   const state = createState([
     player(1, 'werewolf', 'wolves', ['kill']),
     player(2, 'villager', 'good'),
@@ -153,7 +168,7 @@ test.skip('Werewolf action engine bridge projects witch poison state (covered by
   assert.equal(result.state.rounds?.[0]?.night?.witchPoisonTarget, 2);
 });
 
-test.skip('Werewolf action engine bridge falls back to legacy on engine validation failure (covered by PostgreSQL workflow integration)', async () => {
+test('Werewolf action engine bridge falls back to legacy on engine validation failure', async () => {
   const state = createState([
     player(4, 'seer', 'good', ['inspectFaction']),
     player(2, 'villager', 'good'),
@@ -210,3 +225,4 @@ function window(matchId: string, stepId: string, actionType: string, actorIds: n
     targetIds: [1, 2, 3, 4],
   };
 }
+});

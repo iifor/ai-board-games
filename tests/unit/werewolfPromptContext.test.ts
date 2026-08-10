@@ -7,6 +7,8 @@ import { BasePlayerAgent } from '../../packages/server/modules/agent-core/player
 import { runWerewolfAiAction } from '../../packages/server/modules/werewolf/aiActions';
 import { createWerewolfSkills } from '../../packages/server/modules/werewolf/roles';
 import { createRuntime } from '../../packages/server/modules/werewolf/runtime';
+import { setDbExecutorForTests } from '../../packages/server/db';
+import type { DbExecutor } from '../../packages/server/db/types';
 
 function player(id: number, role: string, faction: string, patch: Record<string, unknown> = {}) {
   return {
@@ -386,7 +388,17 @@ test('werewolf lightweight system prompt follows fixed template', () => {
   ].join('\n'));
 });
 
-test.skip('runtime player agent uses one full opening system prompt and retains it for debug (covered by PostgreSQL workflow integration)', async () => {
+test('runtime player agent uses one full opening system prompt and retains it for debug', async (t) => {
+  const memoryDb: DbExecutor = {
+    queryOne: async () => null,
+    queryMany: async () => [],
+    execute: async () => ({ rowCount: 0 }),
+    withTransaction: async (operation) => operation(memoryDb),
+    healthCheck: async () => true,
+    close: async () => {},
+  };
+  setDbExecutorForTests(memoryDb);
+  t.after(() => setDbExecutorForTests(null));
   const players = [
     runtimePlayer(1, 'werewolf', '狼人', 'wolves', ['kill']),
     runtimePlayer(2, 'villager', '平民', 'good', []),

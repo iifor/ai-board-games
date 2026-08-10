@@ -14,6 +14,8 @@ import {
 import { resolveAiActionSpeech, runActionWindowAiTask } from '../../packages/server/modules/werewolf/aiActions';
 import { BasePlayerAgent } from '../../packages/server/modules/agent-core/playerAgent';
 import { createRound } from '../../packages/server/modules/werewolf/agents';
+import { setDbExecutorForTests } from '../../packages/server/db';
+import type { DbExecutor } from '../../packages/server/db/types';
 
 test('action speech policy scopes natural and result-dependent actions', () => {
   const naturalActionTypes = [
@@ -367,7 +369,17 @@ test('action speech target validation covers aliases and every multi-target seat
   assert.equal(normalizeActionSpeechForPayload('witch_poison', { use: true, target: 5 }, '我决定毒15号。'), '');
 });
 
-test.skip('out-of-scope action window leaves the action payload untouched (covered by PostgreSQL workflow integration)', async () => {
+test('out-of-scope action window leaves the action payload untouched', async (t) => {
+  const memoryDb: DbExecutor = {
+    queryOne: async () => null,
+    queryMany: async () => [],
+    execute: async () => ({ rowCount: 0 }),
+    withTransaction: async (operation) => operation(memoryDb),
+    healthCheck: async () => true,
+    close: async () => {},
+  };
+  setDbExecutorForTests(memoryDb);
+  t.after(() => setDbExecutorForTests(null));
   const prototype = BasePlayerAgent.prototype as unknown as {
     askVoteTarget: (...args: unknown[]) => Promise<number | null>;
   };

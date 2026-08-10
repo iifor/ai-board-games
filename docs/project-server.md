@@ -446,6 +446,8 @@ docker compose ps
 
 生产唯一业务数据库为 PostgreSQL 16。`db/index.ts` 异步初始化 `pg` 连接池并执行带 advisory lock 和校验和的版本化 SQL migration；所有 repository 通过异步 `DbExecutor` 访问数据库。SQLite 只存在于独立的 `packages/db-migrator` 一次性导入工具中，服务端没有 SQLite 或 JSON fallback。
 
+PostgreSQL executor 为 OID 1184（`timestamptz`）注册统一 parser：可解析的时间值规范化为 UTC ISO-8601 `...Z`，PostgreSQL 特殊值或不可解析值保持原样。该约定保证 SQLite 迁移到 PostgreSQL 后 repository 与管理 API 的时间字段格式兼容。
+
 `createApp()` 在注册路由前完成数据库 migration 和幂等 seed，失败时不会监听端口。`/api/toc/health` 执行真实数据库查询，数据库不可用时返回 503。配置使用 `DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_SSL`、`DATABASE_CA_PATH`、`DATABASE_POOL_MAX`、`DATABASE_CONNECTION_TIMEOUT_MS` 和 `DATABASE_STATEMENT_TIMEOUT_MS`。部署、备份、恢复和正式切换见 `docs/postgresql-deployment.md`。
 
 服务端构建同时产出离线 migration rehearsal adapter 及其正式 SQL migration 副本。adapter 在服务端编译上下文复用唯一的 `createPostgresExecutor` 和 `migratePostgres`，只接受 stdin JSON，不从 argv 读取数据库 URL；`packages/db-migrator` 不加载服务端 TypeScript，也不复制 migration SQL。adapter 不提供 drop/truncate 操作，按 runId hash 获取 PostgreSQL advisory lock 后原子检查并创建唯一 rehearsal schema。

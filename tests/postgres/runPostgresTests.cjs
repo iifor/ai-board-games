@@ -12,6 +12,7 @@ const testFiles = [
   'coreRepositories.test.ts',
   'authIntegration.test.ts',
   'llmQuotaIntegration.test.ts',
+  'gameApplicationIntegration.test.ts',
   'gameRepositories.test.ts',
   'workflowConcurrency.test.ts',
   'sqliteImporter.test.ts',

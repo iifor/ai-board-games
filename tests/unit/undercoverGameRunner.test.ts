@@ -7,9 +7,13 @@ import { runSession, selectPlayersForGame } from '../../packages/server/modules/
 import { buildUndercoverDebugSpeech, buildUndercoverDebugVote } from '../../packages/server/modules/undercover/debug';
 import { createInitialUndercoverState, validatePublicSpeech } from '../../packages/server/modules/undercover/rules';
 import {
-  controlUndercoverDebugMatch,
-  getDebugState,
+  getStepHandler,
+  getWorkflow,
 } from '../../packages/server/modules/workflow-engine';
+import {
+  UNDERCOVER_WORKFLOW_ID,
+  registerUndercoverWorkflow,
+} from '../../packages/server/modules/undercover/workflow';
 import {
   normalizeGameType,
   validatePlayerSelection,
@@ -118,95 +122,81 @@ test('legacy runners preserve definition-backed session metadata', () => {
   assert.deepEqual(werewolf.session.playback, { prefetchCount: 2 });
 });
 
-test.skip('debug Undercover completes its first speech without calling the player model (covered by PostgreSQL workflow integration)', async (t) => {
-  resetGameEngine();
-  const aiConfigModule = require('../../packages/server/config/ai') as { getAiConfig: () => unknown };
-  const settingsModule = require('../../packages/server/modules/settings/service') as { getSpectatorMode: () => boolean };
-  const originalGetAiConfig = aiConfigModule.getAiConfig;
-  const originalGetSpectatorMode = settingsModule.getSpectatorMode;
+test('debug Undercover completes its first speech without calling the player model', async (t) => {
+  registerUndercoverWorkflow();
+  const workflowRepository = require('../../packages/server/modules/workflow-engine/repository') as {
+    listAiTasks: (matchId: string) => Promise<Array<Record<string, unknown>>>;
+  };
+  const originalListAiTasks = workflowRepository.listAiTasks;
   const originalAskJson = BasePlayerAgent.prototype.askJson;
   const players = Array.from({ length: 6 }, (_, index) => ({
     id: index + 101,
-    name: `${index + 1}号`,
     nickname: `${index + 1}号`,
     avatar: '',
-    avatarUrl: '',
-    provider: 'test',
-    providerName: 'test',
-    baseUrl: '',
-    apiKeyEnv: 'TEST_KEY',
-    apiKey: '',
-    apiFormat: 'openai-compatible',
-    model: '',
-    modelId: 1,
-    temperature: 0.5,
-    personality: '测试玩家',
-    sex: '未知',
-    voicePackageId: null,
-    thinkingEnabled: false,
-    fallbackModel: null,
   }));
-  aiConfigModule.getAiConfig = () => ({
-    rounds: 3,
-    host: { id: 0, name: '主持人', nickname: '主持人' },
-    players,
-    missingProviders: [],
-    realReady: true,
-  });
-  settingsModule.getSpectatorMode = () => false;
+  const state = {
+    ...createInitialUndercoverState(players, {
+      seed: 42,
+      wordPair: { civilian: '咖啡', undercover: '奶茶' },
+      undercoverPlayerId: 102,
+    }),
+    completedSteps: {},
+    round: 1,
+  };
+  const match = {
+    id: 'undercover-debug-unit',
+    config: { debugMode: true },
+    state,
+  };
+  const step = {
+    id: 'round_1_speech_0',
+    type: 'undercover.speech',
+    config: { round: 1, orderIndex: 0 },
+  };
+  const task = {
+    id: 'undercover-debug-unit:round_1_speech_0:speech:101',
+    matchId: match.id,
+    stepId: step.id,
+    taskKey: 'speech:101',
+    playerId: 101,
+    action: 'undercover_speech',
+    status: 'queued',
+    promptContextSnapshot: { actorId: 101, round: 1 },
+  };
+  const handler = getStepHandler(UNDERCOVER_WORKFLOW_ID, step.type);
+  const workflow = getWorkflow(UNDERCOVER_WORKFLOW_ID);
   let askJsonCalls = 0;
   BasePlayerAgent.prototype.askJson = async () => {
     askJsonCalls += 1;
-    return null;
+    throw new Error('debug Undercover must not call the player model');
   };
   t.after(() => {
-    aiConfigModule.getAiConfig = originalGetAiConfig;
-    settingsModule.getSpectatorMode = originalGetSpectatorMode;
+    workflowRepository.listAiTasks = originalListAiTasks;
     BasePlayerAgent.prototype.askJson = originalAskJson;
   });
-
-  const sent: Record<string, unknown>[] = [];
-  let closed = false;
-  const session = {
-    send(payload: Record<string, unknown>) { sent.push(payload); },
-    async sendAndWait(payload: Record<string, unknown>) { sent.push(payload); },
-    resolveAck() {},
-    close() { closed = true; },
-    setPaused() {},
-    skipCurrentPhase() {},
-  };
-
-  const running = runSession(
-    session as never,
-    'real',
-    players.map((player) => player.id),
-    'undercover',
-    { debugMode: true },
-  );
-  await waitForCondition(() => sent.some((event) => event.type === 'undercover-debug-ready'));
-  const ready = sent.find((event) => event.type === 'undercover-debug-ready')!;
-  const matchId = String((ready.payload as { matchId?: string }).matchId);
-  const interrupt = getDebugState(matchId)!.interrupts.find((item) =>
-    item.interruptType === 'undercover_debug_breakpoint' && item.status === 'pending'
-  );
-  assert.ok(interrupt);
-  controlUndercoverDebugMatch({
-    matchId,
-    interruptId: interrupt.id,
-    action: 'continuous',
+  const result = await handler.runAiTask!({
+    match,
+    workflow,
+    step,
+    task,
   });
-  await running;
+  workflowRepository.listAiTasks = async () => [{
+    ...task,
+    status: 'succeeded',
+    result,
+  }];
 
-  const starts = sent.filter((event) => event.message === '谁是卧底开始');
-  assert.equal(starts.length, 1);
-  assert.equal(starts[0].type, 'host');
-  assert.equal((starts[0].game as Record<string, unknown>).type, 'undercover');
-  const completed = sent.find((event) => event.type === 'done');
-  assert.equal(completed?.message, '谁是卧底结束，身份已经揭晓。');
-  assert.equal((completed?.game as Record<string, unknown>).gameType, 'undercover');
-  assert.equal(sent.some((event) => event.type === 'undercover-speech'), true);
+  const completed = await handler.execute({
+    match,
+    workflow,
+    step,
+    state,
+  });
+  assert.equal(completed.status, 'COMPLETED');
+  assert.equal(completed.events?.[0]?.type, 'undercover-speech');
+  assert.equal((completed.state?.speeches as unknown[]).length, 1);
+  assert.equal((completed.state?.completedSteps as Record<string, boolean>)[step.id], true);
   assert.equal(askJsonCalls, 0);
-  assert.equal(closed, true);
 });
 
 test('runSession persists the start before every runtime event while live playback is delayed', async (t) => {
@@ -428,12 +418,4 @@ function deferred<T>() {
     resolve = done as (value?: T | PromiseLike<T>) => void;
   });
   return { promise, resolve };
-}
-
-async function waitForCondition(predicate: () => boolean): Promise<void> {
-  for (let index = 0; index < 50; index += 1) {
-    if (predicate()) return;
-    await new Promise<void>((resolve) => setTimeout(resolve, 10));
-  }
-  assert.equal(predicate(), true);
 }

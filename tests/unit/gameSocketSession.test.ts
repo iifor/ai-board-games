@@ -5,7 +5,6 @@ import { getGameEngine, resetGameEngine } from '../../packages/server/modules/en
 import { createSession, isSpeechWaitPayload, parseMessage } from '../../packages/server/modules/game-socket/session';
 import { createPreparedSender, isImmediateEvent, isRuleIntroEvent } from '../../packages/server/modules/game-socket/sender';
 import { runSession } from '../../packages/server/modules/game-socket/service';
-import { replayGameSession } from '../../packages/server/modules/game-socket/replay';
 import {
   createLivePlaybackSource,
   createPlaybackPipeline,
@@ -13,7 +12,6 @@ import {
   preparePlaybackEvents,
   toPlaybackEvent,
 } from '../../packages/server/modules/game-socket/playback';
-import { deleteGame, saveGameRecord } from '../../packages/server/modules/games';
 import { createGameCapacity, createSessionStartGuard } from '../../packages/server/modules/game-socket/capacity';
 
 interface SentPayload {
@@ -425,40 +423,6 @@ test('PlaybackPipeline replays a stored host start as an immediate event', async
   assert.equal(sent.length, 1);
   assert.equal(sent[0].type, 'host');
   assert.equal(waited.length, 0);
-});
-
-test.skip('Undercover history replays stored host and display events in order (covered by PostgreSQL game integration)', async () => {
-  const gameId = `undercover-replay-${Date.now()}`;
-  const storedEvents = [
-    toPlaybackEvent({ type: 'host', message: '谁是卧底开始' }, 'god', 1),
-    toPlaybackEvent({
-      type: 'undercover-speech',
-      message: '1号完成描述',
-      presentation: { suppressSpeech: true, requiresAck: false },
-    }, 'god', 2),
-  ];
-  await saveGameRecord({
-    id: gameId,
-    gameType: 'undercover',
-    mode: 'standard-6',
-    players: [],
-    playbackEvents: storedEvents,
-  });
-  const sent: SentPayload[] = [];
-  let closed = false;
-  const session = {
-    ...createImmediateSession(sent),
-    close() { closed = true; },
-  };
-
-  try {
-    await replayGameSession(session as never, 'undercover', gameId);
-    assert.deepEqual(sent.map((event) => event.type), ['host', 'undercover-speech']);
-    assert.deepEqual(sent.map((event) => event.message), ['谁是卧底开始', '1号完成描述']);
-    assert.equal(closed, true);
-  } finally {
-    await deleteGame(gameId);
-  }
 });
 
 test('PlaybackEvent strips ack ids and records media references', () => {
