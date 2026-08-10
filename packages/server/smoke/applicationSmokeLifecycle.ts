@@ -2,8 +2,8 @@ import crypto from 'node:crypto';
 import { once } from 'node:events';
 import http from 'node:http';
 import { createApp } from '../app';
-import { setDbExecutorForTests } from '../db';
-import type { DatabaseConfig } from '../db/config';
+import { getDbExecutorForTests, setDbExecutorForTests } from '../db';
+import { readDatabaseConfig } from '../db/config';
 import { createPostgresExecutor } from '../db/postgres';
 import type { DbExecutor } from '../db/types';
 import { shutdownObservability } from '../modules/observability';
@@ -19,10 +19,12 @@ interface EnvironmentSnapshot {
 
 interface ApplicationSmokeLifecycleDependencies {
   createApplication: typeof createApp;
+  createExecutor: typeof createPostgresExecutor;
 }
 
 const defaultDependencies: ApplicationSmokeLifecycleDependencies = {
   createApplication: createApp,
+  createExecutor: createPostgresExecutor,
 };
 
 function restoreEnvironment(snapshot: EnvironmentSnapshot): void {
@@ -53,21 +55,9 @@ async function closeHttpServer(server: http.Server): Promise<void> {
 
 async function startApplicationSmokeRuntime(
   request: ApplicationSmokeAdapterRequest,
-  dependencies: ApplicationSmokeLifecycleDependencies = defaultDependencies,
+  dependencies: Partial<ApplicationSmokeLifecycleDependencies> = {},
 ): Promise<SmokeRuntime> {
-  const config: DatabaseConfig = {
-    connectionString: request.targetUrl,
-    schema: request.targetSchema,
-    poolMax: 4,
-    connectionTimeoutMs: 5_000,
-    statementTimeoutMs: 30_000,
-    ssl: new URL(request.targetUrl).searchParams.get('sslmode')?.toLowerCase() === 'verify-full'
-      ? { rejectUnauthorized: true as const }
-      : false,
-  };
-  const database = createPostgresExecutor(config);
-  const healthProbe = createPostgresExecutor({ ...config, poolMax: 1 });
-  const executor = createHealthAwareExecutor(database, healthProbe);
+  const resolved = { ...defaultDependencies, ...dependencies };
   const suffix = crypto.createHash('sha256').update(request.runId).digest('hex').slice(0, 10);
   const adminUsername = `application-smoke-${suffix}`;
   const adminPassword = 'application-smoke-initial-password';
@@ -78,17 +68,23 @@ async function startApplicationSmokeRuntime(
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SECRET: process.env.JWT_SECRET,
   };
+  const previousExecutor = getDbExecutorForTests();
   process.env.ADMIN_USERNAME = adminUsername;
   process.env.ADMIN_PASSWORD = adminPassword;
   process.env.DATABASE_SCHEMA = request.targetSchema;
   process.env.DATABASE_URL = request.targetUrl;
   process.env.JWT_SECRET = 'application-smoke-jwt-secret-at-least-32-characters';
-  setDbExecutorForTests(executor);
+  let database: DbExecutor | undefined;
+  let healthProbe: DbExecutor | undefined;
   let server: http.Server | undefined;
   let probeClosed = false;
   let closed = false;
   try {
-    server = http.createServer(await dependencies.createApplication());
+    const config = readDatabaseConfig();
+    database = resolved.createExecutor(config);
+    healthProbe = resolved.createExecutor({ ...config, poolMax: 1 });
+    setDbExecutorForTests(createHealthAwareExecutor(database, healthProbe));
+    server = http.createServer(await resolved.createApplication());
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
@@ -101,7 +97,7 @@ async function startApplicationSmokeRuntime(
       async disconnectHealthProbe() {
         if (probeClosed) return;
         probeClosed = true;
-        await healthProbe.close();
+        await healthProbe!.close();
       },
       async close() {
         if (closed) return;
@@ -109,12 +105,12 @@ async function startApplicationSmokeRuntime(
         let primaryError: unknown;
         try { await closeHttpServer(server!); } catch (error) { primaryError = error; }
         try { await shutdownObservability(); } catch (error) { if (!primaryError) primaryError = error; }
-        setDbExecutorForTests(null);
+        setDbExecutorForTests(previousExecutor);
         if (!probeClosed) {
-          try { await healthProbe.close(); } catch (error) { if (!primaryError) primaryError = error; }
+          try { await healthProbe!.close(); } catch (error) { if (!primaryError) primaryError = error; }
           probeClosed = true;
         }
-        try { await database.close(); } catch (error) { if (!primaryError) primaryError = error; }
+        try { await database!.close(); } catch (error) { if (!primaryError) primaryError = error; }
         restoreEnvironment(environment);
         if (primaryError) throw primaryError;
       },
@@ -122,9 +118,9 @@ async function startApplicationSmokeRuntime(
   } catch (error) {
     if (server) await closeHttpServer(server).catch(() => undefined);
     await shutdownObservability().catch(() => undefined);
-    setDbExecutorForTests(null);
-    if (!probeClosed) await healthProbe.close().catch(() => undefined);
-    await database.close().catch(() => undefined);
+    setDbExecutorForTests(previousExecutor);
+    if (!probeClosed && healthProbe) await healthProbe.close().catch(() => undefined);
+    if (database) await database.close().catch(() => undefined);
     restoreEnvironment(environment);
     throw error;
   }

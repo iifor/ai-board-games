@@ -26,6 +26,7 @@ async function countRows(database: DbExecutor, table: string, column: string, va
   const allowed = new Set([
     'games.id', 'game_players.game_id', 'game_playback_events.game_id',
     'matches.id', 'workflow_events.match_id', 'game_traces.id',
+    'trace_spans.trace_id', 'game_events.trace_id',
   ]);
   if (!allowed.has(`${table}.${column}`)) throw new Error('Unsafe smoke count query');
   const row = await database.queryOne<{ count: number }>(
@@ -102,7 +103,9 @@ async function runApplicationSmokeScenario(
     const traceId = await createWorkflowAndObservabilityFixtures(runtime.database, gameId, players);
     if (await countRows(runtime.database, 'matches', 'id', gameId) !== 1
       || await countRows(runtime.database, 'workflow_events', 'match_id', gameId) !== 1
-      || await countRows(runtime.database, 'game_traces', 'id', traceId) !== 1) {
+      || await countRows(runtime.database, 'game_traces', 'id', traceId) !== 1
+      || await countRows(runtime.database, 'trace_spans', 'trace_id', traceId) < 1
+      || await countRows(runtime.database, 'game_events', 'trace_id', traceId) < 1) {
       throw new Error('Workflow or observability fixture was not persisted');
     }
     const deletion = await requestJson(runtime.baseUrl, `/api/admin/workflow/matches/${encodeURIComponent(gameId)}`, {
@@ -112,8 +115,11 @@ async function runApplicationSmokeScenario(
     for (const [table, column] of [
       ['games', 'id'], ['game_players', 'game_id'], ['game_playback_events', 'game_id'],
       ['matches', 'id'], ['workflow_events', 'match_id'], ['game_traces', 'id'],
+      ['trace_spans', 'trace_id'], ['game_events', 'trace_id'],
     ] as const) {
-      const identifier = table === 'game_traces' ? traceId : gameId;
+      const identifier = table === 'game_traces' || table === 'trace_spans' || table === 'game_events'
+        ? traceId
+        : gameId;
       if (await countRows(runtime.database, table, column, identifier)) throw new Error(`${table} fixture survived formal deletion`);
     }
     if (await countMemory(runtime.database, memory.ownerPlayerId, memory.subjectPlayerId) !== 1) {

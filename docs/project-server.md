@@ -4,9 +4,9 @@
 
 The server owns both compiled operations adapters. One `tsconfig.rehearsal.json` compilation emits the migration rehearsal adapter and the application smoke adapter under `packages/server/dist/ops`; the existing rehearsal entry remains available for compatibility. `packages/db-migrator` starts the compiled smoke adapter as a child process and sends the target URL only through stdin. It never imports server TypeScript, and the server never imports db-migrator.
 
-The application smoke runtime starts the real Express app against the already-imported rehearsal schema. Its source is split into lifecycle, HTTP, fixture, scenario, adapter, and type responsibilities. The internal `runSession` dependency seam is server-only and is not present in HTTP or WebSocket input. It persists a non-debug Undercover game with deterministic fake runner/config dependencies, empty speech, and a network-call guard, so no paid LLM or TTS call can occur.
+The application smoke runtime starts the real Express app against the already-imported rehearsal schema. Its source is split into lifecycle, HTTP, fixture, scenario, adapter, and type responsibilities. Inside the isolated child it temporarily sets the target URL/schema and then calls the canonical `readDatabaseConfig`, so production SSL/CA, pool-size, connection-timeout, and statement-timeout settings remain authoritative. The internal `runSession` dependency seam is server-only and is not present in HTTP or WebSocket input. It persists a non-debug Undercover game with deterministic fake runner/config dependencies, empty speech, and a network-call guard, so no paid LLM or TTS call can occur.
 
-Observability shutdown first flushes and shuts down the provider, then drains queued PostgreSQL writes until the queue is stably empty. Queue entries are deleted only when the map still points to the same settled promise. Teardown order is HTTP close, observability shutdown/drain, executor restore and pool close, then test-only schema drop. LLM spans created without a current game trace are standard non-recording spans and do not create orphan `trace_spans` rows.
+Observability shutdown first flushes and shuts down the provider, then drains queued PostgreSQL writes until the queue is stably empty. Queue entries are deleted only when the map still points to the same settled promise. Teardown order is HTTP close, observability shutdown/drain, exact restoration of the previously installed executor, smoke pool close, then test-only schema drop. LLM spans created without a current game trace are standard non-recording spans and do not create orphan `trace_spans` rows.
 
 ## 项目概述
 
@@ -224,8 +224,8 @@ C 端 REST 路由挂载到 `/api/toc`，主要能力包括：
 
 主要数据表类别：
 
-- 配置类：`players`、`model_providers`、`models`、`voice_packages`、`werewolf_roles`、`werewolf_modes`、`skins`、`app_settings`
-- 对局类：`games`、`game_players`、`game_player_selections`
+- 配置类：`players`、`model_providers`、`models`、`voice_packages`、`werewolf_roles`、`werewolf_modes`、`skins`、`app_settings`、`game_player_selections`（按 `game_type` 保存选人偏好，不归属于单场 match）
+- 对局类：`games`、`game_players`
 - 工作流类：`matches`、`match_snapshots`、`workflow_events`、`ai_tasks`、`pending_actions`、`outbox_messages`、`workflow_effects`、`workflow_interrupts`
 - 观测类：`game_traces`、`trace_spans`、`llm_records`、`agent_decisions`、`game_events`、`state_snapshots`
 - 记忆类：`memory_snapshots` 保存按 match 隔离的本局会话；`player_game_memories` 保存按游戏类型、观察者和被观察者聚合的跨局画像。

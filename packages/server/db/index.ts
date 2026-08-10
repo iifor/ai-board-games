@@ -29,10 +29,14 @@ function setDbExecutorForTests(database: DbExecutor | null): void {
   connection = database;
 }
 
+function getDbExecutorForTests(): DbExecutor | null {
+  return connection;
+}
+
 async function closeDb(): Promise<void> {
   const active = connection;
   connection = null;
   await active?.close();
 }
 
-export { getDb, getDbExecutor, initializeDb, setDbExecutorForTests, closeDb };
+export { getDb, getDbExecutor, getDbExecutorForTests, initializeDb, setDbExecutorForTests, closeDb };

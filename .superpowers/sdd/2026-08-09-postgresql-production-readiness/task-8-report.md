@@ -15,6 +15,7 @@ The database target is sent to the compiled child only through stdin. It is abse
 2. The first Task 8 RED stopped during module loading because `packages/db-migrator/src/smoke/applicationSmoke` did not exist; zero Task 8 assertions executed.
 3. The first integrated run executed 85 tests: 81 passed and 4 failed. Failures isolated the drain test from prior work, exposed missing smoke runtime environment setup, required explicit smoke injection in pre-existing rehearsal tests, and proved the compiled dist rehearsal correctly failed when the real smoke failed.
 4. After the queue drain was made awaitable, force-flush exposed a second existing observability defect: standalone LLM probes created 38 orphan OpenTelemetry spans whose `trace_id` had no `game_traces` parent. This produced 38 deterministic foreign-key errors instead of delayed executor errors.
+5. Fix Round 1 reproduced five review failures: both successful close and startup failure cleared a pre-existing executor; missing canonical CA input still reached application startup; injected executor capture observed none of the canonical pool/timeout/CA configuration; and a schema with the `trace_spans`/`game_events` cascades removed still passed smoke.
 
 ## GREEN implementation
 
@@ -39,7 +40,7 @@ The smoke scenario verifies these checks in order:
 8. `health.disconnected`
 9. `teardown.observability-drained`
 
-It starts the real Express app on a random loopback port, reads every required configuration module, performs skin create/update/delete, persists a deterministic `debugMode: false` Undercover game through normal `runSession`/game service/repositories, validates ordered live and stored playback, creates and updates player memory, creates workflow and observability fixtures, and calls the authenticated formal match deletion API. Game, players, playback, workflow, and observability rows are removed; cross-game player memory remains.
+It starts the real Express app on a random loopback port, reads every required configuration module, performs skin create/update/delete, persists a deterministic `debugMode: false` Undercover game through normal `runSession`/game service/repositories, validates ordered live and stored playback, creates and updates player memory, creates workflow and observability fixtures, and calls the authenticated formal match deletion API. Game, game-player, playback, workflow, trace, trace-span, and game-event rows are removed; cross-game player memory remains. `game_player_selections` is not match-owned: it stores `game_type`-level selection preferences and is deliberately outside the deletion assertion.
 
 The internal dependency seam is the sixth `runSession` parameter. It is not available through WebSocket or HTTP input. The fake config and runner use no API key or voice, emit empty speakable text, and install a network guard; the smoke asserts runner calls equal one and external fetch calls equal zero.
 
@@ -52,6 +53,7 @@ The internal dependency seam is the sixth `runSession` parameter. It is not avai
 - The controlled race test enqueues a write while shutdown is pending and proves all writes complete before shutdown returns.
 - Standalone LLM spans without a current game trace now use an OpenTelemetry non-recording span, so they do not initialize a provider or create orphan database rows. Game-scoped spans retain their existing persistence behavior.
 - Smoke lifecycle environment changes are precisely restored on both success and a controlled startup failure.
+- Smoke lifecycle also restores the exact previous executor on both paths and resolves executor settings through canonical `readDatabaseConfig`, including SSL/CA, pool size, and timeouts.
 
 ## Verification
 
@@ -59,7 +61,7 @@ All commands used `pnpm.cmd`. The PostgreSQL URL was process-only and targeted a
 
 | Command | Result |
 | --- | --- |
-| `pnpm.cmd run test:postgres` | PASS, 86/86, 0 skipped, 0 observability errors |
+| `pnpm.cmd run test:postgres` | PASS, 90/90, 0 skipped, 0 observability errors |
 | `pnpm.cmd run test:workflow` | PASS, 127/127 |
 | `pnpm.cmd run test:unit` | PASS, 337/337 |
 | `pnpm.cmd run test:migration` | PASS, 60/60 |
@@ -79,13 +81,15 @@ All commands used `pnpm.cmd`. The PostgreSQL URL was process-only and targeted a
 - `packages/server/smoke/applicationSmokeScenario.ts`: ordered smoke acceptance orchestration.
 - `packages/server/smoke/applicationSmokeAdapter.ts`: validated stdin/stdout child protocol and observability error capture.
 - `packages/db-migrator/src/smoke/applicationSmoke.ts`: compiled child invocation and atomic readiness report publication.
-- `tests/postgres/applicationSmoke.test.ts`: environment failure restoration, queue race/non-recording span proof, and real compiled smoke assertions.
+- `tests/postgres/applicationSmoke.test.ts`: queue race/non-recording span proof plus positive and orphan-child compiled smoke assertions.
+- `tests/postgres/applicationSmokeLifecycle.test.ts`: executor restoration plus canonical SSL/CA/pool/timeout lifecycle coverage.
 - `tests/postgres/smokeHarness.ts`: isolated migrated test schema and application lifecycle helpers.
 
 ### Modified
 
 - `packages/server/modules/game-socket/service.ts`: typed server-only `runSession` dependency seam.
 - `packages/server/modules/observability/tracer.ts`: race-safe drain, awaitable flush/shutdown, and non-recording standalone LLM spans.
+- `packages/server/db/index.ts`: typed current-executor test seam used to restore caller state exactly.
 - `packages/server/tsconfig.rehearsal.json`: one compiled operations closure for rehearsal and smoke.
 - `packages/server/scripts/build-rehearsal-adapter.cjs`: compatible output/copy layout for both adapters and canonical migrations.
 - `packages/db-migrator/src/commands/rehearse.ts`: validation-to-smoke gate and smoke artifact/status propagation.

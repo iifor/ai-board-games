@@ -2,7 +2,7 @@
 
 ## Application smoke and observability shutdown (2026-08-10)
 
-The PostgreSQL rehearsal smoke persists a deterministic `debugMode: false` Undercover session through the normal `runSession`, game service, repositories, playback pipeline, and formal workflow-match delete API. It creates workflow and observability fixtures before deletion, verifies ordered detail/replay data, confirms match-owned rows are removed, and confirms cross-game `player_game_memories` remains.
+The PostgreSQL rehearsal smoke persists a deterministic `debugMode: false` Undercover session through the normal `runSession`, game service, repositories, playback pipeline, and formal workflow-match delete API. It creates workflow and observability fixtures before deletion, proves `game_traces`, `trace_spans`, and `game_events` were actually seeded, verifies those match-owned rows are removed, and confirms cross-game `player_game_memories` remains. `game_player_selections` is deliberately excluded from match deletion because it is a `game_type`-level selection preference rather than match-owned history.
 
 Observability writes are serialized per trace and can be awaited through `flushObservability`/`shutdownObservability`. Shutdown does not use sleeps or retries: it flushes and shuts down the provider, then repeatedly awaits a snapshot of queued writes until the map is stably empty. Standalone LLM probes without a game trace use a non-recording OpenTelemetry span, preventing an orphan span from violating the `game_traces` foreign key.
 

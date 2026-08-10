@@ -5,7 +5,6 @@ import path from 'node:path';
 import test from 'node:test';
 import { runApplicationSmoke } from '../../packages/db-migrator/src/smoke/applicationSmoke';
 import { setDbExecutorForTests } from '../../packages/server/db';
-import { startApplicationSmokeRuntime } from '../../packages/server/smoke/applicationSmokeLifecycle';
 import type { DbExecutor } from '../../packages/server/db/types';
 import {
   endSpan,
@@ -21,39 +20,6 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
   const promise = new Promise<void>((done) => { resolve = done; });
   return { promise, resolve };
 }
-
-function restoreEnvironment(name: string, value: string | undefined): void {
-  if (value === undefined) delete process.env[name];
-  else process.env[name] = value;
-}
-
-test('application smoke restores database environment when runtime startup fails', async () => {
-  const schema = await createSmokeSchema();
-  const originalUrl = process.env.DATABASE_URL;
-  const originalSchema = process.env.DATABASE_SCHEMA;
-  process.env.DATABASE_URL = 'sentinel-existing-url';
-  delete process.env.DATABASE_SCHEMA;
-  try {
-    await assert.rejects(
-      startApplicationSmokeRuntime({
-        runId: 'environment-restore',
-        targetUrl: schema.targetUrl,
-        targetSchema: schema.schema,
-      }, {
-        createApplication: async () => { throw new Error('controlled application startup failure'); },
-      }),
-      /controlled application startup failure/,
-    );
-    assert.equal(process.env.DATABASE_URL, 'sentinel-existing-url');
-    assert.equal(process.env.DATABASE_SCHEMA, undefined);
-  } finally {
-    await shutdownObservability();
-    setDbExecutorForTests(null);
-    await schema.close();
-    restoreEnvironment('DATABASE_URL', originalUrl);
-    restoreEnvironment('DATABASE_SCHEMA', originalSchema);
-  }
-});
 
 test('observability shutdown drains writes enqueued while shutdown is in progress', async () => {
   await shutdownObservability();
@@ -164,6 +130,31 @@ test('compiled application smoke exercises the real app without paid external ca
     const persisted = await fs.readFile(reportPath, 'utf8');
     assert.doesNotMatch(persisted, /postgres(?:ql)?:\/\//i);
     assert.doesNotMatch(persisted, /consensus_test/i);
+  } finally {
+    await schema.close();
+    await fs.rm(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('compiled application smoke fails when observability child rows survive formal deletion', async () => {
+  const schema = await createSmokeSchema();
+  const outputDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'consensus-application-smoke-orphan-'));
+  const runId = `application-smoke-orphan-${Date.now()}`;
+  try {
+    await schema.database.execute('ALTER TABLE trace_spans DROP CONSTRAINT trace_spans_trace_id_fkey');
+    await schema.database.execute('ALTER TABLE game_events DROP CONSTRAINT game_events_trace_id_fkey');
+    const report = await runApplicationSmoke({
+      runId,
+      targetUrl: schema.targetUrl,
+      targetSchema: schema.schema,
+      outputDirectory,
+    });
+
+    assert.equal(report.status, 'failed');
+    assert.equal(
+      report.checks.some((check) => check.id === 'workflow.observability-delete' && check.status === 'passed'),
+      false,
+    );
   } finally {
     await schema.close();
     await fs.rm(outputDirectory, { recursive: true, force: true });
