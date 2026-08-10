@@ -27,6 +27,7 @@ const SIGNED_CHECKS = REQUIRED_RELEASE_CHECKS.filter((id) => ![
   'backup.executed', 'rehearsal.first', 'rehearsal.second', 'rehearsal.same-source-hash',
   'smoke.health', 'smoke.auth-and-config', 'smoke.game-replay-memory-delete',
 ].includes(id));
+const OPTIONAL_SKIPPED_CHECKS = new Set(['source.raw-wal', 'source.raw-shm']);
 const SHA256 = /^[a-f0-9]{64}$/;
 
 export interface ReleaseReadinessOptions {
@@ -67,7 +68,10 @@ function evaluate(reports: ReadinessReport[], signoff: OperatorSignoff): { check
   const smokes = reports.filter((report) => report.stage === 'smoke');
   const allReportsPassed = reports.length > 0 && reports.every((report) => (
     report.status === 'passed' && report.errors.length === 0
-    && report.checks.length > 0 && report.checks.every((check) => check.status === 'passed')
+    && report.checks.length > 0 && report.checks.every((check) => (
+      check.status !== 'failed'
+      && (check.status !== 'skipped' || (report.stage === 'backup' && OPTIONAL_SKIPPED_CHECKS.has(check.id)))
+    ))
   )) && signoff.approved && signoff.checks.length > 0
     && signoff.checks.every((check) => check.status === 'passed');
   const first = rehearsals[0];

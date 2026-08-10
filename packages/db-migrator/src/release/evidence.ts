@@ -162,7 +162,7 @@ export async function loadReleaseEvidence(
     claimed.add(key);
   }
 
-  const artifactClaims = new Map<string, ArtifactType>();
+  const artifactClaims = new Set<string>();
   for (let index = 0; index < reports.length; index += 1) {
     const report = reports[index];
     assertRequiredArtifacts(report);
@@ -170,9 +170,8 @@ export async function loadReleaseEvidence(
       const candidate = path.resolve(path.dirname(reportCaptures[index].resolvedPath), artifact.path);
       if (!isInside(rootPath, candidate)) throw new Error('Artifact path escapes the signoff directory');
       const key = pathKey(candidate);
-      const previousType = artifactClaims.get(key);
-      if (previousType && previousType !== artifact.type) throw new Error('Artifact path has conflicting claims');
-      artifactClaims.set(key, artifact.type);
+      if (artifactClaims.has(key)) throw new Error('Artifact path is claimed more than once');
+      artifactClaims.add(key);
       const expected = manifest.get(key);
       if (!expected) throw new Error('Artifact is absent from the signed manifest');
       const captured = await captureStableFile(candidate, rootRealPath, path.basename(candidate), 'RELEASE_EVIDENCE_CHANGED');

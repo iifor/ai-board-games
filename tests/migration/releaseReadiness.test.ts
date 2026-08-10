@@ -57,6 +57,17 @@ async function sha256(candidate: string): Promise<string> {
   return createHash('sha256').update(await fs.readFile(candidate)).digest('hex');
 }
 
+function uniqueEvidencePaths(candidates: string[]): string[] {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const resolved = path.resolve(candidate);
+    const key = process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 interface Fixture {
   root: string;
   reportPaths: string[];
@@ -87,6 +98,8 @@ async function createFixture(): Promise<Fixture> {
     readinessReport('backup-1', 'backup', [
       { id: 'backup.execute', status: 'passed', message: 'executed' },
       { id: 'backup.publish', status: 'passed', message: 'published' },
+      { id: 'source.raw-wal', status: 'skipped', message: 'Source SQLite WAL sidecar does not exist; no file fabricated' },
+      { id: 'source.raw-shm', status: 'skipped', message: 'Source SQLite SHM sidecar does not exist; no file fabricated' },
     ]),
     readinessReport('rehearsal-1', 'rehearsal', [
       { id: 'source.snapshot.sha256', status: 'passed', expected: 'a'.repeat(64), actual: 'a'.repeat(64), message: 'verified' },
@@ -150,12 +163,12 @@ async function createFixture(): Promise<Fixture> {
         approvedBy: 'release-operator',
         approvedAt: '2026-08-10T02:00:00.000Z',
         checks: OPERATOR_CHECKS.map((id) => ({ id, status: 'passed' })),
-        reportManifest: await Promise.all([...new Set([
+        reportManifest: await Promise.all(uniqueEvidencePaths([
           ...reportPaths,
           ...reports.flatMap((report) => (
             Array.isArray(report.artifacts) ? report.artifacts.map((artifact) => path.resolve(artifact.path)) : []
           )),
-        ])].map(async (candidate) => ({
+        ]).map(async (candidate) => ({
           path: path.relative(root, candidate).split(path.sep).join('/'),
           sizeBytes: (await fs.stat(candidate)).size,
           sha256: await sha256(candidate),
@@ -336,4 +349,53 @@ test('fails closed when operator signoff contains a failed internal check', asyn
     operatorSignoffPath: fixture.signoffPath,
   });
   assert.equal(result.status, 'failed');
+});
+
+test('fails when a final required gate is skipped even though optional producer checks may skip', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  const required = fixture.reports[5].checks.find((check) => check.id === 'runtime.no-sqlite');
+  assert.ok(required);
+  required.status = 'skipped';
+
+  assert.equal((await runFixture(fixture)).status, 'failed');
+});
+
+test('fails when an undeclared producer check is skipped', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  fixture.reports[0].checks.push({ id: 'producer.unknown-optional', status: 'skipped', message: 'not a declared optional check' });
+
+  assert.equal((await runFixture(fixture)).status, 'failed');
+});
+
+test('fails when a backup-only optional check is skipped by another report stage', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  fixture.reports[5].checks.push({ id: 'source.raw-wal', status: 'skipped', message: 'wrong producer stage' });
+
+  assert.equal((await runFixture(fixture)).status, 'failed');
+});
+
+test('fails when independent rehearsals reuse one or all artifact paths, including aliases', async (t) => {
+  const variantNames = [
+    'one-shared-artifact',
+    'all-shared-artifacts',
+    'lexical-path-alias',
+    ...(process.platform === 'win32' ? ['case-path-alias'] : []),
+  ];
+  const fixtures = await Promise.all(variantNames.map(() => createFixture()));
+  t.after(() => Promise.all(fixtures.map((fixture) => fs.rm(fixture.root, { recursive: true, force: true }))));
+
+  fixtures[0].reports[2].artifacts[0].path = fixtures[0].reports[1].artifacts[0].path;
+  fixtures[1].reports[2].artifacts = fixtures[1].reports[1].artifacts.map((artifact) => ({ ...artifact }));
+  const shared = fixtures[2].reports[1].artifacts[0].path;
+  fixtures[2].reports[2].artifacts[0].path = path.join(path.dirname(shared), 'alias-segment', '..', path.basename(shared));
+  if (process.platform === 'win32') {
+    fixtures[3].reports[2].artifacts[0].path = fixtures[3].reports[1].artifacts[0].path.toUpperCase();
+  }
+
+  for (const [index, fixture] of fixtures.entries()) {
+    assert.equal((await runFixture(fixture)).status, 'failed', variantNames[index]);
+  }
 });
