@@ -5,13 +5,17 @@ import { captureStableFile, copyStableFile } from './fileSnapshot';
 import { pathExists } from './publication';
 
 const WINDOWS_SQLITE_MAX_PATH_LENGTH = 259;
+const SQLITE_DATABASE_SUFFIXES = ['', '-wal', '-shm', '-journal'] as const;
 
 function codedError(code: string, message: string): Error & { code: string } {
   return Object.assign(new Error(message), { code });
 }
 
-export function assertSqlitePathBudget(candidates: string[]): void {
+export function assertSqlitePathBudget(databasePaths: string[]): void {
   if (process.platform !== 'win32') return;
+  const candidates = databasePaths.flatMap((databasePath) => (
+    SQLITE_DATABASE_SUFFIXES.map((suffix) => `${databasePath}${suffix}`)
+  ));
   if (candidates.some((candidate) => path.resolve(candidate).length > WINDOWS_SQLITE_MAX_PATH_LENGTH)) {
     throw codedError('BACKUP_PATH_TOO_LONG', 'Backup output path is too long for SQLite recovery');
   }

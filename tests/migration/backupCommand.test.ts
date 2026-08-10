@@ -396,6 +396,48 @@ test('an unavoidable Windows SQLite path overflow fails before source copy or SQ
   }
 });
 
+test('a recovery WAL sidecar overflow is rejected before copying a valid main path', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows SQLite sidecar path-budget regression');
+    return;
+  }
+  const fixture = createWalFixture();
+  const runId = 'a';
+  const output = directoryAtExactLength(fixture.root, 202);
+  const originalOpen = fs.promises.open;
+  let sourceContentOpens = 0;
+  fs.promises.open = async (candidate, flags, mode) => {
+    const resolved = path.resolve(String(candidate));
+    if (resolved === path.resolve(fixture.sourcePath)
+      || resolved === path.resolve(`${fixture.sourcePath}-wal`)
+      || resolved === path.resolve(`${fixture.sourcePath}-shm`)) {
+      sourceContentOpens += 1;
+    }
+    return originalOpen(candidate, flags as never, mode);
+  };
+  try {
+    const result = await runBackup({
+      runId,
+      sourcePath: fixture.sourcePath,
+      outputDirectory: output,
+      resourceDirectories: [],
+      execute: true,
+    });
+
+    assert.equal(result.status, 'failed');
+    assert.equal(result.errors[0]?.code, 'BACKUP_PATH_TOO_LONG');
+    assert.equal(result.errors[0]?.message, 'Backup output path is too long for SQLite recovery');
+    assert.equal(sourceContentOpens, 0);
+    assert.equal(fs.existsSync(path.join(output, runId)), false);
+    const failures = failedSites(output, runId);
+    assert.equal(failures.length, 1);
+    assert.deepEqual(relativeFiles(failures[0]), ['a-backup.json', 'a-backup.md']);
+  } finally {
+    fs.promises.open = originalOpen;
+    cleanupFixture(fixture);
+  }
+});
+
 test('manifest verification rejects a changed artifact', async () => {
   const fixture = createWalFixture();
   const runId = 'backup-tamper-001';

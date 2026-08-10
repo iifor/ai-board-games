@@ -135,7 +135,7 @@ if ($preflightExit -ne 0 -or $preflight.status -ne 'passed') { throw 'Preflight 
 
 **输入**：与步骤 2 相同的源和资源、全新 backup runId、证据根目录。
 
-backup 的最终目录、报告和 `manifest.json` 仍记录完整 runId；工具内部的 staging、failed site 与 reservation owner token 使用固定长度的 runId 摘要及排他随机后缀，不把完整 runId 重复拼入临时路径。Windows 上工具会在复制源文件或 SQLite-open 隔离副本前核对实际 recovery、consistent 与最终 SQLite 路径预算；无法满足时以固定脱敏的 `BACKUP_PATH_TOO_LONG` 失败，不要求 operator 人为缩短合法 runId，也不会发布部分 backup。
+backup 的最终目录、报告和 `manifest.json` 仍记录完整 runId；工具内部的 staging、failed site 与 reservation owner token 使用固定长度的 runId 摘要及排他随机后缀，不把完整 runId 重复拼入临时路径。Windows 上工具会在复制源文件或 SQLite-open 隔离副本前核对 recovery、consistent 与最终数据库主文件及其 `-wal`、`-shm`、`-journal` 实际路径预算；无法满足时以固定脱敏的 `BACKUP_PATH_TOO_LONG` 失败，不要求 operator 人为缩短合法 runId，也不会发布部分 backup。
 
 **命令**：
 
