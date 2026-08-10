@@ -126,7 +126,7 @@ test('redaction uses the exact database URL marker across quoting, strings, JSON
     ["DATABASE_URL='postgresql://single_user:single_password@single.host/single_db'", `DATABASE_URL=${marker}`],
     ['DATABASE_URL="postgresql://double_user:double_password@double.host/double_db"', `DATABASE_URL=${marker}`],
     ['DATABASE_URL=postgresql://plain_user:plain_password@plain.host/plain_db', `DATABASE_URL=${marker}`],
-    ['{"databaseUrl":"postgresql://json_user:json_password@json.host/json_db"}', `{"databaseUrl":"${marker}"}`],
+    ['{"databaseUrl":"postgresql://json_user:json_password@json.host/json_db"}', `{"databaseUrl":${marker}`],
     ['Connect using postgresql://text_user:text_password@text.host/text_db now', `Connect using ${marker} now`],
   ];
   for (const [input, expected] of cases) assert.equal(redactSecrets(input), expected);
@@ -142,7 +142,7 @@ test('redaction uses the exact database URL marker across quoting, strings, JSON
   });
   const payload = JSON.parse(output[0]) as MigrationReport;
   assert.equal(payload.sourcePath, `DATABASE_URL=${marker}`);
-  assert.equal(payload.errors[0], `{"databaseUrl":"${marker}"}`);
+  assert.equal(payload.errors[0], `{"databaseUrl":${marker}`);
 });
 
 test('redaction conservatively consumes malformed PostgreSQL URLs through a safe boundary', () => {
@@ -153,10 +153,10 @@ test('redaction conservatively consumes malformed PostgreSQL URLs through a safe
     ["DATABASE_URL='postgresql://u:p@single-unclosed.host/single_db", `DATABASE_URL=${marker}`],
     ['DATABASE_URL="postgresql://u:p@double-unclosed.host/double_db', `DATABASE_URL=${marker}`],
     ["Use postgresql://u:pa'ss@space.host/space_db safely", `Use ${marker} safely`],
-    ['{"url":"postgresql://u:pa"ss@json.host/json_db","next":1}', `{"url":"${marker}","next":1}`],
+    ['{"url":"postgresql://u:pa"ss@json.host/json_db","next":1}', `{"url":${marker}`],
     [
-      'first=postgres://u:p@first.host/first_db,second=postgresql://u:p@second.host/second_db',
-      `first=${marker},second=${marker}`,
+      'first=postgres://u:p@first.host/first_db second=postgresql://u:p@second.host/second_db',
+      `first=${marker} second=${marker}`,
     ],
   ];
 
@@ -167,6 +167,39 @@ test('redaction conservatively consumes malformed PostgreSQL URLs through a safe
       assert.doesNotMatch(redacted, new RegExp(leaked));
     }
   }
+});
+
+test('redaction does not trust delimiter-adjacent wrapper quotes as PostgreSQL URL boundaries', () => {
+  const marker = '[REDACTED_DATABASE_URL]';
+  const delimiters = [
+    ['comma', ','],
+    ['colon', ':'],
+    ['closing-brace', '}'],
+    ['closing-bracket', ']'],
+    ['semicolon', ';'],
+  ] as const;
+  const quoteStyles = [
+    ['single', "'"],
+    ['double', '"'],
+  ] as const;
+
+  for (const [delimiterName, delimiter] of delimiters) {
+    for (const [quoteName, quote] of quoteStyles) {
+      for (const closed of [true, false]) {
+        const label = `connection_${delimiterName}_${quoteName}_${closed ? 'closed' : 'unclosed'}`;
+        const suffix = `${delimiterName}-${quoteName}-${closed ? 'closed' : 'unclosed'}`;
+        const input = `${label}=${quote}postgresql://u:pa${quote}${delimiter}ss@${suffix}.host/${suffix}_db${closed ? quote : ''}`;
+        assert.equal(redactSecrets(input), `${label}=${marker}`, input);
+      }
+    }
+  }
+
+  assert.equal(
+    redactSecrets(
+      `first="postgresql://u:pa",ss@first.host/first_db" second='postgres://u:pa';ss@second.host/second_db'`,
+    ),
+    `first=${marker} second=${marker}`,
+  );
 });
 
 test('readiness status maps to stable process exit codes', () => {

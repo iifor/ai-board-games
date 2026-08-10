@@ -31,7 +31,6 @@ export interface WrittenReport {
 
 const SENSITIVE_ASSIGNMENTS = /\b([A-Z][A-Z0-9_]*(?:URL|SECRET|PASSWORD|PASSWD|API_KEY|TOKEN|KEY))=("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;]+)/gi;
 const DATABASE_URL_SCHEME = /\bpostgres(?:ql)?:\/\//gi;
-const DATABASE_URL_SCHEME_AFTER_LABEL = /^(?:[A-Z_][A-Z0-9_.-]*=)?postgres(?:ql)?:\/\//i;
 const REDACTED_DATABASE_URL = '[REDACTED_DATABASE_URL]';
 
 const defaultFileSystem: ReportFileSystem = {
@@ -54,20 +53,10 @@ function isWhitespaceOrControl(character: string): boolean {
   return /\s/u.test(character) || character.charCodeAt(0) <= 0x20;
 }
 
-function databaseUrlEnd(value: string, start: number, schemeEnd: number): number {
-  const wrapper = value[start - 1] === "'" || value[start - 1] === '"' ? value[start - 1] : undefined;
+function databaseUrlEnd(value: string, schemeEnd: number): number {
+  // Malformed credentials can contain quotes and structural punctuation, so only whitespace proves a boundary.
   for (let index = schemeEnd; index < value.length; index += 1) {
-    const character = value[index];
-    if (isWhitespaceOrControl(character)) return index;
-
-    if (wrapper && character === wrapper) {
-      const next = value[index + 1];
-      if (next === undefined || isWhitespaceOrControl(next) || /[,;})\]]/.test(next)) return index;
-    }
-
-    if ((character === ',' || character === ';') && DATABASE_URL_SCHEME_AFTER_LABEL.test(value.slice(index + 1))) {
-      return index;
-    }
+    if (isWhitespaceOrControl(value[index])) return index;
   }
   return value.length;
 }
@@ -78,9 +67,12 @@ function redactDatabaseUrls(value: string): string {
   let redacted = '';
   let match: RegExpExecArray | null;
   while ((match = DATABASE_URL_SCHEME.exec(value)) !== null) {
-    redacted += value.slice(cursor, match.index);
+    const wrapperStart = value[match.index - 1] === "'" || value[match.index - 1] === '"'
+      ? match.index - 1
+      : match.index;
+    redacted += value.slice(cursor, wrapperStart);
     redacted += REDACTED_DATABASE_URL;
-    cursor = databaseUrlEnd(value, match.index, DATABASE_URL_SCHEME.lastIndex);
+    cursor = databaseUrlEnd(value, DATABASE_URL_SCHEME.lastIndex);
     DATABASE_URL_SCHEME.lastIndex = cursor;
   }
   return cursor === 0 ? value : redacted + value.slice(cursor);
