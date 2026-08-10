@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { migrateSqliteToPostgres } from './importer';
+import { runBackup } from './commands/backup';
 import { runPreflight } from './commands/preflight';
 import { parseCommandLine, type ParsedCommand } from './cli/arguments';
 import { readinessReportExitCode, redactSecrets, sanitizeForOutput } from './reporting/reportWriter';
@@ -25,6 +26,22 @@ async function runBuiltInReadinessCommand(
   command: Exclude<ParsedCommand['command'], 'migrate'>,
   parsed: ParsedCommand,
 ): Promise<ReadinessReport> {
+  if (command === 'backup') {
+    const sourcePath = parsed.values.get('source') || '';
+    const outputDirectory = parsed.values.get('output') || '';
+    const runId = parsed.values.get('run-id') || '';
+    const resources = parsed.values.get('resources');
+    if (!sourcePath || !outputDirectory || !runId) {
+      throw new Error('Usage: pnpm migrate -- backup --source <sqlite> --output <dir> --resources <dir1,dir2> --run-id <id> [--execute]');
+    }
+    return runBackup({
+      runId,
+      sourcePath: path.resolve(sourcePath),
+      outputDirectory: path.resolve(outputDirectory),
+      resourceDirectories: resources ? resources.split(',').map((entry) => path.resolve(entry.trim())).filter(Boolean) : [],
+      execute: parsed.execute,
+    });
+  }
   if (command !== 'preflight') throw commandNotImplemented(command);
   const sourcePath = parsed.values.get('source') || '';
   const targetUrl = parsed.values.get('target') || process.env.DATABASE_URL || '';
