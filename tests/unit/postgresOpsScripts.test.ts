@@ -30,6 +30,11 @@ const cases = [
     expected: ['--filter', '@ai-presenter/db-migrator', 'run', 'restore-drill', '--', '--backup', 'backup-dir', '--manifest', 'manifest.json', '--resource-map', 'map.json', '--restore-output', 'out/r', '--output', 'out', '--run-id', 'restore-1', '--execute'],
   },
   {
+    name: 'prepare-signoff',
+    args: ['-Reports', 'a.json,b.json', '-ReleaseCandidate', '0123456789abcdef0123456789abcdef01234567', '-GoLiveOwner', 'go-live', '-RollbackOwner', 'rollback', '-Output', 'out', '-RunId', 'signoff-1'],
+    expected: ['--filter', '@ai-presenter/db-migrator', 'run', 'prepare-signoff', '--', '--reports', 'a.json,b.json', '--release-candidate', '0123456789abcdef0123456789abcdef01234567', '--go-live-owner', 'go-live', '--rollback-owner', 'rollback', '--output', 'out', '--run-id', 'signoff-1'],
+  },
+  {
     name: 'rehearse',
     args: ['-SourceSnapshot', 'snapshot.sqlite', '-Manifest', 'manifest.json', '-Output', 'out', '-RunId', 'rehearsal-1', '-Execute'],
     expected: ['--filter', '@ai-presenter/db-migrator', 'run', 'rehearse', '--', '--source-snapshot', 'snapshot.sqlite', '--manifest', 'manifest.json', '--output', 'out', '--run-id', 'rehearsal-1', '--execute'],
@@ -54,7 +59,9 @@ test('PostgreSQL operations scripts are typed, thin, and contain no database imp
     assert.match(source, /\[(?:string|bool|switch)\]\s*\$[A-Za-z]+/, entry.name);
     assert.match(source, /\$PSScriptRoot/, entry.name);
     assert.doesNotMatch(source, /\bpsql\b|DROP\s+SCHEMA|\bVACUUM\b|\bcheckpoint\b|postgres(?:ql)?:\/\/|\bpassword\b/i, entry.name);
-    if (entry.name === 'release-readiness' || entry.name === 'verify-backup') assert.doesNotMatch(source, /\$Execute|--execute/i);
+    if (['release-readiness', 'verify-backup', 'prepare-signoff'].includes(entry.name)) {
+      assert.doesNotMatch(source, /\$Execute|--execute/i);
+    }
     if (entry.name === 'preflight' || entry.name === 'validate') {
       assert.doesNotMatch(source, /\$Target|--target/i, entry.name);
       assert.match(source, /DATABASE_URL/, entry.name);

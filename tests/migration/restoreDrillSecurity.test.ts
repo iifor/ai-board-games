@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { runRestoreDrill, type RestoreDrillOptions } from '../../packages/db-migrator/src/commands/restore-drill';
 import { assertExactRestoredFileSet } from '../../packages/db-migrator/src/restore/copyVerified';
-import { createBackupFixture, replaceManifest } from './backupRestoreFixture';
+import { createBackupFixture, replaceManifest, snapshotTree } from './backupRestoreFixture';
 
 function options(
   fixture: Awaited<ReturnType<typeof createBackupFixture>>,
@@ -70,7 +70,10 @@ test('restore-drill fails raw corruption even when the consistent copy and manif
   assert.equal(report.status, 'failed');
   assert.ok(report.errors[0]?.code.startsWith('RESTORE_SQLITE'));
   await fs.access(path.join(fixture.output, 'r', 'sqlite-raw', 'source.sqlite'));
-  await fs.access(path.join(fixture.output, 'r', '.restore-owner'));
+  await assert.rejects(fs.access(path.join(fixture.output, 'r', '.restore-owner')), { code: 'ENOENT' });
+  const owner = (await fs.readdir(fixture.output)).find((name) => name.includes('restore-owner'));
+  assert.ok(owner);
+  await fs.access(path.join(fixture.output, owner));
   await fs.access(path.join(fixture.output, 'restore-corrupt-raw-backup.json'));
 });
 
@@ -111,7 +114,6 @@ test('restore-drill refuses backup, report, repository, and known production res
   const fixture = await createBackupFixture(t);
   const repoRoot = path.resolve(__dirname, '../..');
   const targets = [
-    fixture.root,
     fixture.output,
     repoRoot,
     path.join(repoRoot, 'packages', 'data'),
@@ -124,6 +126,13 @@ test('restore-drill refuses backup, report, repository, and known production res
     }));
     assert.equal(report.status, 'failed');
   }
+  await assert.rejects(
+    runRestoreDrill(options(fixture, 'restore-target-backup', {
+      restoreDirectory: fixture.root,
+      execute: false,
+    })),
+    { code: 'RESTORE_OUTPUT_UNSAFE' },
+  );
 });
 
 test('restore-drill never overwrites an existing report for the same run', async (t) => {
@@ -135,4 +144,24 @@ test('restore-drill never overwrites an existing report for the same run', async
   const second = { ...first, restoreDirectory: path.join(fixture.output, 'r2') };
   await assert.rejects(runRestoreDrill(second), { code: 'REPORT_ALREADY_EXISTS' });
   assert.deepEqual(await fs.readFile(reportPath), before);
+  await assert.rejects(fs.access(path.join(fixture.output, 'r2', '.restore-owner')), { code: 'ENOENT' });
+  const owners = (await fs.readdir(fixture.output)).filter((name) => name.includes('restore-owner'));
+  assert.equal(owners.length, 2);
+});
+
+test('restore-drill rejects canonical output and restore aliases inside backup before creating files', async (t) => {
+  const fixture = await createBackupFixture(t);
+  const alias = path.join(fixture.temporary, 'restore-backup-alias');
+  await fs.symlink(fixture.root, alias, 'junction');
+  const before = await snapshotTree(fixture.root);
+
+  await assert.rejects(
+    runRestoreDrill(options(fixture, 'unsafe-restore-output', {
+      outputDirectory: path.join(alias, 'evidence'),
+      restoreDirectory: path.join(alias, 'evidence', 'restore'),
+    })),
+    { code: 'RESTORE_OUTPUT_UNSAFE' },
+  );
+
+  assert.deepEqual(await snapshotTree(fixture.root), before);
 });

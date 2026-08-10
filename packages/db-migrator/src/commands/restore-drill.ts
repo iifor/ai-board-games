@@ -4,12 +4,13 @@ import { captureStableFile } from '../backup/fileSnapshot';
 import { verifyPublishedBackup } from '../backup/manifestEvidence';
 import { isSafeRunId } from '../backup/publication';
 import { assertSqlitePathBudget } from '../backup/sqliteRecovery';
+import { assertBackupWriteBoundary } from '../backup/writeBoundary';
 import { writeReadinessReport } from '../reporting/reportWriter';
 import type { ReadinessArtifact, ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
 import {
   assertExactRestoredFileSet,
+  claimRestoreOwnership,
   copyRestorePlan,
-  releaseRestoreOwnership,
   type RestoredFile,
 } from '../restore/copyVerified';
 import {
@@ -86,13 +87,9 @@ async function verifyRestoredFiles(plan: RestorePlan, restored: RestoredFile[]):
 }
 
 function validateOptions(options: RestoreDrillOptions): void {
-  const output = path.resolve(options.outputDirectory || '.');
-  const restore = path.resolve(options.restoreDirectory || '.');
-  const backup = path.resolve(options.backupDirectory || '.');
   if (!isSafeRunId(options.runId) || !options.backupDirectory.trim() || !options.manifestPath.trim()
     || !options.outputDirectory.trim() || !options.restoreDirectory.trim() || typeof options.execute !== 'boolean'
-    || (options.resourceMap === undefined && !options.resourceMapPath?.trim())
-    || path.dirname(restore) !== output || restore === backup || output === backup) {
+    || (options.resourceMap === undefined && !options.resourceMapPath?.trim())) {
     throw Object.assign(new Error('Restore drill parameters are invalid'), { code: 'RESTORE_PARAMETERS_INVALID' });
   }
 }
@@ -103,8 +100,22 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Rea
   const errors: ReadinessReport['errors'] = [];
   const artifacts: ReadinessArtifact[] = [];
   const output = path.resolve(options.outputDirectory || '.');
+  validateOptions(options);
+  await assertBackupWriteBoundary({
+    backupDirectory: options.backupDirectory,
+    outputDirectory: output,
+    restoreDirectory: options.restoreDirectory,
+    writePaths: [
+      path.join(output, `${options.runId}-backup.json`),
+      path.join(output, `${options.runId}-backup.md`),
+      options.restoreDirectory,
+    ],
+    errorCode: 'RESTORE_OUTPUT_UNSAFE',
+  });
   try {
-    validateOptions(options);
+    if (path.dirname(path.resolve(options.restoreDirectory)) !== output) {
+      throw Object.assign(new Error('Restore drill parameters are invalid'), { code: 'RESTORE_PARAMETERS_INVALID' });
+    }
     const verified = await verifyPublishedBackup(options.backupDirectory, options.manifestPath);
     checks.push({ id: 'backup.verify-manifest', status: 'passed', message: 'Backup evidence is stable and manifest-complete' });
     const resourceMap = options.resourceMapPath
@@ -123,10 +134,16 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Rea
     }
 
     await ensureOutputDirectory(output);
-    const copied = await copyRestorePlan(verified, plan);
+    const ownership = await claimRestoreOwnership(output, plan.restoreRoot, options.runId);
+    artifacts.push({
+      type: 'evidence',
+      path: path.relative(output, ownership.token.sourcePath).split(path.sep).join('/'),
+      sha256: ownership.token.sha256,
+    });
+    const copied = await copyRestorePlan(verified, plan, ownership);
     const restored = copied.restored;
     checks.push({ id: 'backup.restore-files', status: 'passed', actual: `${restored.length} files`, message: 'Raw, consistent, manifest, and mapped resource files restored through verified Node handles' });
-    const sqlite = verifyRestoredSqlite(plan.restoreRoot);
+    const sqlite = await verifyRestoredSqlite(plan.restoreRoot);
     checks.push({ id: 'backup.restore-raw-integrity', status: 'passed', actual: sqlite.rawIntegrity, message: 'Raw rollback set passed read-only query-only integrity verification with adjacent sidecars' });
     checks.push({ id: 'backup.restore-consistent-integrity', status: 'passed', actual: sqlite.consistentIntegrity, message: 'Consistent SQLite snapshot passed independent read-only integrity verification' });
     checks.push({ id: 'backup.restore-counts', status: 'passed', actual: JSON.stringify(sqlite.counts), message: 'Raw and consistent key-table counts match' });
@@ -136,8 +153,6 @@ export async function runRestoreDrill(options: RestoreDrillOptions): Promise<Rea
       ...plan.files.map((file) => path.relative(plan.restoreRoot, file.destinationPath).split(path.sep).join('/')),
       'manifest.json',
     ];
-    await assertExactRestoredFileSet(plan.restoreRoot, [...expectedPaths, '.restore-owner']);
-    await releaseRestoreOwnership(copied.ownership);
     await assertExactRestoredFileSet(plan.restoreRoot, expectedPaths);
     for (const restoredFile of restored) {
       const relative = path.relative(output, restoredFile.path).split(path.sep).join('/');

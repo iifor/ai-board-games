@@ -5,7 +5,7 @@ import test from 'node:test';
 import { captureStableFile } from '../../packages/db-migrator/src/backup/fileSnapshot';
 import { runVerifyBackup } from '../../packages/db-migrator/src/commands/verify-backup';
 import { runRestoreDrill } from '../../packages/db-migrator/src/commands/restore-drill';
-import { createBackupFixture } from './backupRestoreFixture';
+import { createBackupFixture, readManifest, replaceWithWalWithoutShm } from './backupRestoreFixture';
 
 test('verify-backup validates a published backup containing a 296+ character resource path', async (t) => {
   const fixture = await createBackupFixture(t);
@@ -60,6 +60,45 @@ test('restore-drill dry-run writes nothing and execute restores raw, consistent,
   await fs.access(path.join(restoreRoot, 'sqlite-consistent.sqlite'));
   await fs.access(path.join(restoreRoot, 'manifest.json'));
   await assert.rejects(fs.access(path.join(restoreRoot, '.restore-owner')), { code: 'ENOENT' });
+  const ownerArtifacts = executed.artifacts.filter((artifact) => artifact.type === 'evidence' && artifact.path.includes('restore-owner'));
+  assert.equal(ownerArtifacts.length, 1);
+  await fs.access(path.join(fixture.output, ...ownerArtifacts[0].path.split('/')));
+});
+
+test('restore-drill verifies a WAL-without-SHM rollback set without opening or mutating final restored files', async (t) => {
+  const fixture = await createBackupFixture(t);
+  await replaceWithWalWithoutShm(fixture);
+  const manifest = await readManifest(fixture.manifestPath);
+  assert.ok(manifest.entries.some((entry) => entry.path === 'sqlite-raw/source.sqlite-wal'));
+  assert.ok(!manifest.entries.some((entry) => entry.path === 'sqlite-raw/source.sqlite-shm'));
+  const restoreRoot = path.join(fixture.output, 'wal-restore');
+
+  const report = await runRestoreDrill({
+    runId: 'restore-wal-without-shm',
+    backupDirectory: fixture.root,
+    manifestPath: fixture.manifestPath,
+    outputDirectory: fixture.output,
+    restoreDirectory: restoreRoot,
+    resourceMap: [
+      { sourceIndex: 0, destination: 'resources-a' },
+      { sourceIndex: 1, destination: 'resources-b' },
+    ],
+    execute: true,
+  });
+
+  assert.equal(report.status, 'passed');
+  await assert.rejects(fs.access(path.join(restoreRoot, 'sqlite-raw', 'source.sqlite-shm')), { code: 'ENOENT' });
+  for (const name of ['source.sqlite', 'source.sqlite-wal']) {
+    const entry = manifest.entries.find((candidate) => candidate.path === `sqlite-raw/${name}`)!;
+    const restored = await captureStableFile(
+      path.join(restoreRoot, 'sqlite-raw', name),
+      await fs.realpath(restoreRoot),
+      entry.path,
+      'TEST_RESTORED_FILE',
+    );
+    assert.equal(restored.sha256, entry.sha256);
+    assert.equal(restored.sizeBytes, entry.sizeBytes);
+  }
 });
 
 test('stable backup hashing streams a large file without FileHandle.readFile', async (t) => {

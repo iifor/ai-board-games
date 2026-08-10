@@ -50,46 +50,24 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 **命令**：
 
 ```powershell
-$sourceCandidates = @($Source, "$Source-wal", "$Source-shm")
-$mainSource = Test-Path -LiteralPath $Source -PathType Leaf
-if (-not $mainSource) { throw 'Source SQLite file is missing; WAL/SHM cannot substitute for it.' }
-$sourceFiles = foreach ($candidate in $sourceCandidates) {
-  if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-    $item = Get-Item -LiteralPath $candidate
-    [ordered]@{
-      name = $item.Name
-      sizeBytes = $item.Length
-      lastWriteTimeUtc = $item.LastWriteTimeUtc.ToString('o')
-      sha256 = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    }
-  }
-}
-$resourceFiles = foreach ($root in $Resources) {
-  $resolved = (Resolve-Path -LiteralPath $root).Path
-  Get-ChildItem -LiteralPath $resolved -Recurse -File | ForEach-Object {
-    [ordered]@{
-      root = $resolved
-      relativePath = $_.FullName.Substring($resolved.Length).TrimStart('\')
-      sizeBytes = $_.Length
-      lastWriteTimeUtc = $_.LastWriteTimeUtc.ToString('o')
-      sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    }
-  }
+if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) {
+  throw 'Source SQLite file is missing; WAL/SHM cannot substitute for it.'
 }
 $inventory = [ordered]@{
   capturedAt = [DateTime]::UtcNow.ToString('o')
-  mode = 'read-only-inventory'
-  sqlite = @($sourceFiles)
-  resources = @($resourceFiles)
+  mode = 'path-inventory-only'
+  sqlite = @($Source, "$Source-wal", "$Source-shm")
+  resources = @($Resources)
+  authoritativeHashes = 'executed backup manifest plus verify-backup report'
 }
 Write-Utf8NoBom (Join-Path $EvidenceRoot '01-source-inventory.json') ($inventory | ConvertTo-Json -Depth 8)
 ```
 
-**预期输出**：`01-source-inventory.json`，列出实际存在的 SQLite/WAL/SHM 和全部资源元数据；不创建源端文件。
+**预期输出**：`01-source-inventory.json` 仅记录输入路径，不递归读取资源；不创建源端文件。资源与 SQLite 的 authoritative size/SHA-256 来自随后执行的 backup manifest，并由独立 `verify-backup` 报告确认。
 
-**成功条件**：主 SQLite 存在、所有输入可读、记录的 hash 为 64 位小写 SHA-256。
+**成功条件**：主 SQLite 存在；资源完整集合与 64 位小写 SHA-256 最终由 executed manifest + verify report 证明。
 
-**失败停止点**：任一源或资源不可读、路径错误、hash 失败即停止；不得补造缺失 WAL/SHM。
+**失败停止点**：主源缺失或后续 Node backup/verify 无法读取任何输入即停止；不得补造缺失 WAL/SHM。
 
 **证据路径**：`$EvidenceRoot\01-source-inventory.json`。
 
@@ -441,7 +419,6 @@ $environmentDraft = [ordered]@{
     [ordered]@{
       type = 'evidence'
       path = ([IO.Path]::GetFullPath($_)).Substring($EvidenceRoot.Length).TrimStart('\').Replace('\','/')
-      sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
     }
   })
   errors = @([ordered]@{ code = 'INDEPENDENT_VERIFICATION_PENDING'; message = 'Raw evidence has not been independently approved.' })
@@ -464,50 +441,23 @@ if ($environmentChecks.Count -ne $SignedChecks.Count -or @($environmentChecks | 
 if ((@($environmentChecks.id) -join '|') -cne (@($SignedChecks | Sort-Object) -join '|') -or @($environmentReport.errors).Count -ne 0) {
   throw 'Independent environment report check set or errors are invalid.'
 }
-$expectedEnvironmentArtifacts = @($environmentDraft.artifacts | Sort-Object path | ForEach-Object { "$($_.type)|$($_.path)|$($_.sha256)" })
-$actualEnvironmentArtifacts = @($environmentReport.artifacts | Sort-Object path | ForEach-Object { "$($_.type)|$($_.path)|$($_.sha256)" })
+$expectedEnvironmentArtifacts = @($environmentDraft.artifacts | Sort-Object path | ForEach-Object { "$($_.type)|$($_.path)" })
+$actualEnvironmentArtifacts = @($environmentReport.artifacts | Sort-Object path | ForEach-Object { "$($_.type)|$($_.path)" })
 if (($expectedEnvironmentArtifacts -join "`n") -cne ($actualEnvironmentArtifacts -join "`n")) {
   throw 'Independent environment report changed the raw evidence artifact set.'
 }
 
-$ReportPaths = @($preflightReportPath,$BackupReportPath,$RestoreReportPath,
+$ReportPaths = @($preflightReportPath,$BackupReportPath,$VerifyBackupReportPath,$RestoreReportPath,
   $Rehearsal1ReportPath,$Rehearsal1SmokePath,$Rehearsal2ReportPath,$Rehearsal2SmokePath,$EnvironmentReportPath)
-$EvidencePaths = [Collections.Generic.List[string]]::new()
-foreach ($reportPath in $ReportPaths) {
-  $fullReport = [IO.Path]::GetFullPath($reportPath)
-  $EvidencePaths.Add($fullReport)
-  $report = Get-Content -LiteralPath $fullReport -Raw | ConvertFrom-Json
-  if ($report.status -ne 'passed' -or @($report.errors).Count -ne 0) { throw "Input report failed: $($report.runId)" }
-  foreach ($artifact in @($report.artifacts)) {
-    $candidate = if ([IO.Path]::IsPathRooted([string]$artifact.path)) {
-      [IO.Path]::GetFullPath([string]$artifact.path)
-    } else {
-      [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $fullReport) ([string]$artifact.path)))
-    }
-    $EvidencePaths.Add($candidate)
-  }
-}
-$rootPrefix = $EvidenceRoot.TrimEnd('\') + '\'
-$manifestEntries = foreach ($candidate in @($EvidencePaths | Sort-Object -Unique)) {
-  if (-not $candidate.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Evidence escapes signoff directory.' }
-  $item = Get-Item -LiteralPath $candidate
-  if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Reparse evidence is forbidden.' }
-  [ordered]@{
-    path = $candidate.Substring($rootPrefix.Length).Replace('\', '/')
-    sizeBytes = $item.Length
-    sha256 = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
-  }
-}
-$SignoffDraftPath = Join-Path $EvidenceRoot 'postgresql-operator-signoff.pending.json'
+$ReportCsv = $ReportPaths -join ','
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+  (Join-Path $RepoRoot 'scripts\ops\postgres\prepare-signoff.ps1') `
+  -Reports $ReportCsv -ReleaseCandidate $ReleaseCandidate `
+  -GoLiveOwner $env:GO_LIVE_OWNER.Trim() -RollbackOwner $env:ROLLBACK_OWNER.Trim() `
+  -Output $EvidenceRoot -RunId $ReadinessRunId
+if ($LASTEXITCODE -ne 0) { throw 'Stable signoff draft preparation failed; preserve evidence and stop.' }
+$SignoffDraftPath = Join-Path $EvidenceRoot "$ReadinessRunId-operator-signoff.pending.json"
 $SignoffPath = Join-Path $EvidenceRoot 'postgresql-operator-signoff.json'
-$signoffDraft = Get-Content -LiteralPath (Join-Path $RepoRoot 'docs\runbooks\postgresql-operator-signoff.example.json') -Raw | ConvertFrom-Json
-$signoffDraft.releaseCandidate = $ReleaseCandidate
-$signoffDraft.readinessRunId = $ReadinessRunId
-$signoffDraft.goLiveOwner.name = $env:GO_LIVE_OWNER.Trim()
-$signoffDraft.rollbackOwner.name = $env:ROLLBACK_OWNER.Trim()
-$signoffDraft.maintenanceWindowMinutes = [int]$MinimumWindow
-$signoffDraft.reportManifest = @($manifestEntries)
-Write-Utf8NoBom $SignoffDraftPath ($signoffDraft | ConvertTo-Json -Depth 12)
 Write-Host "Pending draft created: $SignoffDraftPath"
 Write-Host 'A different independent operator must review every raw artifact, copy the draft to the final path, set real approval timestamps, approvedBy, status=approved, approved=true, and all signed checks=passed.'
 if ((Read-Host 'Type REVIEWED only after the independently edited final signoff exists') -cne 'REVIEWED') { throw 'Independent review gate not completed.' }
@@ -535,12 +485,9 @@ if ($actualChecks.Count -ne $SignedChecks.Count -or @($actualChecks | Where-Obje
   throw 'All and only signed checks must be passed.'
 }
 if ((@($actualChecks.id) -join '|') -cne (@($SignedChecks | Sort-Object) -join '|')) { throw 'Signed check set mismatch.' }
-$expectedManifest = @($manifestEntries | Sort-Object path | ForEach-Object { "$($_.path)|$($_.sizeBytes)|$($_.sha256)" })
-$actualManifest = @($signoff.reportManifest | Sort-Object path | ForEach-Object { "$($_.path)|$($_.sizeBytes)|$($_.sha256)" })
-if (($expectedManifest -join "`n") -cne ($actualManifest -join "`n")) { throw 'Signed reportManifest does not exactly match reports and artifacts.' }
 ```
 
-**预期输出**：每项命令都有独立原始 artifact；脚本先生成 `status=failed`、checks 全为 `failed` 的 pending environment report，独立 operator 逐项核对后手工复制并改成最终报告，脚本只读验证其 check 集合与未变更的 `evidence` artifact。随后才生成 pending signoff 草稿，由不同于 go-live/rollback owner 的独立 operator 填写实际时间并签字。2x maintenance window（两次演练最大耗时的两倍并向上取整）写入签核。
+**预期输出**：每项命令都有独立原始 artifact；脚本先生成 checks 全为 `failed` 的 pending environment report，独立 operator 逐项核对后手工复制并改成最终报告。随后由 Node `prepare-signoff` 用稳定流式句柄对九份报告及其 artifact 建立精确 manifest（含唯一 verify report），只生成 `pending/approved=false` 草稿；独立 operator 再填写实际时间并签字。2x maintenance window（两次演练最大耗时的两倍并向上取整）写入签核。
 
 **成功条件**：完整 release gates 通过；运行镜像无迁移工具；`PGSSLMODE` 与应用 `DATABASE_SSL` 均精确为 `verify-full`，`PGSSLROOTCERT` 与 `DATABASE_CA_PATH` 解析到同一 CA 且 hash 已记录，当前 `pg_backend_pid()` 在 `pg_stat_ssl` 中为 `ssl=true`；最小权限/正整数配置有效；三方身份两两不同；最终 signoff 已由独立 operator 手工签署；`reportManifest` 精确覆盖输入 reports + artifacts。
 
@@ -550,7 +497,7 @@ if (($expectedManifest -join "`n") -cne ($actualManifest -join "`n")) { throw 'S
 
 ### 11. 执行 release-readiness 聚合
 
-**输入**：八份选定报告、实际 operator signoff、固定 40 位候选 SHA、与 signoff `readinessRunId` 相同的 release runId 和输出目录。
+**输入**：九份选定报告（含唯一 `verify-backup` 报告）、实际 operator signoff、固定 40 位候选 SHA、与 signoff `readinessRunId` 相同的 release runId 和输出目录。
 
 **命令**：
 

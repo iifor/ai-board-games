@@ -175,7 +175,8 @@ test('production-readiness evidence is raw, secret-safe, operator-approved, and 
 
   assert.match(source, /Test-Path.{0,80}Source/isu);
   assert.match(source, /throw.{0,80}(SQLite|source)/isu);
-  assert.match(source, /resourceFiles[\s\S]{0,500}sha256/iu);
+  assert.match(source, /authoritativeHashes[\s\S]{0,250}executed backup manifest plus verify-backup report/iu);
+  assert.doesNotMatch(source, /Get-ChildItem|Get-FileHash/iu);
   assert.match(preflight, /DATABASE_URL/);
   assert.doesNotMatch(preflight, /-Target\s+\$env:TEST_DATABASE_URL/iu);
   assert.match(runbook, /PGHOST\/PGPORT\/PGDATABASE\/PGUSER\/PGPASSWORD\/PGSSLMODE\/PGSSLROOTCERT/iu);
@@ -214,7 +215,9 @@ test('production-readiness evidence is raw, secret-safe, operator-approved, and 
   assert.match(signoff, /pending independent verification/iu);
   assert.doesNotMatch(signoff, /\$environmentReport\s*=[\s\S]{0,300}status\s*=\s*'passed'/iu);
   assert.match(signoff, /Type REVIEWED_ENVIRONMENT/iu);
-  assert.match(signoff, /postgresql-operator-signoff\.example\.json/);
+  assert.match(signoff, /prepare-signoff\.ps1/);
+  assert.match(signoff, /\$VerifyBackupReportPath/);
+  assert.doesNotMatch(signoff, /\$EvidencePaths|\$manifestEntries|Get-ChildItem/iu);
   assert.match(signoff, /pending (?:draft|草稿)/iu);
   assert.match(signoff, /Read-Host|independent operator/iu);
   assert.match(signoff, /approvedBy/iu);
@@ -336,6 +339,11 @@ test('operator signoff example keeps plan fields and satisfies the real evidence
 
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'postgres-doc-signoff-'));
   t.after(() => fs.rm(temporary, { recursive: true, force: true }));
+  const backupPath = path.join(temporary, 'backup.sqlite');
+  const manifestPath = path.join(temporary, 'manifest.json');
+  await fs.writeFile(backupPath, 'backup');
+  await fs.writeFile(manifestPath, 'manifest');
+  const manifestSha256 = createHash('sha256').update('manifest').digest('hex');
   const reportPath = path.join(temporary, 'report.json');
   const reportBytes = Buffer.from(JSON.stringify({
     runId: 'docs-truth',
@@ -349,6 +357,26 @@ test('operator signoff example keeps plan fields and satisfies the real evidence
     errors: [],
   }));
   await fs.writeFile(reportPath, reportBytes);
+  const backupReportPath = path.join(temporary, 'backup-report.json');
+  const backupReportBytes = Buffer.from(JSON.stringify({
+    runId: 'docs-backup', stage: 'backup', status: 'passed',
+    startedAt: '2026-08-10T00:00:00.000Z', finishedAt: '2026-08-10T00:00:01.000Z', durationMs: 1000,
+    checks: [{ id: 'backup.execute', status: 'passed', message: 'executed' }],
+    artifacts: [
+      { type: 'backup', path: 'backup.sqlite', sha256: createHash('sha256').update('backup').digest('hex') },
+      { type: 'manifest', path: 'manifest.json', sha256: manifestSha256 },
+    ], errors: [],
+  }));
+  await fs.writeFile(backupReportPath, backupReportBytes);
+  const identity = JSON.stringify({ runId: 'docs-backup', manifestSha256 });
+  const verifyReportPath = path.join(temporary, 'verify-report.json');
+  const verifyReportBytes = Buffer.from(JSON.stringify({
+    runId: 'docs-verify', stage: 'backup', status: 'passed',
+    startedAt: '2026-08-10T00:00:00.000Z', finishedAt: '2026-08-10T00:00:01.000Z', durationMs: 1000,
+    checks: [{ id: 'backup.verify-manifest', status: 'passed', expected: identity, actual: identity, message: 'verified' }],
+    artifacts: [], errors: [],
+  }));
+  await fs.writeFile(verifyReportPath, verifyReportBytes);
   const parserFixture = {
     ...example,
     releaseCandidate: '0123456789abcdef0123456789abcdef01234567',
@@ -361,15 +389,18 @@ test('operator signoff example keeps plan fields and satisfies the real evidence
     approvedBy: 'independent-operator',
     approvedAt: '2026-08-10T00:00:02.000Z',
     checks: example.checks.map(({ id }) => ({ id, status: 'passed' as const })),
-    reportManifest: [{
-      path: 'report.json',
-      sizeBytes: reportBytes.length,
-      sha256: createHash('sha256').update(reportBytes).digest('hex'),
-    }],
+    reportManifest: [
+      ['report.json', reportBytes], ['backup-report.json', backupReportBytes], ['verify-report.json', verifyReportBytes],
+      ['backup.sqlite', Buffer.from('backup')], ['manifest.json', Buffer.from('manifest')],
+    ].map(([entryPath, bytes]) => ({
+      path: entryPath as string,
+      sizeBytes: (bytes as Buffer).length,
+      sha256: createHash('sha256').update(bytes as Buffer).digest('hex'),
+    })),
   };
   const signoffPath = path.join(temporary, 'signoff.json');
   await fs.writeFile(signoffPath, JSON.stringify(parserFixture));
-  const loaded = await loadReleaseEvidence([reportPath], signoffPath);
+  const loaded = await loadReleaseEvidence([reportPath, backupReportPath, verifyReportPath], signoffPath);
   assert.equal(loaded.signoff.version, 1);
   assert.equal(loaded.reports[0].runId, 'docs-truth');
 });

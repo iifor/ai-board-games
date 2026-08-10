@@ -1,9 +1,10 @@
-import { createHash } from 'node:crypto';
-import { constants as fsConstants, promises as fs } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { captureStableFile } from '../backup/fileSnapshot';
 import { isSafeRunId } from '../backup/publication';
 import type { ArtifactType, ReadinessReport } from '../reporting/reportTypes';
+import { assertMatchingBackupVerification } from './backupVerification';
+import { isInside, pathKey, readStableJson, type StableJson } from './stableJson';
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const STAGES = ['preflight', 'backup', 'import', 'validation', 'rehearsal', 'smoke', 'release'];
@@ -33,54 +34,9 @@ export interface OperatorSignoff {
   reportManifest: ReportManifestEntry[];
 }
 
-interface StableJson<T> { value: T; sha256: string; sizeBytes: number; resolvedPath: string }
-
-function isInside(root: string, candidate: string): boolean {
-  const relative = path.relative(root, candidate);
-  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
-}
-
-function sameFile(left: { dev: bigint; ino: bigint; size: bigint; mtimeNs: bigint }, right: typeof left): boolean {
-  return left.dev === right.dev && left.ino === right.ino && left.size === right.size && left.mtimeNs === right.mtimeNs;
-}
-
-async function readStableJson<T>(candidate: string, rootPath: string, rootRealPath: string): Promise<StableJson<T>> {
-  const resolvedPath = path.resolve(candidate);
-  if (!isInside(rootPath, resolvedPath)) throw new Error('Evidence path escapes the signoff directory');
-  const before = await fs.lstat(resolvedPath, { bigint: true });
-  if (before.isSymbolicLink() || !before.isFile()) throw new Error('Evidence must be a regular non-reparse file');
-  const beforeRealPath = await fs.realpath(resolvedPath);
-  if (!isInside(rootRealPath, beforeRealPath)) throw new Error('Evidence resolves outside the signoff directory');
-  const handle = await fs.open(resolvedPath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW || 0));
-  let bytes: Buffer;
-  try {
-    const opened = await handle.stat({ bigint: true });
-    if (!sameFile(before, opened)) throw new Error('Evidence changed while opening');
-    bytes = await handle.readFile();
-    const afterRead = await handle.stat({ bigint: true });
-    if (!sameFile(opened, afterRead) || BigInt(bytes.length) !== opened.size) throw new Error('Evidence changed while reading');
-  } finally {
-    await handle.close();
-  }
-  const after = await fs.lstat(resolvedPath, { bigint: true });
-  const afterRealPath = await fs.realpath(resolvedPath);
-  if (!sameFile(before, after) || afterRealPath !== beforeRealPath) throw new Error('Evidence path changed after reading');
-  return {
-    value: JSON.parse(bytes.toString('utf8')) as T,
-    sha256: createHash('sha256').update(bytes).digest('hex'),
-    sizeBytes: bytes.length,
-    resolvedPath,
-  };
-}
-
 function safeManifestPath(candidate: string): boolean {
   return Boolean(candidate) && !candidate.includes('\\') && !path.posix.isAbsolute(candidate)
     && path.posix.normalize(candidate) === candidate && candidate !== '..' && !candidate.startsWith('../');
-}
-
-function pathKey(candidate: string): string {
-  const resolved = path.resolve(candidate);
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 function nonEmpty(value: unknown): value is string {
@@ -101,7 +57,7 @@ function approvedOwner(value: unknown): value is { name: string; approvedAt: str
   return operatorIdentity(owner.name) && validApprovalTime(owner.approvedAt);
 }
 
-function isReadinessReport(value: unknown): value is ReadinessReport {
+export function isReadinessReport(value: unknown): value is ReadinessReport {
   if (!value || typeof value !== 'object') return false;
   const report = value as Partial<ReadinessReport>;
   return nonEmpty(report.runId) && isSafeRunId(report.runId)
@@ -142,7 +98,7 @@ function isSignoff(value: unknown): value is OperatorSignoff {
     ));
 }
 
-function assertRequiredArtifacts(report: ReadinessReport): void {
+export function assertRequiredArtifacts(report: ReadinessReport): void {
   const counts = new Map<ArtifactType, number>();
   for (const artifact of report.artifacts) counts.set(artifact.type, (counts.get(artifact.type) || 0) + 1);
   const check = (id: string): boolean => report.checks.some((item) => item.id === id);
@@ -216,5 +172,6 @@ export async function loadReleaseEvidence(
   if (claimed.size !== manifest.size || [...manifest.keys()].some((key) => !claimed.has(key))) {
     throw new Error('Signed manifest does not exactly cover reports and artifacts');
   }
+  assertMatchingBackupVerification(reports);
   return { reports, signoff };
 }

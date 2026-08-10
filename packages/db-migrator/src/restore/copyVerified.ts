@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { captureStableFile, copyStableFile, type StableFile } from '../backup/fileSnapshot';
@@ -5,7 +6,7 @@ import type { VerifiedBackup } from '../backup/manifestEvidence';
 import type { RestorePlan } from './restorePlan';
 
 export interface RestoredFile { path: string; relativePath: string; sizeBytes: number; sha256: string }
-export interface RestoreOwnership { rootRealPath: string; token: StableFile }
+export interface RestoreOwnership { evidenceRootRealPath: string; token: StableFile }
 export interface RestoreCopy { restored: RestoredFile[]; ownership: RestoreOwnership }
 
 function codedError(code: string): Error & { code: string } {
@@ -20,7 +21,7 @@ async function exists(candidate: string): Promise<boolean> {
   }
 }
 
-async function claimRestoreRoot(root: string): Promise<RestoreOwnership> {
+async function claimRestoreRoot(root: string): Promise<string> {
   const parent = path.dirname(root);
   const parentStats = await fs.lstat(parent);
   if (parentStats.isSymbolicLink() || !parentStats.isDirectory()) throw codedError('RESTORE_TARGET_INVALID');
@@ -38,11 +39,25 @@ async function claimRestoreRoot(root: string): Promise<RestoreOwnership> {
   if (rootStats.isSymbolicLink() || !rootStats.isDirectory() || path.dirname(rootReal) !== parentReal) {
     throw codedError('RESTORE_TARGET_INVALID');
   }
-  const tokenPath = path.join(root, '.restore-owner');
+  return rootReal;
+}
+
+function targetDigest(root: string): string {
+  const normalized = process.platform === 'win32' ? path.resolve(root).toLowerCase() : path.resolve(root);
+  return createHash('sha256').update(normalized).digest('hex').slice(0, 24);
+}
+
+export async function claimRestoreOwnership(
+  evidenceRoot: string,
+  restoreRoot: string,
+  runId: string,
+): Promise<RestoreOwnership> {
+  const evidenceRootRealPath = await fs.realpath(evidenceRoot);
+  const tokenPath = path.join(evidenceRoot, `.restore-owner-${targetDigest(restoreRoot)}.json`);
   let tokenHandle;
   try {
     tokenHandle = await fs.open(tokenPath, 'wx', 0o600);
-    await tokenHandle.writeFile(`${process.pid}\n`);
+    await tokenHandle.writeFile(`${JSON.stringify({ version: 1, runId, target: targetDigest(restoreRoot) })}\n`);
     await tokenHandle.sync();
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw codedError('RESTORE_TARGET_IN_USE');
@@ -50,8 +65,13 @@ async function claimRestoreRoot(root: string): Promise<RestoreOwnership> {
   } finally {
     await tokenHandle?.close();
   }
-  const token = await captureStableFile(tokenPath, rootReal, '.restore-owner', 'RESTORE_TARGET_IN_USE');
-  return { rootRealPath: rootReal, token };
+  const token = await captureStableFile(
+    tokenPath,
+    evidenceRootRealPath,
+    path.basename(tokenPath),
+    'RESTORE_TARGET_IN_USE',
+  );
+  return { evidenceRootRealPath, token };
 }
 
 function sameStable(left: StableFile, right: StableFile): boolean {
@@ -59,9 +79,12 @@ function sameStable(left: StableFile, right: StableFile): boolean {
     && left.mtimeNs === right.mtimeNs && left.realPath === right.realPath && left.sha256 === right.sha256;
 }
 
-export async function copyRestorePlan(verified: VerifiedBackup, plan: RestorePlan): Promise<RestoreCopy> {
-  const ownership = await claimRestoreRoot(plan.restoreRoot);
-  const restoreReal = ownership.rootRealPath;
+export async function copyRestorePlan(
+  verified: VerifiedBackup,
+  plan: RestorePlan,
+  ownership: RestoreOwnership,
+): Promise<RestoreCopy> {
+  const restoreReal = await claimRestoreRoot(plan.restoreRoot);
   const restored: RestoredFile[] = [];
   for (const file of plan.files) {
     const source = verified.files.get(file.entry.path);
@@ -110,17 +133,6 @@ export async function copyRestorePlan(verified: VerifiedBackup, plan: RestorePla
   );
   if (!sameStable(verified.manifestFile, finalManifest)) throw codedError('RESTORE_SOURCE_CHANGED');
   return { restored, ownership };
-}
-
-export async function releaseRestoreOwnership(ownership: RestoreOwnership): Promise<void> {
-  const current = await captureStableFile(
-    ownership.token.sourcePath,
-    ownership.rootRealPath,
-    '.restore-owner',
-    'RESTORE_TARGET_IN_USE',
-  );
-  if (!sameStable(ownership.token, current)) throw codedError('RESTORE_TARGET_IN_USE');
-  await fs.rm(ownership.token.sourcePath);
 }
 
 export async function assertExactRestoredFileSet(root: string, expectedPaths: string[]): Promise<void> {

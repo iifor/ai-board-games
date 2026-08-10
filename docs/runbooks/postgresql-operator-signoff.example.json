@@ -28,7 +28,7 @@
   ],
   "reportManifest": [
     {
-      "path": "reports/REPLACE_WITH_REPORT.json",
+      "path": "reports/REPLACE_WITH_VERIFY_BACKUP_REPORT.json",
       "sizeBytes": 0,
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     }

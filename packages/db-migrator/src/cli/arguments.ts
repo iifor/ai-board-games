@@ -1,5 +1,6 @@
 const COMMANDS = [
-  'migrate', 'preflight', 'backup', 'verify-backup', 'restore-drill', 'validate', 'rehearse', 'release-readiness',
+  'migrate', 'preflight', 'backup', 'verify-backup', 'restore-drill', 'validate', 'rehearse', 'prepare-signoff',
+  'release-readiness',
 ] as const;
 
 export interface ParsedCommand {

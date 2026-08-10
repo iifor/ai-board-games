@@ -14,6 +14,7 @@ const testFiles = [
   'backupRestoreBuiltCli.test.ts',
   'backupVerificationSecurity.test.ts',
   'restoreDrillSecurity.test.ts',
+  'prepareSignoff.test.ts',
   'releaseReadiness.test.ts',
 ].map((file) => path.join(__dirname, file));
 

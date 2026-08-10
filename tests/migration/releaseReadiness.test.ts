@@ -142,6 +142,16 @@ async function createFixture(): Promise<Fixture> {
     { type: 'backup', path: artifactPaths[6], sha256: await sha256(artifactPaths[6]) },
     { type: 'manifest', path: artifactPaths[7], sha256: await sha256(artifactPaths[7]) },
   ];
+  const verificationIdentity = JSON.stringify({
+    runId: reports[0].runId,
+    manifestSha256: reports[0].artifacts[1].sha256,
+  });
+  reports.push(readinessReport('verify-backup-1', 'backup', [{
+    id: 'backup.verify-manifest', status: 'passed',
+    expected: verificationIdentity, actual: verificationIdentity,
+    message: 'verified immutable backup manifest',
+  }]));
+  reportPaths.push(path.join(reportsDirectory, `report-${reports.length}.json`));
   const signoffPath = path.join(root, 'operator-signoff.json');
   const outputDirectory = path.join(root, 'output');
   const signoff: Record<string, unknown> = {};
@@ -216,6 +226,15 @@ test('passes only complete evidence and computes a three-minute maintenance wind
   await fs.access(path.join(fixture.outputDirectory, 'release-pass-release.md'));
 });
 
+test('fails when the signed closure omits the unique backup verification report', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  fixture.reportPaths.pop();
+  fixture.reports.pop();
+
+  assert.equal((await runFixture(fixture, 'release-missing-verify')).status, 'failed');
+});
+
 test('accepts immutable raw evidence artifacts in the signed manifest closure', async (t) => {
   const fixture = await createFixture();
   t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
@@ -235,8 +254,8 @@ test('fails when a required report is missing or any input report failed', async
   missing.reports.splice(4, 1);
   missing.reports[2].artifacts = missing.reports[2].artifacts.filter((artifact) => artifact.type !== 'smoke-report');
   assert.equal((await runFixture(missing)).status, 'failed');
-  missingRestore.reportPaths.pop();
-  missingRestore.reports.pop();
+  missingRestore.reportPaths.splice(6, 1);
+  missingRestore.reports.splice(6, 1);
   assert.equal((await runFixture(missingRestore)).status, 'failed');
   failed.reports[1].status = 'failed';
   failed.reports[1].errors = [{ code: 'FAILED', message: 'failed' }];

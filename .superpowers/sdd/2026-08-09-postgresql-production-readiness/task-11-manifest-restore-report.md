@@ -11,11 +11,12 @@ The published backup was valid and Node had already captured a resource whose ab
 ## Outcome
 
 - `verify-backup` is a formal read-only db-migrator command. It validates the manifest identity and shape, exact case-insensitive file set, sizes, SHA-256 values, top-level SQLite hashes, filesystem identities, and pre/post evidence stability. It rejects symlinks/reparse points, path escape, duplicate/case-aliased paths, missing/extra files, and TOCTOU changes with fixed path-free errors.
-- `restore-drill` performs a non-mutating dry-run unless `--execute` is explicit. Execute claims a nonexistent or empty isolated target with an exclusive owner token, maps every resource source index to a distinct relative destination, copies through held Node handles into exclusive files, and verifies the exact restored file set, sizes, and hashes. Failure preserves the isolated scene and owner token; success removes the token before final exact-set verification.
+- `restore-drill` performs a non-mutating dry-run unless `--execute` is explicit. Execute claims a nonexistent or empty isolated target, while an O_EXCL owner token remains in the evidence root rather than restored content. It maps every resource source index to a distinct relative destination, copies through held Node handles into exclusive files, and verifies the exact restored file set, sizes, and hashes. Success and failure both preserve ownership evidence without polluting the restored file set.
 - Ordinary backup and resource files are hashed and copied in 256 KiB chunks. Only the small manifest and resource-map JSON files use stable whole-file reads. A 32 MiB controlled-file test forbids `FileHandle.readFile` on the normal evidence path.
-- The raw SQLite main/WAL/SHM rollback set is opened in place read-only and query-only, then checked independently from the consistent copy. Both require `integrity_check=ok`, required tables, and matching key-table counts.
-- `verify-backup.ps1` and `restore-drill.ps1` are thin `$PSScriptRoot` plus `pnpm.cmd` forwarders. They contain no SQL, database URL, hash, or copy implementation.
-- The production-readiness runbook now invokes those commands and no longer embeds a second PowerShell hashing/copying/SQLite implementation.
+- Neither final restored SQLite set is opened. Raw main/WAL/SHM and the consistent copy are streamed into separate tool-owned short verification workspaces; only those private copies are opened read-only/query-only. Both require `integrity_check=ok`, required tables, and matching key-table counts, including main-only and WAL-without-SHM cases.
+- `verify-backup.ps1`, `restore-drill.ps1`, and `prepare-signoff.ps1` are thin `$PSScriptRoot` plus `pnpm.cmd` forwarders. They contain no SQL, database URL, hash, or copy implementation.
+- `prepare-signoff` streams and binds the exact report/artifact closure into a pending, never-approved draft. Release evidence now requires exactly one artifact-free verify report whose manifest SHA/run identity matches the executed backup report; the final release report still contains exactly 16 checks.
+- The production-readiness runbook now invokes those commands and no longer embeds PowerShell resource/evidence traversal, hashing, copying, or SQLite verification.
 
 ## TDD evidence
 
@@ -24,18 +25,22 @@ The published backup was valid and Node had already captured a resource whose ab
 - Security/built RED: 94/96 passed. The two failures exposed an unreliable Windows process-spawn harness and an unsafe manifest run id; both were corrected.
 - Resource-map RED: 95/96 passed because malformed JSON failed before the command could emit atomic sanitized failure evidence; stable map loading moved inside the command boundary.
 - Ownership/exact-set RED: 96/98 passed. Failure scenes lacked an owner token and no exact destination-set API existed; both boundaries were implemented.
-- Final migration/backup result: 98/98 passed, 0 failed, 0 skipped. This includes a real 296+ character fixture where the old PowerShell hash flow fails and the built Node CLI verifies and restores successfully.
+- Review RED A: 98/100 passed; canonical junction aliases could write reports or restored bytes into the backup tree.
+- Review RED B: 97/101 passed; owner evidence polluted restored content and WAL verification could mutate final files.
+- Review RED D: 101/103 passed; late extra files and early identity replacement/deletion were not rechecked at verifier completion.
+- Review RED E: the suite first stopped on the intentionally missing `prepare-signoff` module; the first implementation then passed 104/105 because restore reports were incorrectly counted as independent verify reports.
+- Final migration/backup result: 105/105 passed, 0 failed, 0 skipped. This includes real 296+ paths, built main-only and WAL-without-SHM restore, canonical write-boundary preservation, second-pass TOCTOU capture, and a pending signoff closure that the final evidence loader accepts after independent approval fields are supplied.
 
 ## Verification
 
 | Gate | Result |
 | --- | --- |
-| `pnpm.cmd run test:migration` | PASS, 98/98 |
+| `pnpm.cmd run test:migration` | PASS, 105/105 |
 | `pnpm.cmd run test:unit` | PASS, 348/348 |
 | `pnpm.cmd run test:postgres` with the authorized local test environment | PASS, 107/107 |
 | `pnpm.cmd run check` | PASS, all five checked workspace packages |
 | db-migrator plus server/shared/client/admin builds | PASS |
-| PowerShell AST parse | PASS, 7 scripts and 13 readiness-runbook blocks |
+| PowerShell AST parse | PASS, 8 scripts and 13 readiness-runbook blocks |
 | Wrapper/runtime static scan | PASS; no URL/SQL/hash/copy logic in wrappers and no server `better-sqlite3` dependency |
 | `git diff --check` | PASS |
 

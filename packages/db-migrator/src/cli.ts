@@ -7,6 +7,7 @@ import { runValidation } from './commands/validate';
 import { runReleaseReadiness } from './commands/release-readiness';
 import { runVerifyBackup } from './commands/verify-backup';
 import { runRestoreDrill } from './commands/restore-drill';
+import { runPrepareSignoff } from './commands/prepare-signoff';
 import { parseCommandLine, type ParsedCommand } from './cli/arguments';
 import { readinessReportExitCode, redactSecrets, sanitizeForOutput } from './reporting/reportWriter';
 import type { ReadinessReport } from './reporting/reportTypes';
@@ -82,6 +83,26 @@ async function runBuiltInReadinessCommand(
       outputDirectory: path.resolve(outputDirectory),
       execute: parsed.execute,
     });
+  }
+  if (command === 'prepare-signoff') {
+    if (parsed.execute) throw new Error('prepare-signoff is read-only and does not accept --execute');
+    const reports = parsed.values.get('reports') || '';
+    const outputDirectory = parsed.values.get('output') || '';
+    const runId = parsed.values.get('run-id') || '';
+    const releaseCandidate = parsed.values.get('release-candidate') || '';
+    const goLiveOwner = parsed.values.get('go-live-owner') || '';
+    const rollbackOwner = parsed.values.get('rollback-owner') || '';
+    if (!reports || !releaseCandidate || !goLiveOwner || !rollbackOwner || !outputDirectory || !runId) {
+      throw new Error('Usage: prepare-signoff --reports <comma-separated-json> --release-candidate <git-sha> --go-live-owner <name> --rollback-owner <name> --output <dir> --run-id <id>');
+    }
+    return (await runPrepareSignoff({
+      runId,
+      releaseCandidate,
+      reportPaths: reports.split(',').map((entry) => path.resolve(entry.trim())).filter(Boolean),
+      outputDirectory: path.resolve(outputDirectory),
+      goLiveOwner,
+      rollbackOwner,
+    })).report;
   }
   if (command === 'validate') {
     const sourceSnapshotPath = parsed.values.get('source-snapshot') || '';

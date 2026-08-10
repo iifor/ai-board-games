@@ -3,6 +3,7 @@ import { isSafeRunId } from '../backup/publication';
 import { writeReadinessReport } from '../reporting/reportWriter';
 import type { ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
 import { loadReleaseEvidence, type OperatorSignoff } from '../release/evidence';
+import { hasMatchingBackupVerification } from '../release/backupVerification';
 
 export const REQUIRED_RELEASE_CHECKS = [
   'ci.release-gates',
@@ -112,7 +113,8 @@ function evaluate(
       && evidence.length > 0 && evidence.every((check) => check.status === 'passed');
   };
   const result = new Map<string, boolean>(SIGNED_CHECKS.map((id) => [id, signed(id)]));
-  result.set('backup.executed', executedBackups.length === 1 && checkPassed(executedBackups[0], 'backup.execute'));
+  result.set('backup.executed', executedBackups.length === 1 && checkPassed(executedBackups[0], 'backup.execute')
+    && hasMatchingBackupVerification(reports));
   result.set('backup.restore-drill', signed('backup.restore-drill')
     && backup.some((report) => checkPassed(report, 'backup.restore-drill')));
   result.set('rehearsal.first', independent && rehearsalPassed(first));

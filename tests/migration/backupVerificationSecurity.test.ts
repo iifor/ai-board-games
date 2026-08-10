@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { runVerifyBackup } from '../../packages/db-migrator/src/commands/verify-backup';
-import { createBackupFixture, readManifest } from './backupRestoreFixture';
+import { createBackupFixture, readManifest, snapshotTree } from './backupRestoreFixture';
 
 async function verify(t: test.TestContext, mutate: (fixture: Awaited<ReturnType<typeof createBackupFixture>>) => Promise<void>) {
   const fixture = await createBackupFixture(t);
@@ -110,4 +110,79 @@ test('verify-backup never overwrites an existing report for the same run', async
   const before = await fs.readFile(reportPath);
   await assert.rejects(runVerifyBackup(options), { code: 'REPORT_ALREADY_EXISTS' });
   assert.deepEqual(await fs.readFile(reportPath), before);
+});
+
+test('verify-backup rejects a canonical output alias inside backup before writing any evidence', async (t) => {
+  const fixture = await createBackupFixture(t);
+  const alias = path.join(fixture.temporary, 'backup-alias');
+  await fs.symlink(fixture.root, alias, 'junction');
+  const before = await snapshotTree(fixture.root);
+
+  await assert.rejects(
+    runVerifyBackup({
+      runId: 'unsafe-verify-output',
+      backupDirectory: fixture.root,
+      manifestPath: fixture.manifestPath,
+      outputDirectory: path.join(alias, 'reports'),
+    }),
+    { code: 'BACKUP_VERIFY_OUTPUT_UNSAFE' },
+  );
+
+  assert.deepEqual(await snapshotTree(fixture.root), before);
+});
+
+async function mutateOnSecondRootEnumeration(
+  root: string,
+  mutate: () => Promise<void>,
+  operation: () => Promise<unknown>,
+): Promise<number> {
+  const mutable = fs as unknown as { readdir: typeof fs.readdir };
+  const original = mutable.readdir;
+  let rootReads = 0;
+  mutable.readdir = (async (candidate: Parameters<typeof fs.readdir>[0], options?: Parameters<typeof fs.readdir>[1]) => {
+    if (path.resolve(String(candidate)) === path.resolve(root) && ++rootReads === 2) await mutate();
+    return original(candidate, options as never);
+  }) as typeof fs.readdir;
+  try { await operation(); } finally { mutable.readdir = original; }
+  return rootReads;
+}
+
+test('verify-backup rejects an extra file introduced after the initial complete capture', async (t) => {
+  const fixture = await createBackupFixture(t);
+  let report: Awaited<ReturnType<typeof runVerifyBackup>> | undefined;
+  const rootReads = await mutateOnSecondRootEnumeration(
+    fixture.root,
+    () => fs.writeFile(path.join(fixture.root, 'late-extra.txt'), 'late'),
+    async () => { report = await runVerifyBackup({
+      runId: 'verify-late-extra',
+      backupDirectory: fixture.root,
+      manifestPath: fixture.manifestPath,
+      outputDirectory: fixture.output,
+    }); },
+  );
+  assert.ok(rootReads >= 2);
+  assert.equal(report?.status, 'failed');
+});
+
+test('verify-backup rejects byte-identical replacement or deletion after an early file was captured', async (t) => {
+  for (const mode of ['replace', 'delete'] as const) {
+    const fixture = await createBackupFixture(t);
+    const target = path.join(fixture.root, 'sqlite-consistent.sqlite');
+    const bytes = await fs.readFile(target);
+    let report: Awaited<ReturnType<typeof runVerifyBackup>> | undefined;
+    await mutateOnSecondRootEnumeration(
+      fixture.root,
+      async () => {
+        await fs.rm(target);
+        if (mode === 'replace') await fs.writeFile(target, bytes);
+      },
+      async () => { report = await runVerifyBackup({
+        runId: `verify-late-${mode}`,
+        backupDirectory: fixture.root,
+        manifestPath: fixture.manifestPath,
+        outputDirectory: fixture.output,
+      }); },
+    );
+    assert.equal(report?.status, 'failed', mode);
+  }
 });

@@ -103,6 +103,13 @@ function sameStableFile(left: StableFile, right: StableFile): boolean {
     && left.mtimeNs === right.mtimeNs && left.realPath === right.realPath && left.sha256 === right.sha256;
 }
 
+function assertExactPaths(actualPaths: string[], entries: ManifestEntry[]): void {
+  if (actualPaths.length !== entries.length
+    || actualPaths.some((candidate, index) => candidate !== entries[index].path)) {
+    fail('BACKUP_FILESET_MISMATCH');
+  }
+}
+
 export async function verifyPublishedBackup(backupDirectory: string, manifestPath: string): Promise<VerifiedBackup> {
   try {
     const root = path.resolve(backupDirectory);
@@ -119,10 +126,7 @@ export async function verifyPublishedBackup(backupDirectory: string, manifestPat
     );
     const manifest = parseManifest(manifestFile.bytes);
     const actualPaths = await listBackupFiles(root, rootRealPath);
-    if (actualPaths.length !== manifest.entries.length
-      || actualPaths.some((candidate, index) => candidate !== manifest.entries[index].path)) {
-      fail('BACKUP_FILESET_MISMATCH');
-    }
+    assertExactPaths(actualPaths, manifest.entries);
     const files = new Map<string, StableFile>();
     for (const entry of manifest.entries) {
       const candidate = path.join(root, ...entry.path.split('/'));
@@ -130,6 +134,20 @@ export async function verifyPublishedBackup(backupDirectory: string, manifestPat
       if (captured.sizeBytes !== entry.sizeBytes || captured.sha256 !== entry.sha256) fail('BACKUP_CONTENT_MISMATCH');
       files.set(entry.path, captured);
     }
+    assertExactPaths(await listBackupFiles(root, rootRealPath), manifest.entries);
+    for (const entry of manifest.entries) {
+      const first = files.get(entry.path)!;
+      const final = await captureStableFile(
+        path.join(root, ...entry.path.split('/')),
+        rootRealPath,
+        entry.path,
+        'BACKUP_EVIDENCE_CHANGED',
+      );
+      if (!sameStableFile(first, final) || final.sizeBytes !== entry.sizeBytes || final.sha256 !== entry.sha256) {
+        fail('BACKUP_EVIDENCE_CHANGED');
+      }
+    }
+    assertExactPaths(await listBackupFiles(root, rootRealPath), manifest.entries);
     const finalManifest = await captureStableFile(
       expectedManifestPath,
       rootRealPath,

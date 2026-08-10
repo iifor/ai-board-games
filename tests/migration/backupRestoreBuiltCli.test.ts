@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import { createBackupFixture } from './backupRestoreFixture';
+import { createBackupFixture, replaceWithWalWithoutShm } from './backupRestoreFixture';
 
 const repoRoot = path.resolve(__dirname, '../..');
 const builtCli = path.join(repoRoot, 'packages', 'db-migrator', 'dist', 'cli.js');
@@ -77,4 +77,22 @@ test('built Node CLI verifies and restores a 296+ character path that the old Po
   ], { cwd: repoRoot, encoding: 'utf8' });
   assert.equal(restore.status, 0, restore.stderr || restore.stdout);
   assert.equal(JSON.parse(restore.stdout.trim()).status, 'passed');
+
+  const walFixture = await createBackupFixture(t);
+  await replaceWithWalWithoutShm(walFixture);
+  assert.equal(await fs.stat(path.join(walFixture.root, 'sqlite-raw', 'source.sqlite-wal')).then(() => true), true);
+  await assert.rejects(() => fs.stat(path.join(walFixture.root, 'sqlite-raw', 'source.sqlite-shm')));
+  const walMap = path.join(walFixture.temporary, 'resource-map.json');
+  await fs.writeFile(walMap, JSON.stringify({
+    version: 1,
+    resources: [{ sourceIndex: 0, destination: 'resources-a' }, { sourceIndex: 1, destination: 'resources-b' }],
+  }));
+  const walRestore = spawnSync(process.execPath, [
+    builtCli, 'restore-drill', '--backup', walFixture.root, '--manifest', walFixture.manifestPath,
+    '--resource-map', walMap, '--restore-output', path.join(walFixture.output, 'r'),
+    '--output', walFixture.output, '--run-id', 'built-wal-restore', '--execute',
+  ], { cwd: repoRoot, encoding: 'utf8' });
+  assert.equal(walRestore.status, 0, walRestore.stderr || walRestore.stdout);
+  assert.equal(JSON.parse(walRestore.stdout.trim()).status, 'passed');
+  await assert.rejects(() => fs.stat(path.join(walFixture.output, 'r', 'sqlite-raw', 'source.sqlite-shm')));
 });

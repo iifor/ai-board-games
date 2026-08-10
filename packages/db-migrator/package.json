@@ -11,6 +11,7 @@
     "backup": "tsx src/cli.ts backup",
     "verify-backup": "tsx src/cli.ts verify-backup",
     "restore-drill": "tsx src/cli.ts restore-drill",
+    "prepare-signoff": "tsx src/cli.ts prepare-signoff",
     "validate": "tsx src/cli.ts validate",
     "rehearse": "tsx src/cli.ts rehearse",
     "release-readiness": "tsx src/cli.ts release-readiness"
