@@ -153,7 +153,7 @@ async function targetImportTablesAreEmpty(database: DbExecutor, schema: string):
   const quotedSchema = quoteIdentifier(schema);
   for (const table of IMPORT_TABLES) {
     const relation = await database.queryOne<{ relation: string | null }>(
-      'SELECT to_regclass(format(\'%I.%I\', $1, $2))::text AS relation',
+      'SELECT to_regclass(format(\'%I.%I\', $1::text, $2::text))::text AS relation',
       [schema, table],
     );
     if (!relation?.relation) return { empty: false, missingTable: table };

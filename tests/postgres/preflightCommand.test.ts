@@ -106,7 +106,7 @@ test('preflight reports TARGET_NOT_EMPTY when an import table already has data',
     const outputDirectory = createOutputDirectory();
     try {
       await database.execute(`INSERT INTO skins (id, name, version, source, terms_json, background, truth, clues_json, noises_json, memory_examples_json, enabled)
-        VALUES ('preflight-skin', 'Preflight', 'v1', 'test', '[]', '', '', '[]', '[]', '[]', true)`);
+        VALUES ('preflight-skin', 'Preflight', 'v1', 'test', '[]', '', '', '[]', '[]', '[]', 1)`);
       const report = await runPreflight(options(sourcePath, outputDirectory, { targetSchema: schema }));
       assert.equal(report.status, 'failed');
       assert.deepEqual(errorCodes(report), ['TARGET_NOT_EMPTY']);
