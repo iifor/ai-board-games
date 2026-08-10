@@ -120,6 +120,31 @@ test('redaction preserves the database URL marker inside a sensitive environment
   );
 });
 
+test('redaction uses the exact database URL marker across quoting, strings, JSON, and CLI payloads', async () => {
+  const marker = '[REDACTED_DATABASE_URL]';
+  const cases: Array<[string, string]> = [
+    ["DATABASE_URL='postgresql://single_user:single_password@single.host/single_db'", `DATABASE_URL=${marker}`],
+    ['DATABASE_URL="postgresql://double_user:double_password@double.host/double_db"', `DATABASE_URL=${marker}`],
+    ['DATABASE_URL=postgresql://plain_user:plain_password@plain.host/plain_db', `DATABASE_URL=${marker}`],
+    ['{"databaseUrl":"postgresql://json_user:json_password@json.host/json_db"}', `{"databaseUrl":"${marker}"}`],
+    ['Connect using postgresql://text_user:text_password@text.host/text_db now', `Connect using ${marker} now`],
+  ];
+  for (const [input, expected] of cases) assert.equal(redactSecrets(input), expected);
+
+  const output: string[] = [];
+  const report = migrationReport('succeeded');
+  report.sourcePath = "DATABASE_URL='postgresql://cli_user:cli_password@cli.host/cli_db'";
+  report.errors = ['{"databaseUrl":"postgresql://cli_json:cli_secret@cli-json.host/cli_json_db"}'];
+  await main(['migrate', '--source', 'source.sqlite', '--target', 'postgresql://target:secret@target.host/db'], {
+    migrate: async () => report,
+    stdout: (line) => output.push(line),
+    stderr: () => undefined,
+  });
+  const payload = JSON.parse(output[0]) as MigrationReport;
+  assert.equal(payload.sourcePath, `DATABASE_URL=${marker}`);
+  assert.equal(payload.errors[0], `{"databaseUrl":"${marker}"}`);
+});
+
 test('readiness status maps to stable process exit codes', () => {
   assert.equal(readinessReportExitCode(createReport('passed')), 0);
   assert.equal(readinessReportExitCode(createReport('failed')), 1);

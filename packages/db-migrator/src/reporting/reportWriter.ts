@@ -50,7 +50,13 @@ const defaultFileSystem: ReportFileSystem = {
 };
 
 export function redactSecrets(value: string): string {
-  const withRedactedUrls = value.replace(CONNECTION_URL, REDACTED_DATABASE_URL);
+  const withRedactedUrls = value.replace(CONNECTION_URL, (candidate, offset: number, source: string) => {
+    if (source[offset - 1] === "'") {
+      const closingQuote = candidate.lastIndexOf("'");
+      if (closingQuote >= 0) return `${REDACTED_DATABASE_URL}${candidate.slice(closingQuote)}`;
+    }
+    return REDACTED_DATABASE_URL;
+  });
   return withRedactedUrls.replace(SENSITIVE_ASSIGNMENTS, (_match, name: string, rawValue: string) => {
     const unquoted = /^(['"]).*\1$/.test(rawValue) ? rawValue.slice(1, -1) : rawValue;
     return `${name}=${unquoted === REDACTED_DATABASE_URL ? REDACTED_DATABASE_URL : '***'}`;
