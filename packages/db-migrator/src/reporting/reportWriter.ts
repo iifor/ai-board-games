@@ -29,6 +29,20 @@ export interface WrittenReport {
   markdownPath: string;
 }
 
+export type PublishedFileRollbackResult = 'removed-owned' | 'preserved-foreign' | 'rollback-incomplete';
+
+export interface PublishedFileIdentity {
+  dev: string;
+  ino: string;
+}
+
+export interface RollbackOwnedPublishedFileOptions {
+  referencePath: string;
+  finalPath: string;
+  expectedIdentity?: PublishedFileIdentity;
+  fileSystem?: ReportFileSystem;
+}
+
 const SENSITIVE_ASSIGNMENTS = /\b([A-Z][A-Z0-9_]*(?:URL|SECRET|PASSWORD|PASSWD|API_KEY|TOKEN|KEY))=("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;]+)/gi;
 const DATABASE_URL_SCHEME = /\bpostgres(?:ql)?:\/\//gi;
 const REDACTED_DATABASE_URL = '[REDACTED_DATABASE_URL]';
@@ -46,7 +60,7 @@ const defaultFileSystem: ReportFileSystem = {
   link: (source, destination) => fs.link(source, destination),
   rename: (source, destination) => fs.rename(source, destination),
   rm: (candidate) => fs.rm(candidate, { force: true }),
-  stat: (candidate) => fs.stat(candidate),
+  stat: (candidate) => fs.stat(candidate, { bigint: true }),
 };
 
 function isWhitespaceOrControl(character: string): boolean {
@@ -190,7 +204,9 @@ export async function writeReadinessReport(options: WriteReportOptions): Promise
     jsonPublished = true;
     await fileSystem.link(markdownTempPath, markdownPath);
   } catch (error) {
-    if (jsonPublished) await rollbackPublishedFile(fileSystem, jsonTempPath, jsonPath);
+    if (jsonPublished) {
+      await rollbackOwnedPublishedFile({ referencePath: jsonTempPath, finalPath: jsonPath, fileSystem });
+    }
     await Promise.all(createdTempPaths.map((candidate) => fileSystem.rm(candidate)));
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw reportExistsError(jsonPath, markdownPath);
     throw error;
@@ -199,29 +215,41 @@ export async function writeReadinessReport(options: WriteReportOptions): Promise
   return { jsonPath, markdownPath };
 }
 
-async function rollbackPublishedFile(
-  fileSystem: ReportFileSystem,
-  tempPath: string,
-  finalPath: string,
-): Promise<void> {
-  const rollbackPath = `${tempPath}.rollback-${randomUUID()}`;
+export function publishedFileIdentity(
+  stats: { dev: number | bigint; ino: number | bigint },
+): PublishedFileIdentity | null {
+  const hasReliableIdentity = typeof stats.ino === 'bigint' ? stats.ino > 0n : stats.ino > 0;
+  return hasReliableIdentity ? { dev: stats.dev.toString(), ino: stats.ino.toString() } : null;
+}
+
+export async function rollbackOwnedPublishedFile(
+  options: RollbackOwnedPublishedFileOptions,
+): Promise<PublishedFileRollbackResult> {
+  const { referencePath, finalPath, expectedIdentity, fileSystem = defaultFileSystem } = options;
+  const rollbackPath = `${referencePath}.rollback-${randomUUID()}`;
   try {
     await fileSystem.rename(finalPath, rollbackPath);
   } catch {
-    return;
+    return 'rollback-incomplete';
   }
 
   try {
-    const [temporary, quarantined] = await Promise.all([fileSystem.stat(tempPath), fileSystem.stat(rollbackPath)]);
-    const hasReliableIdentity = (ino: number | bigint) => typeof ino === 'bigint' ? ino > 0n : ino > 0;
+    const [reference, quarantined] = await Promise.all([
+      expectedIdentity ? Promise.resolve(expectedIdentity) : fileSystem.stat(referencePath).then(publishedFileIdentity),
+      fileSystem.stat(rollbackPath).then(publishedFileIdentity),
+    ]);
     if (
-      hasReliableIdentity(temporary.ino)
-      && hasReliableIdentity(quarantined.ino)
-      && temporary.dev === quarantined.dev
-      && temporary.ino === quarantined.ino
+      reference
+      && quarantined
+      && reference.dev === quarantined.dev
+      && reference.ino === quarantined.ino
     ) {
-      await fileSystem.rm(rollbackPath);
-      return;
+      try {
+        await fileSystem.rm(rollbackPath);
+        return 'removed-owned';
+      } catch {
+        return 'rollback-incomplete';
+      }
     }
   } catch {
     // Restore below whenever ownership cannot be proven.
@@ -229,8 +257,9 @@ async function rollbackPublishedFile(
 
   try {
     await fileSystem.link(rollbackPath, finalPath);
-    await fileSystem.rm(rollbackPath);
+    await fileSystem.rm(rollbackPath).catch(() => undefined);
   } catch {
     // A new final now exists. Preserve the quarantined content rather than deleting either file.
   }
+  return 'preserved-foreign';
 }

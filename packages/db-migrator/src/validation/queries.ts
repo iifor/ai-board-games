@@ -1,6 +1,5 @@
 import { IDENTITY_TABLES, IMPORT_TABLES } from '../constants';
-// @ts-ignore TS6059: this type-only cross-package import intentionally reuses the server contract despite db-migrator's isolated rootDir.
-import type { DbExecutor } from '../../../server/db/types';
+import type { DbExecutor } from '../../../shared/types/dbExecutor';
 
 export type ValidationDbExecutor = Pick<DbExecutor, 'queryOne' | 'queryMany' | 'close'>;
 

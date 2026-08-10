@@ -5,7 +5,13 @@ import Database from 'better-sqlite3';
 import { IMPORT_TABLES, SKIPPED_TABLES } from '../constants';
 import { hashFile, verifyManifest, type BackupManifest } from '../backup/manifest';
 import { isSafeRunId } from '../backup/publication';
-import { redactSecrets, writeReadinessReport } from '../reporting/reportWriter';
+import {
+  redactSecrets,
+  publishedFileIdentity,
+  rollbackOwnedPublishedFile,
+  writeReadinessReport,
+  type PublishedFileIdentity,
+} from '../reporting/reportWriter';
 import type { ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
 import type { MigrationReport } from '../types';
 import {
@@ -48,6 +54,8 @@ export interface ValidateOptions {
 export interface ValidateDependencies {
   createSqlite(sourcePath: string): Database.Database;
   createPostgres(targetUrl: string, targetSchema: string): ValidationDbExecutor;
+  hashEvidence(candidate: string): Promise<string>;
+  writeReport(options: Parameters<typeof writeReadinessReport>[0]): ReturnType<typeof writeReadinessReport>;
 }
 
 function tlsConfiguration(targetUrl: string): false | { rejectUnauthorized: true } {
@@ -70,6 +78,8 @@ const defaultDependencies: ValidateDependencies = {
     statementTimeoutMs: STATEMENT_TIMEOUT_MS,
     ssl: tlsConfiguration(targetUrl),
   }),
+  hashEvidence: hashFile,
+  writeReport: writeReadinessReport,
 };
 
 function createReport(
@@ -161,34 +171,66 @@ function buildValidationEvidence(report: ReadinessReport): ValidationEvidence {
   return { version: 1, runId: report.runId, stage: 'validation', status: report.status, summary, checks };
 }
 
+interface PublishedValidationEvidence {
+  artifact: { type: 'validation-report'; path: string; sha256: string };
+  finalPath: string;
+  ownership: PublishedFileIdentity;
+  temporaryPath: string;
+}
+
 async function publishValidationEvidence(
   outputDirectory: string,
   report: ReadinessReport,
-): Promise<{ type: 'validation-report'; path: string; sha256: string }> {
+  hashEvidence: ValidateDependencies['hashEvidence'],
+): Promise<PublishedValidationEvidence> {
   await fs.mkdir(outputDirectory, { recursive: true });
   const finalPath = path.join(outputDirectory, `${report.runId}-validation-evidence.json`);
   const temporaryPath = `${finalPath}.tmp-${randomUUID()}`;
   let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
   let closed = false;
   let published = false;
+  let ownership: PublishedFileIdentity | null = null;
+  let retainTemporary = false;
   try {
     handle = await fs.open(temporaryPath, 'wx');
     await handle.writeFile(`${JSON.stringify(buildValidationEvidence(report), null, 2)}\n`, 'utf8');
     await handle.sync();
+    ownership = publishedFileIdentity(await handle.stat({ bigint: true }));
+    if (!ownership) throw new Error('Validation evidence identity is unavailable');
     await handle.close();
     closed = true;
     await fs.link(temporaryPath, finalPath);
     published = true;
-    const sha256 = await hashFile(finalPath);
-    return { type: 'validation-report', path: finalPath, sha256 };
-  } catch (error) {
-    if (published) await fs.rm(finalPath, { force: true });
-    throw error;
+    const sha256 = await hashEvidence(finalPath);
+    retainTemporary = true;
+    return {
+      artifact: { type: 'validation-report', path: finalPath, sha256 },
+      finalPath,
+      ownership,
+      temporaryPath,
+    };
+  } catch {
+    let code = 'VALIDATION_EVIDENCE_PUBLICATION_FAILED';
+    if (published && ownership) {
+      const rollback = await rollbackOwnedPublishedFile({
+        referencePath: temporaryPath,
+        finalPath,
+        expectedIdentity: ownership,
+      });
+      if (rollback !== 'removed-owned') code = 'VALIDATION_EVIDENCE_ROLLBACK_SKIPPED';
+    }
+    throw Object.assign(new Error('Validation evidence could not be published'), { code });
   } finally {
     if (handle && !closed) {
       try { await handle.close(); } catch { /* cleanup continues below */ }
     }
-    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+    if (!retainTemporary && ownership) {
+      await rollbackOwnedPublishedFile({
+        referencePath: temporaryPath,
+        finalPath: temporaryPath,
+        expectedIdentity: ownership,
+      });
+    }
   }
 }
 
@@ -507,16 +549,45 @@ export async function runValidation(
 
   let result = createReport(options, started, checks, errors);
   if (!isSafeRunId(options.runId) || !options.outputDirectory.trim()) return result;
-  let evidencePath: string | undefined;
+  let evidence: PublishedValidationEvidence | undefined;
   try {
-    const artifact = await publishValidationEvidence(options.outputDirectory, result);
-    evidencePath = artifact.path;
-    result = { ...result, artifacts: [artifact] };
-    await writeReadinessReport({ outputDirectory: options.outputDirectory, report: result });
-  } catch {
-    if (evidencePath) await fs.rm(evidencePath, { force: true }).catch(() => undefined);
+    evidence = await publishValidationEvidence(options.outputDirectory, result, resolved.hashEvidence);
+    result = { ...result, artifacts: [evidence.artifact] };
+    await resolved.writeReport({ outputDirectory: options.outputDirectory, report: result });
+  } catch (error) {
+    let ownershipChanged = (error as NodeJS.ErrnoException).code === 'VALIDATION_EVIDENCE_ROLLBACK_SKIPPED';
+    if (evidence) {
+      const rollback = await rollbackOwnedPublishedFile({
+        referencePath: evidence.temporaryPath,
+        finalPath: evidence.finalPath,
+        expectedIdentity: evidence.ownership,
+      });
+      ownershipChanged ||= rollback !== 'removed-owned';
+      await rollbackOwnedPublishedFile({
+        referencePath: evidence.temporaryPath,
+        finalPath: evidence.temporaryPath,
+        expectedIdentity: evidence.ownership,
+      });
+    }
     failed(checks, errors, 'validation-report.write', 'VALIDATION_REPORT_WRITE_FAILED', 'Validation report could not be written');
+    if (ownershipChanged) {
+      failed(
+        checks,
+        errors,
+        'validation-evidence.rollback-ownership',
+        'VALIDATION_EVIDENCE_ROLLBACK_SKIPPED',
+        'Validation evidence rollback skipped because ownership changed or could not be proven',
+      );
+    }
     result = createReport(options, started, checks, errors);
+    return result;
+  }
+  if (evidence) {
+    await rollbackOwnedPublishedFile({
+      referencePath: evidence.temporaryPath,
+      finalPath: evidence.temporaryPath,
+      expectedIdentity: evidence.ownership,
+    });
   }
   return result;
 }

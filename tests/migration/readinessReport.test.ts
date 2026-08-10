@@ -342,6 +342,21 @@ test('two concurrent writers publish once and return REPORT_ALREADY_EXISTS to th
   }
 });
 
+test('DbExecutor has one canonical shared declaration and db-migrator imports no server implementation source', () => {
+  const root = path.resolve(__dirname, '../..');
+  const sharedContract = fs.readFileSync(path.join(root, 'packages/shared/types/dbExecutor.d.ts'), 'utf8');
+  const serverTypes = fs.readFileSync(path.join(root, 'packages/server/db/types.ts'), 'utf8');
+  const validationQueries = fs.readFileSync(path.join(root, 'packages/db-migrator/src/validation/queries.ts'), 'utf8');
+  assert.match(sharedContract, /interface DbExecutor/);
+  assert.match(serverTypes, /from ['"]\.\.\/\.\.\/shared\/types\/dbExecutor['"]/);
+  assert.match(validationQueries, /from ['"]\.\.\/\.\.\/\.\.\/shared\/types\/dbExecutor['"]/);
+  assert.doesNotMatch(validationQueries, /@ts-ignore|server\/db\/types/);
+  assert.equal(
+    [sharedContract, serverTypes, validationQueries].join('\n').match(/interface DbExecutor/g)?.length,
+    1,
+  );
+});
+
 function migrationReport(status: MigrationReport['status']): MigrationReport {
   return {
     status,

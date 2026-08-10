@@ -544,6 +544,48 @@ test('validation rolls back its evidence sidecar when final readiness report pub
   });
 });
 
+test('validation preserves a foreign evidence replacement when evidence hashing fails after publication', async () => {
+  await withValidationFixture(async ({ options }) => {
+    const evidencePath = path.join(options.outputDirectory, `${options.runId}-validation-evidence.json`);
+    const foreignContent = 'foreign-evidence-after-hash-publication';
+    const report = await runValidation(options, {
+      hashEvidence: async (candidate) => {
+        assert.equal(candidate, evidencePath);
+        fs.rmSync(candidate);
+        fs.writeFileSync(candidate, foreignContent, 'utf8');
+        throw new Error('INJECTED_HASH_FAILURE db.foreign.example:5432 user=foreign password=foreign');
+      },
+    });
+    assert.equal(report.status, 'failed');
+    assert.ok(errorCodes(report).includes('VALIDATION_REPORT_WRITE_FAILED'));
+    assert.ok(errorCodes(report).includes('VALIDATION_EVIDENCE_ROLLBACK_SKIPPED'));
+    assert.equal(fs.readFileSync(evidencePath, 'utf8'), foreignContent);
+    assert.deepEqual(fs.readdirSync(options.outputDirectory), [`${options.runId}-validation-evidence.json`]);
+    assert.doesNotMatch(JSON.stringify(report), /INJECTED_HASH_FAILURE|db\.foreign|5432|foreign password/i);
+  });
+});
+
+test('validation preserves a foreign evidence replacement when final report writing fails', async () => {
+  await withValidationFixture(async ({ options }) => {
+    const evidencePath = path.join(options.outputDirectory, `${options.runId}-validation-evidence.json`);
+    const foreignContent = 'foreign-evidence-after-report-publication';
+    const report = await runValidation(options, {
+      writeReport: async ({ report: reportToWrite }) => {
+        assert.equal(reportToWrite.artifacts[0]?.path, evidencePath);
+        fs.rmSync(evidencePath);
+        fs.writeFileSync(evidencePath, foreignContent, 'utf8');
+        throw new Error('INJECTED_REPORT_FAILURE dns.foreign.example database=foreign query=SELECT secret');
+      },
+    });
+    assert.equal(report.status, 'failed');
+    assert.ok(errorCodes(report).includes('VALIDATION_REPORT_WRITE_FAILED'));
+    assert.ok(errorCodes(report).includes('VALIDATION_EVIDENCE_ROLLBACK_SKIPPED'));
+    assert.equal(fs.readFileSync(evidencePath, 'utf8'), foreignContent);
+    assert.deepEqual(fs.readdirSync(options.outputDirectory), [`${options.runId}-validation-evidence.json`]);
+    assert.doesNotMatch(JSON.stringify(report), /INJECTED_REPORT_FAILURE|dns\.foreign|database=foreign|SELECT secret/i);
+  });
+});
+
 test('validate CLI routes all required paths and exits from the readiness report status', async () => {
   await withValidationFixture(async ({ options }) => {
     const stdout: string[] = [];
