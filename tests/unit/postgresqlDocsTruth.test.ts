@@ -82,6 +82,7 @@ test('current production documentation describes the PostgreSQL-only runtime con
   const serverTruth = section(documents.find(({ name }) => name === 'project-server.md')!.text, '## 当前生产运行真相');
   const workflowTruth = section(documents.find(({ name }) => name === 'project-workflow.md')!.text, '## PostgreSQL 工作流持久化契约');
   const deployment = documents.find(({ name }) => name === 'postgresql-deployment.md')!.text;
+  const productionEnvironment = section(deployment, '## 必需环境变量');
   const runtimeTruth = `${summaryTruth}\n${serverTruth}\n${workflowTruth}\n${deployment}`;
 
   assert.match(summaryTruth, /生产唯一业务数据库.{0,12}PostgreSQL 16/);
@@ -89,6 +90,9 @@ test('current production documentation describes the PostgreSQL-only runtime con
   assert.match(serverTruth, /启动.{0,24}migration/);
   assert.match(serverTruth, /\/api\/toc\/health.{0,40}(真实|实际).*PostgreSQL/);
   for (const variable of environmentVariables) assert.match(runtimeTruth, new RegExp(`\\b${variable}\\b`), variable);
+  assert.match(productionEnvironment, /\| `DATABASE_SSL` \| [^\r\n]*`verify-full`[^\r\n]*\|/u);
+  assert.doesNotMatch(productionEnvironment, /\| `DATABASE_SSL` \| [^\r\n]*`require`[^\r\n]*\|/u);
+  assert.match(deployment, /`require`[^\r\n]{0,120}仅.{0,20}代码兼容[^\r\n]{0,120}不满足.{0,20}生产.{0,20}(签署|基线)/iu);
 
   for (const { name, text } of documents) {
     for (const line of text.split(/\r?\n/).filter((candidate) => candidate.includes('better-sqlite3'))) {

@@ -16,11 +16,13 @@
 | --- | --- |
 | `DATABASE_URL` | 最小权限应用角色连接串；只放在 secret manager/受控 `.env`，不得进入命令行、日志或报告 |
 | `DATABASE_SCHEMA` | 默认 `consensus`；仅允许小写 PostgreSQL identifier |
-| `DATABASE_SSL` | 生产设置为 `require` 或 `verify-full`，启用证书校验 |
+| `DATABASE_SSL` | 生产仅允许 `verify-full`，同时校验证书链和主机名 |
 | `DATABASE_CA_PATH` | 挂载的可信 CA 文件路径；文件只读且权限最小化 |
 | `DATABASE_POOL_MAX` | 单实例默认 10；总连接预算为实例数乘该值，再加迁移、备份和监控保留量 |
 | `DATABASE_CONNECTION_TIMEOUT_MS` | 默认 5000，必须为正整数 |
 | `DATABASE_STATEMENT_TIMEOUT_MS` | 默认 30000，必须为正整数 |
+
+`require` 仅用于运行时代码兼容旧环境；它不验证主机名，不满足生产签署基线，不能作为生产选项。
 
 ## 最小权限角色
 
