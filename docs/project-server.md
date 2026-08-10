@@ -1,5 +1,13 @@
 # 后端服务架构
 
+## 当前生产运行真相
+
+生产唯一业务数据库是 PostgreSQL 16。服务端使用 `pg` 连接池和异步 `DbExecutor`（`queryOne`、`queryMany`、`execute`、`withTransaction`、`healthCheck`、`close`）；`initializeDb()` 在应用注册路由和监听端口前执行带 advisory lock、版本号和校验和的 migration，再执行幂等 seed。`/api/toc/health` 会发起真实 PostgreSQL 查询，连接不可用时返回 HTTP 503。
+
+服务启动执行 migration，失败时不监听端口；成功后才允许注册业务流量。
+
+数据库配置为 `DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_SSL`、`DATABASE_CA_PATH`、`DATABASE_POOL_MAX`、`DATABASE_CONNECTION_TIMEOUT_MS`、`DATABASE_STATEMENT_TIMEOUT_MS`。启用 TLS 时连接池固定 `rejectUnauthorized: true`，可从 CA 文件加载信任链；pool、连接超时和 statement timeout 都必须为正整数。`better-sqlite3` 仅存在于独立的 `packages/db-migrator` 一次性旧数据导入工具，不进入服务端生产依赖或镜像。
+
 ## PostgreSQL application smoke gate (2026-08-10)
 
 The server owns both compiled operations adapters. One `tsconfig.rehearsal.json` compilation emits the migration rehearsal adapter and the application smoke adapter under `packages/server/dist/ops`; the existing rehearsal entry remains available for compatibility. `packages/db-migrator` starts the compiled smoke adapter as a child process and sends the target URL only through stdin. It never imports server TypeScript, and the server never imports db-migrator.
@@ -17,7 +25,7 @@ Observability shutdown first flushes and shuts down the provider, then drains qu
 - TypeScript
 - Express
 - ws
-- better-sqlite3
+- PostgreSQL 16 / pg
 - zod
 - Microsoft Cognitive Services Speech SDK
 - OpenTelemetry
@@ -37,10 +45,11 @@ packages/server/
 │   ├── ai.ts                # 运行时 AI 配置聚合
 │   └── index.ts
 ├── db/
-│   ├── index.ts             # 数据库初始化入口
-│   ├── migrations.ts        # SQLite 表结构和字段补齐
-│   ├── fallback.ts          # JSON fallback 数据库
-│   ├── migrate-fallback.ts
+│   ├── index.ts             # PostgreSQL 异步初始化和关闭入口
+│   ├── config.ts            # URL/schema/TLS/pool/timeout 配置
+│   ├── postgres.ts          # pg Pool DbExecutor
+│   ├── types.ts             # 执行器和事务类型
+│   ├── postgres/            # 版本化 SQL migration runner
 │   └── seed.ts              # 默认数据
 ├── middlewares/
 │   ├── responseFormatter.ts # 统一响应格式
@@ -206,21 +215,16 @@ C 端 REST 路由挂载到 `/api/toc`，主要能力包括：
 - `action-window`：ActionWindow 生命周期和 action 提交合法性校验。
 - `effect`：`EffectQueue` 和 `EffectResolutionService`，负责 `Action -> Effect -> Event -> State` 链路。
 - `channel`：统一校验 DomainEvent 可见性通道。
-- `state`：`MatchStateStore` 接口和 SQLite adapter，隔离 core 与数据库实现。
+- `state`：`MatchStateStore` 接口和 PostgreSQL adapter，隔离 core 与数据库实现。
 - C 端公开游戏类型和玩家数量校验统一读取已注册 `GameDefinition.session.playerSelection`，路由不再维护重复白名单。
 
-当前阶段复用既有工作流表，不新增数据库表。`SqliteMatchStateStore` 通过现有 `matches.state_json` 保存投影后的 match state，通过 `workflow_effects` 和 `workflow_events` 保存 effect/event。
+当前阶段复用既有工作流表，不新增数据库表。`PostgresMatchStateStore` 通过现有 `matches.state_json` 保存投影后的 match state，通过 `workflow_effects` 和 `workflow_events` 保存 effect/event。
 
 狼人杀 `werewolf.action_window` 已通过 werewolf 专用 bridge 接入 Engine Core 的 action/effect/resolver/projector contract。当前接管范围限于夜间行动状态写入，不接管夜间死亡结算、Socket 播放轴或 TTS。bridge 会写入 `werewolf_action_engine_shadow_audited` system workflow event，用于持续对比 legacy reducer 与 Engine Core 投影结果。
 
 ### 数据库层
 
-数据库默认使用 SQLite，文件在 `packages/data/ai-presenter.sqlite`。核心入口：
-
-- `db/index.ts`：初始化数据库连接。
-- `db/migrations.ts`：创建表和字段补齐。
-- `db/fallback.ts`：JSON fallback 数据库。
-- `db/seed.ts`：默认玩家、模型、音色、狼人杀配置等数据。
+数据库层只接受 PostgreSQL 16。`db/index.ts` 负责异步连接生命周期，`db/config.ts` 负责安全配置，`db/postgres.ts` 实现参数化查询与显式事务传播，`db/postgres/migrate.ts` 在 advisory lock 下执行版本化 migration，`db/seed.ts` 写入默认玩家、模型、音色和狼人杀配置。应用启动失败不会监听端口。
 
 主要数据表类别：
 
@@ -238,8 +242,8 @@ Workflow 快照使用 `match_snapshots.last_event_seq` 记录事件水位，恢�
 20 局并依赖外键级联清理关联 workflow 数据。
 
 `running` / `waiting` match 若连续超过 7 天未更新，服务会在启动时及此后每 24 小时
-执行硬删除，并依赖外键级联清理关联 workflow 数据。该清理释放的 SQLite 页面可被
-后续写入复用；在线服务不执行阻塞式 `VACUUM`，物理缩小数据库文件需在停服维护窗口完成。
+执行硬删除，并依赖外键级联清理关联 workflow 数据。空间回收由 PostgreSQL autovacuum、
+监控阈值和受控维护策略负责，不在在线删除接口内执行数据库压缩。
 
 调试 workflow 的持久化耗时直接输出结构化服务端日志，不写入 observability 或
 workflow 表，避免性能测量再次产生数据库写入放大。超过 500ms 的记录使用 warning。
@@ -292,8 +296,8 @@ pnpm run check:server
 生产容器：
 
 - 最终 runtime 镜像包含 TypeScript 运行器及 `packages/shared/dist`，CI 必须构建最终镜像而不是只构建 builder stage。
-- `consensus-data` volume 挂载到 `/app/data`，保存 SQLite 数据库。
 - `consensus-resources` volume 挂载到 `/app/packages/server/resources`，保存上传图片和生成语音。
+- PostgreSQL 16 独立部署；生产 Compose 不创建数据库服务，也不挂载业务数据库 volume。
 - 收到 `SIGTERM` 或 `SIGINT` 后依次关闭 WebSocket、OpenTelemetry、数据库和 HTTP server；10 秒内无法关闭或清理失败时以非零状态退出。
 
 腾讯云入口：
@@ -312,30 +316,7 @@ docker compose ps
 curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/health"
 ```
 
-部署前备份数据库与生成资源（生产 `.env` 使用 `COMPOSE_PROJECT_NAME=consensus`）：
-
-```bash
-mkdir -p backups
-STAMP="$(date +%Y%m%d-%H%M%S)"
-docker compose stop app
-docker run --rm -v consensus_consensus-data:/source:ro -v "$PWD/backups:/backup" alpine sh -c "tar czf /backup/data-${STAMP}.tgz -C /source ."
-docker run --rm -v consensus_consensus-resources:/source:ro -v "$PWD/backups:/backup" alpine sh -c "tar czf /backup/resources-${STAMP}.tgz -C /source ."
-docker compose start app
-```
-
-恢复前确认两个文件的时间戳一致，然后执行：
-
-```bash
-DATA_BACKUP="data-20260715-120000.tgz"
-RESOURCES_BACKUP="resources-20260715-120000.tgz"
-docker compose stop app
-docker run --rm -e ARCHIVE="$DATA_BACKUP" -v consensus_consensus-data:/target -v "$PWD/backups:/backup:ro" alpine sh -c 'find /target -mindepth 1 -maxdepth 1 -exec rm -rf {} + && tar xzf "/backup/$ARCHIVE" -C /target'
-docker run --rm -e ARCHIVE="$RESOURCES_BACKUP" -v consensus_consensus-resources:/target -v "$PWD/backups:/backup:ro" alpine sh -c 'find /target -mindepth 1 -maxdepth 1 -exec rm -rf {} + && tar xzf "/backup/$ARCHIVE" -C /target'
-docker compose start app
-docker compose ps
-```
-
-将示例文件名替换为实际备份。SQLite 与资源必须使用同一时间点的成对备份；volume 持久化不能替代异机备份。
+数据库/资源备份、WAL 归档、恢复演练和正式切换前证据收集见 `docs/postgresql-deployment.md` 与 `docs/runbooks/postgresql-production-readiness.md`；切换失败恢复见 `docs/runbooks/postgresql-rollback.md`。volume 持久化不能替代异机备份。
 
 ## 扩展点与注意事项
 
@@ -443,16 +424,16 @@ docker compose ps
 
 ## Player Model Fallback
 
-- 明确的额度耗尽、余额不足或欠费响应会将模型持久化为 `enabled = 0`、`disabled_reason = quota_exhausted`，并以带 `Z` 的 UTC ISO 8601 记录 `disabled_at`。SQLite、JSON fallback 及 JSON 迁入 SQLite 保持相同字段；当前请求继续使用玩家配置的单一备用模型，普通限流、超时和 5xx 不写入额度耗尽标记。
+- 明确的额度耗尽、余额不足或欠费响应会在 PostgreSQL 中将模型持久化为 `enabled = 0`、`disabled_reason = quota_exhausted`，并以带 `Z` 的 UTC ISO 8601 记录 `disabled_at`。当前请求继续使用玩家配置的单一备用模型，普通限流、超时和 5xx 不写入额度耗尽标记。
 - `players.fallback_model_id` stores one optional backup model reference and is exposed as `fallbackModelId` only through the admin player API.
 - The shared LLM boundary keeps the existing single transient retry for network, timeout, 429 and 5xx failures, then invokes the configured backup model once.
 - Queued and retried LLM attempts recheck the in-process quota breaker after acquiring limiter capacity. Only the existing model connection test uses an internal probe path; ordinary calls cannot bypass the breaker.
 - Missing/disabled primary configuration, upstream errors and empty responses can fall back. Invalid JSON uses the backup for the existing correction attempt.
 - When an upstream response explicitly reports account arrears, insufficient balance, exhausted free quota, or an overdue bill, the shared LLM boundary immediately marks that model unavailable in memory and persists `models.enabled = 0`. Generic 429 rate limiting does not disable the model.
 - Werewolf, debate and player debug chat share this path. If both models fail, the existing game-level fallback behavior remains authoritative.
-# PostgreSQL 16 当前实现（2026-08-08）
+## PostgreSQL 16 迁移与演练边界（2026-08-08）
 
-生产唯一业务数据库为 PostgreSQL 16。`db/index.ts` 异步初始化 `pg` 连接池并执行带 advisory lock 和校验和的版本化 SQL migration；所有 repository 通过异步 `DbExecutor` 访问数据库。SQLite 只存在于独立的 `packages/db-migrator` 一次性导入工具中，服务端没有 SQLite 或 JSON fallback。
+`packages/db-migrator` 与服务端依赖隔离，只通过已编译 ops adapter 的 stdin 协议复用正式 migration；旧 workflow 与旧观测历史明确不导入。正式 server 包不依赖 migrator。
 
 PostgreSQL executor 为 OID 1184（`timestamptz`）注册统一 parser：可解析的时间值规范化为 UTC ISO-8601 `...Z`，PostgreSQL 特殊值或不可解析值保持原样。该约定保证 SQLite 迁移到 PostgreSQL 后 repository 与管理 API 的时间字段格式兼容。
 

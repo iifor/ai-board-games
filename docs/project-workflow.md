@@ -1,5 +1,11 @@
 # 游戏工作流与 AI 调度
 
+## PostgreSQL 工作流持久化契约
+
+所有工作流 repository、service、controller、runner 和 worker 均通过异步 `DbExecutor` 访问 PostgreSQL 16。`tickMatch` 在 serializable 事务开始时用 `SELECT ... FOR UPDATE` 锁定目标 Match，事件序号在锁内计算；Match、workflow event、snapshot 和 outbox 在同一事务提交，任一失败整体回滚。AI task 与 outbox 通过 `FOR UPDATE SKIP LOCKED` 原子领取，多个实例不会重复消费同一记录。
+
+终态 Match 删除仅接受 `completed`、`failed`、`paused_debug`。正式删除 API 在事务内清理同 ID game、game players、回放、workflow 子表和观测 trace 树；跨局 `player_game_memories` 保留，按 `game_type` 保存的 `game_player_selections` 也不属于单局删除范围。物理空间由 PostgreSQL autovacuum 和受控维护处理，删除 API 不承担文件缩减。
+
 ## Application smoke and observability shutdown (2026-08-10)
 
 The PostgreSQL rehearsal smoke persists a deterministic `debugMode: false` Undercover session through the normal `runSession`, game service, repositories, playback pipeline, and formal workflow-match delete API. It creates workflow and observability fixtures before deletion, proves `game_traces`, `trace_spans`, and `game_events` were actually seeded, verifies those match-owned rows are removed, and confirms cross-game `player_game_memories` remains. `game_player_selections` is deliberately excluded from match deletion because it is a `game_type`-level selection preference rather than match-owned history.
@@ -14,7 +20,7 @@ Observability writes are serialized per trace and can be awaited through `flushO
 
 - TypeScript
 - ws WebSocket
-- better-sqlite3 持久化
+- PostgreSQL 16 / 异步事务持久化
 - zod schema
 - OpenAI-compatible LLM 调用
 - TTS 语音资源生成
@@ -54,7 +60,7 @@ packages/server/modules/
 │   ├── effect/             # EffectQueue、EffectResolver
 │   ├── event/              # DomainEvent EventBus
 │   ├── channel/            # ChannelSystem 可见性校验
-│   └── state/              # MatchStateStore 与 SQLite adapter
+│   └── state/              # MatchStateStore 与 PostgreSQL adapter
 ├── engine-registry.ts      # GameEngine 单例 + 游戏注册
 ├── debate-runner.ts        # 辩论赛 GameEngine runner
 ├── werewolf-runner.ts      # 狼人杀 GameEngine runner
@@ -126,10 +132,8 @@ packages/server/modules/
 
 - 调试 match 的 `tickMatch` 与 `commitWorkflowChange` 会输出结构化
   `workflow-persistence-timing` 日志，使用同一 `correlationId` 关联一次推进。
-- 日志拆分状态恢复、handler、JSON 序列化、event/outbox/match/snapshot 写入、
-  事务总耗时及 `transactionCommitMs`，并记录数据库/WAL 文件大小变化。
-  `transactionCommitMs` 表示同步事务回调结束到事务返回的综合 COMMIT/WAL/fsync
-  时间，不是操作系统级单独 fsync 指标。
+- 日志拆分状态恢复、handler、JSON 序列化、event/outbox/match/snapshot 写入和
+  事务总耗时；`transactionCommitMs` 表示事务回调结束到 PostgreSQL 提交返回的综合耗时。
 - `workflow_events` 不再为每个事件保存完整 `projectedState`。状态变化使用内部
   `statePatch`，由 `set` 和 `remove` 路径操作组成；数组整体替换。
 - `match_snapshots.last_event_seq` 是恢复水位。新快照只重放
@@ -141,13 +145,12 @@ packages/server/modules/
 - `debugMode` 终态 match 仅保留最近 20 局。服务启动和调试对局进入终态时清理。
 - `running` / `waiting` match 若 `updated_at` 超过 7 天未变化，服务启动时立即清理，
   并在持续运行期间每 24 小时再次清理；刚好 7 天的 match 保留。
-- 两类清理都硬删除 `matches` 并依赖外键级联，不会在在线服务中自动执行阻塞式
-  `VACUUM`。
+- 两类清理都硬删除 `matches` 并依赖 PostgreSQL 外键级联；表膨胀交给 autovacuum
+  与数据库监控处理，不在在线请求中触发维护操作。
 - B 端可对 `completed`、`failed`、`paused_debug` Match 发起单条彻底删除。服务端在
   一个事务中删除同 ID game/playback、根 Span `game.id` 对应的 Trace 树和 Match
   workflow 外键子表；`player_game_memories` 保留，专属音频在事务提交后清理。
-- 删除只释放 SQLite 可复用页面，不保证数据库文件立即缩小；checkpoint、备份和
-  `VACUUM` 继续限定在停服维护窗口。
+- 删除不承诺立即归还底层存储；需要额外空间治理时由 DBA 在独立维护流程评估。
 - 狼人杀调试模式只跳过真实模型与语音依赖，不跳过玩法分支。禁言长老、骑士、
   花蝴蝶、潜行者、狼美人、噩梦之影、摄梦人、魔术师等特殊技能，以及白狼王自爆，会按调试
   随机概率决定是否发动，结果继续进入原有 reducer、死亡链和播放管线。
@@ -209,7 +212,7 @@ flowchart TD
 - `EffectResolutionService`：通过 resolver 把 effect 结算为 `DomainEvent`，再按游戏定义的 `projectState` 投影回 match state。
 - `ChannelSystem`：校验所有 `DomainEvent` 必须声明 channel，`scope` event 必须声明 `scopeKey`。
 - `InvariantChecker`：聚合 debug state 中的 channel、effect lifecycle、重复 idempotencyKey 等不变量问题。
-- `MatchStateStore`：隔离 core 与 SQLite 细节，SQLite adapter 复用现有 `matches`、`pending_actions`、`workflow_effects`、`workflow_events`。
+- `MatchStateStore`：隔离 core 与 PostgreSQL 细节，`PostgresMatchStateStore` 复用现有 `matches`、`pending_actions`、`workflow_effects`、`workflow_events`。
 
 #### 游戏注册与运行入口
 
@@ -744,7 +747,6 @@ pnpm run test:workflow
 - The speech remains on the existing `reason -> werewolf_phase_result -> presentation.speakableText` delivery path.
 - Deterministic text is used only as the human, debug, or model-failure fallback.
 - This changes no API, database, shared type, C-end layout, or channel visibility contract.
-# PostgreSQL 并发语义（2026-08-08）
+## 调试断点事务约束（2026-08-08）
 
-`tickMatch` 在 serializable 事务中通过 `SELECT ... FOR UPDATE` 锁定 Match，事件序号在锁内计算；Match、事件、快照和 outbox 同事务提交。AI task 与 outbox 使用 `FOR UPDATE SKIP LOCKED` 原子领取，支持后续多实例而不重复消费。工作流 repository、service、controller、GameEngine adapter、狼人杀、辩论赛和谁是卧底调用链均为异步。
 谁是卧底调试断点在 `tickMatch` 持有 Match 行锁时，查询和创建 `workflow_interrupts` 必须复用当前事务 executor，不得绕回连接池产生外键锁等待。

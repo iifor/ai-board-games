@@ -1,5 +1,11 @@
 # 项目总体架构
 
+## 当前生产运行真相
+
+生产唯一业务数据库是 PostgreSQL 16。服务端只通过异步 `DbExecutor` 访问业务数据，`createApp()` 在监听端口前完成版本化 migration 和幂等 seed；migration、seed 或数据库健康检查失败时不会返回健康状态。生产 Compose 不创建数据库服务，也不挂载旧业务数据库 volume，只保留资源目录和头像挂载。
+
+一次性旧数据导入由隔离的 `packages/db-migrator` 执行：它只读源 SQLite，将允许迁移的配置、管理员、玩家、历史、回放和长期记忆导入全新 PostgreSQL 目标；服务端运行镜像不包含该工具。生产准备、两次演练、签核与回滚分别见 `docs/runbooks/postgresql-production-readiness.md` 和 `docs/runbooks/postgresql-rollback.md`。
+
 ## PostgreSQL rehearsal smoke gate (2026-08-10)
 
 Every executed migration rehearsal now runs post-import validation and then a compiled, server-owned application smoke against that same schema. The gate verifies real health/auth/config/history/replay/memory/workflow/observability/delete paths while replacing paid runner, LLM, and TTS dependencies inside a typed server-only seam. A failed smoke marks rehearsal failed while preserving the schema plus migration, validation, smoke, and rehearsal reports for diagnosis.
@@ -19,7 +25,7 @@ Every executed migration rehearsal now runs post-import validation and then a co
 - 语言：TypeScript、少量 CommonJS 运行脚本。
 - 包管理：pnpm workspace。
 - 前端：React 18、React Router、Vite。
-- 服务端：Express、ws、better-sqlite3、zod。
+- 服务端：Express、ws、PostgreSQL 16（`pg`）、zod。
 - AI 与语音：OpenAI-compatible 模型配置、Azure Speech、Mimo TTS。
 - 观测与测试：OpenTelemetry、Node 测试脚本。
 
@@ -39,10 +45,6 @@ Every executed migration rehearsal now runs post-import validation and then a co
 ├── pnpm-workspace.yaml        # pnpm workspace 包声明
 ├── pnpm-lock.yaml             # 依赖锁定
 ├── run-web.cmd                # Windows 启动辅助脚本
-├── data/
-│   ├── consensus-mist.sqlite      # SQLite 数据库
-│   ├── consensus-mist.sqlite-shm
-│   └── consensus-mist.sqlite-wal
 ├── docs/
 │   ├── README.md
 │   ├── project-summary.md
@@ -51,15 +53,19 @@ Every executed migration rehearsal now runs post-import validation and then a co
 │   ├── project-client.md
 │   ├── project-admin.md
 │   ├── project-shared.md
-│   └── project-prompts.md
+│   ├── project-prompts.md
+│   ├── postgresql-deployment.md
+│   └── runbooks/                  # PostgreSQL 上线准备与回滚手册
 ├── packages/
 │   ├── client/                 # C 端游戏前台
 │   ├── admin/                  # B 端管理后台
 │   ├── server/                 # Express API、WebSocket、游戏工作流
 │   ├── shared/                 # 前后端共享类型、schema、常量
-│   └── data/
+│   └── db-migrator/            # 不进入生产镜像的一次性导入/演练工具
+├── scripts/ops/postgres/       # 五个薄 PowerShell 运维入口
 └── tests/
     ├── migration/
+    ├── postgres/
     ├── unit/
     └── workflow/
 ```
@@ -89,7 +95,7 @@ flowchart TD
   Debate --> Engine["workflow-engine"]
   Werewolf --> Engine
   Undercover --> Engine
-  Engine --> Db["SQLite / JSON fallback"]
+  Engine --> Db["PostgreSQL 16"]
   Engine --> Outbox["outbox_messages"]
   Outbox --> Socket
   Socket --> Client
@@ -151,8 +157,9 @@ flowchart TD
 - Mimo TTS：`MIMO_API_KEY`、`MIMO_BASE_URL`、`MIMO_TTS_MODEL`、`MIMO_TTS_FORMAT`、`MIMO_TTS_VOICE`
 - Cloudflare：`CLOUDFLARE_ACCOUNT_ID`
 - 数据库模型密钥：`DATABASE_MODEL_API_KEY`
+- PostgreSQL：`DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_SSL`、`DATABASE_CA_PATH`、`DATABASE_POOL_MAX`、`DATABASE_CONNECTION_TIMEOUT_MS`、`DATABASE_STATEMENT_TIMEOUT_MS`。生产启用证书校验并使用最小权限应用角色；连接池总预算需按应用实例数核算。
 - 生产认证：`JWT_SECRET`（至少 32 字符）、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（至少 12 字符）。生产环境缺失或强度不足时服务拒绝启动。账号仅在管理员表为空时创建一次，首次登录必须改密；已有账号不会被环境变量覆盖。
-- Docker Compose：生产 `.env` 固定 `COMPOSE_PROJECT_NAME=consensus`，便于稳定识别数据库和资源 volume。
+- Docker Compose：生产 `.env` 固定 `COMPOSE_PROJECT_NAME=consensus`，便于稳定识别资源 volume；PostgreSQL 由独立基础设施提供。
 
 构建产物：
 
@@ -173,7 +180,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-腾讯云 CVM 需要提前安装 Docker，并安装 `docker compose` 插件或旧版 `docker-compose` 命令；需要提前 clone 本仓库，并在项目目录放置生产 `.env`。`consensus-data` 保存 SQLite，`consensus-resources` 保存上传图片和生成语音，头像继续使用 `./avatars` bind mount。部署脚本不会把 GitHub Secrets 写入仓库。
+腾讯云 CVM 需要提前安装 Docker，并安装 `docker compose` 插件或旧版 `docker-compose` 命令；需要提前 clone 本仓库，并在项目目录放置生产 `.env`。应用通过 `DATABASE_URL` 连接独立 PostgreSQL 16；`consensus-resources` 保存上传图片和生成语音，头像继续使用 `./avatars` bind mount。部署脚本不会把 GitHub Secrets 写入仓库。
 
 公网 HTTPS 由腾讯云负载均衡终止，负载均衡通过 HTTP/WebSocket 回源 CVM 的 Nginx 80 端口。CVM 安全组必须只允许负载均衡访问 80 端口；应用和 Nginx 不直接暴露公网 TLS。部署完成后先确认 `docker compose ps` 中 `app` 为 healthy，再通过生产域名请求 `/api/toc/health`。
 
@@ -214,8 +221,6 @@ GitHub 仓库需要配置以下 Secrets：
 - Default werewolf mode coverage now includes mode 30 `magic-wolf-demon-hunter-12`.
 - Mode 29 remains skipped because the local rule list is insufficient for executable workflow rules.
 - Mode 30 reuses the existing werewolf workflow, event, snapshot, debug and seed mechanisms; no new package, database table or deployment command was added.
-# 持久化基线（2026-08-08）
-
-生产持久化已统一为 PostgreSQL 16；服务端通过异步 `DbExecutor` 访问数据库，应用启动前完成 schema migration 和种子数据初始化。SQLite 仅由独立的一次性迁移工具只读访问，用于把配置、管理员、玩家、游戏历史、回放和长期记忆导入空 PostgreSQL 目标库；旧 workflow 和观测历史不迁移。
+## 迁移演练边界（2026-08-08）
 
 迁移 rehearsal 仅允许 database 名以 `_test` 或 `_rehearsal` 结尾。每次 execute 使用 `consensus_rehearsal_<UTC timestamp>_<run hash>` 新 schema；同 runId hash 在整个目标数据库中只允许一个 schema，并由已编译 server adapter 内的 advisory lock 原子保证。dry-run 不连接 PostgreSQL；失败现场不自动删除。

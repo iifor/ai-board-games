@@ -1,66 +1,68 @@
-# PostgreSQL 16 部署与切换
+# PostgreSQL 16 环境与部署基线
 
-## Rehearsal application smoke
+本文只定义 PostgreSQL 16 的生产环境基线。正式切换前的 12 步证据流程见 `docs/runbooks/postgresql-production-readiness.md`；切换验收失败见 `docs/runbooks/postgresql-rollback.md`。这些文档和脚本都不会自动连接真实生产或切换流量，真实切换必须另行获得独立授权。
 
-An executed `rehearse` command now uses the same imported schema for a compiled application smoke after validation. The target URL enters db-migrator through `DATABASE_URL` and is forwarded to the server adapter through child stdin only; it is absent from argv, stdout, and readiness reports. The smoke report is published atomically as `<run-id>-smoke.json` and `<run-id>-smoke.md` without overwriting existing evidence.
+## 运行边界
 
-The smoke checks the live database health route (including a real disconnected probe), bootstrap administrator login and forced password change, configuration reads plus skin CRUD, a persisted non-debug Undercover game with zero external model/TTS calls, detail and replay ordering, memory create/update, and formal terminal-match deletion including trace span/event children. The child resolves its executors through the server's canonical database configuration, including `DATABASE_SSL`, `DATABASE_CA_PATH`, pool size, and timeout settings. On failure, the rehearsal schema and all migration, validation, smoke, and rehearsal reports remain. Use a new run ID for the next attempt; investigate the preserved schema before test-only cleanup.
+- 生产唯一业务数据库为独立部署的 PostgreSQL 16；应用 Compose 不创建数据库服务。
+- 服务启动在监听端口前执行带 advisory lock 与校验和的 migration 和幂等 seed；失败即停止启动。
+- `/api/toc/health` 执行真实 PostgreSQL 查询，数据库不可用时返回 HTTP 503。
+- 上传图片、头像和生成音频仍位于文件系统资源目录，必须与数据库恢复点配套备份。
+- 旧数据只通过 `packages/db-migrator` 一次性只读导入全新空目标；旧 workflow 和旧观测数据不迁移。
 
-生产应用只连接独立部署的 PostgreSQL 16，不由应用 Compose 创建数据库。应用账号只需要目标 schema 的连接、读写、sequence 使用权限；迁移账号还需要创建 schema 与 DDL 权限。TLS 必须校验证书，使用 `DATABASE_SSL=require` 和 `DATABASE_CA_PATH` 指向 CA 文件。
+## 必需环境变量
 
-## 首次准备
+| 变量 | 生产要求 |
+| --- | --- |
+| `DATABASE_URL` | 最小权限应用角色连接串；只放在 secret manager/受控 `.env`，不得进入命令行、日志或报告 |
+| `DATABASE_SCHEMA` | 默认 `consensus`；仅允许小写 PostgreSQL identifier |
+| `DATABASE_SSL` | 生产设置为 `require` 或 `verify-full`，启用证书校验 |
+| `DATABASE_CA_PATH` | 挂载的可信 CA 文件路径；文件只读且权限最小化 |
+| `DATABASE_POOL_MAX` | 单实例默认 10；总连接预算为实例数乘该值，再加迁移、备份和监控保留量 |
+| `DATABASE_CONNECTION_TIMEOUT_MS` | 默认 5000，必须为正整数 |
+| `DATABASE_STATEMENT_TIMEOUT_MS` | 默认 30000，必须为正整数 |
 
-1. 创建空数据库、`consensus` schema、迁移账号和最小权限应用账号。
-2. 配置 `DATABASE_URL`、`DATABASE_SCHEMA`、TLS、连接池和超时变量。
-3. 启动服务时自动获取 advisory lock 并执行带校验和的 SQL migration；migration 或 seed 失败时服务不会监听端口。
-4. `/api/toc/health` 会执行真实 PostgreSQL 查询；数据库不可用时返回 HTTP 503。
+## 最小权限角色
 
-## 一次性 SQLite 导入
+推荐区分迁移角色和应用角色。迁移角色在受控发布阶段拥有目标 schema 的 DDL 权限；应用角色只拥有连接、schema usage、业务表 DML、sequence 使用以及读取 migration 状态所需权限。完成 migration 后撤销应用角色不需要的 schema/database create 权限。
 
-只能向业务表为空的目标 schema 导入：
-
-```powershell
-pnpm.cmd --filter @ai-presenter/db-migrator migrate -- --source C:\backup\ai-presenter.sqlite --target $env:DATABASE_URL --schema consensus
-```
-
-工具以只读方式打开 SQLite，并在一个 PostgreSQL 事务中导入配置、管理员、玩家、游戏历史、回放和跨局长期记忆。旧 workflow 运行数据和旧观测数据明确跳过。输出包含一行机器可读 JSON 和人类可读摘要；JSON、时间、外键、行数或 sequence 校验失败会整体回滚。目标非空时拒绝运行，因此重复执行也会被拒绝。
-
-## 全新 schema 迁移演练
-
-先构建 server adapter 与 db-migrator：
-
-```powershell
-pnpm.cmd --filter @ai-presenter/server run build
-pnpm.cmd --filter @ai-presenter/db-migrator run build
-```
-
-不带 `--execute` 的 dry-run 只验证 manifest、数据库名称和参数，并报告将使用的安全 schema；它不会连接 PostgreSQL：
+权限授予必须由受审 IaC 或 DBA 变更执行，仓库不提供自动授权 SQL。授权后使用隔离环境的应用角色执行以下只读验证；连接信息必须由 secret manager 注入，不要写入仓库：
 
 ```powershell
-$env:DATABASE_URL = '<dedicated-test-database-url>'
-pnpm.cmd --filter @ai-presenter/db-migrator run migrate -- rehearse --source-snapshot C:\backup\sqlite-consistent.sqlite --manifest C:\backup\manifest.json --output C:\backup\rehearsal-reports --run-id rehearsal-20260810
+$AppSchema = if ($env:DATABASE_SCHEMA) { $env:DATABASE_SCHEMA } else { 'consensus' }
+$state = (& psql $env:TEST_APP_DATABASE_URL -X -tA -v ON_ERROR_STOP=1 `
+  --set=app_schema=$AppSchema -c `
+  "SELECT has_database_privilege(current_user,current_database(),'CONNECT')::text || '|' || has_database_privilege(current_user,current_database(),'CREATE')::text || '|' || has_schema_privilege(current_user, :'app_schema','USAGE')::text;").Trim()
+if ($LASTEXITCODE -ne 0 -or $state -cne 'true|false|true') {
+  throw 'Expected CONNECT=true, CREATE DATABASE=false, schema USAGE=true.'
+}
 ```
 
-确认后追加 `--execute`。`rehearse` 只从进程环境 `DATABASE_URL` 读取目标；传入 `--target` 会在任何源文件或数据库访问前以固定错误 `REHEARSAL_TARGET_ARG_FORBIDDEN` 拒绝。命令只允许 database 名以 `_test` 或 `_rehearsal` 结尾，创建 `consensus_rehearsal_<UTC timestamp>_<run hash>` schema，依次执行正式 migration、事务导入和 migration validation。相同 runId 即使更换时间或输出目录也会因全库 run hash 门禁而拒绝；并发创建由 adapter 内 advisory lock 串行化。数据库 URL 仅经父进程环境进入 db-migrator，再经子进程 stdin 传给已编译 adapter，不出现在父/子 argv 或结构化输出中。
+DBA 必须审核实际 grants，并保存 `\du+`、`\dn+`、schema/table/sequence grants 和拒绝 `CREATE DATABASE`/非目标 schema 写入的证据。
 
-失败时 CLI 退出码为 1，并在脱敏 JSON 中返回保留的 schema 名。schema、迁移报告、validation 报告和 rehearsal summary 均保留用于排障；工具没有 drop/truncate API。后续重试必须使用新的 runId，确认不再需要失败现场后由数据库管理员在维护流程中单独处置。
+因为应用启动会执行 migration，发布阶段可短时使用迁移角色完成一次受控初始化；随后必须撤销该凭据并以应用角色重启。应用角色仍需读取 migration 状态，但不应长期持有 database/schema create 权限。后续版本有新 migration 时重复同一受控发布流程。
 
-## 正式切换
+## TLS 与证书校验
 
-1. 至少用生产 SQLite 副本完成两次演练，记录耗时和逐表行数。
-2. 进入维护窗口，停止新建对局并等待活动对局结束，然后停止旧应用。
-3. 对 SQLite 执行 checkpoint，备份数据库、`-wal`、`-shm`（若存在）以及资源目录；记录同一时间点和校验和。
-4. 向全新 PostgreSQL schema 执行导入，保存 JSON 报告。
-5. 启动 PostgreSQL 版本，验证管理员登录、配置 CRUD、完整对局、历史回放、长期记忆、观测写入和终态对局删除。
-6. 验收通过后恢复流量。
+- 生产连接必须协商 TLS，并校验证书链和主机名；CA 文件通过 `DATABASE_CA_PATH` 挂载为只读。
+- 预检 URL 使用 `sslmode=verify-full`，与 `-RequireTls true` 一起形成 fail-closed 门禁。
+- 证书到期时间、握手失败、CA 轮换和数据库端强制 TLS 状态纳入监控；证书轮换先在隔离环境验证。
 
-## 备份与恢复
+## 连接池与超时预算
 
-- 每日执行 PostgreSQL 物理基础备份或受控的 `pg_dump`，启用 WAL 归档以支持时间点恢复（PITR）。
-- 资源目录独立备份；数据库备份和资源备份必须记录同一恢复时间点。
-- 每季度在隔离环境执行恢复演练：恢复基础备份、回放 WAL、运行 migration checksum 校验和冒烟测试，并记录 RPO/RTO。
-- 备份文件加密、限制访问，并设置与业务要求一致的保留期。
+`DATABASE_POOL_MAX × 最大应用实例数 + migration/运维/监控预留` 必须小于数据库 `max_connections` 的受控预算。告警至少覆盖池等待、活跃/空闲连接、连接失败、statement timeout、长事务、死锁、锁等待和连接耗尽。扩容应用实例前先重新核算，而不是只提高数据库上限。
 
-## 回滚
+## 备份、WAL 归档与恢复演练
 
-若验收失败，立即停止 PostgreSQL 版本，恢复旧镜像以及切换前同一时间点的 SQLite/WAL/资源备份。失败的 PostgreSQL 数据库只保留排障，不作为下一次导入目标；下一次重试必须使用全新空库。切换期间不实施双写，因此不得在两套应用同时接收真实写流量。
+- 每日执行受控物理基础备份或 `pg_dump`，启用 WAL 归档以支持 PITR；持续监控 archive lag、最近成功备份、备份大小和校验结果。
+- 资源目录单独备份，并与数据库恢复点记录同一 UTC 时间、水位和 SHA-256；备份加密、最小权限访问、异机保存并设置保留期。
+- 至少每季度在隔离环境恢复基础备份、回放 WAL、核验 migration checksum、执行真实 health/smoke，并记录 RPO/RTO。
+- 首次 PostgreSQL 正式切换仍需保留切换前同一时间点 SQLite、`-wal`、`-shm`（存在时）和资源快照，以支持旧镜像回滚。
+
+## 监控与发布门禁
+
+上线前必须有数据库可用性、复制/WAL 归档、备份新鲜度、连接池、超时、锁/死锁、慢查询、autovacuum、表/索引膨胀、磁盘、证书到期和 `/api/toc/health` 告警。发布聚合器固定检查 CI、无关键 skip、执行备份、restore drill、两次独立演练、同源 hash、runtime 无旧数据库依赖、TLS、最小权限、pool/timeouts、同 schema smoke、文档真相和独立 operator signoff。
+
+## 一次性导入与失败现场
+
+导入目标必须是全新空 PostgreSQL database/schema，不支持增量、合并或长期双写。rehearsal 的 `DATABASE_URL` 只从进程环境传入，命令行 `--target` 会在 I/O 前拒绝；执行失败时 schema 和 migration/validation/smoke/rehearsal 报告全部保留。失败 PostgreSQL 目标仅用于排障，下一次演练或正式重试必须使用另一个全新空目标。

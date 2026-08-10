@@ -18,6 +18,7 @@
 5. B 端后台管理任务读 `docs/project-admin.md`。
 6. 共享类型、schema、常量、测试任务读 `docs/project-shared.md`。
 7. 狼人杀 AI 玩家提示词、PromptContext、LLM 调用和 trace 观测任务读 `docs/project-prompts.md`。
+8. PostgreSQL 上线准备按 `docs/runbooks/postgresql-production-readiness.md` 执行；验收失败按 `docs/runbooks/postgresql-rollback.md` 回滚。
 
 读完对应文档后，使用 CodeGraph 定位具体实现、符号调用关系和影响面；不要再通过维护文档里的源码路径表来替代 CodeGraph。
 
@@ -40,6 +41,8 @@
 | B 端后台页面、管理资源、调试入口 | `project-admin.md` | `project-server.md` |
 | 工作流 step、AI task、pending action、投影 | `project-workflow.md` | `project-client.md`、`project-shared.md` |
 | 启动命令、端口、环境变量、部署方式 | `project-summary.md` | `project-server.md` |
+| PostgreSQL 上线门禁、演练、签核 | `runbooks/postgresql-production-readiness.md` | `postgresql-deployment.md` |
+| PostgreSQL 切换失败回滚 | `runbooks/postgresql-rollback.md` | `postgresql-deployment.md` |
 
 ## 文档职责
 
@@ -50,3 +53,6 @@
 - `project-admin.md`：B 端后台管理职责、管理资源、调试和观测约定。
 - `project-shared.md`：共享类型、schema、常量和测试约定。
 - `project-prompts.md`：狼人杀 AI 玩家提示词、动态上下文、LLM 调用和观测约定。
+- `postgresql-deployment.md`：PostgreSQL 16 环境、权限、TLS、备份恢复和监控基线。
+- `runbooks/postgresql-production-readiness.md`：正式切换前不可交换的 12 步准备与证据聚合流程；只准备和申请授权，不执行真实切流。
+- `runbooks/postgresql-rollback.md`：切换验收失败后的旧镜像与同时间点 SQLite/WAL/SHM/资源恢复流程。
