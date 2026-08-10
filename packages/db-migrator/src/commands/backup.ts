@@ -1,15 +1,13 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import {
-  assertSameSourceSnapshot,
-  captureSourceSnapshot,
   captureStableFile,
   copyStableFile,
+  copySourceSnapshot,
   inspectFileMetadata,
   inspectSourceFiles,
   type FileMetadata,
   type SourceInspection,
-  type SourceSnapshot,
 } from '../backup/fileSnapshot';
 import { buildManifest, hashFile, verifyManifest, type BackupManifest } from '../backup/manifest';
 import { createConsistentDatabase } from '../backup/sqliteRecovery';
@@ -35,7 +33,7 @@ export interface BackupOptions {
 }
 
 interface ResourceFile { file: FileMetadata; rootRealPath: string; destination: string }
-interface BackupPlan { source: SourceInspection; sourceRootRealPath: string; resources: ResourceFile[]; estimatedBytes: number }
+interface BackupPlan { source: SourceInspection; resources: ResourceFile[]; estimatedBytes: number }
 
 function evidenceRunId(runId: string): string {
   return isSafeRunId(runId) ? runId : 'invalid-run';
@@ -111,26 +109,20 @@ async function planBackup(options: BackupOptions): Promise<BackupPlan> {
   }
   if (typeof options.execute !== 'boolean') throw codedError('INVALID_PARAMETERS', 'execute must be boolean');
   const source = await inspectSourceFiles(options.sourcePath);
-  const sourceRootRealPath = await fs.realpath(path.dirname(path.resolve(options.sourcePath)));
   const resources = (await Promise.all(options.resourceDirectories.map(inspectResourceRoot))).flat();
   const estimatedBytes = source.files.reduce((sum, file) => sum + file.sizeBytes, 0)
     + resources.reduce((sum, entry) => sum + entry.file.sizeBytes, 0);
-  return { source, sourceRootRealPath, resources, estimatedBytes };
+  return { source, resources, estimatedBytes };
 }
 
 async function copyRawSnapshot(
-  source: SourceSnapshot,
-  sourceRootRealPath: string,
+  sourcePath: string,
   stagingRoot: string,
   checks: ReadinessCheck[],
 ): Promise<string> {
   const rawRoot = path.join(stagingRoot, 'sqlite-raw');
   await fs.mkdir(rawRoot);
-  for (const file of source.files) {
-    await copyStableFile(file, sourceRootRealPath, path.join(rawRoot, file.archiveName), 'SOURCE_CHANGED_DURING_BACKUP');
-  }
-  const after = await captureSourceSnapshot(source.files[0].sourcePath);
-  assertSameSourceSnapshot(source, after);
+  const source = await copySourceSnapshot(sourcePath, rawRoot, 'SOURCE_CHANGED_DURING_BACKUP');
   for (const suffix of ['-wal', '-shm'] as const) {
     const id = suffix === '-wal' ? 'source.raw-wal' : 'source.raw-shm';
     const archived = source.files.some((file) => file.archiveName === `source.sqlite${suffix}`);
@@ -172,8 +164,7 @@ export async function runBackup(options: BackupOptions): Promise<ReadinessReport
     if (await pathExists(finalRoot)) throw codedError('BACKUP_RUN_ALREADY_EXISTS', 'Backup final run already exists');
 
     stagingRoot = await createUniqueSite(output, options.runId, 'staging');
-    const source = await captureSourceSnapshot(options.sourcePath);
-    const rawRoot = await copyRawSnapshot(source, plan.sourceRootRealPath, stagingRoot, checks);
+    const rawRoot = await copyRawSnapshot(options.sourcePath, stagingRoot, checks);
     const consistentPath = await createConsistentDatabase(rawRoot, stagingRoot);
     checks.push({ id: 'sqlite.consistent', status: 'passed', expected: 'ok', actual: 'ok', message: 'Staged raw SQLite recovery produced an integrity-checked snapshot' });
 

@@ -1,8 +1,20 @@
 import fs from 'node:fs';
 import { promises as fsPromises } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { Pool } from 'pg';
+import {
+  assertSameSourceSnapshot,
+  captureSourceSnapshot,
+  copySourceSnapshot,
+  type SourceSnapshot,
+} from '../backup/fileSnapshot';
+import {
+  assertOwnedTemporaryDirectory,
+  recordOwnedTemporaryDirectory,
+  type OwnedTemporaryDirectory,
+} from '../backup/ownedTemporaryDirectory';
 import { IMPORT_TABLES } from '../constants';
 import { redactSecrets } from '../reporting/reportWriter';
 import type { ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
@@ -42,9 +54,11 @@ export interface PreflightOptions {
 }
 
 export interface PreflightDependencies {
-  createSqlite(path: string): Database.Database;
+  createSqlite(inspectionCopyPath: string): Database.Database;
   createPostgres(url: string, schema: string): DbExecutor;
   availableBytes(path: string): Promise<number>;
+  createTemporaryDirectory(): Promise<string>;
+  removeTemporaryDirectory(path: string): Promise<void>;
 }
 
 function tlsVerificationEnabled(targetUrl: string): boolean {
@@ -56,7 +70,7 @@ function tlsVerificationEnabled(targetUrl: string): boolean {
 }
 
 const defaultDependencies: PreflightDependencies = {
-  createSqlite: (sourcePath) => new Database(sourcePath, { readonly: true, fileMustExist: true }),
+  createSqlite: (inspectionCopyPath) => new Database(inspectionCopyPath, { readonly: true, fileMustExist: true }),
   createPostgres: (targetUrl, schema) => new ReadOnlyPostgresExecutor(new Pool({
     connectionString: targetUrl,
     max: PREFLIGHT_POOL_MAX,
@@ -70,6 +84,8 @@ const defaultDependencies: PreflightDependencies = {
     const stats = await fsPromises.statfs(candidate);
     return Number(stats.bavail) * Number(stats.bsize);
   },
+  createTemporaryDirectory: () => fsPromises.mkdtemp(path.join(os.tmpdir(), 'consensus-preflight-')),
+  removeTemporaryDirectory: (candidate) => fsPromises.rm(candidate, { recursive: true, force: true }),
 };
 
 function quoteIdentifier(identifier: string): string {
@@ -173,6 +189,8 @@ export async function runPreflight(
   const resolved = { ...defaultDependencies, ...dependencies };
   let sqlite: Database.Database | undefined;
   let postgres: DbExecutor | undefined;
+  let sourceSnapshot: SourceSnapshot | undefined;
+  let temporaryDirectory: OwnedTemporaryDirectory | undefined;
 
   const runChecks = async (): Promise<void> => {
     const optionError = validateOptions(options);
@@ -187,8 +205,28 @@ export async function runPreflight(
       return;
     }
     try {
-      sqlite = resolved.createSqlite(options.sourcePath);
-      passedCheck(checks, 'source.exists-and-readable', 'SQLite source opened read-only');
+      const candidate = await resolved.createTemporaryDirectory();
+      temporaryDirectory = await recordOwnedTemporaryDirectory(candidate);
+    } catch {
+      failedCheck(checks, errors, 'source.isolated-copy', 'PREFLIGHT_TEMP_SETUP_FAILED', 'Private SQLite inspection directory could not be created');
+      return;
+    }
+
+    try {
+      sourceSnapshot = await copySourceSnapshot(
+        options.sourcePath,
+        temporaryDirectory.path,
+        'SOURCE_CHANGED_DURING_PREFLIGHT',
+      );
+      passedCheck(checks, 'source.isolated-copy', 'Live SQLite file set captured into a stable private copy without SQLite-opening the source');
+    } catch {
+      failedCheck(checks, errors, 'source.isolated-copy', 'SOURCE_CHANGED_DURING_PREFLIGHT', 'Live SQLite source changed during isolated preflight capture');
+      return;
+    }
+
+    try {
+      sqlite = resolved.createSqlite(path.join(temporaryDirectory.path, 'source.sqlite'));
+      passedCheck(checks, 'source.exists-and-readable', 'Isolated SQLite copy opened read-only; live source was not SQLite-opened');
     } catch {
       failedCheck(checks, errors, 'source.exists-and-readable', 'SOURCE_INTEGRITY_FAILED', 'SQLite source cannot be opened read-only');
       return;
@@ -283,15 +321,33 @@ export async function runPreflight(
     if (sqlite) {
       try {
         sqlite.close();
-      } catch (error) {
-        failedCheck(checks, errors, 'source.close', 'SQLITE_CLOSE_FAILED', error instanceof Error ? error.message : 'SQLite source close failed');
+      } catch {
+        failedCheck(checks, errors, 'source.close', 'SQLITE_CLOSE_FAILED', 'Private SQLite inspection connection could not be closed');
       }
     }
     if (postgres) {
       try {
         await postgres.close();
-      } catch (error) {
-        failedCheck(checks, errors, 'target.close', 'POSTGRES_CLOSE_FAILED', error instanceof Error ? error.message : 'PostgreSQL target close failed');
+      } catch {
+        failedCheck(checks, errors, 'target.close', 'POSTGRES_CLOSE_FAILED', 'PostgreSQL target connection could not be closed');
+      }
+    }
+    if (sourceSnapshot) {
+      try {
+        const after = await captureSourceSnapshot(options.sourcePath, 'SOURCE_CHANGED_DURING_PREFLIGHT');
+        assertSameSourceSnapshot(sourceSnapshot, after, 'SOURCE_CHANGED_DURING_PREFLIGHT');
+        passedCheck(checks, 'source.unchanged', 'Live SQLite main, WAL, and SHM file set remained unchanged');
+      } catch {
+        failedCheck(checks, errors, 'source.unchanged', 'SOURCE_CHANGED_DURING_PREFLIGHT', 'Live SQLite source changed during preflight');
+      }
+    }
+    if (temporaryDirectory) {
+      try {
+        await assertOwnedTemporaryDirectory(temporaryDirectory);
+        await resolved.removeTemporaryDirectory(temporaryDirectory.path);
+        passedCheck(checks, 'source.temp-cleanup', 'Private SQLite inspection directory removed');
+      } catch {
+        failedCheck(checks, errors, 'source.temp-cleanup', 'PREFLIGHT_TEMP_CLEANUP_FAILED', 'Private SQLite inspection directory cleanup failed');
       }
     }
   }

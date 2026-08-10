@@ -121,6 +121,8 @@ if ($preflightExit -ne 0 -or $preflight.status -ne 'passed') { throw 'Preflight 
 
 **预期输出**：状态为 `passed` 的 preflight JSON；源完整性、空间、PostgreSQL 16、目标新鲜度、TLS 和受限连接检查通过。该步骤是只读 preflight dry-run，不创建 schema。
 
+预检只通过文件系统稳定复制当时存在的 SQLite main/WAL/SHM，并仅在工具私有临时目录中打开隔离副本；不得直接 SQLite-open `$Source`。报告中的 `source.isolated-copy`、`source.unchanged` 与 `source.temp-cleanup` 必须通过，确认源文件集、size、mtime、文件身份和 SHA-256 前后一致且临时副本已清理。
+
 **成功条件**：子进程退出码为 0，报告 `status=passed`，`target.postgres-version` 与 `target.tls` 均通过。
 
 **失败停止点**：任一检查失败立即停止；保留 stdout 转存报告和脱敏 stderr，不切换到其他目标“试到成功”。

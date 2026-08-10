@@ -134,16 +134,22 @@ async function exists(candidate: string): Promise<boolean> {
   }
 }
 
-export async function captureSourceSnapshot(sourcePath: string): Promise<SourceSnapshot> {
-  const inspection = await inspectSourceFiles(sourcePath);
+export async function captureSourceSnapshot(
+  sourcePath: string,
+  code = 'SOURCE_CHANGED_DURING_BACKUP',
+): Promise<SourceSnapshot> {
+  const inspection = await inspectSourceFiles(sourcePath, code);
   const rootRealPath = await fs.realpath(path.dirname(path.resolve(sourcePath)));
   const files = await Promise.all(inspection.files.map((file) => (
-    captureStableFile(file.sourcePath, rootRealPath, file.archiveName, 'SOURCE_CHANGED_DURING_BACKUP')
+    captureStableFile(file.sourcePath, rootRealPath, file.archiveName, code)
   )));
   return { files };
 }
 
-export async function inspectSourceFiles(sourcePath: string): Promise<SourceInspection> {
+export async function inspectSourceFiles(
+  sourcePath: string,
+  code = 'SOURCE_CHANGED_DURING_BACKUP',
+): Promise<SourceInspection> {
   const source = path.resolve(sourcePath);
   const rootRealPath = await fs.realpath(path.dirname(source));
   if (!await exists(source)) throw codedError('SOURCE_DATABASE_INVALID', 'SQLite source file does not exist');
@@ -151,12 +157,16 @@ export async function inspectSourceFiles(sourcePath: string): Promise<SourceInsp
   for (const suffix of ['', '-wal', '-shm']) {
     const candidate = `${source}${suffix}`;
     if (suffix && !await exists(candidate)) continue;
-    files.push(await inspectFileMetadata(candidate, rootRealPath, `source.sqlite${suffix}`, 'SOURCE_CHANGED_DURING_BACKUP'));
+    files.push(await inspectFileMetadata(candidate, rootRealPath, `source.sqlite${suffix}`, code));
   }
   return { files };
 }
 
-export function assertSameSourceSnapshot(before: SourceSnapshot, after: SourceSnapshot): void {
+export function assertSameSourceSnapshot(
+  before: SourceSnapshot,
+  after: SourceSnapshot,
+  code = 'SOURCE_CHANGED_DURING_BACKUP',
+): void {
   const comparable = (snapshot: SourceSnapshot) => snapshot.files.map((file) => ({
     archiveName: file.archiveName,
     sizeBytes: file.sizeBytes,
@@ -166,8 +176,23 @@ export function assertSameSourceSnapshot(before: SourceSnapshot, after: SourceSn
     ino: file.ino,
   }));
   if (JSON.stringify(comparable(before)) !== JSON.stringify(comparable(after))) {
-    throw codedError('SOURCE_CHANGED_DURING_BACKUP', 'Source database, WAL, or SHM changed during backup');
+    throw codedError(code, 'Source database, WAL, or SHM changed during stable snapshot capture');
   }
+}
+
+export async function copySourceSnapshot(
+  sourcePath: string,
+  destinationRoot: string,
+  code = 'SOURCE_CHANGED_DURING_BACKUP',
+): Promise<SourceSnapshot> {
+  const before = await captureSourceSnapshot(sourcePath, code);
+  const sourceRootRealPath = await fs.realpath(path.dirname(path.resolve(sourcePath)));
+  for (const file of before.files) {
+    await copyStableFile(file, sourceRootRealPath, path.join(destinationRoot, file.archiveName), code);
+  }
+  const after = await captureSourceSnapshot(sourcePath, code);
+  assertSameSourceSnapshot(before, after, code);
+  return before;
 }
 
 async function writeAll(handle: FileHandle, buffer: Buffer, length: number, position: number): Promise<void> {

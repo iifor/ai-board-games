@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,6 +25,56 @@ function sqliteFixture(): string {
   database.exec('CREATE TABLE fixture (id INTEGER PRIMARY KEY, value TEXT NOT NULL); INSERT INTO fixture (value) VALUES (\'ready\');');
   database.close();
   return file;
+}
+
+function walFixtureWithoutSidecars(): { root: string; sourcePath: string } {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'preflight WAL 路径-'));
+  const sourcePath = path.join(root, 'live source.sqlite');
+  const database = new Database(sourcePath);
+  assert.equal(database.pragma('journal_mode = WAL', { simple: true }), 'wal');
+  database.exec('CREATE TABLE fixture (id INTEGER PRIMARY KEY, value TEXT NOT NULL); INSERT INTO fixture (value) VALUES (\'ready\');');
+  database.pragma('wal_checkpoint(TRUNCATE)');
+  database.close();
+  fs.rmSync(`${sourcePath}-wal`, { force: true });
+  fs.rmSync(`${sourcePath}-shm`, { force: true });
+  return { root, sourcePath };
+}
+
+function walFixtureWithSidecars(): { root: string; sourcePath: string; database: Database.Database } {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'preflight-wal-live-'));
+  const sourcePath = path.join(root, 'live.sqlite');
+  const database = new Database(sourcePath);
+  assert.equal(database.pragma('journal_mode = WAL', { simple: true }), 'wal');
+  database.pragma('wal_autocheckpoint = 0');
+  database.exec('CREATE TABLE fixture (id INTEGER PRIMARY KEY, value TEXT NOT NULL); INSERT INTO fixture (value) VALUES (\'ready\');');
+  assert.equal(fs.existsSync(`${sourcePath}-wal`), true);
+  assert.equal(fs.existsSync(`${sourcePath}-shm`), true);
+  return { root, sourcePath, database };
+}
+
+interface SourceFileState {
+  name: string;
+  sizeBytes: number;
+  mtimeNs: string;
+  dev: string;
+  ino: string;
+  sha256: string;
+}
+
+function sourceFileSet(sourcePath: string): SourceFileState[] {
+  return ['', '-wal', '-shm'].flatMap((suffix) => {
+    const candidate = `${sourcePath}${suffix}`;
+    if (!fs.existsSync(candidate)) return [];
+    const stats = fs.lstatSync(candidate, { bigint: true });
+    return [{
+      name: path.basename(candidate),
+      sizeBytes: Number(stats.size),
+      mtimeNs: stats.mtimeNs.toString(),
+      dev: stats.dev.toString(),
+      ino: stats.ino.toString(),
+      sha256: createHash('sha256').update(fs.readFileSync(candidate)).digest('hex'),
+    }];
+  });
 }
 
 function createOutputDirectory(): string {
@@ -82,6 +133,173 @@ function sqliteWithCloseFailure(sourcePath: string): { sqlite: Database.Database
   sqlite.close = (() => { throw new Error('SQLITE_CLOSE_FAILURE'); }) as typeof sqlite.close;
   return { sqlite, release: () => realClose() };
 }
+
+test('preflight never creates SQLite sidecars beside a WAL-mode live source', async () => {
+  const fixture = walFixtureWithoutSidecars();
+  const outputDirectory = createOutputDirectory();
+  const before = sourceFileSet(fixture.sourcePath);
+  const outputBefore = fs.readdirSync(outputDirectory).sort();
+  try {
+    assert.deepEqual(before.map((entry) => entry.name), ['live source.sqlite']);
+    const report = await runPreflight(options(fixture.sourcePath, outputDirectory), {
+      createPostgres: () => freshTargetExecutor(),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'passed');
+    assert.deepEqual(sourceFileSet(fixture.sourcePath), before);
+    assert.equal(fs.existsSync(`${fixture.sourcePath}-wal`), false);
+    assert.equal(fs.existsSync(`${fixture.sourcePath}-shm`), false);
+    assert.deepEqual(fs.readdirSync(outputDirectory).sort(), outputBefore);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight preserves an existing live WAL and SHM byte-for-byte', async () => {
+  const fixture = walFixtureWithSidecars();
+  const outputDirectory = createOutputDirectory();
+  const before = sourceFileSet(fixture.sourcePath);
+  try {
+    const report = await runPreflight(options(fixture.sourcePath, outputDirectory), {
+      createPostgres: () => freshTargetExecutor(),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'passed');
+    assert.deepEqual(sourceFileSet(fixture.sourcePath), before);
+  } finally {
+    fixture.database.close();
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight rejects a live source mutation after the isolated copy is opened', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createSqlite: (isolatedPath) => {
+        fs.appendFileSync(sourcePath, Buffer.from([0]));
+        return new Database(isolatedPath, { readonly: true, fileMustExist: true });
+      },
+      createPostgres: () => freshTargetExecutor(),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['SOURCE_CHANGED_DURING_PREFLIGHT']);
+  } finally {
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight rejects a byte-identical live source replacement by filesystem identity', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const replacementPath = `${sourcePath}.replacement`;
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createSqlite: (isolatedPath) => {
+        fs.copyFileSync(sourcePath, replacementPath);
+        fs.renameSync(replacementPath, sourcePath);
+        return new Database(isolatedPath, { readonly: true, fileMustExist: true });
+      },
+      createPostgres: () => freshTargetExecutor(),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['SOURCE_CHANGED_DURING_PREFLIGHT']);
+  } finally {
+    fs.rmSync(replacementPath, { force: true });
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight removes its private SQLite inspection directory after success', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const privateRoot = path.join(outputDirectory, 'operator-visible-test-temp');
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createTemporaryDirectory: async () => {
+        await fs.promises.mkdir(privateRoot);
+        return privateRoot;
+      },
+      createPostgres: () => freshTargetExecutor(),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'passed');
+    assert.equal(fs.existsSync(privateRoot), false);
+  } finally {
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight fails closed on private-directory cleanup without replacing an integrity failure', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const privateRoot = path.join(outputDirectory, 'cleanup-failure-temp');
+  fs.writeFileSync(sourcePath, Buffer.from('not a sqlite database'));
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createTemporaryDirectory: async () => {
+        await fs.promises.mkdir(privateRoot);
+        return privateRoot;
+      },
+      removeTemporaryDirectory: async () => {
+        throw new Error(`cleanup rejected at ${privateRoot}`);
+      },
+      createPostgres: () => freshTargetExecutor(),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['SOURCE_INTEGRITY_FAILED', 'PREFLIGHT_TEMP_CLEANUP_FAILED']);
+    assert.equal(report.errors[1]?.message.includes(privateRoot), false);
+    assert.equal(fs.existsSync(privateRoot), true);
+  } finally {
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight never removes a foreign directory that replaces its private directory before cleanup', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const privateRoot = path.join(outputDirectory, 'replaceable-temp');
+  const displacedRoot = path.join(outputDirectory, 'displaced-owned-temp');
+  const foreignMarker = path.join(privateRoot, 'foreign.txt');
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createTemporaryDirectory: async () => {
+        await fs.promises.mkdir(privateRoot);
+        return privateRoot;
+      },
+      createPostgres: () => freshTargetExecutor(async () => {
+        await fs.promises.rename(privateRoot, displacedRoot);
+        await fs.promises.mkdir(privateRoot);
+        await fs.promises.writeFile(foreignMarker, 'do-not-delete');
+      }),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['PREFLIGHT_TEMP_CLEANUP_FAILED']);
+    assert.equal(fs.readFileSync(foreignMarker, 'utf8'), 'do-not-delete');
+    assert.equal(fs.existsSync(displacedRoot), true);
+  } finally {
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
 
 test('preflight reports SOURCE_NOT_FOUND without opening a target connection', async () => {
   const outputDirectory = createOutputDirectory();
