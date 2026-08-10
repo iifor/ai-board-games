@@ -30,11 +30,19 @@
 
 ```powershell
 $AppSchema = if ($env:DATABASE_SCHEMA) { $env:DATABASE_SCHEMA } else { 'consensus' }
-if (-not $env:PGSERVICE) {
-  foreach ($name in @('PGHOST','PGPORT','PGDATABASE','PGUSER','PGPASSWORD','PGSSLMODE')) {
-    if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "$name is required when PGSERVICE is absent." }
-  }
+if ($null -ne $env:PGSERVICE -and $env:PGSERVICE.Length -gt 0) {
+  throw 'PGSERVICE is forbidden in the signed readiness gate.'
 }
+foreach ($name in @('PGHOST','PGPORT','PGDATABASE','PGUSER','PGPASSWORD','PGSSLMODE','PGSSLROOTCERT')) {
+  if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "$name is required." }
+}
+if ($env:PGSSLMODE -cne 'verify-full') { throw 'PGSSLMODE must be exactly verify-full.' }
+$pgRootCert = (Resolve-Path -LiteralPath $env:PGSSLROOTCERT).Path
+$databaseCaPath = (Resolve-Path -LiteralPath $env:DATABASE_CA_PATH).Path
+if ($pgRootCert -cne $databaseCaPath) { throw 'PGSSLROOTCERT and DATABASE_CA_PATH must resolve to the same file.' }
+$sessionSsl = (& psql -X -tA -v ON_ERROR_STOP=1 -c `
+  'SELECT ssl::text FROM pg_stat_ssl WHERE pid = pg_backend_pid();').Trim()
+if ($LASTEXITCODE -ne 0 -or $sessionSsl -cne 'true') { throw 'Current backend session is not using TLS.' }
 $state = (& psql -X -tA -v ON_ERROR_STOP=1 `
   --set=app_schema=$AppSchema -c `
   "SELECT has_database_privilege(current_user,current_database(),'CONNECT')::text || '|' || has_database_privilege(current_user,current_database(),'CREATE')::text || '|' || has_schema_privilege(current_user, :'app_schema','USAGE')::text;").Trim()
@@ -43,7 +51,7 @@ if ($LASTEXITCODE -ne 0 -or $state -cne 'true|false|true') {
 }
 ```
 
-`psql` 只读取受控进程环境中的 `PGSERVICE` 或完整 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD/PGSSLMODE/PGSSLROOTCERT`；不得把 URL 作为位置参数展开到进程列表或审计日志。
+签署的 readiness gate 禁止 `PGSERVICE`，因为其 TLS 设置无法直接写入证据；`psql` 只读取完整的 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD/PGSSLMODE/PGSSLROOTCERT`。`PGSSLMODE` 必须精确为 `verify-full`，root cert 必须与 `DATABASE_CA_PATH` 解析到同一文件，并通过 `pg_stat_ssl WHERE pid=pg_backend_pid()` 证明当前会话 `ssl=true`；不得把 URL 作为位置参数展开到进程列表或审计日志。
 
 DBA 必须审核实际 grants，并保存 `\du+`、`\dn+`、schema/table/sequence grants 和拒绝 `CREATE DATABASE`/非目标 schema 写入的证据。
 
@@ -51,7 +59,7 @@ DBA 必须审核实际 grants，并保存 `\du+`、`\dn+`、schema/table/sequenc
 
 ## TLS 与证书校验
 
-- 生产连接必须协商 TLS，并校验证书链和主机名；CA 文件通过 `DATABASE_CA_PATH` 挂载为只读。
+- 生产连接必须使用 `verify-full` 校验证书链和主机名；CA 文件通过 `DATABASE_CA_PATH` 挂载为只读，并与 `PGSSLROOTCERT` 指向同一文件。
 - 预检 URL 使用 `sslmode=verify-full`，与 `-RequireTls true` 一起形成 fail-closed 门禁。
 - 证书到期时间、握手失败、CA 轮换和数据库端强制 TLS 状态纳入监控；证书轮换先在隔离环境验证。
 

@@ -6,7 +6,7 @@
 
 - 在同一个受控 PowerShell 会话执行全部步骤，仓库当前提交固定且工作树干净。
 - `$env:TEST_DATABASE_URL` 指向名称以 `_test` 或 `_rehearsal` 结尾的专用 PostgreSQL 16 数据库，并带 `sslmode=verify-full`；它不是生产数据库。
-- TLS/最小权限检查使用 `PGSERVICE`，或已继承的 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD/PGSSLMODE/PGSSLROOTCERT`；`psql` 命令行不得出现数据库 URL 或密码。
+- TLS/最小权限检查只使用已继承的 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD/PGSSLMODE/PGSSLROOTCERT`；签署门禁拒绝任何非空 `PGSERVICE`，`psql` 命令行不得出现数据库 URL 或密码。
 - 生产源仅以只读路径提供；本手册不会启动或停止生产应用，也不会连接真实生产 PostgreSQL。
 - `Source`、资源目录和证据根目录路径不得包含逗号；release-readiness 使用逗号分隔报告路径。
 
@@ -367,12 +367,27 @@ try {
 $migratorRoot = Join-Path $RepoRoot 'packages\db-migrator'
 Push-Location $migratorRoot
 try {
-  $sqliteValidationJson = & node -e $sqliteValidationScript -- (Join-Path $RestoreRoot 'sqlite-consistent.sqlite')
-  $sqliteValidationExit = $LASTEXITCODE
+  $rawValidationJson = & node -e $sqliteValidationScript -- (Join-Path $RestoreRoot 'sqlite-raw\source.sqlite')
+  $rawValidationExit = $LASTEXITCODE
+  if ($rawValidationExit -ne 0 -or -not $rawValidationJson) { throw 'Raw SQLite/WAL rollback-set validation failed.' }
+  $consistentValidationJson = & node -e $sqliteValidationScript -- (Join-Path $RestoreRoot 'sqlite-consistent.sqlite')
+  $consistentValidationExit = $LASTEXITCODE
 } finally { Pop-Location }
-if ($sqliteValidationExit -ne 0 -or -not $sqliteValidationJson) { throw 'Read-only SQLite restore validation failed.' }
-$sqliteValidation = $sqliteValidationJson | ConvertFrom-Json
-if ($sqliteValidation.integrityCheck -cne 'ok' -or -not $sqliteValidation.queryOnly) { throw 'SQLite restore integrity check failed.' }
+if ($consistentValidationExit -ne 0 -or -not $consistentValidationJson) { throw 'Consistent SQLite copy validation failed.' }
+$rawValidation = $rawValidationJson | ConvertFrom-Json
+$consistentValidation = $consistentValidationJson | ConvertFrom-Json
+if ($rawValidation.integrityCheck -cne 'ok' -or -not $rawValidation.queryOnly) { throw 'Raw rollback-set integrity check failed.' }
+if ($consistentValidation.integrityCheck -cne 'ok' -or -not $consistentValidation.queryOnly) { throw 'Consistent-copy integrity check failed.' }
+foreach ($table in @('admin_users','app_settings','players','games','game_playback_events','player_game_memories')) {
+  if ([int64]$rawValidation.counts.$table -ne [int64]$consistentValidation.counts.$table) {
+    throw "Raw rollback set and consistent copy count mismatch: $table"
+  }
+}
+$sqliteValidation = [ordered]@{
+  rawRollbackSet = $rawValidation
+  consistentCopy = $consistentValidation
+  countsMatch = $true
+}
 Write-Utf8NoBom $sqliteValidationPath ($sqliteValidation | ConvertTo-Json -Depth 6)
 
 $restoreWatch.Stop()
@@ -392,7 +407,11 @@ $restoreArtifacts += [ordered]@{
 $restoreReport = [ordered]@{
   runId = $RestoreRunId; stage = 'backup'; status = 'passed'; startedAt = $restoreStartedAt.ToString('o')
   finishedAt = $restoreFinishedAt.ToString('o'); durationMs = [int64]$restoreWatch.ElapsedMilliseconds
-  checks = @([ordered]@{ id = 'backup.restore-drill'; status = 'passed'; message = 'Restored bytes, SQLite integrity, key counts and WAL/SHM combination verified in isolation' })
+  checks = @(
+    [ordered]@{ id = 'backup.restore-drill'; status = 'passed'; message = 'Raw rollback set and consistent copy independently verified in isolation' }
+    [ordered]@{ id = 'backup.restore-drill.raw-rollback-set'; status = 'passed'; message = 'Read-only integrity and key counts passed on sqlite-raw/source.sqlite with adjacent WAL/SHM' }
+    [ordered]@{ id = 'backup.restore-drill.consistent-copy'; status = 'passed'; message = 'Read-only integrity and key counts passed independently on sqlite-consistent.sqlite' }
+  )
   artifacts = @($restoreArtifacts)
   errors = @()
 }
@@ -400,11 +419,11 @@ $RestoreReportPath = Join-Path $EvidenceRoot "$RestoreRunId-backup.json"
 Write-Utf8NoBom $RestoreReportPath ($restoreReport | ConvertTo-Json -Depth 10)
 ```
 
-**预期输出**：隔离目录中完整恢复同一组 SQLite/WAL/SHM（存在时）和资源；现有 db-migrator 的 `better-sqlite3` 以只读/query-only 打开恢复副本，执行 `PRAGMA integrity_check` 并记录关键表计数；报告记录 Stopwatch 实测耗时。
+**预期输出**：隔离目录中完整恢复同一组 SQLite/WAL/SHM（存在时）和资源；现有 db-migrator 的 `better-sqlite3` 首先在 `sqlite-raw` 原位以只读/query-only 打开真正回滚文件 `source.sqlite`，让同目录 `source.sqlite-wal/-shm` 参与恢复，再独立验证 `sqlite-consistent.sqlite`。两者都执行 `PRAGMA integrity_check`、记录关键表计数并要求计数相同；报告记录 Stopwatch 实测耗时。
 
-**成功条件**：恢复文件集合、size、SHA-256、WAL/SHM 存在组合全部一致；`admin_users/app_settings/players/games/game_playback_events/player_game_memories` 计数已记录；报告 `backup.restore-drill=passed`。
+**成功条件**：恢复文件集合、size、SHA-256、WAL/SHM 存在组合全部一致；raw rollback set 与 consistent copy 的完整性及 `admin_users/app_settings/players/games/game_playback_events/player_game_memories` 计数分别通过且相同；报告的 aggregate/raw/consistent 三项 checks 均为 `passed`。
 
-**失败停止点**：不得覆盖已有恢复目录；缺文件或 hash 不一致立即停止，并保留恢复目录排障。
+**失败停止点**：不得覆盖已有恢复目录；缺文件、hash 不一致、raw rollback set 无法只读恢复、任一 integrity check 或计数对比失败立即停止。即使 consistent copy 正常，raw rollback set 损坏也必须失败并保留恢复目录排障。
 
 **证据路径**：`$RestoreRoot`、`$sqliteValidationPath`、`$RestoreReportPath`；每一项都由报告 artifact 与签署 manifest 固定。
 
@@ -419,7 +438,8 @@ $CiLog = Join-Path $EvidenceRoot '10-ci-release-gates.log'
 $NoCriticalSkipLog = Join-Path $EvidenceRoot '10-tests-no-critical-skips.log'
 $RuntimeBuildLog = Join-Path $EvidenceRoot '10-runtime-image-build.log'
 $RuntimeNoSqliteLog = Join-Path $EvidenceRoot '10-runtime-no-sqlite.log'
-$TlsLog = Join-Path $EvidenceRoot '10-postgres-tls.log'
+$TlsSessionLog = Join-Path $EvidenceRoot '10-postgres-tls-session.log'
+$TlsEvidence = Join-Path $EvidenceRoot '10-postgres-tls.json'
 $PrivilegeLog = Join-Path $EvidenceRoot '10-postgres-least-privilege.log'
 $PoolTimeoutEvidence = Join-Path $EvidenceRoot '10-postgres-pool-timeouts.json'
 $DocsTruthLog = Join-Path $EvidenceRoot '10-docs-runtime-truth.log'
@@ -448,16 +468,34 @@ if ($runtimeBuildExit -ne 0) { throw 'Runtime image build failed.' }
 $runtimeInspectExit = $LASTEXITCODE
 if ($runtimeInspectExit -ne 0) { throw 'Runtime image contains the one-time migrator or SQLite dependency.' }
 
-$hasPgService = -not [string]::IsNullOrWhiteSpace($env:PGSERVICE)
-$requiredPgEnvironment = @('PGHOST','PGPORT','PGDATABASE','PGUSER','PGPASSWORD','PGSSLMODE','PGSSLROOTCERT')
-if (-not $hasPgService -and @($requiredPgEnvironment | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) }).Count) {
-  throw 'Provide PGSERVICE or the complete inherited PG* environment; do not pass a database URL to psql.'
+if ($null -ne $env:PGSERVICE -and $env:PGSERVICE.Length -gt 0) {
+  throw 'PGSERVICE is forbidden for this gate because its ssl settings are not visible in the signed evidence.'
 }
-$tlsOutput = & psql -X -tA -v ON_ERROR_STOP=1 -c 'SHOW ssl;' 2>&1
-$tlsExit = $LASTEXITCODE
-$tlsOutput | Set-Content -LiteralPath $TlsLog -Encoding utf8
-$tlsState = ([string]($tlsOutput | Select-Object -Last 1)).Trim()
-if ($tlsExit -ne 0 -or $tlsState -cne 'on') { throw 'TLS is not active.' }
+$requiredPgEnvironment = @('PGHOST','PGPORT','PGDATABASE','PGUSER','PGPASSWORD','PGSSLMODE','PGSSLROOTCERT')
+if (@($requiredPgEnvironment | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) }).Count) {
+  throw 'The complete inherited PG* environment is required; do not pass a database URL to psql.'
+}
+if ($env:PGSSLMODE -cne 'verify-full' -or $env:DATABASE_SSL -cne 'verify-full') {
+  throw 'PGSSLMODE and DATABASE_SSL must both be exactly verify-full.'
+}
+$pgRootCert = (Resolve-Path -LiteralPath $env:PGSSLROOTCERT).Path
+$databaseCaPath = (Resolve-Path -LiteralPath $env:DATABASE_CA_PATH).Path
+if ($pgRootCert -cne $databaseCaPath) { throw 'PGSSLROOTCERT and DATABASE_CA_PATH must resolve to the same CA file.' }
+$caSha256 = (Get-FileHash -LiteralPath $pgRootCert -Algorithm SHA256).Hash.ToLowerInvariant()
+$tlsSessionOutput = & psql -X -tA -v ON_ERROR_STOP=1 -c `
+  'SELECT ssl::text FROM pg_stat_ssl WHERE pid = pg_backend_pid();' 2>&1
+$tlsSessionExit = $LASTEXITCODE
+$tlsSessionOutput | Set-Content -LiteralPath $TlsSessionLog -Encoding utf8
+$tlsSessionState = ([string]($tlsSessionOutput | Select-Object -Last 1)).Trim()
+if ($tlsSessionExit -ne 0 -or $tlsSessionState -cne 'true') { throw 'The current PostgreSQL backend session is not using TLS.' }
+$tls = [ordered]@{
+  actualMode = $env:PGSSLMODE
+  actualRootCert = $pgRootCert
+  databaseCaPath = $databaseCaPath
+  caSha256 = $caSha256
+  sessionSsl = $true
+}
+Write-Utf8NoBom $TlsEvidence ($tls | ConvertTo-Json -Depth 4)
 $privilegeOutput = & psql -X -tA -v ON_ERROR_STOP=1 --set=app_schema=$AppSchema -c `
   "SELECT has_database_privilege(current_user,current_database(),'CONNECT')::text || '|' || has_database_privilege(current_user,current_database(),'CREATE')::text || '|' || has_schema_privilege(current_user, :'app_schema','USAGE')::text;" 2>&1
 $privilegeExit = $LASTEXITCODE
@@ -473,11 +511,9 @@ foreach ($name in $positiveSettings) {
   $parsed = 0
   if (-not [int]::TryParse($value, [ref]$parsed) -or $parsed -le 0) { throw "$name must be a positive integer." }
 }
-if (-not $env:DATABASE_SSL -or -not $env:DATABASE_CA_PATH) { throw 'TLS and CA settings are required.' }
-if (-not (Test-Path -LiteralPath $env:DATABASE_CA_PATH -PathType Leaf)) { throw 'CA file is unreadable.' }
 $poolTimeout = [ordered]@{
   databaseSsl = $env:DATABASE_SSL
-  caSha256 = (Get-FileHash -LiteralPath $env:DATABASE_CA_PATH -Algorithm SHA256).Hash.ToLowerInvariant()
+  caSha256 = $caSha256
   poolMax = [int]$env:DATABASE_POOL_MAX
   connectionTimeoutMs = [int]$env:DATABASE_CONNECTION_TIMEOUT_MS
   statementTimeoutMs = [int]$env:DATABASE_STATEMENT_TIMEOUT_MS
@@ -493,7 +529,8 @@ if ($env:GO_LIVE_OWNER.Trim() -ieq $env:ROLLBACK_OWNER.Trim()) { throw 'Go-live 
 $MinimumWindow = [math]::Ceiling((2 * [math]::Max([double]$r1.durationMs, [double]$r2.durationMs)) / 60000)
 $SignedChecks = @('ci.release-gates','tests.no-critical-skips','backup.restore-drill','runtime.no-sqlite',
   'postgres.tls','postgres.least-privilege','postgres.pool-and-timeouts','docs.runtime-truth','operator.signoff')
-$RawEvidencePaths = @($CiLog,$NoCriticalSkipLog,$RuntimeBuildLog,$RuntimeNoSqliteLog,$TlsLog,$PrivilegeLog,$PoolTimeoutEvidence,$DocsTruthLog)
+$RawEvidencePaths = @($CiLog,$NoCriticalSkipLog,$RuntimeBuildLog,$RuntimeNoSqliteLog,
+  $TlsSessionLog,$TlsEvidence,$PrivilegeLog,$PoolTimeoutEvidence,$DocsTruthLog)
 $evidenceWatch.Stop()
 $evidenceFinished = [DateTime]::UtcNow
 $EnvironmentReportDraftPath = Join-Path $EvidenceRoot "$ReadinessRunId-environment.pending.json"
@@ -607,7 +644,7 @@ if (($expectedManifest -join "`n") -cne ($actualManifest -join "`n")) { throw 'S
 
 **预期输出**：每项命令都有独立原始 artifact；脚本先生成 `status=failed`、checks 全为 `failed` 的 pending environment report，独立 operator 逐项核对后手工复制并改成最终报告，脚本只读验证其 check 集合与未变更的 `evidence` artifact。随后才生成 pending signoff 草稿，由不同于 go-live/rollback owner 的独立 operator 填写实际时间并签字。2x maintenance window（两次演练最大耗时的两倍并向上取整）写入签核。
 
-**成功条件**：完整 release gates 通过；运行镜像无迁移工具；TLS/CA/最小权限/正整数配置有效；三方身份两两不同；最终 signoff 已由独立 operator 手工签署；`reportManifest` 精确覆盖输入 reports + artifacts。
+**成功条件**：完整 release gates 通过；运行镜像无迁移工具；`PGSSLMODE` 与应用 `DATABASE_SSL` 均精确为 `verify-full`，`PGSSLROOTCERT` 与 `DATABASE_CA_PATH` 解析到同一 CA 且 hash 已记录，当前 `pg_backend_pid()` 在 `pg_stat_ssl` 中为 `ssl=true`；最小权限/正整数配置有效；三方身份两两不同；最终 signoff 已由独立 operator 手工签署；`reportManifest` 精确覆盖输入 reports + artifacts。
 
 **失败停止点**：任一原始检查或责任分离失败即停止；自动化只生成 failed/pending environment 与 signoff 草稿并验证最终文件，绝不生成 all-passed 环境报告、绝不代填 `approvedBy/approvedAt`、绝不自动批准。独立 operator 只能在逐项核对真实 evidence 后把对应 check 改为 passed。
 

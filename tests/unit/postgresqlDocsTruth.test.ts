@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -167,7 +168,9 @@ test('production-readiness evidence is raw, secret-safe, operator-approved, and 
   assert.match(source, /resourceFiles[\s\S]{0,500}sha256/iu);
   assert.match(preflight, /DATABASE_URL/);
   assert.doesNotMatch(preflight, /-Target\s+\$env:TEST_DATABASE_URL/iu);
-  assert.match(runbook, /psql[\s\S]{0,120}PGHOST|PGSERVICE/iu);
+  assert.match(runbook, /PGHOST\/PGPORT\/PGDATABASE\/PGUSER\/PGPASSWORD\/PGSSLMODE\/PGSSLROOTCERT/iu);
+  assert.match(runbook, /psql[^\r\n]{0,120}(不得出现数据库 URL|do not pass a database URL)/iu);
+  assert.doesNotMatch(runbook, /TLS[^\r\n]{0,120}使用 `PGSERVICE`/iu);
   assert.doesNotMatch(runbook, /psql\s+\$env:[A-Z_]*DATABASE_URL/iu);
   assert.doesNotMatch(deployment, /psql\s+\$env:[A-Z_]*DATABASE_URL/iu);
 
@@ -182,7 +185,7 @@ test('production-readiness evidence is raw, secret-safe, operator-approved, and 
 
   for (const artifact of [
     '10-ci-release-gates.log', '10-runtime-image-build.log', '10-runtime-no-sqlite.log',
-    '10-postgres-tls.log', '10-postgres-least-privilege.log', '10-postgres-pool-timeouts.json',
+    '10-postgres-tls-session.log', '10-postgres-tls.json', '10-postgres-least-privilege.log', '10-postgres-pool-timeouts.json',
   ]) assert.match(signoff, new RegExp(artifact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), artifact);
   assert.match(signoff, /RawEvidencePaths[\s\S]{0,1800}artifacts/iu);
   assert.match(signoff, /type\s*=\s*'evidence'/);
@@ -203,6 +206,59 @@ test('production-readiness evidence is raw, secret-safe, operator-approved, and 
   assert.match(aggregate, /-ReleaseCandidate\s+\$ReleaseCandidate/);
 });
 
+test('restore drill validates the raw SQLite WAL rollback set independently from the consistent copy', async (t) => {
+  const runbook = await readDoc('runbooks/postgresql-production-readiness.md');
+  const restore = numberedStep(runbook, 9);
+  assert.match(restore, /Join-Path\s+\$RestoreRoot\s+'sqlite-raw\\source\.sqlite'/iu);
+  assert.match(restore, /backup\.restore-drill\.raw-rollback-set/);
+  assert.match(restore, /backup\.restore-drill\.consistent-copy/);
+  assert.match(restore, /rawRollbackSet/);
+  assert.match(restore, /consistentCopy/);
+
+  const validationScript = /\$sqliteValidationScript\s*=\s*@'\r?\n([\s\S]*?)\r?\n'@/.exec(restore)?.[1];
+  assert.ok(validationScript, 'missing embedded SQLite validation script');
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'postgres-raw-restore-'));
+  t.after(() => fs.rm(temporary, { recursive: true, force: true }));
+  const rawRoot = path.join(temporary, 'sqlite-raw');
+  await fs.mkdir(rawRoot);
+  const rawPath = path.join(rawRoot, 'source.sqlite');
+  const consistentPath = path.join(temporary, 'sqlite-consistent.sqlite');
+  const migratorRoot = path.join(repoRoot, 'packages', 'db-migrator');
+  const createValidSqlite = [
+    "const Database=require('better-sqlite3');",
+    'const db=new Database(process.argv[1]);',
+    "for(const table of ['admin_users','app_settings','players','games','game_playback_events','player_game_memories']) db.exec(`CREATE TABLE ${table}(id INTEGER PRIMARY KEY)`);",
+    'db.close();',
+  ].join('');
+  const created = spawnSync(process.execPath, ['-e', createValidSqlite, '--', consistentPath], { cwd: migratorRoot, encoding: 'utf8' });
+  assert.equal(created.status, 0, created.stderr);
+  await fs.writeFile(rawPath, Buffer.from('corrupt raw rollback bytes'));
+
+  const consistent = spawnSync(process.execPath, ['-e', validationScript, '--', consistentPath], { cwd: migratorRoot, encoding: 'utf8' });
+  assert.equal(consistent.status, 0, consistent.stderr);
+  const raw = spawnSync(process.execPath, ['-e', validationScript, '--', rawPath], { cwd: migratorRoot, encoding: 'utf8' });
+  assert.notEqual(raw.status, 0, 'corrupt raw rollback set must fail even when the consistent copy is valid');
+});
+
+test('readiness proves verify-full CA identity and TLS on the current PostgreSQL backend', async () => {
+  const runbook = await readDoc('runbooks/postgresql-production-readiness.md');
+  const deployment = await readDoc('postgresql-deployment.md');
+  const signoff = numberedStep(runbook, 10);
+  assert.match(signoff, /PGSERVICE[\s\S]{0,160}throw/iu);
+  assert.doesNotMatch(signoff, /IsNullOrWhiteSpace\(\$env:PGSERVICE\)/iu);
+  assert.match(signoff, /PGSSLMODE[\s\S]{0,120}-cne\s+'verify-full'/iu);
+  assert.match(signoff, /Resolve-Path[^\n]*PGSSLROOTCERT/iu);
+  assert.match(signoff, /Resolve-Path[^\n]*DATABASE_CA_PATH/iu);
+  assert.match(signoff, /\$pgRootCert\s+-cne\s+\$databaseCaPath/iu);
+  assert.match(signoff, /pg_stat_ssl[\s\S]{0,100}pg_backend_pid\(\)/iu);
+  assert.match(signoff, /\$tlsSessionState\s+-cne\s+'true'/iu);
+  assert.doesNotMatch(signoff, /SHOW\s+ssl/iu);
+  for (const field of ['actualMode', 'actualRootCert', 'caSha256', 'sessionSsl']) assert.match(signoff, new RegExp(`\\b${field}\\b`), field);
+  assert.match(deployment, /PGSERVICE.{0,80}(禁止|forbidden)/iu);
+  assert.match(deployment, /PGSSLMODE.{0,80}verify-full/iu);
+  assert.match(deployment, /pg_stat_ssl.{0,100}pg_backend_pid\(\)/iu);
+});
+
 test('rollback runbook restores one SQLite and resources point and quarantines failed PostgreSQL targets', async () => {
   const rollback = await readDoc('runbooks/postgresql-rollback.md');
   assert.match(rollback, /同一时间点.{0,80}SQLite.{0,20}WAL.{0,20}SHM.{0,40}资源/isu);
@@ -216,6 +272,7 @@ test('rollback runbook restores one SQLite and resources point and quarantines f
   const restore = numberedStep(rollback, 5);
   const start = numberedStep(rollback, 6);
   const smoke = numberedStep(rollback, 7);
+  for (const binding of ['RollbackRunId', 'ChangeTicket', 'ExpectedOldTarget']) assert.match(freeze, new RegExp(`\\$${binding}\\b`), binding);
   for (const gate of [freeze, quarantine]) {
     assert.match(gate, /receipt|回执/iu);
     assert.match(gate, /Get-FileHash/);
@@ -223,6 +280,12 @@ test('rollback runbook restores one SQLite and resources point and quarantines f
     assert.match(gate, /occurredAt/);
     assert.doesNotMatch(gate, /Stop accepting traffic|diagnostics-only-do-not-reuse'\s*\n\s*capturedAt/iu);
   }
+  assert.match(freeze, /stopReceipt\.runId\s+-cne\s+\$RollbackRunId/iu);
+  assert.match(freeze, /stopReceipt\.ticketId\s+-cne\s+\$ChangeTicket/iu);
+  assert.match(freeze, /stopReceipt\.target\s+-cne\s+\$ExpectedOldTarget/iu);
+  assert.match(quarantine, /isolationReceipt\.runId\s+-cne\s+\$RollbackRunId/iu);
+  assert.match(quarantine, /isolationReceipt\.ticketId\s+-cne\s+\$ChangeTicket/iu);
+  assert.match(quarantine, /isolationReceipt\.target\s+-cne\s+\$FailedTargetId/iu);
   assert.match(restore, /ResourceRestoreMap/);
   assert.match(restore, /resource-\d{3}|resource-\$\(/);
   assert.match(restore, /GetFullPath|Resolve-Path/);
@@ -238,9 +301,17 @@ test('rollback runbook restores one SQLite and resources point and quarantines f
   assert.match(start, /resourceDestinations/iu);
   assert.match(start, /ticketId/);
   assert.match(start, /occurredAt/);
+  assert.match(start, /startReceipt\.runId\s+-cne\s+\$RollbackRunId/iu);
+  assert.match(start, /startReceipt\.ticketId\s+-cne\s+\$ChangeTicket/iu);
+  assert.match(start, /startReceipt\.target\s+-cne\s+\$ExpectedOldTarget/iu);
   assert.doesNotMatch(start, /start-plan\.json/);
   for (const check of ['admin', 'config', 'history', 'replay', 'resource']) assert.match(smoke, new RegExp(check, 'iu'), check);
   assert.match(smoke, /Get-FileHash|sha256/iu);
+  assert.match(smoke, /smokeFinishedAt\s*=\s*\[DateTimeOffset\]::UtcNow/iu);
+  assert.match(smoke, /trafficReceipt\.runId\s+-cne\s+\$RollbackRunId/iu);
+  assert.match(smoke, /trafficReceipt\.ticketId\s+-cne\s+\$ChangeTicket/iu);
+  assert.match(smoke, /trafficReceipt\.target\s+-cne\s+\$ExpectedOldTarget/iu);
+  assert.match(smoke, /trafficOccurredAt\s+-lt\s+\$smokeFinishedAt/iu);
   assert.doesNotMatch(smoke, /Admin login, configuration, history, replay and resources verified/);
 });
 

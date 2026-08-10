@@ -6,7 +6,7 @@
 
 - go-live owner 宣布验收失败、rollback owner 接管，并取得当次回滚授权。
 - 使用正式切换前最后一份已验证 backup manifest；SQLite、WAL/SHM 和资源来自同一 runId。
-- 平台回执必须是普通 JSON 文件，至少包含 `action/status/target/occurredAt/ticketId`；本手册只验证并记录其 SHA-256，不生成平台成功回执。
+- 平台回执必须是普通 JSON 文件，至少包含 `action/status/target/occurredAt/runId/ticketId`；stop/start/traffic 的 target 必须等于本轮 `$ExpectedOldTarget`，isolation/closure 的 target 必须等于失败 PostgreSQL 标识。所有回执必须绑定同一 `$RollbackRunId/$ChangeTicket`，traffic 回执还必须晚于五项 smoke 语义验证完成时间。本手册只验证并记录原始回执 SHA-256，不生成平台成功回执。
 - 失败 PostgreSQL database/schema 只读保留用于排障，禁止 drop、覆盖和二次导入；下次使用全新空库/schema。
 
 ## 1. 冻结写入并停止 PostgreSQL 应用版本
@@ -19,7 +19,14 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $RollbackRoot = 'REPLACE_WITH_NEW_ROLLBACK_EVIDENCE_DIRECTORY'
+$RollbackRunId = 'REPLACE_WITH_UNIQUE_ROLLBACK_RUN_ID'
+$ChangeTicket = 'REPLACE_WITH_APPROVED_CHANGE_TICKET'
+$ExpectedOldTarget = 'REPLACE_WITH_EXACT_OLD_APPLICATION_TARGET'
 $TrafficStopReceiptPath = 'REPLACE_WITH_PLATFORM_TRAFFIC_STOP_RECEIPT.json'
+foreach ($binding in @($RollbackRunId,$ChangeTicket,$ExpectedOldTarget)) {
+  if ([string]::IsNullOrWhiteSpace($binding) -or $binding.StartsWith('REPLACE_WITH_')) { throw 'Real rollback run, ticket and old target bindings are required.' }
+}
+if ($RollbackRunId -notmatch '^[A-Za-z0-9._-]+$') { throw 'RollbackRunId is unsafe.' }
 if (Test-Path -LiteralPath $RollbackRoot) { throw 'Rollback evidence directory must be new.' }
 New-Item -ItemType Directory -Path $RollbackRoot | Out-Null
 if (-not (Test-Path -LiteralPath $TrafficStopReceiptPath -PathType Leaf)) { throw 'Traffic-stop receipt is required.' }
@@ -28,13 +35,15 @@ if (($receiptItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { t
 $stopReceipt = Get-Content -LiteralPath $TrafficStopReceiptPath -Raw | ConvertFrom-Json
 $stopOccurredAt = [DateTimeOffset]::MinValue
 if ($stopReceipt.action -cne 'stop-traffic-and-postgres-app' -or $stopReceipt.status -cne 'completed' -or
-    -not $stopReceipt.target -or -not $stopReceipt.ticketId -or
+    $stopReceipt.runId -cne $RollbackRunId -or $stopReceipt.ticketId -cne $ChangeTicket -or
+    $stopReceipt.target -cne $ExpectedOldTarget -or
     -not [DateTimeOffset]::TryParse([string]$stopReceipt.occurredAt, [ref]$stopOccurredAt)) {
   throw 'Platform traffic-stop receipt is invalid.'
 }
 [ordered]@{
   receiptPath = (Resolve-Path -LiteralPath $TrafficStopReceiptPath).Path
   sha256 = (Get-FileHash -LiteralPath $TrafficStopReceiptPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  runId = $RollbackRunId; ticketId = $ChangeTicket; target = $ExpectedOldTarget
   verifiedAt = [DateTime]::UtcNow.ToString('o')
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $RollbackRoot '01-traffic-stop-receipt-hash.json') -Encoding utf8
 ```
@@ -62,13 +71,16 @@ if (($isolationReceiptItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -
 $isolationReceipt = Get-Content -LiteralPath $PostgresIsolationReceiptPath -Raw | ConvertFrom-Json
 $isolationOccurredAt = [DateTimeOffset]::MinValue
 if ($isolationReceipt.action -cne 'quarantine-postgres-target' -or $isolationReceipt.status -cne 'completed' -or
-    $isolationReceipt.target -cne $FailedTargetId -or -not $isolationReceipt.ticketId -or
+    $isolationReceipt.runId -cne $RollbackRunId -or $isolationReceipt.ticketId -cne $ChangeTicket -or
+    $isolationReceipt.target -cne $FailedTargetId -or
     -not [DateTimeOffset]::TryParse([string]$isolationReceipt.occurredAt, [ref]$isolationOccurredAt) -or
     $isolationReceipt.disposition -cne 'diagnostics-only-do-not-reuse') {
   throw 'DBA isolation receipt does not prove the required quarantine.'
 }
 [ordered]@{
   target = $FailedTargetId
+  runId = $RollbackRunId
+  ticketId = $ChangeTicket
   receiptSha256 = (Get-FileHash -LiteralPath $PostgresIsolationReceiptPath -Algorithm SHA256).Hash.ToLowerInvariant()
   disposition = $isolationReceipt.disposition
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $RollbackRoot '02-postgres-isolation-receipt-hash.json') -Encoding utf8
@@ -246,7 +258,8 @@ $startOccurredAt = [DateTimeOffset]::MinValue
 $expectedResourceDestinations = @($ResourceRestoreMap | ForEach-Object { [IO.Path]::GetFullPath([string]$_.Destination) } | Sort-Object)
 $actualResourceDestinations = @($startReceipt.resourceDestinations | ForEach-Object { [IO.Path]::GetFullPath([string]$_) } | Sort-Object)
 if ($startReceipt.action -cne 'start-old-version-isolated' -or $startReceipt.status -cne 'completed' -or
-    -not $startReceipt.target -or -not $startReceipt.ticketId -or
+    $startReceipt.runId -cne $RollbackRunId -or $startReceipt.ticketId -cne $ChangeTicket -or
+    $startReceipt.target -cne $ExpectedOldTarget -or
     -not [DateTimeOffset]::TryParse([string]$startReceipt.occurredAt, [ref]$startOccurredAt) -or
     $startReceipt.imageDigest -cne $OldImageDigest -or $startReceipt.trafficAttached -ne $false -or
     [IO.Path]::GetFullPath([string]$startReceipt.legacyDataRoot) -cne [IO.Path]::GetFullPath($LegacyDataRoot) -or
@@ -256,6 +269,7 @@ if ($startReceipt.action -cne 'start-old-version-isolated' -or $startReceipt.sta
 [ordered]@{
   commandLogSha256 = (Get-FileHash -LiteralPath $startLog -Algorithm SHA256).Hash.ToLowerInvariant()
   receiptSha256 = (Get-FileHash -LiteralPath $RollbackStartReceiptPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  runId = $RollbackRunId; ticketId = $ChangeTicket; target = $ExpectedOldTarget
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $RollbackRoot '06-start-evidence-hashes.json') -Encoding utf8
 ```
 
@@ -296,23 +310,28 @@ foreach ($result in $smoke.results) {
   $hash = (Get-FileHash -LiteralPath $response -Algorithm SHA256).Hash.ToLowerInvariant()
   if ($item.Length -ne $result.sizeBytes -or $hash -cne $result.sha256) { throw "Raw smoke response mismatch: $($result.id)" }
 }
+$smokeFinishedAt = [DateTimeOffset]::UtcNow
 if (-not (Test-Path -LiteralPath $TrafficRestoreReceiptPath -PathType Leaf)) { throw 'Traffic restore requires a platform receipt.' }
 $trafficReceipt = Get-Content -LiteralPath $TrafficRestoreReceiptPath -Raw | ConvertFrom-Json
 $trafficOccurredAt = [DateTimeOffset]::MinValue
 if ($trafficReceipt.action -cne 'restore-traffic-to-old-version' -or $trafficReceipt.status -cne 'completed' -or
-    -not $trafficReceipt.target -or -not $trafficReceipt.ticketId -or
+    $trafficReceipt.runId -cne $RollbackRunId -or $trafficReceipt.ticketId -cne $ChangeTicket -or
+    $trafficReceipt.target -cne $ExpectedOldTarget -or
     -not [DateTimeOffset]::TryParse([string]$trafficReceipt.occurredAt, [ref]$trafficOccurredAt) -or
+    $trafficOccurredAt -lt $smokeFinishedAt -or
     $trafficReceipt.imageDigest -cne $OldImageDigest) { throw 'Traffic restore receipt is invalid.' }
 [ordered]@{
   smokeCommandLogSha256 = (Get-FileHash -LiteralPath $smokeCommandLog -Algorithm SHA256).Hash.ToLowerInvariant()
   smokeResultsSha256 = (Get-FileHash -LiteralPath $LegacySmokeResultPath -Algorithm SHA256).Hash.ToLowerInvariant()
   trafficReceiptSha256 = (Get-FileHash -LiteralPath $TrafficRestoreReceiptPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  runId = $RollbackRunId; ticketId = $ChangeTicket; target = $ExpectedOldTarget
+  smokeFinishedAt = $smokeFinishedAt.ToString('o'); trafficOccurredAt = $trafficOccurredAt.ToString('o')
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $RollbackRoot '07-smoke-and-traffic-evidence-hashes.json') -Encoding utf8
 ```
 
 **预期输出**：管理员登录、配置读取、历史详情、回放顺序和资源文件五项真实检查各自产生原始响应；逐项语义、size、SHA-256 通过后，平台才恢复流量并出具回执。
 
-**成功条件**：五项 ID 精确、逐项 `status=passed` 且 `semanticAssertion=true`，所有原始响应 hash 一致，流量恢复回执指向固定旧镜像。
+**成功条件**：五项 ID 精确、逐项 `status=passed` 且 `semanticAssertion=true`，所有原始响应 hash 一致；完成五项语义验证后记录 `$smokeFinishedAt`，流量恢复回执必须属于同一 rollback run/change ticket/old target，且 `occurredAt >= smokeFinishedAt` 并指向固定旧镜像。
 
 **失败停止点**：任一 endpoint/data/resource 检查失败或原始响应不匹配，均不得恢复流量；没有平台回执不得声称恢复成功。
 
@@ -330,7 +349,8 @@ if (-not (Test-Path -LiteralPath $IncidentClosureReceiptPath -PathType Leaf)) { 
 $closure = Get-Content -LiteralPath $IncidentClosureReceiptPath -Raw | ConvertFrom-Json
 $closureOccurredAt = [DateTimeOffset]::MinValue
 if ($closure.action -cne 'close-rollback-incident' -or $closure.status -cne 'closed' -or
-    $closure.target -cne $FailedTargetId -or -not $closure.ticketId -or
+    $closure.runId -cne $RollbackRunId -or $closure.ticketId -cne $ChangeTicket -or
+    $closure.target -cne $FailedTargetId -or
     -not [DateTimeOffset]::TryParse([string]$closure.occurredAt, [ref]$closureOccurredAt) -or
     $closure.failedPostgresDisposition -cne 'preserve-for-diagnostics-only' -or
     $closure.retryTargetRequirement -cne 'new-empty-database-or-schema' -or
