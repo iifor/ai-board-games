@@ -1,10 +1,8 @@
 import { IDENTITY_TABLES, IMPORT_TABLES } from '../constants';
+// @ts-ignore TS6059: this type-only cross-package import intentionally reuses the server contract despite db-migrator's isolated rootDir.
+import type { DbExecutor } from '../../../server/db/types';
 
-export interface DbExecutor {
-  queryOne<T extends object>(sql: string, params?: readonly unknown[]): Promise<T | null>;
-  queryMany<T extends object>(sql: string, params?: readonly unknown[]): Promise<T[]>;
-  close(): Promise<void>;
-}
+export type ValidationDbExecutor = Pick<DbExecutor, 'queryOne' | 'queryMany' | 'close'>;
 
 export interface TableCount { table: string; count: number }
 export interface ForeignKeyViolation { constraint: string; table: string; key: string }
@@ -140,22 +138,22 @@ export const BUSINESS_SAMPLES: readonly BusinessSampleDefinition[] = [
   },
 ];
 
-export async function countImportedTables(db: DbExecutor): Promise<TableCount[]> {
+export async function countImportedTables(db: ValidationDbExecutor): Promise<TableCount[]> {
   return db.queryMany<TableCount>(TABLE_COUNT_SQL);
 }
 
-export async function findForeignKeyViolations(db: DbExecutor): Promise<ForeignKeyViolation[]> {
+export async function findForeignKeyViolations(db: ValidationDbExecutor): Promise<ForeignKeyViolation[]> {
   return db.queryMany<ForeignKeyViolation>(FOREIGN_KEY_SQL);
 }
 
-export async function readIdentityStates(db: DbExecutor): Promise<IdentityState[]> {
+export async function readIdentityStates(db: ValidationDbExecutor): Promise<IdentityState[]> {
   return db.queryMany<IdentityState>(IDENTITY_SQL);
 }
 
-export async function findJsonSemanticViolations(db: DbExecutor): Promise<JsonSemanticViolation[]> {
+export async function findJsonSemanticViolations(db: ValidationDbExecutor): Promise<JsonSemanticViolation[]> {
   return db.queryMany<JsonSemanticViolation>(JSON_SEMANTICS_SQL);
 }
 
-export async function findTimestampViolations(db: DbExecutor): Promise<TimestampViolation[]> {
+export async function findTimestampViolations(db: ValidationDbExecutor): Promise<TimestampViolation[]> {
   return db.queryMany<TimestampViolation>(TIMESTAMP_SQL);
 }

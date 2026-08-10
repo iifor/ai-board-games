@@ -1,9 +1,10 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { IMPORT_TABLES, SKIPPED_TABLES } from '../constants';
 import { hashFile, verifyManifest, type BackupManifest } from '../backup/manifest';
+import { isSafeRunId } from '../backup/publication';
 import { redactSecrets, writeReadinessReport } from '../reporting/reportWriter';
 import type { ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
 import type { MigrationReport } from '../types';
@@ -14,7 +15,7 @@ import {
   findJsonSemanticViolations,
   findTimestampViolations,
   readIdentityStates,
-  type DbExecutor,
+  type ValidationDbExecutor,
 } from '../validation/queries';
 
 interface PostgresExecutorConfig {
@@ -27,7 +28,7 @@ interface PostgresExecutorConfig {
 }
 
 const { createPostgresExecutor } = require('../../../server/db/postgres') as {
-  createPostgresExecutor(config: PostgresExecutorConfig): DbExecutor;
+  createPostgresExecutor(config: PostgresExecutorConfig): ValidationDbExecutor;
 };
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
@@ -46,7 +47,7 @@ export interface ValidateOptions {
 
 export interface ValidateDependencies {
   createSqlite(sourcePath: string): Database.Database;
-  createPostgres(targetUrl: string, targetSchema: string): DbExecutor;
+  createPostgres(targetUrl: string, targetSchema: string): ValidationDbExecutor;
 }
 
 function tlsConfiguration(targetUrl: string): false | { rejectUnauthorized: true } {
@@ -122,7 +123,7 @@ function failed(
 }
 
 function validateOptions(options: ValidateOptions): string | null {
-  if (!options.runId.trim()) return 'runId is required';
+  if (!isSafeRunId(options.runId)) return 'runId must be a safe, non-empty identifier';
   if (!options.sourceSnapshotPath.trim()) return 'sourceSnapshotPath is required';
   if (!options.sourceManifestPath.trim()) return 'sourceManifestPath is required';
   if (!options.migrationReportPath.trim()) return 'migrationReportPath is required';
@@ -135,6 +136,60 @@ function validateOptions(options: ValidateOptions): string | null {
     return 'targetUrl must be a PostgreSQL URL';
   }
   return null;
+}
+
+function postgresFailureMessage(base: string, error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  return /\bpostgres(?:ql)?:\/\//i.test(raw) ? `${base}: [REDACTED_DATABASE_URL]` : base;
+}
+
+interface ValidationEvidence {
+  version: 1;
+  runId: string;
+  stage: 'validation';
+  status: ReadinessReport['status'];
+  summary: { passed: number; failed: number; skipped: number };
+  checks: Array<{ id: string; status: ReadinessCheck['status'] }>;
+}
+
+function buildValidationEvidence(report: ReadinessReport): ValidationEvidence {
+  const summary = { passed: 0, failed: 0, skipped: 0 };
+  const checks = report.checks.map((check) => {
+    summary[check.status] += 1;
+    return { id: redactSecrets(check.id), status: check.status };
+  });
+  return { version: 1, runId: report.runId, stage: 'validation', status: report.status, summary, checks };
+}
+
+async function publishValidationEvidence(
+  outputDirectory: string,
+  report: ReadinessReport,
+): Promise<{ type: 'validation-report'; path: string; sha256: string }> {
+  await fs.mkdir(outputDirectory, { recursive: true });
+  const finalPath = path.join(outputDirectory, `${report.runId}-validation-evidence.json`);
+  const temporaryPath = `${finalPath}.tmp-${randomUUID()}`;
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  let closed = false;
+  let published = false;
+  try {
+    handle = await fs.open(temporaryPath, 'wx');
+    await handle.writeFile(`${JSON.stringify(buildValidationEvidence(report), null, 2)}\n`, 'utf8');
+    await handle.sync();
+    await handle.close();
+    closed = true;
+    await fs.link(temporaryPath, finalPath);
+    published = true;
+    const sha256 = await hashFile(finalPath);
+    return { type: 'validation-report', path: finalPath, sha256 };
+  } catch (error) {
+    if (published) await fs.rm(finalPath, { force: true });
+    throw error;
+  } finally {
+    if (handle && !closed) {
+      try { await handle.close(); } catch { /* cleanup continues below */ }
+    }
+    await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+  }
 }
 
 function isMigrationReport(value: unknown): value is MigrationReport {
@@ -205,7 +260,7 @@ async function verifySourceManifest(options: ValidateOptions): Promise<void> {
 
 async function validateRows(
   sqlite: Database.Database,
-  postgres: DbExecutor,
+  postgres: ValidationDbExecutor,
   migrationReport: MigrationReport,
   checks: ReadinessCheck[],
   errors: ReadinessReport['errors'],
@@ -226,7 +281,7 @@ async function validateRows(
 }
 
 async function validateForeignKeys(
-  postgres: DbExecutor,
+  postgres: ValidationDbExecutor,
   checks: ReadinessCheck[],
   errors: ReadinessReport['errors'],
 ): Promise<void> {
@@ -247,7 +302,7 @@ async function validateForeignKeys(
 }
 
 async function validateJson(
-  postgres: DbExecutor,
+  postgres: ValidationDbExecutor,
   checks: ReadinessCheck[],
   errors: ReadinessReport['errors'],
 ): Promise<void> {
@@ -270,7 +325,7 @@ async function validateJson(
 }
 
 async function validateTimestamps(
-  postgres: DbExecutor,
+  postgres: ValidationDbExecutor,
   checks: ReadinessCheck[],
   errors: ReadinessReport['errors'],
 ): Promise<void> {
@@ -293,7 +348,7 @@ async function validateTimestamps(
 }
 
 async function validateIdentities(
-  postgres: DbExecutor,
+  postgres: ValidationDbExecutor,
   checks: ReadinessCheck[],
   errors: ReadinessReport['errors'],
 ): Promise<void> {
@@ -317,7 +372,7 @@ async function validateIdentities(
 
 async function validateBusinessSamples(
   sqlite: Database.Database,
-  postgres: DbExecutor,
+  postgres: ValidationDbExecutor,
   checks: ReadinessCheck[],
   errors: ReadinessReport['errors'],
 ): Promise<void> {
@@ -351,12 +406,18 @@ export async function runValidation(
   const errors: ReadinessReport['errors'] = [];
   const resolved = { ...defaultDependencies, ...dependencies };
   let sqlite: Database.Database | undefined;
-  let postgres: DbExecutor | undefined;
+  let postgres: ValidationDbExecutor | undefined;
 
   const runChecks = async (): Promise<void> => {
     const optionError = validateOptions(options);
     if (optionError) {
-      failed(checks, errors, 'parameters.safe', 'INVALID_PARAMETERS', optionError);
+      failed(
+        checks,
+        errors,
+        'parameters.safe',
+        isSafeRunId(options.runId) ? 'INVALID_PARAMETERS' : 'INVALID_RUN_ID',
+        optionError,
+      );
       return;
     }
     passed(checks, 'parameters.safe', 'Validation parameters are valid');
@@ -388,6 +449,20 @@ export async function runValidation(
 
     try {
       postgres = resolved.createPostgres(options.targetUrl, options.targetSchema);
+      await postgres.queryOne<{ ready: number }>('SELECT 1 AS ready');
+      passed(checks, 'target.open-readonly', 'PostgreSQL target opened for read-only validation');
+    } catch (error) {
+      failed(
+        checks,
+        errors,
+        'target.open-readonly',
+        'POSTGRES_CONNECTION_FAILED',
+        postgresFailureMessage('PostgreSQL validation failed', error),
+      );
+      return;
+    }
+
+    try {
       await validateRows(sqlite, postgres, migrationReport, checks, errors);
       await validateForeignKeys(postgres, checks, errors);
       await validateJson(postgres, checks, errors);
@@ -400,7 +475,7 @@ export async function runValidation(
         errors,
         'validation.queries',
         'VALIDATION_QUERY_FAILED',
-        error instanceof Error ? error.message : 'Validation query failed',
+        postgresFailureMessage('Read-only validation query failed', error),
       );
     }
   };
@@ -408,20 +483,20 @@ export async function runValidation(
   try {
     await runChecks();
   } catch (error) {
-    failed(checks, errors, 'validation.unexpected', 'VALIDATION_FAILED', error instanceof Error ? error.message : 'Validation failed');
+    failed(checks, errors, 'validation.unexpected', 'VALIDATION_FAILED', 'Validation failed');
   } finally {
     if (sqlite) {
       try {
         sqlite.close();
-      } catch (error) {
-        failed(checks, errors, 'source.close', 'SQLITE_CLOSE_FAILED', error instanceof Error ? error.message : 'SQLite source close failed');
+      } catch {
+        failed(checks, errors, 'source.close', 'SQLITE_CLOSE_FAILED', 'SQLite source close failed');
       }
     }
     if (postgres) {
       try {
         await postgres.close();
       } catch (error) {
-        failed(checks, errors, 'target.close', 'POSTGRES_CLOSE_FAILED', error instanceof Error ? error.message : 'PostgreSQL target close failed');
+        failed(checks, errors, 'target.close', 'POSTGRES_CLOSE_FAILED', postgresFailureMessage('PostgreSQL target close failed', error));
       }
     }
   }
@@ -431,16 +506,16 @@ export async function runValidation(
   }
 
   let result = createReport(options, started, checks, errors);
+  if (!isSafeRunId(options.runId) || !options.outputDirectory.trim()) return result;
+  let evidencePath: string | undefined;
   try {
-    const written = await writeReadinessReport({ outputDirectory: options.outputDirectory, report: result });
-    if (result.status === 'passed') {
-      result = {
-        ...result,
-        artifacts: [{ type: 'validation-report', path: written.jsonPath, sha256: await hashFile(written.jsonPath) }],
-      };
-    }
-  } catch (error) {
-    failed(checks, errors, 'validation-report.write', 'VALIDATION_REPORT_WRITE_FAILED', error instanceof Error ? error.message : 'Validation report could not be written');
+    const artifact = await publishValidationEvidence(options.outputDirectory, result);
+    evidencePath = artifact.path;
+    result = { ...result, artifacts: [artifact] };
+    await writeReadinessReport({ outputDirectory: options.outputDirectory, report: result });
+  } catch {
+    if (evidencePath) await fs.rm(evidencePath, { force: true }).catch(() => undefined);
+    failed(checks, errors, 'validation-report.write', 'VALIDATION_REPORT_WRITE_FAILED', 'Validation report could not be written');
     result = createReport(options, started, checks, errors);
   }
   return result;

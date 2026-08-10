@@ -20,6 +20,7 @@ import {
   quarantineOwned,
   releaseReservation,
   reserveFinal,
+  isSafeRunId,
   type FinalReservation,
 } from '../backup/publication';
 import { redactSecrets, writeReadinessReport } from '../reporting/reportWriter';
@@ -36,10 +37,8 @@ export interface BackupOptions {
 interface ResourceFile { file: FileMetadata; rootRealPath: string; destination: string }
 interface BackupPlan { source: SourceInspection; sourceRootRealPath: string; resources: ResourceFile[]; estimatedBytes: number }
 
-const SAFE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-
 function evidenceRunId(runId: string): string {
-  return SAFE_RUN_ID.test(runId) && runId !== '.' && runId !== '..' ? runId : 'invalid-run';
+  return isSafeRunId(runId) ? runId : 'invalid-run';
 }
 
 function codedError(code: string, message: string): Error & { code: string } {
@@ -105,7 +104,7 @@ async function inspectResourceRoot(root: string, index: number): Promise<Resourc
 }
 
 async function planBackup(options: BackupOptions): Promise<BackupPlan> {
-  if (!SAFE_RUN_ID.test(options.runId) || options.runId === '.' || options.runId === '..') throw codedError('INVALID_RUN_ID', 'runId must be a safe, non-empty identifier');
+  if (!isSafeRunId(options.runId)) throw codedError('INVALID_RUN_ID', 'runId must be a safe, non-empty identifier');
   if (!options.sourcePath.trim() || !options.outputDirectory.trim()) throw codedError('INVALID_PARAMETERS', 'sourcePath and outputDirectory are required');
   if (!Array.isArray(options.resourceDirectories) || options.resourceDirectories.some((item) => !item.trim())) {
     throw codedError('INVALID_PARAMETERS', 'resourceDirectories must contain non-empty paths');

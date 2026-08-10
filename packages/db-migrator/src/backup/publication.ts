@@ -16,6 +16,17 @@ export interface QuarantineResult {
   unmovedEvidence: string[];
 }
 
+const SAFE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const WINDOWS_RESERVED_RUN_ID = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+
+export function isSafeRunId(runId: string): boolean {
+  return SAFE_RUN_ID.test(runId)
+    && runId !== '.'
+    && runId !== '..'
+    && !runId.endsWith('.')
+    && !WINDOWS_RESERVED_RUN_ID.test(runId);
+}
+
 function codedError(code: string, message: string): Error & { code: string } {
   return Object.assign(new Error(message), { code });
 }
@@ -30,7 +41,7 @@ export async function pathExists(candidate: string): Promise<boolean> {
 
 export async function createUniqueSite(output: string, runId: string, kind: 'staging' | 'failed'): Promise<string> {
   await fs.mkdir(output, { recursive: true });
-  const safeRunId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(runId) ? runId : 'invalid-run';
+  const safeRunId = isSafeRunId(runId) ? runId : 'invalid-run';
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const candidate = path.join(output, `${kind === 'staging' ? '.' : ''}${safeRunId}.${kind}-${randomUUID()}`);
     try { await fs.mkdir(candidate); return candidate; }

@@ -256,9 +256,26 @@ test('validation passes source/import/target checks using only reads and emits h
     }
     const artifact = report.artifacts.find((candidate) => candidate.type === 'validation-report');
     assert.ok(artifact?.path);
+    assert.equal(artifact?.path, path.join(options.outputDirectory, `${options.runId}-validation-evidence.json`));
     assert.match(artifact?.sha256 || '', /^[a-f0-9]{64}$/);
     assert.equal(await hashFile(artifact!.path), artifact?.sha256);
-    const serialized = JSON.stringify(report) + fs.readFileSync(artifact!.path, 'utf8');
+    const durablePath = path.join(options.outputDirectory, `${options.runId}-validation.json`);
+    const durable = JSON.parse(fs.readFileSync(durablePath, 'utf8')) as typeof report;
+    assert.deepEqual(durable, JSON.parse(JSON.stringify(report)));
+    assert.deepEqual(durable.artifacts, report.artifacts);
+    const evidence = JSON.parse(fs.readFileSync(artifact!.path, 'utf8')) as {
+      version: number;
+      runId: string;
+      stage: string;
+      status: string;
+      summary: { passed: number; failed: number; skipped: number };
+      checks: Array<{ id: string; status: string }>;
+    };
+    assert.deepEqual(Object.keys(evidence).sort(), ['checks', 'runId', 'stage', 'status', 'summary', 'version']);
+    assert.ok(evidence.checks.every((check) => Object.keys(check).sort().join(',') === 'id,status'));
+    assert.equal(evidence.checks.length, report.checks.length);
+    assert.equal(evidence.summary.passed + evidence.summary.failed + evidence.summary.skipped, report.checks.length);
+    const serialized = JSON.stringify(report) + JSON.stringify(durable) + JSON.stringify(evidence);
     for (const secret of [
       'super-secret-password-hash',
       'top-secret-config',
@@ -378,7 +395,11 @@ test('validation never includes malformed source row values in query failure mes
     const report = await runValidation(options);
     assert.equal(report.status, 'failed');
     assert.ok(errorCodes(report).includes('VALIDATION_QUERY_FAILED'));
-    assert.doesNotMatch(JSON.stringify(report), /private-malformed-source-json/);
+    assert.equal(report.errors.find((error) => error.code === 'VALIDATION_QUERY_FAILED')?.message, 'Read-only validation query failed');
+    const serialized = JSON.stringify(report);
+    for (const fragment of ['private-malformed-source-json', 'private-ma', 'topic_json', 'SELECT secret']) {
+      assert.doesNotMatch(serialized, new RegExp(fragment, 'i'));
+    }
   });
 });
 
@@ -433,10 +454,93 @@ test('validation redacts a PostgreSQL URL as one placeholder without retaining e
       createPostgres: () => { throw new Error(`DATABASE_URL=${url}`); },
     });
     const serialized = JSON.stringify(report);
+    assert.ok(errorCodes(report).includes('POSTGRES_CONNECTION_FAILED'));
+    assert.equal(
+      report.errors.find((error) => error.code === 'POSTGRES_CONNECTION_FAILED')?.message,
+      'PostgreSQL validation failed: [REDACTED_DATABASE_URL]',
+    );
     assert.match(serialized, /\[REDACTED_DATABASE_URL\]/);
     for (const component of ['route_user', 'route_password', 'route.host', '5432', 'route_database', 'sslmode']) {
       assert.doesNotMatch(serialized, new RegExp(component));
     }
+  });
+});
+
+test('validation replaces endpoint-only PostgreSQL connection and DNS errors with fixed messages', async () => {
+  await withValidationFixture(async ({ options, root }) => {
+    const cases = [
+      'connect ECONNREFUSED db.internal.example:5432 database=consensus user=db_user password=db_password query=SELECT secret',
+      'getaddrinfo ENOTFOUND dns.internal.example database=consensus user=dns_user password=dns_password',
+    ];
+    for (const [index, rawMessage] of cases.entries()) {
+      const report = await runValidation({
+        ...options,
+        runId: `${options.runId}-endpoint-${index}`,
+        outputDirectory: path.join(root, `endpoint-${index}`),
+      }, {
+        createPostgres: () => { throw new Error(rawMessage); },
+      });
+      assert.equal(report.errors.find((error) => error.code === 'POSTGRES_CONNECTION_FAILED')?.message, 'PostgreSQL validation failed');
+      const serialized = JSON.stringify(report);
+      for (const secret of ['db.internal.example', 'dns.internal.example', '5432', 'consensus', 'db_user', 'db_password', 'dns_user', 'dns_password', 'SELECT', 'secret']) {
+        assert.doesNotMatch(serialized, new RegExp(secret, 'i'));
+      }
+    }
+  });
+});
+
+test('validation rejects unsafe run ids before opening databases or writing inside or outside output', async () => {
+  await withValidationFixture(async ({ options, root }) => {
+    const unsafeRunIds = ['../escape', 'dir/name', 'dir\\name', 'C:drive', '.', '..', `bad${String.fromCharCode(1)}id`, 'CON', 'trailing.'];
+    for (const [index, runId] of unsafeRunIds.entries()) {
+      const outputDirectory = path.join(root, `unsafe-output-${index}`);
+      fs.mkdirSync(outputDirectory);
+      let sqliteOpened = false;
+      let postgresOpened = false;
+      const report = await runValidation({ ...options, runId, outputDirectory }, {
+        createSqlite: () => {
+          sqliteOpened = true;
+          throw new Error('must not open SQLite');
+        },
+        createPostgres: () => {
+          postgresOpened = true;
+          throw new Error('must not open PostgreSQL');
+        },
+      });
+      assert.deepEqual(errorCodes(report), ['INVALID_RUN_ID']);
+      assert.equal(sqliteOpened, false);
+      assert.equal(postgresOpened, false);
+      assert.deepEqual(fs.readdirSync(outputDirectory), []);
+    }
+    assert.equal(fs.existsSync(path.join(root, 'escape-validation.json')), false);
+    assert.equal(fs.existsSync(path.join(root, 'escape-validation-evidence.json')), false);
+  });
+});
+
+test('validation evidence publication does not overwrite an existing sidecar or leave temp files', async () => {
+  await withValidationFixture(async ({ options }) => {
+    fs.mkdirSync(options.outputDirectory, { recursive: true });
+    const evidencePath = path.join(options.outputDirectory, `${options.runId}-validation-evidence.json`);
+    fs.writeFileSync(evidencePath, 'existing-evidence', 'utf8');
+    const report = await runValidation(options);
+    assert.equal(report.status, 'failed');
+    assert.ok(errorCodes(report).includes('VALIDATION_REPORT_WRITE_FAILED'));
+    assert.equal(fs.readFileSync(evidencePath, 'utf8'), 'existing-evidence');
+    assert.deepEqual(fs.readdirSync(options.outputDirectory), [`${options.runId}-validation-evidence.json`]);
+  });
+});
+
+test('validation rolls back its evidence sidecar when final readiness report publication fails', async () => {
+  await withValidationFixture(async ({ options }) => {
+    fs.mkdirSync(options.outputDirectory, { recursive: true });
+    const durablePath = path.join(options.outputDirectory, `${options.runId}-validation.json`);
+    fs.writeFileSync(durablePath, 'existing-final-report', 'utf8');
+    const report = await runValidation(options);
+    assert.equal(report.status, 'failed');
+    assert.ok(errorCodes(report).includes('VALIDATION_REPORT_WRITE_FAILED'));
+    assert.equal(fs.readFileSync(durablePath, 'utf8'), 'existing-final-report');
+    assert.equal(fs.existsSync(path.join(options.outputDirectory, `${options.runId}-validation-evidence.json`)), false);
+    assert.deepEqual(fs.readdirSync(options.outputDirectory), [`${options.runId}-validation.json`]);
   });
 });
 
