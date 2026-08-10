@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -8,6 +9,8 @@ import Database from 'better-sqlite3';
 import { runBackup } from '../../packages/db-migrator/src/commands/backup';
 import { verifyManifest, type BackupManifest } from '../../packages/db-migrator/src/backup/manifest';
 import { main } from '../../packages/db-migrator/src/cli';
+
+const cryptoModule = require('node:crypto') as typeof import('node:crypto');
 
 interface WalFixture {
   root: string;
@@ -125,13 +128,15 @@ test('backup dry-run reports skipped mutations without creating files or changin
   }
 });
 
-test('dry-run performs zero content opens or reads and preserves source/resource metadata', async () => {
+test('dry-run performs zero content opens, reads, or hashes and preserves source/resource metadata', async () => {
   const fixture = createWalFixture();
   const dryRunOutput = path.join(fixture.root, 'dry-run-output');
   const before = metadataWithoutContent(fixture.root);
   const originalOpen = fs.promises.open;
+  const originalCreateHash = cryptoModule.createHash;
   let contentOpens = 0;
   let contentReads = 0;
+  let contentHashes = 0;
   fs.promises.open = async (candidate, flags, mode) => {
     contentOpens += 1;
     const handle = await originalOpen(candidate, flags as never, mode);
@@ -142,6 +147,11 @@ test('dry-run performs zero content opens or reads and preserves source/resource
     };
     return handle;
   };
+  cryptoModule.createHash = ((...args: Parameters<typeof originalCreateHash>) => {
+    contentHashes += 1;
+    return originalCreateHash(...args);
+  }) as typeof originalCreateHash;
+  syncBuiltinESMExports();
   try {
     const report = await runBackup({
       runId: 'no-content-io', sourcePath: fixture.sourcePath, outputDirectory: dryRunOutput,
@@ -150,10 +160,13 @@ test('dry-run performs zero content opens or reads and preserves source/resource
     assert.equal(report.status, 'passed');
     assert.equal(contentOpens, 0);
     assert.equal(contentReads, 0);
+    assert.equal(contentHashes, 0);
     assert.equal(fs.existsSync(dryRunOutput), false);
     assert.deepEqual(metadataWithoutContent(fixture.root), before);
   } finally {
     fs.promises.open = originalOpen;
+    cryptoModule.createHash = originalCreateHash;
+    syncBuiltinESMExports();
     cleanupFixture(fixture);
   }
 });
