@@ -4,8 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
+import { main } from '../../packages/db-migrator/src/cli';
 import { IMPORT_TABLES } from '../../packages/db-migrator/src/constants';
 import { runPreflight, type PreflightOptions } from '../../packages/db-migrator/src/commands/preflight';
+import type { ReadinessReport } from '../../packages/db-migrator/src/reporting/reportTypes';
 import { migratePostgres } from '../../packages/server/db/postgres/migrate';
 import type { DbExecutor } from '../../packages/server/db/types';
 import { withTestSchema } from './helpers';
@@ -57,6 +59,28 @@ function emptyExecutor(version: string): DbExecutor {
     healthCheck: async () => true,
     close: async () => undefined,
   };
+}
+
+function freshTargetExecutor(close: () => Promise<void> = async () => undefined): DbExecutor {
+  return {
+    queryOne: async <T extends object>(sql: string): Promise<T | null> => {
+      if (sql.includes('server_version_num')) return { server_version_num: '160000' } as T;
+      if (sql.includes('pg_namespace')) return { exists: false } as T;
+      return null;
+    },
+    queryMany: async <T extends object>(): Promise<T[]> => [],
+    execute: async () => ({ rowCount: 0 }),
+    withTransaction: async <T>(operation: (transaction: DbExecutor) => Promise<T>) => operation(freshTargetExecutor(close)),
+    healthCheck: async () => true,
+    close,
+  };
+}
+
+function sqliteWithCloseFailure(sourcePath: string): { sqlite: Database.Database; release: () => void } {
+  const sqlite = new Database(sourcePath, { readonly: true, fileMustExist: true });
+  const realClose = sqlite.close.bind(sqlite);
+  sqlite.close = (() => { throw new Error('SQLITE_CLOSE_FAILURE'); }) as typeof sqlite.close;
+  return { sqlite, release: () => realClose() };
 }
 
 test('preflight reports SOURCE_NOT_FOUND without opening a target connection', async () => {
@@ -203,4 +227,130 @@ test('preflight leaves an existing migrated empty target unchanged', async () =>
       fs.rmSync(outputDirectory, { recursive: true, force: true });
     }
   });
+});
+
+test('preflight records POSTGRES_CLOSE_FAILED after otherwise-passed checks', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  let postgresCloseAttempts = 0;
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createPostgres: () => freshTargetExecutor(async () => {
+        postgresCloseAttempts += 1;
+        throw new Error('POSTGRES_CLOSE_FAILURE');
+      }),
+    });
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['POSTGRES_CLOSE_FAILED']);
+    assert.equal(report.checks.find((check) => check.id === 'target.close')?.status, 'failed');
+    assert.equal(postgresCloseAttempts, 1);
+  } finally {
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight records SQLITE_CLOSE_FAILED after otherwise-passed checks', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const source = sqliteWithCloseFailure(sourcePath);
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createSqlite: () => source.sqlite,
+      createPostgres: () => freshTargetExecutor(),
+    });
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['SQLITE_CLOSE_FAILED']);
+    assert.equal(report.checks.find((check) => check.id === 'source.close')?.status, 'failed');
+  } finally {
+    source.release();
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight records both close failures after otherwise-passed checks', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const source = sqliteWithCloseFailure(sourcePath);
+  let postgresCloseAttempts = 0;
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createSqlite: () => source.sqlite,
+      createPostgres: () => freshTargetExecutor(async () => {
+        postgresCloseAttempts += 1;
+        throw new Error('POSTGRES_CLOSE_FAILURE');
+      }),
+    });
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['SQLITE_CLOSE_FAILED', 'POSTGRES_CLOSE_FAILED']);
+    assert.equal(postgresCloseAttempts, 1);
+  } finally {
+    source.release();
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight preserves an earlier failure while recording close failures', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const source = sqliteWithCloseFailure(sourcePath);
+  let postgresCloseAttempts = 0;
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createSqlite: () => source.sqlite,
+      createPostgres: () => {
+        const executor = emptyExecutor('150000');
+        executor.close = async () => {
+          postgresCloseAttempts += 1;
+          throw new Error('POSTGRES_CLOSE_FAILURE');
+        };
+        return executor;
+      },
+    });
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), [
+      'POSTGRES_VERSION_UNSUPPORTED',
+      'SQLITE_CLOSE_FAILED',
+      'POSTGRES_CLOSE_FAILED',
+    ]);
+    assert.equal(postgresCloseAttempts, 1);
+  } finally {
+    source.release();
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight CLI route redacts PostgreSQL URLs from readiness reports before stdout', async () => {
+  const url = 'postgresql://route_user:route_password@route.host:5432/route_database?sslmode=require';
+  const report: ReadinessReport = {
+    runId: 'preflight-route-redaction',
+    stage: 'preflight',
+    status: 'failed',
+    startedAt: '2026-08-10T00:00:00.000Z',
+    finishedAt: '2026-08-10T00:00:01.000Z',
+    durationMs: 1000,
+    checks: [{ id: 'target.postgres-version', status: 'failed', actual: url, message: `upstream rejected ${url}` }],
+    artifacts: [],
+    errors: [{ code: 'POSTGRES_CONNECTION_FAILED', message: `DATABASE_URL=${url}` }],
+  };
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const exitCodes: number[] = [];
+  await main(['preflight'], {
+    runReadinessCommand: async () => report,
+    stdout: (line) => stdout.push(line),
+    stderr: (line) => stderr.push(line),
+    setExitCode: (code) => exitCodes.push(code),
+  });
+  assert.deepEqual(exitCodes, [1]);
+  assert.equal(stdout.length, 1);
+  for (const line of [...stdout, ...stderr]) {
+    assert.match(line, /\[REDACTED_DATABASE_URL\]/);
+    for (const component of ['route_user', 'route_password', 'route.host', '5432', 'route_database', 'sslmode']) {
+      assert.doesNotMatch(line, new RegExp(component));
+    }
+  }
 });

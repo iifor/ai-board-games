@@ -174,36 +174,36 @@ export async function runPreflight(
   let sqlite: Database.Database | undefined;
   let postgres: DbExecutor | undefined;
 
-  try {
+  const runChecks = async (): Promise<void> => {
     const optionError = validateOptions(options);
     if (optionError) {
       failedCheck(checks, errors, 'parameters.safe', 'INVALID_PARAMETERS', optionError);
-      return report(options.runId, started, checks, errors);
+      return;
     }
     passedCheck(checks, 'parameters.safe', 'Preflight parameters are valid');
 
     if (!fs.existsSync(options.sourcePath)) {
       failedCheck(checks, errors, 'source.exists-and-readable', 'SOURCE_NOT_FOUND', 'SQLite source file does not exist');
-      return report(options.runId, started, checks, errors);
+      return;
     }
     try {
       sqlite = resolved.createSqlite(options.sourcePath);
       passedCheck(checks, 'source.exists-and-readable', 'SQLite source opened read-only');
     } catch {
       failedCheck(checks, errors, 'source.exists-and-readable', 'SOURCE_INTEGRITY_FAILED', 'SQLite source cannot be opened read-only');
-      return report(options.runId, started, checks, errors);
+      return;
     }
 
     try {
       const integrity = sqlite.prepare('PRAGMA integrity_check').pluck().get();
       if (integrity !== 'ok') {
         failedCheck(checks, errors, 'source.integrity', 'SOURCE_INTEGRITY_FAILED', 'SQLite integrity check did not return ok', 'ok', String(integrity));
-        return report(options.runId, started, checks, errors);
+        return;
       }
       passedCheck(checks, 'source.integrity', 'SQLite integrity check passed', 'ok', 'ok');
     } catch {
       failedCheck(checks, errors, 'source.integrity', 'SOURCE_INTEGRITY_FAILED', 'SQLite integrity check could not complete');
-      return report(options.runId, started, checks, errors);
+      return;
     }
 
     let resourceBytes = 0;
@@ -212,7 +212,7 @@ export async function runPreflight(
       passedCheck(checks, 'resources.readable', 'Resource directories are readable');
     } catch {
       failedCheck(checks, errors, 'resources.readable', 'RESOURCE_DIRECTORY_UNREADABLE', 'A resource directory is missing or unreadable');
-      return report(options.runId, started, checks, errors);
+      return;
     }
 
     const sourceBytes = readOnlySize(options.sourcePath) + readOnlySize(`${options.sourcePath}-wal`) + readOnlySize(`${options.sourcePath}-shm`);
@@ -221,12 +221,12 @@ export async function runPreflight(
       const available = await resolved.availableBytes(options.outputDirectory);
       if (!Number.isFinite(available) || available < requiredBytes) {
         failedCheck(checks, errors, 'disk.capacity', 'INSUFFICIENT_DISK_SPACE', 'Output volume does not have enough free space', `at least ${requiredBytes} bytes`, `${available} bytes`);
-        return report(options.runId, started, checks, errors);
+        return;
       }
       passedCheck(checks, 'disk.capacity', 'Output volume has sufficient free space', `at least ${requiredBytes} bytes`, `${available} bytes`);
     } catch {
       failedCheck(checks, errors, 'disk.capacity', 'OUTPUT_DIRECTORY_UNAVAILABLE', 'Output directory volume cannot be inspected');
-      return report(options.runId, started, checks, errors);
+      return;
     }
 
     try {
@@ -235,12 +235,12 @@ export async function runPreflight(
       const versionNumber = Number(version?.server_version_num || 0);
       if (Math.floor(versionNumber / 10_000) !== POSTGRES_MAJOR_VERSION) {
         failedCheck(checks, errors, 'target.postgres-version', 'POSTGRES_VERSION_UNSUPPORTED', 'PostgreSQL major version must be 16', '16', String(Math.floor(versionNumber / 10_000) || 'unknown'));
-        return report(options.runId, started, checks, errors);
+        return;
       }
       passedCheck(checks, 'target.postgres-version', 'PostgreSQL major version is supported', '16', '16');
     } catch (error) {
       failedCheck(checks, errors, 'target.postgres-version', 'POSTGRES_CONNECTION_FAILED', error instanceof Error ? error.message : 'PostgreSQL connection failed');
-      return report(options.runId, started, checks, errors);
+      return;
     }
 
     const schema = await postgres.queryOne<{ exists: boolean }>('SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = $1) AS exists', [options.targetSchema]);
@@ -258,27 +258,42 @@ export async function runPreflight(
             empty.missingTable ? 'TARGET_TABLE_MISSING' : 'TARGET_NOT_EMPTY',
             empty.missingTable ? `Target import table is missing: ${empty.missingTable}` : 'Target import tables must be empty',
           );
-          return report(options.runId, started, checks, errors);
+          return;
         }
         passedCheck(checks, 'target.import-tables-empty', 'All target import tables are empty');
       } catch (error) {
         failedCheck(checks, errors, 'target.import-tables-empty', 'TARGET_NOT_EMPTY', error instanceof Error ? error.message : 'Target import table check failed');
-        return report(options.runId, started, checks, errors);
+        return;
       }
     }
 
     if (options.requireTls && !tlsVerificationEnabled(options.targetUrl)) {
       failedCheck(checks, errors, 'target.tls', 'TLS_REQUIRED', 'TLS certificate verification requires sslmode=verify-full');
-      return report(options.runId, started, checks, errors);
+      return;
     }
     passedCheck(checks, 'target.tls', options.requireTls ? 'TLS certificate verification is enabled' : 'TLS certificate verification is not required');
     passedCheck(checks, 'target.pool-and-timeouts', 'Preflight uses a single connection with bounded timeouts');
-    return report(options.runId, started, checks, errors);
+  };
+
+  try {
+    await runChecks();
   } catch (error) {
     failedCheck(checks, errors, 'preflight.unexpected', 'PREFLIGHT_FAILED', error instanceof Error ? error.message : 'Preflight failed');
-    return report(options.runId, started, checks, errors);
   } finally {
-    try { sqlite?.close(); } catch { /* source was opened read-only and must not block report completion */ }
-    try { await postgres?.close(); } catch { /* close failures must not hide preflight findings */ }
+    if (sqlite) {
+      try {
+        sqlite.close();
+      } catch (error) {
+        failedCheck(checks, errors, 'source.close', 'SQLITE_CLOSE_FAILED', error instanceof Error ? error.message : 'SQLite source close failed');
+      }
+    }
+    if (postgres) {
+      try {
+        await postgres.close();
+      } catch (error) {
+        failedCheck(checks, errors, 'target.close', 'POSTGRES_CLOSE_FAILED', error instanceof Error ? error.message : 'PostgreSQL target close failed');
+      }
+    }
   }
+  return report(options.runId, started, checks, errors);
 }
