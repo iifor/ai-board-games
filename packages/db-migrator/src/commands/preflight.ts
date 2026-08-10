@@ -59,7 +59,9 @@ export interface PreflightDependencies {
   availableBytes(path: string): Promise<number>;
   createTemporaryDirectory(): Promise<string>;
   renameTemporaryDirectory(source: string, destination: string): Promise<void>;
-  removeTemporaryDirectory(path: string): Promise<void>;
+  listTemporaryDirectory(path: string): Promise<string[]>;
+  unlinkTemporaryFile(path: string): Promise<void>;
+  removeEmptyTemporaryDirectory(path: string): Promise<void>;
 }
 
 function tlsVerificationEnabled(targetUrl: string): boolean {
@@ -87,7 +89,9 @@ const defaultDependencies: PreflightDependencies = {
   },
   createTemporaryDirectory: () => fsPromises.mkdtemp(path.join(os.tmpdir(), 'consensus-preflight-')),
   renameTemporaryDirectory: (source, destination) => fsPromises.rename(source, destination),
-  removeTemporaryDirectory: (candidate) => fsPromises.rm(candidate, { recursive: true, force: true }),
+  listTemporaryDirectory: (candidate) => fsPromises.readdir(candidate),
+  unlinkTemporaryFile: (candidate) => fsPromises.unlink(candidate),
+  removeEmptyTemporaryDirectory: (candidate) => fsPromises.rmdir(candidate),
 };
 
 function quoteIdentifier(identifier: string): string {
@@ -347,7 +351,9 @@ export async function runPreflight(
       try {
         await cleanupOwnedTemporaryDirectory(temporaryDirectory, {
           rename: resolved.renameTemporaryDirectory,
-          remove: resolved.removeTemporaryDirectory,
+          list: resolved.listTemporaryDirectory,
+          unlink: resolved.unlinkTemporaryFile,
+          rmdir: resolved.removeEmptyTemporaryDirectory,
         });
         passedCheck(checks, 'source.temp-cleanup', 'Private SQLite inspection directory removed');
       } catch {

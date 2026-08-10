@@ -121,7 +121,7 @@ if ($preflightExit -ne 0 -or $preflight.status -ne 'passed') { throw 'Preflight 
 
 **预期输出**：状态为 `passed` 的 preflight JSON；源完整性、空间、PostgreSQL 16、目标新鲜度、TLS 和受限连接检查通过。该步骤是只读 preflight dry-run，不创建 schema。
 
-预检只通过文件系统稳定复制当时存在的 SQLite main/WAL/SHM，并仅在工具私有临时目录中打开隔离副本；不得直接 SQLite-open `$Source`。报告中的 `source.isolated-copy`、`source.unchanged` 与 `source.temp-cleanup` 必须通过，确认源文件集、size、mtime、文件身份和 SHA-256 前后一致；临时副本必须经原子隔离、身份复核、递归删除及原/隔离双路径不存在检查，静默 no-op 或部分清理不得通过。
+预检只通过文件系统稳定复制当时存在的 SQLite main/WAL/SHM，并仅在工具私有随机父目录的 inspection 子目录中打开隔离副本；不得直接 SQLite-open `$Source`。报告中的 `source.isolated-copy`、`source.unchanged` 与 `source.temp-cleanup` 必须通过，确认源文件集、size、mtime、文件身份和 SHA-256 前后一致。清理必须验证父目录、原子隔离后的 inspection、`O_NOFOLLOW` 所有权 token 与 main/可选 WAL/SHM 固定白名单，只能逐文件 `unlink`、最后删 token，再用非递归 `rmdir` 删除两个空目录并验证无残留；不得使用递归删除。未知条目、reparse point、身份变化、静默 no-op 或部分清理必须失败并保留未删场景。Node 路径 API 仍存在同账号对手在单次检查与单文件操作之间的微小竞态，因此切换窗口必须保持主机账号隔离；该竞态不会扩展为递归目录删除。
 
 **成功条件**：子进程退出码为 0，报告 `status=passed`，`target.postgres-version` 与 `target.tls` 均通过。
 
