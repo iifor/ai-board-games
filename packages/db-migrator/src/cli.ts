@@ -2,6 +2,7 @@ import path from 'node:path';
 import { migrateSqliteToPostgres } from './importer';
 import { runBackup } from './commands/backup';
 import { runPreflight } from './commands/preflight';
+import { runRehearsal } from './commands/rehearse';
 import { runValidation } from './commands/validate';
 import { parseCommandLine, type ParsedCommand } from './cli/arguments';
 import { readinessReportExitCode, redactSecrets, sanitizeForOutput } from './reporting/reportWriter';
@@ -63,6 +64,24 @@ async function runBuiltInReadinessCommand(
       targetSchema,
       outputDirectory: path.resolve(outputDirectory),
     });
+  }
+  if (command === 'rehearse') {
+    const sourceSnapshotPath = parsed.values.get('source-snapshot') || '';
+    const sourceManifestPath = parsed.values.get('manifest') || '';
+    const targetUrl = parsed.values.get('target') || process.env.DATABASE_URL || '';
+    const outputDirectory = parsed.values.get('output') || '';
+    const runId = parsed.values.get('run-id') || '';
+    if (!sourceSnapshotPath || !sourceManifestPath || !targetUrl || !outputDirectory || !runId) {
+      throw new Error('Usage: pnpm migrate -- rehearse --source-snapshot <sqlite> --manifest <json> --target <postgres-url> --output <dir> --run-id <id> [--execute]');
+    }
+    return (await runRehearsal({
+      runId,
+      sourceSnapshotPath: path.resolve(sourceSnapshotPath),
+      sourceManifestPath: path.resolve(sourceManifestPath),
+      targetUrl,
+      outputDirectory: path.resolve(outputDirectory),
+      execute: parsed.execute,
+    })).report;
   }
   if (command !== 'preflight') throw commandNotImplemented(command);
   const sourcePath = parsed.values.get('source') || '';

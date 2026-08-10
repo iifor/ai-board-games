@@ -29,6 +29,12 @@ export interface WrittenReport {
   markdownPath: string;
 }
 
+export interface WriteJsonArtifactOptions {
+  finalPath: string;
+  payload: unknown;
+  fileSystem?: ReportFileSystem;
+}
+
 export type PublishedFileRollbackResult = 'removed-owned' | 'preserved-foreign' | 'rollback-incomplete';
 
 export interface PublishedFileIdentity {
@@ -140,6 +146,7 @@ function renderMarkdown(report: ReadinessReport): string {
     '# Readiness report',
     '',
     `Run: ${report.runId}`,
+    `Schema: ${report.schema || '-'}`,
     `Stage: ${report.stage}`,
     `Status: ${report.status}`,
     `Duration: ${report.durationMs}ms`,
@@ -175,6 +182,35 @@ async function writeTemporaryFile(fileSystem: ReportFileSystem, tempPath: string
     if (handle) await fileSystem.rm(tempPath);
     throw error;
   }
+}
+
+export async function writeJsonArtifactExclusive(options: WriteJsonArtifactOptions): Promise<void> {
+  const { finalPath, payload, fileSystem = defaultFileSystem } = options;
+  const temporaryPath = `${finalPath}.tmp-${randomUUID()}`;
+  await fileSystem.mkdir(path.dirname(finalPath));
+  let temporaryCreated = false;
+  let primaryError: unknown;
+  try {
+    await writeTemporaryFile(
+      fileSystem,
+      temporaryPath,
+      `${JSON.stringify(sanitizeForOutput(payload), null, 2)}\n`,
+    );
+    temporaryCreated = true;
+    await fileSystem.link(temporaryPath, finalPath);
+  } catch (error) {
+    primaryError = error;
+  }
+  if (temporaryCreated) {
+    try {
+      await fileSystem.rm(temporaryPath);
+    } catch {
+      throw Object.assign(new Error('Temporary artifact cleanup failed'), {
+        code: 'ARTIFACT_TEMP_CLEANUP_FAILED',
+      });
+    }
+  }
+  if (primaryError) throw primaryError;
 }
 
 function reportExistsError(jsonPath: string, markdownPath: string): Error & { code: 'REPORT_ALREADY_EXISTS' } {

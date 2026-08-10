@@ -2,7 +2,13 @@ import fs from 'node:fs';
 import Database from 'better-sqlite3';
 import { Client } from 'pg';
 import { IDENTITY_TABLES, IMPORT_TABLES, SKIPPED_TABLES } from './constants';
-import type { MigrationOptions, MigrationReport, TableReport } from './types';
+import type {
+  MigrationClient,
+  MigrationDependencies,
+  MigrationOptions,
+  MigrationReport,
+  TableReport,
+} from './types';
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
 
@@ -25,14 +31,14 @@ function normalizeValue(column: string, value: unknown, table: string, rowIndex:
   return value;
 }
 
-async function assertEmptyTarget(client: Client, schema: string): Promise<void> {
+async function assertEmptyTarget(client: MigrationClient, schema: string): Promise<void> {
   for (const table of IMPORT_TABLES) {
     const result = await client.query<{ count: string }>(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(table)}`);
     if (Number(result.rows[0]?.count || 0) > 0) throw new Error(`Target table is not empty: ${schema}.${table}`);
   }
 }
 
-async function targetColumns(client: Client, schema: string, table: string): Promise<Set<string>> {
+async function targetColumns(client: MigrationClient, schema: string, table: string): Promise<Set<string>> {
   const result = await client.query<{ column_name: string }>(`
     SELECT column_name FROM information_schema.columns
     WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`, [schema, table]);
@@ -40,7 +46,7 @@ async function targetColumns(client: Client, schema: string, table: string): Pro
   return new Set(result.rows.map((row) => row.column_name));
 }
 
-async function importTable(sqlite: Database.Database, client: Client, schema: string, table: string): Promise<TableReport> {
+async function importTable(sqlite: Database.Database, client: MigrationClient, schema: string, table: string): Promise<TableReport> {
   const exists = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table);
   const rows = exists ? sqlite.prepare(`SELECT * FROM ${quoteIdentifier(table)}`).all() as Record<string, unknown>[] : [];
   const allowed = await targetColumns(client, schema, table);
@@ -56,26 +62,35 @@ async function importTable(sqlite: Database.Database, client: Client, schema: st
   return { sourceRows: rows.length, targetRows: Number(target.rows[0]?.count || 0), importedRows };
 }
 
-async function resetIdentities(client: Client, tables: readonly string[]): Promise<void> {
+async function resetIdentities(client: MigrationClient, tables: readonly string[]): Promise<void> {
   for (const table of tables) {
     await client.query(`SELECT setval(pg_get_serial_sequence($1, 'id'), COALESCE((SELECT MAX(id) FROM ${quoteIdentifier(table)}), 1),
       EXISTS (SELECT 1 FROM ${quoteIdentifier(table)}))`, [table]);
   }
 }
 
-export async function migrateSqliteToPostgres(options: MigrationOptions): Promise<MigrationReport> {
+const defaultDependencies: MigrationDependencies = {
+  createClient: async (options) => new Client({ connectionString: options.targetUrl }) as unknown as MigrationClient,
+};
+
+export async function migrateSqliteToPostgres(
+  options: MigrationOptions,
+  dependencies: Partial<MigrationDependencies> = {},
+): Promise<MigrationReport> {
   const started = Date.now();
   const startedAt = new Date(started).toISOString();
   const schema = options.targetSchema || 'consensus';
   if (!fs.existsSync(options.sourcePath)) throw new Error(`SQLite source does not exist: ${options.sourcePath}`);
   quoteIdentifier(schema);
   const sqlite = new Database(options.sourcePath, { readonly: true, fileMustExist: true });
-  const client = new Client({ connectionString: options.targetUrl });
+  const resolved = { ...defaultDependencies, ...dependencies };
+  let client: MigrationClient | undefined;
   const tables: Record<string, TableReport> = {};
   const report = (): MigrationReport => ({ status: 'succeeded', sourcePath: options.sourcePath,
     targetSchema: schema, startedAt, durationMs: Date.now() - started, tables,
     skippedTables: [...SKIPPED_TABLES], errors: [], validation: 'passed' });
   try {
+    client = await resolved.createClient(options);
     await client.connect();
     await client.query(`SET search_path TO ${quoteIdentifier(schema)}, public`);
     await client.query('BEGIN');
@@ -88,12 +103,12 @@ export async function migrateSqliteToPostgres(options: MigrationOptions): Promis
     await client.query('COMMIT');
     return report();
   } catch (error) {
-    try { await client.query('ROLLBACK'); } catch { /* connection may already be lost */ }
+    try { await client?.query('ROLLBACK'); } catch { /* connection may already be lost */ }
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), { migrationReport: {
       ...report(), status: 'failed', validation: 'failed', errors: [error instanceof Error ? error.message : String(error)],
     } satisfies MigrationReport });
   } finally {
     sqlite.close();
-    await client.end().catch(() => undefined);
+    await client?.end().catch(() => undefined);
   }
 }

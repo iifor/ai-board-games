@@ -16,3 +16,18 @@ export interface MigrationOptions {
   targetUrl: string;
   targetSchema?: string;
 }
+
+export interface MigrationQueryResult<T extends object> {
+  rows: T[];
+  rowCount: number | null;
+}
+
+export interface MigrationClient {
+  connect(): Promise<void>;
+  query<T extends object>(sql: string, values?: readonly unknown[]): Promise<MigrationQueryResult<T>>;
+  end(): Promise<void>;
+}
+
+export interface MigrationDependencies {
+  createClient(options: MigrationOptions): Promise<MigrationClient>;
+}

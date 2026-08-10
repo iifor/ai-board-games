@@ -17,6 +17,7 @@ const testFiles = [
   'sqliteImporter.test.ts',
   'preflightCommand.test.ts',
   'validateMigration.test.ts',
+  'rehearsalCommand.test.ts',
 ]
   .map((file) => path.join(__dirname, file));
 const originalTsLoader = Module._extensions['.ts'];

@@ -154,6 +154,7 @@ flowchart TD
 
 - C 端构建到 `dist/client`。
 - B 端构建到 `dist/admin`。
+- server build 在保持现有 runtime 入口的同时，将离线 PostgreSQL rehearsal adapter 和正式 migration SQL 产出到 `packages/server/dist`；db-migrator 的已编译 CLI 通过子进程 stdin 调用该 adapter。
 - 服务端通过 Express 静态托管这些产物。
 - `dist/` 是构建产物目录，不纳入源码目录树。
 
@@ -212,3 +213,5 @@ GitHub 仓库需要配置以下 Secrets：
 # 持久化基线（2026-08-08）
 
 生产持久化已统一为 PostgreSQL 16；服务端通过异步 `DbExecutor` 访问数据库，应用启动前完成 schema migration 和种子数据初始化。SQLite 仅由独立的一次性迁移工具只读访问，用于把配置、管理员、玩家、游戏历史、回放和长期记忆导入空 PostgreSQL 目标库；旧 workflow 和观测历史不迁移。
+
+迁移 rehearsal 仅允许 database 名以 `_test` 或 `_rehearsal` 结尾。每次 execute 使用 `consensus_rehearsal_<UTC timestamp>_<run hash>` 新 schema；同 runId hash 在整个目标数据库中只允许一个 schema，并由已编译 server adapter 内的 advisory lock 原子保证。dry-run 不连接 PostgreSQL；失败现场不自动删除。

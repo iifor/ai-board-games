@@ -14,6 +14,7 @@ import {
 } from '../reporting/reportWriter';
 import type { ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
 import type { MigrationReport } from '../types';
+import { createValidationExecutor } from '../postgres/validationExecutor';
 import {
   BUSINESS_SAMPLES,
   countImportedTables,
@@ -24,22 +25,7 @@ import {
   type ValidationDbExecutor,
 } from '../validation/queries';
 
-interface PostgresExecutorConfig {
-  connectionString: string;
-  schema: string;
-  poolMax: number;
-  connectionTimeoutMs: number;
-  statementTimeoutMs: number;
-  ssl: false | { rejectUnauthorized: true };
-}
-
-const { createPostgresExecutor } = require('../../../server/db/postgres') as {
-  createPostgresExecutor(config: PostgresExecutorConfig): ValidationDbExecutor;
-};
-
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
-const CONNECTION_TIMEOUT_MS = 5_000;
-const STATEMENT_TIMEOUT_MS = 30_000;
 
 export interface ValidateOptions {
   runId: string;
@@ -58,26 +44,9 @@ export interface ValidateDependencies {
   writeReport(options: Parameters<typeof writeReadinessReport>[0]): ReturnType<typeof writeReadinessReport>;
 }
 
-function tlsConfiguration(targetUrl: string): false | { rejectUnauthorized: true } {
-  try {
-    return new URL(targetUrl).searchParams.get('sslmode')?.toLowerCase() === 'verify-full'
-      ? { rejectUnauthorized: true }
-      : false;
-  } catch {
-    return false;
-  }
-}
-
 const defaultDependencies: ValidateDependencies = {
   createSqlite: (sourcePath) => new Database(sourcePath, { readonly: true, fileMustExist: true }),
-  createPostgres: (targetUrl, targetSchema) => createPostgresExecutor({
-    connectionString: targetUrl,
-    schema: targetSchema,
-    poolMax: 1,
-    connectionTimeoutMs: CONNECTION_TIMEOUT_MS,
-    statementTimeoutMs: STATEMENT_TIMEOUT_MS,
-    ssl: tlsConfiguration(targetUrl),
-  }),
+  createPostgres: createValidationExecutor,
   hashEvidence: hashFile,
   writeReport: writeReadinessReport,
 };

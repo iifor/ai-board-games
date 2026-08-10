@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
 import { migrateSqliteToPostgres } from '../../packages/db-migrator/src';
+import type { MigrationClient } from '../../packages/db-migrator/src/types';
 import { migratePostgres } from '../../packages/server/db/postgres/migrate';
 import { withTestSchema } from './helpers';
 
@@ -93,4 +94,37 @@ test('SQLite importer rejects orphan foreign keys and rolls back the game', asyn
       fs.unlinkSync(sourcePath);
     }
   });
+});
+
+test('SQLite importer accepts a prepared client factory and still sets the rehearsal search_path explicitly', async () => {
+  const sourcePath = path.join(os.tmpdir(), `consensus-migrator-empty-${process.pid}-${Date.now()}.sqlite`);
+  new Database(sourcePath).close();
+  const queries: string[] = [];
+  let ended = false;
+  const client: MigrationClient = {
+    connect: async () => undefined,
+    query: async <T extends object>(sql: string): Promise<{ rows: T[]; rowCount: number | null }> => {
+      queries.push(sql);
+      if (/information_schema\.columns/i.test(sql)) {
+        return { rows: [{ column_name: 'id' }] as T[], rowCount: 1 };
+      }
+      if (/COUNT\(\*\)/i.test(sql)) return { rows: [{ count: '0' }] as T[], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    },
+    end: async () => { ended = true; },
+  };
+  try {
+    const report = await migrateSqliteToPostgres({
+      sourcePath,
+      targetUrl: 'postgresql://127.0.0.1:1/consensus_test',
+      targetSchema: 'consensus_rehearsal_factory',
+    }, {
+      createClient: async () => client,
+    });
+    assert.equal(report.status, 'succeeded');
+    assert.ok(queries.some((sql) => sql === 'SET search_path TO "consensus_rehearsal_factory", public'));
+    assert.equal(ended, true);
+  } finally {
+    fs.unlinkSync(sourcePath);
+  }
 });

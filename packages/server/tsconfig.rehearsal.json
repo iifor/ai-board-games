@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "declaration": false,
+    "noEmit": false,
+    "rootDir": ".",
+    "outDir": "dist"
+  },
+  "include": [
+    "db/config.ts",
+    "db/types.ts",
+    "db/postgres.ts",
+    "db/postgres/migrate.ts",
+    "db/postgres/rehearsalAdapter.ts",
+    "../shared/types/dbExecutor.d.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,2 +1,9 @@
 export { migrateSqliteToPostgres } from './importer';
-export type { MigrationOptions, MigrationReport, TableReport } from './types';
+export type {
+  MigrationClient,
+  MigrationDependencies,
+  MigrationOptions,
+  MigrationReport,
+  MigrationQueryResult,
+  TableReport,
+} from './types';

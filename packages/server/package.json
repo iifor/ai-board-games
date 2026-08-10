@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node --preserve-symlinks --preserve-symlinks-main ./dev-runtime.cjs",
     "dev": "node --preserve-symlinks --preserve-symlinks-main ./dev-runtime.cjs",
-    "build": "node --preserve-symlinks --preserve-symlinks-main ./node_modules/typescript/lib/tsc.js",
+    "build": "node --preserve-symlinks --preserve-symlinks-main ./node_modules/typescript/lib/tsc.js && node ./scripts/build-rehearsal-adapter.cjs",
     "check": "node --preserve-symlinks --preserve-symlinks-main ./node_modules/typescript/lib/tsc.js --noEmit"
   },
   "dependencies": {
