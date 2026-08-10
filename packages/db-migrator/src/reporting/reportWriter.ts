@@ -30,7 +30,8 @@ export interface WrittenReport {
 }
 
 const SENSITIVE_ASSIGNMENTS = /\b([A-Z][A-Z0-9_]*(?:URL|SECRET|PASSWORD|PASSWD|API_KEY|TOKEN|KEY))=("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;]+)/gi;
-const CONNECTION_URL = /\b(?:postgres|postgresql):\/\/[^\s"`<>]+/gi;
+const DATABASE_URL_SCHEME = /\bpostgres(?:ql)?:\/\//gi;
+const DATABASE_URL_SCHEME_AFTER_LABEL = /^(?:[A-Z_][A-Z0-9_.-]*=)?postgres(?:ql)?:\/\//i;
 const REDACTED_DATABASE_URL = '[REDACTED_DATABASE_URL]';
 
 const defaultFileSystem: ReportFileSystem = {
@@ -49,17 +50,46 @@ const defaultFileSystem: ReportFileSystem = {
   stat: (candidate) => fs.stat(candidate),
 };
 
-export function redactSecrets(value: string): string {
-  const withRedactedUrls = value.replace(CONNECTION_URL, (candidate, offset: number, source: string) => {
-    if (source[offset - 1] === "'") {
-      const closingQuote = candidate.lastIndexOf("'");
-      if (closingQuote >= 0) return `${REDACTED_DATABASE_URL}${candidate.slice(closingQuote)}`;
+function isWhitespaceOrControl(character: string): boolean {
+  return /\s/u.test(character) || character.charCodeAt(0) <= 0x20;
+}
+
+function databaseUrlEnd(value: string, start: number, schemeEnd: number): number {
+  const wrapper = value[start - 1] === "'" || value[start - 1] === '"' ? value[start - 1] : undefined;
+  for (let index = schemeEnd; index < value.length; index += 1) {
+    const character = value[index];
+    if (isWhitespaceOrControl(character)) return index;
+
+    if (wrapper && character === wrapper) {
+      const next = value[index + 1];
+      if (next === undefined || isWhitespaceOrControl(next) || /[,;})\]]/.test(next)) return index;
     }
-    return REDACTED_DATABASE_URL;
-  });
+
+    if ((character === ',' || character === ';') && DATABASE_URL_SCHEME_AFTER_LABEL.test(value.slice(index + 1))) {
+      return index;
+    }
+  }
+  return value.length;
+}
+
+function redactDatabaseUrls(value: string): string {
+  DATABASE_URL_SCHEME.lastIndex = 0;
+  let cursor = 0;
+  let redacted = '';
+  let match: RegExpExecArray | null;
+  while ((match = DATABASE_URL_SCHEME.exec(value)) !== null) {
+    redacted += value.slice(cursor, match.index);
+    redacted += REDACTED_DATABASE_URL;
+    cursor = databaseUrlEnd(value, match.index, DATABASE_URL_SCHEME.lastIndex);
+    DATABASE_URL_SCHEME.lastIndex = cursor;
+  }
+  return cursor === 0 ? value : redacted + value.slice(cursor);
+}
+
+export function redactSecrets(value: string): string {
+  const withRedactedUrls = redactDatabaseUrls(value);
   return withRedactedUrls.replace(SENSITIVE_ASSIGNMENTS, (_match, name: string, rawValue: string) => {
-    const unquoted = /^(['"]).*\1$/.test(rawValue) ? rawValue.slice(1, -1) : rawValue;
-    return `${name}=${unquoted === REDACTED_DATABASE_URL ? REDACTED_DATABASE_URL : '***'}`;
+    return `${name}=${rawValue.includes(REDACTED_DATABASE_URL) ? REDACTED_DATABASE_URL : '***'}`;
   });
 }
 

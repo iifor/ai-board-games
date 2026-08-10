@@ -145,6 +145,30 @@ test('redaction uses the exact database URL marker across quoting, strings, JSON
   assert.equal(payload.errors[0], `{"databaseUrl":"${marker}"}`);
 });
 
+test('redaction conservatively consumes malformed PostgreSQL URLs through a safe boundary', () => {
+  const marker = '[REDACTED_DATABASE_URL]';
+  const cases: Array<[string, string]> = [
+    ["DATABASE_URL='postgresql://u:pa'ss@apostrophe.host/apostrophe_db", `DATABASE_URL=${marker}`],
+    ['DATABASE_URL="postgresql://u:pa"ss@quote.host/quote_db', `DATABASE_URL=${marker}`],
+    ["DATABASE_URL='postgresql://u:p@single-unclosed.host/single_db", `DATABASE_URL=${marker}`],
+    ['DATABASE_URL="postgresql://u:p@double-unclosed.host/double_db', `DATABASE_URL=${marker}`],
+    ["Use postgresql://u:pa'ss@space.host/space_db safely", `Use ${marker} safely`],
+    ['{"url":"postgresql://u:pa"ss@json.host/json_db","next":1}', `{"url":"${marker}","next":1}`],
+    [
+      'first=postgres://u:p@first.host/first_db,second=postgresql://u:p@second.host/second_db',
+      `first=${marker},second=${marker}`,
+    ],
+  ];
+
+  for (const [input, expected] of cases) {
+    const redacted = redactSecrets(input);
+    assert.equal(redacted, expected);
+    for (const leaked of ['ss@', '.host', '_db', 'apostrophe', 'quote', 'unclosed']) {
+      assert.doesNotMatch(redacted, new RegExp(leaked));
+    }
+  }
+});
+
 test('readiness status maps to stable process exit codes', () => {
   assert.equal(readinessReportExitCode(createReport('passed')), 0);
   assert.equal(readinessReportExitCode(createReport('failed')), 1);
