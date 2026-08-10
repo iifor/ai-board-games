@@ -327,13 +327,17 @@ test('validation rejects a successful migration report from another target schem
 
 test('validation reports ORPHAN_FOREIGN_KEY after a target constraint is removed and an orphan is inserted', async () => {
   await withValidationFixture(async ({ database, options }) => {
+    const orphanPlayerId = 9_876_543_210;
     await database.execute('ALTER TABLE game_players DROP CONSTRAINT game_players_player_id_fkey');
-    await database.execute("INSERT INTO game_players (game_id, player_id, player_snapshot_json) VALUES ('validation-game', 999, '{}'::jsonb)");
+    await database.execute(
+      "INSERT INTO game_players (game_id, player_id, player_snapshot_json) VALUES ('validation-game', $1, '{}'::jsonb)",
+      [orphanPlayerId],
+    );
     const report = await runValidation(options);
     assert.equal(report.status, 'failed');
     assert.ok(errorCodes(report).includes('ORPHAN_FOREIGN_KEY'));
     const serialized = JSON.stringify(report);
-    assert.doesNotMatch(serialized, /999/);
+    assert.doesNotMatch(serialized, new RegExp(String(orphanPlayerId)));
   });
 });
 
