@@ -16,6 +16,7 @@ const testFiles = [
   'workflowConcurrency.test.ts',
   'sqliteImporter.test.ts',
   'preflightCommand.test.ts',
+  'validateMigration.test.ts',
 ]
   .map((file) => path.join(__dirname, file));
 const originalTsLoader = Module._extensions['.ts'];

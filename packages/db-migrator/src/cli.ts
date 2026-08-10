@@ -2,6 +2,7 @@ import path from 'node:path';
 import { migrateSqliteToPostgres } from './importer';
 import { runBackup } from './commands/backup';
 import { runPreflight } from './commands/preflight';
+import { runValidation } from './commands/validate';
 import { parseCommandLine, type ParsedCommand } from './cli/arguments';
 import { readinessReportExitCode, redactSecrets, sanitizeForOutput } from './reporting/reportWriter';
 import type { ReadinessReport } from './reporting/reportTypes';
@@ -40,6 +41,27 @@ async function runBuiltInReadinessCommand(
       outputDirectory: path.resolve(outputDirectory),
       resourceDirectories: resources ? resources.split(',').map((entry) => path.resolve(entry.trim())).filter(Boolean) : [],
       execute: parsed.execute,
+    });
+  }
+  if (command === 'validate') {
+    const sourceSnapshotPath = parsed.values.get('source-snapshot') || '';
+    const sourceManifestPath = parsed.values.get('manifest') || '';
+    const migrationReportPath = parsed.values.get('migration-report') || '';
+    const targetUrl = parsed.values.get('target') || process.env.DATABASE_URL || '';
+    const targetSchema = parsed.values.get('schema') || process.env.DATABASE_SCHEMA || 'consensus';
+    const outputDirectory = parsed.values.get('output') || '';
+    const runId = parsed.values.get('run-id') || '';
+    if (!sourceSnapshotPath || !sourceManifestPath || !migrationReportPath || !targetUrl || !outputDirectory || !runId) {
+      throw new Error('Usage: pnpm migrate -- validate --source-snapshot <sqlite> --manifest <json> --migration-report <json> --target <postgres-url> --schema <schema> --output <dir> --run-id <id>');
+    }
+    return runValidation({
+      runId,
+      sourceSnapshotPath: path.resolve(sourceSnapshotPath),
+      sourceManifestPath: path.resolve(sourceManifestPath),
+      migrationReportPath: path.resolve(migrationReportPath),
+      targetUrl,
+      targetSchema,
+      outputDirectory: path.resolve(outputDirectory),
     });
   }
   if (command !== 'preflight') throw commandNotImplemented(command);
