@@ -11,6 +11,7 @@ import type {
 } from './types';
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
+const MIGRATION_FAILURE_REPORT_ERROR = 'MIGRATION_IMPORT_FAILED: SQLite to PostgreSQL import failed';
 
 function quoteIdentifier(value: string): string {
   if (!IDENTIFIER.test(value)) throw new Error(`Unsafe PostgreSQL identifier: ${value}`);
@@ -105,7 +106,7 @@ export async function migrateSqliteToPostgres(
   } catch (error) {
     try { await client?.query('ROLLBACK'); } catch { /* connection may already be lost */ }
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), { migrationReport: {
-      ...report(), status: 'failed', validation: 'failed', errors: [error instanceof Error ? error.message : String(error)],
+      ...report(), status: 'failed', validation: 'failed', errors: [MIGRATION_FAILURE_REPORT_ERROR],
     } satisfies MigrationReport });
   } finally {
     sqlite.close();

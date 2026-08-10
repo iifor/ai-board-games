@@ -700,7 +700,8 @@ async function runRehearsal(options: RehearsalOptions): Promise<RehearsalResult>
 - [ ] **Step 6: 接入 CLI**
 
 ```powershell
-pnpm.cmd --filter @ai-presenter/db-migrator run migrate -- rehearse --source-snapshot <sqlite> --manifest <json> --target <url> --output <dir> --run-id <id> --execute
+$env:DATABASE_URL = '<dedicated-test-database-url>'
+pnpm.cmd --filter @ai-presenter/db-migrator run migrate -- rehearse --source-snapshot <sqlite> --manifest <json> --output <dir> --run-id <id> --execute
 ```
 
 失败退出码 1；输出必须包含保留的 schema 名，便于排障，但不输出密码。

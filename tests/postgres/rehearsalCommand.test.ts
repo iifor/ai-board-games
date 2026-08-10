@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import { buildManifest } from '../../packages/db-migrator/src/backup/manifest';
 import { main } from '../../packages/db-migrator/src/cli';
 import { runRehearsal } from '../../packages/db-migrator/src/commands/rehearse';
+import { migrateSqliteToPostgres } from '../../packages/db-migrator/src/importer';
 import { writeJsonArtifactExclusive } from '../../packages/db-migrator/src/reporting/reportWriter';
 import {
   assertRehearsalDatabase,
@@ -19,6 +20,7 @@ import {
 import { createPostgresExecutor } from '../../packages/server/db/postgres';
 import { executeRequest } from '../../packages/server/db/postgres/rehearsalAdapter';
 import type { DbExecutor } from '../../packages/server/db/types';
+import type { MigrationClient, MigrationReport } from '../../packages/db-migrator/src/types';
 
 function prepareRehearsalFixture(): {
   root: string;
@@ -72,6 +74,17 @@ async function finalizeRehearsalFixture(
   fs.writeFileSync(fixture.sourceManifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 }
 
+async function withDatabaseUrl<T>(value: string, operation: () => Promise<T>): Promise<T> {
+  const previous = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = value;
+  try {
+    return await operation();
+  } finally {
+    if (previous === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previous;
+  }
+}
+
 test('rehearsal schema is deterministic, safe, and run-specific', () => {
   const now = new Date('2026-08-10T04:05:06.789Z');
   const first = buildRehearsalSchema('release-candidate-a', now);
@@ -120,6 +133,44 @@ test('db-migrator sends the target URL through adapter stdin and never argv', as
     ) as { receivedUrl?: string; argv?: string[] };
     assert.equal(response.receivedUrl, targetUrl);
     assert.deepEqual(response.argv, []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rehearse rejects a literal target argument before source or database access', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rehearsal-argv-rejection-'));
+  const targetUrl = 'postgresql://argv_user:argv_password@203.0.113.77:6543/consensus_test';
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const outputDirectory = path.join(root, 'must-not-be-created');
+  try {
+    await assert.rejects(
+      main([
+        'rehearse',
+        '--source-snapshot', path.join(root, 'must-not-be-opened.sqlite'),
+        '--manifest', path.join(root, 'must-not-be-opened.json'),
+        '--target', targetUrl,
+        '--output', outputDirectory,
+        '--run-id', 'argv-target-rejected',
+        '--execute',
+      ], {
+        stdout: (line) => stdout.push(line),
+        stderr: (line) => stderr.push(line),
+        setExitCode: () => assert.fail('rejected arguments must not produce a readiness exit code'),
+      }),
+      (error: unknown) => {
+        const failure = error as Error & { code?: string };
+        assert.equal(failure.code, 'REHEARSAL_TARGET_ARG_FORBIDDEN');
+        assert.equal(failure.message, 'Rehearsal target must be provided through DATABASE_URL');
+        assert.doesNotMatch(
+          `${failure.code}\n${failure.message}\n${stdout.join('\n')}\n${stderr.join('\n')}`,
+          /argv_user|argv_password|203\.0\.113\.77|6543|postgres(?:ql)?:\/\//i,
+        );
+        return true;
+      },
+    );
+    assert.equal(fs.existsSync(outputDirectory), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -440,25 +491,93 @@ test('rehearsal preserves the migrated schema and reports while rolling back a f
   }
 });
 
-test('rehearse CLI routes dry-run options and emits only a structured sanitized report', async () => {
+test('import failure diagnostics stay with the caller while rehearsal files and CLI use allowlisted text', async () => {
+  const fixture = prepareRehearsalFixture();
+  await finalizeRehearsalFixture(fixture);
+  const rawMessage = 'connect ECONNREFUSED adversarial.host (198.51.100.44:6543) for postgresql://endpoint_user:endpoint_password@adversarial.host:6543/consensus_test';
+  const driverError = new Error(rawMessage);
+  const client: MigrationClient = {
+    connect: async () => { throw driverError; },
+    query: async <T extends object>(): Promise<{ rows: T[]; rowCount: number }> => ({ rows: [], rowCount: 0 }),
+    end: async () => undefined,
+  };
+  let importerError: (Error & { migrationReport?: MigrationReport }) | undefined;
+  const outputDirectory = path.join(fixture.root, 'sanitized-failure-reports');
+  try {
+    try {
+      await migrateSqliteToPostgres({
+        sourcePath: fixture.sourceSnapshotPath,
+        targetUrl: process.env.TEST_DATABASE_URL!,
+        targetSchema: 'consensus',
+      }, { createClient: async () => client });
+      assert.fail('import must fail with the injected driver error');
+    } catch (error) {
+      importerError = error as Error & { migrationReport?: MigrationReport };
+    }
+    assert.equal(importerError, driverError, 'the immediate caller keeps the original Error object');
+    assert.deepEqual(
+      importerError.migrationReport?.errors,
+      ['MIGRATION_IMPORT_FAILED: SQLite to PostgreSQL import failed'],
+    );
+
+    const runId = `sanitized-failure-${process.pid}-${Date.now()}`;
+    const result = await runRehearsal({
+      runId,
+      sourceSnapshotPath: fixture.sourceSnapshotPath,
+      sourceManifestPath: fixture.sourceManifestPath,
+      targetUrl: process.env.TEST_DATABASE_URL!,
+      outputDirectory,
+      execute: true,
+    }, {
+      now: () => new Date('2026-08-10T06:00:00.000Z'),
+      runExists: async () => false,
+      schemaExists: async () => false,
+      createSchema: async () => undefined,
+      migrate: async () => { throw importerError; },
+      validate: async () => assert.fail('validation must not run after import failure'),
+    });
+    assert.equal(result.report.status, 'failed');
+    assert.ok(result.migrationReportPath && fs.existsSync(result.migrationReportPath));
+
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    await main(['rehearse'], {
+      runReadinessCommand: async () => result.report,
+      stdout: (line) => stdout.push(line),
+      stderr: (line) => stderr.push(line),
+      setExitCode: () => undefined,
+    });
+    const persisted = fs.readdirSync(outputDirectory)
+      .map((name) => fs.readFileSync(path.join(outputDirectory, name), 'utf8'))
+      .join('\n');
+    const observable = `${JSON.stringify(importerError.migrationReport)}\n${persisted}\n${stdout.join('\n')}\n${stderr.join('\n')}`;
+    assert.doesNotMatch(
+      observable,
+      /endpoint_user|endpoint_password|adversarial\.host|198\.51\.100\.44|6543|postgres(?:ql)?:\/\//i,
+    );
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('rehearse CLI reads its target from DATABASE_URL and emits only a structured sanitized report', async () => {
   const fixture = prepareRehearsalFixture();
   await finalizeRehearsalFixture(fixture);
   const stdout: string[] = [];
   const stderr: string[] = [];
   const exitCodes: number[] = [];
   try {
-    await main([
-      'rehearse',
-      '--source-snapshot', fixture.sourceSnapshotPath,
-      '--manifest', fixture.sourceManifestPath,
-      '--target', process.env.TEST_DATABASE_URL!,
-      '--output', path.join(fixture.root, 'cli-reports'),
-      '--run-id', `cli-${process.pid}-${Date.now()}`,
-    ], {
-      stdout: (line) => stdout.push(line),
-      stderr: (line) => stderr.push(line),
-      setExitCode: (code) => exitCodes.push(code),
-    });
+    await withDatabaseUrl(process.env.TEST_DATABASE_URL!, () => main([
+        'rehearse',
+        '--source-snapshot', fixture.sourceSnapshotPath,
+        '--manifest', fixture.sourceManifestPath,
+        '--output', path.join(fixture.root, 'cli-reports'),
+        '--run-id', `cli-${process.pid}-${Date.now()}`,
+      ], {
+        stdout: (line) => stdout.push(line),
+        stderr: (line) => stderr.push(line),
+        setExitCode: (code) => exitCodes.push(code),
+      }));
     assert.deepEqual(exitCodes, [0]);
     assert.equal(stdout.length, 1);
     const report = JSON.parse(stdout[0]) as { stage: string; status: string };
@@ -471,26 +590,25 @@ test('rehearse CLI routes dry-run options and emits only a structured sanitized 
   }
 });
 
-test('failed rehearse CLI output includes the preserved schema but never the target URL', async () => {
+test('failed rehearse CLI output includes the preserved schema but never its environment target', async () => {
   const fixture = prepareRehearsalFixture();
   await finalizeRehearsalFixture(fixture);
   const stdout: string[] = [];
   const exitCodes: number[] = [];
   const unsafeTarget = 'postgresql://private_user:private_password@private.host:5432/consensus';
   try {
-    await main([
-      'rehearse',
-      '--source-snapshot', fixture.sourceSnapshotPath,
-      '--manifest', fixture.sourceManifestPath,
-      '--target', unsafeTarget,
-      '--output', path.join(fixture.root, 'failed-cli-reports'),
-      '--run-id', `failed-cli-${process.pid}-${Date.now()}`,
-      '--execute',
-    ], {
-      stdout: (line) => stdout.push(line),
-      stderr: () => undefined,
-      setExitCode: (code) => exitCodes.push(code),
-    });
+    await withDatabaseUrl(unsafeTarget, () => main([
+        'rehearse',
+        '--source-snapshot', fixture.sourceSnapshotPath,
+        '--manifest', fixture.sourceManifestPath,
+        '--output', path.join(fixture.root, 'failed-cli-reports'),
+        '--run-id', `failed-cli-${process.pid}-${Date.now()}`,
+        '--execute',
+      ], {
+        stdout: (line) => stdout.push(line),
+        stderr: () => undefined,
+        setExitCode: (code) => exitCodes.push(code),
+      }));
     assert.deepEqual(exitCodes, [1]);
     const report = JSON.parse(stdout[0]) as { schema?: string; status: string; errors: Array<{ code: string }> };
     assert.equal(report.status, 'failed');
@@ -523,11 +641,14 @@ test('compiled db-migrator dist runs rehearsal without loading server TypeScript
       'rehearse',
       '--source-snapshot', fixture.sourceSnapshotPath,
       '--manifest', fixture.sourceManifestPath,
-      '--target', process.env.TEST_DATABASE_URL!,
       '--output', path.join(fixture.root, 'dist-reports'),
       '--run-id', `dist-${process.pid}-${Date.now()}`,
       '--execute',
-    ], { cwd: root, encoding: 'utf8' });
+    ], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL! },
+    });
     assert.equal(run.status, 0, run.stderr || run.stdout);
     const report = JSON.parse(run.stdout.trim()) as { schema: string; stage: string; status: string };
     schema = report.schema;

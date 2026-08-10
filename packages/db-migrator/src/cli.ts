@@ -66,13 +66,19 @@ async function runBuiltInReadinessCommand(
     });
   }
   if (command === 'rehearse') {
+    if (parsed.values.has('target')) {
+      throw Object.assign(
+        new Error('Rehearsal target must be provided through DATABASE_URL'),
+        { code: 'REHEARSAL_TARGET_ARG_FORBIDDEN' as const },
+      );
+    }
     const sourceSnapshotPath = parsed.values.get('source-snapshot') || '';
     const sourceManifestPath = parsed.values.get('manifest') || '';
-    const targetUrl = parsed.values.get('target') || process.env.DATABASE_URL || '';
+    const targetUrl = process.env.DATABASE_URL || '';
     const outputDirectory = parsed.values.get('output') || '';
     const runId = parsed.values.get('run-id') || '';
     if (!sourceSnapshotPath || !sourceManifestPath || !targetUrl || !outputDirectory || !runId) {
-      throw new Error('Usage: pnpm migrate -- rehearse --source-snapshot <sqlite> --manifest <json> --target <postgres-url> --output <dir> --run-id <id> [--execute]');
+      throw new Error('Usage: set DATABASE_URL, then run rehearse --source-snapshot <sqlite> --manifest <json> --output <dir> --run-id <id> [--execute]');
     }
     return (await runRehearsal({
       runId,

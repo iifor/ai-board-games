@@ -87,3 +87,35 @@
 - advisory lock 仅序列化同 runId hash，其他 runId 可并行，这是隔离排练的预期行为。
 - 完整 PostgreSQL 套件仍输出既有 LLM fallback/observability 测试日志，但 TAP 结果为 68/68；本任务未改变这些非排练路径。
 - 当前无阻塞上线排练的待补测试；部署时必须先构建 server adapter 与 db-migrator，并继续只在专用 `_test`/`_rehearsal` 数据库运行。
+
+## Fix Round 1
+
+- 独立修复提交主题：`fix: keep rehearsal connection details out of artifacts`
+
+### 评审核验与修复
+
+- 父进程 argv：核验发现新 `rehearse` 命令会优先接受 `--target` 的完整连接 URL。该命令没有已部署兼容负担，现只从进程环境 `DATABASE_URL` 读取目标；任何 `--target` 在源文件、输出目录或数据库访问前固定返回 `REHEARSAL_TARGET_ARG_FORBIDDEN` / `Rehearsal target must be provided through DATABASE_URL`。preflight、validate 和旧 migrate 等其他命令保持原行为。
+- importer 报告：核验发现 `migrationReport.errors` 会直接保存 PostgreSQL driver 的原始 `error.message`，失败排练随后会原样持久化 migration artifact。现 immediate caller 仍收到同一个原始 Error 对象用于诊断控制流，但附加的 `migrationReport.errors` 只包含 allowlisted `MIGRATION_IMPORT_FAILED: SQLite to PostgreSQL import failed`；原始 hostname、IP、port、URL、username 和 password 不进入任何报告。
+- 文档与示例：`docs/postgresql-deployment.md` 和实施计划改为先设置 `$env:DATABASE_URL`，再运行不含 `--target` 的 rehearse；文档明确父/子 argv 与结构化输出均不承载连接 URL。
+
+### RED → GREEN 证据
+
+- Finding 1 RED：focused 1 项测试 0/1；现实现继续访问不存在的 manifest，而不是固定拒绝 literal `--target`。
+- Finding 1 GREEN：focused 1/1；断言 source、database 和 output 均未访问，错误及 stdout/stderr 不含 URL、用户名、密码、IP 或端口。
+- Finding 2 RED：focused 1 项测试 0/1；实际 `migrationReport.errors` 含 `postgresql://endpoint_user:endpoint_password@adversarial.host:6543/...`、`198.51.100.44` 和完整 driver 文本。
+- Finding 2 GREEN：focused 1/1；立即 caller 保持原 Error 身份，附加报告、原子持久化 migration/rehearsal 文件及 CLI 可观察输出只含固定安全文本。组合 CLI focused 回归 3/3。
+
+### 最终验证
+
+- `pnpm.cmd run test:postgres`：70/70 通过，0 失败；使用进程级本地 PostgreSQL 16 测试 URL，包含从 db-migrator `dist` 以 `DATABASE_URL` 实际运行。
+- `pnpm.cmd run test:migration`：60/60 通过，0 失败。
+- server `check` / `build`：均通过。
+- db-migrator `check` / `build`：均通过。
+- `git diff --check`：通过。
+
+### 文件与边界
+
+- 修改：`packages/db-migrator/src/cli.ts`、`packages/db-migrator/src/importer.ts`、`tests/postgres/rehearsalCommand.test.ts`、`docs/postgresql-deployment.md`、`docs/superpowers/plans/2026-08-09-postgresql-production-readiness.md` 和本报告。
+- 新增/删除：无。
+- REST/WebSocket、正式 migration/schema、共享类型和前端：无变化。
+- 保持原子 artifact 发布、失败 schema/report 保留、无 drop API；本轮未扩大修改其他 CLI 的 target 兼容语义。
