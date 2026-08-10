@@ -76,3 +76,20 @@ test('PostgreSQL operations scripts forward exact CLI arguments and child exit c
     assert.deepEqual(actual, entry.expected, entry.name);
   }
 });
+
+test('PostgreSQL operations scripts fail when pnpm.cmd cannot be started', async (t) => {
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'postgres-ops-missing-command-'));
+  const emptyPath = path.join(temporary, 'empty-path');
+  await fs.mkdir(emptyPath);
+  t.after(() => fs.rm(temporary, { recursive: true, force: true }));
+  const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+
+  for (const entry of cases) {
+    const result = spawnSync(
+      powershell,
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(scriptsRoot, `${entry.name}.ps1`), ...entry.args],
+      { cwd: temporary, encoding: 'utf8', env: { ...process.env, PATH: emptyPath } },
+    );
+    assert.notEqual(result.status, 0, `${entry.name} must fail when pnpm.cmd is unavailable`);
+  }
+});

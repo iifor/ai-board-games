@@ -15,6 +15,15 @@ $arguments = @(
   '--require-tls', $RequireTls.ToLowerInvariant(), '--run-id', $RunId
 )
 Push-Location $repoRoot
-try { & pnpm.cmd @arguments; $exitCode = $LASTEXITCODE }
+try {
+  $exitCode = 1
+  & pnpm.cmd @arguments
+  if ($null -eq $LASTEXITCODE) { throw 'db-migrator command returned no exit code' }
+  $exitCode = $LASTEXITCODE
+}
+catch {
+  [Console]::Error.WriteLine('Unable to start db-migrator command.')
+  $exitCode = 1
+}
 finally { Pop-Location }
 exit $exitCode

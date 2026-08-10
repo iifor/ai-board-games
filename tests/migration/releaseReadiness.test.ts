@@ -60,6 +60,7 @@ async function sha256(candidate: string): Promise<string> {
 interface Fixture {
   root: string;
   reportPaths: string[];
+  artifactPaths: string[];
   signoffPath: string;
   outputDirectory: string;
   reports: ReadinessReport[];
@@ -70,7 +71,18 @@ interface Fixture {
 async function createFixture(): Promise<Fixture> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'release-readiness-'));
   const reportsDirectory = path.join(root, 'reports');
+  const artifactsDirectory = path.join(root, 'artifacts');
   await fs.mkdir(reportsDirectory);
+  await fs.mkdir(artifactsDirectory);
+  const artifactPaths = [
+    'backup.sqlite', 'backup-manifest.json',
+    'rehearsal-1-migration.json', 'rehearsal-1-validation.json',
+    'rehearsal-2-migration.json', 'rehearsal-2-validation.json',
+    'restore.sqlite', 'restore-manifest.json',
+  ].map((name) => path.join(artifactsDirectory, name));
+  for (const [index, candidate] of artifactPaths.entries()) {
+    await fs.writeFile(candidate, `artifact-${index}\n`);
+  }
   const reports = [
     readinessReport('backup-1', 'backup', [
       { id: 'backup.execute', status: 'passed', message: 'executed' },
@@ -98,6 +110,24 @@ async function createFixture(): Promise<Fixture> {
     ]),
   ];
   const reportPaths = reports.map((_report, index) => path.join(reportsDirectory, `report-${index + 1}.json`));
+  reports[0].artifacts = [
+    { type: 'backup', path: artifactPaths[0], sha256: await sha256(artifactPaths[0]) },
+    { type: 'manifest', path: artifactPaths[1], sha256: await sha256(artifactPaths[1]) },
+  ];
+  reports[1].artifacts = [
+    { type: 'migration-report', path: artifactPaths[2] },
+    { type: 'validation-report', path: artifactPaths[3] },
+    { type: 'smoke-report', path: reportPaths[3] },
+  ];
+  reports[2].artifacts = [
+    { type: 'migration-report', path: artifactPaths[4] },
+    { type: 'validation-report', path: artifactPaths[5] },
+    { type: 'smoke-report', path: reportPaths[4] },
+  ];
+  reports[6].artifacts = [
+    { type: 'backup', path: artifactPaths[6], sha256: await sha256(artifactPaths[6]) },
+    { type: 'manifest', path: artifactPaths[7], sha256: await sha256(artifactPaths[7]) },
+  ];
   const signoffPath = path.join(root, 'operator-signoff.json');
   const outputDirectory = path.join(root, 'output');
   const signoff: Record<string, unknown> = {};
@@ -105,6 +135,7 @@ async function createFixture(): Promise<Fixture> {
   const fixture: Fixture = {
     root,
     reportPaths,
+    artifactPaths,
     signoffPath,
     outputDirectory,
     reports,
@@ -119,8 +150,14 @@ async function createFixture(): Promise<Fixture> {
         approvedBy: 'release-operator',
         approvedAt: '2026-08-10T02:00:00.000Z',
         checks: OPERATOR_CHECKS.map((id) => ({ id, status: 'passed' })),
-        reportManifest: await Promise.all(reportPaths.map(async (candidate) => ({
+        reportManifest: await Promise.all([...new Set([
+          ...reportPaths,
+          ...reports.flatMap((report) => (
+            Array.isArray(report.artifacts) ? report.artifacts.map((artifact) => path.resolve(artifact.path)) : []
+          )),
+        ])].map(async (candidate) => ({
           path: path.relative(root, candidate).split(path.sep).join('/'),
+          sizeBytes: (await fs.stat(candidate)).size,
           sha256: await sha256(candidate),
         }))),
       });
@@ -165,6 +202,7 @@ test('fails when a required report is missing or any input report failed', async
   t.after(() => Promise.all([missing, missingRestore, failed].map((item) => fs.rm(item.root, { recursive: true, force: true }))));
   missing.reportPaths.splice(4, 1);
   missing.reports.splice(4, 1);
+  missing.reports[2].artifacts = missing.reports[2].artifacts.filter((artifact) => artifact.type !== 'smoke-report');
   assert.equal((await runFixture(missing)).status, 'failed');
   missingRestore.reportPaths.pop();
   missingRestore.reports.pop();
@@ -227,4 +265,75 @@ test('fails closed when a report hash or manifest path does not match', async (t
     outputDirectory: escaped.outputDirectory, operatorSignoffPath: escaped.signoffPath,
   });
   assert.equal(escapedResult.status, 'failed');
+});
+
+test('fails closed when a report omits its required artifact evidence', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  fixture.reports[0].artifacts = [];
+
+  assert.equal((await runFixture(fixture)).status, 'failed');
+});
+
+test('fails closed when signed artifact bytes, size, path, or claims are invalid', async (t) => {
+  const fixtures = await Promise.all(['missing', 'tampered', 'size', 'escape', 'conflict'].map(() => createFixture()));
+  t.after(() => Promise.all(fixtures.map((fixture) => fs.rm(fixture.root, { recursive: true, force: true }))));
+
+  await fixtures[0].persist();
+  await fs.rm(fixtures[0].artifactPaths[0]);
+
+  await fixtures[1].persist();
+  await fs.appendFile(fixtures[1].artifactPaths[0], 'tampered');
+
+  await fixtures[2].persist();
+  const sizeSignoff = JSON.parse(await fs.readFile(fixtures[2].signoffPath, 'utf8'));
+  sizeSignoff.reportManifest.find((entry: { path: string }) => entry.path.endsWith('backup.sqlite')).sizeBytes += 1;
+  await fs.writeFile(fixtures[2].signoffPath, JSON.stringify(sizeSignoff));
+
+  const outside = path.join(path.dirname(fixtures[3].root), `${path.basename(fixtures[3].root)}-outside.bin`);
+  await fs.writeFile(outside, 'outside');
+  t.after(() => fs.rm(outside, { force: true }));
+  fixtures[3].reports[0].artifacts[0].path = outside;
+
+  fixtures[4].reports[1].artifacts[1].path = fixtures[4].reports[1].artifacts[0].path;
+
+  for (const [index, fixture] of fixtures.entries()) {
+    const result = fixture === fixtures[0] || fixture === fixtures[1] || fixture === fixtures[2]
+      ? await runReleaseReadiness({
+        runId: `release-artifact-case-${index}`,
+        reportPaths: fixture.reportPaths,
+        outputDirectory: fixture.outputDirectory,
+        operatorSignoffPath: fixture.signoffPath,
+      })
+      : await runFixture(fixture);
+    assert.equal(result.status, 'failed');
+    assert.doesNotMatch(JSON.stringify(result), new RegExp(path.basename(fixture.root), 'i'));
+  }
+});
+
+test('fails closed when a passed candidate contains non-passed checks, errors, or incomplete shape', async (t) => {
+  const fixtures = await Promise.all(['check', 'errors', 'shape'].map(() => createFixture()));
+  t.after(() => Promise.all(fixtures.map((fixture) => fs.rm(fixture.root, { recursive: true, force: true }))));
+  fixtures[0].reports[5].checks.push({ id: 'adversarial.hidden', status: 'failed', message: 'must fail closed' });
+  fixtures[1].reports[5].errors.push({ code: 'HIDDEN_ERROR', message: 'must fail closed' });
+  (fixtures[2].reports[5] as unknown as { artifacts?: unknown }).artifacts = undefined;
+
+  for (const fixture of fixtures) assert.equal((await runFixture(fixture)).status, 'failed');
+});
+
+test('fails closed when operator signoff contains a failed internal check', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  await fixture.persist();
+  const signoff = JSON.parse(await fs.readFile(fixture.signoffPath, 'utf8'));
+  signoff.checks.push({ id: 'adversarial.hidden', status: 'failed' });
+  await fs.writeFile(fixture.signoffPath, JSON.stringify(signoff));
+
+  const result = await runReleaseReadiness({
+    runId: 'release-failed-signoff-check',
+    reportPaths: fixture.reportPaths,
+    outputDirectory: fixture.outputDirectory,
+    operatorSignoffPath: fixture.signoffPath,
+  });
+  assert.equal(result.status, 'failed');
 });
