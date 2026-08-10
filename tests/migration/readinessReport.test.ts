@@ -3,9 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { main } from '../../packages/db-migrator/src/cli';
 import { parseCommandLine } from '../../packages/db-migrator/src/cli/arguments';
 import { readinessReportExitCode, redactSecrets, writeReadinessReport } from '../../packages/db-migrator/src/reporting/reportWriter';
 import type { ReadinessReport } from '../../packages/db-migrator/src/reporting/reportTypes';
+import type { MigrationReport } from '../../packages/db-migrator/src/types';
+import type { ReportFileSystem } from '../../packages/db-migrator/src/reporting/reportWriter';
 
 function createReport(status: ReadinessReport['status'] = 'passed'): ReadinessReport {
   return {
@@ -37,9 +40,9 @@ test('readiness reports write sanitized JSON and Markdown without leftover tempo
     assert.ok(fs.existsSync(written.jsonPath));
     assert.ok(fs.existsSync(written.markdownPath));
     assert.equal(fs.readdirSync(outputDirectory).some((name) => name.endsWith('.tmp')), false);
-    assert.match(json, /postgresql:\/\/user:\*\*\*@host\/db/);
-    assert.match(markdown, /postgresql:\/\/user:\*\*\*@host\/db/);
-    for (const secret of ['secret', 'JWT_SECRET=jwt', 'API_KEY=key', 'DATABASE_URL=postgresql://user:secret@host/db']) {
+    assert.match(json, /\[REDACTED_DATABASE_URL\]/);
+    assert.match(markdown, /\[REDACTED_DATABASE_URL\]/);
+    for (const secret of ['user', 'host', '/db', 'secret', 'JWT_SECRET=jwt', 'API_KEY=key', 'DATABASE_URL=postgresql://user:secret@host/db']) {
       assert.doesNotMatch(json, new RegExp(secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
       assert.doesNotMatch(markdown, new RegExp(secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     }
@@ -96,7 +99,220 @@ test('redaction removes extended environment credential names and quoted values'
   );
 });
 
+test('redaction replaces a PostgreSQL URL without retaining any connection component', () => {
+  const redacted = redactSecrets('postgresql://db_user:db_password@db.internal:5432/consensus?sslmode=require');
+  assert.equal(redacted, '[REDACTED_DATABASE_URL]');
+  for (const component of ['db_user', 'db_password', 'db.internal', '5432', 'consensus', 'sslmode']) {
+    assert.doesNotMatch(redacted, new RegExp(component));
+  }
+});
+
+test('redaction consumes an apostrophe inside a PostgreSQL URL instead of leaking its tail', () => {
+  const redacted = redactSecrets("postgresql://db_user:pa'ss@db.internal/consensus");
+  assert.equal(redacted, '[REDACTED_DATABASE_URL]');
+  assert.doesNotMatch(redacted, /ss|db\.internal|consensus/);
+});
+
+test('redaction preserves the database URL marker inside a sensitive environment assignment', () => {
+  assert.equal(
+    redactSecrets('DATABASE_URL="postgresql://db_user:db_password@db.internal:5432/consensus"'),
+    'DATABASE_URL=[REDACTED_DATABASE_URL]',
+  );
+});
+
 test('readiness status maps to stable process exit codes', () => {
   assert.equal(readinessReportExitCode(createReport('passed')), 0);
   assert.equal(readinessReportExitCode(createReport('failed')), 1);
+});
+
+function injectedFileSystem(failure: 'write' | 'sync' | 'close' | null = null): ReportFileSystem {
+  return {
+    mkdir: async (directory) => { await fs.promises.mkdir(directory, { recursive: true }); },
+    open: async (candidate, flags) => {
+      const handle = await fs.promises.open(candidate, flags);
+      return {
+        writeFile: async (content) => {
+          await handle.writeFile(content, 'utf8');
+          if (failure === 'write') throw new Error('INJECTED_WRITE_FAILURE');
+        },
+        sync: async () => {
+          await handle.sync();
+          if (failure === 'sync') throw new Error('INJECTED_SYNC_FAILURE');
+        },
+        close: async () => {
+          await handle.close();
+          if (failure === 'close') throw new Error('INJECTED_CLOSE_FAILURE');
+        },
+      };
+    },
+    link: (source, destination) => fs.promises.link(source, destination),
+    rename: (source, destination) => fs.promises.rename(source, destination),
+    rm: (candidate) => fs.promises.rm(candidate, { force: true }),
+    stat: (candidate) => fs.promises.stat(candidate),
+  };
+}
+
+for (const failure of ['write', 'sync', 'close'] as const) {
+  test(`readiness report removes its temporary file after injected ${failure} failure`, async () => {
+    const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'readiness-report-failure-'));
+    try {
+      await assert.rejects(
+        () => writeReadinessReport({ outputDirectory, report: createReport(), fileSystem: injectedFileSystem(failure) }),
+        new RegExp(`INJECTED_${failure.toUpperCase()}_FAILURE`),
+      );
+      assert.deepEqual(fs.readdirSync(outputDirectory), []);
+    } finally {
+      fs.rmSync(outputDirectory, { recursive: true, force: true });
+    }
+  });
+}
+
+test('race-safe publication preserves a final file created immediately before the first publish', async () => {
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'readiness-report-race-'));
+  const original = 'original-json';
+  const fileSystem = injectedFileSystem();
+  const realLink = fileSystem.link;
+  let links = 0;
+  fileSystem.link = async (source, destination) => {
+    links += 1;
+    if (links === 1) fs.writeFileSync(destination, original);
+    await realLink(source, destination);
+  };
+  try {
+    await assert.rejects(
+      () => writeReadinessReport({ outputDirectory, report: createReport(), fileSystem }),
+      (error: unknown) => (error as NodeJS.ErrnoException).code === 'REPORT_ALREADY_EXISTS',
+    );
+    assert.equal(fs.readFileSync(path.join(outputDirectory, 'run-20260809-001-preflight.json'), 'utf8'), original);
+    assert.equal(fs.existsSync(path.join(outputDirectory, 'run-20260809-001-preflight.md')), false);
+    assert.equal(fs.readdirSync(outputDirectory).some((name) => name.endsWith('.tmp')), false);
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('second publication failure rolls back only this writer and preserves the concurrent final', async () => {
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'readiness-report-race-'));
+  const original = 'original-markdown';
+  const fileSystem = injectedFileSystem();
+  const realLink = fileSystem.link;
+  let links = 0;
+  fileSystem.link = async (source, destination) => {
+    links += 1;
+    if (links === 2) fs.writeFileSync(destination, original);
+    await realLink(source, destination);
+  };
+  try {
+    await assert.rejects(
+      () => writeReadinessReport({ outputDirectory, report: createReport(), fileSystem }),
+      (error: unknown) => (error as NodeJS.ErrnoException).code === 'REPORT_ALREADY_EXISTS',
+    );
+    assert.equal(fs.existsSync(path.join(outputDirectory, 'run-20260809-001-preflight.json')), false);
+    assert.equal(fs.readFileSync(path.join(outputDirectory, 'run-20260809-001-preflight.md'), 'utf8'), original);
+    assert.equal(fs.readdirSync(outputDirectory).some((name) => name.endsWith('.tmp')), false);
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('rollback preserves a replaced final when filesystem identity cannot prove ownership', async () => {
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'readiness-report-ownership-'));
+  const externalContent = 'external-json';
+  const jsonPath = path.join(outputDirectory, 'run-20260809-001-preflight.json');
+  const fileSystem = injectedFileSystem();
+  const realLink = fileSystem.link;
+  let links = 0;
+  fileSystem.link = async (source, destination) => {
+    links += 1;
+    if (links === 1) return realLink(source, destination);
+    if (links === 2) {
+      fs.rmSync(jsonPath);
+      fs.writeFileSync(jsonPath, externalContent);
+      throw Object.assign(new Error('INJECTED_SECOND_PUBLICATION_FAILURE'), { code: 'EIO' });
+    }
+    return realLink(source, destination);
+  };
+  fileSystem.stat = async () => ({ dev: 0, ino: 0 });
+  try {
+    await assert.rejects(
+      () => writeReadinessReport({ outputDirectory, report: createReport(), fileSystem }),
+      /INJECTED_SECOND_PUBLICATION_FAILURE/,
+    );
+    assert.equal(fs.readFileSync(jsonPath, 'utf8'), externalContent);
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('two concurrent writers publish once and return REPORT_ALREADY_EXISTS to the loser', async () => {
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'readiness-report-concurrent-'));
+  try {
+    const results = await Promise.allSettled([
+      writeReadinessReport({ outputDirectory, report: createReport() }),
+      writeReadinessReport({ outputDirectory, report: createReport() }),
+    ]);
+    assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
+    const rejected = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+    assert.equal((rejected?.reason as NodeJS.ErrnoException).code, 'REPORT_ALREADY_EXISTS');
+    assert.equal(fs.readdirSync(outputDirectory).some((name) => name.endsWith('.tmp')), false);
+  } finally {
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+function migrationReport(status: MigrationReport['status']): MigrationReport {
+  return {
+    status,
+    sourcePath: 'postgresql://legacy_user:legacy_password@legacy.host:5432/legacy_db',
+    targetSchema: 'consensus',
+    startedAt: '2026-08-09T00:00:00.000Z',
+    durationMs: 1,
+    tables: {},
+    skippedTables: [],
+    errors: ['postgresql://error_user:error_password@error.host/error_db'],
+    validation: status === 'succeeded' ? 'passed' : 'failed',
+  };
+}
+
+test('CLI sanitizes successful and attached failed migration reports before stdout serialization', async () => {
+  const output: string[] = [];
+  await main(['migrate', '--source', 'source.sqlite', '--target', 'postgresql://target:secret@target.host/db'], {
+    migrate: async () => migrationReport('succeeded'),
+    stdout: (line) => output.push(line),
+    stderr: () => undefined,
+  });
+  const failed = Object.assign(new Error('migration failed'), { migrationReport: migrationReport('failed') });
+  await assert.rejects(
+    () => main(['migrate', '--source', 'source.sqlite', '--target', 'postgresql://target:secret@target.host/db'], {
+      migrate: async () => { throw failed; },
+      stdout: (line) => output.push(line),
+      stderr: () => undefined,
+    }),
+    /migration failed/,
+  );
+  assert.equal(output.length, 2);
+  for (const line of output) {
+    assert.match(line, /\[REDACTED_DATABASE_URL\]/);
+    for (const component of ['legacy_user', 'legacy_password', 'legacy.host', 'legacy_db', 'error_user', 'error.host', 'error_db']) {
+      assert.doesNotMatch(line, new RegExp(component));
+    }
+  }
+});
+
+test('CLI readiness completion emits sanitized reports and maps passed or failed status to exit code', async () => {
+  const output: string[] = [];
+  const exitCodes: number[] = [];
+  for (const status of ['passed', 'failed'] as const) {
+    await main(['preflight'], {
+      runReadinessCommand: async () => createReport(status),
+      stdout: (line) => output.push(line),
+      setExitCode: (code) => exitCodes.push(code),
+    });
+  }
+  assert.deepEqual(exitCodes, [0, 1]);
+  assert.equal(output.length, 2);
+  for (const line of output) {
+    assert.match(line, /\[REDACTED_DATABASE_URL\]/);
+    assert.doesNotMatch(line, /user|host|secret|\/db/);
+  }
 });
