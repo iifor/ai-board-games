@@ -29,9 +29,15 @@ const SIGNED_CHECKS = REQUIRED_RELEASE_CHECKS.filter((id) => ![
 ].includes(id));
 const OPTIONAL_SKIPPED_CHECKS = new Set(['source.raw-wal', 'source.raw-shm']);
 const SHA256 = /^[a-f0-9]{64}$/;
+const GIT_SHA = /^[a-f0-9]{40}$/;
+
+function isReleaseCandidate(value: string): boolean {
+  return GIT_SHA.test(value) && !/^0{40}$/.test(value);
+}
 
 export interface ReleaseReadinessOptions {
   runId: string;
+  releaseCandidate: string;
   reportPaths: string[];
   outputDirectory: string;
   operatorSignoffPath: string;
@@ -61,12 +67,23 @@ function gate(id: typeof REQUIRED_RELEASE_CHECKS[number], passed: boolean, messa
   return { id, status: passed ? 'passed' : 'failed', message: passed ? message : `Required evidence failed: ${id}` };
 }
 
-function evaluate(reports: ReadinessReport[], signoff: OperatorSignoff): { checks: ReadinessCheck[]; minutes: number } {
+function evaluate(
+  reports: ReadinessReport[],
+  signoff: OperatorSignoff,
+  expected: Pick<ReleaseReadinessOptions, 'runId' | 'releaseCandidate'>,
+): { checks: ReadinessCheck[]; minutes: number } {
   const backup = reports.filter((report) => report.stage === 'backup');
   const executedBackups = backup.filter((report) => report.checks.some((check) => check.id === 'backup.execute'));
   const rehearsals = reports.filter((report) => report.stage === 'rehearsal');
   const smokes = reports.filter((report) => report.stage === 'smoke');
-  const allReportsPassed = reports.length > 0 && reports.every((report) => (
+  const first = rehearsals[0];
+  const second = rehearsals[1];
+  const maxDuration = rehearsals.length === 2 ? Math.max(first.durationMs, second.durationMs) : 0;
+  const minutes = maxDuration ? Math.ceil((2 * maxDuration) / 60_000) : 0;
+  const signoffContextMatches = signoff.releaseCandidate === expected.releaseCandidate
+    && signoff.readinessRunId === expected.runId
+    && signoff.maintenanceWindowMinutes === minutes;
+  const allReportsPassed = signoffContextMatches && reports.length > 0 && reports.every((report) => (
     report.status === 'passed' && report.errors.length === 0
     && report.checks.length > 0 && report.checks.every((check) => (
       check.status !== 'failed'
@@ -74,8 +91,6 @@ function evaluate(reports: ReadinessReport[], signoff: OperatorSignoff): { check
     ))
   )) && signoff.approved && signoff.checks.length > 0
     && signoff.checks.every((check) => check.status === 'passed');
-  const first = rehearsals[0];
-  const second = rehearsals[1];
   const firstHash = first && sourceHash(first);
   const secondHash = second && sourceHash(second);
   const independent = rehearsals.length === 2 && first.runId !== second.runId
@@ -114,13 +129,13 @@ function evaluate(reports: ReadinessReport[], signoff: OperatorSignoff): { check
     allReportsPassed && result.get(id) === true,
     id === 'operator.signoff' ? 'Independent operator signoff is complete' : `Verified evidence: ${id}`,
   ));
-  const maxDuration = rehearsals.length === 2 ? Math.max(first.durationMs, second.durationMs) : 0;
-  return { checks, minutes: maxDuration ? Math.ceil((2 * maxDuration) / 60_000) : 0 };
+  return { checks, minutes };
 }
 
 export async function runReleaseReadiness(options: ReleaseReadinessOptions): Promise<ReleaseReadinessReport> {
   if (!isSafeRunId(options.runId)) throw Object.assign(new Error('runId must be a safe, non-empty identifier'), { code: 'INVALID_RUN_ID' });
-  if (!options.outputDirectory.trim() || !options.operatorSignoffPath.trim() || !options.reportPaths.length) {
+  if (!isReleaseCandidate(options.releaseCandidate) || !options.outputDirectory.trim()
+    || !options.operatorSignoffPath.trim() || !options.reportPaths.length) {
     throw Object.assign(new Error('reports, operator signoff and output directory are required'), { code: 'INVALID_PARAMETERS' });
   }
   const started = Date.now();
@@ -128,7 +143,7 @@ export async function runReleaseReadiness(options: ReleaseReadinessOptions): Pro
   let maintenanceWindowMinutes = 0;
   try {
     const evidence = await loadReleaseEvidence(options.reportPaths, options.operatorSignoffPath);
-    ({ checks, minutes: maintenanceWindowMinutes } = evaluate(evidence.reports, evidence.signoff));
+    ({ checks, minutes: maintenanceWindowMinutes } = evaluate(evidence.reports, evidence.signoff, options));
   } catch {
     checks = REQUIRED_RELEASE_CHECKS.map((id) => gate(id, false, ''));
   }

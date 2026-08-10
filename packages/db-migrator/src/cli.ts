@@ -49,12 +49,12 @@ async function runBuiltInReadinessCommand(
     const sourceSnapshotPath = parsed.values.get('source-snapshot') || '';
     const sourceManifestPath = parsed.values.get('manifest') || '';
     const migrationReportPath = parsed.values.get('migration-report') || '';
-    const targetUrl = parsed.values.get('target') || process.env.DATABASE_URL || '';
+    const targetUrl = process.env.DATABASE_URL || '';
     const targetSchema = parsed.values.get('schema') || process.env.DATABASE_SCHEMA || 'consensus';
     const outputDirectory = parsed.values.get('output') || '';
     const runId = parsed.values.get('run-id') || '';
     if (!sourceSnapshotPath || !sourceManifestPath || !migrationReportPath || !targetUrl || !outputDirectory || !runId) {
-      throw new Error('Usage: pnpm migrate -- validate --source-snapshot <sqlite> --manifest <json> --migration-report <json> --target <postgres-url> --schema <schema> --output <dir> --run-id <id>');
+      throw new Error('Usage: set DATABASE_URL, then run validate --source-snapshot <sqlite> --manifest <json> --migration-report <json> --schema <schema> --output <dir> --run-id <id>');
     }
     return runValidation({
       runId,
@@ -96,11 +96,13 @@ async function runBuiltInReadinessCommand(
     const operatorSignoffPath = parsed.values.get('operator-signoff') || '';
     const outputDirectory = parsed.values.get('output') || '';
     const runId = parsed.values.get('run-id') || '';
-    if (!reports || !operatorSignoffPath || !outputDirectory || !runId) {
-      throw new Error('Usage: release-readiness --reports <comma-separated-json> --operator-signoff <json> --output <dir> --run-id <id>');
+    const releaseCandidate = parsed.values.get('release-candidate') || '';
+    if (!reports || !operatorSignoffPath || !releaseCandidate || !outputDirectory || !runId) {
+      throw new Error('Usage: release-readiness --reports <comma-separated-json> --operator-signoff <json> --release-candidate <40-char-git-sha> --output <dir> --run-id <id>');
     }
     return runReleaseReadiness({
       runId,
+      releaseCandidate,
       reportPaths: reports.split(',').map((entry) => path.resolve(entry.trim())).filter(Boolean),
       outputDirectory: path.resolve(outputDirectory),
       operatorSignoffPath: path.resolve(operatorSignoffPath),
@@ -108,13 +110,13 @@ async function runBuiltInReadinessCommand(
   }
   if (command !== 'preflight') throw commandNotImplemented(command);
   const sourcePath = parsed.values.get('source') || '';
-  const targetUrl = parsed.values.get('target') || process.env.DATABASE_URL || '';
+  const targetUrl = process.env.DATABASE_URL || '';
   const targetSchema = parsed.values.get('schema') || process.env.DATABASE_SCHEMA || 'consensus';
   const outputDirectory = parsed.values.get('output') || '';
   const resources = parsed.values.get('resources');
   const requireTls = parsed.values.get('require-tls');
   if (!sourcePath || !targetUrl || !outputDirectory || requireTls === undefined) {
-    throw new Error('Usage: pnpm migrate -- preflight --source <sqlite> --target <postgres-url> --schema <schema> --output <dir> --resources <dir1,dir2> --require-tls <true|false>');
+    throw new Error('Usage: set DATABASE_URL, then run preflight --source <sqlite> --schema <schema> --output <dir> --resources <dir1,dir2> --require-tls <true|false>');
   }
   if (requireTls !== 'true' && requireTls !== 'false') throw new Error('--require-tls must be true or false');
   return runPreflight({
@@ -139,6 +141,10 @@ function writeJson(stdout: (line: string) => void, payload: unknown): void {
 async function main(argv = process.argv.slice(2), overrides: Partial<CliDependencies> = {}): Promise<void> {
   const dependencies = { ...defaultDependencies, ...overrides };
   const parsed = parseCommandLine(argv);
+  if ((parsed.command === 'preflight' || parsed.command === 'validate') && parsed.values.has('target')) {
+    const code = parsed.command === 'preflight' ? 'PREFLIGHT_TARGET_ARG_FORBIDDEN' : 'VALIDATION_TARGET_ARG_FORBIDDEN';
+    throw Object.assign(new Error(`${parsed.command} target must be provided through DATABASE_URL`), { code });
+  }
   if (parsed.command !== 'migrate') {
     const report = await (dependencies.runReadinessCommand || runBuiltInReadinessCommand)(parsed.command, parsed);
     writeJson(dependencies.stdout, report);

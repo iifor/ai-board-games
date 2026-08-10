@@ -595,20 +595,26 @@ test('validate CLI routes all required paths and exits from the readiness report
     const stdout: string[] = [];
     const exitCodes: number[] = [];
     const cliRunId = `${options.runId}-cli`;
-    await main([
-      'validate',
-      '--source-snapshot', options.sourceSnapshotPath,
-      '--manifest', options.sourceManifestPath,
-      '--migration-report', options.migrationReportPath,
-      '--target', options.targetUrl,
-      '--schema', options.targetSchema,
-      '--output', options.outputDirectory,
-      '--run-id', cliRunId,
-    ], {
-      stdout: (line) => stdout.push(line),
-      stderr: () => undefined,
-      setExitCode: (code) => exitCodes.push(code),
-    });
+    const previousDatabaseUrl = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = options.targetUrl;
+    try {
+      await main([
+        'validate',
+        '--source-snapshot', options.sourceSnapshotPath,
+        '--manifest', options.sourceManifestPath,
+        '--migration-report', options.migrationReportPath,
+        '--schema', options.targetSchema,
+        '--output', options.outputDirectory,
+        '--run-id', cliRunId,
+      ], {
+        stdout: (line) => stdout.push(line),
+        stderr: () => undefined,
+        setExitCode: (code) => exitCodes.push(code),
+      });
+    } finally {
+      if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = previousDatabaseUrl;
+    }
     assert.deepEqual(exitCodes, [0]);
     assert.equal(stdout.length, 1);
     const report = JSON.parse(stdout[0]) as { runId: string; stage: string; status: string };

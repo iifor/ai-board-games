@@ -6,7 +6,7 @@
 
 - 在同一个受控 PowerShell 会话执行全部步骤，仓库当前提交固定且工作树干净。
 - `$env:TEST_DATABASE_URL` 指向名称以 `_test` 或 `_rehearsal` 结尾的专用 PostgreSQL 16 数据库，并带 `sslmode=verify-full`；它不是生产数据库。
-- `$env:TEST_APP_DATABASE_URL` 使用待验证的最小权限应用角色，同样只指向隔离环境。
+- TLS/最小权限检查使用 `PGSERVICE`，或已继承的 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD/PGSSLMODE/PGSSLROOTCERT`；`psql` 命令行不得出现数据库 URL 或密码。
 - 生产源仅以只读路径提供；本手册不会启动或停止生产应用，也不会连接真实生产 PostgreSQL。
 - `Source`、资源目录和证据根目录路径不得包含逗号；release-readiness 使用逗号分隔报告路径。
 
@@ -25,13 +25,15 @@ $Rehearsal1RunId = 'rehearsal-1-REPLACE_WITH_UTC_ID'
 $Rehearsal2RunId = 'rehearsal-2-REPLACE_WITH_UTC_ID'
 $RestoreRunId = 'restore-drill-REPLACE_WITH_UTC_ID'
 $ReadinessRunId = 'readiness-REPLACE_WITH_UTC_ID'
-$ReleaseRunId = 'release-REPLACE_WITH_UTC_ID'
 $RuntimeImage = 'consensus-readiness:REPLACE_WITH_GIT_SHA'
 $AppSchema = if ($env:DATABASE_SCHEMA) { $env:DATABASE_SCHEMA } else { 'consensus' }
 
 if (Test-Path -LiteralPath $EvidenceRoot) { throw 'EvidenceRoot must be new and empty.' }
 if (-not $env:TEST_DATABASE_URL) { throw 'TEST_DATABASE_URL is required.' }
-if (-not $env:TEST_APP_DATABASE_URL) { throw 'TEST_APP_DATABASE_URL is required.' }
+if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { throw 'Source SQLite file is required.' }
+foreach ($resourceRoot in $Resources) {
+  if (-not (Test-Path -LiteralPath $resourceRoot -PathType Container)) { throw "Resource root is required: $resourceRoot" }
+}
 New-Item -ItemType Directory -Path $EvidenceRoot | Out-Null
 $EvidenceRoot = (Resolve-Path -LiteralPath $EvidenceRoot).Path
 
@@ -48,6 +50,8 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
 
 ```powershell
 $sourceCandidates = @($Source, "$Source-wal", "$Source-shm")
+$mainSource = Test-Path -LiteralPath $Source -PathType Leaf
+if (-not $mainSource) { throw 'Source SQLite file is missing; WAL/SHM cannot substitute for it.' }
 $sourceFiles = foreach ($candidate in $sourceCandidates) {
   if (Test-Path -LiteralPath $candidate -PathType Leaf) {
     $item = Get-Item -LiteralPath $candidate
@@ -67,6 +71,7 @@ $resourceFiles = foreach ($root in $Resources) {
       relativePath = $_.FullName.Substring($resolved.Length).TrimStart('\')
       sizeBytes = $_.Length
       lastWriteTimeUtc = $_.LastWriteTimeUtc.ToString('o')
+      sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     }
   }
 }
@@ -96,12 +101,17 @@ Write-Utf8NoBom (Join-Path $EvidenceRoot '01-source-inventory.json') ($inventory
 ```powershell
 $preflightReportPath = Join-Path $EvidenceRoot "$PreflightRunId-preflight.json"
 $preflightErrorPath = Join-Path $EvidenceRoot '02-preflight.stderr.log'
-$preflightOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
-  (Join-Path $RepoRoot 'scripts\ops\postgres\preflight.ps1') `
-  -Source $Source -Target $env:TEST_DATABASE_URL -Output $EvidenceRoot `
-  -Resources ($Resources -join ',') -RequireTls true -RunId $PreflightRunId `
-  2> $preflightErrorPath
-$preflightExit = $LASTEXITCODE
+$previousDatabaseUrl = $env:DATABASE_URL
+$env:DATABASE_URL = $env:TEST_DATABASE_URL
+try {
+  $preflightOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+    (Join-Path $RepoRoot 'scripts\ops\postgres\preflight.ps1') `
+    -Source $Source -Output $EvidenceRoot -Resources ($Resources -join ',') `
+    -RequireTls true -RunId $PreflightRunId 2> $preflightErrorPath
+  $preflightExit = $LASTEXITCODE
+} finally {
+  $env:DATABASE_URL = $previousDatabaseUrl
+}
 $preflightJson = $preflightOutput | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1
 if (-not $preflightJson) { throw 'Preflight returned no JSON report.' }
 $preflight = $preflightJson | ConvertFrom-Json
@@ -116,6 +126,8 @@ if ($preflightExit -ne 0 -or $preflight.status -ne 'passed') { throw 'Preflight 
 **失败停止点**：任一检查失败立即停止；保留 stdout 转存报告和脱敏 stderr，不切换到其他目标“试到成功”。
 
 **证据路径**：`$preflightReportPath`、`$preflightErrorPath`。
+
+`preflight.ps1` 与 `validate.ps1` 的 readiness 路径只从子进程环境读取 `DATABASE_URL`，并主动拒绝 `--target/-Target`。这样 URL 不进入进程参数或审计命令行；历史根 `migrate` 命令的兼容参数不用于本手册。
 
 ### 3. 执行 backup --execute
 
@@ -304,14 +316,22 @@ foreach ($id in $requiredSmoke) {
 ```powershell
 $RestoreRoot = Join-Path $EvidenceRoot 'restore-drill'
 if (Test-Path -LiteralPath $RestoreRoot) { throw 'Restore drill target must be new.' }
+$restoreStartedAt = [DateTime]::UtcNow
+$restoreWatch = [Diagnostics.Stopwatch]::StartNew()
 New-Item -ItemType Directory -Path $RestoreRoot | Out-Null
 Get-ChildItem -LiteralPath $BackupRoot -Force | ForEach-Object {
   Copy-Item -LiteralPath $_.FullName -Destination $RestoreRoot -Recurse
 }
 $restoreManifestPath = Join-Path $RestoreRoot 'manifest.json'
 $restoreManifest = Get-Content -LiteralPath $restoreManifestPath -Raw | ConvertFrom-Json
+$restorePrefix = [IO.Path]::GetFullPath($RestoreRoot).TrimEnd('\') + '\'
 foreach ($entry in $restoreManifest.entries) {
-  $candidate = Join-Path $RestoreRoot ($entry.path.Replace('/', '\'))
+  $relative = [string]$entry.path
+  if (-not $relative -or $relative.Contains('\') -or [IO.Path]::IsPathRooted($relative) -or $relative.Split('/') -contains '..') {
+    throw "Unsafe restored manifest path: $relative"
+  }
+  $candidate = [IO.Path]::GetFullPath((Join-Path $RestoreRoot ($relative.Replace('/', '\'))))
+  if (-not $candidate.StartsWith($restorePrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Restored path escape.' }
   if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { throw "Restored file missing: $($entry.path)" }
   $item = Get-Item -LiteralPath $candidate
   $hash = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -319,53 +339,131 @@ foreach ($entry in $restoreManifest.entries) {
 }
 $restoredFiles = @(Get-ChildItem -LiteralPath $RestoreRoot -Recurse -File | Where-Object { $_.FullName -cne $restoreManifestPath })
 if ($restoredFiles.Count -ne @($restoreManifest.entries).Count) { throw 'Restore drill file set mismatch.' }
-$restoreStarted = [DateTime]::UtcNow.AddSeconds(-1).ToString('o')
+
+foreach ($suffix in @('-wal','-shm')) {
+  $archiveName = "sqlite-raw/source.sqlite$suffix"
+  $declared = @($restoreManifest.entries | Where-Object { $_.path -ceq $archiveName }).Count
+  $restored = [int](Test-Path -LiteralPath (Join-Path $RestoreRoot $archiveName.Replace('/', '\')) -PathType Leaf)
+  if ($declared -ne $restored) { throw "SQLite sidecar combination changed: $archiveName" }
+}
+
+$sqliteValidationPath = Join-Path $RestoreRoot 'sqlite-readonly-validation.json'
+$sqliteValidationScript = @'
+const Database = require('better-sqlite3');
+const file = process.argv[1];
+const tables = ['admin_users','app_settings','players','games','game_playback_events','player_game_memories'];
+const db = new Database(file, { readonly: true, fileMustExist: true });
+try {
+  db.pragma('query_only = ON');
+  const integrity = db.pragma('integrity_check', { simple: true });
+  if (integrity !== 'ok') throw new Error(`integrity_check=${String(integrity)}`);
+  const counts = Object.fromEntries(tables.map((table) => {
+    const exists = Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
+    return [table, exists ? Number(db.prepare(`SELECT COUNT(*) AS count FROM "${table}"`).get().count) : 0];
+  }));
+  process.stdout.write(JSON.stringify({ integrityCheck: integrity, queryOnly: true, counts }));
+} finally { db.close(); }
+'@
+$migratorRoot = Join-Path $RepoRoot 'packages\db-migrator'
+Push-Location $migratorRoot
+try {
+  $sqliteValidationJson = & node -e $sqliteValidationScript -- (Join-Path $RestoreRoot 'sqlite-consistent.sqlite')
+  $sqliteValidationExit = $LASTEXITCODE
+} finally { Pop-Location }
+if ($sqliteValidationExit -ne 0 -or -not $sqliteValidationJson) { throw 'Read-only SQLite restore validation failed.' }
+$sqliteValidation = $sqliteValidationJson | ConvertFrom-Json
+if ($sqliteValidation.integrityCheck -cne 'ok' -or -not $sqliteValidation.queryOnly) { throw 'SQLite restore integrity check failed.' }
+Write-Utf8NoBom $sqliteValidationPath ($sqliteValidation | ConvertTo-Json -Depth 6)
+
+$restoreWatch.Stop()
+$restoreFinishedAt = [DateTime]::UtcNow
 $restoreRelative = $RestoreRoot.Substring($EvidenceRoot.Length).TrimStart('\').Replace('\', '/')
+$restoreArtifacts = @($restoreManifest.entries | ForEach-Object {
+  [ordered]@{ type = 'backup'; path = "$restoreRelative/$($_.path)"; sha256 = $_.sha256 }
+})
+$restoreArtifacts += [ordered]@{
+  type = 'manifest'; path = "$restoreRelative/manifest.json"
+  sha256 = (Get-FileHash $restoreManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+$restoreArtifacts += [ordered]@{
+  type = 'evidence'; path = "$restoreRelative/sqlite-readonly-validation.json"
+  sha256 = (Get-FileHash $sqliteValidationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+}
 $restoreReport = [ordered]@{
-  runId = $RestoreRunId; stage = 'backup'; status = 'passed'; startedAt = $restoreStarted
-  finishedAt = [DateTime]::UtcNow.ToString('o'); durationMs = 1000
-  checks = @([ordered]@{ id = 'backup.restore-drill'; status = 'passed'; message = 'SQLite/WAL/SHM/resources restored and manifest verified in isolation' })
-  artifacts = @(
-    [ordered]@{ type = 'backup'; path = "$restoreRelative/sqlite-consistent.sqlite"; sha256 = (Get-FileHash (Join-Path $RestoreRoot 'sqlite-consistent.sqlite') -Algorithm SHA256).Hash.ToLowerInvariant() },
-    [ordered]@{ type = 'manifest'; path = "$restoreRelative/manifest.json"; sha256 = (Get-FileHash $restoreManifestPath -Algorithm SHA256).Hash.ToLowerInvariant() }
-  )
+  runId = $RestoreRunId; stage = 'backup'; status = 'passed'; startedAt = $restoreStartedAt.ToString('o')
+  finishedAt = $restoreFinishedAt.ToString('o'); durationMs = [int64]$restoreWatch.ElapsedMilliseconds
+  checks = @([ordered]@{ id = 'backup.restore-drill'; status = 'passed'; message = 'Restored bytes, SQLite integrity, key counts and WAL/SHM combination verified in isolation' })
+  artifacts = @($restoreArtifacts)
   errors = @()
 }
 $RestoreReportPath = Join-Path $EvidenceRoot "$RestoreRunId-backup.json"
 Write-Utf8NoBom $RestoreReportPath ($restoreReport | ConvertTo-Json -Depth 10)
 ```
 
-**预期输出**：隔离目录中完整恢复同一组 SQLite/WAL/SHM（存在时）和资源，所有 manifest 条目复验通过，并生成 restore drill 报告。
+**预期输出**：隔离目录中完整恢复同一组 SQLite/WAL/SHM（存在时）和资源；现有 db-migrator 的 `better-sqlite3` 以只读/query-only 打开恢复副本，执行 `PRAGMA integrity_check` 并记录关键表计数；报告记录 Stopwatch 实测耗时。
 
-**成功条件**：恢复文件集合、size、SHA-256 全部一致；报告 `backup.restore-drill=passed`。
+**成功条件**：恢复文件集合、size、SHA-256、WAL/SHM 存在组合全部一致；`admin_users/app_settings/players/games/game_playback_events/player_game_memories` 计数已记录；报告 `backup.restore-drill=passed`。
 
 **失败停止点**：不得覆盖已有恢复目录；缺文件或 hash 不一致立即停止，并保留恢复目录排障。
 
-**证据路径**：`$RestoreRoot`、`$RestoreReportPath`。
+**证据路径**：`$RestoreRoot`、`$sqliteValidationPath`、`$RestoreReportPath`；每一项都由报告 artifact 与签署 manifest 固定。
 
 ### 10. 收集 CI/runtime/TLS/最小权限/pool/timeout/signoff 证据
 
-**输入**：固定 git SHA、隔离测试凭据、两个不同责任人和前九步全部报告。
+**输入**：固定 git SHA、隔离测试凭据、go-live/rollback 两位责任人、另一位独立 operator，以及前九步全部报告。
 
 **命令**：
 
 ```powershell
 $CiLog = Join-Path $EvidenceRoot '10-ci-release-gates.log'
-pnpm.cmd run verify:release *>&1 | Tee-Object -FilePath $CiLog
-if ($LASTEXITCODE -ne 0) { throw 'CI release gates failed.' }
+$NoCriticalSkipLog = Join-Path $EvidenceRoot '10-tests-no-critical-skips.log'
+$RuntimeBuildLog = Join-Path $EvidenceRoot '10-runtime-image-build.log'
+$RuntimeNoSqliteLog = Join-Path $EvidenceRoot '10-runtime-no-sqlite.log'
+$TlsLog = Join-Path $EvidenceRoot '10-postgres-tls.log'
+$PrivilegeLog = Join-Path $EvidenceRoot '10-postgres-least-privilege.log'
+$PoolTimeoutEvidence = Join-Path $EvidenceRoot '10-postgres-pool-timeouts.json'
+$DocsTruthLog = Join-Path $EvidenceRoot '10-docs-runtime-truth.log'
+$evidenceStarted = [DateTime]::UtcNow
+$evidenceWatch = [Diagnostics.Stopwatch]::StartNew()
 
-docker build --target runtime -t $RuntimeImage -f (Join-Path $RepoRoot 'Dockerfile') $RepoRoot
-if ($LASTEXITCODE -ne 0) { throw 'Runtime image build failed.' }
-docker run --rm --entrypoint node $RuntimeImage -e `
-  'const fs=require("fs");const p=require("./packages/server/package.json");const d={...(p.dependencies||{}),...(p.optionalDependencies||{})};if(fs.existsSync("packages/db-migrator")||d["better-sqlite3"])process.exit(1);'
-if ($LASTEXITCODE -ne 0) { throw 'Runtime image contains the one-time migrator or SQLite dependency.' }
+& pnpm.cmd run verify:release *>&1 | Tee-Object -FilePath $CiLog
+$ciExit = $LASTEXITCODE
+if ($ciExit -ne 0) { throw 'CI release gates failed.' }
+& pnpm.cmd run test:unit *>&1 | Tee-Object -FilePath $NoCriticalSkipLog
+$unitExit = $LASTEXITCODE
+if ($unitExit -ne 0 -or -not (Select-String -LiteralPath $NoCriticalSkipLog -Pattern '# skipped 0' -Quiet)) {
+  throw 'Unit suite failed or contains skipped tests.'
+}
+& pnpm.cmd run test:unit -- postgresqlDocsTruth.test.ts *>&1 | Tee-Object -FilePath $DocsTruthLog
+$docsExit = $LASTEXITCODE
+if ($docsExit -ne 0) { throw 'Documentation runtime truth gate failed.' }
 
-$tlsState = (& psql $env:TEST_APP_DATABASE_URL -X -tA -v ON_ERROR_STOP=1 -c 'SHOW ssl;').Trim()
-if ($LASTEXITCODE -ne 0 -or $tlsState -cne 'on') { throw 'TLS is not active.' }
-$privilegeState = (& psql $env:TEST_APP_DATABASE_URL -X -tA -v ON_ERROR_STOP=1 `
-  --set=app_schema=$AppSchema -c `
-  "SELECT has_database_privilege(current_user,current_database(),'CONNECT')::text || '|' || has_database_privilege(current_user,current_database(),'CREATE')::text || '|' || has_schema_privilege(current_user, :'app_schema','USAGE')::text;").Trim()
-if ($LASTEXITCODE -ne 0 -or $privilegeState -cne 'true|false|true') {
+& docker build --target runtime -t $RuntimeImage -f (Join-Path $RepoRoot 'Dockerfile') $RepoRoot *>&1 |
+  Tee-Object -FilePath $RuntimeBuildLog
+$runtimeBuildExit = $LASTEXITCODE
+if ($runtimeBuildExit -ne 0) { throw 'Runtime image build failed.' }
+& docker run --rm --entrypoint node $RuntimeImage -e `
+  'const fs=require("fs");const p=require("./packages/server/package.json");const d={...(p.dependencies||{}),...(p.optionalDependencies||{})};if(fs.existsSync("packages/db-migrator")||d["better-sqlite3"])process.exit(1);console.log("runtime-no-sqlite=passed");' `
+  *>&1 | Tee-Object -FilePath $RuntimeNoSqliteLog
+$runtimeInspectExit = $LASTEXITCODE
+if ($runtimeInspectExit -ne 0) { throw 'Runtime image contains the one-time migrator or SQLite dependency.' }
+
+$hasPgService = -not [string]::IsNullOrWhiteSpace($env:PGSERVICE)
+$requiredPgEnvironment = @('PGHOST','PGPORT','PGDATABASE','PGUSER','PGPASSWORD','PGSSLMODE','PGSSLROOTCERT')
+if (-not $hasPgService -and @($requiredPgEnvironment | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) }).Count) {
+  throw 'Provide PGSERVICE or the complete inherited PG* environment; do not pass a database URL to psql.'
+}
+$tlsOutput = & psql -X -tA -v ON_ERROR_STOP=1 -c 'SHOW ssl;' 2>&1
+$tlsExit = $LASTEXITCODE
+$tlsOutput | Set-Content -LiteralPath $TlsLog -Encoding utf8
+$tlsState = ([string]($tlsOutput | Select-Object -Last 1)).Trim()
+if ($tlsExit -ne 0 -or $tlsState -cne 'on') { throw 'TLS is not active.' }
+$privilegeOutput = & psql -X -tA -v ON_ERROR_STOP=1 --set=app_schema=$AppSchema -c `
+  "SELECT has_database_privilege(current_user,current_database(),'CONNECT')::text || '|' || has_database_privilege(current_user,current_database(),'CREATE')::text || '|' || has_schema_privilege(current_user, :'app_schema','USAGE')::text;" 2>&1
+$privilegeExit = $LASTEXITCODE
+$privilegeOutput | Set-Content -LiteralPath $PrivilegeLog -Encoding utf8
+$privilegeState = ([string]($privilegeOutput | Select-Object -Last 1)).Trim()
+if ($privilegeExit -ne 0 -or $privilegeState -cne 'true|false|true') {
   throw 'Least-privilege expectation failed: CONNECT=true, CREATE DATABASE=false, schema USAGE=true.'
 }
 
@@ -377,21 +475,65 @@ foreach ($name in $positiveSettings) {
 }
 if (-not $env:DATABASE_SSL -or -not $env:DATABASE_CA_PATH) { throw 'TLS and CA settings are required.' }
 if (-not (Test-Path -LiteralPath $env:DATABASE_CA_PATH -PathType Leaf)) { throw 'CA file is unreadable.' }
+$poolTimeout = [ordered]@{
+  databaseSsl = $env:DATABASE_SSL
+  caSha256 = (Get-FileHash -LiteralPath $env:DATABASE_CA_PATH -Algorithm SHA256).Hash.ToLowerInvariant()
+  poolMax = [int]$env:DATABASE_POOL_MAX
+  connectionTimeoutMs = [int]$env:DATABASE_CONNECTION_TIMEOUT_MS
+  statementTimeoutMs = [int]$env:DATABASE_STATEMENT_TIMEOUT_MS
+}
+Write-Utf8NoBom $PoolTimeoutEvidence ($poolTimeout | ConvertTo-Json -Depth 4)
 
-$ReleaseCandidate = (git rev-parse HEAD).Trim()
-if (-not $env:GO_LIVE_OWNER -or -not $env:ROLLBACK_OWNER -or -not $env:INDEPENDENT_OPERATOR) { throw 'Independent owner identities are required.' }
-if ($env:GO_LIVE_OWNER -ceq $env:ROLLBACK_OWNER) { throw 'Go-live and rollback owners must be different people.' }
+$ReleaseCandidate = (git rev-parse HEAD).Trim().ToLowerInvariant()
+if ($ReleaseCandidate -notmatch '^[a-f0-9]{40}$') { throw 'A full 40-character release candidate git SHA is required.' }
+if ([string]::IsNullOrWhiteSpace($env:GO_LIVE_OWNER) -or [string]::IsNullOrWhiteSpace($env:ROLLBACK_OWNER)) {
+  throw 'Go-live and rollback owner identities are required.'
+}
+if ($env:GO_LIVE_OWNER.Trim() -ieq $env:ROLLBACK_OWNER.Trim()) { throw 'Go-live and rollback owners must be different people.' }
 $MinimumWindow = [math]::Ceiling((2 * [math]::Max([double]$r1.durationMs, [double]$r2.durationMs)) / 60000)
 $SignedChecks = @('ci.release-gates','tests.no-critical-skips','backup.restore-drill','runtime.no-sqlite',
   'postgres.tls','postgres.least-privilege','postgres.pool-and-timeouts','docs.runtime-truth','operator.signoff')
-$now = [DateTime]::UtcNow.ToString('o')
+$RawEvidencePaths = @($CiLog,$NoCriticalSkipLog,$RuntimeBuildLog,$RuntimeNoSqliteLog,$TlsLog,$PrivilegeLog,$PoolTimeoutEvidence,$DocsTruthLog)
+$evidenceWatch.Stop()
+$evidenceFinished = [DateTime]::UtcNow
+$EnvironmentReportDraftPath = Join-Path $EvidenceRoot "$ReadinessRunId-environment.pending.json"
 $EnvironmentReportPath = Join-Path $EvidenceRoot "$ReadinessRunId-environment.json"
-$environmentReport = [ordered]@{
-  runId = $ReadinessRunId; stage = 'release'; status = 'passed'; startedAt = $now; finishedAt = $now; durationMs = 0
-  checks = @($SignedChecks | ForEach-Object { [ordered]@{ id = $_; status = 'passed'; message = "Operator verified evidence: $_" } })
-  artifacts = @(); errors = @()
+$environmentDraft = [ordered]@{
+  runId = $ReadinessRunId; stage = 'release'; status = 'failed'; startedAt = $evidenceStarted.ToString('o')
+  finishedAt = $evidenceFinished.ToString('o'); durationMs = [int64]$evidenceWatch.ElapsedMilliseconds
+  checks = @($SignedChecks | ForEach-Object { [ordered]@{ id = $_; status = 'failed'; message = "Pending independent verification: $_" } })
+  artifacts = @($RawEvidencePaths | ForEach-Object {
+    [ordered]@{
+      type = 'evidence'
+      path = ([IO.Path]::GetFullPath($_)).Substring($EvidenceRoot.Length).TrimStart('\').Replace('\','/')
+      sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+  })
+  errors = @([ordered]@{ code = 'INDEPENDENT_VERIFICATION_PENDING'; message = 'Raw evidence has not been independently approved.' })
 }
-Write-Utf8NoBom $EnvironmentReportPath ($environmentReport | ConvertTo-Json -Depth 10)
+Write-Utf8NoBom $EnvironmentReportDraftPath ($environmentDraft | ConvertTo-Json -Depth 10)
+Write-Host "Pending environment report created: $EnvironmentReportDraftPath"
+Write-Host 'An independent operator must inspect every raw artifact, copy the draft to the final environment path, and only then set status/checks to passed and clear errors.'
+if ((Read-Host 'Type REVIEWED_ENVIRONMENT only after the independently edited final environment report exists') -cne 'REVIEWED_ENVIRONMENT') {
+  throw 'Independent environment review gate not completed.'
+}
+if (-not (Test-Path -LiteralPath $EnvironmentReportPath -PathType Leaf)) { throw 'Independent final environment report is missing.' }
+$environmentReport = Get-Content -LiteralPath $EnvironmentReportPath -Raw | ConvertFrom-Json
+if ($environmentReport.runId -cne $ReadinessRunId -or $environmentReport.stage -cne 'release' -or $environmentReport.status -cne 'passed') {
+  throw 'Independent environment report identity or status is invalid.'
+}
+$environmentChecks = @($environmentReport.checks | Sort-Object id)
+if ($environmentChecks.Count -ne $SignedChecks.Count -or @($environmentChecks | Where-Object { $_.status -cne 'passed' }).Count) {
+  throw 'Independent environment report must pass all and only signed checks.'
+}
+if ((@($environmentChecks.id) -join '|') -cne (@($SignedChecks | Sort-Object) -join '|') -or @($environmentReport.errors).Count -ne 0) {
+  throw 'Independent environment report check set or errors are invalid.'
+}
+$expectedEnvironmentArtifacts = @($environmentDraft.artifacts | Sort-Object path | ForEach-Object { "$($_.type)|$($_.path)|$($_.sha256)" })
+$actualEnvironmentArtifacts = @($environmentReport.artifacts | Sort-Object path | ForEach-Object { "$($_.type)|$($_.path)|$($_.sha256)" })
+if (($expectedEnvironmentArtifacts -join "`n") -cne ($actualEnvironmentArtifacts -join "`n")) {
+  throw 'Independent environment report changed the raw evidence artifact set.'
+}
 
 $ReportPaths = @($preflightReportPath,$BackupReportPath,$RestoreReportPath,
   $Rehearsal1ReportPath,$Rehearsal1SmokePath,$Rehearsal2ReportPath,$Rehearsal2SmokePath,$EnvironmentReportPath)
@@ -421,33 +563,59 @@ $manifestEntries = foreach ($candidate in @($EvidencePaths | Sort-Object -Unique
     sha256 = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
   }
 }
+$SignoffDraftPath = Join-Path $EvidenceRoot 'postgresql-operator-signoff.pending.json'
 $SignoffPath = Join-Path $EvidenceRoot 'postgresql-operator-signoff.json'
-$signoff = Get-Content -LiteralPath (Join-Path $RepoRoot 'docs\runbooks\postgresql-operator-signoff.example.json') -Raw | ConvertFrom-Json
-$signoff.releaseCandidate = $ReleaseCandidate
-$signoff.readinessRunId = $ReadinessRunId
-$signoff.goLiveOwner.name = $env:GO_LIVE_OWNER
-$signoff.goLiveOwner.approvedAt = $now
-$signoff.rollbackOwner.name = $env:ROLLBACK_OWNER
-$signoff.rollbackOwner.approvedAt = $now
-$signoff.maintenanceWindowMinutes = [int]$MinimumWindow
-$signoff.approvedBy = $env:INDEPENDENT_OPERATOR
-$signoff.approvedAt = $now
-$signoff.checks = @($SignedChecks | ForEach-Object { [ordered]@{ id = $_; status = 'passed' } })
-$signoff.reportManifest = @($manifestEntries)
-Write-Utf8NoBom $SignoffPath ($signoff | ConvertTo-Json -Depth 12)
+$signoffDraft = Get-Content -LiteralPath (Join-Path $RepoRoot 'docs\runbooks\postgresql-operator-signoff.example.json') -Raw | ConvertFrom-Json
+$signoffDraft.releaseCandidate = $ReleaseCandidate
+$signoffDraft.readinessRunId = $ReadinessRunId
+$signoffDraft.goLiveOwner.name = $env:GO_LIVE_OWNER.Trim()
+$signoffDraft.rollbackOwner.name = $env:ROLLBACK_OWNER.Trim()
+$signoffDraft.maintenanceWindowMinutes = [int]$MinimumWindow
+$signoffDraft.reportManifest = @($manifestEntries)
+Write-Utf8NoBom $SignoffDraftPath ($signoffDraft | ConvertTo-Json -Depth 12)
+Write-Host "Pending draft created: $SignoffDraftPath"
+Write-Host 'A different independent operator must review every raw artifact, copy the draft to the final path, set real approval timestamps, approvedBy, status=approved, approved=true, and all signed checks=passed.'
+if ((Read-Host 'Type REVIEWED only after the independently edited final signoff exists') -cne 'REVIEWED') { throw 'Independent review gate not completed.' }
+if (-not (Test-Path -LiteralPath $SignoffPath -PathType Leaf)) { throw 'Independent operator final signoff is missing.' }
+$signoff = Get-Content -LiteralPath $SignoffPath -Raw | ConvertFrom-Json
+if ($signoff.releaseCandidate -cne $ReleaseCandidate -or $signoff.readinessRunId -cne $ReadinessRunId) { throw 'Signed candidate or readiness run mismatch.' }
+if ($signoff.status -cne 'approved' -or $signoff.approved -ne $true) { throw 'Final signoff is not approved.' }
+if ([int]$signoff.maintenanceWindowMinutes -ne [int]$MinimumWindow) { throw 'Signed maintenance window mismatch.' }
+$ownerNames = @([string]$signoff.goLiveOwner.name,[string]$signoff.rollbackOwner.name)
+if ($ownerNames[0] -cne $env:GO_LIVE_OWNER.Trim() -or $ownerNames[1] -cne $env:ROLLBACK_OWNER.Trim() -or $ownerNames[0] -ieq $ownerNames[1]) {
+  throw 'Signed go-live and rollback owners are invalid.'
+}
+$operator = ([string]$signoff.approvedBy).Trim()
+if (-not $operator -or $operator.StartsWith('REPLACE_WITH_') -or $ownerNames -icontains $operator) {
+  throw 'Independent operator must be nonempty and different from go-live and rollback owners.'
+}
+foreach ($approval in @($signoff.goLiveOwner.approvedAt,$signoff.rollbackOwner.approvedAt,$signoff.approvedAt)) {
+  $approvalTime = [DateTimeOffset]::MinValue
+  if (-not [DateTimeOffset]::TryParse([string]$approval, [ref]$approvalTime) -or $approvalTime -le [DateTimeOffset]::UnixEpoch) {
+    throw 'Real approval timestamps after the placeholder epoch are required.'
+  }
+}
+$actualChecks = @($signoff.checks | Sort-Object id)
+if ($actualChecks.Count -ne $SignedChecks.Count -or @($actualChecks | Where-Object { $_.status -cne 'passed' }).Count) {
+  throw 'All and only signed checks must be passed.'
+}
+if ((@($actualChecks.id) -join '|') -cne (@($SignedChecks | Sort-Object) -join '|')) { throw 'Signed check set mismatch.' }
+$expectedManifest = @($manifestEntries | Sort-Object path | ForEach-Object { "$($_.path)|$($_.sizeBytes)|$($_.sha256)" })
+$actualManifest = @($signoff.reportManifest | Sort-Object path | ForEach-Object { "$($_.path)|$($_.sizeBytes)|$($_.sha256)" })
+if (($expectedManifest -join "`n") -cne ($actualManifest -join "`n")) { throw 'Signed reportManifest does not exactly match reports and artifacts.' }
 ```
 
-**预期输出**：CI、runtime、TLS、最小权限、pool、timeout 和 signoff 均有证据；2x maintenance window（两次演练最大耗时的两倍并向上取整）写入签核。
+**预期输出**：每项命令都有独立原始 artifact；脚本先生成 `status=failed`、checks 全为 `failed` 的 pending environment report，独立 operator 逐项核对后手工复制并改成最终报告，脚本只读验证其 check 集合与未变更的 `evidence` artifact。随后才生成 pending signoff 草稿，由不同于 go-live/rollback owner 的独立 operator 填写实际时间并签字。2x maintenance window（两次演练最大耗时的两倍并向上取整）写入签核。
 
-**成功条件**：完整 release gates 通过；运行镜像无迁移工具；TLS/CA/最小权限/正整数配置有效；两位责任人独立；`reportManifest` 精确覆盖输入 reports + artifacts。
+**成功条件**：完整 release gates 通过；运行镜像无迁移工具；TLS/CA/最小权限/正整数配置有效；三方身份两两不同；最终 signoff 已由独立 operator 手工签署；`reportManifest` 精确覆盖输入 reports + artifacts。
 
-**失败停止点**：任一检查或责任分离失败即停止；不得手工把失败 check 改成 passed。
+**失败停止点**：任一原始检查或责任分离失败即停止；自动化只生成 failed/pending environment 与 signoff 草稿并验证最终文件，绝不生成 all-passed 环境报告、绝不代填 `approvedBy/approvedAt`、绝不自动批准。独立 operator 只能在逐项核对真实 evidence 后把对应 check 改为 passed。
 
-**证据路径**：`$CiLog`、`$EnvironmentReportPath`、`$SignoffPath` 及其相对 manifest 条目。
+**证据路径**：`$RawEvidencePaths`、`$EnvironmentReportDraftPath`、`$EnvironmentReportPath`、`$SignoffDraftPath`、`$SignoffPath` 及其相对 manifest 条目。
 
 ### 11. 执行 release-readiness 聚合
 
-**输入**：八份选定报告、实际 operator signoff、全新 release runId 和输出目录。
+**输入**：八份选定报告、实际 operator signoff、固定 40 位候选 SHA、与 signoff `readinessRunId` 相同的 release runId 和输出目录。
 
 **命令**：
 
@@ -456,9 +624,10 @@ $ReleaseOutput = Join-Path $EvidenceRoot 'release-output'
 $ReportCsv = $ReportPaths -join ','
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
   (Join-Path $RepoRoot 'scripts\ops\postgres\release-readiness.ps1') `
-  -Reports $ReportCsv -OperatorSignoff $SignoffPath -Output $ReleaseOutput -RunId $ReleaseRunId
+  -Reports $ReportCsv -OperatorSignoff $SignoffPath -ReleaseCandidate $ReleaseCandidate `
+  -Output $ReleaseOutput -RunId $ReadinessRunId
 if ($LASTEXITCODE -ne 0) { throw 'Release readiness failed; preserve all evidence and stop.' }
-$ReleaseReportPath = Join-Path $ReleaseOutput "$ReleaseRunId-release.json"
+$ReleaseReportPath = Join-Path $ReleaseOutput "$ReadinessRunId-release.json"
 $release = Get-Content -LiteralPath $ReleaseReportPath -Raw | ConvertFrom-Json
 if ($release.status -ne 'passed' -or @($release.checks).Count -ne 16) { throw 'Release gate is not a complete PASS.' }
 if ($release.maintenanceWindowMinutes -ne $MinimumWindow) { throw 'Computed maintenance window mismatch.' }
@@ -505,4 +674,4 @@ Write-Host "Readiness PASS. Submit $AuthorizationRequestPath to the independent 
 
 ## 签核 manifest 契约
 
-`postgresql-operator-signoff.example.json` 保留计划字段，同时补齐真实聚合器要求的 `version/approved/approvedBy/approvedAt/checks/reportManifest`。每个 manifest 条目必须相对于 signoff 文件目录，使用 `/`，包含精确字节数和 64 位小写 SHA-256；列表必须精确覆盖传入的 reports 及这些报告声明的全部 artifacts。示例里的 `REPLACE_*`、零 hash 和纪元时间只是安全占位，不能直接用于聚合。
+`postgresql-operator-signoff.example.json` 是不可通过聚合器的 pending 草稿：保留计划字段，同时补齐真实聚合器要求的 `version/approved/approvedBy/approvedAt/checks/reportManifest`。独立 operator 必须先核验 failed/pending environment 草稿及每份原始 evidence，再手工产出最终 passed environment report 和 approved signoff。每个 manifest 条目必须相对于 signoff 文件目录，使用 `/`，包含精确字节数和 64 位小写 SHA-256；列表必须精确覆盖传入的 reports 及这些报告声明的全部 artifacts。示例里的 `REPLACE_*`、零 hash 和纪元时间只是安全占位，不能直接用于聚合。

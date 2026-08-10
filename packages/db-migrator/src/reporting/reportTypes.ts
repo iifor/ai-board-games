@@ -1,6 +1,6 @@
 export type ReadinessStage = 'preflight' | 'backup' | 'import' | 'validation' | 'rehearsal' | 'smoke' | 'release';
 export type CheckStatus = 'passed' | 'failed' | 'skipped';
-export type ArtifactType = 'backup' | 'manifest' | 'migration-report' | 'validation-report' | 'rehearsal-report' | 'smoke-report';
+export type ArtifactType = 'backup' | 'manifest' | 'migration-report' | 'validation-report' | 'rehearsal-report' | 'smoke-report' | 'evidence';
 
 export interface ReadinessCheck {
   id: string;

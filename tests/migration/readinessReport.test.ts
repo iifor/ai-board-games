@@ -88,6 +88,33 @@ test('command parser preserves legacy migration and rejects duplicate options', 
   assert.throws(() => parseCommandLine(['preflight', '--output', 'a', '--output', 'b']), /Duplicate option/);
 });
 
+test('readiness CLI rejects PostgreSQL URLs in argv before invoking command I/O', async () => {
+  const target = 'postgresql://argv_user:argv_password@argv.host/readiness';
+  for (const [command, code] of [
+    ['preflight', 'PREFLIGHT_TARGET_ARG_FORBIDDEN'],
+    ['validate', 'VALIDATION_TARGET_ARG_FORBIDDEN'],
+  ] as const) {
+    let commandCalls = 0;
+    await assert.rejects(
+      () => main([command, '--target', target], {
+        runReadinessCommand: async () => {
+          commandCalls += 1;
+          return createReport();
+        },
+        stdout: () => undefined,
+        stderr: () => undefined,
+      }),
+      (error: unknown) => {
+        const candidate = error as Error & { code?: string };
+        assert.equal(candidate.code, code);
+        assert.doesNotMatch(candidate.message, /argv_user|argv_password|argv\.host|readiness/);
+        return true;
+      },
+    );
+    assert.equal(commandCalls, 0, command);
+  }
+});
+
 test('redaction sanitizes environment assignments when a URL cannot be parsed', () => {
   assert.equal(redactSecrets('DATABASE_URL=not-a-url JWT_SECRET=jwt API_KEY=key'), 'DATABASE_URL=*** JWT_SECRET=*** API_KEY=***');
 });

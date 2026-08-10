@@ -442,3 +442,5 @@ PostgreSQL executor 为 OID 1184（`timestamptz`）注册统一 parser：可解�
 服务端构建同时产出离线 migration rehearsal adapter 及其正式 SQL migration 副本。adapter 在服务端编译上下文复用唯一的 `createPostgresExecutor` 和 `migratePostgres`，只接受 stdin JSON，不从 argv 读取数据库 URL；`packages/db-migrator` 不加载服务端 TypeScript，也不复制 migration SQL。adapter 不提供 drop/truncate 操作，按 runId hash 获取 PostgreSQL advisory lock 后原子检查并创建唯一 rehearsal schema。
 
 `packages/db-migrator` 的 `rehearse` 命令固定执行 manifest 校验、测试库后缀门禁、全局 runId/schema 唯一性、正式 migration、事务导入和只读验收。dry-run 只生成并报告安全 schema 名，不打开 PostgreSQL；execute 失败时保留 schema 和已发布报告用于排障。验证器使用 db-migrator 自有的只读 PostgreSQL 查询连接，不再动态加载 server 源码。
+
+生产准备路径的 `preflight`、`validate` 和 `rehearse` 命令只从进程环境读取 `DATABASE_URL`；传入 `--target` 会在任何文件或数据库 I/O 前以固定脱敏错误拒绝。`release-readiness` 还要求显式 40 位 `--release-candidate`，并校验它与签核候选 SHA 一致。签核解析器会强制校验 readiness runId、go-live/rollback/独立 operator 三方身份分离、真实批准时间、两倍演练窗口、`approved` 状态，以及 reports 与其 `evidence` artifacts 的精确 size/SHA-256 manifest；自动化只生成 failed/pending 草稿，不代签。

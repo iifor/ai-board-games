@@ -18,6 +18,7 @@ const OPERATOR_CHECKS = [
   'docs.runtime-truth',
   'operator.signoff',
 ] as const;
+const RELEASE_CANDIDATE = '0123456789abcdef0123456789abcdef01234567';
 
 function readinessReport(
   runId: string,
@@ -76,7 +77,7 @@ interface Fixture {
   outputDirectory: string;
   reports: ReadinessReport[];
   signoff: Record<string, unknown>;
-  persist(): Promise<void>;
+  persist(readinessRunId?: string): Promise<void>;
 }
 
 async function createFixture(): Promise<Fixture> {
@@ -89,7 +90,7 @@ async function createFixture(): Promise<Fixture> {
     'backup.sqlite', 'backup-manifest.json',
     'rehearsal-1-migration.json', 'rehearsal-1-validation.json',
     'rehearsal-2-migration.json', 'rehearsal-2-validation.json',
-    'restore.sqlite', 'restore-manifest.json',
+    'restore.sqlite', 'restore-manifest.json', 'environment-tls.log',
   ].map((name) => path.join(artifactsDirectory, name));
   for (const [index, candidate] of artifactPaths.entries()) {
     await fs.writeFile(candidate, `artifact-${index}\n`);
@@ -153,14 +154,20 @@ async function createFixture(): Promise<Fixture> {
     outputDirectory,
     reports,
     signoff,
-    async persist() {
+    async persist(readinessRunId = 'release-pass') {
       for (let index = 0; index < reports.length; index += 1) {
         await fs.writeFile(reportPaths[index], `${JSON.stringify(reports[index], null, 2)}\n`);
       }
       Object.assign(signoff, {
+        releaseCandidate: RELEASE_CANDIDATE,
+        readinessRunId,
+        goLiveOwner: { name: 'go-live-owner', approvedAt: '2026-08-10T01:55:00.000Z' },
+        rollbackOwner: { name: 'rollback-owner', approvedAt: '2026-08-10T01:56:00.000Z' },
+        maintenanceWindowMinutes: 3,
+        status: 'approved',
         version: 1,
         approved: true,
-        approvedBy: 'release-operator',
+        approvedBy: 'independent-release-operator',
         approvedAt: '2026-08-10T02:00:00.000Z',
         checks: OPERATOR_CHECKS.map((id) => ({ id, status: 'passed' })),
         reportManifest: await Promise.all(uniqueEvidencePaths([
@@ -181,9 +188,10 @@ async function createFixture(): Promise<Fixture> {
 }
 
 async function runFixture(fixture: Fixture, runId = `release-${Date.now()}-${Math.random().toString(16).slice(2)}`) {
-  await fixture.persist();
+  await fixture.persist(runId);
   return runReleaseReadiness({
     runId,
+    releaseCandidate: RELEASE_CANDIDATE,
     reportPaths: fixture.reportPaths,
     outputDirectory: fixture.outputDirectory,
     operatorSignoffPath: fixture.signoffPath,
@@ -206,6 +214,16 @@ test('passes only complete evidence and computes a three-minute maintenance wind
   ]);
   await fs.access(path.join(fixture.outputDirectory, 'release-pass-release.json'));
   await fs.access(path.join(fixture.outputDirectory, 'release-pass-release.md'));
+});
+
+test('accepts immutable raw evidence artifacts in the signed manifest closure', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  fixture.reports[5].artifacts = [
+    { type: 'evidence', path: fixture.artifactPaths[8], sha256: await sha256(fixture.artifactPaths[8]) },
+  ];
+
+  assert.equal((await runFixture(fixture, 'release-raw-evidence')).status, 'passed');
 });
 
 test('fails when a required report is missing or any input report failed', async (t) => {
@@ -261,20 +279,22 @@ test('fails closed when a report hash or manifest path does not match', async (t
   const escaped = await createFixture();
   t.after(() => Promise.all([tampered, escaped].map((item) => fs.rm(item.root, { recursive: true, force: true }))));
 
-  await tampered.persist();
+  await tampered.persist('release-tampered');
   await fs.appendFile(tampered.reportPaths[0], 'tampered');
   const tamperedResult = await runReleaseReadiness({
     runId: 'release-tampered', reportPaths: tampered.reportPaths,
+    releaseCandidate: RELEASE_CANDIDATE,
     outputDirectory: tampered.outputDirectory, operatorSignoffPath: tampered.signoffPath,
   });
   assert.equal(tamperedResult.status, 'failed');
 
-  await escaped.persist();
+  await escaped.persist('release-escaped');
   const signoff = JSON.parse(await fs.readFile(escaped.signoffPath, 'utf8'));
   signoff.reportManifest[0].path = '../outside.json';
   await fs.writeFile(escaped.signoffPath, JSON.stringify(signoff));
   const escapedResult = await runReleaseReadiness({
     runId: 'release-escaped', reportPaths: escaped.reportPaths,
+    releaseCandidate: RELEASE_CANDIDATE,
     outputDirectory: escaped.outputDirectory, operatorSignoffPath: escaped.signoffPath,
   });
   assert.equal(escapedResult.status, 'failed');
@@ -292,13 +312,13 @@ test('fails closed when signed artifact bytes, size, path, or claims are invalid
   const fixtures = await Promise.all(['missing', 'tampered', 'size', 'escape', 'conflict'].map(() => createFixture()));
   t.after(() => Promise.all(fixtures.map((fixture) => fs.rm(fixture.root, { recursive: true, force: true }))));
 
-  await fixtures[0].persist();
+  await fixtures[0].persist('release-artifact-case-0');
   await fs.rm(fixtures[0].artifactPaths[0]);
 
-  await fixtures[1].persist();
+  await fixtures[1].persist('release-artifact-case-1');
   await fs.appendFile(fixtures[1].artifactPaths[0], 'tampered');
 
-  await fixtures[2].persist();
+  await fixtures[2].persist('release-artifact-case-2');
   const sizeSignoff = JSON.parse(await fs.readFile(fixtures[2].signoffPath, 'utf8'));
   sizeSignoff.reportManifest.find((entry: { path: string }) => entry.path.endsWith('backup.sqlite')).sizeBytes += 1;
   await fs.writeFile(fixtures[2].signoffPath, JSON.stringify(sizeSignoff));
@@ -314,6 +334,7 @@ test('fails closed when signed artifact bytes, size, path, or claims are invalid
     const result = fixture === fixtures[0] || fixture === fixtures[1] || fixture === fixtures[2]
       ? await runReleaseReadiness({
         runId: `release-artifact-case-${index}`,
+        releaseCandidate: RELEASE_CANDIDATE,
         reportPaths: fixture.reportPaths,
         outputDirectory: fixture.outputDirectory,
         operatorSignoffPath: fixture.signoffPath,
@@ -337,18 +358,60 @@ test('fails closed when a passed candidate contains non-passed checks, errors, o
 test('fails closed when operator signoff contains a failed internal check', async (t) => {
   const fixture = await createFixture();
   t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
-  await fixture.persist();
+  await fixture.persist('release-failed-signoff-check');
   const signoff = JSON.parse(await fs.readFile(fixture.signoffPath, 'utf8'));
   signoff.checks.push({ id: 'adversarial.hidden', status: 'failed' });
   await fs.writeFile(fixture.signoffPath, JSON.stringify(signoff));
 
   const result = await runReleaseReadiness({
     runId: 'release-failed-signoff-check',
+    releaseCandidate: RELEASE_CANDIDATE,
     reportPaths: fixture.reportPaths,
     outputDirectory: fixture.outputDirectory,
     operatorSignoffPath: fixture.signoffPath,
   });
   assert.equal(result.status, 'failed');
+});
+
+test('fails closed when plan-critical signoff identity, candidate, run, window, or status is invalid', async (t) => {
+  const cases: Array<[string, (signoff: Record<string, any>) => void]> = [
+    ['candidate', (signoff) => { signoff.releaseCandidate = 'f'.repeat(40); }],
+    ['placeholder candidate', (signoff) => { signoff.releaseCandidate = '0'.repeat(40); }],
+    ['run', (signoff) => { signoff.readinessRunId = 'another-release-run'; }],
+    ['owners', (signoff) => { signoff.rollbackOwner.name = signoff.goLiveOwner.name; }],
+    ['operator', (signoff) => { signoff.approvedBy = signoff.rollbackOwner.name; }],
+    ['window', (signoff) => { signoff.maintenanceWindowMinutes = 2; }],
+    ['status', (signoff) => { signoff.status = 'pending'; signoff.approved = false; }],
+  ];
+  for (const [name, mutate] of cases) {
+    const fixture = await createFixture();
+    t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+    await fixture.persist('release-signoff-contract');
+    const signoff = JSON.parse(await fs.readFile(fixture.signoffPath, 'utf8')) as Record<string, any>;
+    mutate(signoff);
+    await fs.writeFile(fixture.signoffPath, JSON.stringify(signoff));
+    const result = await runReleaseReadiness({
+      runId: 'release-signoff-contract',
+      releaseCandidate: RELEASE_CANDIDATE,
+      reportPaths: fixture.reportPaths,
+      outputDirectory: fixture.outputDirectory,
+      operatorSignoffPath: fixture.signoffPath,
+    });
+    assert.equal(result.status, 'failed', name);
+  }
+});
+
+test('rejects a placeholder release candidate before reading evidence', async () => {
+  await assert.rejects(
+    () => runReleaseReadiness({
+      runId: 'release-placeholder-candidate',
+      releaseCandidate: '0'.repeat(40),
+      reportPaths: ['not-read.json'],
+      outputDirectory: 'not-written',
+      operatorSignoffPath: 'not-read-signoff.json',
+    }),
+    (error: unknown) => (error as { code?: string }).code === 'INVALID_PARAMETERS',
+  );
 });
 
 test('fails when a final required gate is skipped even though optional producer checks may skip', async (t) => {

@@ -67,6 +67,14 @@ function section(document: string, heading: string): string {
   return nextHeading === -1 ? rest : rest.slice(0, nextHeading);
 }
 
+function numberedStep(runbook: string, number: number): string {
+  const match = new RegExp(`^#{2,3} ${number}\\.\\s+.+$`, 'm').exec(runbook);
+  assert.ok(match, `missing step ${number}`);
+  const rest = runbook.slice(match.index + match[0].length);
+  const next = /^#{2,3} \d+\.\s+.+$/m.exec(rest);
+  return next ? rest.slice(0, next.index) : rest;
+}
+
 test('current production documentation describes the PostgreSQL-only runtime contract', async () => {
   const documents = await Promise.all(projectDocs.map(async (name) => ({ name, text: await readDoc(name) })));
   const summaryTruth = section(documents.find(({ name }) => name === 'project-summary.md')!.text, '## 当前生产运行真相');
@@ -145,13 +153,95 @@ test('production-readiness runbook preserves the twelve non-exchangeable operato
   assert.match(runbook, /不得.{0,30}(自动切流|连接真实生产)/u);
 });
 
+test('production-readiness evidence is raw, secret-safe, operator-approved, and independently bound', async () => {
+  const runbook = await readDoc('runbooks/postgresql-production-readiness.md');
+  const deployment = await readDoc('postgresql-deployment.md');
+  const source = numberedStep(runbook, 1);
+  const preflight = numberedStep(runbook, 2);
+  const restore = numberedStep(runbook, 9);
+  const signoff = numberedStep(runbook, 10);
+  const aggregate = numberedStep(runbook, 11);
+
+  assert.match(source, /Test-Path.{0,80}Source/isu);
+  assert.match(source, /throw.{0,80}(SQLite|source)/isu);
+  assert.match(source, /resourceFiles[\s\S]{0,500}sha256/iu);
+  assert.match(preflight, /DATABASE_URL/);
+  assert.doesNotMatch(preflight, /-Target\s+\$env:TEST_DATABASE_URL/iu);
+  assert.match(runbook, /psql[\s\S]{0,120}PGHOST|PGSERVICE/iu);
+  assert.doesNotMatch(runbook, /psql\s+\$env:[A-Z_]*DATABASE_URL/iu);
+  assert.doesNotMatch(deployment, /psql\s+\$env:[A-Z_]*DATABASE_URL/iu);
+
+  assert.match(restore, /Stopwatch/);
+  assert.match(restore, /better-sqlite3/);
+  assert.match(restore, /PRAGMA integrity_check/);
+  for (const table of ['admin_users', 'app_settings', 'players', 'games', 'game_playback_events', 'player_game_memories']) {
+    assert.match(restore, new RegExp(`\\b${table}\\b`), table);
+  }
+  assert.match(restore, /@\('-wal','-shm'\)/);
+  assert.doesNotMatch(restore, /durationMs\s*=\s*1000|AddSeconds\(-1\)/);
+
+  for (const artifact of [
+    '10-ci-release-gates.log', '10-runtime-image-build.log', '10-runtime-no-sqlite.log',
+    '10-postgres-tls.log', '10-postgres-least-privilege.log', '10-postgres-pool-timeouts.json',
+  ]) assert.match(signoff, new RegExp(artifact.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), artifact);
+  assert.match(signoff, /RawEvidencePaths[\s\S]{0,1800}artifacts/iu);
+  assert.match(signoff, /type\s*=\s*'evidence'/);
+  assert.match(signoff, /EnvironmentReportDraftPath/);
+  assert.match(signoff, /status\s*=\s*'failed'/);
+  assert.match(signoff, /pending independent verification/iu);
+  assert.doesNotMatch(signoff, /\$environmentReport\s*=[\s\S]{0,300}status\s*=\s*'passed'/iu);
+  assert.match(signoff, /Type REVIEWED_ENVIRONMENT/iu);
+  assert.match(signoff, /postgresql-operator-signoff\.example\.json/);
+  assert.match(signoff, /pending (?:draft|草稿)/iu);
+  assert.match(signoff, /Read-Host|independent operator/iu);
+  assert.match(signoff, /approvedBy/iu);
+  assert.match(signoff, /goLiveOwner/iu);
+  assert.match(signoff, /rollbackOwner/iu);
+  assert.match(signoff, /different from go-live and rollback owners/iu);
+  assert.doesNotMatch(signoff, /approvedBy\s*=\s*\$env:INDEPENDENT_OPERATOR/);
+  assert.doesNotMatch(signoff, /\$signoff\.approved\s*=\s*\$true/);
+  assert.match(aggregate, /-ReleaseCandidate\s+\$ReleaseCandidate/);
+});
+
 test('rollback runbook restores one SQLite and resources point and quarantines failed PostgreSQL targets', async () => {
   const rollback = await readDoc('runbooks/postgresql-rollback.md');
   assert.match(rollback, /同一时间点.{0,80}SQLite.{0,20}WAL.{0,20}SHM.{0,40}资源/isu);
   assert.match(rollback, /旧镜像/);
   assert.match(rollback, /失败.{0,20}PostgreSQL.{0,40}仅.{0,10}排障/isu);
-  assert.match(rollback, /不得.{0,30}(下次|后续).{0,30}目标/isu);
+  assert.match(rollback, /(?:不得|禁止).{0,30}(下次|后续).{0,30}目标|禁止作为下次目标/isu);
   assert.match(rollback, /全新.{0,12}(空库|schema)/u);
+
+  const freeze = numberedStep(rollback, 1);
+  const quarantine = numberedStep(rollback, 2);
+  const restore = numberedStep(rollback, 5);
+  const start = numberedStep(rollback, 6);
+  const smoke = numberedStep(rollback, 7);
+  for (const gate of [freeze, quarantine]) {
+    assert.match(gate, /receipt|回执/iu);
+    assert.match(gate, /Get-FileHash/);
+    assert.match(gate, /ticketId/);
+    assert.match(gate, /occurredAt/);
+    assert.doesNotMatch(gate, /Stop accepting traffic|diagnostics-only-do-not-reuse'\s*\n\s*capturedAt/iu);
+  }
+  assert.match(restore, /ResourceRestoreMap/);
+  assert.match(restore, /resource-\d{3}|resource-\$\(/);
+  assert.match(restore, /GetFullPath|Resolve-Path/);
+  assert.match(restore, /path escape|路径逃逸/iu);
+  assert.match(restore, /sizeBytes[\s\S]{0,300}sha256/iu);
+  assert.match(restore, /ResourceRestoreMap\.Count[\s\S]{0,120}mappedIndexes\.Count/iu);
+  assert.match(restore, /GetFileName[\s\S]{0,100}LegacyDatabaseFileName/iu);
+  assert.match(restore, /sqliteRestoreEntries[\s\S]{0,1200}sha256/iu);
+  assert.match(start, /RollbackStartCommand/);
+  assert.match(start, /Invoke-Expression|&\s+\$RollbackStart/);
+  assert.match(start, /LASTEXITCODE|ExitCode/);
+  assert.match(start, /legacyDataRoot/iu);
+  assert.match(start, /resourceDestinations/iu);
+  assert.match(start, /ticketId/);
+  assert.match(start, /occurredAt/);
+  assert.doesNotMatch(start, /start-plan\.json/);
+  for (const check of ['admin', 'config', 'history', 'replay', 'resource']) assert.match(smoke, new RegExp(check, 'iu'), check);
+  assert.match(smoke, /Get-FileHash|sha256/iu);
+  assert.doesNotMatch(smoke, /Admin login, configuration, history, replay and resources verified/);
 });
 
 test('operator signoff example keeps plan fields and satisfies the real evidence parser shape', async (t) => {
@@ -163,8 +253,9 @@ test('operator signoff example keeps plan fields and satisfies the real evidence
     [],
   );
   assert.equal(example.version, 1);
-  assert.equal(example.approved, true);
-  assert.equal(example.status, 'approved');
+  assert.equal(example.approved, false);
+  assert.equal(example.status, 'pending');
+  assert.ok(example.checks.every(({ status }) => status === 'failed'));
   assert.deepEqual(example.checks.map(({ id }) => id), signedCheckIds);
   assert.ok(example.reportManifest.length > 0);
   for (const entry of example.reportManifest) {
@@ -191,8 +282,16 @@ test('operator signoff example keeps plan fields and satisfies the real evidence
   await fs.writeFile(reportPath, reportBytes);
   const parserFixture = {
     ...example,
-    approvedBy: 'REPLACE_WITH_INDEPENDENT_OPERATOR',
-    approvedAt: '1970-01-01T00:00:00.000Z',
+    releaseCandidate: '0123456789abcdef0123456789abcdef01234567',
+    readinessRunId: 'docs-truth',
+    goLiveOwner: { name: 'go-live-owner', approvedAt: '2026-08-10T00:00:00.000Z' },
+    rollbackOwner: { name: 'rollback-owner', approvedAt: '2026-08-10T00:00:01.000Z' },
+    maintenanceWindowMinutes: 1,
+    status: 'approved',
+    approved: true,
+    approvedBy: 'independent-operator',
+    approvedAt: '2026-08-10T00:00:02.000Z',
+    checks: example.checks.map(({ id }) => ({ id, status: 'passed' as const })),
     reportManifest: [{
       path: 'report.json',
       sizeBytes: reportBytes.length,

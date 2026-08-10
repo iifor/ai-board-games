@@ -11,8 +11,8 @@ const scriptsRoot = path.join(repoRoot, 'scripts', 'ops', 'postgres');
 const cases = [
   {
     name: 'preflight',
-    args: ['-Source', 'source.sqlite', '-Target', 'postgres://user@host/db', '-Output', 'out', '-Resources', 'resources', '-RequireTls', 'true', '-RunId', 'preflight-1'],
-    expected: ['--filter', '@ai-presenter/db-migrator', 'run', 'preflight', '--', '--source', 'source.sqlite', '--target', 'postgres://user@host/db', '--output', 'out', '--resources', 'resources', '--require-tls', 'true', '--run-id', 'preflight-1'],
+    args: ['-Source', 'source.sqlite', '-Output', 'out', '-Resources', 'resources', '-RequireTls', 'true', '-RunId', 'preflight-1'],
+    expected: ['--filter', '@ai-presenter/db-migrator', 'run', 'preflight', '--', '--source', 'source.sqlite', '--output', 'out', '--resources', 'resources', '--require-tls', 'true', '--run-id', 'preflight-1'],
   },
   {
     name: 'backup',
@@ -26,13 +26,13 @@ const cases = [
   },
   {
     name: 'validate',
-    args: ['-SourceSnapshot', 'snapshot.sqlite', '-Manifest', 'manifest.json', '-MigrationReport', 'migration.json', '-Target', 'postgres://user@host/db', '-Schema', 'schema_a', '-Output', 'out', '-RunId', 'validation-1'],
-    expected: ['--filter', '@ai-presenter/db-migrator', 'run', 'validate', '--', '--source-snapshot', 'snapshot.sqlite', '--manifest', 'manifest.json', '--migration-report', 'migration.json', '--target', 'postgres://user@host/db', '--schema', 'schema_a', '--output', 'out', '--run-id', 'validation-1'],
+    args: ['-SourceSnapshot', 'snapshot.sqlite', '-Manifest', 'manifest.json', '-MigrationReport', 'migration.json', '-Schema', 'schema_a', '-Output', 'out', '-RunId', 'validation-1'],
+    expected: ['--filter', '@ai-presenter/db-migrator', 'run', 'validate', '--', '--source-snapshot', 'snapshot.sqlite', '--manifest', 'manifest.json', '--migration-report', 'migration.json', '--schema', 'schema_a', '--output', 'out', '--run-id', 'validation-1'],
   },
   {
     name: 'release-readiness',
-    args: ['-Reports', 'a.json,b.json', '-OperatorSignoff', 'signoff.json', '-Output', 'out', '-RunId', 'release-1'],
-    expected: ['--filter', '@ai-presenter/db-migrator', 'run', 'release-readiness', '--', '--reports', 'a.json,b.json', '--operator-signoff', 'signoff.json', '--output', 'out', '--run-id', 'release-1'],
+    args: ['-Reports', 'a.json,b.json', '-OperatorSignoff', 'signoff.json', '-ReleaseCandidate', '0123456789abcdef0123456789abcdef01234567', '-Output', 'out', '-RunId', 'release-1'],
+    expected: ['--filter', '@ai-presenter/db-migrator', 'run', 'release-readiness', '--', '--reports', 'a.json,b.json', '--operator-signoff', 'signoff.json', '--release-candidate', '0123456789abcdef0123456789abcdef01234567', '--output', 'out', '--run-id', 'release-1'],
   },
 ] as const;
 
@@ -45,6 +45,10 @@ test('PostgreSQL operations scripts are typed, thin, and contain no database imp
     assert.match(source, /\$PSScriptRoot/, entry.name);
     assert.doesNotMatch(source, /\bpsql\b|DROP\s+SCHEMA|\bVACUUM\b|\bcheckpoint\b|postgres(?:ql)?:\/\/|\bpassword\b/i, entry.name);
     if (entry.name === 'release-readiness') assert.doesNotMatch(source, /\$Execute|--execute/i);
+    if (entry.name === 'preflight' || entry.name === 'validate') {
+      assert.doesNotMatch(source, /\$Target|--target/i, entry.name);
+      assert.match(source, /DATABASE_URL/, entry.name);
+    }
   }
 });
 

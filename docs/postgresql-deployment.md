@@ -30,13 +30,20 @@
 
 ```powershell
 $AppSchema = if ($env:DATABASE_SCHEMA) { $env:DATABASE_SCHEMA } else { 'consensus' }
-$state = (& psql $env:TEST_APP_DATABASE_URL -X -tA -v ON_ERROR_STOP=1 `
+if (-not $env:PGSERVICE) {
+  foreach ($name in @('PGHOST','PGPORT','PGDATABASE','PGUSER','PGPASSWORD','PGSSLMODE')) {
+    if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "$name is required when PGSERVICE is absent." }
+  }
+}
+$state = (& psql -X -tA -v ON_ERROR_STOP=1 `
   --set=app_schema=$AppSchema -c `
   "SELECT has_database_privilege(current_user,current_database(),'CONNECT')::text || '|' || has_database_privilege(current_user,current_database(),'CREATE')::text || '|' || has_schema_privilege(current_user, :'app_schema','USAGE')::text;").Trim()
 if ($LASTEXITCODE -ne 0 -or $state -cne 'true|false|true') {
   throw 'Expected CONNECT=true, CREATE DATABASE=false, schema USAGE=true.'
 }
 ```
+
+`psql` 只读取受控进程环境中的 `PGSERVICE` 或完整 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD/PGSSLMODE/PGSSLROOTCERT`；不得把 URL 作为位置参数展开到进程列表或审计日志。
 
 DBA 必须审核实际 grants，并保存 `\du+`、`\dn+`、schema/table/sequence grants 和拒绝 `CREATE DATABASE`/非目标 schema 写入的证据。
 
@@ -65,4 +72,4 @@ DBA 必须审核实际 grants，并保存 `\du+`、`\dn+`、schema/table/sequenc
 
 ## 一次性导入与失败现场
 
-导入目标必须是全新空 PostgreSQL database/schema，不支持增量、合并或长期双写。rehearsal 的 `DATABASE_URL` 只从进程环境传入，命令行 `--target` 会在 I/O 前拒绝；执行失败时 schema 和 migration/validation/smoke/rehearsal 报告全部保留。失败 PostgreSQL 目标仅用于排障，下一次演练或正式重试必须使用另一个全新空目标。
+导入目标必须是全新空 PostgreSQL database/schema，不支持增量、合并或长期双写。生产准备路径的 `preflight`、`validate` 与 `rehearse` 都只从进程环境读取 `DATABASE_URL`，命令行 `--target` 会在任何 I/O 前以脱敏错误拒绝；一次性 `migrate` 的旧 CLI 兼容入口不属于该路径。执行失败时 schema 和 migration/validation/smoke/rehearsal 报告全部保留。失败 PostgreSQL 目标仅用于排障，下一次演练或正式重试必须使用另一个全新空目标。

@@ -9,11 +9,22 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const STAGES = ['preflight', 'backup', 'import', 'validation', 'rehearsal', 'smoke', 'release'];
 const CHECK_STATUSES = ['passed', 'failed', 'skipped'];
 const ARTIFACT_TYPES: ArtifactType[] = [
-  'backup', 'manifest', 'migration-report', 'validation-report', 'rehearsal-report', 'smoke-report',
+  'backup', 'manifest', 'migration-report', 'validation-report', 'rehearsal-report', 'smoke-report', 'evidence',
 ];
+const GIT_SHA = /^[a-f0-9]{40}$/;
+
+function validGitSha(value: unknown): value is string {
+  return typeof value === 'string' && GIT_SHA.test(value) && !/^0{40}$/.test(value);
+}
 
 export interface ReportManifestEntry { path: string; sizeBytes: number; sha256: string }
 export interface OperatorSignoff {
+  releaseCandidate: string;
+  readinessRunId: string;
+  goLiveOwner: { name: string; approvedAt: string };
+  rollbackOwner: { name: string; approvedAt: string };
+  maintenanceWindowMinutes: number;
+  status: 'approved';
   version: 1;
   approved: boolean;
   approvedBy: string;
@@ -76,6 +87,20 @@ function nonEmpty(value: unknown): value is string {
   return typeof value === 'string' && Boolean(value.trim());
 }
 
+function validApprovalTime(value: unknown): value is string {
+  return nonEmpty(value) && Number.isFinite(Date.parse(value)) && Date.parse(value) > 0;
+}
+
+function operatorIdentity(value: unknown): value is string {
+  return nonEmpty(value) && !value.trim().startsWith('REPLACE_WITH_') && !/^<.*>$/.test(value.trim());
+}
+
+function approvedOwner(value: unknown): value is { name: string; approvedAt: string } {
+  if (!value || typeof value !== 'object') return false;
+  const owner = value as { name?: unknown; approvedAt?: unknown };
+  return operatorIdentity(owner.name) && validApprovalTime(owner.approvedAt);
+}
+
 function isReadinessReport(value: unknown): value is ReadinessReport {
   if (!value || typeof value !== 'object') return false;
   const report = value as Partial<ReadinessReport>;
@@ -100,8 +125,14 @@ function isReadinessReport(value: unknown): value is ReadinessReport {
 function isSignoff(value: unknown): value is OperatorSignoff {
   if (!value || typeof value !== 'object') return false;
   const signoff = value as Partial<OperatorSignoff>;
-  return signoff.version === 1 && typeof signoff.approved === 'boolean'
-    && nonEmpty(signoff.approvedBy) && nonEmpty(signoff.approvedAt) && Number.isFinite(Date.parse(signoff.approvedAt))
+  if (!validGitSha(signoff.releaseCandidate) || !isSafeRunId(signoff.readinessRunId || '')) return false;
+  if (!approvedOwner(signoff.goLiveOwner) || !approvedOwner(signoff.rollbackOwner)
+    || signoff.goLiveOwner.name.trim().toLowerCase() === signoff.rollbackOwner.name.trim().toLowerCase()) return false;
+  if (!operatorIdentity(signoff.approvedBy) || !validApprovalTime(signoff.approvedAt)) return false;
+  const independent = signoff.approvedBy.trim().toLowerCase();
+  if ([signoff.goLiveOwner.name, signoff.rollbackOwner.name].some((name) => name.trim().toLowerCase() === independent)) return false;
+  return signoff.version === 1 && signoff.approved === true && signoff.status === 'approved'
+    && Number.isSafeInteger(signoff.maintenanceWindowMinutes) && Number(signoff.maintenanceWindowMinutes) >= 0
     && Array.isArray(signoff.checks) && signoff.checks.every((check) => (
       check && nonEmpty(check.id) && ['passed', 'failed'].includes(check.status)
     ))

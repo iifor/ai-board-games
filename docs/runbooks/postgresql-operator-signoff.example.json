@@ -10,21 +10,21 @@
     "approvedAt": "1970-01-01T00:00:00.000Z"
   },
   "maintenanceWindowMinutes": 0,
-  "status": "approved",
+  "status": "pending",
   "version": 1,
-  "approved": true,
+  "approved": false,
   "approvedBy": "REPLACE_WITH_INDEPENDENT_OPERATOR",
   "approvedAt": "1970-01-01T00:00:00.000Z",
   "checks": [
-    { "id": "ci.release-gates", "status": "passed" },
-    { "id": "tests.no-critical-skips", "status": "passed" },
-    { "id": "backup.restore-drill", "status": "passed" },
-    { "id": "runtime.no-sqlite", "status": "passed" },
-    { "id": "postgres.tls", "status": "passed" },
-    { "id": "postgres.least-privilege", "status": "passed" },
-    { "id": "postgres.pool-and-timeouts", "status": "passed" },
-    { "id": "docs.runtime-truth", "status": "passed" },
-    { "id": "operator.signoff", "status": "passed" }
+    { "id": "ci.release-gates", "status": "failed" },
+    { "id": "tests.no-critical-skips", "status": "failed" },
+    { "id": "backup.restore-drill", "status": "failed" },
+    { "id": "runtime.no-sqlite", "status": "failed" },
+    { "id": "postgres.tls", "status": "failed" },
+    { "id": "postgres.least-privilege", "status": "failed" },
+    { "id": "postgres.pool-and-timeouts", "status": "failed" },
+    { "id": "docs.runtime-truth", "status": "failed" },
+    { "id": "operator.signoff", "status": "failed" }
   ],
   "reportManifest": [
     {

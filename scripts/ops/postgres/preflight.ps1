@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][string]$Source,
-  [Parameter(Mandatory = $true)][string]$Target,
   [Parameter(Mandatory = $true)][string]$Output,
   [Parameter(Mandatory = $true)][string]$Resources,
   [Parameter(Mandatory = $true)][ValidateSet('true', 'false')][string]$RequireTls,
@@ -9,9 +8,10 @@ param(
 )
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '../../..')
+if (-not $env:DATABASE_URL) { throw 'DATABASE_URL is required.' }
 $arguments = @(
   '--filter', '@ai-presenter/db-migrator', 'run', 'preflight', '--',
-  '--source', $Source, '--target', $Target, '--output', $Output, '--resources', $Resources,
+  '--source', $Source, '--output', $Output, '--resources', $Resources,
   '--require-tls', $RequireTls.ToLowerInvariant(), '--run-id', $RunId
 )
 Push-Location $repoRoot

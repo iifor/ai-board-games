@@ -2,6 +2,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$Reports,
   [Parameter(Mandatory = $true)][string]$OperatorSignoff,
+  [Parameter(Mandatory = $true)][string]$ReleaseCandidate,
   [Parameter(Mandatory = $true)][string]$Output,
   [Parameter(Mandatory = $true)][string]$RunId
 )
@@ -9,7 +10,8 @@ param(
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '../../..')
 $arguments = @(
   '--filter', '@ai-presenter/db-migrator', 'run', 'release-readiness', '--',
-  '--reports', $Reports, '--operator-signoff', $OperatorSignoff, '--output', $Output, '--run-id', $RunId
+  '--reports', $Reports, '--operator-signoff', $OperatorSignoff, '--release-candidate', $ReleaseCandidate,
+  '--output', $Output, '--run-id', $RunId
 )
 Push-Location $repoRoot
 try {
