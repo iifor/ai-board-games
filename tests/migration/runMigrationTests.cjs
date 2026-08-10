@@ -10,6 +10,10 @@ const testFiles = [
   'eventMapping.test.ts',
   'readinessReport.test.ts',
   'backupCommand.test.ts',
+  'backupRestoreCommands.test.ts',
+  'backupRestoreBuiltCli.test.ts',
+  'backupVerificationSecurity.test.ts',
+  'restoreDrillSecurity.test.ts',
   'releaseReadiness.test.ts',
 ].map((file) => path.join(__dirname, file));
 

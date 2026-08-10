@@ -21,6 +21,7 @@ $Resources = @('REPLACE_WITH_RESOURCES_DIRECTORY')
 $EvidenceRoot = 'REPLACE_WITH_NEW_EVIDENCE_DIRECTORY'
 $PreflightRunId = 'preflight-REPLACE_WITH_UTC_ID'
 $BackupRunId = 'backup-REPLACE_WITH_UTC_ID'
+$VerifyBackupRunId = 'verify-backup-REPLACE_WITH_UTC_ID'
 $Rehearsal1RunId = 'rehearsal-1-REPLACE_WITH_UTC_ID'
 $Rehearsal2RunId = 'rehearsal-2-REPLACE_WITH_UTC_ID'
 $RestoreRunId = 'restore-drill-REPLACE_WITH_UTC_ID'
@@ -166,36 +167,20 @@ if (-not (Test-Path -LiteralPath $BackupReportPath -PathType Leaf)) { throw 'Bac
 **命令**：
 
 ```powershell
-$manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
-if ($manifest.version -ne 1 -or $manifest.runId -ne $BackupRunId) { throw 'Manifest header mismatch.' }
-$actualFiles = @(Get-ChildItem -LiteralPath $BackupRoot -Recurse -File |
-  Where-Object { $_.FullName -cne $ManifestPath })
-if ($actualFiles.Count -ne @($manifest.entries).Count) { throw 'Manifest file set mismatch.' }
-foreach ($file in $actualFiles) {
-  $relative = $file.FullName.Substring($BackupRoot.Length + 1).Replace('\', '/')
-  $matches = @($manifest.entries | Where-Object { $_.path -ceq $relative })
-  if ($matches.Count -ne 1) { throw "Manifest path mismatch: $relative" }
-  $entry = $matches[0]
-  $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-  if ($entry.sizeBytes -ne $file.Length -or $entry.sha256 -cne $hash) {
-    throw "Manifest bytes mismatch: $relative"
-  }
-}
-$sourceEntry = @($manifest.entries | Where-Object { $_.path -ceq 'sqlite-raw/source.sqlite' })
-$consistentEntry = @($manifest.entries | Where-Object { $_.path -ceq 'sqlite-consistent.sqlite' })
-if ($sourceEntry.Count -ne 1 -or $consistentEntry.Count -ne 1) { throw 'Required SQLite snapshots missing.' }
-if ($sourceEntry[0].sha256 -cne $manifest.sourceDatabaseSha256) { throw 'Source hash header mismatch.' }
-if ($consistentEntry[0].sha256 -cne $manifest.consistentDatabaseSha256) { throw 'Consistent hash header mismatch.' }
-'manifest verified twice' | Set-Content -LiteralPath (Join-Path $EvidenceRoot '04-manifest-second-verification.txt')
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+  (Join-Path $RepoRoot 'scripts\ops\postgres\verify-backup.ps1') `
+  -Backup $BackupRoot -Manifest $ManifestPath -Output $EvidenceRoot -RunId $VerifyBackupRunId
+if ($LASTEXITCODE -ne 0) { throw 'Independent backup verification failed; preserve the backup and stop.' }
+$VerifyBackupReportPath = Join-Path $EvidenceRoot "$VerifyBackupRunId-backup.json"
 ```
 
-**预期输出**：独立重算的文件集合、size 和 SHA-256 与 manifest 完全一致，并生成二次校验标记。
+**预期输出**：db-migrator 通过 Node 只读句柄重新验证完整文件集合、稳定 identity、size 和 SHA-256，并原子发布不覆盖的 JSON/Markdown 校验报告。该路径不使用 `Resolve-Path`、`Get-ChildItem` 或 `Get-FileHash` 遍历 backup，因此支持 manifest 中超过 260 字符的合法资源路径。
 
-**成功条件**：无异常，两个必需 SQLite 条目与 manifest 顶层 hash 一致。
+**成功条件**：退出 0，`backup.verify-manifest=passed`；manifest 的 runId、顶层 source/consistent hash、排序、重复/大小写别名、完整文件集合与前后 identity 全部一致。
 
-**失败停止点**：任何多文件、少文件、path/size/hash 不一致立即停止；不得重写 manifest。
+**失败停止点**：任何多文件、少文件、reparse/junction、path escape、重复/大小写别名、identity/size/hash/TOCTOU 不一致立即停止；错误固定脱敏，不得重写 backup 或 manifest。
 
-**证据路径**：`$ManifestPath`、`$EvidenceRoot\04-manifest-second-verification.txt`。
+**证据路径**：`$ManifestPath`、`$VerifyBackupReportPath`。
 
 ### 5. 演练 1 到全新 schema
 
@@ -319,117 +304,26 @@ foreach ($id in $requiredSmoke) {
 
 ```powershell
 $RestoreRoot = Join-Path $EvidenceRoot 'restore-drill'
-if (Test-Path -LiteralPath $RestoreRoot) { throw 'Restore drill target must be new.' }
-$restoreStartedAt = [DateTime]::UtcNow
-$restoreWatch = [Diagnostics.Stopwatch]::StartNew()
-New-Item -ItemType Directory -Path $RestoreRoot | Out-Null
-Get-ChildItem -LiteralPath $BackupRoot -Force | ForEach-Object {
-  Copy-Item -LiteralPath $_.FullName -Destination $RestoreRoot -Recurse
+$ResourceMapPath = Join-Path $EvidenceRoot '09-restore-resource-map.json'
+$resourceMappings = for ($index = 0; $index -lt $Resources.Count; $index += 1) {
+  [ordered]@{ sourceIndex = $index; destination = "resource-$('{0:D3}' -f $index)-restored" }
 }
-$restoreManifestPath = Join-Path $RestoreRoot 'manifest.json'
-$restoreManifest = Get-Content -LiteralPath $restoreManifestPath -Raw | ConvertFrom-Json
-$restorePrefix = [IO.Path]::GetFullPath($RestoreRoot).TrimEnd('\') + '\'
-foreach ($entry in $restoreManifest.entries) {
-  $relative = [string]$entry.path
-  if (-not $relative -or $relative.Contains('\') -or [IO.Path]::IsPathRooted($relative) -or $relative.Split('/') -contains '..') {
-    throw "Unsafe restored manifest path: $relative"
-  }
-  $candidate = [IO.Path]::GetFullPath((Join-Path $RestoreRoot ($relative.Replace('/', '\'))))
-  if (-not $candidate.StartsWith($restorePrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Restored path escape.' }
-  if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { throw "Restored file missing: $($entry.path)" }
-  $item = Get-Item -LiteralPath $candidate
-  $hash = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
-  if ($item.Length -ne $entry.sizeBytes -or $hash -cne $entry.sha256) { throw "Restored bytes mismatch: $($entry.path)" }
-}
-$restoredFiles = @(Get-ChildItem -LiteralPath $RestoreRoot -Recurse -File | Where-Object { $_.FullName -cne $restoreManifestPath })
-if ($restoredFiles.Count -ne @($restoreManifest.entries).Count) { throw 'Restore drill file set mismatch.' }
-
-foreach ($suffix in @('-wal','-shm')) {
-  $archiveName = "sqlite-raw/source.sqlite$suffix"
-  $declared = @($restoreManifest.entries | Where-Object { $_.path -ceq $archiveName }).Count
-  $restored = [int](Test-Path -LiteralPath (Join-Path $RestoreRoot $archiveName.Replace('/', '\')) -PathType Leaf)
-  if ($declared -ne $restored) { throw "SQLite sidecar combination changed: $archiveName" }
-}
-
-$sqliteValidationPath = Join-Path $RestoreRoot 'sqlite-readonly-validation.json'
-$sqliteValidationScript = @'
-const Database = require('better-sqlite3');
-const file = process.argv[1];
-const tables = ['admin_users','app_settings','players','games','game_playback_events','player_game_memories'];
-const db = new Database(file, { readonly: true, fileMustExist: true });
-try {
-  db.pragma('query_only = ON');
-  const integrity = db.pragma('integrity_check', { simple: true });
-  if (integrity !== 'ok') throw new Error(`integrity_check=${String(integrity)}`);
-  const counts = Object.fromEntries(tables.map((table) => {
-    const exists = Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
-    return [table, exists ? Number(db.prepare(`SELECT COUNT(*) AS count FROM "${table}"`).get().count) : 0];
-  }));
-  process.stdout.write(JSON.stringify({ integrityCheck: integrity, queryOnly: true, counts }));
-} finally { db.close(); }
-'@
-$migratorRoot = Join-Path $RepoRoot 'packages\db-migrator'
-Push-Location $migratorRoot
-try {
-  $rawValidationJson = & node -e $sqliteValidationScript -- (Join-Path $RestoreRoot 'sqlite-raw\source.sqlite')
-  $rawValidationExit = $LASTEXITCODE
-  if ($rawValidationExit -ne 0 -or -not $rawValidationJson) { throw 'Raw SQLite/WAL rollback-set validation failed.' }
-  $consistentValidationJson = & node -e $sqliteValidationScript -- (Join-Path $RestoreRoot 'sqlite-consistent.sqlite')
-  $consistentValidationExit = $LASTEXITCODE
-} finally { Pop-Location }
-if ($consistentValidationExit -ne 0 -or -not $consistentValidationJson) { throw 'Consistent SQLite copy validation failed.' }
-$rawValidation = $rawValidationJson | ConvertFrom-Json
-$consistentValidation = $consistentValidationJson | ConvertFrom-Json
-if ($rawValidation.integrityCheck -cne 'ok' -or -not $rawValidation.queryOnly) { throw 'Raw rollback-set integrity check failed.' }
-if ($consistentValidation.integrityCheck -cne 'ok' -or -not $consistentValidation.queryOnly) { throw 'Consistent-copy integrity check failed.' }
-foreach ($table in @('admin_users','app_settings','players','games','game_playback_events','player_game_memories')) {
-  if ([int64]$rawValidation.counts.$table -ne [int64]$consistentValidation.counts.$table) {
-    throw "Raw rollback set and consistent copy count mismatch: $table"
-  }
-}
-$sqliteValidation = [ordered]@{
-  rawRollbackSet = $rawValidation
-  consistentCopy = $consistentValidation
-  countsMatch = $true
-}
-Write-Utf8NoBom $sqliteValidationPath ($sqliteValidation | ConvertTo-Json -Depth 6)
-
-$restoreWatch.Stop()
-$restoreFinishedAt = [DateTime]::UtcNow
-$restoreRelative = $RestoreRoot.Substring($EvidenceRoot.Length).TrimStart('\').Replace('\', '/')
-$restoreArtifacts = @($restoreManifest.entries | ForEach-Object {
-  [ordered]@{ type = 'backup'; path = "$restoreRelative/$($_.path)"; sha256 = $_.sha256 }
-})
-$restoreArtifacts += [ordered]@{
-  type = 'manifest'; path = "$restoreRelative/manifest.json"
-  sha256 = (Get-FileHash $restoreManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-}
-$restoreArtifacts += [ordered]@{
-  type = 'evidence'; path = "$restoreRelative/sqlite-readonly-validation.json"
-  sha256 = (Get-FileHash $sqliteValidationPath -Algorithm SHA256).Hash.ToLowerInvariant()
-}
-$restoreReport = [ordered]@{
-  runId = $RestoreRunId; stage = 'backup'; status = 'passed'; startedAt = $restoreStartedAt.ToString('o')
-  finishedAt = $restoreFinishedAt.ToString('o'); durationMs = [int64]$restoreWatch.ElapsedMilliseconds
-  checks = @(
-    [ordered]@{ id = 'backup.restore-drill'; status = 'passed'; message = 'Raw rollback set and consistent copy independently verified in isolation' }
-    [ordered]@{ id = 'backup.restore-drill.raw-rollback-set'; status = 'passed'; message = 'Read-only integrity and key counts passed on sqlite-raw/source.sqlite with adjacent WAL/SHM' }
-    [ordered]@{ id = 'backup.restore-drill.consistent-copy'; status = 'passed'; message = 'Read-only integrity and key counts passed independently on sqlite-consistent.sqlite' }
-  )
-  artifacts = @($restoreArtifacts)
-  errors = @()
-}
+Write-Utf8NoBom $ResourceMapPath ([ordered]@{ version = 1; resources = @($resourceMappings) } | ConvertTo-Json -Depth 4)
 $RestoreReportPath = Join-Path $EvidenceRoot "$RestoreRunId-backup.json"
-Write-Utf8NoBom $RestoreReportPath ($restoreReport | ConvertTo-Json -Depth 10)
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+  (Join-Path $RepoRoot 'scripts\ops\postgres\restore-drill.ps1') `
+  -Backup $BackupRoot -Manifest $ManifestPath -ResourceMap $ResourceMapPath `
+  -RestoreOutput $RestoreRoot -Output $EvidenceRoot -RunId $RestoreRunId -Execute
+if ($LASTEXITCODE -ne 0) { throw 'Restore drill failed; preserve the isolated restore root and stop.' }
 ```
 
-**预期输出**：隔离目录中完整恢复同一组 SQLite/WAL/SHM（存在时）和资源；现有 db-migrator 的 `better-sqlite3` 首先在 `sqlite-raw` 原位以只读/query-only 打开真正回滚文件 `source.sqlite`，让同目录 `source.sqlite-wal/-shm` 参与恢复，再独立验证 `sqlite-consistent.sqlite`。两者都执行 `PRAGMA integrity_check`、记录关键表计数并要求计数相同；报告记录 Stopwatch 实测耗时。
+**预期输出**：Node 长路径句柄在隔离目录中恢复 raw SQLite/WAL/SHM、consistent copy、原 manifest 与每个 source index 映射后的资源。db-migrator 在 `sqlite-raw` 原位以只读/query-only 打开 `source.sqlite`，使同目录 sidecar 参与恢复，再独立验证 consistent copy；报告记录真实 Stopwatch 耗时、关键表计数与每个恢复文件的 SHA-256 artifact。
 
-**成功条件**：恢复文件集合、size、SHA-256、WAL/SHM 存在组合全部一致；raw rollback set 与 consistent copy 的完整性及 `admin_users/app_settings/players/games/game_playback_events/player_game_memories` 计数分别通过且相同；报告的 aggregate/raw/consistent 三项 checks 均为 `passed`。
+**成功条件**：`backup.restore-drill=passed`，恢复文件集合、size、SHA-256、WAL/SHM 存在组合全部一致；raw rollback set 与 consistent copy 的完整性及关键表计数分别通过且相同；资源映射精确覆盖所有 source index，且目标是隔离相对目录。
 
 **失败停止点**：不得覆盖已有恢复目录；缺文件、hash 不一致、raw rollback set 无法只读恢复、任一 integrity check 或计数对比失败立即停止。即使 consistent copy 正常，raw rollback set 损坏也必须失败并保留恢复目录排障。
 
-**证据路径**：`$RestoreRoot`、`$sqliteValidationPath`、`$RestoreReportPath`；每一项都由报告 artifact 与签署 manifest 固定。
+**证据路径**：`$RestoreRoot`、`$ResourceMapPath`、`$RestoreReportPath`；失败时不清理隔离恢复现场，报告错误不包含源或目标绝对路径。
 
 ### 10. 收集 CI/runtime/TLS/最小权限/pool/timeout/signoff 证据
 

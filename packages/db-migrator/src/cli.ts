@@ -5,6 +5,8 @@ import { runPreflight } from './commands/preflight';
 import { runRehearsal } from './commands/rehearse';
 import { runValidation } from './commands/validate';
 import { runReleaseReadiness } from './commands/release-readiness';
+import { runVerifyBackup } from './commands/verify-backup';
+import { runRestoreDrill } from './commands/restore-drill';
 import { parseCommandLine, type ParsedCommand } from './cli/arguments';
 import { readinessReportExitCode, redactSecrets, sanitizeForOutput } from './reporting/reportWriter';
 import type { ReadinessReport } from './reporting/reportTypes';
@@ -42,6 +44,42 @@ async function runBuiltInReadinessCommand(
       sourcePath: path.resolve(sourcePath),
       outputDirectory: path.resolve(outputDirectory),
       resourceDirectories: resources ? resources.split(',').map((entry) => path.resolve(entry.trim())).filter(Boolean) : [],
+      execute: parsed.execute,
+    });
+  }
+  if (command === 'verify-backup') {
+    if (parsed.execute) throw new Error('verify-backup is read-only and does not accept --execute');
+    const backupDirectory = parsed.values.get('backup') || '';
+    const manifestPath = parsed.values.get('manifest') || '';
+    const outputDirectory = parsed.values.get('output') || '';
+    const runId = parsed.values.get('run-id') || '';
+    if (!backupDirectory || !manifestPath || !outputDirectory || !runId) {
+      throw new Error('Usage: verify-backup --backup <dir> --manifest <json> --output <dir> --run-id <id>');
+    }
+    return runVerifyBackup({
+      runId,
+      backupDirectory: path.resolve(backupDirectory),
+      manifestPath: path.resolve(manifestPath),
+      outputDirectory: path.resolve(outputDirectory),
+    });
+  }
+  if (command === 'restore-drill') {
+    const backupDirectory = parsed.values.get('backup') || '';
+    const manifestPath = parsed.values.get('manifest') || '';
+    const resourceMapPath = parsed.values.get('resource-map') || '';
+    const restoreDirectory = parsed.values.get('restore-output') || '';
+    const outputDirectory = parsed.values.get('output') || '';
+    const runId = parsed.values.get('run-id') || '';
+    if (!backupDirectory || !manifestPath || !resourceMapPath || !restoreDirectory || !outputDirectory || !runId) {
+      throw new Error('Usage: restore-drill --backup <dir> --manifest <json> --resource-map <json> --restore-output <dir> --output <dir> --run-id <id> [--execute]');
+    }
+    return runRestoreDrill({
+      runId,
+      backupDirectory: path.resolve(backupDirectory),
+      manifestPath: path.resolve(manifestPath),
+      resourceMapPath: path.resolve(resourceMapPath),
+      restoreDirectory: path.resolve(restoreDirectory),
+      outputDirectory: path.resolve(outputDirectory),
       execute: parsed.execute,
     });
   }

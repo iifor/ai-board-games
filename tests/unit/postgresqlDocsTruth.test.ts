@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -74,6 +73,12 @@ function numberedStep(runbook: string, number: number): string {
   const rest = runbook.slice(match.index + match[0].length);
   const next = /^#{2,3} \d+\.\s+.+$/m.exec(rest);
   return next ? rest.slice(0, next.index) : rest;
+}
+
+function powershellBlock(step: string): string {
+  const block = /```powershell\r?\n([\s\S]*?)\r?\n```/.exec(step)?.[1];
+  assert.ok(block, 'missing PowerShell command block');
+  return block;
 }
 
 test('current production documentation describes the PostgreSQL-only runtime contract', async () => {
@@ -163,6 +168,7 @@ test('production-readiness evidence is raw, secret-safe, operator-approved, and 
   const deployment = await readDoc('postgresql-deployment.md');
   const source = numberedStep(runbook, 1);
   const preflight = numberedStep(runbook, 2);
+  const verify = numberedStep(runbook, 4);
   const restore = numberedStep(runbook, 9);
   const signoff = numberedStep(runbook, 10);
   const aggregate = numberedStep(runbook, 11);
@@ -178,13 +184,23 @@ test('production-readiness evidence is raw, secret-safe, operator-approved, and 
   assert.doesNotMatch(runbook, /psql\s+\$env:[A-Z_]*DATABASE_URL/iu);
   assert.doesNotMatch(deployment, /psql\s+\$env:[A-Z_]*DATABASE_URL/iu);
 
-  assert.match(restore, /Stopwatch/);
-  assert.match(restore, /better-sqlite3/);
-  assert.match(restore, /PRAGMA integrity_check/);
-  for (const table of ['admin_users', 'app_settings', 'players', 'games', 'game_playback_events', 'player_game_memories']) {
-    assert.match(restore, new RegExp(`\\b${table}\\b`), table);
+  const verifyCommand = powershellBlock(verify);
+  assert.match(verifyCommand, /verify-backup\.ps1/);
+  assert.match(verifyCommand, /-Backup\s+\$BackupRoot/);
+  assert.match(verifyCommand, /-Manifest\s+\$ManifestPath/);
+  assert.doesNotMatch(verifyCommand, /Get-FileHash|Get-ChildItem|Resolve-Path|Copy-Item|node\s+-e/iu);
+
+  const restoreCommand = powershellBlock(restore);
+  assert.match(restoreCommand, /restore-drill\.ps1/);
+  for (const option of ['-ResourceMap', '-RestoreOutput', '-Output', '-RunId', '-Execute']) {
+    assert.match(restoreCommand, new RegExp(option), option);
   }
-  assert.match(restore, /@\('-wal','-shm'\)/);
+  assert.doesNotMatch(restoreCommand, /Get-FileHash|Get-ChildItem|Resolve-Path|Copy-Item|better-sqlite3|node\s+-e/iu);
+  assert.match(restore, /raw SQLite\/WAL\/SHM/iu);
+  assert.match(restore, /query-only/iu);
+  assert.match(restore, /integrity check/iu);
+  assert.match(restore, /关键表计数/iu);
+  assert.match(restore, /Stopwatch/);
   assert.doesNotMatch(restore, /durationMs\s*=\s*1000|AddSeconds\(-1\)/);
 
   for (const artifact of [
@@ -210,38 +226,16 @@ test('production-readiness evidence is raw, secret-safe, operator-approved, and 
   assert.match(aggregate, /-ReleaseCandidate\s+\$ReleaseCandidate/);
 });
 
-test('restore drill validates the raw SQLite WAL rollback set independently from the consistent copy', async (t) => {
+test('restore drill delegates raw rollback and consistent-copy validation to the formal command', async () => {
   const runbook = await readDoc('runbooks/postgresql-production-readiness.md');
   const restore = numberedStep(runbook, 9);
-  assert.match(restore, /Join-Path\s+\$RestoreRoot\s+'sqlite-raw\\source\.sqlite'/iu);
-  assert.match(restore, /backup\.restore-drill\.raw-rollback-set/);
-  assert.match(restore, /backup\.restore-drill\.consistent-copy/);
-  assert.match(restore, /rawRollbackSet/);
-  assert.match(restore, /consistentCopy/);
-
-  const validationScript = /\$sqliteValidationScript\s*=\s*@'\r?\n([\s\S]*?)\r?\n'@/.exec(restore)?.[1];
-  assert.ok(validationScript, 'missing embedded SQLite validation script');
-  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'postgres-raw-restore-'));
-  t.after(() => fs.rm(temporary, { recursive: true, force: true }));
-  const rawRoot = path.join(temporary, 'sqlite-raw');
-  await fs.mkdir(rawRoot);
-  const rawPath = path.join(rawRoot, 'source.sqlite');
-  const consistentPath = path.join(temporary, 'sqlite-consistent.sqlite');
-  const migratorRoot = path.join(repoRoot, 'packages', 'db-migrator');
-  const createValidSqlite = [
-    "const Database=require('better-sqlite3');",
-    'const db=new Database(process.argv[1]);',
-    "for(const table of ['admin_users','app_settings','players','games','game_playback_events','player_game_memories']) db.exec(`CREATE TABLE ${table}(id INTEGER PRIMARY KEY)`);",
-    'db.close();',
-  ].join('');
-  const created = spawnSync(process.execPath, ['-e', createValidSqlite, '--', consistentPath], { cwd: migratorRoot, encoding: 'utf8' });
-  assert.equal(created.status, 0, created.stderr);
-  await fs.writeFile(rawPath, Buffer.from('corrupt raw rollback bytes'));
-
-  const consistent = spawnSync(process.execPath, ['-e', validationScript, '--', consistentPath], { cwd: migratorRoot, encoding: 'utf8' });
-  assert.equal(consistent.status, 0, consistent.stderr);
-  const raw = spawnSync(process.execPath, ['-e', validationScript, '--', rawPath], { cwd: migratorRoot, encoding: 'utf8' });
-  assert.notEqual(raw.status, 0, 'corrupt raw rollback set must fail even when the consistent copy is valid');
+  const command = powershellBlock(restore);
+  assert.match(command, /restore-drill\.ps1/);
+  assert.match(command, /-Execute/);
+  assert.doesNotMatch(command, /sqliteValidationScript|PRAGMA|better-sqlite3|Copy-Item|Get-FileHash|node\s+-e/iu);
+  assert.match(restore, /raw rollback set/iu);
+  assert.match(restore, /consistent copy/iu);
+  assert.match(restore, /raw rollback set 损坏也必须失败/iu);
 });
 
 test('readiness proves verify-full CA identity and TLS on the current PostgreSQL backend', async () => {

@@ -5,6 +5,7 @@
 生产唯一业务数据库是 PostgreSQL 16。服务端只通过异步 `DbExecutor` 访问业务数据，`createApp()` 在监听端口前完成版本化 migration 和幂等 seed；migration、seed 或数据库健康检查失败时不会返回健康状态。生产 Compose 不创建数据库服务，也不挂载旧业务数据库 volume，只保留资源目录和头像挂载。
 
 一次性旧数据导入由隔离的 `packages/db-migrator` 执行：它只读源 SQLite，将允许迁移的配置、管理员、玩家、历史、回放和长期记忆导入全新 PostgreSQL 目标；服务端运行镜像不包含该工具。生产准备、两次演练、签核与回滚分别见 `docs/runbooks/postgresql-production-readiness.md` 和 `docs/runbooks/postgresql-rollback.md`。
+Windows 上的 backup 二次校验与隔离 restore drill 也由 db-migrator 正式命令通过 Node 稳定句柄执行，避免 PowerShell 在 296+ 字符资源路径上失效；这些离线能力不改变生产数据库或服务端镜像边界。
 
 ## PostgreSQL rehearsal smoke gate (2026-08-10)
 

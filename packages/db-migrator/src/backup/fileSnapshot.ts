@@ -14,6 +14,7 @@ export interface FileMetadata {
 }
 
 export interface StableFile extends FileMetadata { sha256: string }
+export interface StableFileContent extends StableFile { bytes: Buffer }
 
 export interface SourceInspection { files: FileMetadata[] }
 export interface SourceSnapshot { files: StableFile[] }
@@ -109,18 +110,52 @@ export async function captureStableFile(
   code: string,
 ): Promise<StableFile> {
   try {
-    const expected: StableFile = { ...await inspectFileMetadata(candidate, rootRealPath, archiveName, code), sha256: '' };
+    const expected = await inspectFileMetadata(candidate, rootRealPath, archiveName, code);
     let handle: FileHandle | undefined;
+    let sha256: string;
     try {
       handle = await openNoFollow(candidate);
       const opened = await handle.stat({ bigint: true });
       if (!sameIdentity(opened, expected)) throw codedError(code, `File identity changed while opening: ${candidate}`);
-      expected.sha256 = await hashHandle(handle);
+      sha256 = await hashHandle(handle);
+      const afterRead = await handle.stat({ bigint: true });
+      if (!sameIdentity(afterRead, expected)) throw codedError(code, `File changed while reading: ${candidate}`);
     } finally {
       await handle?.close();
     }
-    await assertPathIdentity(candidate, rootRealPath, expected, code);
-    return expected;
+    const stable = { ...expected, sha256: sha256! };
+    await assertPathIdentity(candidate, rootRealPath, stable, code);
+    return stable;
+  } catch (error) {
+    throw normalizeFileError(error, code, `File changed while capturing a stable snapshot: ${candidate}`);
+  }
+}
+
+export async function captureStableFileContent(
+  candidate: string,
+  rootRealPath: string,
+  archiveName: string,
+  code: string,
+): Promise<StableFileContent> {
+  try {
+    const expected = await inspectFileMetadata(candidate, rootRealPath, archiveName, code);
+    let handle: FileHandle | undefined;
+    let bytes: Buffer;
+    try {
+      handle = await openNoFollow(candidate);
+      const opened = await handle.stat({ bigint: true });
+      if (!sameIdentity(opened, expected)) throw codedError(code, `File identity changed while opening: ${candidate}`);
+      bytes = await handle.readFile();
+      const afterRead = await handle.stat({ bigint: true });
+      if (!sameIdentity(afterRead, expected) || bytes.length !== expected.sizeBytes) {
+        throw codedError(code, `File changed while reading: ${candidate}`);
+      }
+    } finally {
+      await handle?.close();
+    }
+    const stable = { ...expected, sha256: createHash('sha256').update(bytes!).digest('hex') };
+    await assertPathIdentity(candidate, rootRealPath, stable, code);
+    return { ...stable, bytes: bytes! };
   } catch (error) {
     throw normalizeFileError(error, code, `File changed while capturing a stable snapshot: ${candidate}`);
   }

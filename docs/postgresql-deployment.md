@@ -76,6 +76,7 @@ DBA 必须审核实际 grants，并保存 `\du+`、`\dn+`、schema/table/sequenc
 - 至少每季度在隔离环境恢复基础备份、回放 WAL、核验 migration checksum、执行真实 health/smoke，并记录 RPO/RTO。
 - 首次 PostgreSQL 正式切换仍需保留切换前同一时间点 SQLite、`-wal`、`-shm`（存在时）和资源快照，以支持旧镜像回滚。
 - 一次性 SQLite backup 的完整 runId 只用于最终目录、报告与 manifest 审计字段；内部 staging/failed/owner 名称为固定长度摘要加排他随机后缀，避免 Windows 路径随 runId 线性膨胀。工具会在源内容复制和 SQLite recovery 打开前检查数据库主文件及 `-wal`、`-shm`、`-journal` 的实际路径，超限固定返回 `BACKUP_PATH_TOO_LONG` 且不发布部分 backup；合法 runId 不需要人为缩短。
+- backup 二次校验和 restore drill 必须使用 db-migrator 的 `verify-backup` 与 `restore-drill`，不得以 PowerShell `Get-FileHash`/`Copy-Item` 或临时 `node -e` SQLite 脚本替代。正式命令支持长资源路径，复核完整 manifest 闭包与稳定文件身份，将 raw main/WAL/SHM、consistent copy 和每个资源 source index 恢复到证据根下的隔离相对目标，并以只读/query-only integrity/counts 和逐文件 hash 生成原子报告。
 
 ## 监控与发布门禁
 

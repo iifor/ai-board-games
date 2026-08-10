@@ -1,4 +1,6 @@
-const COMMANDS = ['migrate', 'preflight', 'backup', 'validate', 'rehearse', 'release-readiness'] as const;
+const COMMANDS = [
+  'migrate', 'preflight', 'backup', 'verify-backup', 'restore-drill', 'validate', 'rehearse', 'release-readiness',
+] as const;
 
 export interface ParsedCommand {
   command: typeof COMMANDS[number];
