@@ -445,4 +445,4 @@ PostgreSQL executor 为 OID 1184（`timestamptz`）注册统一 parser：可解�
 
 生产准备路径的 `preflight`、`validate` 和 `rehearse` 命令只从进程环境读取 `DATABASE_URL`；传入 `--target` 会在任何文件或数据库 I/O 前以固定脱敏错误拒绝。`release-readiness` 还要求显式 40 位 `--release-candidate`，并校验它与签核候选 SHA 一致。签核解析器会强制校验 readiness runId、go-live/rollback/独立 operator 三方身份分离、真实批准时间、两倍演练窗口、`approved` 状态，以及 reports 与其 `evidence` artifacts 的精确 size/SHA-256 manifest；自动化只生成 failed/pending 草稿，不代签。
 
-`preflight` 不会通过 SQLite 打开生产源文件。它使用与正式 backup 相同的稳定文件快照边界，把当时存在的 main/WAL/SHM 文件集复制到工具自有临时目录，只对隔离副本执行 `PRAGMA integrity_check`；结束前再次核对源文件集、size、mtime、文件身份与 SHA-256，并删除临时目录。任何源竞态、关闭失败或临时目录清理失败都会使预检失败，且不会覆盖更早的主错误。
+`preflight` 不会通过 SQLite 打开生产源文件。它使用与正式 backup 相同的稳定文件快照边界，把当时存在的 main/WAL/SHM 文件集复制到工具自有临时目录，只对隔离副本执行 `PRAGMA integrity_check`；结束前再次核对源文件集、size、mtime、文件身份与 SHA-256。清理时先把已认领目录原子改名到不可预测的隔离路径，复核文件系统身份后才递归删除，并确认隔离路径与原路径均不存在；no-op、部分删除或原路径被外来目录重新占用都会失败，外来目录不会被删除。任何源竞态、关闭失败或临时目录清理失败都会使预检失败，且不会覆盖更早的主错误。

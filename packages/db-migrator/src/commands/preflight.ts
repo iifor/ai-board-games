@@ -11,7 +11,7 @@ import {
   type SourceSnapshot,
 } from '../backup/fileSnapshot';
 import {
-  assertOwnedTemporaryDirectory,
+  cleanupOwnedTemporaryDirectory,
   recordOwnedTemporaryDirectory,
   type OwnedTemporaryDirectory,
 } from '../backup/ownedTemporaryDirectory';
@@ -58,6 +58,7 @@ export interface PreflightDependencies {
   createPostgres(url: string, schema: string): DbExecutor;
   availableBytes(path: string): Promise<number>;
   createTemporaryDirectory(): Promise<string>;
+  renameTemporaryDirectory(source: string, destination: string): Promise<void>;
   removeTemporaryDirectory(path: string): Promise<void>;
 }
 
@@ -85,6 +86,7 @@ const defaultDependencies: PreflightDependencies = {
     return Number(stats.bavail) * Number(stats.bsize);
   },
   createTemporaryDirectory: () => fsPromises.mkdtemp(path.join(os.tmpdir(), 'consensus-preflight-')),
+  renameTemporaryDirectory: (source, destination) => fsPromises.rename(source, destination),
   removeTemporaryDirectory: (candidate) => fsPromises.rm(candidate, { recursive: true, force: true }),
 };
 
@@ -343,8 +345,10 @@ export async function runPreflight(
     }
     if (temporaryDirectory) {
       try {
-        await assertOwnedTemporaryDirectory(temporaryDirectory);
-        await resolved.removeTemporaryDirectory(temporaryDirectory.path);
+        await cleanupOwnedTemporaryDirectory(temporaryDirectory, {
+          rename: resolved.renameTemporaryDirectory,
+          remove: resolved.removeTemporaryDirectory,
+        });
         passedCheck(checks, 'source.temp-cleanup', 'Private SQLite inspection directory removed');
       } catch {
         failedCheck(checks, errors, 'source.temp-cleanup', 'PREFLIGHT_TEMP_CLEANUP_FAILED', 'Private SQLite inspection directory cleanup failed');

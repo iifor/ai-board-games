@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -6,6 +7,11 @@ export interface OwnedTemporaryDirectory {
   realPath: string;
   dev: string;
   ino: string;
+}
+
+export interface OwnedTemporaryDirectoryCleanupDependencies {
+  rename(source: string, destination: string): Promise<void>;
+  remove(candidate: string): Promise<void>;
 }
 
 export async function recordOwnedTemporaryDirectory(candidate: string): Promise<OwnedTemporaryDirectory> {
@@ -25,14 +31,46 @@ export async function recordOwnedTemporaryDirectory(candidate: string): Promise<
   };
 }
 
-export async function assertOwnedTemporaryDirectory(owner: OwnedTemporaryDirectory): Promise<void> {
-  const stats = await fs.lstat(owner.path, { bigint: true });
-  const realPath = await fs.realpath(owner.path);
-  if (stats.isSymbolicLink()
-    || !stats.isDirectory()
-    || stats.dev.toString() !== owner.dev
-    || stats.ino.toString() !== owner.ino
-    || realPath !== owner.realPath) {
-    throw new Error('Private inspection directory identity changed');
+async function pathIsMissing(candidate: string): Promise<boolean> {
+  try {
+    await fs.lstat(candidate);
+    return false;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
+    throw error;
+  }
+}
+
+export async function cleanupOwnedTemporaryDirectory(
+  owner: OwnedTemporaryDirectory,
+  dependencies: OwnedTemporaryDirectoryCleanupDependencies,
+): Promise<void> {
+  const quarantinePath = path.join(
+    path.dirname(owner.path),
+    `.${path.basename(owner.path)}.cleanup-${randomUUID()}`,
+  );
+  await dependencies.rename(owner.path, quarantinePath);
+
+  const quarantinedStats = await fs.lstat(quarantinePath, { bigint: true });
+  const quarantinedRealPath = await fs.realpath(quarantinePath);
+  const expectedRealPath = path.join(path.dirname(owner.realPath), path.basename(quarantinePath));
+  if (quarantinedStats.isSymbolicLink()
+    || !quarantinedStats.isDirectory()
+    || quarantinedStats.dev.toString() !== owner.dev
+    || quarantinedStats.ino.toString() !== owner.ino
+    || quarantinedRealPath !== expectedRealPath) {
+    throw new Error('Private inspection quarantine identity changed');
+  }
+
+  let removeFailed = false;
+  try {
+    await dependencies.remove(quarantinePath);
+  } catch {
+    removeFailed = true;
+  }
+  const quarantineMissing = await pathIsMissing(quarantinePath);
+  const originalMissing = await pathIsMissing(owner.path);
+  if (removeFailed || !quarantineMissing || !originalMissing) {
+    throw new Error('Private inspection directory cleanup did not complete');
   }
 }

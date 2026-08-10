@@ -225,18 +225,26 @@ test('preflight removes its private SQLite inspection directory after success', 
   const sourcePath = sqliteFixture();
   const outputDirectory = createOutputDirectory();
   const privateRoot = path.join(outputDirectory, 'operator-visible-test-temp');
+  let quarantinePath = '';
   try {
     const report = await runPreflight(options(sourcePath, outputDirectory), {
       createTemporaryDirectory: async () => {
         await fs.promises.mkdir(privateRoot);
         return privateRoot;
       },
+      renameTemporaryDirectory: async (source, destination) => {
+        quarantinePath = destination;
+        await fs.promises.rename(source, destination);
+      },
       createPostgres: () => freshTargetExecutor(),
       availableBytes: async () => Number.MAX_SAFE_INTEGER,
     });
 
     assert.equal(report.status, 'passed');
+    assert.notEqual(quarantinePath, '');
     assert.equal(fs.existsSync(privateRoot), false);
+    assert.equal(fs.existsSync(quarantinePath), false);
+    assert.deepEqual(fs.readdirSync(outputDirectory), []);
   } finally {
     fs.rmSync(sourcePath, { force: true });
     fs.rmSync(outputDirectory, { recursive: true, force: true });
@@ -247,12 +255,17 @@ test('preflight fails closed on private-directory cleanup without replacing an i
   const sourcePath = sqliteFixture();
   const outputDirectory = createOutputDirectory();
   const privateRoot = path.join(outputDirectory, 'cleanup-failure-temp');
+  let quarantinePath = '';
   fs.writeFileSync(sourcePath, Buffer.from('not a sqlite database'));
   try {
     const report = await runPreflight(options(sourcePath, outputDirectory), {
       createTemporaryDirectory: async () => {
         await fs.promises.mkdir(privateRoot);
         return privateRoot;
+      },
+      renameTemporaryDirectory: async (source, destination) => {
+        quarantinePath = destination;
+        await fs.promises.rename(source, destination);
       },
       removeTemporaryDirectory: async () => {
         throw new Error(`cleanup rejected at ${privateRoot}`);
@@ -264,7 +277,9 @@ test('preflight fails closed on private-directory cleanup without replacing an i
     assert.equal(report.status, 'failed');
     assert.deepEqual(errorCodes(report), ['SOURCE_INTEGRITY_FAILED', 'PREFLIGHT_TEMP_CLEANUP_FAILED']);
     assert.equal(report.errors[1]?.message.includes(privateRoot), false);
-    assert.equal(fs.existsSync(privateRoot), true);
+    assert.equal(fs.existsSync(privateRoot), false);
+    assert.notEqual(quarantinePath, '');
+    assert.equal(fs.existsSync(path.join(quarantinePath, 'source.sqlite')), true);
   } finally {
     fs.rmSync(sourcePath, { force: true });
     fs.rmSync(outputDirectory, { recursive: true, force: true });
@@ -277,11 +292,16 @@ test('preflight never removes a foreign directory that replaces its private dire
   const privateRoot = path.join(outputDirectory, 'replaceable-temp');
   const displacedRoot = path.join(outputDirectory, 'displaced-owned-temp');
   const foreignMarker = path.join(privateRoot, 'foreign.txt');
+  let quarantinePath = '';
   try {
     const report = await runPreflight(options(sourcePath, outputDirectory), {
       createTemporaryDirectory: async () => {
         await fs.promises.mkdir(privateRoot);
         return privateRoot;
+      },
+      renameTemporaryDirectory: async (source, destination) => {
+        quarantinePath = destination;
+        await fs.promises.rename(source, destination);
       },
       createPostgres: () => freshTargetExecutor(async () => {
         await fs.promises.rename(privateRoot, displacedRoot);
@@ -293,8 +313,111 @@ test('preflight never removes a foreign directory that replaces its private dire
 
     assert.equal(report.status, 'failed');
     assert.deepEqual(errorCodes(report), ['PREFLIGHT_TEMP_CLEANUP_FAILED']);
-    assert.equal(fs.readFileSync(foreignMarker, 'utf8'), 'do-not-delete');
+    assert.notEqual(quarantinePath, '');
+    assert.equal(fs.readFileSync(path.join(quarantinePath, path.basename(foreignMarker)), 'utf8'), 'do-not-delete');
+    assert.equal(fs.existsSync(privateRoot), false);
     assert.equal(fs.existsSync(displacedRoot), true);
+  } finally {
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight rejects a post-check directory swap without deleting the foreign replacement', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const privateRoot = path.join(outputDirectory, 'post-check-swap-temp');
+  const displacedRoot = path.join(outputDirectory, 'post-check-owned-temp');
+  let quarantinePath = '';
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createTemporaryDirectory: async () => {
+        await fs.promises.mkdir(privateRoot);
+        return privateRoot;
+      },
+      renameTemporaryDirectory: async (source, destination) => {
+        quarantinePath = destination;
+        await fs.promises.rename(source, displacedRoot);
+        await fs.promises.mkdir(source);
+        await fs.promises.writeFile(path.join(source, 'foreign.txt'), 'preserve-foreign');
+        await fs.promises.rename(source, destination);
+      },
+      createPostgres: () => freshTargetExecutor(),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['PREFLIGHT_TEMP_CLEANUP_FAILED']);
+    assert.notEqual(quarantinePath, '');
+    assert.equal(fs.readFileSync(path.join(quarantinePath, 'foreign.txt'), 'utf8'), 'preserve-foreign');
+    assert.equal(fs.existsSync(displacedRoot), true);
+  } finally {
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight rejects a silent no-op cleanup and leaves the private copy intact', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const privateRoot = path.join(outputDirectory, 'no-op-cleanup-temp');
+  let quarantinePath = '';
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createTemporaryDirectory: async () => {
+        await fs.promises.mkdir(privateRoot);
+        return privateRoot;
+      },
+      renameTemporaryDirectory: async (source, destination) => {
+        quarantinePath = destination;
+        await fs.promises.rename(source, destination);
+      },
+      removeTemporaryDirectory: async () => undefined,
+      createPostgres: () => freshTargetExecutor(),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['PREFLIGHT_TEMP_CLEANUP_FAILED']);
+    assert.equal(fs.existsSync(privateRoot), false);
+    assert.notEqual(quarantinePath, '');
+    assert.equal(fs.existsSync(path.join(quarantinePath, 'source.sqlite')), true);
+  } finally {
+    fs.rmSync(sourcePath, { force: true });
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('preflight preserves a foreign directory created at the original path after quarantine', async () => {
+  const sourcePath = sqliteFixture();
+  const outputDirectory = createOutputDirectory();
+  const privateRoot = path.join(outputDirectory, 'reoccupied-temp');
+  const foreignMarker = path.join(privateRoot, 'foreign.txt');
+  let quarantinePath = '';
+  try {
+    const report = await runPreflight(options(sourcePath, outputDirectory), {
+      createTemporaryDirectory: async () => {
+        await fs.promises.mkdir(privateRoot);
+        return privateRoot;
+      },
+      renameTemporaryDirectory: async (source, destination) => {
+        quarantinePath = destination;
+        await fs.promises.rename(source, destination);
+      },
+      removeTemporaryDirectory: async (candidate) => {
+        await fs.promises.mkdir(privateRoot);
+        await fs.promises.writeFile(foreignMarker, 'preserve-original');
+        await fs.promises.rm(candidate, { recursive: true, force: true });
+      },
+      createPostgres: () => freshTargetExecutor(),
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+    });
+
+    assert.equal(report.status, 'failed');
+    assert.deepEqual(errorCodes(report), ['PREFLIGHT_TEMP_CLEANUP_FAILED']);
+    assert.equal(fs.readFileSync(foreignMarker, 'utf8'), 'preserve-original');
+    assert.notEqual(quarantinePath, '');
+    assert.equal(fs.existsSync(quarantinePath), false);
   } finally {
     fs.rmSync(sourcePath, { force: true });
     fs.rmSync(outputDirectory, { recursive: true, force: true });
