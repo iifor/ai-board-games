@@ -1,15 +1,18 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import Database from 'better-sqlite3';
 import {
   assertSameSourceSnapshot,
   captureSourceSnapshot,
   captureStableFile,
   copyStableFile,
+  inspectFileMetadata,
+  inspectSourceFiles,
+  type FileMetadata,
+  type SourceInspection,
   type SourceSnapshot,
-  type StableFile,
 } from '../backup/fileSnapshot';
 import { buildManifest, hashFile, verifyManifest, type BackupManifest } from '../backup/manifest';
+import { createConsistentDatabase } from '../backup/sqliteRecovery';
 import {
   createUniqueSite,
   pathExists,
@@ -30,8 +33,8 @@ export interface BackupOptions {
   execute: boolean;
 }
 
-interface ResourceFile { file: StableFile; rootRealPath: string; destination: string }
-interface BackupPlan { source: SourceSnapshot; sourceRootRealPath: string; resources: ResourceFile[]; estimatedBytes: number }
+interface ResourceFile { file: FileMetadata; rootRealPath: string; destination: string }
+interface BackupPlan { source: SourceInspection; sourceRootRealPath: string; resources: ResourceFile[]; estimatedBytes: number }
 
 const SAFE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -92,7 +95,7 @@ async function inspectResourceRoot(root: string, index: number): Promise<Resourc
         if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
           throw codedError('RESOURCE_PATH_ESCAPE', `Resource path escapes its root: ${candidate}`);
         }
-        const file = await captureStableFile(candidate, rootRealPath, relative, 'RESOURCE_PATH_CHANGED');
+        const file = await inspectFileMetadata(candidate, rootRealPath, relative, 'RESOURCE_PATH_CHANGED');
         files.push({ file, rootRealPath, destination: path.join('resources', `resource-${String(index).padStart(3, '0')}`, relative) });
       } else throw codedError('RESOURCE_FILE_INVALID', `Resource entry is not a regular file: ${candidate}`);
     }
@@ -108,7 +111,7 @@ async function planBackup(options: BackupOptions): Promise<BackupPlan> {
     throw codedError('INVALID_PARAMETERS', 'resourceDirectories must contain non-empty paths');
   }
   if (typeof options.execute !== 'boolean') throw codedError('INVALID_PARAMETERS', 'execute must be boolean');
-  const source = await captureSourceSnapshot(options.sourcePath);
+  const source = await inspectSourceFiles(options.sourcePath);
   const sourceRootRealPath = await fs.realpath(path.dirname(path.resolve(options.sourcePath)));
   const resources = (await Promise.all(options.resourceDirectories.map(inspectResourceRoot))).flat();
   const estimatedBytes = source.files.reduce((sum, file) => sum + file.sizeBytes, 0)
@@ -116,17 +119,22 @@ async function planBackup(options: BackupOptions): Promise<BackupPlan> {
   return { source, sourceRootRealPath, resources, estimatedBytes };
 }
 
-async function copyRawSnapshot(plan: BackupPlan, stagingRoot: string, checks: ReadinessCheck[]): Promise<string> {
+async function copyRawSnapshot(
+  source: SourceSnapshot,
+  sourceRootRealPath: string,
+  stagingRoot: string,
+  checks: ReadinessCheck[],
+): Promise<string> {
   const rawRoot = path.join(stagingRoot, 'sqlite-raw');
   await fs.mkdir(rawRoot);
-  for (const file of plan.source.files) {
-    await copyStableFile(file, plan.sourceRootRealPath, path.join(rawRoot, file.archiveName), 'SOURCE_CHANGED_DURING_BACKUP');
+  for (const file of source.files) {
+    await copyStableFile(file, sourceRootRealPath, path.join(rawRoot, file.archiveName), 'SOURCE_CHANGED_DURING_BACKUP');
   }
-  const after = await captureSourceSnapshot(plan.source.files[0].sourcePath);
-  assertSameSourceSnapshot(plan.source, after);
+  const after = await captureSourceSnapshot(source.files[0].sourcePath);
+  assertSameSourceSnapshot(source, after);
   for (const suffix of ['-wal', '-shm'] as const) {
     const id = suffix === '-wal' ? 'source.raw-wal' : 'source.raw-shm';
-    const archived = plan.source.files.some((file) => file.archiveName === `source.sqlite${suffix}`);
+    const archived = source.files.some((file) => file.archiveName === `source.sqlite${suffix}`);
     checks.push({
       id,
       status: archived ? 'passed' : 'skipped',
@@ -136,32 +144,6 @@ async function copyRawSnapshot(plan: BackupPlan, stagingRoot: string, checks: Re
     });
   }
   return rawRoot;
-}
-
-async function createConsistentDatabase(rawRoot: string, stagingRoot: string): Promise<string> {
-  const recoveryRoot = path.join(stagingRoot, '.sqlite-recovery');
-  const recoverySource = path.join(recoveryRoot, 'source.sqlite');
-  await fs.mkdir(recoveryRoot);
-  const rawRealPath = await fs.realpath(rawRoot);
-  try {
-    for (const archiveName of ['source.sqlite', 'source.sqlite-wal']) {
-      const candidate = path.join(rawRoot, archiveName);
-      if (!await pathExists(candidate)) continue;
-      const stable = await captureStableFile(candidate, rawRealPath, archiveName, 'STAGED_RAW_INVALID');
-      await copyStableFile(stable, rawRealPath, path.join(recoveryRoot, archiveName), 'STAGED_RAW_INVALID');
-    }
-    const consistentPath = path.join(stagingRoot, 'sqlite-consistent.sqlite');
-    const recovery = new Database(recoverySource, { fileMustExist: true });
-    try { await recovery.backup(consistentPath); } finally { recovery.close(); }
-    const consistent = new Database(consistentPath, { readonly: true, fileMustExist: true });
-    try {
-      const integrity = consistent.prepare('PRAGMA integrity_check').pluck().get();
-      if (integrity !== 'ok') throw codedError('CONSISTENT_DATABASE_INVALID', `Consistent SQLite integrity check returned: ${String(integrity)}`);
-    } finally { consistent.close(); }
-    return consistentPath;
-  } finally {
-    await fs.rm(recoveryRoot, { recursive: true, force: true });
-  }
 }
 
 async function writeManifest(candidate: string, manifest: BackupManifest): Promise<void> {
@@ -191,14 +173,21 @@ export async function runBackup(options: BackupOptions): Promise<ReadinessReport
     if (await pathExists(finalRoot)) throw codedError('BACKUP_RUN_ALREADY_EXISTS', 'Backup final run already exists');
 
     stagingRoot = await createUniqueSite(output, options.runId, 'staging');
-    const rawRoot = await copyRawSnapshot(plan, stagingRoot, checks);
+    const source = await captureSourceSnapshot(options.sourcePath);
+    const rawRoot = await copyRawSnapshot(source, plan.sourceRootRealPath, stagingRoot, checks);
     const consistentPath = await createConsistentDatabase(rawRoot, stagingRoot);
     checks.push({ id: 'sqlite.consistent', status: 'passed', expected: 'ok', actual: 'ok', message: 'Staged raw SQLite recovery produced an integrity-checked snapshot' });
 
     for (const resource of plan.resources) {
       const destination = path.join(stagingRoot, resource.destination);
       await fs.mkdir(path.dirname(destination), { recursive: true });
-      await copyStableFile(resource.file, resource.rootRealPath, destination, 'RESOURCE_PATH_CHANGED');
+      const stable = await captureStableFile(
+        resource.file.sourcePath,
+        resource.rootRealPath,
+        resource.file.archiveName,
+        'RESOURCE_PATH_CHANGED',
+      );
+      await copyStableFile(stable, resource.rootRealPath, destination, 'RESOURCE_PATH_CHANGED');
     }
     checks.push({ id: 'resources.archived', status: 'passed', actual: `${plan.resources.length} files`, message: 'Resource files archived from held, identity-checked handles' });
 
@@ -225,14 +214,23 @@ export async function runBackup(options: BackupOptions): Promise<ReadinessReport
     addFailure(checks, errors, errorCode(error), error);
     if (!options.execute) return report(options, started, checks, [], errors);
     let failureSite: string | undefined;
-    try { failureSite = await quarantineOwned(stagingRoot, reservation, output, options.runId); }
-    catch (quarantineError) { addFailure(checks, errors, 'BACKUP_FAILURE_SITE_ERROR', quarantineError); }
-    if (!failureSite) {
-      try { failureSite = await createUniqueSite(output, options.runId, 'failed'); }
-      catch (siteError) { addFailure(checks, errors, 'BACKUP_FAILURE_SITE_ERROR', siteError); }
-    }
-    const failedReport = report(options, started, checks, [], errors);
+    try { failureSite = await createUniqueSite(output, options.runId, 'failed'); }
+    catch (siteError) { addFailure(checks, errors, 'BACKUP_FAILURE_SITE_ERROR', siteError); }
     if (failureSite) {
+      try {
+        const quarantine = await quarantineOwned(failureSite, stagingRoot, reservation);
+        if (quarantine.unmovedEvidence.length) {
+          addFailure(
+            checks,
+            errors,
+            'BACKUP_QUARANTINE_INCOMPLETE',
+            new Error(`Unmoved backup evidence: ${quarantine.unmovedEvidence.join(', ')}`),
+          );
+        }
+      } catch (quarantineError) {
+        addFailure(checks, errors, 'BACKUP_QUARANTINE_INCOMPLETE', quarantineError);
+      }
+      const failedReport = report(options, started, checks, [], errors);
       const evidenceReport = { ...failedReport, runId: evidenceRunId(options.runId) };
       try { await writeReadinessReport({ outputDirectory: failureSite, report: evidenceReport }); }
       catch (reportError) { addFailure(checks, errors, 'BACKUP_REPORT_WRITE_FAILED', reportError); }

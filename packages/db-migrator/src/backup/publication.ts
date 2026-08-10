@@ -11,6 +11,11 @@ export interface FinalReservation {
   ino: string;
 }
 
+export interface QuarantineResult {
+  failureSite: string;
+  unmovedEvidence: string[];
+}
+
 function codedError(code: string, message: string): Error & { code: string } {
   return Object.assign(new Error(message), { code });
 }
@@ -101,23 +106,32 @@ async function moveFailureEvidence(source: string, failureSite: string): Promise
 }
 
 export async function quarantineOwned(
+  failureSite: string,
   stagingRoot: string | undefined,
   reservation: FinalReservation | undefined,
-  output: string,
-  runId: string,
-): Promise<string> {
-  const failureSite = await createUniqueSite(output, runId, 'failed');
-  if (reservation && await ownsReservation(reservation)) {
-    await moveFailureEvidence(reservation.root, failureSite);
-    await fs.rm(reservation.ownerToken, { force: true });
+): Promise<QuarantineResult> {
+  const unmovedEvidence: string[] = [];
+  if (reservation) {
+    if (await ownsReservation(reservation)) {
+      try { await moveFailureEvidence(reservation.root, failureSite); }
+      catch { unmovedEvidence.push(reservation.root); }
+      try { await fs.rm(reservation.ownerToken, { force: true }); }
+      catch { unmovedEvidence.push(reservation.ownerToken); }
+    } else {
+      unmovedEvidence.push(reservation.root);
+    }
   }
   if (stagingRoot && await pathExists(stagingRoot)) {
     const remainder = path.join(failureSite, 'staging-remainder');
-    await fs.mkdir(remainder);
-    await moveFailureEvidence(stagingRoot, remainder);
-    await fs.rmdir(remainder).catch(() => undefined);
+    try {
+      await fs.mkdir(remainder);
+      await moveFailureEvidence(stagingRoot, remainder);
+      await fs.rmdir(remainder).catch(() => undefined);
+    } catch {
+      unmovedEvidence.push(stagingRoot);
+    }
   }
-  return failureSite;
+  return { failureSite, unmovedEvidence };
 }
 
 export async function releaseReservation(reservation: FinalReservation): Promise<void> {

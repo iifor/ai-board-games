@@ -82,6 +82,25 @@ function relativeFiles(root: string): string[] {
   return found.sort();
 }
 
+function metadataWithoutContent(root: string): Array<Record<string, string>> {
+  const found: Array<Record<string, string>> = [];
+  const visit = (candidate: string): void => {
+    const stats = fs.lstatSync(candidate, { bigint: true });
+    if (stats.isDirectory()) {
+      for (const entry of fs.readdirSync(candidate)) visit(path.join(candidate, entry));
+      return;
+    }
+    found.push({
+      path: path.relative(root, candidate).split(path.sep).join('/'),
+      size: stats.size.toString(),
+      atimeNs: stats.atimeNs.toString(),
+      mtimeNs: stats.mtimeNs.toString(),
+    });
+  };
+  visit(root);
+  return found.sort((left, right) => left.path.localeCompare(right.path));
+}
+
 test('backup dry-run reports skipped mutations without creating files or changing the WAL source', async () => {
   const fixture = createWalFixture();
   const dryRunOutput = path.join(fixture.root, 'does-not-exist');
@@ -102,6 +121,39 @@ test('backup dry-run reports skipped mutations without creating files or changin
     assert.equal(fs.existsSync(dryRunOutput), false);
     assert.deepEqual(sourceMetadata(fixture.sourcePath), before);
   } finally {
+    cleanupFixture(fixture);
+  }
+});
+
+test('dry-run performs zero content opens or reads and preserves source/resource metadata', async () => {
+  const fixture = createWalFixture();
+  const dryRunOutput = path.join(fixture.root, 'dry-run-output');
+  const before = metadataWithoutContent(fixture.root);
+  const originalOpen = fs.promises.open;
+  let contentOpens = 0;
+  let contentReads = 0;
+  fs.promises.open = async (candidate, flags, mode) => {
+    contentOpens += 1;
+    const handle = await originalOpen(candidate, flags as never, mode);
+    const originalRead = handle.read.bind(handle);
+    handle.read = async (buffer, offset, length, position) => {
+      contentReads += 1;
+      return originalRead(buffer, offset, length, position);
+    };
+    return handle;
+  };
+  try {
+    const report = await runBackup({
+      runId: 'no-content-io', sourcePath: fixture.sourcePath, outputDirectory: dryRunOutput,
+      resourceDirectories: [fixture.resources], execute: false,
+    });
+    assert.equal(report.status, 'passed');
+    assert.equal(contentOpens, 0);
+    assert.equal(contentReads, 0);
+    assert.equal(fs.existsSync(dryRunOutput), false);
+    assert.deepEqual(metadataWithoutContent(fixture.root), before);
+  } finally {
+    fs.promises.open = originalOpen;
     cleanupFixture(fixture);
   }
 });
@@ -584,6 +636,51 @@ test('partial publication quarantines only the reserved directory and never expo
     assert.equal(failures.length, 1);
     assert.equal(fs.existsSync(path.join(failures[0], 'manifest.json')), false);
   } finally {
+    fs.promises.rename = originalRename;
+    cleanupFixture(fixture);
+  }
+});
+
+test('quarantine move failure keeps one claimed failed site and writes its report there', async () => {
+  const fixture = createWalFixture();
+  const runId = 'quarantine-move-failure';
+  const originalOpen = fs.promises.open;
+  const originalRename = fs.promises.rename;
+  let copyFailed = false;
+  let quarantineMoveFailed = false;
+  fs.promises.open = async (candidate, flags, mode) => {
+    const value = String(candidate);
+    if (!copyFailed && value.includes(`.${runId}.staging-`) && value.endsWith('asset.txt')) {
+      copyFailed = true;
+      throw new Error('injected resource copy failure');
+    }
+    return originalOpen(candidate, flags as never, mode);
+  };
+  fs.promises.rename = async (source, destination) => {
+    if (!quarantineMoveFailed && String(destination).includes(`${runId}.failed-`)) {
+      quarantineMoveFailed = true;
+      throw new Error('injected quarantine move failure');
+    }
+    return originalRename(source, destination);
+  };
+  try {
+    const report = await runBackup({
+      runId, sourcePath: fixture.sourcePath, outputDirectory: fixture.output,
+      resourceDirectories: [fixture.resources], execute: true,
+    });
+    assert.equal(copyFailed, true);
+    assert.equal(quarantineMoveFailed, true);
+    assert.equal(report.status, 'failed');
+    const failures = failedSites(fixture.output, runId);
+    assert.equal(failures.length, 1);
+    const reportPath = path.join(failures[0], `${runId}-backup.json`);
+    assert.equal(fs.existsSync(reportPath), true);
+    const saved = JSON.parse(fs.readFileSync(reportPath, 'utf8')) as { errors: Array<{ code: string; message: string }> };
+    const quarantineError = saved.errors.find((error) => error.code === 'BACKUP_QUARANTINE_INCOMPLETE');
+    assert.ok(quarantineError);
+    assert.match(quarantineError.message, /staging/i);
+  } finally {
+    fs.promises.open = originalOpen;
     fs.promises.rename = originalRename;
     cleanupFixture(fixture);
   }

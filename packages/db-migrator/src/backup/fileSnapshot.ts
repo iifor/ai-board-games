@@ -3,17 +3,19 @@ import { constants as fsConstants, promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { FileHandle } from 'node:fs/promises';
 
-export interface StableFile {
+export interface FileMetadata {
   sourcePath: string;
   realPath: string;
   archiveName: string;
   sizeBytes: number;
   mtimeNs: string;
-  sha256: string;
   dev: string;
   ino: string;
 }
 
+export interface StableFile extends FileMetadata { sha256: string }
+
+export interface SourceInspection { files: FileMetadata[] }
 export interface SourceSnapshot { files: StableFile[] }
 
 function codedError(code: string, message: string): Error & { code: string } {
@@ -31,7 +33,7 @@ function isInside(root: string, candidate: string): boolean {
   return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
 }
 
-function sameIdentity(stats: { dev: bigint; ino: bigint; size: bigint; mtimeNs: bigint }, expected: StableFile): boolean {
+function sameIdentity(stats: { dev: bigint; ino: bigint; size: bigint; mtimeNs: bigint }, expected: FileMetadata): boolean {
   return stats.dev.toString() === expected.dev
     && stats.ino.toString() === expected.ino
     && Number(stats.size) === expected.sizeBytes
@@ -62,7 +64,7 @@ async function hashHandle(handle: FileHandle): Promise<string> {
   return hash.digest('hex');
 }
 
-async function assertPathIdentity(candidate: string, rootRealPath: string, expected: StableFile, code: string): Promise<void> {
+async function assertPathIdentity(candidate: string, rootRealPath: string, expected: FileMetadata, code: string): Promise<void> {
   try {
     const stats = await fs.lstat(candidate, { bigint: true });
     if (stats.isSymbolicLink() || !stats.isFile()) throw codedError(code, `Regular non-reparse file is required: ${candidate}`);
@@ -75,6 +77,31 @@ async function assertPathIdentity(candidate: string, rootRealPath: string, expec
   }
 }
 
+export async function inspectFileMetadata(
+  candidate: string,
+  rootRealPath: string,
+  archiveName: string,
+  code: string,
+): Promise<FileMetadata> {
+  try {
+    const stats = await fs.lstat(candidate, { bigint: true });
+    if (stats.isSymbolicLink() || !stats.isFile()) throw codedError(code, `Regular non-reparse file is required: ${candidate}`);
+    const realPath = await fs.realpath(candidate);
+    if (!isInside(rootRealPath, realPath)) throw codedError(code, `File resolves outside its root: ${candidate}`);
+    return {
+      sourcePath: candidate,
+      realPath,
+      archiveName,
+      sizeBytes: Number(stats.size),
+      mtimeNs: stats.mtimeNs.toString(),
+      dev: stats.dev.toString(),
+      ino: stats.ino.toString(),
+    };
+  } catch (error) {
+    throw normalizeFileError(error, code, `File changed while inspecting metadata: ${candidate}`);
+  }
+}
+
 export async function captureStableFile(
   candidate: string,
   rootRealPath: string,
@@ -82,20 +109,7 @@ export async function captureStableFile(
   code: string,
 ): Promise<StableFile> {
   try {
-    const stats = await fs.lstat(candidate, { bigint: true });
-    if (stats.isSymbolicLink() || !stats.isFile()) throw codedError(code, `Regular non-reparse file is required: ${candidate}`);
-    const realPath = await fs.realpath(candidate);
-    if (!isInside(rootRealPath, realPath)) throw codedError(code, `File resolves outside its root: ${candidate}`);
-    const expected: StableFile = {
-      sourcePath: candidate,
-      realPath,
-      archiveName,
-      sizeBytes: Number(stats.size),
-      mtimeNs: stats.mtimeNs.toString(),
-      sha256: '',
-      dev: stats.dev.toString(),
-      ino: stats.ino.toString(),
-    };
+    const expected: StableFile = { ...await inspectFileMetadata(candidate, rootRealPath, archiveName, code), sha256: '' };
     let handle: FileHandle | undefined;
     try {
       handle = await openNoFollow(candidate);
@@ -121,14 +135,23 @@ async function exists(candidate: string): Promise<boolean> {
 }
 
 export async function captureSourceSnapshot(sourcePath: string): Promise<SourceSnapshot> {
+  const inspection = await inspectSourceFiles(sourcePath);
+  const rootRealPath = await fs.realpath(path.dirname(path.resolve(sourcePath)));
+  const files = await Promise.all(inspection.files.map((file) => (
+    captureStableFile(file.sourcePath, rootRealPath, file.archiveName, 'SOURCE_CHANGED_DURING_BACKUP')
+  )));
+  return { files };
+}
+
+export async function inspectSourceFiles(sourcePath: string): Promise<SourceInspection> {
   const source = path.resolve(sourcePath);
   const rootRealPath = await fs.realpath(path.dirname(source));
   if (!await exists(source)) throw codedError('SOURCE_DATABASE_INVALID', 'SQLite source file does not exist');
-  const files: StableFile[] = [];
+  const files: FileMetadata[] = [];
   for (const suffix of ['', '-wal', '-shm']) {
     const candidate = `${source}${suffix}`;
     if (suffix && !await exists(candidate)) continue;
-    files.push(await captureStableFile(candidate, rootRealPath, `source.sqlite${suffix}`, 'SOURCE_CHANGED_DURING_BACKUP'));
+    files.push(await inspectFileMetadata(candidate, rootRealPath, `source.sqlite${suffix}`, 'SOURCE_CHANGED_DURING_BACKUP'));
   }
   return { files };
 }
