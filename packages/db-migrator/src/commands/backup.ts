@@ -10,7 +10,7 @@ import {
   type SourceInspection,
 } from '../backup/fileSnapshot';
 import { buildManifest, hashFile, verifyManifest, type BackupManifest } from '../backup/manifest';
-import { createConsistentDatabase } from '../backup/sqliteRecovery';
+import { assertSqlitePathBudget, createConsistentDatabase } from '../backup/sqliteRecovery';
 import {
   createUniqueSite,
   pathExists,
@@ -164,6 +164,11 @@ export async function runBackup(options: BackupOptions): Promise<ReadinessReport
     if (await pathExists(finalRoot)) throw codedError('BACKUP_RUN_ALREADY_EXISTS', 'Backup final run already exists');
 
     stagingRoot = await createUniqueSite(output, options.runId, 'staging');
+    assertSqlitePathBudget([
+      path.join(stagingRoot, '.sqlite-recovery', 'source.sqlite'),
+      path.join(stagingRoot, 'sqlite-consistent.sqlite'),
+      path.join(finalRoot, 'sqlite-consistent.sqlite'),
+    ]);
     const rawRoot = await copyRawSnapshot(options.sourcePath, stagingRoot, checks);
     const consistentPath = await createConsistentDatabase(rawRoot, stagingRoot);
     checks.push({ id: 'sqlite.consistent', status: 'passed', expected: 'ok', actual: 'ok', message: 'Staged raw SQLite recovery produced an integrity-checked snapshot' });

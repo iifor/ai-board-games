@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { verifyManifest, type BackupManifest } from './manifest';
@@ -39,17 +39,15 @@ export async function pathExists(candidate: string): Promise<boolean> {
   }
 }
 
+function shortRunIdDigest(runId: string): string {
+  return createHash('sha256').update(runId).digest('hex').slice(0, 12);
+}
+
 export async function createUniqueSite(output: string, runId: string, kind: 'staging' | 'failed'): Promise<string> {
   await fs.mkdir(output, { recursive: true });
   const safeRunId = isSafeRunId(runId) ? runId : 'invalid-run';
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const candidate = path.join(output, `${kind === 'staging' ? '.' : ''}${safeRunId}.${kind}-${randomUUID()}`);
-    try { await fs.mkdir(candidate); return candidate; }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    }
-  }
-  throw codedError('BACKUP_SITE_RESERVATION_FAILED', `Unable to reserve unique ${kind} site`);
+  const prefix = kind === 'staging' ? '.bks-' : '.bkf-';
+  return fs.mkdtemp(path.join(output, `${prefix}${shortRunIdDigest(safeRunId)}-`));
 }
 
 export async function reserveFinal(output: string, runId: string): Promise<FinalReservation> {
@@ -63,7 +61,7 @@ export async function reserveFinal(output: string, runId: string): Promise<Final
   }
   const stats = await fs.lstat(root, { bigint: true });
   const nonce = randomUUID();
-  const ownerToken = path.join(output, `.${runId}.owner-${randomUUID()}`);
+  const ownerToken = path.join(output, `.bko-${shortRunIdDigest(runId)}-${randomUUID()}`);
   try {
     const handle = await fs.open(ownerToken, 'wx');
     try { await handle.writeFile(nonce, 'utf8'); await handle.sync(); }

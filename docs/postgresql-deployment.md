@@ -75,6 +75,7 @@ DBA 必须审核实际 grants，并保存 `\du+`、`\dn+`、schema/table/sequenc
 - 资源目录单独备份，并与数据库恢复点记录同一 UTC 时间、水位和 SHA-256；备份加密、最小权限访问、异机保存并设置保留期。
 - 至少每季度在隔离环境恢复基础备份、回放 WAL、核验 migration checksum、执行真实 health/smoke，并记录 RPO/RTO。
 - 首次 PostgreSQL 正式切换仍需保留切换前同一时间点 SQLite、`-wal`、`-shm`（存在时）和资源快照，以支持旧镜像回滚。
+- 一次性 SQLite backup 的完整 runId 只用于最终目录、报告与 manifest 审计字段；内部 staging/failed/owner 名称为固定长度摘要加排他随机后缀，避免 Windows 路径随 runId 线性膨胀。工具会在源内容复制和 SQLite recovery 打开前检查实际 SQLite 路径，超限固定返回 `BACKUP_PATH_TOO_LONG` 且不发布部分 backup；合法 runId 不需要人为缩短。
 
 ## 监控与发布门禁
 

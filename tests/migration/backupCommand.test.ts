@@ -8,6 +8,13 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 import { runBackup } from '../../packages/db-migrator/src/commands/backup';
 import { verifyManifest, type BackupManifest } from '../../packages/db-migrator/src/backup/manifest';
+import {
+  createUniqueSite,
+  isSafeRunId,
+  ownsReservation,
+  releaseReservation,
+  reserveFinal,
+} from '../../packages/db-migrator/src/backup/publication';
 import { main } from '../../packages/db-migrator/src/cli';
 
 const cryptoModule = require('node:crypto') as typeof import('node:crypto');
@@ -67,8 +74,11 @@ function sourceMetadata(sourcePath: string): SourceMetadata[] {
 
 function failedSites(output: string, runId: string): string[] {
   if (!fs.existsSync(output)) return [];
+  const reportRunId = isSafeRunId(runId) ? runId : 'invalid-run';
   return fs.readdirSync(output, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith(`${runId}.failed-`))
+    .filter((entry) => entry.isDirectory()
+      && entry.name.startsWith('.bkf-')
+      && fs.existsSync(path.join(output, entry.name, `${reportRunId}-backup.json`)))
     .map((entry) => path.join(output, entry.name));
 }
 
@@ -83,6 +93,16 @@ function relativeFiles(root: string): string[] {
   };
   visit(root);
   return found.sort();
+}
+
+function directoryAtExactLength(root: string, targetLength: number): string {
+  const base = path.join(root, 'long-output');
+  const segmentLength = targetLength - base.length - 1;
+  assert.ok(segmentLength > 0 && segmentLength <= 255, 'requested path length must fit one directory segment');
+  const candidate = path.join(base, 'x'.repeat(segmentLength));
+  assert.equal(candidate.length, targetLength);
+  fs.mkdirSync(candidate, { recursive: true });
+  return candidate;
 }
 
 function metadataWithoutContent(root: string): Array<Record<string, string>> {
@@ -197,7 +217,7 @@ test('execute validation failure confines evidence for an unsafe run id to a uni
     const entries = fs.readdirSync(fixture.output, { withFileTypes: true });
     assert.equal(entries.length, 1);
     assert.equal(entries[0].isDirectory(), true);
-    assert.match(entries[0].name, /^invalid-run\.failed-/);
+    assert.match(entries[0].name, /^\.bkf-[a-f0-9]{12}-/);
     const failureSite = path.join(fixture.output, entries[0].name);
     assert.equal(fs.existsSync(path.join(failureSite, 'invalid-run-backup.json')), true);
     assert.equal(fs.existsSync(path.join(fixture.output, 'escape-backup.json')), false);
@@ -232,8 +252,9 @@ test('execute creates a consistent SQLite snapshot, raw WAL archive, resources, 
     assert.equal(report.status, 'passed');
     assert.equal(fs.existsSync(path.join(fixture.output, `${runId}-backup.json`)), true);
     assert.equal(fs.existsSync(path.join(fixture.output, `${runId}-backup.md`)), true);
-    assert.equal(fs.existsSync(path.join(fixture.output, `.${runId}.staging`)), false);
-    assert.equal(fs.existsSync(path.join(fixture.output, `${runId}.failed`)), false);
+    assert.equal(fs.readdirSync(fixture.output).some((entry) => entry.startsWith('.bks-')), false);
+    assert.equal(fs.readdirSync(fixture.output).some((entry) => entry.startsWith('.bkf-')), false);
+    assert.equal(fs.readdirSync(fixture.output).some((entry) => entry.startsWith('.bko-')), false);
     assert.equal(fs.existsSync(consistentPath), true);
     assert.equal(fs.readFileSync(path.join(runRoot, 'resources', 'resource-000', 'nested', 'asset.txt'), 'utf8'), 'resource-content');
     assert.equal(sha256(path.join(runRoot, 'sqlite-raw', 'source.sqlite')), rawSourceHash);
@@ -267,6 +288,110 @@ test('execute creates a consistent SQLite snapshot, raw WAL archive, resources, 
 
     assert.deepEqual(sourceMetadata(fixture.sourcePath), before);
   } finally {
+    cleanupFixture(fixture);
+  }
+});
+
+test('a 39-character run id succeeds from the real 150-character Windows output depth', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows SQLite path-budget regression');
+    return;
+  }
+  const fixture = createWalFixture();
+  const runId = 'backup-task11-rerun-20260810t131631750z';
+  const output = directoryAtExactLength(fixture.root, 150);
+  try {
+    assert.equal(runId.length, 39);
+    const result = await runBackup({
+      runId,
+      sourcePath: fixture.sourcePath,
+      outputDirectory: output,
+      resourceDirectories: [fixture.resources],
+      execute: true,
+    });
+
+    assert.equal(result.status, 'passed');
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(output, runId, 'manifest.json'), 'utf8'),
+    ) as BackupManifest;
+    assert.equal(manifest.runId, runId);
+    const consistent = new Database(
+      path.join(output, runId, 'sqlite-consistent.sqlite'),
+      { readonly: true, fileMustExist: true },
+    );
+    try { assert.equal(consistent.prepare('PRAGMA integrity_check').pluck().get(), 'ok'); }
+    finally { consistent.close(); }
+  } finally {
+    cleanupFixture(fixture);
+  }
+});
+
+test('internal backup sites stay constant-length and collision-safe for long run ids', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'db-backup-sites-'));
+  const output = path.join(root, 'backups');
+  const longRunId = `backup-${'x'.repeat(120)}`;
+  try {
+    const sites = await Promise.all([
+      createUniqueSite(output, 'a', 'staging'),
+      createUniqueSite(output, longRunId, 'staging'),
+      createUniqueSite(output, longRunId, 'staging'),
+      createUniqueSite(output, longRunId, 'failed'),
+    ]);
+    assert.equal(new Set(sites).size, sites.length);
+    assert.equal(path.basename(sites[0]).length, path.basename(sites[1]).length);
+    assert.equal(path.basename(sites[1]).includes(longRunId), false);
+    assert.equal(path.basename(sites[3]).includes(longRunId), false);
+
+    const reservation = await reserveFinal(output, longRunId);
+    assert.equal(await ownsReservation(reservation), true);
+    assert.equal(path.basename(reservation.ownerToken).includes(longRunId), false);
+    await releaseReservation(reservation);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('an unavoidable Windows SQLite path overflow fails before source copy or SQLite open', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows SQLite path-budget regression');
+    return;
+  }
+  const fixture = createWalFixture();
+  const runId = 'backup-task11-rerun-20260810t131631750z';
+  const output = directoryAtExactLength(fixture.root, 220);
+  const originalOpen = fs.promises.open;
+  let sourceContentOpens = 0;
+  fs.promises.open = async (candidate, flags, mode) => {
+    const resolved = path.resolve(String(candidate));
+    if (resolved === path.resolve(fixture.sourcePath)
+      || resolved === path.resolve(`${fixture.sourcePath}-wal`)
+      || resolved === path.resolve(`${fixture.sourcePath}-shm`)) {
+      sourceContentOpens += 1;
+    }
+    return originalOpen(candidate, flags as never, mode);
+  };
+  try {
+    const result = await runBackup({
+      runId,
+      sourcePath: fixture.sourcePath,
+      outputDirectory: output,
+      resourceDirectories: [fixture.resources],
+      execute: true,
+    });
+
+    assert.equal(result.status, 'failed');
+    assert.equal(result.errors[0]?.code, 'BACKUP_PATH_TOO_LONG');
+    assert.equal(result.errors[0]?.message, 'Backup output path is too long for SQLite recovery');
+    assert.equal(sourceContentOpens, 0);
+    assert.equal(fs.existsSync(path.join(output, runId)), false);
+    const failures = failedSites(output, runId);
+    assert.equal(failures.length, 1);
+    assert.deepEqual(relativeFiles(failures[0]), [
+      `${runId}-backup.json`,
+      `${runId}-backup.md`,
+    ]);
+  } finally {
+    fs.promises.open = originalOpen;
     cleanupFixture(fixture);
   }
 });
@@ -663,14 +788,14 @@ test('quarantine move failure keeps one claimed failed site and writes its repor
   let quarantineMoveFailed = false;
   fs.promises.open = async (candidate, flags, mode) => {
     const value = String(candidate);
-    if (!copyFailed && value.includes(`.${runId}.staging-`) && value.endsWith('asset.txt')) {
+    if (!copyFailed && value.includes(`${path.sep}.bks-`) && value.endsWith('asset.txt')) {
       copyFailed = true;
       throw new Error('injected resource copy failure');
     }
     return originalOpen(candidate, flags as never, mode);
   };
   fs.promises.rename = async (source, destination) => {
-    if (!quarantineMoveFailed && String(destination).includes(`${runId}.failed-`)) {
+    if (!quarantineMoveFailed && String(destination).includes(`${path.sep}.bkf-`)) {
       quarantineMoveFailed = true;
       throw new Error('injected quarantine move failure');
     }
@@ -691,7 +816,7 @@ test('quarantine move failure keeps one claimed failed site and writes its repor
     const saved = JSON.parse(fs.readFileSync(reportPath, 'utf8')) as { errors: Array<{ code: string; message: string }> };
     const quarantineError = saved.errors.find((error) => error.code === 'BACKUP_QUARANTINE_INCOMPLETE');
     assert.ok(quarantineError);
-    assert.match(quarantineError.message, /staging/i);
+    assert.match(quarantineError.message, /(?:staging|\.bks-)/i);
   } finally {
     fs.promises.open = originalOpen;
     fs.promises.rename = originalRename;

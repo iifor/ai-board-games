@@ -135,6 +135,8 @@ if ($preflightExit -ne 0 -or $preflight.status -ne 'passed') { throw 'Preflight 
 
 **输入**：与步骤 2 相同的源和资源、全新 backup runId、证据根目录。
 
+backup 的最终目录、报告和 `manifest.json` 仍记录完整 runId；工具内部的 staging、failed site 与 reservation owner token 使用固定长度的 runId 摘要及排他随机后缀，不把完整 runId 重复拼入临时路径。Windows 上工具会在复制源文件或 SQLite-open 隔离副本前核对实际 recovery、consistent 与最终 SQLite 路径预算；无法满足时以固定脱敏的 `BACKUP_PATH_TOO_LONG` 失败，不要求 operator 人为缩短合法 runId，也不会发布部分 backup。
+
 **命令**：
 
 ```powershell
@@ -153,7 +155,7 @@ if (-not (Test-Path -LiteralPath $BackupReportPath -PathType Leaf)) { throw 'Bac
 
 **成功条件**：命令退出 0，backup 报告 `status=passed` 且 `backup.execute`、`manifest.verified`、`backup.publish` 通过。
 
-**失败停止点**：复制期间源变化、manifest 不一致、输出目录冲突或任何 I/O 错误即停止；保留隔离失败现场。
+**失败停止点**：路径预算不足、复制期间源变化、manifest 不一致、输出目录冲突或任何 I/O 错误即停止；保留隔离失败现场。路径预算失败发生在源内容复制和 SQLite 打开前，最终 run 目录不得出现。
 
 **证据路径**：`$BackupRoot`、`$BackupReportPath`。
 
