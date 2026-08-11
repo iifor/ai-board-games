@@ -33,8 +33,14 @@ RUN pnpm install --frozen-lockfile --offline
 
 # Build order: shared → client → admin (server runs from TS at runtime)
 RUN pnpm run build:shared \
+    && pnpm --filter @ai-presenter/server run build \
+    && pnpm --filter @ai-presenter/db-migrator run build \
     && pnpm run build:client \
     && pnpm run build:admin
+
+# The db-migrator bundle is deliberately created apart from the runtime image.
+# It contains one-time SQLite tooling and is copied only into the ops image.
+RUN pnpm --filter @ai-presenter/db-migrator deploy --prod /opt/db-migrator
 
 # --- Stage 2: Production runtime ---
 FROM node:20-slim AS runtime
@@ -72,3 +78,13 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 # Start server
 CMD ["node", "--preserve-symlinks", "--preserve-symlinks-main", "packages/server/dev-runtime.cjs"]
+
+# --- Stage 3: Offline migration operations ---
+FROM node:20-slim AS ops
+
+WORKDIR /app
+
+COPY --from=builder /opt/db-migrator ./packages/db-migrator
+COPY --from=builder /app/packages/server/dist ./packages/server/dist
+
+CMD ["node", "packages/db-migrator/dist/cli.js"]

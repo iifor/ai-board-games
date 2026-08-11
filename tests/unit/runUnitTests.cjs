@@ -21,6 +21,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'dockerBuildContext.test.ts',
   'deploymentConfig.test.ts',
   'releaseGateConfig.test.ts',
+  'postgresProductionCompose.test.ts',
   'postgresOpsScripts.test.ts',
   'postgresqlDocsTruth.test.ts',
   'gameEventBuilder.test.ts',

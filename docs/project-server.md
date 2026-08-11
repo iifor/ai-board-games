@@ -422,6 +422,10 @@ curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/health"
 - Debug mode uses the existing optional special-skill probability for both new role skills, so they can trigger or skip during debug runs.
 - No database schema change is required; new state is stored in the existing serialized werewolf runtime state.
 
+## Production Compose database role boundary (2026-08-11)
+
+The runtime Compose application uses a host-injected `POSTGRES_APP_DATABASE_URL` for the `consensus_app` role and waits for the private PostgreSQL service to become healthy. It always uses `verify-full`, the mounted CA path, schema `consensus`, pool maximum `10`, connection timeout `5000`, and statement timeout `30000`. Offline database migration is isolated in the Compose `migrator` service with profile `ops` and a distinct host-injected `POSTGRES_MIGRATOR_DATABASE_URL` for `consensus_migrator`; the normal runtime image does not include `packages/db-migrator` or `better-sqlite3`.
+
 ## Player Model Fallback
 
 - 明确的额度耗尽、余额不足或欠费响应会在 PostgreSQL 中将模型持久化为 `enabled = 0`、`disabled_reason = quota_exhausted`，并以带 `Z` 的 UTC ISO 8601 记录 `disabled_at`。当前请求继续使用玩家配置的单一备用模型，普通限流、超时和 5xx 不写入额度耗尽标记。

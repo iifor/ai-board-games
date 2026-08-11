@@ -4,6 +4,44 @@
 #   docker compose logs -f app
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: consensus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: consensus
+      POSTGRES_USER: consensus_bootstrap
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_bootstrap_password
+      POSTGRES_APP_PASSWORD_FILE: /run/secrets/postgres_app_password
+      POSTGRES_MIGRATOR_PASSWORD_FILE: /run/secrets/postgres_migrator_password
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/run/postgres-tls/server.crt
+      - -c
+      - ssl_key_file=/run/postgres-tls/server.key
+      - -c
+      - ssl_ca_file=/run/postgres-tls/ca.crt
+      - -c
+      - password_encryption=scram-sha-256
+    volumes:
+      - consensus-postgres-data:/var/lib/postgresql/data
+      - ./scripts/ops/postgres/init-production-roles.sh:/docker-entrypoint-initdb.d/10-init-production-roles.sh:ro
+      - ${POSTGRES_TLS_CA_FILE:?Set POSTGRES_TLS_CA_FILE to the trusted PostgreSQL CA}:/run/postgres-tls/ca.crt:ro
+      - ${POSTGRES_TLS_CERT_FILE:?Set POSTGRES_TLS_CERT_FILE to the postgres certificate with DNS:postgres SAN}:/run/postgres-tls/server.crt:ro
+      - ${POSTGRES_TLS_KEY_FILE:?Set POSTGRES_TLS_KEY_FILE to the postgres private key}:/run/postgres-tls/server.key:ro
+    secrets:
+      - postgres_bootstrap_password
+      - postgres_app_password
+      - postgres_migrator_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U consensus_bootstrap -d consensus"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   app:
     build:
       context: .
@@ -15,12 +53,23 @@ services:
     volumes:
       - consensus-resources:/app/packages/server/resources # Uploaded images and generated audio
       - ./avatars:/app/avatars          # Avatar images
+      - ${POSTGRES_TLS_CA_FILE:?Set POSTGRES_TLS_CA_FILE to the trusted PostgreSQL CA}:/run/postgres-ca/ca.crt:ro
     env_file:
       - path: .env
         required: false
     environment:
       - NODE_ENV=production
       - PORT=3001
+      - DATABASE_URL=${POSTGRES_APP_DATABASE_URL:?Set POSTGRES_APP_DATABASE_URL to the consensus_app PostgreSQL URL}
+      - DATABASE_SSL=verify-full
+      - DATABASE_SCHEMA=consensus
+      - DATABASE_POOL_MAX=10
+      - DATABASE_CONNECTION_TIMEOUT_MS=5000
+      - DATABASE_STATEMENT_TIMEOUT_MS=30000
+      - DATABASE_CA_PATH=/run/postgres-ca/ca.crt
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/toc/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -40,6 +89,33 @@ services:
       app:
         condition: service_healthy
 
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ops
+    profiles: [ops]
+    environment:
+      DATABASE_URL: ${POSTGRES_MIGRATOR_DATABASE_URL:?Set POSTGRES_MIGRATOR_DATABASE_URL to the consensus_migrator PostgreSQL URL}
+      DATABASE_SSL: verify-full
+      DATABASE_SCHEMA: consensus
+      DATABASE_CA_PATH: /run/postgres-ca/ca.crt
+    volumes:
+      - ${POSTGRES_TLS_CA_FILE:?Set POSTGRES_TLS_CA_FILE to the trusted PostgreSQL CA}:/run/postgres-ca/ca.crt:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+secrets:
+  postgres_bootstrap_password:
+    file: ${POSTGRES_BOOTSTRAP_PASSWORD_FILE:?Set POSTGRES_BOOTSTRAP_PASSWORD_FILE to a host secret file}
+  postgres_app_password:
+    file: ${POSTGRES_APP_PASSWORD_FILE:?Set POSTGRES_APP_PASSWORD_FILE to a host secret file}
+  postgres_migrator_password:
+    file: ${POSTGRES_MIGRATOR_PASSWORD_FILE:?Set POSTGRES_MIGRATOR_PASSWORD_FILE to a host secret file}
+
 volumes:
   consensus-resources:
+    driver: local
+  consensus-postgres-data:
     driver: local
