@@ -38,6 +38,10 @@ test('Docker build context excludes operational evidence and SQLite files while 
     'packages/server/resources/system/database.BACKUP-policy.md',
     'packages/server/resources/system/runtime.LOGO.svg',
     'packages/server/resources/system/UPPER.TMP.md',
+    'packages/server/resources/system/docs/schema.SQLITE-notes.txt',
+    'packages/server/resources/system/docs/schema.sqlite-template.json',
+    'packages/server/resources/system/docs/database.DB-guide.md',
+    'packages/server/resources/system/docs/database.db-schema.yaml',
   ];
   const sensitivePaths = [
     'artifacts/postgres-readiness/rehearsal-report.json',
