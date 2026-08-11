@@ -57,7 +57,7 @@ jobs:
       - name: Validate Docker runtime image
         run: |
           docker build -t consensus-runtime-check:${{ github.sha }} .
-          docker run --rm "consensus-runtime-check:${{ github.sha }}" node -e "try { require.resolve('better-sqlite3'); process.exit(1) } catch { process.exit(0) }"
+          docker run --rm "consensus-runtime-check:${{ github.sha }}" node -e "const fs=require('node:fs'); const forbidden=['/app/packages/db-migrator','/app/artifacts','/app/.superpowers','/app/.worktrees']; if(forbidden.some(fs.existsSync)) process.exit(1); try { require.resolve('better-sqlite3'); process.exit(1) } catch { process.exit(0) }"
 
   deploy:
     name: Build and deploy

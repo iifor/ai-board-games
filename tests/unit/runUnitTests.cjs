@@ -18,6 +18,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'loginRateLimiter.test.ts',
   'authLoginRateLimit.test.ts',
   'serverLifecycle.test.ts',
+  'dockerBuildContext.test.ts',
   'deploymentConfig.test.ts',
   'releaseGateConfig.test.ts',
   'postgresOpsScripts.test.ts',

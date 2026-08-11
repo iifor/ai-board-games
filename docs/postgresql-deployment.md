@@ -87,3 +87,16 @@ DBA 必须审核实际 grants，并保存 `\du+`、`\dn+`、schema/table/sequenc
 导入目标必须是全新空 PostgreSQL database/schema，不支持增量、合并或长期双写。生产准备路径的 `preflight`、`validate` 与 `rehearse` 都只从进程环境读取 `DATABASE_URL`，命令行 `--target` 会在任何 I/O 前以脱敏错误拒绝；一次性 `migrate` 的旧 CLI 兼容入口不属于该路径。执行失败时 schema 和 migration/validation/smoke/rehearsal 报告全部保留。失败 PostgreSQL 目标仅用于排障，下一次演练或正式重试必须使用另一个全新空目标。
 
 导入后校验使用独立的 PostgreSQL 类型解析契约，不继承 server 进程对 `pg` 的全局解析器。业务样本比较把 SQLite JSON 当作序列化文本、PostgreSQL JSON 当作已解析值；时间保留毫秒；只有表级清单明确声明的 `bigint` 列会规范化为十进制字符串。JSON 形状必须与应用读取契约一致：`skins.terms_json` 与 `games.event_json` 均为对象，数组或 JSON `null` 都会使对应语义检查失败。
+
+## Docker build-context boundary (2026-08-11)
+
+The repository root is the production Docker build context, but operational evidence is never an image input. `.dockerignore` excludes the complete `artifacts/`, `.superpowers/`, `.worktrees/`, `backups/`, `reports/`, `logs/`, and temporary-output trees, plus SQLite databases and backup/dump suffixes at any depth. This explicitly covers the legacy `packages/data/*.sqlite*` source set in the primary checkout without deleting it.
+
+The builder can continue to use `COPY . .` only behind that filtered boundary. Package manifests, application source, documentation, and `packages/server/resources` remain in the context; resources are required by the server image and must not be removed by a broad evidence rule. The final runtime stage copies only server/shared runtime inputs and compiled web assets. It must not contain `packages/db-migrator`, operational evidence directories, or the resolvable `better-sqlite3` module that belongs only to the one-time migration (一次性迁移) package `packages/db-migrator`.
+
+Release evidence must retain the plain Docker build log so the `load build context` byte count and elapsed time are reviewable. After a successful build, run the image-level checks below before approving `runtime.no-sqlite`:
+
+```powershell
+docker build --progress=plain -t consensus-runtime-check .
+docker run --rm consensus-runtime-check node -e "const fs=require('node:fs'); const forbidden=['/app/packages/db-migrator','/app/artifacts','/app/.superpowers','/app/.worktrees']; if(forbidden.some(fs.existsSync)) process.exit(1); try { require.resolve('better-sqlite3'); process.exit(1) } catch { process.exit(0) }" # packages/db-migrator 一次性迁移 dependency isolation probe
+```

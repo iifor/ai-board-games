@@ -557,3 +557,9 @@ Write-Host "Readiness PASS. Submit $AuthorizationRequestPath to the independent 
 ## 签核 manifest 契约
 
 `postgresql-operator-signoff.example.json` 是不可通过聚合器的 pending 草稿：保留计划字段，同时补齐真实聚合器要求的 `version/approved/approvedBy/approvedAt/checks/reportManifest`。独立 operator 必须先核验 failed/pending environment 草稿及每份原始 evidence，再手工产出最终 passed environment report 和 approved signoff。每个 manifest 条目必须相对于 signoff 文件目录，使用 `/`，包含精确字节数和 64 位小写 SHA-256；列表必须精确覆盖传入的 reports 及这些报告声明的全部 artifacts。示例里的 `REPLACE_*`、零 hash 和纪元时间只是安全占位，不能直接用于聚合。
+
+## Docker image evidence boundary (2026-08-11)
+
+The Step 10 runtime image evidence is invalid unless the Docker build log shows a bounded `load build context` transfer and the final-image probe exits zero. The repository `.dockerignore` must exclude operational `artifacts/`, `.superpowers/`, `.worktrees/`, backup/report/log/temp outputs, and all SQLite/WAL/SHM/journal or database dump files. Do not delete the legacy source set to satisfy this gate; `packages/data/*.sqlite*` remains a rollback/migration input outside the Docker context.
+
+The context gate must also prove that package manifests, application source, documentation, and `packages/server/resources` are still available to the build. The final-image probe must prove `/app/packages/db-migrator`, `/app/artifacts`, `/app/.superpowers`, and `/app/.worktrees` do not exist and `require.resolve('better-sqlite3')` fails. Preserve the raw build log and probe output as Step 10 evidence; an interrupted build or a missing final image is a failed gate, regardless of earlier type/test results.

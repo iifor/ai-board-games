@@ -5,9 +5,23 @@ node_modules/
 
 # Build artifacts
 dist/
+artifacts/
+.superpowers/
+.worktrees/
+backups/
+reports/
+tmp/
 
-# Database
+# Database files are migration inputs or operator backups, never image inputs.
 data/
+packages/data/
+**/*.sqlite
+**/*.sqlite-*
+**/*.db
+**/*.db-*
+**/*.dump
+**/*.backup
+**/*.bak
 
 # Git
 .git/
