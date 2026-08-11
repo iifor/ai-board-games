@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
+import type { ApplicationSmokeOwnership } from './applicationSmokeOwnership';
 
 interface SmokeHttpResponse {
   status: number;
@@ -86,7 +87,8 @@ async function loginAndChangeInitialPassword(
 async function verifyConfigurationRoutesAndSkinCrud(
   baseUrl: string,
   token: string,
-  runId: string,
+  ownership: ApplicationSmokeOwnership,
+  afterSkinCreate?: () => void | Promise<void>,
 ): Promise<void> {
   for (const route of [
     '/api/admin/skins',
@@ -100,7 +102,7 @@ async function verifyConfigurationRoutesAndSkinCrud(
     requireStatus(await requestJson(baseUrl, route, { token }), 200, `Configuration read ${route}`);
   }
   const skin = {
-    name: `Application Smoke ${runId}`.slice(0, 180),
+    name: ownership.skinName,
     background: 'Application smoke background',
     truth: 'Application smoke truth',
     clues: [{ title: 'Smoke clue', text: 'Smoke clue text' }],
@@ -110,6 +112,8 @@ async function verifyConfigurationRoutesAndSkinCrud(
   requireStatus(created, 201, 'Skin create');
   const skinId = ((created.body.data as Record<string, unknown> | undefined)?.id);
   if (typeof skinId !== 'string' || !skinId) throw new Error('Skin create did not return an id');
+  ownership.skinId = skinId;
+  await afterSkinCreate?.();
   requireStatus(await requestJson(baseUrl, `/api/admin/skins/${encodeURIComponent(skinId)}`, {
     method: 'PUT', token, body: { ...skin, background: 'Application smoke updated background' },
   }), 200, 'Skin update');

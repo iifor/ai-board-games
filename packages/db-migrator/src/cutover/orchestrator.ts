@@ -39,6 +39,7 @@ export interface CutoverDependencies {
   migrate(options: CutoverMigrationOptions): Promise<MigrationReport>;
   validate(options: CutoverValidationOptions): Promise<ReadinessReport>;
   smoke: typeof runApplicationSmoke;
+  closeSource(source: OpenVerifiedCutoverSource): void;
   publishCompletion: typeof publishCutoverCompletion;
   writeReport: typeof writeReadinessReport;
 }
@@ -53,6 +54,7 @@ export const defaultCutoverDependencies: CutoverDependencies = {
   }),
   validate: runCutoverValidation,
   smoke: runApplicationSmoke,
+  closeSource: (source) => source.close(),
   publishCompletion: publishCutoverCompletion,
   writeReport: writeReadinessReport,
 };
@@ -119,6 +121,7 @@ export async function executeReservedCutover(
       outputDirectory: reservation.outputDirectory,
       migration,
       ca,
+      sourceDatabase: verifiedSource.database,
     });
     await verifiedSource.assertUnchanged();
     const validationPath = path.join(reservation.outputDirectory, `${options.runId}-validation.json`);
@@ -169,6 +172,13 @@ export async function executeReservedCutover(
     primaryError = Object.assign(new Error('Production cutover report publication failed'), {
       code: 'CUTOVER_REPORT_PUBLICATION_FAILED',
     });
+  }
+  try { dependencies.closeSource(verifiedSource); } catch {
+    if (!primaryError && finalReport.status === 'passed') {
+      primaryError = Object.assign(new Error('Production cutover source failed to close'), {
+        code: 'CUTOVER_SOURCE_CLOSE_FAILED',
+      });
+    }
   }
   try { await session?.release(); } catch (error) {
     if (!primaryError && finalReport.status === 'passed') primaryError = error;

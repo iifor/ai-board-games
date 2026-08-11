@@ -17,6 +17,12 @@ function invalidSource(): Error & { code: 'CUTOVER_SOURCE_INVALID' } {
   });
 }
 
+function sourceCloseFailure(): Error & { code: 'CUTOVER_SOURCE_CLOSE_FAILED' } {
+  return Object.assign(new Error('Production cutover source failed to close'), {
+    code: 'CUTOVER_SOURCE_CLOSE_FAILED' as const,
+  });
+}
+
 function sameIdentity(left: StableFile, right: StableFile): boolean {
   return left.dev === right.dev && left.ino === right.ino
     && left.sizeBytes === right.sizeBytes && left.mtimeNs === right.mtimeNs
@@ -44,6 +50,7 @@ export async function openVerifiedCutoverSource(
     );
     if (!sameIdentity(before, afterOpen)) throw invalidSource();
     const opened = database;
+    let closed = false;
     return {
       database: opened,
       sourcePath,
@@ -59,7 +66,12 @@ export async function openVerifiedCutoverSource(
         }
       },
       close() {
-        try { opened.exec('ROLLBACK'); } finally { opened.close(); }
+        if (closed) return;
+        closed = true;
+        let failed = false;
+        try { opened.exec('ROLLBACK'); } catch { failed = true; }
+        try { opened.close(); } catch { failed = true; }
+        if (failed) throw sourceCloseFailure();
       },
     };
   } catch {

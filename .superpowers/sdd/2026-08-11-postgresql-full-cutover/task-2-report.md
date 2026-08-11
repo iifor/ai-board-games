@@ -118,3 +118,31 @@ New focused production modules are `cli/cutoverDispatch.ts`, `cutover/boundedFil
 ### Self-review and concerns
 
 The production smoke purpose is not exposed as a separate public CLI. Target reports remain endpoint-free. Execute with missing or invalid authorization remains a failed no-write dry-run, ordinary dry-run writes nothing, the advisory session stays open across all mutating phases, pre-cutover authorization never authorizes traffic, and the final gate remains exactly 16. No blocking concern remains. The local shared test container's password differed from the initially supplied value; the full PG suite read that existing container configuration only into the test subprocess environment, did not echo or persist it, and passed without changing the container or repository credential.
+
+## Fix Round 2 (2026-08-12)
+
+### Verified findings and fixes
+
+1. Formal validation previously reopened `sourceSnapshotPath` through the ordinary validation command even though import used the held verified SQLite handle. `CutoverValidationOptions` now carries that exact handle. The cutover wrapper injects a non-owning facade through the validation dependency boundary: every database method is bound to the held readonly/query-only handle, while facade `close()` is deliberately a no-op. Therefore the ordinary path-opening constructor is never used for production cutover validation, validation cannot close the borrowed handle, and the orchestrator remains the sole owner. No database copy or path alias was introduced.
+2. Production smoke ownership now exists before configuration CRUD. It includes the exact run-owned skin name and records the returned skin ID immediately after a successful POST, before any injected or real PUT/DELETE failure can occur. `finally` removes skin rows by ID and name together with every synthetic player, memory, game, workflow, observability, and admin row, then verifies no owned row remains. Real PostgreSQL tests preserve a pre-existing skin, two players, and their memory byte-for-byte across both a complete successful smoke and an injected failure immediately after skin POST.
+3. Resource closure now follows one strict order: all phases and final report publication, verified SQLite source close, advisory unlock plus PostgreSQL connection close, then completion receipt publication. A source-close failure is fixed as `CUTOVER_SOURCE_CLOSE_FAILED` / `Production cutover source failed to close`; raw paths, errno text, and URLs cannot escape. It still attempts PostgreSQL release, never publishes completion, and cannot produce a releasable closure. An already-recorded phase or report failure remains primary. The verified source close is idempotent and attempts both transaction rollback and database close before returning its fixed failure.
+
+### RED to GREEN evidence
+
+- Held validation: migration RED 129/130 failed because the wrapper did not inject a borrowed source; GREEN 130/130. The test attempts path swap and restore where the platform permits it, proves validation reads only the held verified bytes, proves facade close leaves the owner handle usable, and then proves the post-validation identity/hash check still passes for the restored original. Windows `EBUSY` is accepted only as proof that the held handle itself blocked replacement; the verified bytes are still read from that handle.
+- Smoke skin cleanup: full PostgreSQL RED was 131/132 because the post-create injection hook was never reached. Focused real-PostgreSQL GREEN was 4/4, covering ordinary success, an observability/delete failure, and immediate failure after skin POST; all synthetic row categories were zero afterward.
+- Closure order: focused RED was 1/3 passed and 2/3 failed because source close was absent from the observed order and its injected failure did not reject. After correcting the production order and making the failure double preserve the real close side effect, focused GREEN was 3/3. The tests prove `source-close -> release -> completion`, fixed redaction, receipt absence, and primary phase-failure preservation.
+
+### Fresh verification
+
+- Focused compiled PostgreSQL 16/TLS cutover execute: 1/1 passed; canonical migration, transactional import, held-handle formal validation, production smoke, target gates, and cleanup completed in 54.1 seconds.
+- Final complete PostgreSQL suite: 127 top-level subtests / 134 tests; 134 passed, 0 failed, 0 skipped. The embedded compiled PostgreSQL 16/TLS case passed in 18.1 seconds and the suite completed in 57.2 seconds. An immediately preceding verification attempt used an invalid locally assembled port and failed only with `ECONNREFUSED`; it was corrected and is not counted as GREEN.
+- Complete migration suite: 130/130 passed, 0 failed, 0 skipped.
+- Complete unit suite: 358 top-level subtests / 365 tests; 365 passed, 0 failed, 0 skipped.
+- Complete workflow suite: 127/127 passed, 0 failed, 0 skipped.
+- Workspace type check: all 5 checked packages passed.
+- Workspace production build: server/compiled ops adapters, shared, client, and admin passed. The existing unrelated admin chunk-size warning remains non-failing.
+
+### Scope and self-review
+
+Round 2 changes are limited to four db-migrator cutover files, three server smoke files, three focused test files, and this report. Every changed backend file is below 250 lines; `orchestrator.ts` is 197 lines and the largest changed server smoke file is 170 lines. No canonical SQL, public API, shared type, Compose/entrypoint, Task 3 runbook, live SQLite, production service, nginx, real approval, or Task 11 artifact changed. Formal validation contains no SQLite path open, borrowed ownership is explicit, completion remains absent after every source/session/receipt closure failure, and final release readiness remains exactly 16 gates.

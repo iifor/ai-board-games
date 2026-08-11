@@ -8,9 +8,11 @@ interface ApplicationSmokeOwnership {
   marker: string;
   playerIds: number[];
   players: SmokePlayer[];
+  skinId: string | null;
+  skinName: string;
 }
 
-function ownershipFor(runId: string): ApplicationSmokeOwnership {
+function createApplicationSmokeOwnership(runId: string): ApplicationSmokeOwnership {
   const digest = crypto.createHash('sha256').update(runId).digest('hex');
   const marker = `application-smoke-${digest.slice(0, 16)}`;
   const baseId = -(Number.parseInt(digest.slice(0, 12), 16) + 1_000_000);
@@ -20,14 +22,15 @@ function ownershipFor(runId: string): ApplicationSmokeOwnership {
     marker,
     playerIds,
     players: playerIds.map((id, index) => ({ id, nickname: `${marker}-player-${index + 1}` })),
+    skinId: null,
+    skinName: `Application Smoke ${runId}`.slice(0, 180),
   };
 }
 
 async function createRunOwnedSmokePlayers(
   database: DbExecutor,
-  runId: string,
-): Promise<ApplicationSmokeOwnership> {
-  const ownership = ownershipFor(runId);
+  ownership: ApplicationSmokeOwnership,
+): Promise<void> {
   await database.withTransaction(async (transaction) => {
     const existing = await transaction.queryOne<{ count: number }>(
       'SELECT COUNT(*) AS count FROM players WHERE id = ANY($1::bigint[])',
@@ -42,7 +45,6 @@ async function createRunOwnedSmokePlayers(
       ]);
     }
   });
-  return ownership;
 }
 
 async function cleanupRunOwnedSmokeRows(
@@ -71,6 +73,10 @@ async function cleanupRunOwnedSmokeRows(
     await transaction.execute(`DELETE FROM players
       WHERE id = ANY($1::bigint[]) AND provider = $2 AND personality = $2`,
     [ownership.playerIds, ownership.marker]);
+    if (ownership.skinId) {
+      await transaction.execute('DELETE FROM skins WHERE id = $1', [ownership.skinId]);
+    }
+    await transaction.execute('DELETE FROM skins WHERE name = $1', [ownership.skinName]);
     await transaction.execute('DELETE FROM admin_users WHERE username = $1', [adminUsername]);
   });
 
@@ -82,10 +88,11 @@ async function cleanupRunOwnedSmokeRows(
       + (SELECT COUNT(*) FROM games WHERE id = $2)
       + (SELECT COUNT(*) FROM matches WHERE id = $2)
       + (SELECT COUNT(*) FROM game_traces WHERE id = ANY($4::text[]))
-      + (SELECT COUNT(*) FROM admin_users WHERE username = $3) AS count
-  `, [ownership.playerIds, ownership.gameId, adminUsername, traceIds]);
+      + (SELECT COUNT(*) FROM admin_users WHERE username = $3)
+      + (SELECT COUNT(*) FROM skins WHERE id = $5 OR name = $6) AS count
+  `, [ownership.playerIds, ownership.gameId, adminUsername, traceIds, ownership.skinId, ownership.skinName]);
   if (Number(remaining?.count || 0) !== 0) throw new Error('Application smoke fixture cleanup incomplete');
 }
 
-export { cleanupRunOwnedSmokeRows, createRunOwnedSmokePlayers };
+export { cleanupRunOwnedSmokeRows, createApplicationSmokeOwnership, createRunOwnedSmokePlayers };
 export type { ApplicationSmokeOwnership, SmokePlayer };

@@ -79,6 +79,7 @@ export async function runCutover(
   const verifiedSource = await openVerifiedCutoverSource(
     options.sourceSnapshotPath, finalSource.sourceSnapshotSha256,
   );
+  let sourceHandedToOrchestrator = false;
   try {
     assertCutoverAuthorizationCurrent(authorization.authorization, {
       authorizationPath: options.authorizationPath!, ...authorizationContext, now: resolved.now(),
@@ -92,6 +93,7 @@ export async function runCutover(
       manifestSha256: finalSource.manifestSha256,
       now: started,
     });
+    sourceHandedToOrchestrator = true;
     return await executeReservedCutover(
       options, resolved, reservation, verifiedSource, started,
       authorization.authorization, authorizationContext, [
@@ -114,8 +116,11 @@ export async function runCutover(
         },
       ],
     );
-  } finally {
-    verifiedSource.close();
+  } catch (error) {
+    if (!sourceHandedToOrchestrator) {
+      try { resolved.closeSource(verifiedSource); } catch { /* preserve reservation failure */ }
+    }
+    throw error;
   }
 }
 

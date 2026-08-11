@@ -14,11 +14,19 @@ import {
   type TraceContext,
 } from '../../packages/server/modules/observability';
 import { createSmokeSchema } from './smokeHarness';
+import { runApplicationSmokeScenario } from '../../packages/server/smoke/applicationSmokeScenario';
 
 const PREEXISTING_OWNER = 901001;
 const PREEXISTING_SUBJECT = 901002;
+const PREEXISTING_SKIN_ID = 'preexisting-application-smoke-skin';
 
 async function seedPreexistingPlayersAndMemory(database: DbExecutor): Promise<string[]> {
+  await database.execute(`INSERT INTO skins (
+    id, name, version, source, terms_json, background, truth, clues_json,
+    noises_json, memory_examples_json, enabled, created_at, updated_at
+  ) VALUES ($1, 'Existing Skin', 'v-existing', 'existing', '{"immutable":true}'::jsonb,
+    'must remain unchanged', 'existing truth', '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, 1,
+    '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')`, [PREEXISTING_SKIN_ID]);
   for (const [id, nickname, sortOrder] of [
     [PREEXISTING_OWNER, 'Existing Owner', -200],
     [PREEXISTING_SUBJECT, 'Existing Subject', -199],
@@ -37,7 +45,7 @@ async function seedPreexistingPlayersAndMemory(database: DbExecutor): Promise<st
   return seedSnapshot(database);
 }
 
-async function smokeOwnedRowCounts(database: DbExecutor): Promise<Record<string, number>> {
+async function smokeOwnedRowCounts(database: DbExecutor, runId: string): Promise<Record<string, number>> {
   const result: Record<string, number> = {};
   for (const table of ['games', 'matches', 'game_traces', 'admin_users'] as const) {
     result[table] = await database.queryOne<{ count: number }>(
@@ -51,6 +59,10 @@ async function smokeOwnedRowCounts(database: DbExecutor): Promise<Record<string,
     SELECT COUNT(*) AS count FROM player_game_memories
     WHERE recent_summary IN ('first smoke memory', 'updated smoke memory')
   `).then((row) => Number(row?.count || 0));
+  result.syntheticSkins = await database.queryOne<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM skins WHERE name = $1',
+    [`Application Smoke ${runId}`.slice(0, 180)],
+  ).then((row) => Number(row?.count || 0));
   return result;
 }
 
@@ -161,9 +173,9 @@ test('compiled application smoke exercises the real app without paid external ca
     );
     const after = await seedSnapshot(schema.database);
     assert.deepEqual(after, before, 'preexisting players and memory must remain byte-for-byte unchanged');
-    assert.deepEqual(await smokeOwnedRowCounts(schema.database), {
+    assert.deepEqual(await smokeOwnedRowCounts(schema.database, runId), {
       games: 0, matches: 0, game_traces: 0, admin_users: 0,
-      syntheticPlayers: 0, syntheticMemories: 0,
+      syntheticPlayers: 0, syntheticMemories: 0, syntheticSkins: 0,
     });
     const reportPath = path.join(outputDirectory, `${runId}-smoke.json`);
     const persisted = await fs.readFile(reportPath, 'utf8');
@@ -194,13 +206,39 @@ test('compiled application smoke fails when observability child rows survive for
       report.checks.some((check) => check.id === 'workflow.observability-delete' && check.status === 'passed'),
       false,
     );
-    assert.deepEqual(await smokeOwnedRowCounts(schema.database), {
+    assert.deepEqual(await smokeOwnedRowCounts(schema.database, runId), {
       games: 0, matches: 0, game_traces: 0, admin_users: 0,
-      syntheticPlayers: 0, syntheticMemories: 0,
+      syntheticPlayers: 0, syntheticMemories: 0, syntheticSkins: 0,
     });
   } finally {
     await schema.close();
     await fs.rm(outputDirectory, { recursive: true, force: true });
+  }
+});
+
+test('application smoke removes its created skin when execution fails immediately after POST', async () => {
+  const schema = await createSmokeSchema();
+  const runId = `application-smoke-post-failure-${Date.now()}`;
+  try {
+    const before = await seedPreexistingPlayersAndMemory(schema.database);
+    const response = await runApplicationSmokeScenario({
+      runId,
+      targetUrl: schema.targetUrl,
+      targetSchema: schema.schema,
+    }, [], {
+      afterSkinCreate: async () => { throw new Error('injected after skin POST'); },
+    });
+
+    assert.equal(response.ok, false);
+    assert.equal(response.errors.some((error) => error.code === 'APPLICATION_SMOKE_FAILED'), true);
+    assert.deepEqual(await seedSnapshot(schema.database), before,
+      'preexisting skin, players, and memory must remain byte-for-byte unchanged');
+    assert.deepEqual(await smokeOwnedRowCounts(schema.database, runId), {
+      games: 0, matches: 0, game_traces: 0, admin_users: 0,
+      syntheticPlayers: 0, syntheticMemories: 0, syntheticSkins: 0,
+    });
+  } finally {
+    await schema.close();
   }
 });
 
@@ -214,5 +252,9 @@ async function seedSnapshot(database: DbExecutor): Promise<string[]> {
       SELECT * FROM player_game_memories
       WHERE owner_player_id = $1 AND subject_player_id = $2
     ) value
-  `, [PREEXISTING_OWNER, PREEXISTING_SUBJECT]).then((rows) => rows.map((row) => row.value));
+    UNION ALL
+    SELECT to_jsonb(value)::text AS value FROM (
+      SELECT * FROM skins WHERE id = $3
+    ) value
+  `, [PREEXISTING_OWNER, PREEXISTING_SUBJECT, PREEXISTING_SKIN_ID]).then((rows) => rows.map((row) => row.value));
 }

@@ -7,6 +7,7 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 import { buildManifest, hashFile } from '../../packages/db-migrator/src/backup/manifest';
 import { runCutover } from '../../packages/db-migrator/src/commands/cutover';
+import { publishCutoverCompletion } from '../../packages/db-migrator/src/cutover/completion';
 import { writeReadinessReport } from '../../packages/db-migrator/src/reporting/reportWriter';
 import type { ReadinessReport } from '../../packages/db-migrator/src/reporting/reportTypes';
 import type { MigrationReport } from '../../packages/db-migrator/src/types';
@@ -139,6 +140,11 @@ test('cutover keeps one session through all phases and publishes the complete su
         assert.equal((options as typeof options & { productionCutover?: boolean }).productionCutover, true);
         return phaseReport(options, 'smoke', 'passed');
       },
+      closeSource: (source) => { calls.push('source-close'); source.close(); },
+      publishCompletion: async (completion) => {
+        calls.push('completion');
+        await publishCutoverCompletion(completion);
+      },
     });
     assert.equal(result.status, 'passed');
     for (const id of ['source.manifest.sha256', 'authorization.sha256', 'release.candidate']) {
@@ -149,7 +155,7 @@ test('cutover keeps one session through all phases and publishes the complete su
     assert.doesNotMatch(JSON.stringify(result), /postgresql:\/\/|@postgres|:5432|secret/i);
     assert.deepEqual(calls, [
       'schema', 'import', 'validate:production-cutover:consensus',
-      'smoke:production-cutover:consensus', 'release',
+      'smoke:production-cutover:consensus', 'source-close', 'release', 'completion',
     ]);
     assert.deepEqual(result.artifacts.map((artifact) => artifact.type), [
       'owner-receipt', 'authorization', 'manifest', 'migration-report', 'validation-report', 'smoke-report',
@@ -164,6 +170,72 @@ test('cutover keeps one session through all phases and publishes the complete su
     ), 'utf8')) as MigrationReport;
     assert.equal(migration.sourcePath, '[verified-consistent-snapshot]');
     assert.doesNotMatch(JSON.stringify(migration), new RegExp(fixture.root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('source close failure is fixed, releases PostgreSQL, and leaves no completion receipt', async () => {
+  const fixture = await createFixture('source-close-failure');
+  const completionPath = path.join(fixture.options.outputDirectory, 'source-close-failure-completion-receipt.json');
+  let released = false;
+  let completionPublished = false;
+  try {
+    await assert.rejects(runCutover(fixture.options, {
+      now: () => NOW,
+      openTargetSession: async () => ({
+        client: {} as never,
+        release: async () => { released = true; },
+      }),
+      createSchema: async () => undefined,
+      migrate: async (options) => migrationReport(options.sourcePath),
+      validate: async (options) => phaseReport(options, 'validation', 'passed'),
+      smoke: async (options) => phaseReport(options, 'smoke', 'passed'),
+      closeSource: (source) => {
+        source.close();
+        throw new Error(`SQLITE_BUSY ${fixture.root} ${privateRuntimeUrl()}`);
+      },
+      publishCompletion: async () => { completionPublished = true; },
+    }), (error: unknown) => {
+      const failure = error as Error & { code?: string };
+      assert.equal(failure.code, 'CUTOVER_SOURCE_CLOSE_FAILED');
+      assert.equal(failure.message, 'Production cutover source failed to close');
+      assert.doesNotMatch(JSON.stringify(failure), /SQLITE_BUSY|private|postgres(?:ql)?:\/\//i);
+      return true;
+    });
+    assert.equal(released, true);
+    assert.equal(completionPublished, false);
+    await assert.rejects(fs.access(completionPath));
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('source close failure never replaces an already-recorded phase failure', async () => {
+  const fixture = await createFixture('phase-before-source-close');
+  let released = false;
+  try {
+    const result = await runCutover(fixture.options, {
+      now: () => NOW,
+      openTargetSession: async () => ({
+        client: {} as never,
+        release: async () => { released = true; },
+      }),
+      createSchema: async () => undefined,
+      migrate: async (options) => migrationReport(options.sourcePath),
+      validate: async (options) => phaseReport(options, 'validation', 'failed'),
+      smoke: async () => assert.fail('smoke must remain suppressed'),
+      closeSource: (source) => {
+        source.close();
+        throw new Error(`SQLITE_BUSY ${fixture.root}`);
+      },
+    });
+    assert.equal(result.status, 'failed');
+    assert.deepEqual(result.errors.map((error) => error.code), ['CUTOVER_VALIDATION_FAILED']);
+    assert.equal(released, true);
+    await assert.rejects(fs.access(path.join(
+      fixture.options.outputDirectory, 'phase-before-source-close-completion-receipt.json',
+    )));
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
   }

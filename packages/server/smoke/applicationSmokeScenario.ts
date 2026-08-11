@@ -9,6 +9,7 @@ import {
 } from './applicationSmokeFixtures';
 import {
   cleanupRunOwnedSmokeRows,
+  createApplicationSmokeOwnership,
   createRunOwnedSmokePlayers,
   type ApplicationSmokeOwnership,
 } from './applicationSmokeOwnership';
@@ -56,14 +57,19 @@ function passed(checks: ApplicationSmokeCheck[], id: string, message: string): v
   checks.push({ id, status: 'passed', message });
 }
 
+interface ApplicationSmokeScenarioDependencies {
+  afterSkinCreate?(): void | Promise<void>;
+}
+
 async function runApplicationSmokeScenario(
   request: ApplicationSmokeAdapterRequest,
   observabilityErrors: string[],
+  dependencies: ApplicationSmokeScenarioDependencies = {},
 ): Promise<ApplicationSmokeAdapterResponse> {
   const checks: ApplicationSmokeCheck[] = [];
   const errors: ApplicationSmokeAdapterResponse['errors'] = [];
   const runtime = await startApplicationSmokeRuntime(request);
-  let ownership: ApplicationSmokeOwnership | undefined;
+  const ownership: ApplicationSmokeOwnership = createApplicationSmokeOwnership(request.runId);
   let token = '';
   try {
     const health = await requestJson(runtime.baseUrl, '/api/toc/health');
@@ -75,10 +81,12 @@ async function runApplicationSmokeScenario(
     token = await loginAndChangeInitialPassword(runtime.baseUrl, runtime.adminUsername, runtime.adminPassword);
     passed(checks, 'auth.initial-password-change', 'Initial administrator login and forced password change passed');
 
-    await verifyConfigurationRoutesAndSkinCrud(runtime.baseUrl, token, request.runId);
+    await verifyConfigurationRoutesAndSkinCrud(
+      runtime.baseUrl, token, ownership, dependencies.afterSkinCreate,
+    );
     passed(checks, 'config.read-and-crud', 'Configuration reads and skin CRUD passed through Express routes');
 
-    ownership = await createRunOwnedSmokePlayers(runtime.database, request.runId);
+    await createRunOwnedSmokePlayers(runtime.database, ownership);
     const players = ownership.players;
     const persisted = await runPersistedUndercover(ownership.gameId, players);
     const gameId = persisted.gameId;
@@ -141,11 +149,7 @@ async function runApplicationSmokeScenario(
     errors.push({ code: 'APPLICATION_SMOKE_FAILED', message: 'Application smoke scenario failed' });
   } finally {
     try {
-      if (ownership) {
-        await cleanupRunOwnedSmokeRows(runtime.database, ownership, runtime.adminUsername);
-      } else {
-        await runtime.database.execute('DELETE FROM admin_users WHERE username = $1', [runtime.adminUsername]);
-      }
+      await cleanupRunOwnedSmokeRows(runtime.database, ownership, runtime.adminUsername);
       passed(checks, 'teardown.synthetic-fixtures-removed', 'Every run-owned synthetic row was removed');
     } catch {
       errors.push({ code: 'APPLICATION_SMOKE_FIXTURE_CLEANUP_FAILED', message: 'Application smoke fixture cleanup failed' });
