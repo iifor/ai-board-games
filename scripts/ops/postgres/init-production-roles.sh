@@ -4,20 +4,36 @@ set -eu
 app_password_file="${POSTGRES_APP_PASSWORD_FILE:-/run/secrets/postgres_app_password}"
 migrator_password_file="${POSTGRES_MIGRATOR_PASSWORD_FILE:-/run/secrets/postgres_migrator_password}"
 
-require_non_empty_secret() {
+carriage_return="$(printf '\r')"
+newline='
+'
+
+read_secret() {
   if [ ! -r "$1" ] || [ ! -s "$1" ]; then
+    echo "PostgreSQL role secret must be a readable, non-empty file: $1" >&2
+    exit 1
+  fi
+  secret_value="$(cat "$1"; printf '\037')"
+  secret_value=${secret_value%?}
+  case "$secret_value" in
+    *"$carriage_return$newline") secret_value=${secret_value%"$carriage_return$newline"} ;;
+    *"$newline") secret_value=${secret_value%"$newline"} ;;
+  esac
+  if [ -z "$secret_value" ]; then
     echo "PostgreSQL role secret must be a readable, non-empty file: $1" >&2
     exit 1
   fi
 }
 
-require_non_empty_secret "$app_password_file"
-require_non_empty_secret "$migrator_password_file"
+read_secret "$app_password_file"
+app_password=$secret_value
+read_secret "$migrator_password_file"
+migrator_password=$secret_value
 
 # Init scripts run only for a newly initialized PGDATA. The SQL remains
 # repeatable so a deliberate manual rerun does not create duplicate roles.
-POSTGRES_APP_ROLE_PASSWORD="$(cat "$app_password_file")" \
-POSTGRES_MIGRATOR_ROLE_PASSWORD="$(cat "$migrator_password_file")" \
+POSTGRES_APP_ROLE_PASSWORD="$app_password" \
+POSTGRES_MIGRATOR_ROLE_PASSWORD="$migrator_password" \
 psql --set=ON_ERROR_STOP=1 --username "${POSTGRES_USER:?POSTGRES_USER is required}" --dbname "${POSTGRES_DB:?POSTGRES_DB is required}" <<SQL
 \\getenv app_password POSTGRES_APP_ROLE_PASSWORD
 \\getenv migrator_password POSTGRES_MIGRATOR_ROLE_PASSWORD
