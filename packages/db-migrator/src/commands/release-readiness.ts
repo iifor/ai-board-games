@@ -20,7 +20,7 @@ export const REQUIRED_RELEASE_CHECKS = [
   'smoke.health',
   'smoke.auth-and-config',
   'smoke.game-replay-memory-delete',
-  'docs.runtime-truth',
+  'production.cutover',
   'operator.signoff',
 ] as const;
 
@@ -58,6 +58,13 @@ function sourceHash(report: ReadinessReport): string | undefined {
   if (matching.length !== 1 || matching[0].status !== 'passed') return undefined;
   const check = matching[0];
   return check.actual && check.actual === check.expected && SHA256.test(check.actual) ? check.actual : undefined;
+}
+
+function exactCheckValue(report: ReadinessReport, id: string, pattern: RegExp): string | undefined {
+  const matching = report.checks.filter((item) => item.id === id);
+  if (matching.length !== 1 || matching[0].status !== 'passed') return undefined;
+  const check = matching[0];
+  return check.actual && check.actual === check.expected && pattern.test(check.actual) ? check.actual : undefined;
 }
 
 function smokePassed(report: ReadinessReport, ids: string[]): boolean {
@@ -104,8 +111,9 @@ function evaluate(
   );
   const smokeOne = smokeFor(first);
   const smokeTwo = smokeFor(second);
-  const bothSmoke = (ids: string[]): boolean => smokes.length === 2
-    && Boolean(smokeOne && smokeTwo && smokePassed(smokeOne, ids) && smokePassed(smokeTwo, ids));
+  const bothSmoke = (ids: string[]): boolean => Boolean(
+    smokeOne && smokeTwo && smokePassed(smokeOne, ids) && smokePassed(smokeTwo, ids),
+  );
   const signed = (id: string): boolean => {
     const approvals = signoff.checks.filter((check) => check.id === id);
     const evidence = reports.flatMap((report) => report.checks.filter((check) => check.id === id));
@@ -126,6 +134,35 @@ function evaluate(
     'undercover.persisted-without-external-calls', 'history.detail-and-replay-order',
     'memory.created-and-updated', 'workflow.observability-delete', 'teardown.observability-drained',
   ]));
+  const cutovers = reports.filter((report) => report.stage === 'cutover');
+  const cutover = cutovers[0];
+  const cutoverValidation = cutover && reports.filter((report) => (
+    report.stage === 'validation' && report.runId === cutover.runId && report.schema === cutover.schema
+  ));
+  const cutoverSmoke = cutover && reports.filter((report) => (
+    report.stage === 'smoke' && report.runId === cutover.runId && report.schema === cutover.schema
+  ));
+  const requiredCutoverChecks = [
+    'authorization.valid', 'authorization.sha256', 'release.candidate',
+    'source.snapshot.sha256', 'source.manifest.sha256', 'target.safe', 'schema.migrations',
+    'import.transaction', 'validation', 'smoke', 'closure.evidence',
+  ];
+  const productionCutover = cutovers.length === 1
+    && smokes.length === 3
+    && cutover.schema === 'consensus'
+    && requiredCutoverChecks.every((id) => checkPassed(cutover, id))
+    && sourceHash(cutover) !== undefined
+    && exactCheckValue(cutover, 'source.manifest.sha256', SHA256) !== undefined
+    && exactCheckValue(cutover, 'authorization.sha256', SHA256) !== undefined
+    && exactCheckValue(cutover, 'release.candidate', GIT_SHA) === expected.releaseCandidate
+    && exactCheckValue(cutover, 'target.safe', /^database=consensus;schema=consensus;role=consensus_migrator;tls=verify-full$/) !== undefined
+    && cutoverValidation?.length === 1 && cutoverValidation[0].status === 'passed'
+    && cutoverSmoke?.length === 1 && smokePassed(cutoverSmoke[0], [
+      'health.connected', 'health.disconnected', 'auth.initial-password-change', 'config.read-and-crud',
+      'undercover.persisted-without-external-calls', 'history.detail-and-replay-order',
+      'memory.created-and-updated', 'workflow.observability-delete', 'teardown.observability-drained',
+    ]);
+  result.set('production.cutover', signed('production.cutover') && productionCutover);
   const checks = REQUIRED_RELEASE_CHECKS.map((id) => gate(
     id,
     allReportsPassed && result.get(id) === true,

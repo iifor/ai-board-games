@@ -13,6 +13,7 @@
     "db/postgres.ts",
     "db/postgres/migrate.ts",
     "db/postgres/rehearsalAdapter.ts",
+    "db/postgres/cutoverAdapter.ts",
     "db/seed.ts",
     "smoke/applicationSmokeAdapter.ts",
     "../shared/types/dbExecutor.d.ts"

@@ -10,9 +10,11 @@
 
 ## PostgreSQL application smoke gate (2026-08-10)
 
-The server owns both compiled operations adapters. One `tsconfig.rehearsal.json` compilation emits the migration rehearsal adapter and the application smoke adapter under `packages/server/dist/ops`; the existing rehearsal entry remains available for compatibility. `packages/db-migrator` starts the compiled smoke adapter as a child process and sends the target URL only through stdin. It never imports server TypeScript, and the server never imports db-migrator.
+The server owns the compiled operations adapters. One `tsconfig.rehearsal.json` compilation emits the rehearsal migration adapter, production cutover migration adapter, and application smoke adapter under `packages/server/dist/ops`; the existing rehearsal entry remains available for compatibility. `packages/db-migrator` starts compiled adapters as child processes and sends the target URL only through stdin. It never imports server TypeScript, and the server never imports db-migrator.
 
 The application smoke runtime starts the real Express app against the already-imported rehearsal schema. Its source is split into lifecycle, HTTP, fixture, scenario, adapter, and type responsibilities. Inside the isolated child it temporarily sets the target URL/schema and then calls the canonical `readDatabaseConfig`, so production SSL/CA, pool-size, connection-timeout, and statement-timeout settings remain authoritative. The internal `runSession` dependency seam is server-only and is not present in HTTP or WebSocket input. It persists a non-debug Undercover game with deterministic fake runner/config dependencies, empty speech, and a network-call guard, so no paid LLM or TTS call can occur.
+
+Production smoke is closed by default. The compiled adapter accepts database `consensus` only with the internal `production-cutover` purpose, exact `consensus_migrator@postgres:5432/consensus` identity, schema `consensus`, URL `sslmode=verify-full`, and inherited `DATABASE_SSL=verify-full` plus `DATABASE_CA_PATH`; ordinary smoke still requires a dedicated `_test` or `_rehearsal` database. This purpose is internal to the offline cutover process and does not authorize public traffic or start nginx.
 
 Observability shutdown first flushes and shuts down the provider, then drains queued PostgreSQL writes until the queue is stably empty. Queue entries are deleted only when the map still points to the same settled promise. Teardown order is HTTP close, observability shutdown/drain, exact restoration of the previously installed executor, smoke pool close, then test-only schema drop. LLM spans created without a current game trace are standard non-recording spans and do not create orphan `trace_spans` rows.
 
@@ -446,6 +448,8 @@ PostgreSQL executor 为 OID 1184（`timestamptz`）注册统一 parser：可解�
 服务端构建同时产出离线 migration rehearsal adapter 及其正式 SQL migration 副本。adapter 在服务端编译上下文复用唯一的 `createPostgresExecutor` 和 `migratePostgres`，只接受 stdin JSON，不从 argv 读取数据库 URL；`packages/db-migrator` 不加载服务端 TypeScript，也不复制 migration SQL。adapter 不提供 drop/truncate 操作，按 runId hash 获取 PostgreSQL advisory lock 后原子检查并创建唯一 rehearsal schema。
 
 `packages/db-migrator` 的 `rehearse` 命令固定执行 manifest 校验、测试库后缀门禁、全局 runId/schema 唯一性、正式 migration、事务导入和只读验收。dry-run 只生成并报告安全 schema 名，不打开 PostgreSQL；execute 失败时保留 schema 和已发布报告用于排障。验证器使用 db-migrator 自有的只读 PostgreSQL 查询连接，不再动态加载 server 源码。
+
+`cutover` 是独立的 production-only 编排命令。它只接受已验证 backup 中的 `sqlite-consistent.sqlite` 与 manifest；无 `--execute` 时只稳定复核本地证据，零数据库调用且不创建 output。execute 必须提供单独的 v1 授权文件，并从 ops 子进程环境读取固定 migrator URL、`RELEASE_CANDIDATE_SHA`、`DATABASE_SSL=verify-full` 与 `DATABASE_CA_PATH`；`--target` 及 operator 提供的 database/schema/role/host/port 参数都会在 I/O 前拒绝。授权校验、固定目标/TLS 本地校验通过后，工具以永久 owner receipt 排他预留 run，使用同一个 `pg.Client` advisory-lock session 贯穿只读目标门禁、compiled canonical migration adapter、事务导入、formal validation、production-purpose compiled smoke 和最终报告写入。失败不 retry/drop/truncate，不删除 schema 或证据；该授权不启动 app/nginx，也不构成 traffic approval。
 
 生产准备路径的 `preflight`、`validate` 和 `rehearse` 命令只从进程环境读取 `DATABASE_URL`；传入 `--target` 会在任何文件或数据库 I/O 前以固定脱敏错误拒绝。`release-readiness` 还要求显式 40 位 `--release-candidate`，并校验它与签核候选 SHA 一致。签核解析器会强制校验 readiness runId、go-live/rollback/独立 operator 三方身份分离、真实批准时间、两倍演练窗口、`approved` 状态，以及 reports 与其 `evidence` artifacts 的精确 size/SHA-256 manifest；自动化只生成 failed/pending 草稿，不代签。
 

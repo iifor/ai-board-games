@@ -7,10 +7,11 @@ import { assertMatchingBackupVerification } from './backupVerification';
 import { isInside, pathKey, readStableJson, type StableJson } from './stableJson';
 
 const SHA256 = /^[a-f0-9]{64}$/;
-const STAGES = ['preflight', 'backup', 'import', 'validation', 'rehearsal', 'smoke', 'release'];
+const STAGES = ['preflight', 'backup', 'import', 'validation', 'rehearsal', 'smoke', 'cutover', 'release'];
 const CHECK_STATUSES = ['passed', 'failed', 'skipped'];
 const ARTIFACT_TYPES: ArtifactType[] = [
-  'backup', 'manifest', 'migration-report', 'validation-report', 'rehearsal-report', 'smoke-report', 'evidence',
+  'backup', 'manifest', 'migration-report', 'validation-report', 'rehearsal-report', 'smoke-report',
+  'cutover-report', 'authorization', 'owner-receipt', 'evidence',
 ];
 const GIT_SHA = /^[a-f0-9]{40}$/;
 
@@ -110,6 +111,13 @@ export function assertRequiredArtifacts(report: ReadinessReport): void {
   if (report.stage === 'backup' && (check('backup.execute') || check('backup.restore-drill'))) {
     if ((counts.get('backup') || 0) < 1 || counts.get('manifest') !== 1) {
       throw new Error('Backup artifact evidence is incomplete');
+    }
+  }
+  if (report.stage === 'cutover') {
+    for (const type of [
+      'authorization', 'manifest', 'owner-receipt', 'migration-report', 'validation-report', 'smoke-report',
+    ] as const) {
+      if (counts.get(type) !== 1) throw new Error('Cutover artifact evidence is incomplete');
     }
   }
 }

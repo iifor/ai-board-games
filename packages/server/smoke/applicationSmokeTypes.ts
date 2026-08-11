@@ -4,6 +4,7 @@ interface ApplicationSmokeAdapterRequest {
   runId: string;
   targetUrl: string;
   targetSchema: string;
+  purpose?: 'production-cutover';
 }
 
 interface ApplicationSmokeCheck {

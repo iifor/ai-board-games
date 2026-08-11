@@ -7,26 +7,11 @@ const root = path.resolve(__dirname, '../..');
 const serverRoot = path.join(root, 'packages', 'server');
 const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
 const testFiles = [
-  'dbExecutor.test.ts',
-  'schemaMigration.test.ts',
-  'coreRepositories.test.ts',
-  'authIntegration.test.ts',
-  'llmQuotaIntegration.test.ts',
-  'applicationSmokeLifecycle.test.ts',
-  'applicationSmoke.test.ts',
-  'gameApplicationIntegration.test.ts',
-  'gameRepositories.test.ts',
-  'workflowConcurrency.test.ts',
-  'sqliteImporter.test.ts',
-  'preflightCommand.test.ts',
-  'validateMigration.test.ts',
-  'rehearsalCommand.test.ts',
-  'cutoverTargetSession.test.ts',
-  'cutoverAdapter.test.ts',
-  'cutoverSmokeAdapter.test.ts',
-  'cutoverCommand.test.ts',
-]
-  .map((file) => path.join(__dirname, file));
+  'cutoverAuthorization.test.ts',
+  'cutoverCli.test.ts',
+  'cutoverEvidence.test.ts',
+  'releaseReadiness.test.ts',
+].map((file) => path.join(__dirname, file));
 const originalTsLoader = Module._extensions['.ts'];
 
 if (fs.existsSync(pnpmRoot)) {

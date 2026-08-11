@@ -14,7 +14,9 @@ function validationTypeParsers(): TypeOverrides {
   return parsers;
 }
 
-function tlsConfiguration(targetUrl: string): false | { rejectUnauthorized: true } {
+export type ValidationTls = false | { rejectUnauthorized: true; ca?: string };
+
+function tlsConfiguration(targetUrl: string): ValidationTls {
   try {
     return new URL(targetUrl).searchParams.get('sslmode')?.toLowerCase() === 'verify-full'
       ? { rejectUnauthorized: true }
@@ -24,13 +26,17 @@ function tlsConfiguration(targetUrl: string): false | { rejectUnauthorized: true
   }
 }
 
-export function createValidationExecutor(targetUrl: string, schema: string): ValidationDbExecutor {
+export function createValidationExecutor(
+  targetUrl: string,
+  schema: string,
+  explicitTls?: ValidationTls,
+): ValidationDbExecutor {
   const pool = new Pool({
     connectionString: targetUrl,
     max: 1,
     connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
     statement_timeout: STATEMENT_TIMEOUT_MS,
-    ssl: tlsConfiguration(targetUrl),
+    ssl: explicitTls === undefined ? tlsConfiguration(targetUrl) : explicitTls,
     application_name: 'consensus-db-migrator-validation',
     options: `-c search_path=${schema},public -c default_transaction_read_only=on`,
     types: validationTypeParsers(),

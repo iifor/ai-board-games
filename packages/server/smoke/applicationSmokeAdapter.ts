@@ -16,14 +16,34 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-function parseRequest(raw: string): ApplicationSmokeAdapterRequest {
+function isFixedProductionTarget(targetUrl: URL, schema: string | undefined): boolean {
+  return targetUrl.hostname === 'postgres'
+    && (targetUrl.port || '5432') === '5432'
+    && decodeURIComponent(targetUrl.pathname.replace(/^\//, '')) === 'consensus'
+    && decodeURIComponent(targetUrl.username) === 'consensus_migrator'
+    && targetUrl.searchParams.get('sslmode') === 'verify-full'
+    && schema === 'consensus';
+}
+
+function parseRequest(
+  raw: string,
+  environment: Record<string, string | undefined> = process.env,
+): ApplicationSmokeAdapterRequest {
   const value = JSON.parse(raw) as Partial<ApplicationSmokeAdapterRequest>;
   if (!RUN_ID.test(value.runId || '')) throw new Error('Invalid smoke runId');
   if (!IDENTIFIER.test(value.targetSchema || '')) throw new Error('Invalid smoke schema');
   const targetUrl = new URL(value.targetUrl || '');
   if (!['postgres:', 'postgresql:'].includes(targetUrl.protocol)) throw new Error('Invalid smoke database URL');
   const database = targetUrl.pathname.replace(/^\//, '').toLowerCase();
-  if (!/(?:_test|_rehearsal)$/.test(database)) throw new Error('Smoke database must be dedicated to testing');
+  if (value.purpose === 'production-cutover') {
+    if (!isFixedProductionTarget(targetUrl, value.targetSchema)
+      || environment.DATABASE_SSL !== 'verify-full'
+      || !environment.DATABASE_CA_PATH?.trim()) {
+      throw new Error('Production smoke target is unsafe');
+    }
+  } else if (value.purpose !== undefined || !/(?:_test|_rehearsal)$/.test(database)) {
+    throw new Error('Smoke database must be dedicated to testing');
+  }
   return value as ApplicationSmokeAdapterRequest;
 }
 

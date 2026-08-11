@@ -15,7 +15,7 @@ const OPERATOR_CHECKS = [
   'postgres.tls',
   'postgres.least-privilege',
   'postgres.pool-and-timeouts',
-  'docs.runtime-truth',
+  'production.cutover',
   'operator.signoff',
 ] as const;
 const RELEASE_CANDIDATE = '0123456789abcdef0123456789abcdef01234567';
@@ -91,6 +91,7 @@ async function createFixture(): Promise<Fixture> {
     'rehearsal-1-migration.json', 'rehearsal-1-validation.json',
     'rehearsal-2-migration.json', 'rehearsal-2-validation.json',
     'restore.sqlite', 'restore-manifest.json', 'environment-tls.log',
+    'cutover-authorization.json', 'cutover-manifest.json', 'cutover-owner-receipt.json', 'cutover-migration.json',
   ].map((name) => path.join(artifactsDirectory, name));
   for (const [index, candidate] of artifactPaths.entries()) {
     await fs.writeFile(candidate, `artifact-${index}\n`);
@@ -152,6 +153,41 @@ async function createFixture(): Promise<Fixture> {
     message: 'verified immutable backup manifest',
   }]));
   reportPaths.push(path.join(reportsDirectory, `report-${reports.length}.json`));
+  const cutoverValidationPath = path.join(reportsDirectory, `report-${reports.length + 1}.json`);
+  const cutoverSmokePath = path.join(reportsDirectory, `report-${reports.length + 2}.json`);
+  const cutoverReportPath = path.join(reportsDirectory, `report-${reports.length + 3}.json`);
+  const cutoverValidation = readinessReport('production-cutover-1', 'validation', [
+    { id: 'validation.complete', status: 'passed', message: 'formal validation passed' },
+  ], { schema: 'consensus' });
+  const cutoverSmoke = readinessReport('production-cutover-1', 'smoke', smokeChecks(), { schema: 'consensus' });
+  const cutover = readinessReport('production-cutover-1', 'cutover', [
+    { id: 'authorization.valid', status: 'passed', expected: 'b'.repeat(64), actual: 'b'.repeat(64), message: 'authorization passed' },
+    { id: 'authorization.sha256', status: 'passed', expected: 'b'.repeat(64), actual: 'b'.repeat(64), message: 'authorization hash passed' },
+    { id: 'release.candidate', status: 'passed', expected: RELEASE_CANDIDATE, actual: RELEASE_CANDIDATE, message: 'candidate passed' },
+    { id: 'source.snapshot.sha256', status: 'passed', expected: 'a'.repeat(64), actual: 'a'.repeat(64), message: 'source passed' },
+    { id: 'source.manifest.sha256', status: 'passed', expected: 'c'.repeat(64), actual: 'c'.repeat(64), message: 'manifest passed' },
+    {
+      id: 'target.safe', status: 'passed',
+      expected: 'database=consensus;schema=consensus;role=consensus_migrator;tls=verify-full',
+      actual: 'database=consensus;schema=consensus;role=consensus_migrator;tls=verify-full',
+      message: 'target passed',
+    },
+    { id: 'schema.migrations', status: 'passed', message: 'migration passed' },
+    { id: 'import.transaction', status: 'passed', message: 'import passed' },
+    { id: 'validation', status: 'passed', message: 'validation passed' },
+    { id: 'smoke', status: 'passed', message: 'smoke passed' },
+    { id: 'closure.evidence', status: 'passed', message: 'closure passed' },
+  ], { schema: 'consensus' });
+  cutover.artifacts = [
+    { type: 'authorization', path: artifactPaths[9], sha256: await sha256(artifactPaths[9]) },
+    { type: 'manifest', path: artifactPaths[10], sha256: await sha256(artifactPaths[10]) },
+    { type: 'owner-receipt', path: artifactPaths[11], sha256: await sha256(artifactPaths[11]) },
+    { type: 'migration-report', path: artifactPaths[12], sha256: await sha256(artifactPaths[12]) },
+    { type: 'validation-report', path: cutoverValidationPath },
+    { type: 'smoke-report', path: cutoverSmokePath },
+  ];
+  reports.push(cutoverValidation, cutoverSmoke, cutover);
+  reportPaths.push(cutoverValidationPath, cutoverSmokePath, cutoverReportPath);
   const signoffPath = path.join(root, 'operator-signoff.json');
   const outputDirectory = path.join(root, 'output');
   const signoff: Record<string, unknown> = {};
@@ -220,10 +256,38 @@ test('passes only complete evidence and computes a three-minute maintenance wind
     'ci.release-gates', 'tests.no-critical-skips', 'backup.executed', 'backup.restore-drill',
     'rehearsal.first', 'rehearsal.second', 'rehearsal.same-source-hash', 'runtime.no-sqlite',
     'postgres.tls', 'postgres.least-privilege', 'postgres.pool-and-timeouts', 'smoke.health',
-    'smoke.auth-and-config', 'smoke.game-replay-memory-delete', 'docs.runtime-truth', 'operator.signoff',
+    'smoke.auth-and-config', 'smoke.game-replay-memory-delete', 'production.cutover', 'operator.signoff',
   ]);
   await fs.access(path.join(fixture.outputDirectory, 'release-pass-release.json'));
   await fs.access(path.join(fixture.outputDirectory, 'release-pass-release.md'));
+});
+
+test('production cutover gate fails for absent, duplicate, failed, or mismatched cutover closure', async (t) => {
+  const absent = await createFixture();
+  const duplicate = await createFixture();
+  const failed = await createFixture();
+  const mismatched = await createFixture();
+  const provenance = await createFixture();
+  t.after(() => Promise.all([absent, duplicate, failed, mismatched, provenance].map((item) => (
+    fs.rm(item.root, { recursive: true, force: true })
+  ))));
+
+  absent.reportPaths.pop();
+  absent.reports.pop();
+  assert.equal((await runFixture(absent, 'release-no-cutover')).status, 'failed');
+
+  duplicate.reports.push(structuredClone(duplicate.reports.at(-1)!));
+  duplicate.reportPaths.push(path.join(duplicate.root, 'reports', 'duplicate-cutover.json'));
+  assert.equal((await runFixture(duplicate, 'release-duplicate-cutover')).status, 'failed');
+
+  failed.reports.at(-1)!.status = 'failed';
+  assert.equal((await runFixture(failed, 'release-failed-cutover')).status, 'failed');
+
+  mismatched.reports.at(-3)!.runId = 'different-cutover-run';
+  assert.equal((await runFixture(mismatched, 'release-mismatched-cutover')).status, 'failed');
+
+  provenance.reports.at(-1)!.checks.find((check) => check.id === 'release.candidate')!.actual = 'f'.repeat(40);
+  assert.equal((await runFixture(provenance, 'release-mismatched-provenance')).status, 'failed');
 });
 
 test('fails when the signed closure omits the unique backup verification report', async (t) => {

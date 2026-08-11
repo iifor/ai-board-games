@@ -16,6 +16,9 @@ const testFiles = [
   'restoreDrillSecurity.test.ts',
   'prepareSignoff.test.ts',
   'releaseReadiness.test.ts',
+  'cutoverAuthorization.test.ts',
+  'cutoverCli.test.ts',
+  'cutoverEvidence.test.ts',
   'validationCanonicalization.test.ts',
 ].map((file) => path.join(__dirname, file));
 

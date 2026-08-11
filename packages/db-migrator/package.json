@@ -14,7 +14,8 @@
     "prepare-signoff": "tsx src/cli.ts prepare-signoff",
     "validate": "tsx src/cli.ts validate",
     "rehearse": "tsx src/cli.ts rehearse",
-    "release-readiness": "tsx src/cli.ts release-readiness"
+    "release-readiness": "tsx src/cli.ts release-readiness",
+    "cutover": "tsx src/cli.ts cutover"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",

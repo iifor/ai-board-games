@@ -9,6 +9,7 @@ interface ApplicationSmokeOptions {
   targetUrl: string;
   targetSchema: string;
   outputDirectory: string;
+  productionCutover?: boolean;
 }
 
 interface AdapterCheck {
@@ -76,6 +77,7 @@ async function invokeAdapter(adapterPath: string, options: ApplicationSmokeOptio
       runId: options.runId,
       targetUrl: options.targetUrl,
       targetSchema: options.targetSchema,
+      ...(options.productionCutover ? { purpose: 'production-cutover' } : {}),
     }));
   });
 }

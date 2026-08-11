@@ -136,9 +136,13 @@ export async function captureStableFileContent(
   rootRealPath: string,
   archiveName: string,
   code: string,
+  maxBytes?: number,
 ): Promise<StableFileContent> {
   try {
     const expected = await inspectFileMetadata(candidate, rootRealPath, archiveName, code);
+    if (maxBytes !== undefined && expected.sizeBytes > maxBytes) {
+      throw codedError(code, `File exceeds the allowed size: ${candidate}`);
+    }
     let handle: FileHandle | undefined;
     let bytes: Buffer;
     try {
