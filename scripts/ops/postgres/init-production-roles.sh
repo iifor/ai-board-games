@@ -16,9 +16,11 @@ require_non_empty_secret "$migrator_password_file"
 
 # Init scripts run only for a newly initialized PGDATA. The SQL remains
 # repeatable so a deliberate manual rerun does not create duplicate roles.
+POSTGRES_APP_ROLE_PASSWORD="$(cat "$app_password_file")" \
+POSTGRES_MIGRATOR_ROLE_PASSWORD="$(cat "$migrator_password_file")" \
 psql --set=ON_ERROR_STOP=1 --username "${POSTGRES_USER:?POSTGRES_USER is required}" --dbname "${POSTGRES_DB:?POSTGRES_DB is required}" <<SQL
-\\set app_password \`cat "$app_password_file"\`
-\\set migrator_password \`cat "$migrator_password_file"\`
+\\getenv app_password POSTGRES_APP_ROLE_PASSWORD
+\\getenv migrator_password POSTGRES_MIGRATOR_ROLE_PASSWORD
 
 DO \$\$
 BEGIN
@@ -35,15 +37,12 @@ ALTER ROLE consensus_app LOGIN PASSWORD :'app_password' NOSUPERUSER NOCREATEDB N
 ALTER ROLE consensus_migrator LOGIN PASSWORD :'migrator_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
 
 REVOKE ALL ON DATABASE consensus FROM PUBLIC;
-GRANT CONNECT ON DATABASE consensus TO consensus_app, consensus_migrator;
-CREATE SCHEMA IF NOT EXISTS consensus AUTHORIZATION consensus_migrator;
-REVOKE ALL ON SCHEMA public FROM PUBLIC;
-GRANT USAGE ON SCHEMA consensus TO consensus_app;
-GRANT ALL ON SCHEMA consensus TO consensus_migrator;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA consensus TO consensus_app;
-GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA consensus TO consensus_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE consensus_migrator IN SCHEMA consensus GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO consensus_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE consensus_migrator IN SCHEMA consensus GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO consensus_app;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT CONNECT, CREATE ON DATABASE consensus TO consensus_migrator;
+GRANT CONNECT ON DATABASE consensus TO consensus_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE consensus_migrator GRANT USAGE ON SCHEMAS TO consensus_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE consensus_migrator GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO consensus_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE consensus_migrator GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO consensus_app;
 SQL
 
 # Local bootstrap uses the Unix socket. All TCP clients are explicitly either

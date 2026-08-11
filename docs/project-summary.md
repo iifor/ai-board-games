@@ -2,7 +2,7 @@
 
 ## 当前生产运行真相
 
-生产唯一业务数据库是 PostgreSQL 16。服务端只通过异步 `DbExecutor` 访问业务数据，`createApp()` 在监听端口前完成版本化 migration 和幂等 seed；migration、seed 或数据库健康检查失败时不会返回健康状态。生产 Compose 不创建数据库服务，也不挂载旧业务数据库 volume，只保留资源目录和头像挂载。
+生产唯一业务数据库是 PostgreSQL 16。服务端只通过异步 `DbExecutor` 访问业务数据，`createApp()` 在监听端口前校验版本化 migration 并执行幂等 seed；migration、seed 或数据库健康检查失败时不会返回健康状态。生产 Compose 创建私有 PostgreSQL 服务并使用独立持久化 volume；旧 SQLite 业务数据库不进入 Compose 或 runtime 镜像。
 
 一次性旧数据导入由隔离的 `packages/db-migrator` 执行：它只读源 SQLite，将允许迁移的配置、管理员、玩家、历史、回放和长期记忆导入全新 PostgreSQL 目标；服务端运行镜像不包含该工具。生产准备、两次演练、签核与回滚分别见 `docs/runbooks/postgresql-production-readiness.md` 和 `docs/runbooks/postgresql-rollback.md`。
 Windows 上的 backup 二次校验与隔离 restore drill 也由 db-migrator 正式命令通过 Node 稳定句柄执行，避免 PowerShell 在 296+ 字符资源路径上失效；这些离线能力不改变生产数据库或服务端镜像边界。
@@ -160,7 +160,7 @@ flowchart TD
 - 数据库模型密钥：`DATABASE_MODEL_API_KEY`
 - PostgreSQL：`DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_SSL`、`DATABASE_CA_PATH`、`DATABASE_POOL_MAX`、`DATABASE_CONNECTION_TIMEOUT_MS`、`DATABASE_STATEMENT_TIMEOUT_MS`。生产启用证书校验并使用最小权限应用角色；连接池总预算需按应用实例数核算。
 - 生产认证：`JWT_SECRET`（至少 32 字符）、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（至少 12 字符）。生产环境缺失或强度不足时服务拒绝启动。账号仅在管理员表为空时创建一次，首次登录必须改密；已有账号不会被环境变量覆盖。
-- Docker Compose：生产 `.env` 固定 `COMPOSE_PROJECT_NAME=consensus`，便于稳定识别资源 volume；PostgreSQL 由独立基础设施提供。
+- Docker Compose：生产 `.env` 固定 `COMPOSE_PROJECT_NAME=consensus`，便于稳定识别资源和 PostgreSQL volume；数据库只在 Compose 私网暴露，app 在 PostgreSQL 的 TLS 应用角色健康查询通过后启动。
 
 构建产物：
 
@@ -174,6 +174,8 @@ flowchart TD
 
 `.github/workflows/deploy-master.yml` 监听 `master` 分支 push，也支持手动触发。流程先在 GitHub runner 中使用 Node.js 20 与 pnpm 9.15.4 安装锁定依赖，依次执行类型检查、完整构建、单元测试、工作流测试、迁移测试和最终 runtime 镜像构建；全部通过后才通过 SSH 登录腾讯云 CVM，在服务器项目目录执行：
 
+以下常规部署命令只适用于 PostgreSQL schema 已由受控 migrator 初始化、且本次候选不包含尚未执行的 DDL migration。首次部署或含新 DDL 的版本必须先按 `docs/postgresql-deployment.md` 执行 migrator 生命周期，不能让最小权限 app 代替迁移角色建 schema。
+
 ```bash
 git fetch origin master
 git reset --hard origin/master
@@ -181,7 +183,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-腾讯云 CVM 需要提前安装 Docker，并安装 `docker compose` 插件或旧版 `docker-compose` 命令；需要提前 clone 本仓库，并在项目目录放置生产 `.env`。应用通过 `DATABASE_URL` 连接独立 PostgreSQL 16；`consensus-resources` 保存上传图片和生成语音，头像继续使用 `./avatars` bind mount。部署脚本不会把 GitHub Secrets 写入仓库。
+腾讯云 CVM 需要提前安装 Docker，并安装 `docker compose` 插件或旧版 `docker-compose` 命令；需要提前 clone 本仓库，并在项目目录放置生产 `.env`。app 与 opt-in migrator 从 Compose secret 文件在各自子进程内构造固定角色的 `DATABASE_URL`；宿主环境不提供完整 URL。`consensus-postgres-data` 保存 PostgreSQL 数据，`consensus-resources` 保存上传图片和生成语音，头像继续使用 `./avatars` bind mount。部署脚本不会把 GitHub Secrets 写入仓库。
 
 公网 HTTPS 由腾讯云负载均衡终止，负载均衡通过 HTTP/WebSocket 回源 CVM 的 Nginx 80 端口。CVM 安全组必须只允许负载均衡访问 80 端口；应用和 Nginx 不直接暴露公网 TLS。部署完成后先确认 `docker compose ps` 中 `app` 为 healthy，再通过生产域名请求 `/api/toc/health`。
 

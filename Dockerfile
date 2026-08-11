@@ -59,6 +59,7 @@ COPY packages/server/package.json  packages/server/package.json
 # Copy server source (runs from TS via dev-runtime.cjs)
 COPY packages/server ./packages/server
 COPY packages/shared ./packages/shared
+COPY scripts/ops/postgres/start-production-app.cjs ./scripts/ops/postgres/start-production-app.cjs
 
 # Production deps only. Installing after source copy also guarantees that
 # workspace links point at the final package directories.
@@ -77,7 +78,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3001/api/toc/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Start server
-CMD ["node", "--preserve-symlinks", "--preserve-symlinks-main", "packages/server/dev-runtime.cjs"]
+CMD ["node", "scripts/ops/postgres/start-production-app.cjs"]
 
 # --- Stage 3: Offline migration operations ---
 FROM node:20-slim AS ops
@@ -86,5 +87,7 @@ WORKDIR /app
 
 COPY --from=builder /opt/db-migrator ./packages/db-migrator
 COPY --from=builder /app/packages/server/dist ./packages/server/dist
+COPY scripts/ops/postgres/run-production-migrator.cjs ./scripts/ops/postgres/run-production-migrator.cjs
 
-CMD ["node", "packages/db-migrator/dist/cli.js"]
+ENTRYPOINT ["node", "scripts/ops/postgres/run-production-migrator.cjs"]
+CMD []

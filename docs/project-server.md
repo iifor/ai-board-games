@@ -4,7 +4,7 @@
 
 生产唯一业务数据库是 PostgreSQL 16。服务端使用 `pg` 连接池和异步 `DbExecutor`（`queryOne`、`queryMany`、`execute`、`withTransaction`、`healthCheck`、`close`）；`initializeDb()` 在应用注册路由和监听端口前执行带 advisory lock、版本号和校验和的 migration，再执行幂等 seed。`/api/toc/health` 会发起真实 PostgreSQL 查询，连接不可用时返回 HTTP 503。
 
-服务启动执行 migration，失败时不监听端口；成功后才允许注册业务流量。
+服务启动校验 migration，失败时不监听端口；成功后才允许注册业务流量。生产 Compose 的应用角色不持有 DDL：首次建库及后续含 DDL 的版本必须先通过 opt-in `migrator` 运维容器以迁移角色完成，随后 app 启动时只做已应用 migration 的校验/no-op 和 seed。
 
 数据库配置为 `DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_SSL`、`DATABASE_CA_PATH`、`DATABASE_POOL_MAX`、`DATABASE_CONNECTION_TIMEOUT_MS`、`DATABASE_STATEMENT_TIMEOUT_MS`。启用 TLS 时连接池固定 `rejectUnauthorized: true`，可从 CA 文件加载信任链；pool、连接超时和 statement timeout 都必须为正整数。`better-sqlite3` 仅存在于独立的 `packages/db-migrator` 一次性旧数据导入工具，不进入服务端生产依赖或镜像。
 
@@ -297,7 +297,7 @@ pnpm run check:server
 
 - 最终 runtime 镜像包含 TypeScript 运行器及 `packages/shared/dist`，CI 必须构建最终镜像而不是只构建 builder stage。
 - `consensus-resources` volume 挂载到 `/app/packages/server/resources`，保存上传图片和生成语音。
-- PostgreSQL 16 独立部署；生产 Compose 不创建数据库服务，也不挂载业务数据库 volume。
+- PostgreSQL 16 由生产 Compose 以私有服务运行，使用 `consensus-postgres-data` 持久化且不发布宿主端口。服务证书/私钥由宿主只读注入，私钥由 root 入口复制到 container-only tmpfs 后降权为 PostgreSQL 用户可读的 `0600` 文件。
 - 收到 `SIGTERM` 或 `SIGINT` 后依次关闭 WebSocket、OpenTelemetry、数据库和 HTTP server；10 秒内无法关闭或清理失败时以非零状态退出。
 
 腾讯云入口：
@@ -424,7 +424,7 @@ curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/health"
 
 ## Production Compose database role boundary (2026-08-11)
 
-The runtime Compose application uses a host-injected `POSTGRES_APP_DATABASE_URL` for the `consensus_app` role and waits for the private PostgreSQL service to become healthy. It always uses `verify-full`, the mounted CA path, schema `consensus`, pool maximum `10`, connection timeout `5000`, and statement timeout `30000`. Offline database migration is isolated in the Compose `migrator` service with profile `ops` and a distinct host-injected `POSTGRES_MIGRATOR_DATABASE_URL` for `consensus_migrator`; the normal runtime image does not include `packages/db-migrator` or `better-sqlite3`, which belongs only to the 一次性 SQLite migration package.
+The runtime Compose application receives only the app password secret and a CA-only mount. Its wrapper constructs the fixed `consensus_app@postgres:5432/consensus` URL only in the server child environment; the password and URL are never command arguments or logs. PostgreSQL health executes TLS `verify-full` plus `SELECT 1` as `consensus_app`, so socket/bootstrap readiness cannot unblock the app. Offline operations use the `ops` profile and a real Docker entrypoint that reads only the migrator password secret, constructs the fixed `consensus_migrator` URL only in the CLI child environment, and preserves CLI arguments/exit status. Ordinary Compose configuration and startup do not require an operations URL or enable the migrator service. The normal runtime image does not include `packages/db-migrator` or its 一次性迁移 dependency `better-sqlite3`.
 
 ## Player Model Fallback
 
