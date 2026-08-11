@@ -9,6 +9,7 @@ interface ApplicationSmokeOwnership {
   playerIds: number[];
   players: SmokePlayer[];
   skinId: string | null;
+  skinIdsBeforeCreate: string[] | null;
   skinName: string;
 }
 
@@ -23,8 +24,20 @@ function createApplicationSmokeOwnership(runId: string): ApplicationSmokeOwnersh
     playerIds,
     players: playerIds.map((id, index) => ({ id, nickname: `${marker}-player-${index + 1}` })),
     skinId: null,
+    skinIdsBeforeCreate: null,
     skinName: `Application Smoke ${runId}`.slice(0, 180),
   };
+}
+
+async function capturePreexistingSmokeSkinIds(
+  database: DbExecutor,
+  ownership: ApplicationSmokeOwnership,
+): Promise<void> {
+  const rows = await database.queryMany<{ id: string }>(
+    'SELECT id FROM skins WHERE name = $1 ORDER BY id',
+    [ownership.skinName],
+  );
+  ownership.skinIdsBeforeCreate = rows.map((row) => row.id);
 }
 
 async function createRunOwnedSmokePlayers(
@@ -73,12 +86,38 @@ async function cleanupRunOwnedSmokeRows(
     await transaction.execute(`DELETE FROM players
       WHERE id = ANY($1::bigint[]) AND provider = $2 AND personality = $2`,
     [ownership.playerIds, ownership.marker]);
-    if (ownership.skinId) {
-      await transaction.execute('DELETE FROM skins WHERE id = $1', [ownership.skinId]);
+    if (ownership.skinIdsBeforeCreate) {
+      const before = new Set(ownership.skinIdsBeforeCreate);
+      const current = await transaction.queryMany<{ id: string }>(
+        'SELECT id FROM skins WHERE name = $1 ORDER BY id',
+        [ownership.skinName],
+      );
+      const createdIds = current.map((row) => row.id).filter((id) => !before.has(id));
+      if (ownership.skinId && before.has(ownership.skinId)) {
+        throw new Error('Application smoke skin ownership collision');
+      }
+      if (ownership.skinId && createdIds.includes(ownership.skinId)) {
+        await transaction.execute('DELETE FROM skins WHERE id = $1 AND name = $2', [
+          ownership.skinId, ownership.skinName,
+        ]);
+      } else if (!ownership.skinId && createdIds.length === 1) {
+        await transaction.execute('DELETE FROM skins WHERE id = $1 AND name = $2', [
+          createdIds[0], ownership.skinName,
+        ]);
+      } else if (createdIds.length !== 0) {
+        throw new Error('Application smoke skin ownership is ambiguous');
+      }
     }
-    await transaction.execute('DELETE FROM skins WHERE name = $1', [ownership.skinName]);
     await transaction.execute('DELETE FROM admin_users WHERE username = $1', [adminUsername]);
   });
+
+  const remainingSkinRows = ownership.skinIdsBeforeCreate
+    ? await database.queryMany<{ id: string }>(
+      'SELECT id FROM skins WHERE name = $1 ORDER BY id', [ownership.skinName],
+    )
+    : [];
+  const preexistingSkinIds = new Set(ownership.skinIdsBeforeCreate || []);
+  const remainingOwnedSkins = remainingSkinRows.filter((row) => !preexistingSkinIds.has(row.id)).length;
 
   const remaining = await database.queryOne<{ count: number }>(`
     SELECT
@@ -88,11 +127,17 @@ async function cleanupRunOwnedSmokeRows(
       + (SELECT COUNT(*) FROM games WHERE id = $2)
       + (SELECT COUNT(*) FROM matches WHERE id = $2)
       + (SELECT COUNT(*) FROM game_traces WHERE id = ANY($4::text[]))
-      + (SELECT COUNT(*) FROM admin_users WHERE username = $3)
-      + (SELECT COUNT(*) FROM skins WHERE id = $5 OR name = $6) AS count
-  `, [ownership.playerIds, ownership.gameId, adminUsername, traceIds, ownership.skinId, ownership.skinName]);
-  if (Number(remaining?.count || 0) !== 0) throw new Error('Application smoke fixture cleanup incomplete');
+      + (SELECT COUNT(*) FROM admin_users WHERE username = $3) AS count
+  `, [ownership.playerIds, ownership.gameId, adminUsername, traceIds]);
+  if (Number(remaining?.count || 0) + remainingOwnedSkins !== 0) {
+    throw new Error('Application smoke fixture cleanup incomplete');
+  }
 }
 
-export { cleanupRunOwnedSmokeRows, createApplicationSmokeOwnership, createRunOwnedSmokePlayers };
+export {
+  capturePreexistingSmokeSkinIds,
+  cleanupRunOwnedSmokeRows,
+  createApplicationSmokeOwnership,
+  createRunOwnedSmokePlayers,
+};
 export type { ApplicationSmokeOwnership, SmokePlayer };

@@ -8,6 +8,7 @@ import {
   runPersistedUndercover,
 } from './applicationSmokeFixtures';
 import {
+  capturePreexistingSmokeSkinIds,
   cleanupRunOwnedSmokeRows,
   createApplicationSmokeOwnership,
   createRunOwnedSmokePlayers,
@@ -17,6 +18,7 @@ import {
   loginAndChangeInitialPassword,
   requestJson,
   requireStatus,
+  type SkinCrudHooks,
   verifyConfigurationRoutesAndSkinCrud,
 } from './applicationSmokeHttp';
 import { startApplicationSmokeRuntime } from './applicationSmokeLifecycle';
@@ -57,8 +59,8 @@ function passed(checks: ApplicationSmokeCheck[], id: string, message: string): v
   checks.push({ id, status: 'passed', message });
 }
 
-interface ApplicationSmokeScenarioDependencies {
-  afterSkinCreate?(): void | Promise<void>;
+interface ApplicationSmokeScenarioDependencies extends SkinCrudHooks {
+  cleanupOwnedRows?: typeof cleanupRunOwnedSmokeRows;
 }
 
 async function runApplicationSmokeScenario(
@@ -81,9 +83,8 @@ async function runApplicationSmokeScenario(
     token = await loginAndChangeInitialPassword(runtime.baseUrl, runtime.adminUsername, runtime.adminPassword);
     passed(checks, 'auth.initial-password-change', 'Initial administrator login and forced password change passed');
 
-    await verifyConfigurationRoutesAndSkinCrud(
-      runtime.baseUrl, token, ownership, dependencies.afterSkinCreate,
-    );
+    await capturePreexistingSmokeSkinIds(runtime.database, ownership);
+    await verifyConfigurationRoutesAndSkinCrud(runtime.baseUrl, token, ownership, dependencies);
     passed(checks, 'config.read-and-crud', 'Configuration reads and skin CRUD passed through Express routes');
 
     await createRunOwnedSmokePlayers(runtime.database, ownership);
@@ -149,7 +150,9 @@ async function runApplicationSmokeScenario(
     errors.push({ code: 'APPLICATION_SMOKE_FAILED', message: 'Application smoke scenario failed' });
   } finally {
     try {
-      await cleanupRunOwnedSmokeRows(runtime.database, ownership, runtime.adminUsername);
+      await (dependencies.cleanupOwnedRows || cleanupRunOwnedSmokeRows)(
+        runtime.database, ownership, runtime.adminUsername,
+      );
       passed(checks, 'teardown.synthetic-fixtures-removed', 'Every run-owned synthetic row was removed');
     } catch {
       errors.push({ code: 'APPLICATION_SMOKE_FIXTURE_CLEANUP_FAILED', message: 'Application smoke fixture cleanup failed' });

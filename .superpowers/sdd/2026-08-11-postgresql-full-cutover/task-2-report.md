@@ -146,3 +146,28 @@ The production smoke purpose is not exposed as a separate public CLI. Target rep
 ### Scope and self-review
 
 Round 2 changes are limited to four db-migrator cutover files, three server smoke files, three focused test files, and this report. Every changed backend file is below 250 lines; `orchestrator.ts` is 197 lines and the largest changed server smoke file is 170 lines. No canonical SQL, public API, shared type, Compose/entrypoint, Task 3 runbook, live SQLite, production service, nginx, real approval, or Task 11 artifact changed. Formal validation contains no SQLite path open, borrowed ownership is explicit, completion remains absent after every source/session/receipt closure failure, and final release readiness remains exactly 16 gates.
+
+## Fix Round 3 (2026-08-12)
+
+### Verified finding and fix
+
+The Round 2 smoke cleanup deleted the returned skin ID and then unconditionally deleted every skin with the run-owned name. A disposable real-PostgreSQL fixture proved that a pre-existing skin with the exact same name but a different ID was removed after an injected post-POST failure. Cleanup now captures the complete same-name ID set immediately before the create request. It deletes only a returned ID that is absent from that protected set and still has the exact run-owned name. If the POST succeeded but the response ID was never received, cleanup accepts only one unique set difference; zero means nothing remains, while multiple differences fail closed without deleting ambiguous rows. No name-only delete remains.
+
+The scenario exposes bounded internal failure seams immediately after the POST response arrives, after its ID is recorded, after PUT succeeds, and around the real cleanup operation. They are not public CLI or API behavior. Tests use them only to interrupt the real HTTP/database path and still execute the production cleanup implementation.
+
+### RED to GREEN evidence
+
+- Same-name post-POST RED: focused real PostgreSQL was 3/4; the byte snapshot lost only the protected same-name skin. After ID-set ownership, the focused run was 4/4.
+- Expanded matrix RED: 3/6 passed; PUT-after-success and cleanup-failure injections were not yet observed, while the compiled success case still used the stale adapter. The no-ID-window regression separately produced 3/7 passed before its hook existed.
+- Expanded matrix GREEN after rebuilding the compiled server adapter: 7/7 passed. It covers compiled success, a later observability failure, failure after POST ID receipt, failure before POST ID receipt, failure after PUT, and a cleanup error reported after the real cleanup completed. Every applicable case preserves a pre-existing same-name skin, a pre-existing differently named skin, two players, and their memory byte-for-byte; every synthetic row count is zero.
+
+### Fresh verification and scope
+
+- Complete PostgreSQL suite: 130 top-level subtests / 137 tests; 137 passed, 0 failed, 0 skipped. The embedded compiled PostgreSQL 16/TLS execute passed in 53.8 seconds; the suite completed in 95.1 seconds.
+- Complete migration suite: 130/130 passed, 0 failed, 0 skipped.
+- Complete unit suite: 358 top-level subtests / 365 tests; 365 passed, 0 failed, 0 skipped.
+- Complete workflow suite: 127/127 passed, 0 failed, 0 skipped.
+- Workspace type check: all 5 checked packages passed.
+- Workspace production build passed; the existing unrelated admin chunk-size warning remains non-failing.
+
+Round 3 changes only the three server smoke ownership/HTTP/scenario modules, their real PostgreSQL application-smoke test, and this report. It adds no canonical SQL, public API, shared type, schema, Compose/entrypoint, release gate, Task 3 artifact, or production credential. All changed backend files remain below 250 lines.

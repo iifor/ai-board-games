@@ -7,6 +7,12 @@ interface SmokeHttpResponse {
   body: Record<string, unknown>;
 }
 
+interface SkinCrudHooks {
+  afterSkinCreate?(): void | Promise<void>;
+  afterSkinResponse?(): void | Promise<void>;
+  afterSkinUpdate?(): void | Promise<void>;
+}
+
 function md5(value: string): string {
   return crypto.createHash('md5').update(value).digest('hex');
 }
@@ -88,7 +94,7 @@ async function verifyConfigurationRoutesAndSkinCrud(
   baseUrl: string,
   token: string,
   ownership: ApplicationSmokeOwnership,
-  afterSkinCreate?: () => void | Promise<void>,
+  hooks: SkinCrudHooks = {},
 ): Promise<void> {
   for (const route of [
     '/api/admin/skins',
@@ -109,14 +115,16 @@ async function verifyConfigurationRoutesAndSkinCrud(
     enabled: true,
   };
   const created = await requestJson(baseUrl, '/api/admin/skins', { method: 'POST', token, body: skin });
+  await hooks.afterSkinResponse?.();
   requireStatus(created, 201, 'Skin create');
   const skinId = ((created.body.data as Record<string, unknown> | undefined)?.id);
   if (typeof skinId !== 'string' || !skinId) throw new Error('Skin create did not return an id');
   ownership.skinId = skinId;
-  await afterSkinCreate?.();
+  await hooks.afterSkinCreate?.();
   requireStatus(await requestJson(baseUrl, `/api/admin/skins/${encodeURIComponent(skinId)}`, {
     method: 'PUT', token, body: { ...skin, background: 'Application smoke updated background' },
   }), 200, 'Skin update');
+  await hooks.afterSkinUpdate?.();
   requireStatus(await requestJson(baseUrl, `/api/admin/skins/${encodeURIComponent(skinId)}`, {
     method: 'DELETE', token,
   }), 200, 'Skin delete');
@@ -128,4 +136,4 @@ export {
   requireStatus,
   verifyConfigurationRoutesAndSkinCrud,
 };
-export type { SmokeHttpResponse };
+export type { SkinCrudHooks, SmokeHttpResponse };
