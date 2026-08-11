@@ -26,8 +26,12 @@ const child = spawn(
 
 const forwardedSignals = ['SIGINT', 'SIGTERM'];
 const forwarders = new Map();
+let receivedSignal = null;
 for (const signal of forwardedSignals) {
-  const forward = () => child.kill(signal);
+  const forward = () => {
+    receivedSignal ??= signal;
+    child.kill(signal);
+  };
   forwarders.set(signal, forward);
   process.once(signal, forward);
 }
@@ -41,8 +45,9 @@ child.once('error', (error) => {
 });
 child.once('exit', (code, signal) => {
   removeSignalForwarders();
-  if (signal) {
-    process.exitCode = 128 + (constants.signals[signal] ?? 0);
+  const interruptionSignal = receivedSignal || signal;
+  if (interruptionSignal) {
+    process.exitCode = 128 + (constants.signals[interruptionSignal] ?? 0);
     return;
   }
   process.exitCode = code ?? 1;

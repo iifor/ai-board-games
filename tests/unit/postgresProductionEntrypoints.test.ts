@@ -37,6 +37,12 @@ function assertDockerSuccess(result: ReturnType<typeof docker>, operation: strin
   assert.equal(result.status, 0, `${operation} failed:\n${result.stdout}\n${result.stderr}`);
 }
 
+function assertContainerStopped(container: string, operation: string): void {
+  const inspected = docker(['inspect', '--format', '{{.State.Running}}', container]);
+  assertDockerSuccess(inspected, `${operation} container inspect`);
+  assert.equal(inspected.stdout.trim(), 'false', `${operation} left the container running`);
+}
+
 async function waitForFile(target: string): Promise<void> {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
@@ -83,7 +89,7 @@ console.log(JSON.stringify({
   });
 
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-    test(`${wrapper.name} wrapper returns the standard interruption exit code for child ${signal}`, async (t) => {
+    test(`${wrapper.name} wrapper returns the standard interruption exit code when its ${signal} child exits zero`, async (t) => {
       const temporary = await fs.mkdtemp(path.join(os.tmpdir(), `postgres-${wrapper.name}-${signal.toLowerCase()}-`));
       const container = `consensus-${wrapper.name}-${signal.toLowerCase()}-${randomBytes(5).toString('hex')}`;
       t.after(async () => {
@@ -94,9 +100,15 @@ console.log(JSON.stringify({
       const secretFile = path.join(temporary, 'password');
       const childFile = path.join(temporary, 'child.cjs');
       const readyFile = path.join(temporary, 'ready');
+      const childExitFile = path.join(temporary, 'child-exit');
       await fs.writeFile(secretFile, `${password}\n`);
       await fs.writeFile(childFile, `
-require('node:fs').writeFileSync('/output/ready', 'ready');
+const fs = require('node:fs');
+process.once('${signal}', () => {
+  fs.writeFileSync('/output/child-exit', '0');
+  process.exit(0);
+});
+fs.writeFileSync('/output/ready', 'ready');
 setInterval(() => {}, 1000);
 `);
       const created = docker([
@@ -114,8 +126,44 @@ setInterval(() => {}, 1000);
       const waited = docker(['wait', container]);
       assertDockerSuccess(waited, `${wrapper.name} ${signal} wait`);
       assert.equal(Number(waited.stdout.trim()), signal === 'SIGTERM' ? 143 : 130);
+      assert.equal(await fs.readFile(childExitFile, 'utf8'), '0');
+      assertContainerStopped(container, `${wrapper.name} ${signal}`);
       const logs = docker(['logs', container]);
       assertDockerSuccess(logs, `${wrapper.name} ${signal} logs`);
+      const output = `${logs.stdout}\n${logs.stderr}`;
+      assert.equal(output.includes(password), false);
+      assert.equal(output.includes('postgresql://'), false);
+    });
+
+    test(`${wrapper.name} wrapper returns the standard interruption exit code when only its child receives ${signal}`, async (t) => {
+      const temporary = await fs.mkdtemp(path.join(os.tmpdir(), `postgres-${wrapper.name}-child-${signal.toLowerCase()}-`));
+      const container = `consensus-${wrapper.name}-child-${signal.toLowerCase()}-${randomBytes(5).toString('hex')}`;
+      t.after(async () => {
+        docker(['rm', '-f', container]);
+        await fs.rm(temporary, { recursive: true, force: true });
+      });
+      const password = `  ${randomBytes(12).toString('base64url')}:p@ss/%?#  `;
+      const secretFile = path.join(temporary, 'password');
+      const childFile = path.join(temporary, 'child.cjs');
+      await fs.writeFile(secretFile, `${password}\n`);
+      await fs.writeFile(childFile, `
+process.kill(process.pid, '${signal}');
+`);
+      const created = docker([
+        'create', '--name', container, '--entrypoint', 'node',
+        '-v', `${path.join(scriptsRoot, wrapper.script)}:/wrapper.cjs:ro`,
+        '-v', `${secretFile}:${wrapper.secretTarget}:ro`,
+        '-v', `${childFile}:${wrapper.childTarget}:ro`,
+        'node:20-slim', '/wrapper.cjs', ...wrapper.childArgs,
+      ]);
+      assertDockerSuccess(created, `${wrapper.name} child ${signal} container create`);
+      assertDockerSuccess(docker(['start', container]), `${wrapper.name} child ${signal} container start`);
+      const waited = docker(['wait', container]);
+      assertDockerSuccess(waited, `${wrapper.name} child ${signal} wait`);
+      assert.equal(Number(waited.stdout.trim()), signal === 'SIGTERM' ? 143 : 130);
+      assertContainerStopped(container, `${wrapper.name} child ${signal}`);
+      const logs = docker(['logs', container]);
+      assertDockerSuccess(logs, `${wrapper.name} child ${signal} logs`);
       const output = `${logs.stdout}\n${logs.stderr}`;
       assert.equal(output.includes(password), false);
       assert.equal(output.includes('postgresql://'), false);
