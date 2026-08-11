@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { openCutoverTargetSession } from '../../packages/db-migrator/src/cutover/targetSession';
+import { productionDatabaseUrl } from './cutoverTestHelpers';
 
 interface QueryResult { rows: Array<Record<string, unknown>>; rowCount: number }
 
@@ -41,7 +42,7 @@ test('production target session uses explicit verified TLS, locks once, gates id
   };
   try {
     const session = await openCutoverTargetSession({
-      targetUrl: 'postgresql://consensus_migrator:secret@postgres:5432/consensus?sslmode=verify-full',
+      targetUrl: productionDatabaseUrl(),
       tlsMode: 'verify-full', caPath: files.caPath,
     }, { createClient: (options) => { clientOptions = options as Record<string, unknown>; return client; } });
     assert.deepEqual(clientOptions?.ssl, { ca: 'test-ca', rejectUnauthorized: true });
@@ -84,7 +85,7 @@ test('production target gate rejects every unsafe server state before returning 
         end: async () => undefined,
       };
       await assert.rejects(openCutoverTargetSession({
-        targetUrl: 'postgresql://consensus_migrator:secret@postgres:5432/consensus?sslmode=verify-full',
+        targetUrl: productionDatabaseUrl(),
         tlsMode: 'verify-full', caPath: files.caPath,
       }, { createClient: () => client }), (error: unknown) => {
         assert.equal((error as { code?: string }).code, 'CUTOVER_TARGET_UNSAFE', label);
@@ -102,10 +103,10 @@ test('production target session rejects wrong URL identity, TLS mode, or a held 
   const noCall = () => assert.fail('invalid local configuration must not create a client');
   try {
     for (const targetUrl of [
-      'postgresql://consensus_app:secret@postgres:5432/consensus?sslmode=verify-full',
-      'postgresql://consensus_migrator:secret@127.0.0.1:5432/consensus?sslmode=verify-full',
-      'postgresql://consensus_migrator:secret@postgres:6543/consensus?sslmode=verify-full',
-      'postgresql://consensus_migrator:secret@postgres:5432/other?sslmode=verify-full',
+      productionDatabaseUrl({ role: 'consensus_app' }),
+      productionDatabaseUrl({ host: '127.0.0.1' }),
+      productionDatabaseUrl({ port: 6543 }),
+      productionDatabaseUrl({ database: 'other' }),
     ]) {
       await assert.rejects(openCutoverTargetSession({
         targetUrl, tlsMode: 'verify-full', caPath: files.caPath,
@@ -114,7 +115,7 @@ test('production target session rejects wrong URL identity, TLS mode, or a held 
       ));
     }
     await assert.rejects(openCutoverTargetSession({
-      targetUrl: 'postgresql://consensus_migrator:secret@postgres:5432/consensus',
+      targetUrl: productionDatabaseUrl(),
       tlsMode: 'require', caPath: files.caPath,
     }, { createClient: noCall }), (error: unknown) => (
       (error as { code?: string }).code === 'CUTOVER_TARGET_UNSAFE'
@@ -127,7 +128,7 @@ test('production target session rejects wrong URL identity, TLS mode, or a held 
       end: async () => { ended = true; },
     };
     await assert.rejects(openCutoverTargetSession({
-      targetUrl: 'postgresql://consensus_migrator:secret@postgres:5432/consensus?sslmode=verify-full',
+      targetUrl: productionDatabaseUrl(),
       tlsMode: 'verify-full', caPath: files.caPath,
     }, { createClient: () => locked }), (error: unknown) => (
       (error as { code?: string }).code === 'CUTOVER_ALREADY_RUNNING'
@@ -159,7 +160,7 @@ test('one global advisory lock serializes cutovers regardless of run identifier 
     end: async () => undefined,
   });
   const options = {
-    targetUrl: 'postgresql://consensus_migrator:secret@postgres:5432/consensus?sslmode=verify-full',
+    targetUrl: productionDatabaseUrl(),
     tlsMode: 'verify-full', caPath: files.caPath,
   };
   try {

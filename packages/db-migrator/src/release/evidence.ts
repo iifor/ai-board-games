@@ -4,6 +4,10 @@ import { captureStableFile } from '../backup/fileSnapshot';
 import { isSafeRunId } from '../backup/publication';
 import type { ArtifactType, ReadinessReport } from '../reporting/reportTypes';
 import { assertMatchingBackupVerification } from './backupVerification';
+import {
+  assertCutoverEvidenceClosure,
+  type CapturedReleaseArtifact,
+} from './cutoverVerification';
 import { isInside, pathKey, readStableJson, type StableJson } from './stableJson';
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -12,8 +16,13 @@ const CHECK_STATUSES = ['passed', 'failed', 'skipped'];
 const ARTIFACT_TYPES: ArtifactType[] = [
   'backup', 'manifest', 'migration-report', 'validation-report', 'rehearsal-report', 'smoke-report',
   'cutover-report', 'authorization', 'owner-receipt', 'evidence',
+  'completion-receipt',
 ];
 const GIT_SHA = /^[a-f0-9]{40}$/;
+const CUTOVER_JSON_ARTIFACT_TYPES = new Set<ArtifactType>([
+  'authorization', 'manifest', 'owner-receipt', 'migration-report',
+  'validation-report', 'smoke-report', 'completion-receipt',
+]);
 
 function validGitSha(value: unknown): value is string {
   return typeof value === 'string' && GIT_SHA.test(value) && !/^0{40}$/.test(value);
@@ -116,6 +125,7 @@ export function assertRequiredArtifacts(report: ReadinessReport): void {
   if (report.stage === 'cutover') {
     for (const type of [
       'authorization', 'manifest', 'owner-receipt', 'migration-report', 'validation-report', 'smoke-report',
+      'completion-receipt',
     ] as const) {
       if (counts.get(type) !== 1) throw new Error('Cutover artifact evidence is incomplete');
     }
@@ -158,6 +168,7 @@ export async function loadReleaseEvidence(
   }
 
   const artifactClaims = new Set<string>();
+  const artifactCaptures = new Map<string, CapturedReleaseArtifact>();
   for (let index = 0; index < reports.length; index += 1) {
     const report = reports[index];
     assertRequiredArtifacts(report);
@@ -169,10 +180,20 @@ export async function loadReleaseEvidence(
       artifactClaims.add(key);
       const expected = manifest.get(key);
       if (!expected) throw new Error('Artifact is absent from the signed manifest');
-      const captured = await captureStableFile(candidate, rootRealPath, path.basename(candidate), 'RELEASE_EVIDENCE_CHANGED');
+      const captured = report.stage === 'cutover' && CUTOVER_JSON_ARTIFACT_TYPES.has(artifact.type)
+        ? await readStableJson<unknown>(candidate, rootPath, rootRealPath)
+        : await captureStableFile(candidate, rootRealPath, path.basename(candidate), 'RELEASE_EVIDENCE_CHANGED');
       if (captured.sizeBytes !== expected.sizeBytes || captured.sha256 !== expected.sha256
         || (artifact.sha256 !== undefined && artifact.sha256 !== captured.sha256)) {
         throw new Error('Artifact bytes do not match signed evidence');
+      }
+      if ('value' in captured) {
+        artifactCaptures.set(key, {
+          type: artifact.type,
+          resolvedPath: candidate,
+          sha256: captured.sha256,
+          value: captured.value,
+        });
       }
       claimed.add(key);
     }
@@ -180,6 +201,7 @@ export async function loadReleaseEvidence(
   if (claimed.size !== manifest.size || [...manifest.keys()].some((key) => !claimed.has(key))) {
     throw new Error('Signed manifest does not exactly cover reports and artifacts');
   }
+  assertCutoverEvidenceClosure(reports, reportCaptures, artifactCaptures);
   assertMatchingBackupVerification(reports);
   return { reports, signoff };
 }

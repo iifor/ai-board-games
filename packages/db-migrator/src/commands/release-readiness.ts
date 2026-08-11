@@ -4,6 +4,7 @@ import { writeReadinessReport } from '../reporting/reportWriter';
 import type { ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
 import { loadReleaseEvidence, type OperatorSignoff } from '../release/evidence';
 import { hasMatchingBackupVerification } from '../release/backupVerification';
+import { SKIPPED_TABLES } from '../constants';
 
 export const REQUIRED_RELEASE_CHECKS = [
   'ci.release-gates',
@@ -29,6 +30,7 @@ const SIGNED_CHECKS = REQUIRED_RELEASE_CHECKS.filter((id) => ![
   'smoke.health', 'smoke.auth-and-config', 'smoke.game-replay-memory-delete',
 ].includes(id));
 const OPTIONAL_SKIPPED_CHECKS = new Set(['source.raw-wal', 'source.raw-shm']);
+const INTENTIONAL_VALIDATION_SKIPS = new Set(SKIPPED_TABLES.map((table) => `skipped.${table}`));
 const SHA256 = /^[a-f0-9]{64}$/;
 const GIT_SHA = /^[a-f0-9]{40}$/;
 
@@ -75,6 +77,13 @@ function gate(id: typeof REQUIRED_RELEASE_CHECKS[number], passed: boolean, messa
   return { id, status: passed ? 'passed' : 'failed', message: passed ? message : `Required evidence failed: ${id}` };
 }
 
+function isAllowedSkip(report: ReadinessReport, check: ReadinessCheck): boolean {
+  return (report.stage === 'backup' && OPTIONAL_SKIPPED_CHECKS.has(check.id))
+    || (report.stage === 'validation'
+      && INTENTIONAL_VALIDATION_SKIPS.has(check.id)
+      && check.message === 'intentionally not migrated');
+}
+
 function evaluate(
   reports: ReadinessReport[],
   signoff: OperatorSignoff,
@@ -95,7 +104,7 @@ function evaluate(
     report.status === 'passed' && report.errors.length === 0
     && report.checks.length > 0 && report.checks.every((check) => (
       check.status !== 'failed'
-      && (check.status !== 'skipped' || (report.stage === 'backup' && OPTIONAL_SKIPPED_CHECKS.has(check.id)))
+      && (check.status !== 'skipped' || isAllowedSkip(report, check))
     ))
   )) && signoff.approved && signoff.checks.length > 0
     && signoff.checks.every((check) => check.status === 'passed');
@@ -132,7 +141,8 @@ function evaluate(
   result.set('smoke.auth-and-config', bothSmoke(['auth.initial-password-change', 'config.read-and-crud']));
   result.set('smoke.game-replay-memory-delete', bothSmoke([
     'undercover.persisted-without-external-calls', 'history.detail-and-replay-order',
-    'memory.created-and-updated', 'workflow.observability-delete', 'teardown.observability-drained',
+    'memory.created-and-updated', 'workflow.observability-delete',
+    'teardown.synthetic-fixtures-removed', 'teardown.observability-drained',
   ]));
   const cutovers = reports.filter((report) => report.stage === 'cutover');
   const cutover = cutovers[0];
@@ -160,7 +170,8 @@ function evaluate(
     && cutoverSmoke?.length === 1 && smokePassed(cutoverSmoke[0], [
       'health.connected', 'health.disconnected', 'auth.initial-password-change', 'config.read-and-crud',
       'undercover.persisted-without-external-calls', 'history.detail-and-replay-order',
-      'memory.created-and-updated', 'workflow.observability-delete', 'teardown.observability-drained',
+      'memory.created-and-updated', 'workflow.observability-delete',
+      'teardown.synthetic-fixtures-removed', 'teardown.observability-drained',
     ]);
   result.set('production.cutover', signed('production.cutover') && productionCutover);
   const checks = REQUIRED_RELEASE_CHECKS.map((id) => gate(

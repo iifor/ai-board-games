@@ -78,12 +78,29 @@ export async function migrateSqliteToPostgres(
   options: MigrationOptions,
   dependencies: Partial<MigrationDependencies> = {},
 ): Promise<MigrationReport> {
+  if (!fs.existsSync(options.sourcePath)) throw new Error(`SQLite source does not exist: ${options.sourcePath}`);
+  const sqlite = new Database(options.sourcePath, { readonly: true, fileMustExist: true });
+  return migrateOpenSqliteToPostgres(options, sqlite, dependencies, true);
+}
+
+export async function migrateVerifiedSqliteToPostgres(
+  options: MigrationOptions,
+  sqlite: Database.Database,
+  dependencies: Partial<MigrationDependencies> = {},
+): Promise<MigrationReport> {
+  return migrateOpenSqliteToPostgres(options, sqlite, dependencies, false);
+}
+
+async function migrateOpenSqliteToPostgres(
+  options: MigrationOptions,
+  sqlite: Database.Database,
+  dependencies: Partial<MigrationDependencies>,
+  closeSource: boolean,
+): Promise<MigrationReport> {
   const started = Date.now();
   const startedAt = new Date(started).toISOString();
   const schema = options.targetSchema || 'consensus';
-  if (!fs.existsSync(options.sourcePath)) throw new Error(`SQLite source does not exist: ${options.sourcePath}`);
   quoteIdentifier(schema);
-  const sqlite = new Database(options.sourcePath, { readonly: true, fileMustExist: true });
   const resolved = { ...defaultDependencies, ...dependencies };
   let client: MigrationClient | undefined;
   const tables: Record<string, TableReport> = {};
@@ -109,7 +126,7 @@ export async function migrateSqliteToPostgres(
       ...report(), status: 'failed', validation: 'failed', errors: [MIGRATION_FAILURE_REPORT_ERROR],
     } satisfies MigrationReport });
   } finally {
-    sqlite.close();
+    if (closeSource) sqlite.close();
     await client?.end().catch(() => undefined);
   }
 }

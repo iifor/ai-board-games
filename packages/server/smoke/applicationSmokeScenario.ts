@@ -4,11 +4,14 @@ import {
   createWorkflowAndObservabilityFixtures,
   ensureSmokeAdmin,
   listPlaybackSequences,
-  listSmokePlayers,
-  removeSmokeAdmin,
   replayStoredGame,
   runPersistedUndercover,
 } from './applicationSmokeFixtures';
+import {
+  cleanupRunOwnedSmokeRows,
+  createRunOwnedSmokePlayers,
+  type ApplicationSmokeOwnership,
+} from './applicationSmokeOwnership';
 import {
   loginAndChangeInitialPassword,
   requestJson,
@@ -60,6 +63,7 @@ async function runApplicationSmokeScenario(
   const checks: ApplicationSmokeCheck[] = [];
   const errors: ApplicationSmokeAdapterResponse['errors'] = [];
   const runtime = await startApplicationSmokeRuntime(request);
+  let ownership: ApplicationSmokeOwnership | undefined;
   let token = '';
   try {
     const health = await requestJson(runtime.baseUrl, '/api/toc/health');
@@ -74,8 +78,9 @@ async function runApplicationSmokeScenario(
     await verifyConfigurationRoutesAndSkinCrud(runtime.baseUrl, token, request.runId);
     passed(checks, 'config.read-and-crud', 'Configuration reads and skin CRUD passed through Express routes');
 
-    const players = await listSmokePlayers(runtime.database);
-    const persisted = await runPersistedUndercover(request.runId, players);
+    ownership = await createRunOwnedSmokePlayers(runtime.database, request.runId);
+    const players = ownership.players;
+    const persisted = await runPersistedUndercover(ownership.gameId, players);
     const gameId = persisted.gameId;
     if (persisted.runnerCalls !== 1 || persisted.modelFetchCalls !== 0) {
       throw new Error('Undercover fake dependency boundary was not respected');
@@ -135,8 +140,17 @@ async function runApplicationSmokeScenario(
   } catch {
     errors.push({ code: 'APPLICATION_SMOKE_FAILED', message: 'Application smoke scenario failed' });
   } finally {
-    try { await removeSmokeAdmin(runtime.database, runtime.adminUsername); }
-    catch { errors.push({ code: 'APPLICATION_SMOKE_ADMIN_CLEANUP_FAILED', message: 'Application smoke administrator cleanup failed' }); }
+    try {
+      if (ownership) {
+        await cleanupRunOwnedSmokeRows(runtime.database, ownership, runtime.adminUsername);
+      } else {
+        await runtime.database.execute('DELETE FROM admin_users WHERE username = $1', [runtime.adminUsername]);
+      }
+      passed(checks, 'teardown.synthetic-fixtures-removed', 'Every run-owned synthetic row was removed');
+    } catch {
+      errors.push({ code: 'APPLICATION_SMOKE_FIXTURE_CLEANUP_FAILED', message: 'Application smoke fixture cleanup failed' });
+      checks.push({ id: 'teardown.synthetic-fixtures-removed', status: 'failed', message: 'Run-owned synthetic row cleanup failed' });
+    }
     try { await runtime.close(); }
     catch { errors.push({ code: 'APPLICATION_SMOKE_TEARDOWN_FAILED', message: 'Application smoke teardown failed' }); }
   }

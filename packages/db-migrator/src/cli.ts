@@ -8,8 +8,8 @@ import { runReleaseReadiness } from './commands/release-readiness';
 import { runVerifyBackup } from './commands/verify-backup';
 import { runRestoreDrill } from './commands/restore-drill';
 import { runPrepareSignoff } from './commands/prepare-signoff';
-import { runCutover } from './commands/cutover';
 import { parseCommandLine, type ParsedCommand } from './cli/arguments';
+import { assertCutoverCliOptions, runCutoverCli } from './cli/cutoverDispatch';
 import { readinessReportExitCode, redactSecrets, sanitizeForOutput } from './reporting/reportWriter';
 import type { ReadinessReport } from './reporting/reportTypes';
 import type { MigrationReport } from './types';
@@ -169,33 +169,7 @@ async function runBuiltInReadinessCommand(
     });
   }
   if (command === 'cutover') {
-    const sourceSnapshotPath = parsed.values.get('source-snapshot') || '';
-    const sourceManifestPath = parsed.values.get('manifest') || '';
-    const authorizationPath = parsed.values.get('authorization');
-    const outputDirectory = parsed.values.get('output') || '';
-    const runId = parsed.values.get('run-id') || '';
-    const targetUrl = process.env.DATABASE_URL || '';
-    const releaseCandidate = process.env.RELEASE_CANDIDATE_SHA || '';
-    const tlsMode = process.env.DATABASE_SSL || '';
-    const caPath = process.env.DATABASE_CA_PATH || '';
-    if (!sourceSnapshotPath || !sourceManifestPath || !outputDirectory || !runId
-      || (parsed.execute && (!authorizationPath || !targetUrl || !releaseCandidate || !tlsMode || !caPath))) {
-      throw Object.assign(new Error(
-        'Usage: set DATABASE_URL, RELEASE_CANDIDATE_SHA, DATABASE_SSL, and DATABASE_CA_PATH, then run cutover --source-snapshot <sqlite> --manifest <json> --authorization <json> --output <dir> --run-id <id> --execute',
-      ), { code: 'CUTOVER_INVALID_PARAMETERS' as const });
-    }
-    return runCutover({
-      runId,
-      sourceSnapshotPath: path.resolve(sourceSnapshotPath),
-      sourceManifestPath: path.resolve(sourceManifestPath),
-      authorizationPath: authorizationPath ? path.resolve(authorizationPath) : undefined,
-      outputDirectory: path.resolve(outputDirectory),
-      execute: parsed.execute,
-      targetUrl,
-      releaseCandidate,
-      tlsMode,
-      caPath,
-    });
+    return runCutoverCli(parsed);
   }
   if (command !== 'preflight') throw commandNotImplemented(command);
   const sourcePath = parsed.values.get('source') || '';
@@ -230,23 +204,7 @@ function writeJson(stdout: (line: string) => void, payload: unknown): void {
 async function main(argv = process.argv.slice(2), overrides: Partial<CliDependencies> = {}): Promise<void> {
   const dependencies = { ...defaultDependencies, ...overrides };
   const parsed = parseCommandLine(argv);
-  if (parsed.command === 'cutover') {
-    if (parsed.values.has('target')) {
-      throw Object.assign(new Error('Cutover target is fixed and must not be provided in argv'), {
-        code: 'CUTOVER_TARGET_ARG_FORBIDDEN' as const,
-      });
-    }
-    if (['schema', 'database', 'role', 'host', 'port'].some((name) => parsed.values.has(name))) {
-      throw Object.assign(new Error('Production cutover identity is fixed and must not be provided in argv'), {
-        code: 'CUTOVER_FIXED_OPTION_FORBIDDEN' as const,
-      });
-    }
-    if (parsed.execute && !parsed.values.has('authorization')) {
-      throw Object.assign(new Error('Approved pre-cutover authorization is required for execute'), {
-        code: 'CUTOVER_AUTHORIZATION_REQUIRED' as const,
-      });
-    }
-  }
+  assertCutoverCliOptions(parsed);
   if ((parsed.command === 'preflight' || parsed.command === 'validate') && parsed.values.has('target')) {
     const code = parsed.command === 'preflight' ? 'PREFLIGHT_TARGET_ARG_FORBIDDEN' : 'VALIDATION_TARGET_ARG_FORBIDDEN';
     throw Object.assign(new Error(`${parsed.command} target must be provided through DATABASE_URL`), { code });

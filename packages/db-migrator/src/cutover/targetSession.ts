@@ -43,8 +43,7 @@ function assertFixedUrl(targetUrl: string, tlsMode: string): void {
       || port !== String(CUTOVER_TARGET.port)
       || database !== CUTOVER_TARGET.database
       || role !== CUTOVER_TARGET.role
-      || tlsMode !== CUTOVER_TARGET.tlsMode
-      || parsed.searchParams.get('sslmode') !== CUTOVER_TARGET.tlsMode) {
+      || tlsMode !== CUTOVER_TARGET.tlsMode) {
       throw new Error('unsafe');
     }
   } catch {

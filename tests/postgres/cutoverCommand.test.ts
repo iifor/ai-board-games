@@ -1,23 +1,35 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import Database from 'better-sqlite3';
 import { buildManifest, hashFile } from '../../packages/db-migrator/src/backup/manifest';
 import { runCutover } from '../../packages/db-migrator/src/commands/cutover';
 import { writeReadinessReport } from '../../packages/db-migrator/src/reporting/reportWriter';
 import type { ReadinessReport } from '../../packages/db-migrator/src/reporting/reportTypes';
 import type { MigrationReport } from '../../packages/db-migrator/src/types';
+import { productionDatabaseUrl } from './cutoverTestHelpers';
 
 const RELEASE = '0123456789abcdef0123456789abcdef01234567';
 const NOW = new Date('2026-08-11T03:30:00.000Z');
+
+function privateRuntimeUrl(): string {
+  const target = new URL('postgresql://private-endpoint/consensus');
+  target.username = `test_${randomBytes(8).toString('hex')}`;
+  target.password = randomBytes(16).toString('base64url');
+  return target.toString();
+}
 
 async function createFixture(runId = 'production-cutover') {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cutover-command-'));
   const backup = path.join(root, 'backup');
   await fs.mkdir(path.join(backup, 'sqlite-raw'), { recursive: true });
   const sourceSnapshotPath = path.join(backup, 'sqlite-consistent.sqlite');
-  await fs.writeFile(sourceSnapshotPath, 'consistent-snapshot');
+  const sqlite = new Database(sourceSnapshotPath);
+  sqlite.exec('CREATE TABLE source_identity (marker TEXT NOT NULL); INSERT INTO source_identity VALUES (\'verified\')');
+  sqlite.close();
   await fs.writeFile(path.join(backup, 'sqlite-raw', 'source.sqlite'), 'raw-snapshot');
   const sourceManifestPath = path.join(backup, 'manifest.json');
   const manifest = await buildManifest(backup, 'backup-run');
@@ -46,7 +58,7 @@ async function createFixture(runId = 'production-cutover') {
     options: {
       runId, sourceSnapshotPath, sourceManifestPath, authorizationPath,
       outputDirectory: path.join(root, 'evidence'), execute: true,
-      targetUrl: 'postgresql://consensus_migrator:secret@postgres:5432/consensus?sslmode=verify-full',
+      targetUrl: productionDatabaseUrl(),
       releaseCandidate: RELEASE, tlsMode: 'verify-full', caPath,
     },
   };
@@ -107,10 +119,17 @@ test('cutover keeps one session through all phases and publishes the complete su
         release: async () => {
           calls.push('release');
           await fs.access(path.join(fixture.options.outputDirectory, 'production-cutover-cutover.json'));
+          await assert.rejects(fs.access(path.join(
+            fixture.options.outputDirectory, 'production-cutover-completion-receipt.json',
+          )));
         },
       }),
       createSchema: async () => { calls.push('schema'); },
-      migrate: async (options) => { calls.push('import'); return migrationReport(options.sourcePath); },
+      migrate: async (options) => {
+        calls.push('import');
+        assert.equal(options.sourceDatabase.prepare('SELECT marker FROM source_identity').pluck().get(), 'verified');
+        return migrationReport(options.sourcePath);
+      },
       validate: async (options) => {
         calls.push(`validate:${options.runId}:${options.targetSchema}`);
         return phaseReport(options, 'validation', 'passed');
@@ -134,11 +153,120 @@ test('cutover keeps one session through all phases and publishes the complete su
     ]);
     assert.deepEqual(result.artifacts.map((artifact) => artifact.type), [
       'owner-receipt', 'authorization', 'manifest', 'migration-report', 'validation-report', 'smoke-report',
+      'completion-receipt',
     ]);
     for (const artifact of result.artifacts) {
       assert.match(artifact.sha256 || '', /^[a-f0-9]{64}$/);
       await fs.access(path.join(fixture.options.outputDirectory, artifact.path));
     }
+    const migration = JSON.parse(await fs.readFile(path.join(
+      fixture.options.outputDirectory, 'production-cutover-migration.json',
+    ), 'utf8')) as MigrationReport;
+    assert.equal(migration.sourcePath, '[verified-consistent-snapshot]');
+    assert.doesNotMatch(JSON.stringify(migration), new RegExp(fixture.root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('cutover fails closed when the verified source identity changes during validation', async () => {
+  const fixture = await createFixture('source-changed-during-validation');
+  let smokeCalled = false;
+  try {
+    const result = await runCutover(fixture.options, {
+      now: () => NOW,
+      openTargetSession: async () => ({ client: {} as never, release: async () => undefined }),
+      createSchema: async () => undefined,
+      migrate: async (options) => migrationReport(options.sourcePath),
+      validate: async (options) => {
+        const report = await phaseReport(options, 'validation', 'passed');
+        const changed = new Date(Date.now() + 5_000);
+        await fs.utimes(fixture.options.sourceSnapshotPath, changed, changed);
+        return report;
+      },
+      smoke: async () => { smokeCalled = true; return assert.fail('changed source must suppress smoke'); },
+    });
+    assert.equal(result.status, 'failed');
+    assert.equal(result.errors.some((error) => error.code === 'CUTOVER_SOURCE_INVALID'), true);
+    assert.equal(smokeCalled, false);
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('a passed report is not releasable when session close fails before completion publication', async () => {
+  const fixture = await createFixture('close-before-completion');
+  const completionPath = path.join(fixture.options.outputDirectory, 'close-before-completion-completion-receipt.json');
+  try {
+    await assert.rejects(runCutover(fixture.options, {
+      now: () => NOW,
+      openTargetSession: async () => ({
+        client: {} as never,
+        release: async () => { throw Object.assign(new Error('private'), { code: 'CUTOVER_SESSION_CLOSE_FAILED' }); },
+      }),
+      createSchema: async () => undefined,
+      migrate: async (options) => migrationReport(options.sourcePath),
+      validate: async (options) => phaseReport(options, 'validation', 'passed'),
+      smoke: async (options) => phaseReport(options, 'smoke', 'passed'),
+    }), (error: unknown) => (error as { code?: string }).code === 'CUTOVER_SESSION_CLOSE_FAILED');
+    const report = JSON.parse(await fs.readFile(path.join(
+      fixture.options.outputDirectory, 'close-before-completion-cutover.json',
+    ), 'utf8')) as ReadinessReport;
+    assert.equal(report.status, 'passed');
+    assert.ok(report.artifacts.some((artifact) => artifact.type === 'completion-receipt'));
+    await assert.rejects(fs.access(completionPath));
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('completion publication failure is fixed and leaves no valid completion receipt', async () => {
+  const fixture = await createFixture('completion-publication-failure');
+  const completionPath = path.join(fixture.options.outputDirectory, 'completion-publication-failure-completion-receipt.json');
+  try {
+    await assert.rejects(runCutover(fixture.options, {
+      now: () => NOW,
+      openTargetSession: async () => ({ client: {} as never, release: async () => undefined }),
+      createSchema: async () => undefined,
+      migrate: async (options) => migrationReport(options.sourcePath),
+      validate: async (options) => phaseReport(options, 'validation', 'passed'),
+      smoke: async (options) => phaseReport(options, 'smoke', 'passed'),
+      publishCompletion: async () => { throw new Error('private publication failure'); },
+    }), (error: unknown) => (error as { code?: string }).code === 'CUTOVER_COMPLETION_PUBLICATION_FAILED');
+    await assert.rejects(fs.access(completionPath));
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('cutover report publication failure emits only a fixed path-free failure', async () => {
+  const fixture = await createFixture('report-publication-failure');
+  let released = false;
+  try {
+    await assert.rejects(runCutover(fixture.options, {
+      now: () => NOW,
+      openTargetSession: async () => ({
+        client: {} as never,
+        release: async () => { released = true; },
+      }),
+      createSchema: async () => undefined,
+      migrate: async (options) => migrationReport(options.sourcePath),
+      validate: async (options) => phaseReport(options, 'validation', 'passed'),
+      smoke: async (options) => phaseReport(options, 'smoke', 'passed'),
+      writeReport: async () => {
+        throw new Error(`EACCES ${fixture.root} ${privateRuntimeUrl()}`);
+      },
+    }), (error: unknown) => {
+      const failure = error as Error & { code?: string };
+      assert.equal(failure.code, 'CUTOVER_REPORT_PUBLICATION_FAILED');
+      assert.equal(failure.message, 'Production cutover report publication failed');
+      assert.doesNotMatch(JSON.stringify(failure), /EACCES|private|password|postgres(?:ql)?:\/\//i);
+      return true;
+    });
+    assert.equal(released, true);
+    await assert.rejects(fs.access(path.join(
+      fixture.options.outputDirectory, 'report-publication-failure-completion-receipt.json',
+    )));
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
   }
@@ -174,7 +302,7 @@ test('cutover rejects an unsafe environment before reservation or database acces
   try {
     await assert.rejects(runCutover({
       ...fixture.options,
-      targetUrl: 'postgresql://consensus_migrator:secret@wrong-host:5432/consensus?sslmode=verify-full',
+      targetUrl: productionDatabaseUrl({ host: 'wrong-host' }),
     }, {
       now: () => NOW,
       reserveEvidence: async () => {
@@ -185,6 +313,41 @@ test('cutover rejects an unsafe environment before reservation or database acces
     }), (error: unknown) => (error as { code?: string }).code === 'CUTOVER_TARGET_UNSAFE');
     assert.equal(reservationCalled, false);
     assert.equal(await fs.stat(fixture.options.outputDirectory).then(() => true, () => false), false);
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('cutover revalidates authorization after source verification before reserving evidence', async () => {
+  const fixture = await createFixture('authorization-expired-before-reservation');
+  const times = [NOW, new Date('2026-08-11T04:00:00.001Z')];
+  let reserved = false;
+  try {
+    await assert.rejects(runCutover(fixture.options, {
+      now: () => times.shift() || times.at(-1)!,
+      reserveEvidence: async () => { reserved = true; return assert.fail('expired authorization must not reserve'); },
+      openTargetSession: async () => assert.fail('expired authorization must not connect'),
+    }), (error: unknown) => (error as { code?: string }).code === 'CUTOVER_AUTHORIZATION_INVALID');
+    assert.equal(reserved, false);
+    assert.equal(await fs.stat(fixture.options.outputDirectory).then(() => true, () => false), false);
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('cutover revalidates authorization immediately before schema mutation', async () => {
+  const fixture = await createFixture('authorization-expired-before-schema');
+  const times = [NOW, NOW, NOW, new Date('2026-08-11T04:00:00.001Z'), NOW];
+  let mutated = false;
+  try {
+    const result = await runCutover(fixture.options, {
+      now: () => times.shift() || NOW,
+      openTargetSession: async () => ({ client: {} as never, release: async () => undefined }),
+      createSchema: async () => { mutated = true; },
+    });
+    assert.equal(mutated, false);
+    assert.equal(result.status, 'failed');
+    assert.equal(result.errors[0]?.code, 'CUTOVER_AUTHORIZATION_INVALID');
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
   }

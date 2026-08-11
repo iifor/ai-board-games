@@ -6,23 +6,6 @@ const ts = require('../../packages/server/node_modules/typescript');
 const root = path.resolve(__dirname, '../..');
 const serverRoot = path.join(root, 'packages', 'server');
 const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
-const testFiles = [
-  'eventMapping.test.ts',
-  'readinessReport.test.ts',
-  'backupCommand.test.ts',
-  'backupRestoreCommands.test.ts',
-  'backupRestoreBuiltCli.test.ts',
-  'backupVerificationSecurity.test.ts',
-  'restoreDrillSecurity.test.ts',
-  'prepareSignoff.test.ts',
-  'releaseReadiness.test.ts',
-  'cutoverAuthorization.test.ts',
-  'cutoverCli.test.ts',
-  'cutoverEvidence.test.ts',
-  'cutoverSourceIdentity.test.ts',
-  'validationCanonicalization.test.ts',
-].map((file) => path.join(__dirname, file));
-
 const originalTsLoader = Module._extensions['.ts'];
 
 if (fs.existsSync(pnpmRoot)) {
@@ -32,7 +15,7 @@ if (fs.existsSync(pnpmRoot)) {
   process.env.NODE_PATH = [
     path.join(serverRoot, 'node_modules'),
     ...pnpmModulePaths,
-    process.env.NODE_PATH || ''
+    process.env.NODE_PATH || '',
   ].filter(Boolean).join(path.delimiter);
   Module._initPaths();
 }
@@ -47,16 +30,16 @@ Module._extensions['.ts'] = function loadTs(module, filename) {
       allowSyntheticDefaultImports: true,
       moduleResolution: ts.ModuleResolutionKind.Node10,
       skipLibCheck: true,
-      sourceMap: false
+      sourceMap: false,
     },
-    fileName: filename
+    fileName: filename,
   }).outputText;
   module._compile(output, filename);
 };
 
 try {
   process.chdir(root);
-  for (const file of testFiles) require(file);
+  require(path.join(__dirname, 'applicationSmoke.test.ts'));
 } finally {
   if (originalTsLoader) Module._extensions['.ts'] = originalTsLoader;
 }

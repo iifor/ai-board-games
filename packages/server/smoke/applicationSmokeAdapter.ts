@@ -21,7 +21,6 @@ function isFixedProductionTarget(targetUrl: URL, schema: string | undefined): bo
     && (targetUrl.port || '5432') === '5432'
     && decodeURIComponent(targetUrl.pathname.replace(/^\//, '')) === 'consensus'
     && decodeURIComponent(targetUrl.username) === 'consensus_migrator'
-    && targetUrl.searchParams.get('sslmode') === 'verify-full'
     && schema === 'consensus';
 }
 

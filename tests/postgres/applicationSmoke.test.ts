@@ -15,6 +15,45 @@ import {
 } from '../../packages/server/modules/observability';
 import { createSmokeSchema } from './smokeHarness';
 
+const PREEXISTING_OWNER = 901001;
+const PREEXISTING_SUBJECT = 901002;
+
+async function seedPreexistingPlayersAndMemory(database: DbExecutor): Promise<string[]> {
+  for (const [id, nickname, sortOrder] of [
+    [PREEXISTING_OWNER, 'Existing Owner', -200],
+    [PREEXISTING_SUBJECT, 'Existing Subject', -199],
+  ] as const) {
+    await database.execute(`INSERT INTO players (
+      id, nickname, name, personality, provider, model, enabled, sort_order, created_at, updated_at
+    ) VALUES ($1, $2, $2, 'must remain unchanged', 'existing-provider', 'existing-model', 1, $3,
+      '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')`, [id, nickname, sortOrder]);
+  }
+  await database.execute(`INSERT INTO player_game_memories (
+    game_type, owner_player_id, subject_player_id, games_played, familiarity_score,
+    traits_json, recent_summary, created_at, updated_at
+  ) VALUES ('undercover', $1, $2, 41, 0.75, '{"immutable":true}'::jsonb,
+    'preexisting memory', '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')`,
+  [PREEXISTING_OWNER, PREEXISTING_SUBJECT]);
+  return seedSnapshot(database);
+}
+
+async function smokeOwnedRowCounts(database: DbExecutor): Promise<Record<string, number>> {
+  const result: Record<string, number> = {};
+  for (const table of ['games', 'matches', 'game_traces', 'admin_users'] as const) {
+    result[table] = await database.queryOne<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM ${table}`,
+    ).then((row) => Number(row?.count || 0));
+  }
+  result.syntheticPlayers = await database.queryOne<{ count: number }>(
+    "SELECT COUNT(*) AS count FROM players WHERE provider LIKE 'application-smoke-%'",
+  ).then((row) => Number(row?.count || 0));
+  result.syntheticMemories = await database.queryOne<{ count: number }>(`
+    SELECT COUNT(*) AS count FROM player_game_memories
+    WHERE recent_summary IN ('first smoke memory', 'updated smoke memory')
+  `).then((row) => Number(row?.count || 0));
+  return result;
+}
+
 function deferred(): { promise: Promise<void>; resolve(): void } {
   let resolve!: () => void;
   const promise = new Promise<void>((done) => { resolve = done; });
@@ -96,6 +135,7 @@ test('compiled application smoke exercises the real app without paid external ca
   const outputDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'consensus-application-smoke-'));
   const runId = `application-smoke-${Date.now()}`;
   try {
+    const before = await seedPreexistingPlayersAndMemory(schema.database);
     const report = await runApplicationSmoke({
       runId,
       targetUrl: schema.targetUrl,
@@ -115,17 +155,16 @@ test('compiled application smoke exercises the real app without paid external ca
         'memory.created-and-updated',
         'workflow.observability-delete',
         'health.disconnected',
+        'teardown.synthetic-fixtures-removed',
         'teardown.observability-drained',
       ],
     );
-    assert.equal(
-      await schema.database.queryOne<{ count: number }>(
-        'SELECT COUNT(*) AS count FROM player_game_memories WHERE game_type = $1',
-        ['undercover'],
-      ).then((row) => Number(row?.count || 0)),
-      1,
-      'formal deletion keeps cross-game memory',
-    );
+    const after = await seedSnapshot(schema.database);
+    assert.deepEqual(after, before, 'preexisting players and memory must remain byte-for-byte unchanged');
+    assert.deepEqual(await smokeOwnedRowCounts(schema.database), {
+      games: 0, matches: 0, game_traces: 0, admin_users: 0,
+      syntheticPlayers: 0, syntheticMemories: 0,
+    });
     const reportPath = path.join(outputDirectory, `${runId}-smoke.json`);
     const persisted = await fs.readFile(reportPath, 'utf8');
     assert.doesNotMatch(persisted, /postgres(?:ql)?:\/\//i);
@@ -155,8 +194,25 @@ test('compiled application smoke fails when observability child rows survive for
       report.checks.some((check) => check.id === 'workflow.observability-delete' && check.status === 'passed'),
       false,
     );
+    assert.deepEqual(await smokeOwnedRowCounts(schema.database), {
+      games: 0, matches: 0, game_traces: 0, admin_users: 0,
+      syntheticPlayers: 0, syntheticMemories: 0,
+    });
   } finally {
     await schema.close();
     await fs.rm(outputDirectory, { recursive: true, force: true });
   }
 });
+
+async function seedSnapshot(database: DbExecutor): Promise<string[]> {
+  return database.queryMany<{ value: string }>(`
+    SELECT to_jsonb(value)::text AS value FROM (
+      SELECT * FROM players WHERE id IN ($1, $2) ORDER BY id
+    ) value
+    UNION ALL
+    SELECT to_jsonb(value)::text AS value FROM (
+      SELECT * FROM player_game_memories
+      WHERE owner_player_id = $1 AND subject_player_id = $2
+    ) value
+  `, [PREEXISTING_OWNER, PREEXISTING_SUBJECT]).then((rows) => rows.map((row) => row.value));
+}

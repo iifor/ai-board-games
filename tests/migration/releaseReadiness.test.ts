@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import type { ReadinessCheck, ReadinessReport } from '../../packages/db-migrator/src/reporting/reportTypes';
 import { runReleaseReadiness } from '../../packages/db-migrator/src/commands/release-readiness';
+import { SKIPPED_TABLES } from '../../packages/db-migrator/src/constants';
 
 const OPERATOR_CHECKS = [
   'ci.release-gates',
@@ -50,6 +51,7 @@ function smokeChecks(): ReadinessCheck[] {
     'history.detail-and-replay-order',
     'memory.created-and-updated',
     'workflow.observability-delete',
+    'teardown.synthetic-fixtures-removed',
     'teardown.observability-drained',
   ].map((id) => ({ id, status: 'passed', message: `${id} passed` }));
 }
@@ -77,6 +79,7 @@ interface Fixture {
   outputDirectory: string;
   reports: ReadinessReport[];
   signoff: Record<string, unknown>;
+  completionOverrides: Record<string, unknown>;
   persist(readinessRunId?: string): Promise<void>;
 }
 
@@ -92,10 +95,47 @@ async function createFixture(): Promise<Fixture> {
     'rehearsal-2-migration.json', 'rehearsal-2-validation.json',
     'restore.sqlite', 'restore-manifest.json', 'environment-tls.log',
     'cutover-authorization.json', 'cutover-manifest.json', 'cutover-owner-receipt.json', 'cutover-migration.json',
+    'cutover-completion-receipt.json',
   ].map((name) => path.join(artifactsDirectory, name));
   for (const [index, candidate] of artifactPaths.entries()) {
     await fs.writeFile(candidate, `artifact-${index}\n`);
   }
+  const cutoverManifest = {
+    version: 1, runId: 'backup-1', createdAt: '2026-08-09T23:00:00.000Z',
+    sourceDatabaseSha256: 'd'.repeat(64), consistentDatabaseSha256: 'a'.repeat(64),
+    entries: [
+      { path: 'sqlite-consistent.sqlite', sizeBytes: 1, sha256: 'a'.repeat(64) },
+      { path: 'sqlite-raw/source.sqlite', sizeBytes: 1, sha256: 'd'.repeat(64) },
+    ],
+  };
+  await fs.writeFile(artifactPaths[10], `${JSON.stringify(cutoverManifest, null, 2)}\n`);
+  const cutoverManifestHash = await sha256(artifactPaths[10]);
+  const cutoverAuthorization = {
+    version: 1, purpose: 'production-cutover', status: 'approved', approved: true,
+    releaseCandidate: RELEASE_CANDIDATE, cutoverRunId: 'production-cutover-1',
+    backupManifestSha256: cutoverManifestHash, sourceSnapshotSha256: 'a'.repeat(64),
+    target: {
+      database: 'consensus', schema: 'consensus', role: 'consensus_migrator',
+      host: 'postgres', port: 5432, tlsMode: 'verify-full',
+    },
+    maintenanceWindow: { startsAt: '2026-08-09T23:30:00.000Z', endsAt: '2026-08-10T01:30:00.000Z' },
+    approvals: [
+      { role: 'go-live-owner', name: 'Cutover Owner', approvedAt: '2026-08-09T23:00:00.000Z' },
+      { role: 'rollback-owner', name: 'Rollback Owner', approvedAt: '2026-08-09T23:01:00.000Z' },
+      { role: 'independent-reviewer', name: 'Cutover Reviewer', approvedAt: '2026-08-09T23:02:00.000Z' },
+    ],
+  };
+  await fs.writeFile(artifactPaths[9], `${JSON.stringify(cutoverAuthorization, null, 2)}\n`);
+  const cutoverAuthorizationHash = await sha256(artifactPaths[9]);
+  await fs.writeFile(artifactPaths[11], `${JSON.stringify({
+    version: 1, purpose: 'production-cutover-owner', runId: 'production-cutover-1',
+    schema: 'consensus', reservedAt: '2026-08-10T00:00:00.000Z', nonce: 'fixture-owner-nonce',
+  }, null, 2)}\n`);
+  await fs.writeFile(artifactPaths[12], `${JSON.stringify({
+    status: 'succeeded', sourcePath: '[verified-consistent-snapshot]', targetSchema: 'consensus',
+    startedAt: '2026-08-10T00:00:00.000Z', durationMs: 1, tables: {}, skippedTables: [],
+    errors: [], validation: 'passed',
+  }, null, 2)}\n`);
   const reports = [
     readinessReport('backup-1', 'backup', [
       { id: 'backup.execute', status: 'passed', message: 'executed' },
@@ -161,11 +201,11 @@ async function createFixture(): Promise<Fixture> {
   ], { schema: 'consensus' });
   const cutoverSmoke = readinessReport('production-cutover-1', 'smoke', smokeChecks(), { schema: 'consensus' });
   const cutover = readinessReport('production-cutover-1', 'cutover', [
-    { id: 'authorization.valid', status: 'passed', expected: 'b'.repeat(64), actual: 'b'.repeat(64), message: 'authorization passed' },
-    { id: 'authorization.sha256', status: 'passed', expected: 'b'.repeat(64), actual: 'b'.repeat(64), message: 'authorization hash passed' },
+    { id: 'authorization.valid', status: 'passed', expected: cutoverAuthorizationHash, actual: cutoverAuthorizationHash, message: 'authorization passed' },
+    { id: 'authorization.sha256', status: 'passed', expected: cutoverAuthorizationHash, actual: cutoverAuthorizationHash, message: 'authorization hash passed' },
     { id: 'release.candidate', status: 'passed', expected: RELEASE_CANDIDATE, actual: RELEASE_CANDIDATE, message: 'candidate passed' },
     { id: 'source.snapshot.sha256', status: 'passed', expected: 'a'.repeat(64), actual: 'a'.repeat(64), message: 'source passed' },
-    { id: 'source.manifest.sha256', status: 'passed', expected: 'c'.repeat(64), actual: 'c'.repeat(64), message: 'manifest passed' },
+    { id: 'source.manifest.sha256', status: 'passed', expected: cutoverManifestHash, actual: cutoverManifestHash, message: 'manifest passed' },
     {
       id: 'target.safe', status: 'passed',
       expected: 'database=consensus;schema=consensus;role=consensus_migrator;tls=verify-full',
@@ -185,12 +225,14 @@ async function createFixture(): Promise<Fixture> {
     { type: 'migration-report', path: artifactPaths[12], sha256: await sha256(artifactPaths[12]) },
     { type: 'validation-report', path: cutoverValidationPath },
     { type: 'smoke-report', path: cutoverSmokePath },
+    { type: 'completion-receipt', path: artifactPaths[13] },
   ];
   reports.push(cutoverValidation, cutoverSmoke, cutover);
   reportPaths.push(cutoverValidationPath, cutoverSmokePath, cutoverReportPath);
   const signoffPath = path.join(root, 'operator-signoff.json');
   const outputDirectory = path.join(root, 'output');
   const signoff: Record<string, unknown> = {};
+  const completionOverrides: Record<string, unknown> = {};
 
   const fixture: Fixture = {
     root,
@@ -200,9 +242,51 @@ async function createFixture(): Promise<Fixture> {
     outputDirectory,
     reports,
     signoff,
+    completionOverrides,
     async persist(readinessRunId = 'release-pass') {
       for (let index = 0; index < reports.length; index += 1) {
-        await fs.writeFile(reportPaths[index], `${JSON.stringify(reports[index], null, 2)}\n`);
+        if (reports[index].stage !== 'cutover') {
+          await fs.writeFile(reportPaths[index], `${JSON.stringify(reports[index], null, 2)}\n`);
+        }
+      }
+      const canonicalCutover = reports.find((report) => report.stage === 'cutover');
+      if (canonicalCutover) {
+        const findArtifact = (type: string) => canonicalCutover.artifacts.find((item) => item.type === type)!;
+        const resolveArtifact = (type: string) => path.resolve(findArtifact(type).path);
+        for (const type of ['authorization', 'manifest', 'owner-receipt', 'migration-report', 'validation-report', 'smoke-report']) {
+          findArtifact(type).sha256 = await sha256(resolveArtifact(type));
+        }
+        const completion = {
+          version: 1,
+          purpose: 'production-cutover-completion',
+          runId: canonicalCutover.runId,
+          schema: 'consensus',
+          releaseCandidate: canonicalCutover.checks.find((check) => check.id === 'release.candidate')!.actual,
+          sourceSnapshotSha256: canonicalCutover.checks.find((check) => check.id === 'source.snapshot.sha256')!.actual,
+          manifestSha256: findArtifact('manifest').sha256,
+          authorizationSha256: findArtifact('authorization').sha256,
+          ownerReceiptSha256: findArtifact('owner-receipt').sha256,
+          migrationReportSha256: findArtifact('migration-report').sha256,
+          validationReportSha256: findArtifact('validation-report').sha256,
+          smokeReportSha256: findArtifact('smoke-report').sha256,
+          target: {
+            database: 'consensus', schema: 'consensus', role: 'consensus_migrator',
+            host: 'postgres', port: 5432, tlsMode: 'verify-full',
+          },
+          completedAt: canonicalCutover.finishedAt,
+          ...completionOverrides,
+        };
+        await fs.writeFile(artifactPaths[13], `${JSON.stringify(completion, null, 2)}\n`);
+        for (const report of reports.filter((item) => item.stage === 'cutover')) {
+          for (const artifact of report.artifacts) {
+            artifact.sha256 = await sha256(path.resolve(artifact.path));
+          }
+        }
+      }
+      for (let index = 0; index < reports.length; index += 1) {
+        if (reports[index].stage === 'cutover') {
+          await fs.writeFile(reportPaths[index], `${JSON.stringify(reports[index], null, 2)}\n`);
+        }
       }
       Object.assign(signoff, {
         releaseCandidate: RELEASE_CANDIDATE,
@@ -250,7 +334,7 @@ test('passes only complete evidence and computes a three-minute maintenance wind
 
   const result = await runFixture(fixture, 'release-pass');
 
-  assert.equal(result.status, 'passed');
+  assert.equal(result.status, 'passed', JSON.stringify(result, null, 2));
   assert.equal((result as ReadinessReport & { maintenanceWindowMinutes?: number }).maintenanceWindowMinutes, 3);
   assert.deepEqual(result.checks.map((check) => check.id), [
     'ci.release-gates', 'tests.no-critical-skips', 'backup.executed', 'backup.restore-drill',
@@ -288,6 +372,46 @@ test('production cutover gate fails for absent, duplicate, failed, or mismatched
 
   provenance.reports.at(-1)!.checks.find((check) => check.id === 'release.candidate')!.actual = 'f'.repeat(40);
   assert.equal((await runFixture(provenance, 'release-mismatched-provenance')).status, 'failed');
+});
+
+test('production cutover cryptographic closure binds both authorization checks to the exact artifact', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  const valid = fixture.reports.at(-1)!.checks.find((check) => check.id === 'authorization.valid')!;
+  valid.expected = 'f'.repeat(64);
+  valid.actual = 'f'.repeat(64);
+
+  assert.equal((await runFixture(fixture, 'release-mixed-authorization-check')).status, 'failed');
+});
+
+test('production cutover rejects independently re-signed mixed artifacts of every closure type', async (t) => {
+  const fixtures = await Promise.all(Array.from({ length: 7 }, () => createFixture()));
+  t.after(() => Promise.all(fixtures.map((fixture) => fs.rm(fixture.root, { recursive: true, force: true }))));
+  const [authorization, manifest, owner, migration, validation, smoke, completion] = fixtures;
+
+  const authorizationValue = JSON.parse(await fs.readFile(authorization.artifactPaths[9], 'utf8'));
+  authorizationValue.cutoverRunId = 'other-cutover-run';
+  await fs.writeFile(authorization.artifactPaths[9], `${JSON.stringify(authorizationValue, null, 2)}\n`);
+
+  const manifestValue = JSON.parse(await fs.readFile(manifest.artifactPaths[10], 'utf8'));
+  manifestValue.consistentDatabaseSha256 = 'b'.repeat(64);
+  await fs.writeFile(manifest.artifactPaths[10], `${JSON.stringify(manifestValue, null, 2)}\n`);
+
+  const ownerValue = JSON.parse(await fs.readFile(owner.artifactPaths[11], 'utf8'));
+  ownerValue.runId = 'other-cutover-run';
+  await fs.writeFile(owner.artifactPaths[11], `${JSON.stringify(ownerValue, null, 2)}\n`);
+
+  const migrationValue = JSON.parse(await fs.readFile(migration.artifactPaths[12], 'utf8'));
+  migrationValue.targetSchema = 'other_schema';
+  await fs.writeFile(migration.artifactPaths[12], `${JSON.stringify(migrationValue, null, 2)}\n`);
+
+  validation.reports.at(-3)!.runId = 'other-cutover-run';
+  smoke.reports.at(-2)!.schema = 'other_schema';
+  completion.completionOverrides.ownerReceiptSha256 = 'f'.repeat(64);
+
+  for (const [index, fixture] of fixtures.entries()) {
+    assert.equal((await runFixture(fixture, `release-mixed-closure-${index}`)).status, 'failed');
+  }
 });
 
 test('fails when the signed closure omits the unique backup verification report', async (t) => {
@@ -521,6 +645,35 @@ test('fails when a backup-only optional check is skipped by another report stage
   fixture.reports[5].checks.push({ id: 'source.raw-wal', status: 'skipped', message: 'wrong producer stage' });
 
   assert.equal((await runFixture(fixture)).status, 'failed');
+});
+
+test('accepts only the exact intentional validation skips while preserving all 16 signed gates', async (t) => {
+  const valid = await createFixture();
+  const unknown = await createFixture();
+  const wrongContext = await createFixture();
+  t.after(() => Promise.all([valid, unknown, wrongContext].map((fixture) => (
+    fs.rm(fixture.root, { recursive: true, force: true })
+  ))));
+
+  for (const fixture of [valid, unknown, wrongContext]) {
+    const validation = fixture.reports.at(-3)!;
+    validation.checks.push(...SKIPPED_TABLES.map((table) => ({
+      id: `skipped.${table}`,
+      status: 'skipped' as const,
+      message: 'intentionally not migrated',
+    })));
+  }
+  unknown.reports.at(-3)!.checks.push({
+    id: 'skipped.unknown_table', status: 'skipped', message: 'intentionally not migrated',
+  });
+  wrongContext.reports.at(-3)!.checks.find((check) => check.id === 'skipped.matches')!.message = 'optional';
+
+  const passed = await runFixture(valid, 'release-validation-skips');
+  assert.equal(passed.status, 'passed');
+  assert.equal(passed.checks.length, 16);
+  assert.ok(passed.checks.every((check) => check.status === 'passed'));
+  assert.equal((await runFixture(unknown, 'release-unknown-validation-skip')).status, 'failed');
+  assert.equal((await runFixture(wrongContext, 'release-wrong-validation-skip')).status, 'failed');
 });
 
 test('fails when independent rehearsals reuse one or all artifact paths, including aliases', async (t) => {

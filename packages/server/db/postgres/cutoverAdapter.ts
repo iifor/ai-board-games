@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import { createPostgresExecutor } from '../postgres';
 import type { DbExecutor } from '../types';
 import { migratePostgres } from './migrate';
@@ -5,8 +6,6 @@ import { migratePostgres } from './migrate';
 interface CutoverAdapterRequest {
   targetUrl: string;
   schema: 'consensus';
-  tlsMode: 'verify-full';
-  ca: string;
 }
 
 interface CutoverAdapterResponse {
@@ -19,10 +18,11 @@ interface CutoverAdapterResponse {
 interface CutoverAdapterDependencies {
   createExecutor(config: Parameters<typeof createPostgresExecutor>[0]): DbExecutor;
   migrate(database: DbExecutor): Promise<void>;
+  readCa(path: string): Promise<string>;
 }
 
 const INPUT_LIMIT_BYTES = 1024 * 1024;
-const REQUEST_KEYS = ['targetUrl', 'schema', 'tlsMode', 'ca'];
+const REQUEST_KEYS = ['targetUrl', 'schema'];
 
 function adapterError(code: string, message: string): Error & { code: string } {
   return Object.assign(new Error(message), { code });
@@ -41,14 +41,16 @@ function fixedTarget(targetUrl: string): boolean {
       && parsed.hostname === 'postgres'
       && (parsed.port || '5432') === '5432'
       && decodeURIComponent(parsed.pathname.replace(/^\/+/, '')) === 'consensus'
-      && decodeURIComponent(parsed.username) === 'consensus_migrator'
-      && parsed.searchParams.get('sslmode') === 'verify-full';
+      && decodeURIComponent(parsed.username) === 'consensus_migrator';
   } catch {
     return false;
   }
 }
 
-function parseRequest(raw: string): CutoverAdapterRequest {
+function parseRequest(
+  raw: string,
+  environment: Record<string, string | undefined> = process.env,
+): CutoverAdapterRequest {
   let candidate: unknown;
   try {
     candidate = JSON.parse(raw) as unknown;
@@ -60,9 +62,10 @@ function parseRequest(raw: string): CutoverAdapterRequest {
     throw adapterError('CUTOVER_ADAPTER_INPUT_INVALID', 'Cutover adapter input is invalid');
   }
   const request = candidate as Partial<CutoverAdapterRequest>;
-  if (request.schema !== 'consensus' || request.tlsMode !== 'verify-full'
-    || typeof request.ca !== 'string' || !request.ca
-    || typeof request.targetUrl !== 'string' || !fixedTarget(request.targetUrl)) {
+  if (request.schema !== 'consensus'
+    || typeof request.targetUrl !== 'string' || !fixedTarget(request.targetUrl)
+    || environment.DATABASE_SSL !== 'verify-full'
+    || !environment.DATABASE_CA_PATH?.trim()) {
     throw adapterError('CUTOVER_ADAPTER_INPUT_INVALID', 'Cutover adapter input is invalid');
   }
   return request as CutoverAdapterRequest;
@@ -80,21 +83,30 @@ function safeGate(row: Record<string, unknown> | null): boolean {
 const defaultDependencies: CutoverAdapterDependencies = {
   createExecutor: createPostgresExecutor,
   migrate: migratePostgres,
+  readCa: (candidate) => fs.readFile(candidate, 'utf8'),
 };
 
 async function executeRequest(
   request: CutoverAdapterRequest,
   dependencies: Partial<CutoverAdapterDependencies> = {},
+  environment: Record<string, string | undefined> = process.env,
 ): Promise<CutoverAdapterResponse> {
-  const validated = parseRequest(JSON.stringify(request));
+  const validated = parseRequest(JSON.stringify(request), environment);
   const resolved = { ...defaultDependencies, ...dependencies };
+  let ca: string;
+  try {
+    ca = await resolved.readCa(environment.DATABASE_CA_PATH!);
+    if (!ca) throw new Error('empty');
+  } catch {
+    throw adapterError('CUTOVER_TARGET_UNSAFE', 'Production cutover TLS configuration is unsafe');
+  }
   const database = resolved.createExecutor({
     connectionString: validated.targetUrl,
     schema: 'consensus',
     poolMax: 1,
     connectionTimeoutMs: 5_000,
     statementTimeoutMs: 30_000,
-    ssl: { ca: validated.ca, rejectUnauthorized: true },
+    ssl: { ca, rejectUnauthorized: true },
   });
   let primaryError: unknown;
   try {

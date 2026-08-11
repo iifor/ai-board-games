@@ -15,9 +15,8 @@ import {
   recordEvent,
 } from '../modules/observability';
 import * as memoryRepository from '../modules/player-memory/repository';
-import { createPlayer } from '../modules/players/service';
+import type { SmokePlayer } from './applicationSmokeOwnership';
 
-interface SmokePlayer { id: number; nickname: string }
 interface PersistedUndercoverResult {
   gameId: string;
   modelFetchCalls: number;
@@ -34,37 +33,6 @@ async function ensureSmokeAdmin(username: string, password: string): Promise<voi
   await authRepository.create(username, hashPasswordSync(md5(password)), 'Application smoke', true);
 }
 
-async function removeSmokeAdmin(database: DbExecutor, username: string): Promise<void> {
-  await database.execute('DELETE FROM admin_users WHERE username = $1', [username]);
-}
-
-async function listSmokePlayers(database: DbExecutor): Promise<SmokePlayer[]> {
-  let players = await database.queryMany<SmokePlayer>(
-    'SELECT id, nickname FROM players WHERE enabled = 1 ORDER BY sort_order ASC, id ASC LIMIT 6',
-  );
-  for (let index = players.length; index < 6; index += 1) {
-    await createPlayer({
-      nickname: `Application Smoke Player ${index + 1}`,
-      name: `Application Smoke Player ${index + 1}`,
-      personality: 'Deterministic application smoke fixture',
-      provider: 'application-smoke-fake',
-      model: 'application-smoke-fake',
-      modelId: null,
-      fallbackModelId: null,
-      voicePackageId: null,
-      enabled: true,
-      sortOrder: index + 1,
-    });
-  }
-  if (players.length < 6) {
-    players = await database.queryMany<SmokePlayer>(
-      'SELECT id, nickname FROM players WHERE enabled = 1 ORDER BY sort_order ASC, id ASC LIMIT 6',
-    );
-  }
-  if (players.length !== 6) throw new Error('Application smoke requires six enabled players');
-  return players.map((player) => ({ id: Number(player.id), nickname: String(player.nickname) }));
-}
-
 function createImmediateSession(sent: Array<Record<string, unknown>>): GameSession {
   return {
     send(payload) { sent.push(payload); },
@@ -76,8 +44,7 @@ function createImmediateSession(sent: Array<Record<string, unknown>>): GameSessi
   };
 }
 
-async function runPersistedUndercover(runId: string, players: SmokePlayer[]): Promise<PersistedUndercoverResult> {
-  const gameId = `application-smoke-${crypto.createHash('sha256').update(runId).digest('hex').slice(0, 16)}`;
+async function runPersistedUndercover(gameId: string, players: SmokePlayer[]): Promise<PersistedUndercoverResult> {
   let runnerCalls = 0;
   let modelFetchCalls = 0;
   const sent: Array<Record<string, unknown>> = [];
@@ -241,9 +208,7 @@ export {
   createWorkflowAndObservabilityFixtures,
   ensureSmokeAdmin,
   listPlaybackSequences,
-  listSmokePlayers,
-  removeSmokeAdmin,
   replayStoredGame,
   runPersistedUndercover,
 };
-export type { PersistedUndercoverResult, SmokePlayer };
+export type { PersistedUndercoverResult };

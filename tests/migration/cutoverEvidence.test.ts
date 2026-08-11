@@ -84,3 +84,20 @@ test('cutover evidence rejects unsafe run ids, existing reports, and tampered ca
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test('cutover evidence maps raw directory failures to a fixed path-free error', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cutover-evidence-error-'));
+  const blocked = path.join(root, 'private-output');
+  try {
+    await fs.writeFile(blocked, 'not a directory');
+    await assert.rejects(reserveCutoverEvidence(options(blocked)), (error: unknown) => {
+      const failure = error as Error & { code?: string };
+      assert.equal(failure.code, 'CUTOVER_EVIDENCE_PUBLICATION_FAILED');
+      assert.equal(failure.message, 'Cutover evidence publication failed');
+      assert.doesNotMatch(JSON.stringify(failure), /private-output|EEXIST|EPERM|EACCES|postgres(?:ql)?:\/\//i);
+      return true;
+    });
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

@@ -1,6 +1,5 @@
-import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { captureStableFileContent } from '../backup/fileSnapshot';
+import { captureBoundedFile } from './boundedFile';
 import {
   CUTOVER_APPROVAL_ROLES,
   CUTOVER_TARGET,
@@ -44,7 +43,7 @@ function validSha256(value: unknown): value is string {
 function timestamp(value: unknown): number | null {
   if (typeof value !== 'string' || !value.trim()) return null;
   const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value ? parsed : null;
 }
 
 function realIdentity(value: unknown): value is string {
@@ -93,19 +92,21 @@ function validateShape(
   return names.size === CUTOVER_APPROVAL_ROLES.length;
 }
 
+export function assertCutoverAuthorizationCurrent(
+  authorization: CutoverAuthorization,
+  options: LoadCutoverAuthorizationOptions,
+): void {
+  if (!validateShape(authorization, options)) throw invalid();
+}
+
 export async function loadCutoverAuthorization(
   options: LoadCutoverAuthorizationOptions,
 ): Promise<LoadedCutoverAuthorization> {
   try {
     const resolvedPath = path.resolve(options.authorizationPath);
-    const root = path.dirname(resolvedPath);
-    const rootRealPath = await fs.realpath(root);
-    const captured = await captureStableFileContent(
-      resolvedPath,
-      rootRealPath,
-      path.basename(resolvedPath),
-      'CUTOVER_AUTHORIZATION_INVALID',
-      MAX_AUTHORIZATION_BYTES,
+    const captured = await captureBoundedFile(
+      resolvedPath, MAX_AUTHORIZATION_BYTES,
+      'CUTOVER_AUTHORIZATION_INVALID', 'Pre-cutover authorization is invalid',
     );
     let candidate: unknown;
     try {

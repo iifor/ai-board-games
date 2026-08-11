@@ -10,7 +10,10 @@ export function fixedCutoverFailure(error: unknown): { code: string; message: st
   const allowed = new Set([
     'CUTOVER_ALREADY_RUNNING', 'CUTOVER_TARGET_UNSAFE', 'CUTOVER_SESSION_CLOSE_FAILED',
     'CUTOVER_ADAPTER_INPUT_INVALID', 'CUTOVER_ADAPTER_UNAVAILABLE', 'CUTOVER_ADAPTER_FAILED',
+    'CUTOVER_AUTHORIZATION_INVALID', 'CUTOVER_SOURCE_INVALID',
     'CUTOVER_EVIDENCE_CHANGED', 'CUTOVER_EVIDENCE_PUBLICATION_FAILED', 'CUTOVER_RUN_EXISTS',
+    'CUTOVER_VALIDATION_IO_FAILED', 'CUTOVER_MIGRATION_EVIDENCE_FAILED',
+    'CUTOVER_REPORT_PUBLICATION_FAILED',
   ]);
   return {
     code: allowed.has(code) ? code : 'CUTOVER_FAILED',
@@ -54,7 +57,14 @@ export async function persistCutoverMigration(
   migration: MigrationReport,
 ): Promise<string> {
   const candidate = path.join(path.resolve(options.outputDirectory), `${options.runId}-migration.json`);
-  await writeJsonArtifactExclusive({ finalPath: candidate, payload: migration });
-  artifacts.push(cutoverPhaseArtifact('migration-report', candidate, await hashFile(candidate)));
-  return candidate;
+  const evidence: MigrationReport = { ...migration, sourcePath: '[verified-consistent-snapshot]' };
+  try {
+    await writeJsonArtifactExclusive({ finalPath: candidate, payload: evidence });
+    artifacts.push(cutoverPhaseArtifact('migration-report', candidate, await hashFile(candidate)));
+    return candidate;
+  } catch {
+    throw Object.assign(new Error('Production cutover migration evidence publication failed'), {
+      code: 'CUTOVER_MIGRATION_EVIDENCE_FAILED',
+    });
+  }
 }

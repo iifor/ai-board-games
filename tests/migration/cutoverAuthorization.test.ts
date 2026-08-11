@@ -68,6 +68,8 @@ test('cutover authorization rejects malformed, extra, stale, mismatched, or plac
     ['placeholder identity', (value) => { value.approvals[0].name = 'REPLACE_WITH_GO_LIVE_OWNER'; }],
     ['duplicate identity', (value) => { value.approvals[1].name = 'alice operator'; }],
     ['future approval', (value) => { value.approvals[0].approvedAt = '2026-08-11T03:36:00.000Z'; }],
+    ['non-canonical window timestamp', (value) => { value.maintenanceWindow.startsAt = '2026-08-11T03:00:00Z'; }],
+    ['non-canonical approval timestamp', (value) => { value.approvals[0].approvedAt = '2026-08-11T02:40:00Z'; }],
     ['outside maintenance window', () => undefined, new Date('2026-08-11T04:00:00.001Z')],
     ['wrong run', (value) => { value.cutoverRunId = 'another-run'; }],
     ['wrong candidate', (value) => { value.releaseCandidate = '3'.repeat(40); }],

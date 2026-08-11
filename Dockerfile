@@ -41,6 +41,7 @@ RUN pnpm run build:shared \
 # The db-migrator bundle is deliberately created apart from the runtime image.
 # It contains one-time SQLite tooling and is copied only into the ops image.
 RUN pnpm --filter @ai-presenter/db-migrator deploy --prod /opt/db-migrator
+RUN pnpm --filter @ai-presenter/server deploy --prod /opt/server-ops
 
 # --- Stage 2: Production runtime ---
 FROM node:20-slim AS runtime
@@ -87,6 +88,7 @@ WORKDIR /app
 
 COPY --from=builder /opt/db-migrator ./packages/db-migrator
 COPY --from=builder /app/packages/server/dist ./packages/server/dist
+COPY --from=builder /opt/server-ops/node_modules ./packages/server/node_modules
 COPY scripts/ops/postgres/run-production-migrator.cjs ./scripts/ops/postgres/run-production-migrator.cjs
 
 ENTRYPOINT ["node", "scripts/ops/postgres/run-production-migrator.cjs"]

@@ -81,6 +81,7 @@ function runPaths(outputDirectory: string, runId: string): {
       owner, authorization, manifest,
       named('migration.json'), named('validation.json'), named('validation.md'),
       named('smoke.json'), named('smoke.md'), named('cutover.json'), named('cutover.md'),
+      named('completion-receipt.json'),
     ],
   };
 }
@@ -137,10 +138,12 @@ export async function reserveCutoverEvidence(
     throw cutoverError('CUTOVER_EVIDENCE_CHANGED', 'Verified cutover evidence bytes changed');
   }
   const outputDirectory = path.resolve(options.outputDirectory);
-  await fs.mkdir(outputDirectory, { recursive: true });
+  try { await fs.mkdir(outputDirectory, { recursive: true }); }
+  catch { throw cutoverError('CUTOVER_EVIDENCE_PUBLICATION_FAILED', 'Cutover evidence publication failed'); }
   const paths = runPaths(outputDirectory, options.runId);
   const ownerReceipt = Buffer.from(`${JSON.stringify({
     version: 1,
+    purpose: 'production-cutover-owner',
     runId: options.runId,
     schema: 'consensus',
     reservedAt: options.now.toISOString(),
@@ -152,10 +155,13 @@ export async function reserveCutoverEvidence(
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
       throw cutoverError('CUTOVER_RUN_EXISTS', 'Cutover run already has an owner receipt');
     }
-    throw error;
+    throw cutoverError('CUTOVER_EVIDENCE_PUBLICATION_FAILED', 'Cutover evidence publication failed');
   }
 
-  if ((await Promise.all(paths.all.slice(1).map(exists))).some(Boolean)) {
+  let occupied: boolean;
+  try { occupied = (await Promise.all(paths.all.slice(1).map(exists))).some(Boolean); }
+  catch { throw cutoverError('CUTOVER_EVIDENCE_PUBLICATION_FAILED', 'Cutover evidence publication failed'); }
+  if (occupied) {
     throw cutoverError('CUTOVER_RUN_EXISTS', 'Cutover run already has preserved evidence');
   }
   try {

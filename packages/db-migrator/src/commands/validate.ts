@@ -15,7 +15,6 @@ import {
 import type { ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
 import type { MigrationReport } from '../types';
 import { createValidationExecutor } from '../postgres/validationExecutor';
-import type { ValidationTls } from '../postgres/validationExecutor';
 import {
   BUSINESS_SAMPLES,
   countImportedTables,
@@ -37,12 +36,11 @@ export interface ValidateOptions {
   targetUrl: string;
   targetSchema: string;
   outputDirectory: string;
-  targetTls?: ValidationTls;
 }
 
 export interface ValidateDependencies {
   createSqlite(sourcePath: string): Database.Database;
-  createPostgres(targetUrl: string, targetSchema: string, targetTls?: ValidationTls): ValidationDbExecutor;
+  createPostgres(targetUrl: string, targetSchema: string): ValidationDbExecutor;
   hashEvidence(candidate: string): Promise<string>;
   writeReport(options: Parameters<typeof writeReadinessReport>[0]): ReturnType<typeof writeReadinessReport>;
 }
@@ -433,7 +431,7 @@ export async function runValidation(
     }
 
     try {
-    postgres = resolved.createPostgres(options.targetUrl, options.targetSchema, options.targetTls);
+      postgres = resolved.createPostgres(options.targetUrl, options.targetSchema);
       await postgres.queryOne<{ ready: number }>('SELECT 1 AS ready');
       passed(checks, 'target.open-readonly', 'PostgreSQL target opened for read-only validation');
     } catch (error) {

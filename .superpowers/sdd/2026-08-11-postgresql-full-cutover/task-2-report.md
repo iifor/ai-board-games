@@ -59,3 +59,62 @@ Fresh final results:
 ## Concerns
 
 None blocking. The dedicated test container's configured password differed from the initially supplied test value; final PostgreSQL verification used that container's existing configuration only in-memory and passed completely. No repository or container credential was changed.
+
+## Fix Round 1 (2026-08-12)
+
+### Outcome
+
+Verified every independent-review finding and closed all eleven without widening the production authorization boundary. The production URL is now queryless and validated only for protocol/host/port/database/user; TLS is exclusively inherited from `DATABASE_SSL=verify-full` and a readable CA and is passed as `ssl: { ca, rejectUnauthorized: true }`. Pre-cutover authorization still cannot authorize traffic, app, or nginx startup.
+
+Production smoke now owns uniquely run-scoped synthetic players, memories, game state, and observability rows. It removes all of them in `finally` after success and failure and never selects, updates, or deletes pre-existing players or memories. A real PostgreSQL test seeds pre-existing player/memory bytes and proves they remain unchanged. The implementation also accounts for the actual observability model: `game_traces` has no `game_id`, so run-owned traces are resolved through the root span's `game.id` attribute before cleanup.
+
+Release readiness now accepts only the exact formal-validation intentional skipped-table checks and still rejects unknown or required skips. It cryptographically binds the exact authorization, manifest, owner receipt, completion receipt, migration evidence, validation report, and smoke report to the cutover report's same run, candidate, source, target, schema, paths, and hashes. Independently re-signed swaps or mixed closures for each artifact type fail closed; the final signed gate count remains exactly 16.
+
+A passed report references an immutable completion payload/hash prepared while the advisory lock is held. The completion receipt is published only after unlock and connection close both succeed. Close or receipt-publication failure leaves no valid completion file, uses a fixed CLI failure, and cannot pass release readiness; failed phase reports never receive completion.
+
+The importer now consumes the already-open readonly/query-only SQLite handle owned by cutover. Stable capture, open, filesystem identity and SHA-256 recheck, a held SQLite read transaction, import, validation, and before/after recaptures all bind the same snapshot. Path swaps, inode replacement where the platform permits it, and content/metadata mutation before or during import/validation are detected before a successful closure. Durable migration evidence stores `[verified-consistent-snapshot]`, never an absolute source path.
+
+All cutover evidence/report filesystem failures are mapped to fixed path-free codes: `CUTOVER_SOURCE_INVALID`, `CUTOVER_EVIDENCE_PUBLICATION_FAILED`, `CUTOVER_VALIDATION_IO_FAILED`, `CUTOVER_MIGRATION_EVIDENCE_FAILED`, `CUTOVER_REPORT_PUBLICATION_FAILED`, and `CUTOVER_COMPLETION_PUBLICATION_FAILED`. Adversarial raw errors do not expose absolute paths, database URLs, endpoints, passwords, or errno text. Authorization timestamps must equal canonical `toISOString()` values and are revalidated after source verification immediately before reservation and again immediately before schema mutation.
+
+The CLI dispatcher and orchestration were extracted into focused modules. `cli.ts` is 244 lines, `commands/cutover.ts` is 123 lines, and `cutover/orchestrator.ts` is 187 lines. The pre-existing oversized `backup/fileSnapshot.ts`, `commands/validate.ts`, and `postgres/validationExecutor.ts` are byte-equivalent to the pre-Task-2 baseline; new bounded/TLS behavior lives in focused modules. No touched Task-2 backend module exceeds 250 lines.
+
+### Task 1 overlap
+
+One concrete, minimal Dockerfile overlap was required. The compiled production integration proved that the ops image contained the server adapter but not its production dependencies. The builder now deploys the server production dependency closure to `/opt/server-ops`, and the ops stage copies only that `node_modules` tree to `packages/server/node_modules`. Compose, entrypoints, role/bootstrap scripts, secrets, and canonical SQL were not modified. Both the application and migrator production images remain TypeScript-free and isolated.
+
+### Strict RED to GREEN evidence
+
+1. Queryless URL/environment TLS: focused RED was 4 passed / 11 failed; GREEN was 15/15.
+2. Smoke ownership and cleanup: real PostgreSQL RED was 124/126; success/failure cleanup plus byte-preservation GREEN was 3/3.
+3. Intentional validation skips: a valid 16-gate closure with formal skipped-table checks failed before the change; focused release GREEN was 31/31, with unknown skips still rejected.
+4. Cryptographic closure: valid closure RED was 0/1; GREEN was 1/1, followed by a seven-artifact independently re-signed swap/mix test at 1/1.
+5. Completion receipt: close/publication cases RED were 16/19; GREEN was 19/19.
+6. Path/error redaction: migration evidence first exposed the absolute source path; focused GREEN stores only the fixed marker and all injected filesystem errors are fixed/path-free.
+7. Authorization timing: focused RED was 15/17; GREEN was 17/17.
+8. Source identity: the focused test first failed because the handle-binding module was absent; handle/path-swap GREEN was 1/1 and validation-time mutation GREEN was 1/1.
+9. Real PostgreSQL 16/TLS: the first integration run found the missing ops dependency closure and missing schema in formal validation evidence. After the two narrow fixes, the compiled production execute test was 1/1 GREEN.
+10. Credential literals: the new repository guard produced 128/129 with the two cutover test offenders; runtime-generated opaque credentials/URLs produced 129/129 GREEN.
+11. Size boundary: the dispatcher test first measured `cli.ts` at 287 lines; GREEN is 244/123/187 for CLI/command/orchestrator, with the three pre-existing oversized files restored.
+
+### Real PostgreSQL 16/TLS coverage
+
+The unique production-style Compose fixture builds compiled app/migrator images, generates a one-run CA and `DNS:postgres` leaf certificate, and uses random credentials only in subprocess memory. It proves global advisory-lock contention across two clients with different run IDs; canonical `consensus` schema creation through the compiled server adapter; injected invalid import rollback leaving `consensus.skins` and `consensus.model_providers` at `0|0`; successful compiled execute against a fresh target; same-schema formal validation and production-purpose smoke; complete successful smoke cleanup with synthetic players/memories/games/admin users at zero; the schema-present unsafe-target gate; and TypeScript-free ops/server dist. Cleanup removes only the unique test project, volumes, images, and temporary directory.
+
+### Fresh verification
+
+- Complete migration suite after the final credential-literal guard: 129 tests, 129 passed, 0 failed, 0 skipped.
+- Complete PostgreSQL suite: 124 top-level subtests / 131 tests, 131 passed, 0 failed, 0 skipped; the final compiled real PostgreSQL 16/TLS execute case passed in 54.3 seconds.
+- Complete unit suite: 358 top-level subtests / 365 tests, 365 passed, 0 failed, 0 skipped.
+- Complete workflow suite: 127 tests, 127 passed, 0 failed, 0 skipped.
+- Dedicated production Compose TLS runtime/ops probe: 1 test, 1 passed, 0 failed, 0 skipped. It proved TLS-only/SCRAM, fixed roles, default grants, app DML without DDL, migrator DDL, credential non-disclosure, and image isolation.
+- Workspace `check`: all 5 checked packages passed.
+- Workspace production `build`: server compiled ops adapters, shared, client, and admin passed. The existing non-failing admin chunk-size warning remains unrelated.
+- `git diff --check`, backend size guard, pre-Task-2 baseline restoration check, cutover credential-URL scan, and fixed source-marker scan passed.
+
+### Files and boundaries
+
+New focused production modules are `cli/cutoverDispatch.ts`, `cutover/boundedFile.ts`, `cutover/completion.ts`, `cutover/orchestrator.ts`, `cutover/sourceIdentity.ts`, `cutover/validation.ts`, `postgres/cutoverValidationExecutor.ts`, `release/cutoverVerification.ts`, and `server/smoke/applicationSmokeOwnership.ts`. New tests are the cutover source-identity, application-smoke runner, production integration, and shared cutover test-helper files. Existing Task-2 cutover, release, reporting, importer, server adapter/smoke, runner, and focused test files were modified. Only `docs/project-server.md` and `docs/postgresql-deployment.md` were changed under `docs/`. No file was deleted; no public API, shared business type, canonical SQL, Compose, entrypoint, live SQLite, production service, nginx, real approval, or Task 11 artifact changed.
+
+### Self-review and concerns
+
+The production smoke purpose is not exposed as a separate public CLI. Target reports remain endpoint-free. Execute with missing or invalid authorization remains a failed no-write dry-run, ordinary dry-run writes nothing, the advisory session stays open across all mutating phases, pre-cutover authorization never authorizes traffic, and the final gate remains exactly 16. No blocking concern remains. The local shared test container's password differed from the initially supplied value; the full PG suite read that existing container configuration only into the test subprocess environment, did not echo or persist it, and passed without changing the container or repository credential.

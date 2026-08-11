@@ -25,6 +25,7 @@ const testFiles = [
   'cutoverAdapter.test.ts',
   'cutoverSmokeAdapter.test.ts',
   'cutoverCommand.test.ts',
+  'cutoverProductionIntegration.test.ts',
 ]
   .map((file) => path.join(__dirname, file));
 const originalTsLoader = Module._extensions['.ts'];

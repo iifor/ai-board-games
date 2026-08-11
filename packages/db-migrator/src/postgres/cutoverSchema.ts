@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { readCutoverCa } from '../cutover/targetSession';
 
 interface CutoverSchemaAdapterResponse {
   ok: boolean;
@@ -31,7 +30,6 @@ export async function runCutoverSchemaAdapter(
   options: CutoverSchemaAdapterOptions,
   dependencies: Partial<CutoverSchemaAdapterDependencies> = {},
 ): Promise<void> {
-  const ca = await readCutoverCa(options.caPath);
   const response = await new Promise<CutoverSchemaAdapterResponse>((resolve, reject) => {
     const child = spawn(process.execPath, [dependencies.adapterPath || defaultAdapterPath()], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -63,8 +61,6 @@ export async function runCutoverSchemaAdapter(
     child.stdin.end(JSON.stringify({
       targetUrl: options.targetUrl,
       schema: 'consensus',
-      tlsMode: options.tlsMode,
-      ca,
     }));
   });
   if (!response.ok) {

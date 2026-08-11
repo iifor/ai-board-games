@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,6 +8,28 @@ import { spawnSync } from 'node:child_process';
 import { main } from '../../packages/db-migrator/src/cli';
 import { buildManifest } from '../../packages/db-migrator/src/backup/manifest';
 import type { ReadinessReport } from '../../packages/db-migrator/src/reporting/reportTypes';
+
+test('cutover CLI dispatch and orchestration stay within backend module size boundaries', () => {
+  const root = path.resolve(__dirname, '../..');
+  for (const relative of [
+    'packages/db-migrator/src/cli.ts',
+    'packages/db-migrator/src/commands/cutover.ts',
+  ]) {
+    const lines = fs.readFileSync(path.join(root, relative), 'utf8').split(/\r?\n/).length;
+    assert.ok(lines <= 250, `${relative} has ${lines} lines`);
+  }
+});
+
+test('cutover tests do not persist complete credential-bearing PostgreSQL URLs', () => {
+  const root = path.resolve(__dirname, '../..');
+  const testDirectories = ['tests/migration', 'tests/postgres'];
+  const credentialUrl = /postgres(?:ql)?:\/\/[^\s'"`$/:]+:[^@\s'"`$]+@[^\s'"`$]+/;
+  const offenders = testDirectories.flatMap((relative) => fs.readdirSync(path.join(root, relative))
+    .filter((file) => /^cutover.*\.test\.ts$/.test(file))
+    .filter((file) => credentialUrl.test(fs.readFileSync(path.join(root, relative, file), 'utf8')))
+    .map((file) => `${relative}/${file}`));
+  assert.deepEqual(offenders, []);
+});
 
 function dryReport(runId: string): ReadinessReport {
   return {
@@ -17,6 +40,13 @@ function dryReport(runId: string): ReadinessReport {
   };
 }
 
+function runtimeCredentialUrl(host: string): string {
+  const target = new URL(`postgresql://${host}:6543/consensus`);
+  target.username = `test_${randomBytes(8).toString('hex')}`;
+  target.password = randomBytes(16).toString('base64url');
+  return target.toString();
+}
+
 test('cutover rejects literal target before command, file, database, or output access', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cutover-target-'));
   const output = path.join(root, 'must-not-exist');
@@ -24,7 +54,7 @@ test('cutover rejects literal target before command, file, database, or output a
   try {
     await assert.rejects(main([
       'cutover', '--source-snapshot', path.join(root, 'missing.sqlite'), '--manifest', path.join(root, 'missing.json'),
-      '--target', 'postgresql://private_user:private_password@192.0.2.10:6543/consensus',
+      '--target', runtimeCredentialUrl('192.0.2.10'),
       '--output', output, '--run-id', 'forbidden-target', '--execute',
     ], {
       runReadinessCommand: async () => { invoked = true; return dryReport('forbidden-target'); },
