@@ -90,7 +90,7 @@ DBA 必须审核实际 grants，并保存 `\du+`、`\dn+`、schema/table/sequenc
 
 ## Docker build-context boundary (2026-08-11)
 
-The repository root is the production Docker build context, but operational evidence is never an image input. `.dockerignore` excludes the complete `artifacts/`, `.superpowers/`, `.worktrees/`, `backups/`, `reports/`, `logs/`, and temporary-output trees, plus SQLite databases and backup/dump suffixes at any depth. This explicitly covers the legacy `packages/data/*.sqlite*` source set in the primary checkout without deleting it.
+The repository root is the production Docker build context, but operational evidence is never an image input. `.dockerignore` excludes the complete `artifacts/`, `.superpowers/`, `.worktrees/`, `backups/`, `reports/`, `logs/`, and temporary-output trees. Case-insensitive rules exclude SQLite/database, dump/backup, log, and temporary-file suffixes at any depth, plus `-wal`, `-shm`, and `-journal` sidecars for any basename. This explicitly covers the legacy `packages/data/*.sqlite*` source set in the primary checkout without deleting it.
 
 The builder can continue to use `COPY . .` only behind that filtered boundary. Package manifests, application source, documentation, and `packages/server/resources` remain in the context; resources are required by the server image and must not be removed by a broad evidence rule. The final runtime stage copies only server/shared runtime inputs and compiled web assets. It must not contain `packages/db-migrator`, operational evidence directories, or the resolvable `better-sqlite3` module that belongs only to the one-time migration (一次性迁移) package `packages/db-migrator`.
 

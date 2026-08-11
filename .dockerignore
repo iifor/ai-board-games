@@ -15,13 +15,16 @@ tmp/
 # Database files are migration inputs or operator backups, never image inputs.
 data/
 packages/data/
-**/*.sqlite
-**/*.sqlite-*
-**/*.db
-**/*.db-*
-**/*.dump
-**/*.backup
-**/*.bak
+**/*.[sS][qQ][lL][iI][tT][eE]
+**/*.[sS][qQ][lL][iI][tT][eE]-*
+**/*.[dD][bB]
+**/*.[dD][bB]-*
+**/*.[dD][uU][mM][pP]
+**/*.[bB][aA][cC][kK][uU][pP]
+**/*.[bB][aA][kK]
+**/*-[wW][aA][lL]
+**/*-[sS][hH][mM]
+**/*-[jJ][oO][uU][rR][nN][aA][lL]
 
 # Git
 .git/
@@ -37,7 +40,8 @@ packages/data/
 
 # Logs
 logs/
-*.log
+**/*.[lL][oO][gG]
+**/*.[tT][mM][pP]
 
 # Docker
 docker-compose.yml
