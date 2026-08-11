@@ -15,12 +15,40 @@ import {
 } from '../../packages/server/modules/observability';
 import { createSmokeSchema } from './smokeHarness';
 import { runApplicationSmokeScenario } from '../../packages/server/smoke/applicationSmokeScenario';
-import { cleanupRunOwnedSmokeRows } from '../../packages/server/smoke/applicationSmokeOwnership';
+import {
+  capturePreexistingSmokeSkinIds,
+  cleanupRunOwnedSmokeRows,
+  createApplicationSmokeOwnership,
+} from '../../packages/server/smoke/applicationSmokeOwnership';
+import { slugifyId } from '../../packages/server/modules/skins/utils';
 
 const PREEXISTING_OWNER = 901001;
 const PREEXISTING_SUBJECT = 901002;
 const PREEXISTING_SKIN_ID = 'preexisting-application-smoke-skin';
 const PREEXISTING_OTHER_SKIN_ID = 'preexisting-other-application-smoke-skin';
+
+async function insertSkinFixture(
+  database: DbExecutor,
+  id: string,
+  name: string,
+  source: string,
+): Promise<string[]> {
+  await database.execute(`INSERT INTO skins (
+    id, name, version, source, terms_json, background, truth, clues_json,
+    noises_json, memory_examples_json, enabled, created_at, updated_at
+  ) VALUES ($1, $2, 'v-concurrent', $3, '{"concurrent":true}'::jsonb,
+    'concurrent background', 'concurrent truth', '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, 1,
+    '2026-08-03T00:00:00.000Z', '2026-08-03T00:00:00.000Z')`, [id, name, source]);
+  return skinSnapshot(database, [id]);
+}
+
+async function skinSnapshot(database: DbExecutor, ids: string[]): Promise<string[]> {
+  return database.queryMany<{ value: string }>(`
+    SELECT to_jsonb(value)::text AS value FROM (
+      SELECT * FROM skins WHERE id = ANY($1::text[]) ORDER BY id
+    ) value
+  `, [ids]).then((rows) => rows.map((row) => row.value));
+}
 
 async function seedPreexistingPlayersAndMemory(
   database: DbExecutor,
@@ -56,7 +84,7 @@ async function seedPreexistingPlayersAndMemory(
   return seedSnapshot(database);
 }
 
-async function smokeOwnedRowCounts(database: DbExecutor, runId: string): Promise<Record<string, number>> {
+async function smokeOwnedRowCounts(database: DbExecutor, _runId: string): Promise<Record<string, number>> {
   const result: Record<string, number> = {};
   for (const table of ['games', 'matches', 'game_traces', 'admin_users'] as const) {
     result[table] = await database.queryOne<{ count: number }>(
@@ -71,8 +99,7 @@ async function smokeOwnedRowCounts(database: DbExecutor, runId: string): Promise
     WHERE recent_summary IN ('first smoke memory', 'updated smoke memory')
   `).then((row) => Number(row?.count || 0));
   result.syntheticSkins = await database.queryOne<{ count: number }>(
-    'SELECT COUNT(*) AS count FROM skins WHERE name = $1 AND NOT (id = ANY($2::text[]))',
-    [`Application Smoke ${runId}`.slice(0, 180), [PREEXISTING_SKIN_ID, PREEXISTING_OTHER_SKIN_ID]],
+    "SELECT COUNT(*) AS count FROM skins WHERE source LIKE 'application-smoke-skin-%'",
   ).then((row) => Number(row?.count || 0));
   return result;
 }
@@ -205,6 +232,9 @@ test('compiled application smoke fails when observability child rows survive for
   const outputDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'consensus-application-smoke-orphan-'));
   const runId = `application-smoke-orphan-${Date.now()}`;
   try {
+    const before = await seedPreexistingPlayersAndMemory(
+      schema.database, `Application Smoke ${runId}`.slice(0, 180),
+    );
     await schema.database.execute('ALTER TABLE trace_spans DROP CONSTRAINT trace_spans_trace_id_fkey');
     await schema.database.execute('ALTER TABLE game_events DROP CONSTRAINT game_events_trace_id_fkey');
     const report = await runApplicationSmoke({
@@ -219,6 +249,7 @@ test('compiled application smoke fails when observability child rows survive for
       report.checks.some((check) => check.id === 'workflow.observability-delete' && check.status === 'passed'),
       false,
     );
+    assert.deepEqual(await seedSnapshot(schema.database), before);
     assert.deepEqual(await smokeOwnedRowCounts(schema.database, runId), {
       games: 0, matches: 0, game_traces: 0, admin_users: 0,
       syntheticPlayers: 0, syntheticMemories: 0, syntheticSkins: 0,
@@ -271,7 +302,10 @@ test('application smoke removes one proven new skin when the POST response id is
 
     assert.equal(response.ok, false);
     assert.deepEqual(await seedSnapshot(schema.database), before);
-    assert.equal((await smokeOwnedRowCounts(schema.database, runId)).syntheticSkins, 0);
+    assert.deepEqual(await smokeOwnedRowCounts(schema.database, runId), {
+      games: 0, matches: 0, game_traces: 0, admin_users: 0,
+      syntheticPlayers: 0, syntheticMemories: 0, syntheticSkins: 0,
+    });
   } finally {
     await schema.close();
   }
@@ -293,7 +327,10 @@ test('application smoke removes only its created skin when execution fails after
     assert.equal(response.ok, false);
     assert.equal(response.errors.some((error) => error.code === 'APPLICATION_SMOKE_FAILED'), true);
     assert.deepEqual(await seedSnapshot(schema.database), before);
-    assert.equal((await smokeOwnedRowCounts(schema.database, runId)).syntheticSkins, 0);
+    assert.deepEqual(await smokeOwnedRowCounts(schema.database, runId), {
+      games: 0, matches: 0, game_traces: 0, admin_users: 0,
+      syntheticPlayers: 0, syntheticMemories: 0, syntheticSkins: 0,
+    });
   } finally {
     await schema.close();
   }
@@ -320,6 +357,116 @@ test('application smoke preserves preexisting rows when cleanup reports failure 
       (error) => error.code === 'APPLICATION_SMOKE_FIXTURE_CLEANUP_FAILED',
     ), true);
     assert.deepEqual(await seedSnapshot(schema.database), before);
+    assert.deepEqual(await smokeOwnedRowCounts(schema.database, runId), {
+      games: 0, matches: 0, game_traces: 0, admin_users: 0,
+      syntheticPlayers: 0, syntheticMemories: 0, syntheticSkins: 0,
+    });
+  } finally {
+    await schema.close();
+  }
+});
+
+test('application smoke does not delete a concurrent same-name skin when POST creates no row', async () => {
+  const schema = await createSmokeSchema();
+  const runId = `application-smoke-post-rejected-${Date.now()}`;
+  const skinName = `Application Smoke ${runId}`.slice(0, 180);
+  const concurrentId = `concurrent-post-rejected-${Date.now()}`;
+  try {
+    const before = await seedPreexistingPlayersAndMemory(schema.database, skinName);
+    const ownership = createApplicationSmokeOwnership(runId);
+    await capturePreexistingSmokeSkinIds(schema.database, ownership);
+    const concurrentBefore = await insertSkinFixture(
+      schema.database, concurrentId, skinName, 'independent-concurrent-writer',
+    );
+    await cleanupRunOwnedSmokeRows(schema.database, ownership, 'absent-smoke-admin');
+
+    assert.deepEqual(await seedSnapshot(schema.database), before);
+    assert.deepEqual(await skinSnapshot(schema.database, [concurrentId]), concurrentBefore,
+      'a failed POST with no created row must not transfer ownership to a concurrent insert');
+    assert.equal((await smokeOwnedRowCounts(schema.database, runId)).syntheticSkins, 0);
+  } finally {
+    await schema.close();
+  }
+});
+
+test('application smoke removes only its marker row when the response id is lost beside a concurrent skin', async () => {
+  const schema = await createSmokeSchema();
+  const runId = `application-smoke-lost-id-concurrent-${Date.now()}`;
+  const skinName = `Application Smoke ${runId}`.slice(0, 180);
+  const concurrentId = `concurrent-lost-id-${Date.now()}`;
+  try {
+    const before = await seedPreexistingPlayersAndMemory(schema.database, skinName);
+    let concurrentBefore: string[] = [];
+    const response = await runApplicationSmokeScenario({
+      runId, targetUrl: schema.targetUrl, targetSchema: schema.schema,
+    }, [], {
+      afterSkinResponse: async () => {
+        const smokeRows = await schema.database.queryMany<{ id: string; source: string }>(
+          'SELECT id, source FROM skins WHERE name = $1 AND id <> $2 ORDER BY id',
+          [skinName, PREEXISTING_SKIN_ID],
+        );
+        assert.equal(smokeRows.length, 1, 'the formal POST must persist exactly one smoke row');
+        assert.match(
+          smokeRows[0].source,
+          /^application-smoke-skin-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+          'the formal POST must persist the per-run UUID marker unchanged',
+        );
+        concurrentBefore = await insertSkinFixture(
+          schema.database, concurrentId, skinName, 'independent-concurrent-writer',
+        );
+        throw new Error('injected response id loss beside concurrent insert');
+      },
+    });
+
+    assert.equal(response.ok, false);
+    assert.equal(response.errors.some((error) => error.code === 'APPLICATION_SMOKE_FAILED'), true);
+    assert.equal(response.errors.some(
+      (error) => error.code === 'APPLICATION_SMOKE_FIXTURE_CLEANUP_FAILED',
+    ), false);
+    assert.deepEqual(await seedSnapshot(schema.database), before);
+    assert.deepEqual(await skinSnapshot(schema.database, [concurrentId]), concurrentBefore);
+    assert.deepEqual(
+      await schema.database.queryMany<{ id: string }>(
+        'SELECT id FROM skins WHERE name = $1 ORDER BY id', [skinName],
+      ).then((rows) => rows.map((row) => row.id)),
+      [concurrentId, PREEXISTING_SKIN_ID].sort(),
+      'the unreceived smoke row must be removed without deleting the concurrent row',
+    );
+    assert.deepEqual(await smokeOwnedRowCounts(schema.database, runId), {
+      games: 0, matches: 0, game_traces: 0, admin_users: 0,
+      syntheticPlayers: 0, syntheticMemories: 0, syntheticSkins: 0,
+    });
+  } finally {
+    await schema.close();
+  }
+});
+
+test('application smoke does not delete a replacement same-name skin after its own row disappears', async () => {
+  const schema = await createSmokeSchema();
+  const runId = `application-smoke-replaced-row-${Date.now()}`;
+  const skinName = `Application Smoke ${runId}`.slice(0, 180);
+  const smokeSkinId = slugifyId(skinName);
+  const concurrentId = `concurrent-replacement-${Date.now()}`;
+  try {
+    const before = await seedPreexistingPlayersAndMemory(schema.database, skinName);
+    let concurrentBefore: string[] = [];
+    const response = await runApplicationSmokeScenario({
+      runId, targetUrl: schema.targetUrl, targetSchema: schema.schema,
+    }, [], {
+      afterSkinResponse: async () => {
+        await schema.database.execute('DELETE FROM skins WHERE id = $1', [smokeSkinId]);
+        concurrentBefore = await insertSkinFixture(
+          schema.database, concurrentId, skinName, 'independent-concurrent-writer',
+        );
+        throw new Error('injected response loss after external smoke-row deletion');
+      },
+    });
+
+    assert.equal(response.ok, false);
+    assert.equal(response.errors.some((error) => error.code === 'APPLICATION_SMOKE_FAILED'), true);
+    assert.deepEqual(await seedSnapshot(schema.database), before);
+    assert.deepEqual(await skinSnapshot(schema.database, [concurrentId]), concurrentBefore,
+      'cleanup must not substitute a concurrent row for the externally deleted smoke row');
     assert.deepEqual(await smokeOwnedRowCounts(schema.database, runId), {
       games: 0, matches: 0, game_traces: 0, admin_users: 0,
       syntheticPlayers: 0, syntheticMemories: 0, syntheticSkins: 0,

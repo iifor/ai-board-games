@@ -171,3 +171,36 @@ The scenario exposes bounded internal failure seams immediately after the POST r
 - Workspace production build passed; the existing unrelated admin chunk-size warning remains non-failing.
 
 Round 3 changes only the three server smoke ownership/HTTP/scenario modules, their real PostgreSQL application-smoke test, and this report. It adds no canonical SQL, public API, shared type, schema, Compose/entrypoint, release gate, Task 3 artifact, or production credential. All changed backend files remain below 250 lines.
+
+## Fix Round 4 (2026-08-12)
+
+### Verified finding and fix
+
+Round 3 still inferred an unknown skin ID from the unique difference between the same-name ID sets captured before and after POST. Real PostgreSQL concurrency tests proved that this is not ownership: a failed/no-create POST followed by one independent same-name insert caused cleanup to delete the independent row, while deleting the smoke row and inserting a same-name replacement in the response window caused the same unsafe substitution. Keeping both the smoke and concurrent rows made cleanup fail as ambiguous and leave the synthetic smoke row behind.
+
+Each application-smoke scenario now creates a separate `application-smoke-skin-<crypto.randomUUID()>` marker. The existing authenticated skin POST and PUT persist it unchanged through the existing `source` field; no API, schema, shared type, or canonical SQL changed. The marker is temporary, non-sensitive, absent from cutover reports, and verified as zero-residue after cleanup.
+
+Cleanup still captures the same-name ID set before POST. With a returned ID, it deletes only that exact ID when the row also has the exact name and marker and was not in the pre-create set. Without a returned ID, it deletes only marker-bearing, same-name IDs absent from the pre-create set. It never deletes by name or by an unmarked unique ID difference. If the smoke row was externally removed, an independent same-name replacement is not a substitute. Final cleanup verification counts the exact per-run marker across all skin names and fails if any remains.
+
+### Strict RED to GREEN evidence
+
+- Case A, no smoke row/unknown ID plus one independent same-name insert: disposable PostgreSQL RED was 0/1. Existing cleanup deleted the independent row (`expected` one byte snapshot, `actual []`).
+- Cases B and C: disposable PostgreSQL RED was 0/2. When smoke and independent rows both existed after a lost response ID, cleanup reported `APPLICATION_SMOKE_FIXTURE_CLEANUP_FAILED` and left the smoke row. When the smoke row disappeared before an independent same-name replacement entered, cleanup deleted the replacement (`expected` one byte snapshot, `actual []`).
+- Marker GREEN: the three concurrency regressions passed 3/3. The complete focused application-smoke file then passed 10/10 after rebuilding the single compiled server operations adapter. The lost-ID case also queries PostgreSQL inside the response hook and proves the formal POST persisted exactly one RFC 4122 version-4 marker unchanged.
+- The focused matrix covers compiled success, a later observability/delete failure, failure after POST ID receipt, failure before ID receipt, failure after PUT, cleanup reporting failure after real cleanup, and all three concurrency windows. Applicable cases preserve the pre-existing same-name skin, differently named skin, two players, memory, and independent concurrent rows byte-for-byte; all synthetic marker rows are zero afterward.
+
+### Fresh verification
+
+- Focused real PostgreSQL application smoke: 10/10 passed, 0 failed, 0 skipped.
+- Complete PostgreSQL suite: 133 top-level subtests / 140 tests; 140 passed, 0 failed, 0 skipped. The compiled unique PostgreSQL 16 TLS production integration passed in 53.892 seconds; the suite completed in 96.227 seconds.
+- Complete migration suite: 130/130 passed, 0 failed, 0 skipped.
+- Complete unit suite: 358 top-level subtests / 365 tests; 365 passed, 0 failed, 0 skipped.
+- Complete workflow suite: 127/127 passed, 0 failed, 0 skipped.
+- Workspace TypeScript check: all 5 checked packages passed.
+- Full production build passed for server and the single compiled operations adapter build, shared, client, and admin. The existing unrelated admin chunk-size warning remains non-failing.
+- `git diff --check`, changed-path scope, backend line-count, no-name-only-delete, and added-secret/URL checks passed. Changed backend files are 140 and 139 lines; the inspected unchanged scenario is 173 lines.
+- The disposable compiled cutover integration left zero matching containers, volumes, networks, or images.
+
+### Scope and self-review
+
+Round 4 changes only `applicationSmokeHttp.ts`, `applicationSmokeOwnership.ts`, `applicationSmoke.test.ts`, and this ignored report. `applicationSmokeScenario.ts` required no change and no helper file was added. There is no frontend, public API contract, shared type, database schema, canonical migration SQL, Compose/entrypoint, release gate, Task 3 artifact, live SQLite, production service, nginx, real approval, or production credential change. No file was deleted and no production cleanup scope was widened.

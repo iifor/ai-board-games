@@ -10,6 +10,7 @@ interface ApplicationSmokeOwnership {
   players: SmokePlayer[];
   skinId: string | null;
   skinIdsBeforeCreate: string[] | null;
+  skinMarker: string;
   skinName: string;
 }
 
@@ -25,6 +26,7 @@ function createApplicationSmokeOwnership(runId: string): ApplicationSmokeOwnersh
     players: playerIds.map((id, index) => ({ id, nickname: `${marker}-player-${index + 1}` })),
     skinId: null,
     skinIdsBeforeCreate: null,
+    skinMarker: `application-smoke-skin-${crypto.randomUUID()}`,
     skinName: `Application Smoke ${runId}`.slice(0, 180),
   };
 }
@@ -89,35 +91,29 @@ async function cleanupRunOwnedSmokeRows(
     if (ownership.skinIdsBeforeCreate) {
       const before = new Set(ownership.skinIdsBeforeCreate);
       const current = await transaction.queryMany<{ id: string }>(
-        'SELECT id FROM skins WHERE name = $1 ORDER BY id',
-        [ownership.skinName],
+        'SELECT id FROM skins WHERE name = $1 AND source = $2 ORDER BY id',
+        [ownership.skinName, ownership.skinMarker],
       );
-      const createdIds = current.map((row) => row.id).filter((id) => !before.has(id));
+      const ownedIds = current.map((row) => row.id).filter((id) => !before.has(id));
       if (ownership.skinId && before.has(ownership.skinId)) {
         throw new Error('Application smoke skin ownership collision');
       }
-      if (ownership.skinId && createdIds.includes(ownership.skinId)) {
-        await transaction.execute('DELETE FROM skins WHERE id = $1 AND name = $2', [
-          ownership.skinId, ownership.skinName,
+      if (ownership.skinId && ownedIds.includes(ownership.skinId)) {
+        await transaction.execute('DELETE FROM skins WHERE id = $1 AND name = $2 AND source = $3', [
+          ownership.skinId, ownership.skinName, ownership.skinMarker,
         ]);
-      } else if (!ownership.skinId && createdIds.length === 1) {
-        await transaction.execute('DELETE FROM skins WHERE id = $1 AND name = $2', [
-          createdIds[0], ownership.skinName,
+      } else if (!ownership.skinId && ownedIds.length) {
+        await transaction.execute('DELETE FROM skins WHERE id = ANY($1::text[]) AND name = $2 AND source = $3', [
+          ownedIds, ownership.skinName, ownership.skinMarker,
         ]);
-      } else if (createdIds.length !== 0) {
-        throw new Error('Application smoke skin ownership is ambiguous');
       }
     }
     await transaction.execute('DELETE FROM admin_users WHERE username = $1', [adminUsername]);
   });
 
-  const remainingSkinRows = ownership.skinIdsBeforeCreate
-    ? await database.queryMany<{ id: string }>(
-      'SELECT id FROM skins WHERE name = $1 ORDER BY id', [ownership.skinName],
-    )
-    : [];
-  const preexistingSkinIds = new Set(ownership.skinIdsBeforeCreate || []);
-  const remainingOwnedSkins = remainingSkinRows.filter((row) => !preexistingSkinIds.has(row.id)).length;
+  const remainingOwnedSkins = await database.queryOne<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM skins WHERE source = $1', [ownership.skinMarker],
+  );
 
   const remaining = await database.queryOne<{ count: number }>(`
     SELECT
@@ -129,7 +125,7 @@ async function cleanupRunOwnedSmokeRows(
       + (SELECT COUNT(*) FROM game_traces WHERE id = ANY($4::text[]))
       + (SELECT COUNT(*) FROM admin_users WHERE username = $3) AS count
   `, [ownership.playerIds, ownership.gameId, adminUsername, traceIds]);
-  if (Number(remaining?.count || 0) + remainingOwnedSkins !== 0) {
+  if (Number(remaining?.count || 0) + Number(remainingOwnedSkins?.count || 0) !== 0) {
     throw new Error('Application smoke fixture cleanup incomplete');
   }
 }

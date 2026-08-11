@@ -109,6 +109,7 @@ async function verifyConfigurationRoutesAndSkinCrud(
   }
   const skin = {
     name: ownership.skinName,
+    source: ownership.skinMarker,
     background: 'Application smoke background',
     truth: 'Application smoke truth',
     clues: [{ title: 'Smoke clue', text: 'Smoke clue text' }],
