@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
@@ -24,6 +24,7 @@ import {
   readIdentityStates,
   type ValidationDbExecutor,
 } from '../validation/queries';
+import { businessSampleHash } from '../validation/sampleCanonicalization';
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
 
@@ -232,35 +233,6 @@ function sourceCount(sqlite: Database.Database, table: typeof IMPORT_TABLES[numb
   return Number(row.count);
 }
 
-function canonicalValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalValue);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, item]) => [key, canonicalValue(item)]),
-    );
-  }
-  return value;
-}
-
-function normalizeSampleRow(row: Record<string, unknown> | null): Record<string, unknown> | null {
-  if (!row) return null;
-  return Object.fromEntries(Object.entries(row).map(([column, rawValue]) => {
-    if (rawValue == null) return [column, null];
-    if (column.endsWith('_json')) return [column, canonicalValue(JSON.parse(String(rawValue)))];
-    if (column.endsWith('_at')) {
-      const date = new Date(String(rawValue));
-      return [column, Number.isNaN(date.getTime()) ? '[INVALID_TIMESTAMP]' : date.toISOString()];
-    }
-    return [column, rawValue];
-  }));
-}
-
-function sampleHash(row: Record<string, unknown> | null): string {
-  return createHash('sha256').update(JSON.stringify(canonicalValue(normalizeSampleRow(row)))).digest('hex');
-}
-
 async function verifySourceManifest(options: ValidateOptions): Promise<void> {
   const raw: unknown = JSON.parse(await fs.readFile(options.sourceManifestPath, 'utf8'));
   const manifest = raw as BackupManifest;
@@ -390,8 +362,8 @@ async function validateBusinessSamples(
   for (const sample of BUSINESS_SAMPLES) {
     const source = sqlite.prepare(sample.sourceSql).get() as Record<string, unknown> | undefined;
     const target = await postgres.queryOne<Record<string, unknown>>(sample.targetSql);
-    const sourceHash = sampleHash(source || null);
-    const targetHash = sampleHash(target);
+    const sourceHash = businessSampleHash(source || null, sample.bigintColumns, 'serialized');
+    const targetHash = businessSampleHash(target, sample.bigintColumns);
     if (sourceHash === targetHash) {
       passed(checks, `sample.${sample.id}`, `Deterministic ${sample.table} sample matches`, `sha256:${sourceHash}`, `sha256:${targetHash}`);
     } else {

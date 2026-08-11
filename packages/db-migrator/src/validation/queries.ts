@@ -14,6 +14,7 @@ export interface BusinessSampleDefinition {
   table: string;
   sourceSql: string;
   targetSql: string;
+  bigintColumns?: readonly string[];
 }
 
 const TABLE_COUNT_SQL = IMPORT_TABLES.map((table) => (
@@ -47,7 +48,7 @@ const IDENTITY_SQL = IDENTITY_TABLES.map((table) => `
 `).join('\nUNION ALL\n');
 
 const JSON_SEMANTICS = [
-  ['skins', 'terms_json', 'array'],
+  ['skins', 'terms_json', 'object'],
   ['skins', 'clues_json', 'array'],
   ['skins', 'noises_json', 'array'],
   ['skins', 'memory_examples_json', 'array'],
@@ -58,7 +59,7 @@ const JSON_SEMANTICS = [
   ['games', 'topic_json', 'object'],
   ['games', 'players_json', 'array'],
   ['games', 'rounds_json', 'array'],
-  ['games', 'event_json', 'array'],
+  ['games', 'event_json', 'object'],
   ['games', 'audio_resources_json', 'array'],
   ['game_players', 'player_snapshot_json', 'object'],
   ['game_player_selections', 'player_ids_json', 'array'],
@@ -102,6 +103,7 @@ export const BUSINESS_SAMPLES: readonly BusinessSampleDefinition[] = [
   {
     id: 'admin_users',
     table: 'admin_users',
+    bigintColumns: ['id'],
     sourceSql: 'SELECT id, username, password_hash, display_name, enabled, must_change_password, created_at, updated_at FROM admin_users ORDER BY id LIMIT 1',
     targetSql: 'SELECT id, username, password_hash, display_name, enabled, must_change_password, created_at, updated_at FROM admin_users ORDER BY id LIMIT 1',
   },
@@ -114,6 +116,7 @@ export const BUSINESS_SAMPLES: readonly BusinessSampleDefinition[] = [
   {
     id: 'players',
     table: 'players',
+    bigintColumns: ['id', 'model_id', 'fallback_model_id', 'voice_package_id'],
     sourceSql: 'SELECT id, nickname, name, avatar, sex, personality, provider, model, model_id, fallback_model_id, voice_package_id, temperature, enabled, sort_order, created_at, updated_at FROM players ORDER BY id LIMIT 1',
     targetSql: 'SELECT id, nickname, name, avatar, sex, personality, provider, model, model_id, fallback_model_id, voice_package_id, temperature, enabled, sort_order, created_at, updated_at FROM players ORDER BY id LIMIT 1',
   },
@@ -132,6 +135,7 @@ export const BUSINESS_SAMPLES: readonly BusinessSampleDefinition[] = [
   {
     id: 'player_game_memories',
     table: 'player_game_memories',
+    bigintColumns: ['id', 'owner_player_id', 'subject_player_id'],
     sourceSql: 'SELECT id, game_type, owner_player_id, subject_player_id, games_played, familiarity_score, traits_json, recent_summary, created_at, updated_at FROM player_game_memories ORDER BY id LIMIT 1',
     targetSql: 'SELECT id, game_type, owner_player_id, subject_player_id, games_played, familiarity_score, traits_json, recent_summary, created_at, updated_at FROM player_game_memories ORDER BY id LIMIT 1',
   },

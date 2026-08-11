@@ -16,6 +16,7 @@ const testFiles = [
   'restoreDrillSecurity.test.ts',
   'prepareSignoff.test.ts',
   'releaseReadiness.test.ts',
+  'validationCanonicalization.test.ts',
 ].map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];

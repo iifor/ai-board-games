@@ -12,7 +12,8 @@ import {
   type ValidateOptions,
 } from '../../packages/db-migrator/src/commands/validate';
 import { migrateSqliteToPostgres } from '../../packages/db-migrator/src/importer';
-import { createPostgresExecutor } from '../../packages/server/db/postgres';
+import { createValidationExecutor } from '../../packages/db-migrator/src/postgres/validationExecutor';
+import type { ValidationDbExecutor } from '../../packages/db-migrator/src/validation/queries';
 import { migratePostgres } from '../../packages/server/db/postgres/migrate';
 import type { DbExecutor } from '../../packages/server/db/types';
 import { withTestSchema } from './helpers';
@@ -28,6 +29,21 @@ const timestamp = '2026-08-08T00:00:00.000Z';
 function createSourceFixture(candidate: string): void {
   const database = new Database(candidate);
   database.exec(`
+    CREATE TABLE skins (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      version TEXT NOT NULL,
+      source TEXT NOT NULL,
+      terms_json TEXT NOT NULL,
+      background TEXT NOT NULL,
+      truth TEXT NOT NULL,
+      clues_json TEXT NOT NULL,
+      noises_json TEXT NOT NULL,
+      memory_examples_json TEXT NOT NULL,
+      enabled INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
     CREATE TABLE app_settings (
       key TEXT PRIMARY KEY,
       value_json TEXT NOT NULL,
@@ -100,6 +116,26 @@ function createSourceFixture(candidate: string): void {
       updated_at TEXT NOT NULL
     );
   `);
+  database.prepare('INSERT INTO skins VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+    'validation-skin',
+    'Validation Skin',
+    'v1',
+    'test',
+    JSON.stringify({ suspect: '嫌疑人' }),
+    'private-background',
+    'private-truth',
+    JSON.stringify([{ clue: 'private-clue' }]),
+    JSON.stringify([]),
+    JSON.stringify([]),
+    1,
+    timestamp,
+    timestamp,
+  );
+  database.prepare('INSERT INTO app_settings VALUES (?, ?, ?)').run(
+    '0-validation-scalar',
+    JSON.stringify(0.5),
+    timestamp,
+  );
   database.prepare('INSERT INTO app_settings VALUES (?, ?, ?)').run(
     'validation-config',
     JSON.stringify({ apiKey: 'top-secret-config', enabled: true }),
@@ -129,7 +165,7 @@ function createSourceFixture(candidate: string): void {
     JSON.stringify({ title: 'private-topic' }),
     JSON.stringify([{ id: 101 }, { id: 102 }]),
     JSON.stringify([{ day: 1 }]),
-    JSON.stringify([{ type: 'private-event' }]),
+    JSON.stringify({ type: 'private-event' }),
     JSON.stringify([]),
     timestamp,
   );
@@ -210,15 +246,8 @@ function errorCodes(report: Awaited<ReturnType<typeof runValidation>>): string[]
   return report.errors.map((error) => error.code);
 }
 
-function readonlyExecutor(schema: string, close?: () => Promise<void>): DbExecutor {
-  const real = createPostgresExecutor({
-    connectionString: process.env.TEST_DATABASE_URL!,
-    schema,
-    poolMax: 1,
-    connectionTimeoutMs: 5_000,
-    statementTimeoutMs: 30_000,
-    ssl: false,
-  });
+function readonlyExecutor(schema: string, close?: () => Promise<void>): ValidationDbExecutor {
+  const real = createValidationExecutor(process.env.TEST_DATABASE_URL!, schema);
   const assertRead = (sql: string): void => assert.match(sql, /^\s*(?:SELECT|SHOW)\b/i);
   return {
     queryOne: async <T extends object>(sql: string, params?: readonly unknown[]): Promise<T | null> => {
@@ -229,9 +258,6 @@ function readonlyExecutor(schema: string, close?: () => Promise<void>): DbExecut
       assertRead(sql);
       return real.queryMany<T>(sql, params);
     },
-    execute: async () => { throw new Error('validation must not execute writes'); },
-    withTransaction: async () => { throw new Error('validation must not open write transactions'); },
-    healthCheck: () => real.healthCheck(),
     close: async () => {
       await real.close();
       if (close) await close();
@@ -347,6 +373,26 @@ test('validation reports JSON_SEMANTICS_INVALID for a non-object object field', 
     const report = await runValidation(options);
     assert.equal(report.status, 'failed');
     assert.ok(errorCodes(report).includes('JSON_SEMANTICS_INVALID'));
+    assert.equal(report.checks.find((check) => check.id === 'json.games.topic_json')?.status, 'failed');
+  });
+});
+
+test('validation enforces object semantics for skin terms and game event fields', async () => {
+  await withValidationFixture(async ({ database, options }) => {
+    await database.execute("UPDATE skins SET terms_json = '[]'::jsonb WHERE id = 'validation-skin'");
+    await database.execute("UPDATE games SET event_json = '[]'::jsonb WHERE id = 'validation-game'");
+    const report = await runValidation(options);
+    assert.equal(report.status, 'failed');
+    assert.equal(report.checks.find((check) => check.id === 'json.skins.terms_json')?.expected, 'object');
+    assert.equal(report.checks.find((check) => check.id === 'json.games.event_json')?.expected, 'object');
+  });
+});
+
+test('validation treats JSON null as invalid for object fields', async () => {
+  await withValidationFixture(async ({ database, options }) => {
+    await database.execute("UPDATE games SET topic_json = 'null'::jsonb WHERE id = 'validation-game'");
+    const report = await runValidation(options);
+    assert.equal(report.status, 'failed');
     assert.equal(report.checks.find((check) => check.id === 'json.games.topic_json')?.status, 'failed');
   });
 });
