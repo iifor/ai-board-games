@@ -11,6 +11,7 @@ import type { CutoverOptions, LoadCutoverAuthorizationOptions } from '../cutover
 import type { ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
 
 const GIT_SHA = /^[a-f0-9]{40}$/;
+const SHA256 = /^[a-f0-9]{64}$/;
 
 function invalidParameters(): Error & { code: 'CUTOVER_INVALID_PARAMETERS' } {
   return Object.assign(new Error('Production cutover parameters are invalid'), {
@@ -23,6 +24,7 @@ function validOptions(options: CutoverOptions): boolean {
     && Boolean(options.sourceSnapshotPath.trim() && options.sourceManifestPath.trim() && options.outputDirectory.trim())
     && (!options.execute || (
       GIT_SHA.test(options.releaseCandidate) && !/^0{40}$/.test(options.releaseCandidate)
+      && SHA256.test(options.freezeReceiptSha256) && !/^0{64}$/.test(options.freezeReceiptSha256)
       && Boolean(options.authorizationPath?.trim())
     ));
 }
@@ -57,6 +59,7 @@ export async function runCutover(
     releaseCandidate: options.releaseCandidate,
     manifestSha256: initialSource.manifestSha256,
     sourceSnapshotSha256: initialSource.sourceSnapshotSha256,
+    freezeReceiptSha256: options.freezeReceiptSha256,
   };
   const authorization = await loadCutoverAuthorization({
     authorizationPath: options.authorizationPath!,
@@ -113,6 +116,11 @@ export async function runCutover(
           id: 'release.candidate', status: 'passed',
           expected: options.releaseCandidate, actual: options.releaseCandidate,
           message: 'Authorized release candidate matches the executing build',
+        },
+        {
+          id: 'freeze.receipt.sha256', status: 'passed',
+          expected: options.freezeReceiptSha256, actual: options.freezeReceiptSha256,
+          message: 'Cutover authorization matches the validated freeze receipt',
         },
       ],
     );

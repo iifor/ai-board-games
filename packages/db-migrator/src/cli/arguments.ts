@@ -2,6 +2,8 @@ const COMMANDS = [
   'migrate', 'preflight', 'backup', 'verify-backup', 'restore-drill', 'validate', 'rehearse', 'prepare-signoff',
   'release-readiness',
   'cutover',
+  'record-production-build', 'verify-production-build',
+  'verify-freeze-receipt', 'verify-traffic-authorization', 'verify-observation-receipt',
 ] as const;
 
 export interface ParsedCommand {

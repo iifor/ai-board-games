@@ -76,7 +76,10 @@ function runCompose(args: string[], environment: Record<string, string>) {
 }
 
 function loadComposeConfig(environment: Record<string, string>): ComposeConfig {
-  const result = runCompose(['--profile', 'ops', 'config', '--format', 'json'], environment);
+  const result = runCompose([
+    '--profile', 'application', '--profile', 'ops', '--profile', 'traffic',
+    'config', '--format', 'json',
+  ], environment);
   assert.equal(result.status, 0, `docker compose config failed:\n${result.stdout}\n${result.stderr}`);
   return JSON.parse(result.stdout) as ComposeConfig;
 }
@@ -93,7 +96,7 @@ test('ordinary Compose configuration needs no ops credential and excludes the mi
   const environment = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('POSTGRES_')));
   const result = runCompose(['--env-file', emptyEnv, 'config', '--services'], environment);
   assert.equal(result.status, 0, `ordinary Compose config must not require ops settings:\n${result.stderr}`);
-  assert.deepEqual(result.stdout.trim().split(/\r?\n/), ['postgres', 'app', 'nginx']);
+  assert.deepEqual(result.stdout.trim().split(/\r?\n/), ['postgres']);
 });
 
 test('production Compose keeps PostgreSQL private, durable, TLS-only, and behind an application-role query health gate', async (t) => {
@@ -127,6 +130,8 @@ test('Compose gives runtime and offline operations fixed, secret-backed TLS iden
   const config = loadComposeConfig(await createComposeFixture(t));
   const app = config.services.app;
   const migrator = config.services.migrator;
+  assert.equal(app.image, 'consensus-production-app');
+  assert.equal(migrator.image, 'consensus-production-migrator');
   assert.equal(app.build?.target, 'runtime', 'Compose must build the final runtime stage for app');
   assert.equal(app.environment?.DATABASE_URL, undefined, 'the app URL must be assembled only inside its child process');
   assert.ok(hasSecret(app, 'postgres_app_password', '/run/secrets/postgres_app_password'));

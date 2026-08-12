@@ -14,6 +14,7 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const ROOT_KEYS = [
   'version', 'purpose', 'status', 'approved', 'releaseCandidate', 'cutoverRunId',
   'backupManifestSha256', 'sourceSnapshotSha256', 'target', 'maintenanceWindow', 'approvals',
+  'freezeReceiptSha256',
 ] as const;
 const TARGET_KEYS = ['database', 'schema', 'role', 'host', 'port', 'tlsMode'] as const;
 const WINDOW_KEYS = ['startsAt', 'endsAt'] as const;
@@ -66,7 +67,9 @@ function validateShape(
     || !validSha256(candidate.backupManifestSha256)
     || candidate.backupManifestSha256 !== options.manifestSha256
     || !validSha256(candidate.sourceSnapshotSha256)
-    || candidate.sourceSnapshotSha256 !== options.sourceSnapshotSha256) return false;
+    || candidate.sourceSnapshotSha256 !== options.sourceSnapshotSha256
+    || !validSha256(candidate.freezeReceiptSha256)
+    || candidate.freezeReceiptSha256 !== options.freezeReceiptSha256) return false;
 
   if (!exactKeys(candidate.target, TARGET_KEYS)) return false;
   const target = candidate.target;

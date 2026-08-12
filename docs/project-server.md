@@ -309,13 +309,12 @@ pnpm run check:server
 - 负载均衡通过 HTTP/WebSocket 回源 Nginx 80 端口；Nginx 保留 `X-Forwarded-Proto`，Express 信任一个代理 hop。
 - CVM 安全组的 80 端口只允许负载均衡访问，Node.js 的 3001 端口只绑定到本机。
 
-部署验证（在 CVM 项目目录执行）：
+首次 PostgreSQL 部署必须使用受控 runbook 的分阶段入口；默认 Compose 只解析并启动 PostgreSQL：
 
 ```bash
-docker compose config --quiet
-docker compose up -d --build
-docker compose ps
-curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/health"
+docker compose config --services
+sh ./scripts/ops/postgres/start-postgres-only.sh
+# 其余 app / traffic / ops 阶段严格按 postgresql-first-deployment-cutover.md 执行
 ```
 
 数据库/资源备份、WAL 归档、恢复演练和正式切换前证据收集见 `docs/postgresql-deployment.md` 与 `docs/runbooks/postgresql-production-readiness.md`；切换失败恢复见 `docs/runbooks/postgresql-rollback.md`。volume 持久化不能替代异机备份。
@@ -427,6 +426,8 @@ curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/health"
 ## Production Compose database role boundary (2026-08-11)
 
 The runtime Compose application receives only the app password secret and a CA-only mount. Its wrapper constructs the fixed `consensus_app@postgres:5432/consensus` URL only in the server child environment; the password and URL are never command arguments or logs. PostgreSQL health executes TLS `verify-full` plus `SELECT 1` as `consensus_app`, so socket/bootstrap readiness cannot unblock the app. Offline operations use the `ops` profile and a real Docker entrypoint that reads only the migrator password secret, constructs the fixed `consensus_migrator` URL only in the CLI child environment, and preserves CLI arguments/exit status. Ordinary Compose configuration and startup do not require an operations URL or enable the migrator service. The normal runtime image does not include `packages/db-migrator` or its 一次性迁移 dependency `better-sqlite3`.
+
+The Linux first-deployment entrypoints under `scripts/ops/postgres/` are intentionally thin: one canonical repository root, Compose file/project, fixed services, and the compiled db-migrator CLI own migration/evidence behavior. Ambient Compose overrides are cleared. Production runtime source comes through an independently verified named candidate context; its actual Git-blob input manifest is embedded in the image and compared with a stable typed build receipt that also binds candidate commit/tree, tooling HEAD, and both image digests. `verify-freeze-receipt`, `verify-traffic-authorization`, and `verify-observation-receipt` are typed, read-only commands. They never write, approve, or connect to PostgreSQL. Freeze verification binds the approved maintenance artifact, candidate/tooling/change/freeze identities, ordered source/resources, stopped writers/background work, current time, and receipt hash. Backup/cutover/completion/release evidence retain the same freeze SHA. Traffic authorization independently binds build, freeze, and release artifacts plus current runtime content, three distinct people, and a canonical UTC window. Observation independently binds the same authorization/run, cannot begin before traffic approval, lasts at least 60 minutes, and closes with a new PostgreSQL backup restored into an isolated target.
 
 ## Player Model Fallback
 

@@ -20,6 +20,7 @@ const OPERATOR_CHECKS = [
   'operator.signoff',
 ] as const;
 const RELEASE_CANDIDATE = '0123456789abcdef0123456789abcdef01234567';
+const FREEZE_RECEIPT_SHA256 = 'f'.repeat(64);
 
 function readinessReport(
   runId: string,
@@ -114,6 +115,7 @@ async function createFixture(): Promise<Fixture> {
     version: 1, purpose: 'production-cutover', status: 'approved', approved: true,
     releaseCandidate: RELEASE_CANDIDATE, cutoverRunId: 'production-cutover-1',
     backupManifestSha256: cutoverManifestHash, sourceSnapshotSha256: 'a'.repeat(64),
+    freezeReceiptSha256: FREEZE_RECEIPT_SHA256,
     target: {
       database: 'consensus', schema: 'consensus', role: 'consensus_migrator',
       host: 'postgres', port: 5432, tlsMode: 'verify-full',
@@ -140,6 +142,7 @@ async function createFixture(): Promise<Fixture> {
     readinessReport('backup-1', 'backup', [
       { id: 'backup.execute', status: 'passed', message: 'executed' },
       { id: 'backup.publish', status: 'passed', message: 'published' },
+      { id: 'freeze.receipt.sha256', status: 'passed', expected: FREEZE_RECEIPT_SHA256, actual: FREEZE_RECEIPT_SHA256, message: 'freeze bound' },
       { id: 'source.raw-wal', status: 'skipped', message: 'Source SQLite WAL sidecar does not exist; no file fabricated' },
       { id: 'source.raw-shm', status: 'skipped', message: 'Source SQLite SHM sidecar does not exist; no file fabricated' },
     ]),
@@ -204,6 +207,7 @@ async function createFixture(): Promise<Fixture> {
     { id: 'authorization.valid', status: 'passed', expected: cutoverAuthorizationHash, actual: cutoverAuthorizationHash, message: 'authorization passed' },
     { id: 'authorization.sha256', status: 'passed', expected: cutoverAuthorizationHash, actual: cutoverAuthorizationHash, message: 'authorization hash passed' },
     { id: 'release.candidate', status: 'passed', expected: RELEASE_CANDIDATE, actual: RELEASE_CANDIDATE, message: 'candidate passed' },
+    { id: 'freeze.receipt.sha256', status: 'passed', expected: FREEZE_RECEIPT_SHA256, actual: FREEZE_RECEIPT_SHA256, message: 'freeze passed' },
     { id: 'source.snapshot.sha256', status: 'passed', expected: 'a'.repeat(64), actual: 'a'.repeat(64), message: 'source passed' },
     { id: 'source.manifest.sha256', status: 'passed', expected: cutoverManifestHash, actual: cutoverManifestHash, message: 'manifest passed' },
     {
@@ -263,6 +267,7 @@ async function createFixture(): Promise<Fixture> {
           schema: 'consensus',
           releaseCandidate: canonicalCutover.checks.find((check) => check.id === 'release.candidate')!.actual,
           sourceSnapshotSha256: canonicalCutover.checks.find((check) => check.id === 'source.snapshot.sha256')!.actual,
+          freezeReceiptSha256: canonicalCutover.checks.find((check) => check.id === 'freeze.receipt.sha256')!.actual,
           manifestSha256: findArtifact('manifest').sha256,
           authorizationSha256: findArtifact('authorization').sha256,
           ownerReceiptSha256: findArtifact('owner-receipt').sha256,
@@ -335,6 +340,7 @@ test('passes only complete evidence and computes a three-minute maintenance wind
   const result = await runFixture(fixture, 'release-pass');
 
   assert.equal(result.status, 'passed', JSON.stringify(result, null, 2));
+  assert.equal(result.freezeReceiptSha256, FREEZE_RECEIPT_SHA256);
   assert.equal((result as ReadinessReport & { maintenanceWindowMinutes?: number }).maintenanceWindowMinutes, 3);
   assert.deepEqual(result.checks.map((check) => check.id), [
     'ci.release-gates', 'tests.no-critical-skips', 'backup.executed', 'backup.restore-drill',
@@ -344,6 +350,16 @@ test('passes only complete evidence and computes a three-minute maintenance wind
   ]);
   await fs.access(path.join(fixture.outputDirectory, 'release-pass-release.json'));
   await fs.access(path.join(fixture.outputDirectory, 'release-pass-release.md'));
+});
+
+test('release rejects independently valid backup and cutover evidence from different freezes', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  const cutover = fixture.reports.find((report) => report.stage === 'cutover')!;
+  const check = cutover.checks.find((item) => item.id === 'freeze.receipt.sha256')!;
+  check.expected = 'e'.repeat(64);
+  check.actual = 'e'.repeat(64);
+  assert.equal((await runFixture(fixture, 'release-mixed-freezes')).status, 'failed');
 });
 
 test('production cutover gate fails for absent, duplicate, failed, or mismatched cutover closure', async (t) => {

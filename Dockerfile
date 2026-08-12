@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # ============================================================
 # CONSENSUS — Multi-stage Dockerfile
 # ============================================================
@@ -43,33 +44,63 @@ RUN pnpm run build:shared \
 RUN pnpm --filter @ai-presenter/db-migrator deploy --prod /opt/db-migrator
 RUN pnpm --filter @ai-presenter/server deploy --prod /opt/server-ops
 
-# --- Stage 2: Production runtime ---
+# --- Stage 2: Build application from the independently verified candidate context ---
+FROM node:20-slim AS runtime-builder
+
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+WORKDIR /app
+
+COPY --from=application_source package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY --from=application_source packages/shared ./packages/shared
+COPY --from=application_source packages/client ./packages/client
+COPY --from=application_source packages/admin ./packages/admin
+COPY --from=application_source packages/server ./packages/server
+COPY --from=application_source packages/db-migrator/package.json ./packages/db-migrator/package.json
+COPY scripts/ops/postgres/application-input-manifest.cjs /usr/local/bin/application-input-manifest.cjs
+
+ARG RELEASE_CANDIDATE_SHA=unbound
+RUN node /usr/local/bin/application-input-manifest.cjs /app "$RELEASE_CANDIDATE_SHA" \
+    > /app/.consensus-application-inputs.json
+
+RUN pnpm install --frozen-lockfile \
+    && pnpm run build:shared \
+    && pnpm --filter @ai-presenter/server run build \
+    && pnpm run build:client \
+    && pnpm run build:admin
+
+# --- Stage 3: Production runtime ---
 FROM node:20-slim AS runtime
+
+ARG RELEASE_CANDIDATE_SHA=unbound
+ARG REVIEWED_TOOLING_HEAD=unbound
+LABEL org.opencontainers.image.revision="${REVIEWED_TOOLING_HEAD}" \
+      org.consensus.application-candidate="${RELEASE_CANDIDATE_SHA}" \
+      org.consensus.image-role="runtime"
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 WORKDIR /app
 
-# Copy workspace manifests
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/shared/package.json  packages/shared/package.json
-COPY packages/client/package.json  packages/client/package.json
-COPY packages/admin/package.json   packages/admin/package.json
-COPY packages/server/package.json  packages/server/package.json
+# The runtime application is copied only from the independently verified
+# application_source context. The start wrapper is the sole tooling overlay.
+COPY --from=application_source package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY --from=application_source packages/shared ./packages/shared
+COPY --from=application_source packages/client ./packages/client
+COPY --from=application_source packages/admin ./packages/admin
+COPY --from=application_source packages/server ./packages/server
 
 # Copy server source (runs from TS via dev-runtime.cjs)
-COPY packages/server ./packages/server
-COPY packages/shared ./packages/shared
 COPY scripts/ops/postgres/start-production-app.cjs ./scripts/ops/postgres/start-production-app.cjs
 
 # Production deps only. Installing after source copy also guarantees that
 # workspace links point at the final package directories.
 RUN pnpm install --frozen-lockfile --prod --filter @ai-presenter/server...
 
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=runtime-builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=runtime-builder /app/.consensus-application-inputs.json ./.consensus-application-inputs.json
 
 # Copy built static assets from builder
-COPY --from=builder /app/dist ./dist
+COPY --from=runtime-builder /app/dist ./dist
 
 # Expose server port
 EXPOSE 3001
@@ -81,8 +112,14 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Start server
 CMD ["node", "scripts/ops/postgres/start-production-app.cjs"]
 
-# --- Stage 3: Offline migration operations ---
+# --- Stage 4: Offline migration operations ---
 FROM node:20-slim AS ops
+
+ARG RELEASE_CANDIDATE_SHA=unbound
+ARG REVIEWED_TOOLING_HEAD=unbound
+LABEL org.opencontainers.image.revision="${REVIEWED_TOOLING_HEAD}" \
+      org.consensus.application-candidate="${RELEASE_CANDIDATE_SHA}" \
+      org.consensus.image-role="ops"
 
 WORKDIR /app
 

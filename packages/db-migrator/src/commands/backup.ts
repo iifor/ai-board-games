@@ -30,6 +30,7 @@ export interface BackupOptions {
   outputDirectory: string;
   resourceDirectories: string[];
   execute: boolean;
+  freezeReceiptSha256?: string;
 }
 
 interface ResourceFile { file: FileMetadata; rootRealPath: string; destination: string }
@@ -108,6 +109,10 @@ async function planBackup(options: BackupOptions): Promise<BackupPlan> {
     throw codedError('INVALID_PARAMETERS', 'resourceDirectories must contain non-empty paths');
   }
   if (typeof options.execute !== 'boolean') throw codedError('INVALID_PARAMETERS', 'execute must be boolean');
+  if (options.freezeReceiptSha256 !== undefined
+    && (!/^[a-f0-9]{64}$/.test(options.freezeReceiptSha256) || /^0{64}$/.test(options.freezeReceiptSha256))) {
+    throw codedError('INVALID_PARAMETERS', 'freezeReceiptSha256 must be a canonical SHA-256');
+  }
   const source = await inspectSourceFiles(options.sourcePath);
   const resources = (await Promise.all(options.resourceDirectories.map(inspectResourceRoot))).flat();
   const estimatedBytes = source.files.reduce((sum, file) => sum + file.sizeBytes, 0)
@@ -155,6 +160,11 @@ export async function runBackup(options: BackupOptions): Promise<ReadinessReport
   try {
     const plan = await planBackup({ ...options, sourcePath: path.resolve(options.sourcePath || '.') });
     checks.push({ id: 'backup.parameters', status: 'passed', message: 'Backup paths and resource roots are valid' });
+    if (options.freezeReceiptSha256) checks.push({
+      id: 'freeze.receipt.sha256', status: 'passed',
+      expected: options.freezeReceiptSha256, actual: options.freezeReceiptSha256,
+      message: 'Backup is bound to the validated freeze receipt',
+    });
     checks.push({ id: 'backup.estimated-bytes', status: 'passed', actual: `${plan.estimatedBytes} bytes`, message: 'Backup input capacity calculated without source writes' });
     if (!options.execute) {
       checks.push({ id: 'backup.execute', status: 'skipped', message: 'dry-run; no files created' });

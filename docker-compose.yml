@@ -1,7 +1,6 @@
 # CONSENSUS Docker Compose
-# Usage:
-#   docker compose up -d --build
-#   docker compose logs -f app
+# Production application and traffic are profile-gated; use only the reviewed
+# scripts/ops/postgres entrypoints from the first-deployment runbook.
 
 services:
   postgres:
@@ -46,10 +45,17 @@ services:
       retries: 12
 
   app:
+    profiles: [application]
+    image: consensus-production-app
     build:
       context: .
+      additional_contexts:
+        application_source: ${APPLICATION_SOURCE_ROOT:-.}
       dockerfile: Dockerfile
       target: runtime
+      args:
+        RELEASE_CANDIDATE_SHA: ${RELEASE_CANDIDATE_SHA:-unbound}
+        REVIEWED_TOOLING_HEAD: ${REVIEWED_TOOLING_HEAD:-unbound}
     restart: unless-stopped
     ports:
       - "127.0.0.1:3001:3001"  # Only accessible locally; Nginx handles external traffic
@@ -82,6 +88,7 @@ services:
       retries: 3
 
   nginx:
+    profiles: [traffic]
     image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
@@ -93,10 +100,16 @@ services:
         condition: service_healthy
 
   migrator:
+    image: consensus-production-migrator
     build:
       context: .
+      additional_contexts:
+        application_source: ${APPLICATION_SOURCE_ROOT:-.}
       dockerfile: Dockerfile
       target: ops
+      args:
+        RELEASE_CANDIDATE_SHA: ${RELEASE_CANDIDATE_SHA:-unbound}
+        REVIEWED_TOOLING_HEAD: ${REVIEWED_TOOLING_HEAD:-unbound}
     profiles: [ops]
     environment:
       DATABASE_SSL: verify-full

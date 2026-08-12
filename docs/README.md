@@ -56,3 +56,4 @@
 - `postgresql-deployment.md`：PostgreSQL 16 环境、权限、TLS、备份恢复和监控基线。
 - `runbooks/postgresql-production-readiness.md`：正式切换前不可交换的 12 步准备与证据聚合流程；只准备和申请授权，不执行真实切流。
 - `runbooks/postgresql-rollback.md`：切换验收失败后的旧镜像与同时间点 SQLite/WAL/SHM/资源恢复流程。
+- `runbooks/postgresql-first-deployment-cutover.md`：首次 Linux Docker Compose 生产部署的 16 步执行、固定 Compose/镜像来源、typed freeze receipt、手工流量门禁、60 分钟观察和按 PostgreSQL 新写入分支的回滚决策。

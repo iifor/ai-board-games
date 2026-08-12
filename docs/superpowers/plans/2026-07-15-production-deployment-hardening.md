@@ -439,7 +439,7 @@ Add PowerShell/Bash-friendly operator commands for:
 
 ```bash
 docker compose config --quiet
-docker compose up -d --build
+sh ./scripts/ops/postgres/start-postgres-only.sh
 docker compose ps
 curl -fsS "https://${PRODUCTION_DOMAIN}/api/toc/health"
 ```
@@ -492,7 +492,7 @@ Expected: every command exits 0 with zero failed tests.
 ```powershell
 docker compose config --quiet
 docker build -t consensus-release-candidate .
-docker compose up -d --build
+sh ./scripts/ops/postgres/start-postgres-only.sh
 docker compose ps
 ```
 

@@ -12,6 +12,7 @@ import type { ReadinessReport } from '../../packages/db-migrator/src/reporting/r
 const repoRoot = path.resolve(__dirname, '../..');
 const composeFile = path.join(repoRoot, 'docker-compose.yml');
 const releaseCandidate = '1234567890abcdef1234567890abcdef12345678';
+const freezeReceiptSha256 = 'f'.repeat(64);
 
 function run(command: string, args: string[], env: NodeJS.ProcessEnv, timeout = 120_000) {
   return spawnSync(command, args, { cwd: repoRoot, env, encoding: 'utf8', timeout, maxBuffer: 10 * 1024 * 1024 });
@@ -80,6 +81,7 @@ async function prepareCutoverInput(root: string, runId: string, invalid = false)
     version: 1, purpose: 'production-cutover', status: 'approved', approved: true,
     releaseCandidate, cutoverRunId: runId,
     backupManifestSha256: await hashFile(manifestPath), sourceSnapshotSha256: await hashFile(source),
+    freezeReceiptSha256,
     target: {
       database: 'consensus', schema: 'consensus', role: 'consensus_migrator',
       host: 'postgres', port: 5432, tlsMode: 'verify-full',
@@ -162,6 +164,7 @@ const targetUrl = 'postgresql://consensus_migrator:' + encodeURIComponent(passwo
       '-v', `${temporary}:/cutover`, 'migrator', 'cutover',
       '--source-snapshot', `/cutover/${id}/backup/sqlite-consistent.sqlite`, '--manifest', `/cutover/${id}/backup/manifest.json`,
       '--authorization', `/cutover/${id}/authorization.json`, '--output', `/cutover/${id}/evidence`,
+      '--freeze-receipt-sha256', freezeReceiptSha256,
       '--run-id', id, '--execute',
     ], 300_000);
 

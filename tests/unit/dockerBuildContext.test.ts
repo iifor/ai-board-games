@@ -120,9 +120,9 @@ test('Docker build context excludes operational evidence and SQLite files while 
   }
 });
 
-test('Docker runtime stage copies only server runtime packages and compiled web assets', async () => {
+test('Docker runtime stage copies application packages only from the named candidate context', async () => {
   const dockerfile = await fs.readFile(path.join(repoRoot, 'Dockerfile'), 'utf8');
-  const runtimeStage = dockerfile.split(/FROM\s+node:20-slim\s+AS\s+runtime/i)[1];
+  const runtimeStage = /^FROM\s+node:20-slim\s+AS\s+runtime(?![-\w])([\s\S]*?)(?=^FROM\s|(?![\s\S]))/im.exec(dockerfile)?.[1];
   assert.ok(runtimeStage, 'Dockerfile must define the production runtime stage');
 
   const copyInstructions = [...runtimeStage.matchAll(/^COPY\s+(.+)$/gm)].map((match) => match[1].trim());
@@ -130,12 +130,13 @@ test('Docker runtime stage copies only server runtime packages and compiled web 
     const operands = instruction.split(/\s+/).filter((operand) => !operand.startsWith('--'));
     return operands.slice(0, -1);
   });
-  assert.ok(copyInstructions.some((instruction) => instruction === 'packages/server ./packages/server'));
-  assert.ok(copyInstructions.some((instruction) => instruction === 'packages/shared ./packages/shared'));
-  assert.ok(copyInstructions.some((instruction) => instruction.includes('/app/dist ./dist')));
+  assert.ok(copyInstructions.some((instruction) => instruction === '--from=application_source packages/server ./packages/server'));
+  assert.ok(copyInstructions.some((instruction) => instruction === '--from=application_source packages/shared ./packages/shared'));
+  assert.ok(copyInstructions.some((instruction) => instruction.includes('--from=runtime-builder /app/dist ./dist')));
   assert.equal(
     copiedSources.some((source) => /^(?:\.|artifacts|\.superpowers|\.worktrees|packages\/db-migrator)(?:\/|$)/.test(source)),
     false,
     `runtime stage contains a broad or migration-only COPY source: ${copiedSources.join(' | ')}`,
   );
+  assert.equal(copyInstructions.some((instruction) => /--from=builder .*packages\/(?:server|shared|client|admin)/.test(instruction)), false);
 });

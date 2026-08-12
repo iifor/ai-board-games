@@ -28,6 +28,7 @@ export interface CutoverAuthorization {
   cutoverRunId: string;
   backupManifestSha256: string;
   sourceSnapshotSha256: string;
+  freezeReceiptSha256: string;
   target: typeof CUTOVER_TARGET;
   maintenanceWindow: { startsAt: string; endsAt: string };
   approvals: [CutoverApproval, CutoverApproval, CutoverApproval];
@@ -39,6 +40,7 @@ export interface LoadCutoverAuthorizationOptions {
   releaseCandidate: string;
   manifestSha256: string;
   sourceSnapshotSha256: string;
+  freezeReceiptSha256: string;
   now: Date;
 }
 
@@ -61,4 +63,5 @@ export interface CutoverOptions {
   releaseCandidate: string;
   tlsMode: string;
   caPath: string;
+  freezeReceiptSha256: string;
 }

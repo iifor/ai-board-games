@@ -57,7 +57,7 @@ GitHub Actions must pass these gates before SSH deployment:
 5. Migration tests.
 6. Full runtime Docker image build.
 
-The remote deployment keeps the existing `docker compose up -d --build` flow. After deployment, Compose health status and an HTTP health request through the load balancer are the acceptance checks.
+This historical design is superseded for PostgreSQL production: remote deployment must use the staged first-deployment wrappers, with default Compose limited to PostgreSQL and traffic opened only by the typed nginx gate.
 
 ## Testing
 

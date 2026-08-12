@@ -126,8 +126,8 @@ test('ephemeral production Compose enforces TLS, SCRAM, fixed roles, default gra
 
     const config = compose(['config', '--services']);
     assert.equal(config.status, 0, `base production config must not require ops variables:\n${config.stderr}`);
-    assert.deepEqual(config.stdout.trim().split(/\r?\n/), ['postgres', 'app', 'nginx']);
-    composeMust(['--profile', 'ops', 'build', 'app', 'migrator'], 900_000);
+    assert.deepEqual(config.stdout.trim().split(/\r?\n/), ['postgres']);
+    composeMust(['--profile', 'application', '--profile', 'ops', 'build', 'app', 'migrator'], 900_000);
     composeMust(['up', '-d', '--wait', '--wait-timeout', '90', 'postgres'], 180_000);
 
     const stagedKey = composeMust(['exec', '-T', 'postgres', 'sh', '-c', "uid=$(id -u postgres); gid=$(id -g postgres); actual=$(stat -c '%u:%g:%a' /run/postgres-tls/server.key); test \"$actual\" = \"$uid:$gid:600\"; printf '%s' \"$actual\""]);
@@ -197,16 +197,16 @@ const { Client } = require('pg');
 })().catch((error) => { console.error(error.code || error.message); process.exit(1); });
 `);
 
-    const appPre = parseProbe(composeProbe(['run', '--rm', '--no-deps', '-e', 'PROBE_MODE=pre', '-v', `${appProbeFile}:/app/packages/server/dev-runtime.cjs:ro`, 'app']));
+    const appPre = parseProbe(composeProbe(['--profile', 'application', 'run', '--rm', '--no-deps', '-e', 'PROBE_MODE=pre', '-v', `${appProbeFile}:/app/packages/server/dev-runtime.cjs:ro`, 'app']));
     assert.deepEqual(appPre, { role: 'consensus_app', database: 'consensus', ssl: true, schema_exists: false, argv: [], create_denied: true });
     const migratorSetup = parseProbe(composeProbe(['--profile', 'ops', 'run', '--rm', '--no-deps', '-v', `${migratorProbeFile}:/app/packages/db-migrator/dist/cli.js:ro`, 'migrator', 'setup']));
     assert.deepEqual(migratorSetup, { role: 'consensus_migrator', database: 'consensus', ssl: true, schema_exists: false, argv: ['setup'], created: true });
-    const appDml = parseProbe(composeProbe(['run', '--rm', '--no-deps', '-e', 'PROBE_MODE=dml', '-v', `${appProbeFile}:/app/packages/server/dev-runtime.cjs:ro`, 'app']));
+    const appDml = parseProbe(composeProbe(['--profile', 'application', 'run', '--rm', '--no-deps', '-e', 'PROBE_MODE=dml', '-v', `${appProbeFile}:/app/packages/server/dev-runtime.cjs:ro`, 'app']));
     assert.deepEqual(appDml, { role: 'consensus_app', database: 'consensus', ssl: true, schema_exists: true, argv: [], dml: true });
     const migratorCleanup = parseProbe(composeProbe(['--profile', 'ops', 'run', '--rm', '--no-deps', '-v', `${migratorProbeFile}:/app/packages/db-migrator/dist/cli.js:ro`, 'migrator', 'cleanup']));
     assert.equal(migratorCleanup.dropped, true);
   } finally {
-    compose(['--profile', 'ops', 'down', '--volumes', '--remove-orphans'], 180_000);
+    compose(['--profile', 'application', '--profile', 'ops', '--profile', 'traffic', 'down', '--volumes', '--remove-orphans'], 180_000);
     for (const volume of [certWorkVolume, tlsSourceVolume]) {
       run('docker', ['volume', 'rm', '-f', volume]);
     }

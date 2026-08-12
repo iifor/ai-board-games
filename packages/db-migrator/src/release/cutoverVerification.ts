@@ -30,6 +30,7 @@ interface CompletionReceipt {
   schema: 'consensus';
   releaseCandidate: string;
   sourceSnapshotSha256: string;
+  freezeReceiptSha256: string;
   manifestSha256: string;
   authorizationSha256: string;
   ownerReceiptSha256: string;
@@ -45,6 +46,7 @@ const GIT_SHA = /^[a-f0-9]{40}$/;
 const OWNER_KEYS = ['version', 'purpose', 'runId', 'schema', 'reservedAt', 'nonce'];
 const COMPLETION_KEYS = [
   'version', 'purpose', 'runId', 'schema', 'releaseCandidate', 'sourceSnapshotSha256',
+  'freezeReceiptSha256',
   'manifestSha256', 'authorizationSha256', 'ownerReceiptSha256', 'migrationReportSha256',
   'validationReportSha256', 'smokeReportSha256', 'target', 'completedAt',
 ];
@@ -97,7 +99,7 @@ function assertCompletion(value: unknown, runId: string): asserts value is Compl
   if (!exactKeys(value, COMPLETION_KEYS) || value.version !== 1 || value.purpose !== 'production-cutover-completion'
     || value.runId !== runId || value.schema !== 'consensus' || !canonicalTime(value.completedAt)
     || !GIT_SHA.test(String(value.releaseCandidate))
-    || !['sourceSnapshotSha256', 'manifestSha256', 'authorizationSha256', 'ownerReceiptSha256',
+    || !['sourceSnapshotSha256', 'freezeReceiptSha256', 'manifestSha256', 'authorizationSha256', 'ownerReceiptSha256',
       'migrationReportSha256', 'validationReportSha256', 'smokeReportSha256']
       .every((key) => SHA256.test(String(value[key])))
     || JSON.stringify(value.target) !== JSON.stringify(CUTOVER_TARGET)) {
@@ -145,6 +147,7 @@ export function assertCutoverEvidenceClosure(
     const authorizationValidHash = exactCheck(cutover, 'authorization.valid', SHA256);
     const authorizationHash = exactCheck(cutover, 'authorization.sha256', SHA256);
     const candidate = exactCheck(cutover, 'release.candidate', GIT_SHA);
+    const freezeReceiptSha256 = exactCheck(cutover, 'freeze.receipt.sha256', SHA256);
 
     if (manifest.sha256 !== manifestHash || authorization.sha256 !== authorizationHash
       || authorizationValidHash !== authorizationHash) {
@@ -160,6 +163,7 @@ export function assertCutoverEvidenceClosure(
       releaseCandidate: candidate,
       manifestSha256: manifest.sha256,
       sourceSnapshotSha256: sourceHash,
+      freezeReceiptSha256,
       now: new Date(cutover.startedAt),
     });
     assertOwner(owner.value, cutover.runId);
@@ -175,6 +179,7 @@ export function assertCutoverEvidenceClosure(
     const receipt = completion.value;
     if (receipt.completedAt !== cutover.finishedAt || receipt.releaseCandidate !== candidate
       || receipt.sourceSnapshotSha256 !== sourceHash || receipt.manifestSha256 !== manifest.sha256
+      || receipt.freezeReceiptSha256 !== freezeReceiptSha256
       || receipt.authorizationSha256 !== authorization.sha256 || receipt.ownerReceiptSha256 !== owner.sha256
       || receipt.migrationReportSha256 !== migration.sha256
       || receipt.validationReportSha256 !== validation.sha256 || receipt.smokeReportSha256 !== smoke.sha256) {

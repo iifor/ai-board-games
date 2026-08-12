@@ -4,6 +4,10 @@
 
 ## 触发条件与回执契约
 
+- First-deployment rollback is state-dependent. Before traffic, preserve the PostgreSQL schema/volume/evidence and require a new run ID plus a new absent target schema; do not restore SQLite merely because cutover failed.
+- After traffic but before any new PostgreSQL business write, stop nginx and app. Restore the frozen SQLite runtime only with a separately bound rollback receipt that proves the exact freeze receipt/hash and zero new PostgreSQL business writes.
+- After any new PostgreSQL business write, SQLite rollback is forbidden. Close traffic, preserve PostgreSQL, and choose forward repair or an explicitly scoped data-reconciliation project.
+- Never add dual write, incremental catch-up, automatic PG-to-SQLite synchronization, or automatic cleanup.
 - go-live owner 宣布验收失败、rollback owner 接管，并取得当次回滚授权。
 - 使用正式切换前最后一份已验证 backup manifest；SQLite、WAL/SHM 和资源来自同一 runId。
 - 平台回执必须是普通 JSON 文件，至少包含 `action/status/target/occurredAt/runId/ticketId`；stop/start/traffic 的 target 必须等于本轮 `$ExpectedOldTarget`，isolation/closure 的 target 必须等于失败 PostgreSQL 标识。所有回执必须绑定同一 `$RollbackRunId/$ChangeTicket`，traffic 回执还必须晚于五项 smoke 语义验证完成时间。本手册只验证并记录原始回执 SHA-256，不生成平台成功回执。

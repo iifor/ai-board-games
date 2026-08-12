@@ -20,12 +20,18 @@ export function assertCutoverCliOptions(parsed: ParsedCommand): void {
       code: 'CUTOVER_AUTHORIZATION_REQUIRED' as const,
     });
   }
+  if (parsed.execute && !parsed.values.has('freeze-receipt-sha256')) {
+    throw Object.assign(new Error('Validated freeze receipt SHA-256 is required for execute'), {
+      code: 'CUTOVER_FREEZE_RECEIPT_REQUIRED' as const,
+    });
+  }
 }
 
 export async function runCutoverCli(parsed: ParsedCommand): Promise<ReadinessReport> {
   const sourceSnapshotPath = parsed.values.get('source-snapshot') || '';
   const sourceManifestPath = parsed.values.get('manifest') || '';
   const authorizationPath = parsed.values.get('authorization');
+  const freezeReceiptSha256 = parsed.values.get('freeze-receipt-sha256') || '';
   const outputDirectory = parsed.values.get('output') || '';
   const runId = parsed.values.get('run-id') || '';
   const targetUrl = process.env.DATABASE_URL || '';
@@ -33,9 +39,10 @@ export async function runCutoverCli(parsed: ParsedCommand): Promise<ReadinessRep
   const tlsMode = process.env.DATABASE_SSL || '';
   const caPath = process.env.DATABASE_CA_PATH || '';
   if (!sourceSnapshotPath || !sourceManifestPath || !outputDirectory || !runId
-    || (parsed.execute && (!authorizationPath || !targetUrl || !releaseCandidate || !tlsMode || !caPath))) {
+    || (parsed.execute && (!authorizationPath || !freezeReceiptSha256
+      || !targetUrl || !releaseCandidate || !tlsMode || !caPath))) {
     throw Object.assign(new Error(
-      'Usage: set DATABASE_URL, RELEASE_CANDIDATE_SHA, DATABASE_SSL, and DATABASE_CA_PATH, then run cutover --source-snapshot <sqlite> --manifest <json> --authorization <json> --output <dir> --run-id <id> --execute',
+      'Usage: set DATABASE_URL, RELEASE_CANDIDATE_SHA, DATABASE_SSL, and DATABASE_CA_PATH, then run cutover --source-snapshot <sqlite> --manifest <json> --authorization <json> --freeze-receipt-sha256 <sha256> --output <dir> --run-id <id> --execute',
     ), { code: 'CUTOVER_INVALID_PARAMETERS' as const });
   }
   return runCutover({
@@ -49,5 +56,6 @@ export async function runCutoverCli(parsed: ParsedCommand): Promise<ReadinessRep
     releaseCandidate,
     tlsMode,
     caPath,
+    freezeReceiptSha256,
   });
 }

@@ -14,6 +14,7 @@ import type { MigrationReport } from '../../packages/db-migrator/src/types';
 import { productionDatabaseUrl } from './cutoverTestHelpers';
 
 const RELEASE = '0123456789abcdef0123456789abcdef01234567';
+const FREEZE_RECEIPT_SHA256 = 'f'.repeat(64);
 const NOW = new Date('2026-08-11T03:30:00.000Z');
 
 function privateRuntimeUrl(): string {
@@ -43,6 +44,7 @@ async function createFixture(runId = 'production-cutover') {
     releaseCandidate: RELEASE, cutoverRunId: runId,
     backupManifestSha256: await hashFile(sourceManifestPath),
     sourceSnapshotSha256: await hashFile(sourceSnapshotPath),
+    freezeReceiptSha256: FREEZE_RECEIPT_SHA256,
     target: {
       database: 'consensus', schema: 'consensus', role: 'consensus_migrator',
       host: 'postgres', port: 5432, tlsMode: 'verify-full',
@@ -61,6 +63,7 @@ async function createFixture(runId = 'production-cutover') {
       outputDirectory: path.join(root, 'evidence'), execute: true,
       targetUrl: productionDatabaseUrl(),
       releaseCandidate: RELEASE, tlsMode: 'verify-full', caPath,
+      freezeReceiptSha256: FREEZE_RECEIPT_SHA256,
     },
   };
 }
@@ -147,7 +150,7 @@ test('cutover keeps one session through all phases and publishes the complete su
       },
     });
     assert.equal(result.status, 'passed');
-    for (const id of ['source.manifest.sha256', 'authorization.sha256', 'release.candidate']) {
+    for (const id of ['source.manifest.sha256', 'authorization.sha256', 'release.candidate', 'freeze.receipt.sha256']) {
       assert.match(result.checks.find((check) => check.id === id)?.actual || '', id === 'release.candidate' ? /^[a-f0-9]{40}$/ : /^[a-f0-9]{64}$/);
     }
     const targetCheck = result.checks.find((check) => check.id === 'target.safe');

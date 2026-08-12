@@ -11,6 +11,7 @@ interface CutoverCompletionReceipt {
   schema: 'consensus';
   releaseCandidate: string;
   sourceSnapshotSha256: string;
+  freezeReceiptSha256: string;
   manifestSha256: string;
   authorizationSha256: string;
   ownerReceiptSha256: string;
@@ -51,6 +52,7 @@ function prepareCutoverCompletion(
     schema: 'consensus',
     releaseCandidate: options.releaseCandidate,
     sourceSnapshotSha256,
+    freezeReceiptSha256: options.freezeReceiptSha256,
     manifestSha256: requiredHash(artifacts, 'manifest'),
     authorizationSha256: requiredHash(artifacts, 'authorization'),
     ownerReceiptSha256: requiredHash(artifacts, 'owner-receipt'),

@@ -6,7 +6,8 @@ const ts = require('../../packages/server/node_modules/typescript');
 const root = path.resolve(__dirname, '../..');
 const serverRoot = path.join(root, 'packages', 'server');
 const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
-const testFiles = [
+const requestedFiles = process.argv.slice(2).filter((file) => file !== '--');
+const testFiles = (requestedFiles.length ? requestedFiles : [
   'eventMapping.test.ts',
   'readinessReport.test.ts',
   'backupCommand.test.ts',
@@ -16,12 +17,16 @@ const testFiles = [
   'restoreDrillSecurity.test.ts',
   'prepareSignoff.test.ts',
   'releaseReadiness.test.ts',
+  'deploymentGate.test.ts',
+  'productionBuildReceiptGate.test.ts',
+  'freezeReceiptGate.test.ts',
+  'observationReceiptGate.test.ts',
   'cutoverAuthorization.test.ts',
   'cutoverCli.test.ts',
   'cutoverEvidence.test.ts',
   'cutoverSourceIdentity.test.ts',
   'validationCanonicalization.test.ts',
-].map((file) => path.join(__dirname, file));
+]).map((file) => path.join(__dirname, file));
 
 const originalTsLoader = Module._extensions['.ts'];
 

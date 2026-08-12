@@ -204,3 +204,7 @@ Cleanup still captures the same-name ID set before POST. With a returned ID, it 
 ### Scope and self-review
 
 Round 4 changes only `applicationSmokeHttp.ts`, `applicationSmokeOwnership.ts`, `applicationSmoke.test.ts`, and this ignored report. `applicationSmokeScenario.ts` required no change and no helper file was added. There is no frontend, public API contract, shared type, database schema, canonical migration SQL, Compose/entrypoint, release gate, Task 3 artifact, live SQLite, production service, nginx, real approval, or production credential change. No file was deleted and no production cleanup scope was widened.
+
+### Task 3 freeze-evidence extension (2026-08-12, not dynamically rerun)
+
+Task 3 Fix Round 2 extends the existing cutover authorization, formal cutover check, and completion receipt with the exact `freezeReceiptSha256`. The release gate requires that value to match the executed backup report and exposes it to the traffic authorization. Related authorization, command, completion, release, CLI, and PostgreSQL fixtures were updated. Canonical SQL, public APIs, shared business types, and database schema are unchanged. This extension has static coverage but the fresh Task 2 dynamic suites remain blocked/not run in the Task 3 agent.

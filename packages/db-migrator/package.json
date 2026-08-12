@@ -15,7 +15,10 @@
     "validate": "tsx src/cli.ts validate",
     "rehearse": "tsx src/cli.ts rehearse",
     "release-readiness": "tsx src/cli.ts release-readiness",
-    "cutover": "tsx src/cli.ts cutover"
+    "cutover": "tsx src/cli.ts cutover",
+    "verify-freeze-receipt": "tsx src/cli.ts verify-freeze-receipt",
+    "verify-traffic-authorization": "tsx src/cli.ts verify-traffic-authorization",
+    "verify-observation-receipt": "tsx src/cli.ts verify-observation-receipt"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",

@@ -8,6 +8,7 @@ import { loadCutoverAuthorization } from '../../packages/db-migrator/src/cutover
 const RELEASE = '0123456789abcdef0123456789abcdef01234567';
 const MANIFEST_HASH = '1'.repeat(64);
 const SOURCE_HASH = '2'.repeat(64);
+const FREEZE_HASH = '3'.repeat(64);
 const NOW = new Date('2026-08-11T03:30:00.000Z');
 
 function validAuthorization(): Record<string, unknown> {
@@ -20,6 +21,7 @@ function validAuthorization(): Record<string, unknown> {
     cutoverRunId: 'cutover-20260811',
     backupManifestSha256: MANIFEST_HASH,
     sourceSnapshotSha256: SOURCE_HASH,
+    freezeReceiptSha256: FREEZE_HASH,
     target: {
       database: 'consensus', schema: 'consensus', role: 'consensus_migrator',
       host: 'postgres', port: 5432, tlsMode: 'verify-full',
@@ -47,6 +49,7 @@ async function validate(value: unknown, now = NOW): Promise<unknown> {
       releaseCandidate: RELEASE,
       manifestSha256: MANIFEST_HASH,
       sourceSnapshotSha256: SOURCE_HASH,
+      freezeReceiptSha256: FREEZE_HASH,
       now,
     });
   } finally {
@@ -78,6 +81,7 @@ test('cutover authorization rejects malformed, extra, stale, mismatched, or plac
     ['wrong manifest hash', (value) => { value.backupManifestSha256 = '4'.repeat(64); }],
     ['all-zero manifest hash', (value) => { value.backupManifestSha256 = '0'.repeat(64); }],
     ['wrong source hash', (value) => { value.sourceSnapshotSha256 = '5'.repeat(64); }],
+    ['wrong freeze hash', (value) => { value.freezeReceiptSha256 = '6'.repeat(64); }],
     ['wrong target database', (value) => { value.target.database = 'other'; }],
     ['wrong target schema', (value) => { value.target.schema = 'other'; }],
     ['wrong target role', (value) => { value.target.role = 'consensus_app'; }],
@@ -108,7 +112,8 @@ test('cutover authorization rejects malformed JSON and files larger than one MiB
   const options = {
     authorizationPath,
     runId: 'cutover-20260811', releaseCandidate: RELEASE,
-    manifestSha256: MANIFEST_HASH, sourceSnapshotSha256: SOURCE_HASH, now: NOW,
+    manifestSha256: MANIFEST_HASH, sourceSnapshotSha256: SOURCE_HASH,
+    freezeReceiptSha256: FREEZE_HASH, now: NOW,
   };
   try {
     await fs.writeFile(authorizationPath, '{broken', 'utf8');

@@ -170,30 +170,23 @@ flowchart TD
 - 服务端通过 Express 静态托管这些产物。
 - `dist/` 是构建产物目录，不纳入源码目录树。
 
-### GitHub Actions 自动部署到腾讯云
+### GitHub Actions 发布验证与人工部署边界
 
-`.github/workflows/deploy-master.yml` 监听 `master` 分支 push，也支持手动触发。流程先在 GitHub runner 中使用 Node.js 20 与 pnpm 9.15.4 安装锁定依赖，依次执行类型检查、完整构建、单元测试、工作流测试、迁移测试和最终 runtime 镜像构建；全部通过后才通过 SSH 登录腾讯云 CVM，在服务器项目目录执行：
+`.github/workflows/deploy-master.yml` 监听 pull request、`master` push 和手动触发，但只执行发布验证。它使用 Node.js 20 与 pnpm 9.15.4 安装锁定依赖，运行类型检查、完整构建、单元测试、工作流测试、迁移测试、PostgreSQL 测试，以及显式 `runtime` target 和 `application_source` named context 的镜像探针。工作流不持有生产 SSH 部署步骤，不执行远端 reset，也不会因 push 自动替换 app 或打开 nginx 流量。
 
-以下常规部署命令只适用于 PostgreSQL schema 已由受控 migrator 初始化、且本次候选不包含尚未执行的 DDL migration。首次部署或含新 DDL 的版本必须先按 `docs/postgresql-deployment.md` 执行 migrator 生命周期，不能让最小权限 app 代替迁移角色建 schema。
+生产部署由人工维护窗口执行。默认 Compose profile 仅包含 `postgres`；`app`、`nginx`、`migrator` 分别由 `application`、`traffic`、`ops` profile 保护。首次部署必须逐步执行 `docs/runbooks/postgresql-first-deployment-cutover.md`，不能用普通 Compose up 绕过 freeze、构建来源、16/16、三人授权或 traffic gate。
 
 ```bash
-git fetch origin master
-git reset --hard origin/master
-docker compose up -d --build
-docker compose ps
+docker compose config --services  # 输出只能是 postgres
+sh ./scripts/ops/postgres/start-postgres-only.sh
+# 后续严格按 first-deployment runbook 的独立步骤执行
 ```
 
-腾讯云 CVM 需要提前安装 Docker，并安装 `docker compose` 插件或旧版 `docker-compose` 命令；需要提前 clone 本仓库，并在项目目录放置生产 `.env`。app 与 opt-in migrator 从 Compose secret 文件在各自子进程内构造固定角色的 `DATABASE_URL`；宿主环境不提供完整 URL。`consensus-postgres-data` 保存 PostgreSQL 数据，`consensus-resources` 保存上传图片和生成语音，头像继续使用 `./avatars` bind mount。部署脚本不会把 GitHub Secrets 写入仓库。
+腾讯云 CVM 需要提前安装 Docker 与支持 named additional context 的 Docker Compose v2.17+。app 与 opt-in migrator 从 Compose secret 文件在各自子进程内构造固定角色的 `DATABASE_URL`；宿主环境不提供完整 URL。`consensus-postgres-data` 保存 PostgreSQL 数据，`consensus-resources` 保存上传图片和生成语音，头像继续使用 `./avatars` bind mount。
 
-公网 HTTPS 由腾讯云负载均衡终止，负载均衡通过 HTTP/WebSocket 回源 CVM 的 Nginx 80 端口。CVM 安全组必须只允许负载均衡访问 80 端口；应用和 Nginx 不直接暴露公网 TLS。部署完成后先确认 `docker compose ps` 中 `app` 为 healthy，再通过生产域名请求 `/api/toc/health`。
+公网 HTTPS 由腾讯云负载均衡终止，负载均衡通过 HTTP/WebSocket 回源 CVM 的 Nginx 80 端口。CVM 安全组必须只允许负载均衡访问 80 端口；应用和 Nginx 不直接暴露公网 TLS。Nginx 只能在应用证据、三方授权、16/16 与 typed traffic gate 全部通过后，由独立 `start-nginx-gated.sh` 人工打开。
 
-GitHub 仓库需要配置以下 Secrets：
-
-- `TENCENT_CLOUD_HOST`：腾讯云 CVM 公网 IP 或域名。
-- `TENCENT_CLOUD_USER`：SSH 登录用户。
-- `TENCENT_CLOUD_SSH_KEY`：可登录服务器的私钥内容。
-- `TENCENT_CLOUD_SSH_PORT`：SSH 端口，可不填，默认 `22`。
-- `TENCENT_CLOUD_PROJECT_PATH`：服务器上的项目目录，例如 `/opt/consensus`。
+验证 workflow 不需要生产主机、SSH 私钥或项目路径 Secrets；生产凭据与证据只在 root 控制的维护环境中提供。
 
 ## 扩展点与注意事项
 
@@ -224,6 +217,10 @@ GitHub 仓库需要配置以下 Secrets：
 - Default werewolf mode coverage now includes mode 30 `magic-wolf-demon-hunter-12`.
 - Mode 29 remains skipped because the local rule list is insufficient for executable workflow rules.
 - Mode 30 reuses the existing werewolf workflow, event, snapshot, debug and seed mechanisms; no new package, database table or deployment command was added.
+
+## PostgreSQL first-deployment operations boundary
+
+The first Linux production deployment uses `docs/runbooks/postgresql-first-deployment-cutover.md`. Approved candidate commit/tree, reviewed tooling overlay HEAD, application-input manifest, runtime image digest, and ops image digest are separate immutable facts. Runtime application bytes come from an exact detached named candidate context; a typed build receipt and an embedded content manifest provide the primary cross-check, with OCI labels as secondary evidence. Production wrappers ignore ambient Compose overrides. A typed read-only freeze validator binds current maintenance authorization, stopped writers/background work, ordered source/resources, and one immutable receipt hash retained by backup, cutover, completion, release, and traffic evidence. PostgreSQL starts first, app starts separately, and nginx starts only through a manual read-only traffic gate after exact 16/16 release evidence. The repository does not approve traffic, fabricate signoff, retry cutover, clean failed target schemas/evidence, or roll PostgreSQL writes back into SQLite.
 ## 迁移演练边界（2026-08-08）
 
 迁移 rehearsal 仅允许 database 名以 `_test` 或 `_rehearsal` 结尾。每次 execute 使用 `consensus_rehearsal_<UTC timestamp>_<run hash>` 新 schema；同 runId hash 在整个目标数据库中只允许一个 schema，并由已编译 server adapter 内的 advisory lock 原子保证。dry-run 不连接 PostgreSQL；失败现场不自动删除。

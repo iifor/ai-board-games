@@ -47,7 +47,9 @@ export interface ReleaseReadinessOptions {
 }
 
 export interface ReleaseReadinessReport extends ReadinessReport {
+  releaseCandidate: string;
   maintenanceWindowMinutes: number;
+  freezeReceiptSha256: string;
 }
 
 function checkPassed(report: ReadinessReport, id: string): boolean {
@@ -88,7 +90,7 @@ function evaluate(
   reports: ReadinessReport[],
   signoff: OperatorSignoff,
   expected: Pick<ReleaseReadinessOptions, 'runId' | 'releaseCandidate'>,
-): { checks: ReadinessCheck[]; minutes: number } {
+): { checks: ReadinessCheck[]; minutes: number; freezeReceiptSha256: string } {
   const backup = reports.filter((report) => report.stage === 'backup');
   const executedBackups = backup.filter((report) => report.checks.some((check) => check.id === 'backup.execute'));
   const rehearsals = reports.filter((report) => report.stage === 'rehearsal');
@@ -130,8 +132,10 @@ function evaluate(
       && evidence.length > 0 && evidence.every((check) => check.status === 'passed');
   };
   const result = new Map<string, boolean>(SIGNED_CHECKS.map((id) => [id, signed(id)]));
+  const backupFreezeSha256 = executedBackups.length === 1
+    ? exactCheckValue(executedBackups[0], 'freeze.receipt.sha256', SHA256) : undefined;
   result.set('backup.executed', executedBackups.length === 1 && checkPassed(executedBackups[0], 'backup.execute')
-    && hasMatchingBackupVerification(reports));
+    && backupFreezeSha256 !== undefined && hasMatchingBackupVerification(reports));
   result.set('backup.restore-drill', signed('backup.restore-drill')
     && backup.some((report) => checkPassed(report, 'backup.restore-drill')));
   result.set('rehearsal.first', independent && rehearsalPassed(first));
@@ -154,9 +158,11 @@ function evaluate(
   ));
   const requiredCutoverChecks = [
     'authorization.valid', 'authorization.sha256', 'release.candidate',
+    'freeze.receipt.sha256',
     'source.snapshot.sha256', 'source.manifest.sha256', 'target.safe', 'schema.migrations',
     'import.transaction', 'validation', 'smoke', 'closure.evidence',
   ];
+  const cutoverFreezeSha256 = cutover && exactCheckValue(cutover, 'freeze.receipt.sha256', SHA256);
   const productionCutover = cutovers.length === 1
     && smokes.length === 3
     && cutover.schema === 'consensus'
@@ -165,6 +171,7 @@ function evaluate(
     && exactCheckValue(cutover, 'source.manifest.sha256', SHA256) !== undefined
     && exactCheckValue(cutover, 'authorization.sha256', SHA256) !== undefined
     && exactCheckValue(cutover, 'release.candidate', GIT_SHA) === expected.releaseCandidate
+    && cutoverFreezeSha256 !== undefined && cutoverFreezeSha256 === backupFreezeSha256
     && exactCheckValue(cutover, 'target.safe', /^database=consensus;schema=consensus;role=consensus_migrator;tls=verify-full$/) !== undefined
     && cutoverValidation?.length === 1 && cutoverValidation[0].status === 'passed'
     && cutoverSmoke?.length === 1 && smokePassed(cutoverSmoke[0], [
@@ -179,7 +186,11 @@ function evaluate(
     allReportsPassed && result.get(id) === true,
     id === 'operator.signoff' ? 'Independent operator signoff is complete' : `Verified evidence: ${id}`,
   ));
-  return { checks, minutes };
+  return {
+    checks,
+    minutes,
+    freezeReceiptSha256: productionCutover && backupFreezeSha256 ? backupFreezeSha256 : '',
+  };
 }
 
 export async function runReleaseReadiness(options: ReleaseReadinessOptions): Promise<ReleaseReadinessReport> {
@@ -191,9 +202,12 @@ export async function runReleaseReadiness(options: ReleaseReadinessOptions): Pro
   const started = Date.now();
   let checks: ReadinessCheck[];
   let maintenanceWindowMinutes = 0;
+  let freezeReceiptSha256 = '';
   try {
     const evidence = await loadReleaseEvidence(options.reportPaths, options.operatorSignoffPath);
-    ({ checks, minutes: maintenanceWindowMinutes } = evaluate(evidence.reports, evidence.signoff, options));
+    ({ checks, minutes: maintenanceWindowMinutes, freezeReceiptSha256 } = evaluate(
+      evidence.reports, evidence.signoff, options,
+    ));
   } catch {
     checks = REQUIRED_RELEASE_CHECKS.map((id) => gate(id, false, ''));
   }
@@ -206,7 +220,9 @@ export async function runReleaseReadiness(options: ReleaseReadinessOptions): Pro
     startedAt: new Date(started).toISOString(),
     finishedAt: new Date(finished).toISOString(),
     durationMs: finished - started,
+    releaseCandidate: options.releaseCandidate,
     maintenanceWindowMinutes,
+    freezeReceiptSha256,
     checks,
     artifacts: [],
     errors: failed.map((check) => ({ code: 'REQUIRED_RELEASE_CHECK_FAILED', message: check.message })),

@@ -126,6 +126,19 @@ test('cutover execute without authorization fails before command, database, or o
   assert.equal(fs.existsSync(output), false);
 });
 
+test('cutover execute without freeze receipt hash fails before command or output access', async () => {
+  let invoked = false;
+  await assert.rejects(main([
+    'cutover', '--source-snapshot', 'missing.sqlite', '--manifest', 'missing.json',
+    '--authorization', 'authorization.json', '--output', 'must-not-exist', '--run-id', 'missing-freeze', '--execute',
+  ], {
+    runReadinessCommand: async () => { invoked = true; return dryReport('missing-freeze'); },
+    stdout: () => assert.fail('must not write stdout'), stderr: () => assert.fail('must not write stderr'),
+    setExitCode: () => assert.fail('must not set exit code'),
+  }), (error: unknown) => (error as { code?: string }).code === 'CUTOVER_FREEZE_RECEIPT_REQUIRED');
+  assert.equal(invoked, false);
+});
+
 test('built-in cutover CLI routes a verified dry-run without environment or output writes', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cutover-built-in-'));
   const backup = path.join(root, 'backup');

@@ -10,6 +10,7 @@ import { runRestoreDrill } from './commands/restore-drill';
 import { runPrepareSignoff } from './commands/prepare-signoff';
 import { parseCommandLine, type ParsedCommand } from './cli/arguments';
 import { assertCutoverCliOptions, runCutoverCli } from './cli/cutoverDispatch';
+import { isDeploymentGateCommand, runDeploymentGateCommand } from './cli/deploymentGateDispatch';
 import { readinessReportExitCode, redactSecrets, sanitizeForOutput } from './reporting/reportWriter';
 import type { ReadinessReport } from './reporting/reportTypes';
 import type { MigrationReport } from './types';
@@ -38,8 +39,9 @@ async function runBuiltInReadinessCommand(
     const outputDirectory = parsed.values.get('output') || '';
     const runId = parsed.values.get('run-id') || '';
     const resources = parsed.values.get('resources');
+    const freezeReceiptSha256 = parsed.values.get('freeze-receipt-sha256') || '';
     if (!sourcePath || !outputDirectory || !runId) {
-      throw new Error('Usage: pnpm migrate -- backup --source <sqlite> --output <dir> --resources <dir1,dir2> --run-id <id> [--execute]');
+      throw new Error('Usage: pnpm migrate -- backup --source <sqlite> --output <dir> --resources <dir1,dir2> --run-id <id> [--freeze-receipt-sha256 <sha256>] [--execute]');
     }
     return runBackup({
       runId,
@@ -47,6 +49,7 @@ async function runBuiltInReadinessCommand(
       outputDirectory: path.resolve(outputDirectory),
       resourceDirectories: resources ? resources.split(',').map((entry) => path.resolve(entry.trim())).filter(Boolean) : [],
       execute: parsed.execute,
+      freezeReceiptSha256: freezeReceiptSha256 || undefined,
     });
   }
   if (command === 'verify-backup') {
@@ -192,11 +195,9 @@ async function runBuiltInReadinessCommand(
     requireTls: requireTls === 'true',
   });
 }
-
 function commandNotImplemented(command: string): Error & { code: 'COMMAND_NOT_IMPLEMENTED' } {
   return Object.assign(new Error(`Command is not implemented: ${command}`), { code: 'COMMAND_NOT_IMPLEMENTED' as const });
 }
-
 function writeJson(stdout: (line: string) => void, payload: unknown): void {
   stdout(JSON.stringify(sanitizeForOutput(payload)));
 }
@@ -205,6 +206,11 @@ async function main(argv = process.argv.slice(2), overrides: Partial<CliDependen
   const dependencies = { ...defaultDependencies, ...overrides };
   const parsed = parseCommandLine(argv);
   assertCutoverCliOptions(parsed);
+  if (isDeploymentGateCommand(parsed.command)) {
+    writeJson(dependencies.stdout, await runDeploymentGateCommand(parsed.command, parsed));
+    dependencies.setExitCode(0);
+    return;
+  }
   if ((parsed.command === 'preflight' || parsed.command === 'validate') && parsed.values.has('target')) {
     const code = parsed.command === 'preflight' ? 'PREFLIGHT_TARGET_ARG_FORBIDDEN' : 'VALIDATION_TARGET_ARG_FORBIDDEN';
     throw Object.assign(new Error(`${parsed.command} target must be provided through DATABASE_URL`), { code });
@@ -230,7 +236,6 @@ async function main(argv = process.argv.slice(2), overrides: Partial<CliDependen
     throw error;
   }
 }
-
 if (require.main === module) {
   void main().catch((error) => {
     const code = (error as Error & { code?: string }).code || 'COMMAND_FAILED';
