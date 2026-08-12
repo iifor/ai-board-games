@@ -11,15 +11,16 @@ import { MATCH_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { toJson } from './utils';
 import type { Match, StepBlocker } from '../../types/workflow';
 import type { WorkflowStep, StepHandlerExecuteResult } from './workflowRegistry';
+import type { DbExecutor } from '../../db/types';
 
 interface TickBudget { maxSteps?: number; maxDurationMs?: number; maxEventsApplied?: number; maxInterruptsProcessed?: number }
 const DEFAULT_BUDGET: Required<TickBudget> = { maxSteps: 20, maxDurationMs: 300, maxEventsApplied: 100, maxInterruptsProcessed: 0 };
 const TERMINAL_STATUSES: string[] = [MATCH_STATUS.COMPLETED, MATCH_STATUS.FAILED, MATCH_STATUS.PAUSED_DEBUG];
 
-async function tickMatch(matchId: string, budget: TickBudget = {}): Promise<Match> {
+async function tickMatch(matchId: string, budget: TickBudget = {}, db: DbExecutor = getDbExecutor()): Promise<Match> {
   const limits = { ...DEFAULT_BUDGET, ...budget };
   const started = Date.now();
-  return getDbExecutor().withTransaction(async (transaction) => {
+  return db.withTransaction(async (transaction) => {
     let match = await repo.getMatch(matchId, transaction, true);
     if (!match) throw new Error(`Match not found: ${matchId}`);
     match = await hydrateMatchFromEventStore(match, transaction);
@@ -63,7 +64,7 @@ async function tickMatch(matchId: string, budget: TickBudget = {}): Promise<Matc
       const previousState = structuredClone(state);
       const handler = getStepHandler(match.workflowId, step.type);
       const result: StepHandlerExecuteResult = await handler.execute({
-        match: match as unknown as Record<string, unknown>, workflow, step, state,
+        match: match as unknown as Record<string, unknown>, workflow, step, state, db: transaction,
       });
       if (result.status === 'FAILED') {
         const failed = await repo.commitWorkflowChange({ matchId, matchPatch: {

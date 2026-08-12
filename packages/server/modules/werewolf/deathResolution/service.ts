@@ -71,6 +71,7 @@ async function recordInitialEffects(context: DeathResolutionContext, effects: Ar
     matchId: context.match.id,
     stepId: context.step.id,
     effects: stableEffects,
+    db: context.db,
   });
   context.checkpoint.initialEffects = effects;
   context.checkpoint.initialEffectsApplied = true;

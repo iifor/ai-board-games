@@ -32,8 +32,8 @@ async function advanceLastWordsStage(context: DeathResolutionContext, playerId: 
   const actionType = 'last_words';
   const actorActionKey = `${actionType}:${playerId}`;
   const currentWindow = context.state.currentActionWindow as ActionWindow | null | undefined;
-  const hasActorWork = await hasOpenWork(context.match.id, context.step.id, actorActionKey);
-  const hasLegacyWork = await hasOpenWork(context.match.id, context.step.id, actionType);
+  const hasActorWork = await hasOpenWork(context.match.id, context.step.id, actorActionKey, context.db);
+  const hasLegacyWork = await hasOpenWork(context.match.id, context.step.id, actionType, context.db);
   const resumesLegacyWindow = !hasActorWork
     && hasLegacyWork
     && currentWindow?.actionType === actionType
@@ -42,7 +42,7 @@ async function advanceLastWordsStage(context: DeathResolutionContext, playerId: 
   const legacyEpochId = `${context.match.id}:${context.step.id}:${actionType}`;
   const epochActionKey = currentWindow?.id === legacyEpochId ? actionType : actorActionKey;
   const actionStep = { ...context.step, config: { ...context.step.config, actionType, ordered: true } };
-  if (!await hasOpenWork(context.match.id, context.step.id, taskActionKey)) {
+  if (!await hasOpenWork(context.match.id, context.step.id, taskActionKey, context.db)) {
     const window = await buildActionWindow({
       match: context.match,
       step: actionStep,
@@ -52,6 +52,7 @@ async function advanceLastWordsStage(context: DeathResolutionContext, playerId: 
       actors,
       targetIds: [],
       optional: false,
+      db: context.db,
     });
     const work = await createActionBlockers({
       match: context.match,
@@ -60,6 +61,7 @@ async function advanceLastWordsStage(context: DeathResolutionContext, playerId: 
       actors,
       promptContext: { day: context.round.day, actionType, round: context.round },
       taskActionType: taskActionKey,
+      db: context.db,
     });
     return {
       kind: 'waiting',
@@ -85,7 +87,7 @@ async function advanceLastWordsStage(context: DeathResolutionContext, playerId: 
     };
   }
 
-  if (!await allActionWorkSucceeded(context.match.id, context.step.id, taskActionKey, actors.length)) {
+  if (!await allActionWorkSucceeded(context.match.id, context.step.id, taskActionKey, actors.length, context.db)) {
     const window = context.state.currentActionWindow || {
       id: `${context.match.id}:${context.step.id}:${epochActionKey}`,
       actionType,
@@ -98,6 +100,7 @@ async function advanceLastWordsStage(context: DeathResolutionContext, playerId: 
       actors,
       promptContext: { day: context.round.day, actionType, round: context.round },
       taskActionType: taskActionKey,
+      db: context.db,
     });
     return {
       kind: 'waiting',
@@ -111,13 +114,14 @@ async function advanceLastWordsStage(context: DeathResolutionContext, playerId: 
     };
   }
 
-  const result = (await collectActionResults(context.match.id, context.step.id, taskActionKey))
+  const result = (await collectActionResults(context.match.id, context.step.id, taskActionKey, context.db))
     .find((item) => Number(item.actorId) === Number(playerId));
   await resolveActionWindow(
     context.match.id,
     context.step.id,
     epochActionKey,
     context.state.currentActionWindow as unknown as ActionWindow,
+    context.db,
   );
   const testimony = applyLastWordsResult(context.round, playerId, result);
   if (!testimony) return { kind: 'advanced' };

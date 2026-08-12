@@ -1,3 +1,5 @@
+import type { DbExecutor } from '../../db/types';
+
 interface WorkflowStep {
   id: string;
   type: string;
@@ -17,6 +19,7 @@ interface StepHandlerExecuteParams {
   workflow: Workflow;
   step: WorkflowStep;
   state: Record<string, unknown>;
+  db?: DbExecutor;
 }
 
 interface StepHandlerExecuteResult {

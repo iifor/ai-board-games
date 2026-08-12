@@ -28,8 +28,8 @@ async function advanceHunterStage(context: DeathResolutionContext, playerId: num
   const actorId = Number(hunter.id);
   const currentWindow = context.state.currentActionWindow as ActionWindow | null | undefined;
   const actorActionKey = `${actionType}:${actorId}`;
-  const hasActorWork = await hasOpenWork(context.match.id, context.step.id, actorActionKey);
-  const hasLegacyWork = await hasOpenWork(context.match.id, context.step.id, actionType);
+  const hasActorWork = await hasOpenWork(context.match.id, context.step.id, actorActionKey, context.db);
+  const hasLegacyWork = await hasOpenWork(context.match.id, context.step.id, actionType, context.db);
   const resumesLegacyWindow = !hasActorWork
     && hasLegacyWork
     && currentWindow?.actionType === actionType
@@ -38,7 +38,7 @@ async function advanceHunterStage(context: DeathResolutionContext, playerId: num
   const legacyEpochId = `${context.match.id}:${context.step.id}:${actionType}`;
   const epochActionKey = currentWindow?.id === legacyEpochId ? actionType : actorActionKey;
   const actionStep = { ...context.step, config: { ...context.step.config, actionType } };
-  if (!await hasOpenWork(context.match.id, context.step.id, taskActionKey)) {
+  if (!await hasOpenWork(context.match.id, context.step.id, taskActionKey, context.db)) {
     const window = await buildActionWindow({
       match: context.match,
       step: actionStep,
@@ -48,6 +48,7 @@ async function advanceHunterStage(context: DeathResolutionContext, playerId: num
       actors: [hunter],
       targetIds: context.runtime.agents.filter((agent) => agent.alive).map((agent) => agent.id),
       optional: false,
+      db: context.db,
     });
     const work = await createActionBlockers({
       match: context.match,
@@ -56,6 +57,7 @@ async function advanceHunterStage(context: DeathResolutionContext, playerId: num
       actors: [hunter],
       promptContext: { day: context.round.day, actionType, round: context.round },
       taskActionType: taskActionKey,
+      db: context.db,
     });
     return {
       kind: 'waiting',
@@ -81,7 +83,7 @@ async function advanceHunterStage(context: DeathResolutionContext, playerId: num
     };
   }
 
-  if (!await allActionWorkSucceeded(context.match.id, context.step.id, taskActionKey, 1)) {
+  if (!await allActionWorkSucceeded(context.match.id, context.step.id, taskActionKey, 1, context.db)) {
     const window = context.state.currentActionWindow || {
       id: `${context.match.id}:${context.step.id}:${epochActionKey}`,
       actionType,
@@ -94,6 +96,7 @@ async function advanceHunterStage(context: DeathResolutionContext, playerId: num
       actors: [hunter],
       promptContext: { day: context.round.day, actionType, round: context.round },
       taskActionType: taskActionKey,
+      db: context.db,
     });
     return {
       kind: 'waiting',
@@ -107,7 +110,7 @@ async function advanceHunterStage(context: DeathResolutionContext, playerId: num
     };
   }
 
-  const result = (await collectActionResults(context.match.id, context.step.id, taskActionKey))
+  const result = (await collectActionResults(context.match.id, context.step.id, taskActionKey, context.db))
     .find((item) => Number(item.actorId) === actorId);
   const target = Number(result?.payload?.target);
   const effect = applyHunterShot(context.runtime.agents as never, context.round as never, {
@@ -135,6 +138,7 @@ async function advanceHunterStage(context: DeathResolutionContext, playerId: num
     context.step.id,
     epochActionKey,
     context.state.currentActionWindow as unknown as ActionWindow,
+    context.db,
   );
   if (effect) {
     await recordWorkflowEffects({
@@ -144,6 +148,7 @@ async function advanceHunterStage(context: DeathResolutionContext, playerId: num
         ...(effect as unknown as Record<string, unknown>),
         id: `${context.match.id}:${context.step.id}:hunter:${actorId}:${target}`,
       }],
+      db: context.db,
     });
   }
   if (effect) {

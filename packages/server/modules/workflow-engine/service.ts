@@ -1,5 +1,5 @@
 import * as repo from './repository';
-import type { CommitChangeInput, CommitChangeResult } from './repository';
+import type { CommitChangeInput, CommitChangeResult, EventInput } from './repository';
 import { requestInterrupt, resolveInterrupt } from './effects';
 import { getDbExecutor } from '../../db';
 import { tickMatch } from './tick';
@@ -147,32 +147,37 @@ async function completeAiTask(taskId: string, result: AiTaskResult | Record<stri
   if (!payload || (typeof payload === 'object' && !Object.keys(payload as object).length)) {
     return await failAiTask(taskId, { message: 'AI task result payload is empty', severity: 'high' }) as Match;
   }
-  await repo.updateAiTask(task.id, {
+  const successPatch = {
     status: 'succeeded',
     raw_output: typeof (result as AiTaskResult).rawOutput === 'string'
       ? (result as AiTaskResult).rawOutput
       : JSON.stringify((result as AiTaskResult).rawOutput ?? payload),
     result_json: toJson(result),
-  });
-  await repo.commitWorkflowChange({
-    matchId: task.matchId,
-    events: [{
-      stepId: task.stepId,
-      playerId: task.playerId,
-      type: (result as AiTaskResult).eventType || 'ai_task_succeeded',
-      payload,
-      idempotencyKey: `${task.id}:result`,
-      visibility: 'system',
-    }],
-  });
+  };
+  const resultEvent = {
+    stepId: task.stepId,
+    playerId: task.playerId,
+    type: (result as AiTaskResult).eventType || 'ai_task_succeeded',
+    payload,
+    idempotencyKey: `${task.id}:result`,
+    visibility: 'system',
+  };
   try {
-    return await wakeTick(task.matchId);
+    return await getDbExecutor().withTransaction(async (transaction) => {
+      await repo.updateAiTask(task.id, successPatch, transaction);
+      await repo.commitWorkflowChange({
+        matchId: task.matchId,
+        events: [resultEvent],
+      }, transaction);
+      return tickMatch(task.matchId, {}, transaction);
+    });
   } catch (error) {
-    return pauseAfterSuccessfulAiAdvanceFailure(task, error);
+    return pauseAfterSuccessfulAiAdvanceFailure(task, error, successPatch, resultEvent);
   }
 }
 
-async function pauseAfterSuccessfulAiAdvanceFailure(task: AiTask, error: unknown): Promise<Match> {
+async function pauseAfterSuccessfulAiAdvanceFailure(task: AiTask, error: unknown,
+  successPatch: Record<string, unknown>, resultEvent: EventInput): Promise<Match> {
   const message = error instanceof Error ? error.message : String(error);
   const failure = {
     message,
@@ -180,21 +185,24 @@ async function pauseAfterSuccessfulAiAdvanceFailure(task: AiTask, error: unknown
     severity: 'high',
     stage: 'wake_tick_after_ai_success',
   };
-  const result = await repo.commitWorkflowChange({
-    matchId: task.matchId,
-    events: [{
-      stepId: task.stepId,
-      playerId: task.playerId,
-      type: 'workflow_advance_failed',
-      payload: failure,
-      visibility: 'system',
-      idempotencyKey: `${task.id}:workflow-advance-failed`,
-    }],
-    matchPatch: {
-      status: MATCH_STATUS.PAUSED_DEBUG,
-      error_json: toJson(failure),
-    },
-    snapshot: true,
+  const result = await getDbExecutor().withTransaction(async (transaction) => {
+    await repo.updateAiTask(task.id, successPatch, transaction);
+    return repo.commitWorkflowChange({
+      matchId: task.matchId,
+      events: [resultEvent, {
+        stepId: task.stepId,
+        playerId: task.playerId,
+        type: 'workflow_advance_failed',
+        payload: failure,
+        visibility: 'system',
+        idempotencyKey: `${task.id}:workflow-advance-failed`,
+      }],
+      matchPatch: {
+        status: MATCH_STATUS.PAUSED_DEBUG,
+        error_json: toJson(failure),
+      },
+      snapshot: true,
+    }, transaction);
   });
   console.error('[workflow-engine] AI result persisted but workflow advance failed', failure);
   await maybeCleanupTerminalDebugMatch(result.match);

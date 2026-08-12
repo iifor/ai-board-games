@@ -204,8 +204,8 @@ async function listAiTasks(matchId: string, status: string | null = null, db: Db
 async function getAiTask(id: string): Promise<AiTask | null> {
   return rowToTask((await getDbExecutor().queryOne<AiTaskRow>('SELECT * FROM ai_tasks WHERE id = $1', [id])) || undefined);
 }
-async function updateAiTask(id: string, patch: Record<string, unknown>): Promise<void> {
-  await updateRow(getDbExecutor(), 'ai_tasks', 'id', id, patch, TASK_COLUMNS);
+async function updateAiTask(id: string, patch: Record<string, unknown>, db: DbExecutor = getDbExecutor()): Promise<void> {
+  await updateRow(db, 'ai_tasks', 'id', id, patch, TASK_COLUMNS);
 }
 async function retryAiTask(id: string): Promise<AiTask | null> {
   await updateAiTask(id, { status: 'retrying', error_json: 'null', worker_id: '', claimed_at: null });
@@ -245,8 +245,8 @@ async function expirePendingActions(matchId: string, stepId: string | null = nul
   return result.rowCount;
 }
 
-async function upsertActionWindowEpoch(epoch: ActionWindowEpochInput): Promise<ActionWindowEpoch | null> {
-  await getDbExecutor().execute(`INSERT INTO action_window_epochs
+async function upsertActionWindowEpoch(epoch: ActionWindowEpochInput, db: DbExecutor = getDbExecutor()): Promise<ActionWindowEpoch | null> {
+  await db.execute(`INSERT INTO action_window_epochs
     (id, match_id, step_id, action_type, status, window_json, created_event_seq, resolved_event_seq,
      expires_at, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
     ON CONFLICT(match_id, step_id, action_type) DO UPDATE SET status=excluded.status,
@@ -255,34 +255,34 @@ async function upsertActionWindowEpoch(epoch: ActionWindowEpochInput): Promise<A
       expires_at=excluded.expires_at, updated_at=excluded.updated_at`, [epoch.id, epoch.matchId, epoch.stepId,
     epoch.actionType, epoch.status || 'open', toJson(epoch.window || {}), epoch.createdEventSeq || null,
     epoch.resolvedEventSeq || null, epoch.expiresAt || null, epoch.createdAt || nowIso(), nowIso()]);
-  return getActionWindowEpoch(epoch.matchId, epoch.stepId, epoch.actionType);
+  return getActionWindowEpoch(epoch.matchId, epoch.stepId, epoch.actionType, db);
 }
-async function getActionWindowEpoch(matchId: string, stepId: string, actionType: string): Promise<ActionWindowEpoch | null> {
-  return rowToActionWindowEpoch((await getDbExecutor().queryOne<ActionWindowEpochRow>(`SELECT * FROM action_window_epochs
+async function getActionWindowEpoch(matchId: string, stepId: string, actionType: string, db: DbExecutor = getDbExecutor()): Promise<ActionWindowEpoch | null> {
+  return rowToActionWindowEpoch((await db.queryOne<ActionWindowEpochRow>(`SELECT * FROM action_window_epochs
     WHERE match_id=$1 AND step_id=$2 AND action_type=$3`, [matchId, stepId, actionType])) || undefined);
 }
-async function listActionWindowEpochs(matchId: string): Promise<ActionWindowEpoch[]> {
-  return (await getDbExecutor().queryMany<ActionWindowEpochRow>('SELECT * FROM action_window_epochs WHERE match_id=$1 ORDER BY created_at ASC', [matchId])).map(rowToActionWindowEpoch).filter((epoch): epoch is ActionWindowEpoch => epoch !== null);
+async function listActionWindowEpochs(matchId: string, db: DbExecutor = getDbExecutor()): Promise<ActionWindowEpoch[]> {
+  return (await db.queryMany<ActionWindowEpochRow>('SELECT * FROM action_window_epochs WHERE match_id=$1 ORDER BY created_at ASC', [matchId])).map(rowToActionWindowEpoch).filter((epoch): epoch is ActionWindowEpoch => epoch !== null);
 }
 
-async function createWorkflowEffect(effect: WorkflowEffectInput): Promise<WorkflowEffect | null> {
-  await getDbExecutor().execute(`INSERT INTO workflow_effects
+async function createWorkflowEffect(effect: WorkflowEffectInput, db: DbExecutor = getDbExecutor()): Promise<WorkflowEffect | null> {
+  await db.execute(`INSERT INTO workflow_effects
     (id,match_id,step_id,source_event_seq,effect_type,status,priority,payload_json,applied_event_seq,created_at,updated_at)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)
     ON CONFLICT(id) DO UPDATE SET step_id=excluded.step_id,source_event_seq=excluded.source_event_seq,
       effect_type=excluded.effect_type,status=excluded.status,priority=excluded.priority,payload_json=excluded.payload_json,
       applied_event_seq=excluded.applied_event_seq,updated_at=excluded.updated_at`, [effect.id,effect.matchId,effect.stepId||null,
     effect.sourceEventSeq||null,effect.effectType,effect.status||'proposed',effect.priority||0,toJson(effect.payload||{}),effect.appliedEventSeq||null,nowIso()]);
-  return getWorkflowEffect(effect.id);
+  return getWorkflowEffect(effect.id, db);
 }
-async function getWorkflowEffect(id: string): Promise<WorkflowEffect | null> {
-  return rowToWorkflowEffect((await getDbExecutor().queryOne<WorkflowEffectRow>('SELECT * FROM workflow_effects WHERE id=$1',[id])) || undefined);
+async function getWorkflowEffect(id: string, db: DbExecutor = getDbExecutor()): Promise<WorkflowEffect | null> {
+  return rowToWorkflowEffect((await db.queryOne<WorkflowEffectRow>('SELECT * FROM workflow_effects WHERE id=$1',[id])) || undefined);
 }
-async function listWorkflowEffects(matchId: string): Promise<WorkflowEffect[]> {
-  return (await getDbExecutor().queryMany<WorkflowEffectRow>('SELECT * FROM workflow_effects WHERE match_id=$1 ORDER BY priority DESC,created_at ASC',[matchId])).map(rowToWorkflowEffect).filter((effect): effect is WorkflowEffect => effect !== null);
+async function listWorkflowEffects(matchId: string, db: DbExecutor = getDbExecutor()): Promise<WorkflowEffect[]> {
+  return (await db.queryMany<WorkflowEffectRow>('SELECT * FROM workflow_effects WHERE match_id=$1 ORDER BY priority DESC,created_at ASC',[matchId])).map(rowToWorkflowEffect).filter((effect): effect is WorkflowEffect => effect !== null);
 }
-async function updateWorkflowEffect(id: string, patch: Record<string, unknown>): Promise<WorkflowEffect | null> {
-  await updateRow(getDbExecutor(),'workflow_effects','id',id,patch,EFFECT_COLUMNS); return getWorkflowEffect(id);
+async function updateWorkflowEffect(id: string, patch: Record<string, unknown>, db: DbExecutor = getDbExecutor()): Promise<WorkflowEffect | null> {
+  await updateRow(db,'workflow_effects','id',id,patch,EFFECT_COLUMNS); return getWorkflowEffect(id, db);
 }
 async function createWorkflowInterrupt(
   item: WorkflowInterruptInput,

@@ -2,7 +2,7 @@
 
 ## PostgreSQL 工作流持久化契约
 
-所有工作流 repository、service、controller、runner 和 worker 均通过异步 `DbExecutor` 访问 PostgreSQL 16。`tickMatch` 在 serializable 事务开始时用 `SELECT ... FOR UPDATE` 锁定目标 Match，事件序号在锁内计算；Match、workflow event、snapshot 和 outbox 在同一事务提交，任一失败整体回滚。AI task 与 outbox 通过 `FOR UPDATE SKIP LOCKED` 原子领取，多个实例不会重复消费同一记录。
+所有工作流 repository、service、controller、runner 和 worker 均通过异步 `DbExecutor` 访问 PostgreSQL 16。`tickMatch` 在 serializable 事务开始时用 `SELECT ... FOR UPDATE` 锁定目标 Match，事件序号在锁内计算；Match、workflow event、snapshot 和 outbox 在同一事务提交，任一失败整体回滚。handler 在锁内创建或查询 action-window epoch、workflow effect、死亡结算子窗口，以及读取辩论 AI task/event 时，必须复用 tick 注入的 `DbExecutor`；AI task 成功结果与随后的 workflow 推进也在同一事务连接上提交，避免第二连接读取旧任务状态或让外键检查反向等待已锁定的 Match。AI task 与 outbox 通过 `FOR UPDATE SKIP LOCKED` 原子领取，多个实例不会重复消费同一记录。
 
 终态 Match 删除仅接受 `completed`、`failed`、`paused_debug`。正式删除 API 在事务内清理同 ID game、game players、回放、workflow 子表和观测 trace 树；跨局 `player_game_memories` 保留，按 `game_type` 保存的 `game_player_selections` 也不属于单局删除范围。物理空间由 PostgreSQL autovacuum 和受控维护处理，删除 API 不承担文件缩减。
 

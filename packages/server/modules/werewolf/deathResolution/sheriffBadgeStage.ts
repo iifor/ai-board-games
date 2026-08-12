@@ -38,7 +38,7 @@ async function advanceSheriffBadgeStage(context: DeathResolutionContext, playerI
   }
 
   const actionStep = { ...context.step, config: { ...context.step.config, actionType } };
-  if (!await hasOpenWork(context.match.id, context.step.id, actorActionKey)) {
+  if (!await hasOpenWork(context.match.id, context.step.id, actorActionKey, context.db)) {
     const window = await buildActionWindow({
       match: context.match,
       step: actionStep,
@@ -48,6 +48,7 @@ async function advanceSheriffBadgeStage(context: DeathResolutionContext, playerI
       actors: [sheriff],
       targetIds,
       optional: false,
+      db: context.db,
     });
     const work = await createActionBlockers({
       match: context.match,
@@ -56,6 +57,7 @@ async function advanceSheriffBadgeStage(context: DeathResolutionContext, playerI
       actors: [sheriff],
       promptContext: { day: context.round.day, actionType, round: context.round },
       taskActionType: actorActionKey,
+      db: context.db,
     });
     return {
       kind: 'waiting',
@@ -81,7 +83,7 @@ async function advanceSheriffBadgeStage(context: DeathResolutionContext, playerI
     };
   }
 
-  if (!await allActionWorkSucceeded(context.match.id, context.step.id, actorActionKey, 1)) {
+  if (!await allActionWorkSucceeded(context.match.id, context.step.id, actorActionKey, 1, context.db)) {
     const window = context.state.currentActionWindow || {
       id: `${context.match.id}:${context.step.id}:${actorActionKey}`,
       actionType,
@@ -94,6 +96,7 @@ async function advanceSheriffBadgeStage(context: DeathResolutionContext, playerI
       actors: [sheriff],
       promptContext: { day: context.round.day, actionType, round: context.round },
       taskActionType: actorActionKey,
+      db: context.db,
     });
     return {
       kind: 'waiting',
@@ -106,13 +109,14 @@ async function advanceSheriffBadgeStage(context: DeathResolutionContext, playerI
       },
     };
   }
-  const result = (await collectActionResults(context.match.id, context.step.id, actorActionKey))
+  const result = (await collectActionResults(context.match.id, context.step.id, actorActionKey, context.db))
     .find((item) => Number(item.actorId) === actorId);
   await resolveActionWindow(
     context.match.id,
     context.step.id,
     actorActionKey,
     context.state.currentActionWindow as unknown as ActionWindow,
+    context.db,
   );
   return applyDisposition(context, sheriff, result?.payload || {});
 }

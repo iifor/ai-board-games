@@ -2,12 +2,14 @@ import { createId, toJson } from './utils';
 import * as repo from './repository';
 import { WORKFLOW_EFFECT_STATUS, WORKFLOW_INTERRUPT_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import type { WorkflowEffect, WorkflowInterrupt } from '../../types/workflow';
+import type { DbExecutor } from '../../db/types';
 
 interface RecordEffectsInput {
   matchId: string;
   stepId?: string | null;
   sourceEventSeq?: number | null;
   effects?: Array<Record<string, unknown>>;
+  db?: DbExecutor;
 }
 
 interface InterruptInput {
@@ -19,7 +21,7 @@ interface InterruptInput {
   payload?: Record<string, unknown>;
 }
 
-async function recordWorkflowEffects({ matchId, stepId = null, sourceEventSeq = null, effects = [] }: RecordEffectsInput): Promise<WorkflowEffect[]> {
+async function recordWorkflowEffects({ matchId, stepId = null, sourceEventSeq = null, effects = [], db }: RecordEffectsInput): Promise<WorkflowEffect[]> {
   const stored = await Promise.all(effects.map((effect, index) => repo.createWorkflowEffect({
     id: String(effect.id || createId('effect')),
     matchId,
@@ -30,7 +32,7 @@ async function recordWorkflowEffects({ matchId, stepId = null, sourceEventSeq = 
     priority: Number(effect.priority || effects.length - index),
     payload: effect,
     appliedEventSeq: sourceEventSeq,
-  })));
+  }, db)));
   return stored.filter((item): item is WorkflowEffect => item !== null);
 }
 

@@ -2,6 +2,7 @@ import * as repo from '../workflow-engine/repository';
 import { stableTaskId } from '../workflow-engine/utils';
 import { BLOCKER_TYPES, BLOCKER_STATUS, ACTION_WINDOW_STATUS } from '@ai-presenter/shared/types/workflowTypes';
 import { hasRoleAction, sortBySeat } from './utils';
+import type { DbExecutor } from '../../db/types';
 
 interface Agent {
   id: number;
@@ -54,7 +55,7 @@ interface Runtime {
   [key: string]: unknown;
 }
 
-async function buildActionWindow({ match, step, state, actionType, epochActionType, actors, targetIds = [], optional = false }: {
+async function buildActionWindow({ match, step, state, actionType, epochActionType, actors, targetIds = [], optional = false, db }: {
   match: Match;
   step: Step;
   state: Record<string, unknown>;
@@ -63,6 +64,7 @@ async function buildActionWindow({ match, step, state, actionType, epochActionTy
   actors: Agent[];
   targetIds?: number[];
   optional?: boolean;
+  db?: DbExecutor;
 }): Promise<ActionWindow> {
   const actorList: Agent[] = step.config.ordered ? (actors || []) : sortBySeat(actors || []);
   const epochKey = epochActionType || actionType;
@@ -89,20 +91,21 @@ async function buildActionWindow({ match, step, state, actionType, epochActionTy
     actionType: epochKey,
     status: ACTION_WINDOW_STATUS.OPEN,
     window: window as Record<string, unknown>
-  });
+  }, db);
   return window;
 }
 
-async function createActionBlockers({ match, step, window, actors, promptContext = {}, taskActionType }: {
+async function createActionBlockers({ match, step, window, actors, promptContext = {}, taskActionType, db }: {
   match: Match;
   step: Step;
   window: ActionWindow;
   actors: Agent[];
   promptContext?: Record<string, unknown>;
   taskActionType?: string;
+  db?: DbExecutor;
 }) {
   const workActionType = taskActionType || window.actionType;
-  const activeActors = await selectActorsForWindow(match.id, step.id, window, actors, workActionType);
+  const activeActors = await selectActorsForWindow(match.id, step.id, window, actors, workActionType, db);
   const blockers: Record<string, unknown>[] = [];
   const tasks: Record<string, unknown>[] = [];
   const pendingActions: Record<string, unknown>[] = [];
@@ -143,7 +146,7 @@ async function createActionBlockers({ match, step, window, actors, promptContext
       status: 'queued',
       prompt: { window, actorId: actor.id },
       promptContextSnapshot: promptContext,
-      visibleEventSeqMax: Math.max(0, ...(await repo.listEvents(match.id)).map((event: { seq?: number }) => event.seq || 0)),
+      visibleEventSeqMax: Math.max(0, ...(await repo.listEvents(match.id, db)).map((event: { seq?: number }) => event.seq || 0)),
       visibleEventIds: []
     });
     blockers.push({
@@ -157,21 +160,21 @@ async function createActionBlockers({ match, step, window, actors, promptContext
   return { blockers, tasks, pendingActions };
 }
 
-async function hasOpenWork(matchId: string, stepId: string, actionType: string): Promise<boolean> {
-  const tasks = (await repo.listAiTasks(matchId)).filter((task: { stepId: string; action: string }) => task.stepId === stepId && task.action === actionType);
-  const actions = (await repo.listPendingActions(matchId)).filter((action: { stepId: string; actionType: string }) => action.stepId === stepId && action.actionType === actionType);
+async function hasOpenWork(matchId: string, stepId: string, actionType: string, db?: DbExecutor): Promise<boolean> {
+  const tasks = (await repo.listAiTasks(matchId, null, db)).filter((task: { stepId: string; action: string }) => task.stepId === stepId && task.action === actionType);
+  const actions = (await repo.listPendingActions(matchId, db)).filter((action: { stepId: string; actionType: string }) => action.stepId === stepId && action.actionType === actionType);
   return tasks.length > 0 || actions.length > 0;
 }
 
-async function collectActionResults(matchId: string, stepId: string, actionType: string): Promise<ActionResult[]> {
-  const taskResults = (await repo.listAiTasks(matchId))
+async function collectActionResults(matchId: string, stepId: string, actionType: string, db?: DbExecutor): Promise<ActionResult[]> {
+  const taskResults = (await repo.listAiTasks(matchId, null, db))
     .filter((task: { stepId: string; action: string; status: string }) => task.stepId === stepId && task.action === actionType && task.status === 'succeeded')
     .map((task: { playerId: string | number; result?: { payload?: Record<string, unknown> } }) => ({
       source: 'ai',
       actorId: Number(task.playerId),
       payload: task.result?.payload || {}
     }));
-  const actionResults = (await repo.listPendingActions(matchId))
+  const actionResults = (await repo.listPendingActions(matchId, db))
     .filter((action: { stepId: string; actionType: string; status: string }) => action.stepId === stepId && action.actionType === actionType && action.status === 'submitted')
     .map((action: { playerId?: string | number; payload?: unknown }) => ({
       source: 'human',
@@ -181,12 +184,12 @@ async function collectActionResults(matchId: string, stepId: string, actionType:
   return [...taskResults, ...actionResults];
 }
 
-async function allActionWorkSucceeded(matchId: string, stepId: string, actionType: string, actorCount: number): Promise<boolean> {
-  const completed = (await collectActionResults(matchId, stepId, actionType)).length;
+async function allActionWorkSucceeded(matchId: string, stepId: string, actionType: string, actorCount: number, db?: DbExecutor): Promise<boolean> {
+  const completed = (await collectActionResults(matchId, stepId, actionType, db)).length;
   return completed >= actorCount;
 }
 
-async function resolveActionWindow(matchId: string, stepId: string, actionType: string, window?: ActionWindow | null): Promise<void> {
+async function resolveActionWindow(matchId: string, stepId: string, actionType: string, window?: ActionWindow | null, db?: DbExecutor): Promise<void> {
   const epochActionType = window?.epochActionType || actionType;
   await repo.upsertActionWindowEpoch({
     id: window?.id || `${matchId}:${stepId}:${epochActionType}`,
@@ -195,13 +198,13 @@ async function resolveActionWindow(matchId: string, stepId: string, actionType: 
     actionType: epochActionType,
     status: ACTION_WINDOW_STATUS.RESOLVED,
     window: (window || {}) as Record<string, unknown>
-  });
+  }, db);
 }
 
-async function selectActorsForWindow(matchId: string, stepId: string, window: ActionWindow, actors: Agent[], taskActionType: string = window.actionType): Promise<Agent[]> {
+async function selectActorsForWindow(matchId: string, stepId: string, window: ActionWindow, actors: Agent[], taskActionType: string = window.actionType, db?: DbExecutor): Promise<Agent[]> {
   if (window.orderMode !== 'ordered') return actors || [];
   const eligibleIds = new Set((actors || []).map((actor) => Number(actor.id)));
-  const completed = (await collectActionResults(matchId, stepId, taskActionType))
+  const completed = (await collectActionResults(matchId, stepId, taskActionType, db))
     .filter((result) => eligibleIds.has(Number(result.actorId)))
     .length;
   const orderedActors = Array.isArray(window.actorIds) && window.actorIds.length

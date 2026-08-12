@@ -34,6 +34,7 @@ import {
 import type { WorkflowMatch, WorkflowState, TaskSpec, AiTask, HandlerResult, RuntimeResult, WorkflowEvent } from './helpers';
 import { formatRelationshipMemoryForPrompt, loadPlayerSession, savePlayerSession } from '../player-memory';
 import { buildAgentHash } from './utils';
+import type { DbExecutor } from '../../db/types';
 
 // ---- Types ----
 
@@ -56,6 +57,7 @@ interface HandlerContext {
   match: WorkflowMatch;
   step: WorkflowStep;
   state: WorkflowState;
+  db?: DbExecutor;
 }
 
 // ---- Constants ----
@@ -130,13 +132,13 @@ const handlers: Record<string, {
     },
   },
   'debate.ai_turn': {
-    async execute({ match, step, state }: HandlerContext) {
+    async execute({ match, step, state, db }: HandlerContext) {
       if (state.completedSteps?.[step.id]) return { status: 'COMPLETED', state };
       const phase = createPhaseFromStep(step);
       const taskSpecs = createTaskSpecs(step, state);
       const tasks: AiTask[] = [];
       const blockers: HandlerResult['blockers'] = [];
-      const existing = ((await listAiTasks(match.id)) as unknown as AiTask[]).filter((task) => task.stepId === step.id);
+      const existing = ((await listAiTasks(match.id, null, db)) as unknown as AiTask[]).filter((task) => task.stepId === step.id);
       const byKey = new Map(existing.map((task) => [task.taskKey, task]));
 
       for (const spec of taskSpecs) {
@@ -153,7 +155,7 @@ const handlers: Record<string, {
             status: 'queued',
             prompt: { phase: phase.id, action: spec.action },
             promptContextSnapshot: { ...spec, phase, topic: state.topic },
-            visibleEventSeqMax: Math.max(0, ...((await listEvents(match.id)) as Array<{ seq?: number }>).map((event) => event.seq || 0)),
+            visibleEventSeqMax: Math.max(0, ...((await listEvents(match.id, db)) as Array<{ seq?: number }>).map((event) => event.seq || 0)),
             visibleEventIds: [],
           });
         }

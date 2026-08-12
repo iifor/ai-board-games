@@ -1,5 +1,6 @@
 import type { Runtime } from '../runtime';
 import type { StepState } from '../handlers/common';
+import type { DbExecutor } from '../../../db/types';
 
 interface Match {
   id: string;
@@ -61,6 +62,7 @@ interface DeathResolutionContext {
   round: DeathResolutionRound;
   checkpoint: DeathResolutionCheckpoint;
   events: unknown[];
+  db?: DbExecutor;
 }
 
 interface HandlerResult {

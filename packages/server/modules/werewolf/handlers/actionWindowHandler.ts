@@ -30,6 +30,7 @@ import { getSeatNumber } from '../utils';
 import { recordWerewolfInteractionFeedback } from '../interactionFeedbackTrace';
 import { canUseWerewolfActionEngineBridge, runWerewolfActionEngineBridge } from '../actionEngineBridge';
 import type { WerewolfActionEngineShadowAudit } from '../actionEngineBridge';
+import type { DbExecutor } from '../../../db/types';
 
 /** 已有独立睁眼事件的夜晚行动 — phase-start 不再重复发布 */
 const NIGHT_WAKE_ACTIONS = new Set([
@@ -73,7 +74,7 @@ interface HandlerResult {
 
 function createActionWindowHandler() {
   return {
-    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
+    async execute({ match, step, state, db }: { match: Match; step: Step; state: StepState; db?: DbExecutor }): Promise<HandlerResult> {
       const isPostgameAction = step.config.actionType === 'mvp_vote' || step.config.actionType === 'postgame_speech';
       if (isDone(state, step.id) || (state.winner && !isPostgameAction)) return completed(state, step.id);
       const runtime = await createRuntime(match, state);
@@ -107,8 +108,8 @@ function createActionWindowHandler() {
       const actors = getActorsForStep(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep, round as unknown as ReducerRound);
       if (!actors.length) return skipAction(match, step, runtime, { systemOnly: true });
 
-      if (!await hasOpenWork(match.id, step.id, step.config.actionType)) {
-        return await openActionWindow({ match, step, state, runtime, round, actors });
+      if (!await hasOpenWork(match.id, step.id, step.config.actionType, db)) {
+        return await openActionWindow({ match, step, state, runtime, round, actors, db });
       }
 
       const eligibleActorIds = new Set(actors.map((actor) => Number(actor.id)));
@@ -116,6 +117,7 @@ function createActionWindowHandler() {
         match.id,
         step.id,
         step.config.actionType!,
+        db,
       ) as unknown as ReducerActionResult[]).filter((result) => (
         eligibleActorIds.has(Number(result.actorId))
       ));
@@ -137,12 +139,12 @@ function createActionWindowHandler() {
         }
         if (hasSelfDestruct(round as unknown as ReducerRound)) {
           applySelfDestruct(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound);
-          return await completeSelfDestructWindow({ match, step, runtime, round, state });
+          return await completeSelfDestructWindow({ match, step, runtime, round, state, db });
         }
       }
 
       if (partialResults.length < actors.length) {
-        return await waitForActionWindow({ match, step, state: partialApplied ? { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: state.currentActionWindow } : state, round, actors });
+        return await waitForActionWindow({ match, step, state: partialApplied ? { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: state.currentActionWindow } : state, round, actors, db });
       }
 
       const shouldUseEngineBridge = !partialApplied && canUseWerewolfActionEngineBridge(step.config.actionType);
@@ -174,7 +176,7 @@ function createActionWindowHandler() {
         });
       }
       const nextState = markStepComplete({ ...actionState, currentStep: step.id, currentActionWindow: null }, step.id);
-      await resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
+      await resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow, db);
       const resolvedChannel = resolveActionChannel(step.config.actionType || '');
       const completedEvents: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_submitted', actionResolvedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType }, resolvedChannel)];
       if (engineBridgeResult?.audit) {
@@ -270,19 +272,20 @@ function shouldApplyPartialResults(step: Step): boolean {
   ));
 }
 
-async function completeSelfDestructWindow({ match, step, runtime, round, state }: {
+async function completeSelfDestructWindow({ match, step, runtime, round, state, db }: {
   match: Match;
   step: Step;
   runtime: Runtime;
   round: Record<string, unknown>;
   state: StepState;
+  db?: DbExecutor;
 }): Promise<HandlerResult> {
   const nextState = markStepComplete({
     ...syncRuntimeState(runtime),
     currentStep: step.id,
     currentActionWindow: null,
   }, step.id);
-  await resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow);
+  await resolveActionWindow(match.id, step.id, step.config.actionType!, state.currentActionWindow as unknown as ActionWindow, db);
   const selfDestruct = (round as { selfDestruct?: Record<string, unknown> }).selfDestruct || {};
   const actorId = Number(selfDestruct.playerId || 0);
   const targetId = Number(selfDestruct.targetId || 0) || null;
@@ -432,13 +435,14 @@ function skipAction(
   };
 }
 
-async function openActionWindow({ match, step, state, runtime, round, actors }: {
+async function openActionWindow({ match, step, state, runtime, round, actors, db }: {
   match: Match;
   step: Step;
   state: StepState;
   runtime: Runtime;
   round: Record<string, unknown>;
   actors: unknown[];
+  db?: DbExecutor;
 }): Promise<HandlerResult> {
   if (step.config.actionType === 'wolf_kill' || step.config.actionType === 'wolf_speech' || step.config.actionType === 'wolf_vote') {
     ensureWolfTeamContext(runtime as unknown as ReducerRuntime, round as unknown as ReducerRound);
@@ -450,7 +454,8 @@ async function openActionWindow({ match, step, state, runtime, round, actors }: 
     actionType: step.config.actionType!,
     actors: actors as Parameters<typeof buildActionWindow>[0]['actors'],
     targetIds: getTargetIds(runtime as unknown as ReducerRuntime, step as unknown as ReducerStep),
-    optional: Boolean(step.config.optional)
+    optional: Boolean(step.config.optional),
+    db,
   });
   const nextState = step.config.actionType === 'wolf_kill' || step.config.actionType === 'wolf_speech' || step.config.actionType === 'wolf_vote'
     ? { ...syncRuntimeState(runtime), currentStep: step.id, currentActionWindow: window }
@@ -460,7 +465,8 @@ async function openActionWindow({ match, step, state, runtime, round, actors }: 
     step,
     window,
     actors: actors as Parameters<typeof createActionBlockers>[0]['actors'],
-    promptContext: { day: step.config.day, actionType: step.config.actionType, round }
+    promptContext: { day: step.config.day, actionType: step.config.actionType, round },
+    db,
   });
   const { channel, scopeKey } = resolveActionChannel(step.config.actionType || '');
   const events: unknown[] = [createWerewolfEvent(match, step, nextState as unknown as Record<string, unknown>, 'werewolf_action_requested', actionRequestedMessage(step.config.actionType, step.config.day), { actionType: step.config.actionType, actionWindow: cloneActionWindow(window) }, { channel, scopeKey })];
@@ -1048,12 +1054,13 @@ function cloneActionWindow(window: ActionWindow): Record<string, unknown> {
   };
 }
 
-async function waitForActionWindow({ match, step, state, round, actors }: {
+async function waitForActionWindow({ match, step, state, round, actors, db }: {
   match: Match;
   step: Step;
   state: StepState;
   round: Record<string, unknown>;
   actors: unknown[];
+  db?: DbExecutor;
 }): Promise<HandlerResult> {
   const existingWindow = state.currentActionWindow || { id: `${match.id}:${step.id}:${step.config.actionType}` };
   const work = await createActionBlockers({
@@ -1061,7 +1068,8 @@ async function waitForActionWindow({ match, step, state, round, actors }: {
     step,
     window: existingWindow as Parameters<typeof createActionBlockers>[0]['window'],
     actors: actors as Parameters<typeof createActionBlockers>[0]['actors'],
-    promptContext: { day: step.config.day, actionType: step.config.actionType, round }
+    promptContext: { day: step.config.day, actionType: step.config.actionType, round },
+    db,
   });
   return {
     status: 'WAITING',

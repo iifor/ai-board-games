@@ -40,9 +40,10 @@ import type {
   Match,
   Step,
 } from '../deathResolution/types';
+import type { DbExecutor } from '../../../db/types';
 function createNightResolveHandler() {
   return {
-    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
+    async execute({ match, step, state, db }: { match: Match; step: Step; state: StepState; db?: DbExecutor }): Promise<HandlerResult> {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
       const runtime = await createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!) as DeathResolutionContext['round'];
@@ -55,6 +56,7 @@ function createNightResolveHandler() {
         round,
         checkpoint,
         events: [],
+        db,
       };
       let shadowAuditEvent: unknown | null = null;
       if (!checkpoint.initialEffectsApplied) {
@@ -109,7 +111,7 @@ function createNightResolveHandler() {
 }
 function createExileResolveHandler() {
   return {
-    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
+    async execute({ match, step, state, db }: { match: Match; step: Step; state: StepState; db?: DbExecutor }): Promise<HandlerResult> {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
       const runtime = await createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!) as DeathResolutionContext['round'];
@@ -122,6 +124,7 @@ function createExileResolveHandler() {
         round,
         checkpoint,
         events: [],
+        db,
       };
       if (!checkpoint.initialEffectsApplied) {
         const resolved = resolveExileEffects(runtime.agents as never, round as never, runtime.modeConfig as never);
@@ -164,7 +167,7 @@ function createExileResolveHandler() {
 
 function createSelfDestructResolveHandler() {
   return {
-    async execute({ match, step, state }: { match: Match; step: Step; state: StepState }): Promise<HandlerResult> {
+    async execute({ match, step, state, db }: { match: Match; step: Step; state: StepState; db?: DbExecutor }): Promise<HandlerResult> {
       if (isDone(state, step.id) || state.winner) return completed(state, step.id);
       const runtime = await createRuntime(match, state);
       const round = ensureRound(runtime.state, step.config.day!) as DeathResolutionContext['round'];
@@ -189,6 +192,7 @@ function createSelfDestructResolveHandler() {
         round,
         checkpoint,
         events: [],
+        db,
       };
       if (!checkpoint.initialEffectsApplied) {
         const actorId = Number(selfDestruct.playerId);
