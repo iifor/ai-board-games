@@ -2,7 +2,11 @@ import path from 'node:path';
 import { isSafeRunId } from '../backup/publication';
 import { writeReadinessReport } from '../reporting/reportWriter';
 import type { ReadinessCheck, ReadinessReport } from '../reporting/reportTypes';
-import { loadReleaseEvidence, type OperatorSignoff } from '../release/evidence';
+import {
+  loadReleaseEvidence,
+  type OperatorSignoff,
+  type ReportManifestEntry,
+} from '../release/evidence';
 import { hasMatchingBackupVerification } from '../release/backupVerification';
 import { SKIPPED_TABLES } from '../constants';
 
@@ -50,27 +54,27 @@ export interface ReleaseReadinessReport extends ReadinessReport {
   releaseCandidate: string;
   maintenanceWindowMinutes: number;
   freezeReceiptSha256: string;
+  evidenceClosure: {
+    operatorSignoff: ReportManifestEntry;
+    reports: ReportManifestEntry[];
+  };
 }
-
 function checkPassed(report: ReadinessReport, id: string): boolean {
   const matching = report.checks.filter((check) => check.id === id);
   return report.status === 'passed' && matching.length > 0 && matching.every((check) => check.status === 'passed');
 }
-
 function sourceHash(report: ReadinessReport): string | undefined {
   const matching = report.checks.filter((item) => item.id === 'source.snapshot.sha256');
   if (matching.length !== 1 || matching[0].status !== 'passed') return undefined;
   const check = matching[0];
   return check.actual && check.actual === check.expected && SHA256.test(check.actual) ? check.actual : undefined;
 }
-
 function exactCheckValue(report: ReadinessReport, id: string, pattern: RegExp): string | undefined {
   const matching = report.checks.filter((item) => item.id === id);
   if (matching.length !== 1 || matching[0].status !== 'passed') return undefined;
   const check = matching[0];
   return check.actual && check.actual === check.expected && pattern.test(check.actual) ? check.actual : undefined;
 }
-
 function smokePassed(report: ReadinessReport, ids: string[]): boolean {
   return report.status === 'passed' && ids.every((id) => checkPassed(report, id));
 }
@@ -86,7 +90,7 @@ function isAllowedSkip(report: ReadinessReport, check: ReadinessCheck): boolean 
       && check.message === 'intentionally not migrated');
 }
 
-function evaluate(
+export function evaluateReleaseEvidence(
   reports: ReadinessReport[],
   signoff: OperatorSignoff,
   expected: Pick<ReleaseReadinessOptions, 'runId' | 'releaseCandidate'>,
@@ -203,9 +207,22 @@ export async function runReleaseReadiness(options: ReleaseReadinessOptions): Pro
   let checks: ReadinessCheck[];
   let maintenanceWindowMinutes = 0;
   let freezeReceiptSha256 = '';
+  let evidenceClosure: ReleaseReadinessReport['evidenceClosure'] = {
+    operatorSignoff: { path: 'unavailable', sizeBytes: 0, sha256: '0'.repeat(64) },
+    reports: [],
+  };
   try {
     const evidence = await loadReleaseEvidence(options.reportPaths, options.operatorSignoffPath);
-    ({ checks, minutes: maintenanceWindowMinutes, freezeReceiptSha256 } = evaluate(
+    const relativeEntry = (capture: { resolvedPath: string; sizeBytes: number; sha256: string }): ReportManifestEntry => ({
+      path: path.relative(evidence.rootPath, capture.resolvedPath).split(path.sep).join('/'),
+      sizeBytes: capture.sizeBytes,
+      sha256: capture.sha256,
+    });
+    evidenceClosure = {
+      operatorSignoff: relativeEntry(evidence.signoffCapture),
+      reports: evidence.reportCaptures.map(relativeEntry),
+    };
+    ({ checks, minutes: maintenanceWindowMinutes, freezeReceiptSha256 } = evaluateReleaseEvidence(
       evidence.reports, evidence.signoff, options,
     ));
   } catch {
@@ -223,6 +240,7 @@ export async function runReleaseReadiness(options: ReleaseReadinessOptions): Pro
     releaseCandidate: options.releaseCandidate,
     maintenanceWindowMinutes,
     freezeReceiptSha256,
+    evidenceClosure,
     checks,
     artifacts: [],
     errors: failed.map((check) => ({ code: 'REQUIRED_RELEASE_CHECK_FAILED', message: check.message })),

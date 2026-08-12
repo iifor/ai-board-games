@@ -24,6 +24,7 @@ interface ObservationReceipt {
   status: 'completed';
   readinessRunId: string;
   trafficAuthorizationSha256: string;
+  trafficOpenedAt: string;
   startedAt: string;
   finishedAt: string;
   postgresqlBusinessWritesObserved: boolean;
@@ -55,13 +56,15 @@ export interface VerifiedObservationReceipt {
   status: 'passed';
   readinessRunId: string;
   trafficAuthorizationSha256: string;
+  trafficOpenedAt: string;
   durationMinutes: number;
   postgresqlBusinessWritesObserved: boolean;
   backupRestoreReceiptSha256: string;
 }
 
 const OBSERVATION_KEYS = [
-  'version', 'purpose', 'status', 'readinessRunId', 'trafficAuthorizationSha256', 'startedAt', 'finishedAt',
+  'version', 'purpose', 'status', 'readinessRunId', 'trafficAuthorizationSha256', 'trafficOpenedAt',
+  'startedAt', 'finishedAt',
   'postgresqlBusinessWritesObserved', 'checks', 'backupRestoreReceipt',
 ] as const;
 const RESTORE_KEYS = [
@@ -83,7 +86,7 @@ function observation(value: unknown): value is ObservationReceipt {
   if (value.version !== 1 || value.purpose !== 'postgresql-first-deployment-observation'
     || value.status !== 'completed' || !isSafeRunId(String(value.readinessRunId || ''))
     || typeof value.trafficAuthorizationSha256 !== 'string' || !SHA256.test(value.trafficAuthorizationSha256)
-    || !canonicalUtc(value.startedAt) || !canonicalUtc(value.finishedAt)
+    || !canonicalUtc(value.trafficOpenedAt) || !canonicalUtc(value.startedAt) || !canonicalUtc(value.finishedAt)
     || typeof value.postgresqlBusinessWritesObserved !== 'boolean'
     || !Array.isArray(value.checks) || !value.checks.every(check)
     || !isReceiptArtifact(value.backupRestoreReceipt)) return false;
@@ -119,7 +122,9 @@ async function verify(options: VerifyObservationReceiptOptions): Promise<Verifie
   const now = options.now || new Date();
   if (receipt.readinessRunId !== traffic.value.readinessRunId
     || receipt.trafficAuthorizationSha256 !== traffic.sha256
-    || Date.parse(receipt.startedAt) < Date.parse(traffic.value.approvedAt)
+    || Date.parse(receipt.trafficOpenedAt) < Date.parse(traffic.value.approvedAt)
+    || Date.parse(receipt.startedAt) < Date.parse(receipt.trafficOpenedAt)
+    || Date.parse(receipt.trafficOpenedAt) > now.getTime()
     || Date.parse(receipt.finishedAt) > now.getTime()) throw new Error('observation binding mismatch');
   const restorePath = path.resolve(rootPath, ...receipt.backupRestoreReceipt.path.split('/'));
   const restored = await readStableJson<unknown>(restorePath, rootPath, rootRealPath);
@@ -131,6 +136,7 @@ async function verify(options: VerifyObservationReceiptOptions): Promise<Verifie
     status: 'passed',
     readinessRunId: receipt.readinessRunId,
     trafficAuthorizationSha256: receipt.trafficAuthorizationSha256,
+    trafficOpenedAt: receipt.trafficOpenedAt,
     durationMinutes: Math.floor((Date.parse(receipt.finishedAt) - Date.parse(receipt.startedAt)) / 60_000),
     postgresqlBusinessWritesObserved: receipt.postgresqlBusinessWritesObserved,
     backupRestoreReceiptSha256: restored.sha256,

@@ -135,7 +135,13 @@ export function assertRequiredArtifacts(report: ReadinessReport): void {
 export async function loadReleaseEvidence(
   reportPaths: string[],
   operatorSignoffPath: string,
-): Promise<{ reports: ReadinessReport[]; signoff: OperatorSignoff }> {
+): Promise<{
+  reports: ReadinessReport[];
+  signoff: OperatorSignoff;
+  reportCaptures: StableJson<ReadinessReport>[];
+  signoffCapture: StableJson<OperatorSignoff>;
+  rootPath: string;
+}> {
   const signoffPath = path.resolve(operatorSignoffPath);
   const rootPath = path.dirname(signoffPath);
   const rootRealPath = await fs.realpath(rootPath);
@@ -203,5 +209,11 @@ export async function loadReleaseEvidence(
   }
   assertCutoverEvidenceClosure(reports, reportCaptures, artifactCaptures);
   assertMatchingBackupVerification(reports);
-  return { reports, signoff };
+  return {
+    reports,
+    signoff,
+    reportCaptures,
+    signoffCapture: signoffCapture as StableJson<OperatorSignoff>,
+    rootPath,
+  };
 }

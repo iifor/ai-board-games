@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
-  candidateTree, fixture, fixedCompose, opsDigest, regexEscape, releaseCandidate, repoRoot, run, runtimeDigest, toolingHead,
+  candidateTree, fixture, fixedCompose, opsDigest, regexEscape, releaseCandidate, repoRoot, run, runtimeDigest,
+  scriptsRoot, toolingHead,
 } from './postgresLinuxOpsFixtures';
 
 test('nginx validates signed evidence and current image provenance before starting nginx only', async (t) => {
@@ -121,4 +125,30 @@ test('runtime application bytes come only from the named candidate context', asy
     'releaseCandidate', 'candidateTree', 'toolingHead', 'applicationInputManifest',
     'applicationInputManifestSha256', 'runtimeImageDigest', 'opsImageDigest',
   ]) assert.match(buildReceipt, new RegExp(field));
+});
+
+test('application input manifest binds paths and bytes without host filesystem execute bits', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'application-input-manifest-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const files = [
+    'package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml',
+    'packages/shared/index.ts', 'packages/client/index.ts', 'packages/admin/index.ts',
+    'packages/server/index.ts', 'packages/db-migrator/package.json',
+  ];
+  for (const [index, relative] of files.entries()) {
+    const target = path.join(root, ...relative.split('/'));
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, `fixture-${index}\n`);
+  }
+  const script = path.join(scriptsRoot, 'application-input-manifest.cjs');
+  const result = spawnSync(process.execPath, [script, root, releaseCandidate], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const manifest = JSON.parse(result.stdout) as {
+    entries: Array<Record<string, string>>; manifestSha256: string;
+  };
+  assert.ok(manifest.entries.every((entry) => (
+    Object.keys(entry).sort().join(',') === 'blobSha1,path'
+  )));
+  const canonical = manifest.entries.map((entry) => `${entry.blobSha1}\t${entry.path}\n`).join('');
+  assert.equal(manifest.manifestSha256, createHash('sha256').update(canonical).digest('hex'));
 });

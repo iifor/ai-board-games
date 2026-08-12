@@ -25,14 +25,13 @@ function visit(candidate, relative, entries) {
     return;
   }
   const bytes = stats.isSymbolicLink() ? Buffer.from(fs.readlinkSync(candidate)) : fs.readFileSync(candidate);
-  const mode = stats.isSymbolicLink() ? '120000' : ((stats.mode & 0o111) ? '100755' : '100644');
-  entries.push({ mode, blobSha1: blobSha1(bytes), path: relative.replace(/\\/g, '/') });
+  entries.push({ blobSha1: blobSha1(bytes), path: relative.replace(/\\/g, '/') });
 }
 
 const entries = [];
 for (const relative of inputPaths) visit(path.join(root, ...relative.split('/')), relative, entries);
 entries.sort((left, right) => (left.path < right.path ? -1 : (left.path > right.path ? 1 : 0)));
-const canonical = entries.map((entry) => `${entry.mode} ${entry.blobSha1}\t${entry.path}\n`).join('');
+const canonical = entries.map((entry) => `${entry.blobSha1}\t${entry.path}\n`).join('');
 const manifest = {
   version: 1,
   purpose: 'consensus-application-build-inputs',

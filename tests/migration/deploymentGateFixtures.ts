@@ -78,16 +78,14 @@ export async function createTrafficFixture(now = Date.now()) {
     'packages/client', 'packages/admin', 'packages/server', 'packages/db-migrator/package.json',
   ];
   const inputEntries = inputPaths.map((input, index) => ({
-    mode: '100644', blobSha1: String(index + 1).repeat(40),
+    blobSha1: String(index + 1).repeat(40),
     path: input.includes('.') ? input : `${input}/package.json`,
   })).sort((left, right) => (left.path < right.path ? -1 : (left.path > right.path ? 1 : 0)));
   const inputManifest = {
     version: 1, purpose: 'consensus-application-build-inputs', releaseCandidate: RELEASE_CANDIDATE,
     inputPaths,
     entries: inputEntries,
-    manifestSha256: sha256(inputEntries.map((entry) => (
-      `${entry.mode} ${entry.blobSha1}\t${entry.path}\n`
-    )).join('')),
+    manifestSha256: sha256(inputEntries.map((entry) => `${entry.blobSha1}\t${entry.path}\n`).join('')),
   };
   const inputManifestCapture = await writeJson(inputManifestPath, inputManifest);
   const buildReceiptPath = path.join(root, 'production-build-receipt.json');
@@ -169,6 +167,7 @@ export async function createObservationFixture() {
   const trafficAuthorizationSha256 = sha256(await fs.readFile(traffic.authorizationPath, 'utf8'));
   const now = Date.now();
   const startedAt = new Date(now - 7_200_000).toISOString();
+  const trafficOpenedAt = new Date(now - 7_260_000).toISOString();
   const finishedAt = new Date(now - 3_000_000).toISOString();
   const restorePath = path.join(traffic.root, 'postgresql-backup-restore.json');
   const restore = {
@@ -183,7 +182,7 @@ export async function createObservationFixture() {
   const observation = {
     version: 1, purpose: 'postgresql-first-deployment-observation', status: 'completed',
     readinessRunId: traffic.authorization.readinessRunId, trafficAuthorizationSha256,
-    startedAt, finishedAt, postgresqlBusinessWritesObserved: true,
+    trafficOpenedAt, startedAt, finishedAt, postgresqlBusinessWritesObserved: true,
     checks: OBSERVATION_CHECKS.map((id) => ({ id, status: 'passed' })),
     backupRestoreReceipt: { path: 'postgresql-backup-restore.json', ...restoreCapture },
   };

@@ -16,6 +16,7 @@ import {
 import { readStableJson, type StableJson } from './stableJson';
 import { captureFreezeReceipt, verifyFreezeReceipt } from './freezeReceipt';
 import { verifyProductionBuildReceipt } from './productionBuildReceipt';
+import { hasReleaseEvidenceClosure, verifyReleaseEvidenceClosure } from './releaseClosureVerification';
 
 type ApprovalRole = 'go-live-owner' | 'rollback-owner' | 'independent-reviewer';
 
@@ -116,6 +117,7 @@ function exactReleaseReport(value: unknown, authorization: TrafficAuthorization)
     && report.runId === authorization.readinessRunId
     && report.releaseCandidate === authorization.releaseCandidate
     && report.freezeReceiptSha256 === authorization.freezeReceipt.sha256
+    && hasReleaseEvidenceClosure(report.evidenceClosure)
     && canonicalUtc(report.startedAt) && canonicalUtc(report.finishedAt)
     && Date.parse(report.finishedAt) <= Date.parse(authorization.approvedAt)
     && authorization.approvals.every((approval) => Date.parse(approval.approvedAt) >= Date.parse(report.finishedAt))
@@ -165,6 +167,7 @@ async function verify(options: VerifyTrafficAuthorizationOptions): Promise<Verif
   if (release.sha256 !== authorization.releaseReport.sha256
     || release.sizeBytes !== authorization.releaseReport.sizeBytes
     || !exactReleaseReport(release.value, authorization)) throw new Error('release report mismatch');
+  await verifyReleaseEvidenceClosure(release.value as ReleaseReadinessReport, rootPath);
   const buildPath = path.resolve(rootPath, ...authorization.buildReceipt.path.split('/'));
   const build = await verifyProductionBuildReceipt({
     receiptPath: buildPath,

@@ -19,10 +19,10 @@ const ROOT_KEYS = [
   'runtimeImageDigest', 'opsImageDigest', 'builtAt',
 ] as const;
 const MANIFEST_KEYS = ['version', 'purpose', 'releaseCandidate', 'inputPaths', 'entries', 'manifestSha256'] as const;
-const ENTRY_KEYS = ['mode', 'blobSha1', 'path'] as const;
+const ENTRY_KEYS = ['blobSha1', 'path'] as const;
 const BLOB_SHA1 = /^[a-f0-9]{40}$/;
 
-interface ApplicationInputEntry { mode: '100644' | '100755' | '120000'; blobSha1: string; path: string }
+interface ApplicationInputEntry { blobSha1: string; path: string }
 
 export interface ApplicationInputManifest {
   version: 1;
@@ -70,7 +70,6 @@ function validManifest(value: unknown): value is ApplicationInputManifest {
     || !Array.isArray(value.entries) || value.entries.length === 0) return false;
   const entries = value.entries as unknown[];
   if (!entries.every((entry) => exactKeys(entry, ENTRY_KEYS)
-    && ['100644', '100755', '120000'].includes(String(entry.mode))
     && BLOB_SHA1.test(String(entry.blobSha1)) && normalizedRelativePath(entry.path))) return false;
   const typed = entries as ApplicationInputEntry[];
   if (typed.some((entry, index) => index > 0 && typed[index - 1].path >= entry.path)) return false;
@@ -78,7 +77,7 @@ function validManifest(value: unknown): value is ApplicationInputManifest {
     || !INPUT_PATHS.every((input) => typed.some((entry) => entry.path === input || entry.path.startsWith(`${input}/`)))) {
     return false;
   }
-  const canonical = typed.map((entry) => `${entry.mode} ${entry.blobSha1}\t${entry.path}\n`).join('');
+  const canonical = typed.map((entry) => `${entry.blobSha1}\t${entry.path}\n`).join('');
   return createHash('sha256').update(canonical).digest('hex') === value.manifestSha256;
 }
 

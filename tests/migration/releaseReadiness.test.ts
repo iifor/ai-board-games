@@ -7,6 +7,18 @@ import test from 'node:test';
 import type { ReadinessCheck, ReadinessReport } from '../../packages/db-migrator/src/reporting/reportTypes';
 import { runReleaseReadiness } from '../../packages/db-migrator/src/commands/release-readiness';
 import { SKIPPED_TABLES } from '../../packages/db-migrator/src/constants';
+import { verifyReleaseEvidenceClosure } from '../../packages/db-migrator/src/release/releaseClosureVerification';
+import { verifyTrafficAuthorization } from '../../packages/db-migrator/src/release/trafficAuthorization';
+import {
+  CANDIDATE_TREE,
+  createTrafficFixture,
+  GO_LIVE_OWNER,
+  OPS_DIGEST,
+  RELEASE_CANDIDATE,
+  RUNTIME_DIGEST,
+  TOOLING_HEAD,
+  writeJson,
+} from './deploymentGateFixtures';
 
 const OPERATOR_CHECKS = [
   'ci.release-gates',
@@ -19,7 +31,6 @@ const OPERATOR_CHECKS = [
   'production.cutover',
   'operator.signoff',
 ] as const;
-const RELEASE_CANDIDATE = '0123456789abcdef0123456789abcdef01234567';
 const FREEZE_RECEIPT_SHA256 = 'f'.repeat(64);
 
 function readinessReport(
@@ -84,7 +95,7 @@ interface Fixture {
   persist(readinessRunId?: string): Promise<void>;
 }
 
-async function createFixture(): Promise<Fixture> {
+async function createFixture(freezeReceiptSha256 = FREEZE_RECEIPT_SHA256): Promise<Fixture> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'release-readiness-'));
   const reportsDirectory = path.join(root, 'reports');
   const artifactsDirectory = path.join(root, 'artifacts');
@@ -115,7 +126,7 @@ async function createFixture(): Promise<Fixture> {
     version: 1, purpose: 'production-cutover', status: 'approved', approved: true,
     releaseCandidate: RELEASE_CANDIDATE, cutoverRunId: 'production-cutover-1',
     backupManifestSha256: cutoverManifestHash, sourceSnapshotSha256: 'a'.repeat(64),
-    freezeReceiptSha256: FREEZE_RECEIPT_SHA256,
+    freezeReceiptSha256,
     target: {
       database: 'consensus', schema: 'consensus', role: 'consensus_migrator',
       host: 'postgres', port: 5432, tlsMode: 'verify-full',
@@ -142,7 +153,7 @@ async function createFixture(): Promise<Fixture> {
     readinessReport('backup-1', 'backup', [
       { id: 'backup.execute', status: 'passed', message: 'executed' },
       { id: 'backup.publish', status: 'passed', message: 'published' },
-      { id: 'freeze.receipt.sha256', status: 'passed', expected: FREEZE_RECEIPT_SHA256, actual: FREEZE_RECEIPT_SHA256, message: 'freeze bound' },
+      { id: 'freeze.receipt.sha256', status: 'passed', expected: freezeReceiptSha256, actual: freezeReceiptSha256, message: 'freeze bound' },
       { id: 'source.raw-wal', status: 'skipped', message: 'Source SQLite WAL sidecar does not exist; no file fabricated' },
       { id: 'source.raw-shm', status: 'skipped', message: 'Source SQLite SHM sidecar does not exist; no file fabricated' },
     ]),
@@ -207,7 +218,7 @@ async function createFixture(): Promise<Fixture> {
     { id: 'authorization.valid', status: 'passed', expected: cutoverAuthorizationHash, actual: cutoverAuthorizationHash, message: 'authorization passed' },
     { id: 'authorization.sha256', status: 'passed', expected: cutoverAuthorizationHash, actual: cutoverAuthorizationHash, message: 'authorization hash passed' },
     { id: 'release.candidate', status: 'passed', expected: RELEASE_CANDIDATE, actual: RELEASE_CANDIDATE, message: 'candidate passed' },
-    { id: 'freeze.receipt.sha256', status: 'passed', expected: FREEZE_RECEIPT_SHA256, actual: FREEZE_RECEIPT_SHA256, message: 'freeze passed' },
+    { id: 'freeze.receipt.sha256', status: 'passed', expected: freezeReceiptSha256, actual: freezeReceiptSha256, message: 'freeze passed' },
     { id: 'source.snapshot.sha256', status: 'passed', expected: 'a'.repeat(64), actual: 'a'.repeat(64), message: 'source passed' },
     { id: 'source.manifest.sha256', status: 'passed', expected: cutoverManifestHash, actual: cutoverManifestHash, message: 'manifest passed' },
     {
@@ -333,6 +344,59 @@ async function runFixture(fixture: Fixture, runId = `release-${Date.now()}-${Mat
   });
 }
 
+async function createValidTrafficClosureFixture() {
+  const now = Date.now();
+  const deployment = await createTrafficFixture(now);
+  const fixture = await createFixture(deployment.freezeCapture.sha256);
+  for (const name of [
+    'maintenance-authorization.json', 'freeze-receipt.json',
+    'application-input-manifest.json', 'production-build-receipt.json',
+  ]) await fs.copyFile(path.join(deployment.root, name), path.join(fixture.root, name));
+  const release = await runFixture(fixture, `release-traffic-${Math.random().toString(16).slice(2)}`);
+  const releasePath = path.join(fixture.outputDirectory, `${release.runId}-release.json`);
+  const buildPath = path.join(fixture.root, 'production-build-receipt.json');
+  const freezePath = path.join(fixture.root, 'freeze-receipt.json');
+  const finished = Date.parse(release.finishedAt);
+  const authorizationPath = path.join(fixture.root, 'traffic-authorization.json');
+  const authorization: any = {
+    version: 1, purpose: 'postgresql-first-deployment-traffic', status: 'approved',
+    readinessRunId: release.runId, releaseCandidate: RELEASE_CANDIDATE, toolingHead: TOOLING_HEAD,
+    runtimeImageDigest: RUNTIME_DIGEST, opsImageDigest: OPS_DIGEST,
+    releaseReport: { path: `output/${release.runId}-release.json`, sizeBytes: 0, sha256: '' },
+    buildReceipt: { path: 'production-build-receipt.json', sizeBytes: 0, sha256: '' },
+    freezeReceipt: {
+      path: 'freeze-receipt.json', sizeBytes: (await fs.stat(freezePath)).size, sha256: await sha256(freezePath),
+    },
+    approvals: [
+      { role: 'go-live-owner', name: GO_LIVE_OWNER, approvedAt: new Date(finished + 1_000).toISOString() },
+      { role: 'rollback-owner', name: 'rollback-owner-b', approvedAt: new Date(finished + 2_000).toISOString() },
+      { role: 'independent-reviewer', name: 'independent-reviewer-c', approvedAt: new Date(finished + 3_000).toISOString() },
+    ],
+    approvedAt: new Date(finished + 4_000).toISOString(),
+    expiresAt: new Date(finished + 3_600_000).toISOString(),
+  };
+  const persist = async () => {
+    const releaseCapture = await writeJson(releasePath, release);
+    const buildCapture = await writeJson(buildPath, deployment.buildReceipt);
+    authorization.releaseReport = { path: `output/${release.runId}-release.json`, ...releaseCapture };
+    authorization.buildReceipt = { path: 'production-build-receipt.json', ...buildCapture };
+    await writeJson(authorizationPath, authorization);
+  };
+  await persist();
+  const verify = (expected: Record<string, string> = {}) => verifyTrafficAuthorization({
+    authorizationPath,
+    releaseCandidate: expected.releaseCandidate || RELEASE_CANDIDATE,
+    toolingHead: expected.toolingHead || TOOLING_HEAD,
+    runtimeImageDigest: expected.runtimeImageDigest || RUNTIME_DIGEST,
+    opsImageDigest: expected.opsImageDigest || OPS_DIGEST,
+    runtimeApplicationInputSha256: expected.runtimeApplicationInputSha256 || deployment.inputManifest.manifestSha256,
+    expectedCandidateTree: expected.candidateTree || CANDIDATE_TREE,
+    expectedApplicationInputSha256: expected.applicationInputManifestSha256 || deployment.inputManifest.manifestSha256,
+    now: new Date(finished + 5_000),
+  });
+  return { deployment, fixture, release, authorization, persist, verify };
+}
+
 test('passes only complete evidence and computes a three-minute maintenance window', async (t) => {
   const fixture = await createFixture();
   t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
@@ -342,6 +406,7 @@ test('passes only complete evidence and computes a three-minute maintenance wind
   assert.equal(result.status, 'passed', JSON.stringify(result, null, 2));
   assert.equal(result.freezeReceiptSha256, FREEZE_RECEIPT_SHA256);
   assert.equal((result as ReadinessReport & { maintenanceWindowMinutes?: number }).maintenanceWindowMinutes, 3);
+  await verifyReleaseEvidenceClosure(result, fixture.root);
   assert.deepEqual(result.checks.map((check) => check.id), [
     'ci.release-gates', 'tests.no-critical-skips', 'backup.executed', 'backup.restore-drill',
     'rehearsal.first', 'rehearsal.second', 'rehearsal.same-source-hash', 'runtime.no-sqlite',
@@ -350,6 +415,74 @@ test('passes only complete evidence and computes a three-minute maintenance wind
   ]);
   await fs.access(path.join(fixture.outputDirectory, 'release-pass-release.json'));
   await fs.access(path.join(fixture.outputDirectory, 'release-pass-release.md'));
+});
+
+test('release closure rejects a signed report or operator signoff changed after publication', async (t) => {
+  const fixture = await createFixture();
+  t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  const result = await runFixture(fixture, 'release-closure-tamper');
+  await fs.appendFile(fixture.reportPaths[0], ' ');
+  await assert.rejects(
+    () => verifyReleaseEvidenceClosure(result, fixture.root),
+    /Report bytes or shape are invalid/,
+  );
+  const signoffFixture = await createFixture();
+  t.after(() => fs.rm(signoffFixture.root, { recursive: true, force: true }));
+  const signoffResult = await runFixture(signoffFixture, 'release-signoff-tamper');
+  await fs.appendFile(signoffFixture.signoffPath, ' ');
+  await assert.rejects(
+    () => verifyReleaseEvidenceClosure(signoffResult, signoffFixture.root),
+    /release evidence closure bytes do not match/,
+  );
+});
+
+test('traffic authorization replays a real release closure and rejects later evidence drift', async (t) => {
+  const valid = await createValidTrafficClosureFixture();
+  t.after(() => fs.rm(valid.deployment.root, { recursive: true, force: true }));
+  t.after(() => fs.rm(valid.fixture.root, { recursive: true, force: true }));
+  assert.equal((await valid.verify()).status, 'passed');
+  await fs.appendFile(valid.fixture.reportPaths[0], ' ');
+  await assert.rejects(valid.verify, (error: any) => error.code === 'TRAFFIC_AUTHORIZATION_INVALID');
+});
+
+test('valid release closure fails closed for authorization, candidate, image, freeze, and build drift', async (t) => {
+  const cases: Array<[string, (valid: Awaited<ReturnType<typeof createValidTrafficClosureFixture>>) => void,
+    Record<string, string>?]> = [
+    ['failed release', (valid) => { valid.release.status = 'failed'; }],
+    ['stale authorization', (valid) => { valid.authorization.expiresAt = new Date(0).toISOString(); }],
+    ['candidate mismatch', () => undefined, { releaseCandidate: 'c'.repeat(40) }],
+    ['tooling mismatch', () => undefined, { toolingHead: 'd'.repeat(40) }],
+    ['runtime mismatch', () => undefined, { runtimeImageDigest: `sha256:${'e'.repeat(64)}` }],
+    ['ops mismatch', () => undefined, { opsImageDigest: `sha256:${'f'.repeat(64)}` }],
+    ['not 16 gates', (valid) => { valid.release.checks.pop(); }],
+    ['mixed freeze', (valid) => { valid.release.freezeReceiptSha256 = 'e'.repeat(64); }],
+    ['runtime input mismatch', () => undefined, { runtimeApplicationInputSha256: '9'.repeat(64) }],
+    ['candidate tree mismatch', () => undefined, { candidateTree: 'c'.repeat(40) }],
+    ['checkout input mismatch', () => undefined, { applicationInputManifestSha256: '8'.repeat(64) }],
+    ['build after approval', (valid) => {
+      valid.deployment.buildReceipt.builtAt = new Date(Date.parse(valid.authorization.approvedAt) + 1).toISOString();
+    }],
+    ['build candidate mismatch', (valid) => { valid.deployment.buildReceipt.releaseCandidate = '9'.repeat(40); }],
+    ['approval predates release', (valid) => {
+      valid.authorization.approvals[0].approvedAt = new Date(Date.parse(valid.release.finishedAt) - 1).toISOString();
+    }],
+    ['duplicate identity', (valid) => {
+      valid.authorization.approvals[2].name = valid.authorization.approvals[0].name;
+    }],
+    ['candidate is tooling', (valid) => { valid.authorization.toolingHead = valid.authorization.releaseCandidate; }],
+    ['same image', (valid) => { valid.authorization.opsImageDigest = valid.authorization.runtimeImageDigest; }],
+  ];
+  for (const [name, mutate, expected] of cases) {
+    const valid = await createValidTrafficClosureFixture();
+    t.after(() => fs.rm(valid.deployment.root, { recursive: true, force: true }));
+    t.after(() => fs.rm(valid.fixture.root, { recursive: true, force: true }));
+    mutate(valid);
+    await valid.persist();
+    await assert.rejects(() => valid.verify(expected), (error: any) => {
+      assert.equal(error.code, 'TRAFFIC_AUTHORIZATION_INVALID', name);
+      return true;
+    }, name);
+  }
 });
 
 test('release rejects independently valid backup and cutover evidence from different freezes', async (t) => {

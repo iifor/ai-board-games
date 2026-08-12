@@ -27,6 +27,8 @@ test('observation rejects chronology, duration, check, traffic, and restore gaps
     ['restore before closure', (fx) => { fx.restore.finishedAt = new Date(Date.parse(fx.observation.finishedAt) - 1).toISOString(); }],
     ['future restore', (fx) => { fx.restore.finishedAt = new Date(Date.now() + 60_000).toISOString(); }],
     ['observation predates traffic', (fx) => { fx.observation.startedAt = new Date(Date.parse(fx.authorization.approvedAt) - 1).toISOString(); }],
+    ['observation predates actual traffic opening', (fx) => { fx.observation.trafficOpenedAt = new Date(Date.parse(fx.observation.startedAt) + 1).toISOString(); }],
+    ['traffic opening predates approval', (fx) => { fx.observation.trafficOpenedAt = new Date(Date.parse(fx.authorization.approvedAt) - 1).toISOString(); }],
   ];
   for (const [name, mutate] of cases) {
     const fixture = await createObservationFixture();

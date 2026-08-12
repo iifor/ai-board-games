@@ -58,7 +58,7 @@ export BUILD_ID=REPLACE_WITH_UNIQUE_PRODUCTION_BUILD_ID
 sh ./scripts/ops/postgres/build-production-images.sh
 ```
 
-**Success**: config, password, incoming immutable backup, evidence, and rollback receipt roots are owned by `root:root` mode `0700`; password files are `root:root` mode `0600`; the PostgreSQL data volume exists and is not bind-mounted to a public path. Docker Compose v2.17+ builds runtime from the named `application_source` context and ops from tooling. The wrapper independently computes the candidate input manifest, compares it to the manifest embedded by the Dockerfile in the runtime image, and emits candidate tree, manifest artifact hash/size, distinct canonical runtime/ops digests, and exact labels.
+**Success**: config, password, incoming immutable backup, evidence, and rollback receipt roots are owned by `root:root` mode `0700`; password files are `root:root` mode `0600`; the PostgreSQL data volume exists and is not bind-mounted to a public path. Docker Compose v2.17+ builds runtime from the named `application_source` context and ops from tooling. The wrapper independently computes the candidate path-and-Git-blob input manifest, compares it to the manifest embedded by the Dockerfile in the runtime image, and emits candidate tree, manifest artifact hash/size, distinct canonical runtime/ops digests, and exact labels. The input manifest binds paths and bytes only; the independently recomputed candidate Git tree binds Git modes and symlink identity so Windows BuildKit permission rewriting cannot create a false mismatch.
 
 **Stop**: shared group/world access, pre-existing unreviewed contents, a missing directory, wrong owner/mode, a volume not belonging to this deployment, Compose older than 2.17, dirty/wrong/attached candidate, dirty tooling, manifest mismatch, `unbound` label, or noncanonical/equal image digests. Do not create approvals, certificates, or traffic receipts automatically.
 
@@ -425,15 +425,17 @@ export POSTGRES_CA_FILE=/srv/consensus-first-deployment/secrets/postgres-tls/ca.
 sh ./scripts/ops/postgres/release-readiness-linux.sh
 ```
 
-**Success**: `release-readiness` produces a passed immutable report with exactly 16/16 unique passed checks and no errors:
+**Success**: `release-readiness` produces a passed immutable report with exactly 16/16 unique passed checks and no errors. Its `evidenceClosure` binds the approved operator signoff and every signed input report by exact relative path, size, and SHA-256; this is replayable evidence, not a self-declared digest:
 
 `ci.release-gates`, `tests.no-critical-skips`, `backup.executed`, `backup.restore-drill`, `rehearsal.first`, `rehearsal.second`, `rehearsal.same-source-hash`, `runtime.no-sqlite`, `postgres.tls`, `postgres.least-privilege`, `postgres.pool-and-timeouts`, `smoke.health`, `smoke.auth-and-config`, `smoke.game-replay-memory-delete`, `production.cutover`, `operator.signoff`.
 
 After that report is immutable, three distinct humans manually author—not generate with a wrapper—a traffic authorization independent from the release report. Its exact v1 fields are `purpose=postgresql-first-deployment-traffic`, `status=approved`, `readinessRunId`, `releaseCandidate`, `toolingHead`, `runtimeImageDigest`, `opsImageDigest`, `releaseReport {path,sizeBytes,sha256}`, `buildReceipt {path,sizeBytes,sha256}`, `freezeReceipt {path,sizeBytes,sha256}`, three ordered `approvals {role,name,approvedAt}`, canonical `approvedAt`, and canonical future `expiresAt`. The build receipt itself has exact v1 fields `purpose=postgresql-production-image-build`, `status=built`, `buildId`, `releaseCandidate`, `candidateTree`, `toolingHead`, `applicationInputManifest {path,sizeBytes,sha256}`, `applicationInputManifestSha256`, both image digests, and canonical `builtAt`. The read-only traffic validator stable-reads every artifact, recomputes the input manifest, revalidates the freeze receipt and maintenance authorization, and requires the current runtime's embedded input SHA to match; traffic approval never substitutes for any artifact.
 
-**Stop**: release missing/failed/stale, any check absent/duplicate/failed/not exactly 16, any report/candidate/run/image/OCI-label mismatch, backup/cutover/release/traffic freeze SHA drift, missing/hash-drifted build receipt or input manifest, current runtime input mismatch, missing restore/auth/TLS/least-privilege/three-human evidence, or traffic authorization created before the immutable release report.
+Before traffic can pass, the validator reloads the closure's operator signoff, report manifest, reports, and report artifacts through the same `loadReleaseEvidence` contract used by `release-readiness`. It independently reproduces all 16 gates, the maintenance window, and the freeze SHA. A traffic authorization never substitutes for missing signed evidence.
 
-**Evidence**: release JSON/Markdown bytes/hash including `freezeReceiptSha256`, typed build receipt/input-manifest bytes/hashes, and independently stored traffic authorization bytes/hash. Neither approval artifact is an automatic PASS receipt.
+**Stop**: release missing/failed/stale, missing evidence closure, signoff/report-manifest drift, any signed report or artifact missing/tampered/extra, closure unable to reproduce all 16 checks, any check absent/duplicate/failed/not exactly 16, any report/candidate/run/image/OCI-label mismatch, backup/cutover/release/traffic freeze SHA drift, missing/hash-drifted build receipt or input manifest, current runtime input mismatch, missing restore/auth/TLS/least-privilege/three-human evidence, or traffic authorization created before the immutable release report.
+
+**Evidence**: release JSON/Markdown bytes/hash including `freezeReceiptSha256` and the replayable signoff/report `evidenceClosure`, typed build receipt/input-manifest bytes/hashes, and independently stored traffic authorization bytes/hash. Neither approval artifact is an automatic PASS receipt.
 
 ## 15. Manually open traffic through the gated nginx-only entrypoint
 
@@ -453,15 +455,16 @@ export RUNTIME_IMAGE_DIGEST=sha256:REPLACE_WITH_64_HEX_RUNTIME_IMAGE_DIGEST
 export OPS_IMAGE_DIGEST=sha256:REPLACE_WITH_64_HEX_OPS_IMAGE_DIGEST
 export POSTGRES_MIGRATOR_PASSWORD_FILE=/srv/consensus-first-deployment/secrets/postgres-migrator/password
 export POSTGRES_CA_FILE=/srv/consensus-first-deployment/secrets/postgres-tls/ca.crt
-export TRAFFIC_OPENED_AT=REPLACE_WITH_MANUALLY_RECORDED_CANONICAL_UTC_OPENED_AT
 sh ./scripts/ops/postgres/start-nginx-gated.sh
+export TRAFFIC_OPENED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+printf 'traffic_opened_at=%s\n' "$TRAFFIC_OPENED_AT"
 ```
 
-**Success**: the manual `start-nginx-gated.sh` ignores ambient Compose overrides; requires clean exact tooling plus an independent detached clean exact candidate checkout; recomputes the candidate tree and fixed application-input manifest SHA from that checkout; verifies current image IDs plus candidate/tooling/role OCI labels; extracts the actual runtime input-manifest SHA; and invokes the read-only `verify-traffic-authorization` command. That validator cross-checks the independently recomputed values against the stable build receipt/input manifest and current runtime marker, then revalidates the freeze/maintenance artifacts, release report, three identities, canonical open window, and exactly 16 passed checks. Only then does the fixed `traffic` profile start nginx while the `application` profile exposes the already healthy app dependency.
+**Success**: the manual `start-nginx-gated.sh` ignores ambient Compose overrides; requires clean exact tooling plus an independent detached clean exact candidate checkout; recomputes the candidate tree and fixed application-input manifest SHA from that checkout; verifies current image IDs plus candidate/tooling/role OCI labels; extracts the actual runtime input-manifest SHA; and invokes the read-only `verify-traffic-authorization` command. That validator cross-checks the independently recomputed values against the stable build receipt/input manifest and current runtime marker, then revalidates the freeze/maintenance artifacts, full signed release evidence closure, three identities, canonical open window, and independently reproduced 16 passed checks. Only then does the fixed `traffic` profile start nginx while the `application` profile exposes the already healthy app dependency.
 
 **Stop**: receipt missing/failed/stale, candidate/tooling/image mismatch, not 16/16, app absent/unhealthy, or validator nonzero. The nginx wrapper is separate and is never transitively invoked by backup, cutover, app start, signoff, or release-readiness.
 
-**Evidence**: validator safe JSON output, current image IDs/labels, traffic authorization/release/freeze hashes, app health, the nginx-only Compose transcript, and a separate manually recorded traffic openedAt bound to that transcript. The openedAt record is not generated or approved by automation.
+**Evidence**: validator safe JSON output, current image IDs/labels, traffic authorization/release/freeze hashes, app health, the nginx-only Compose transcript, and the conservatively recorded canonical traffic openedAt value in `TRAFFIC_OPENED_AT` immediately after the successful nginx-only command. The operator copies that exact value into the immutable observation receipt as `trafficOpenedAt`; it is a runtime fact, not an approval.
 
 ## 16. Observe at least 60 minutes and close with a new PostgreSQL restore test
 
@@ -480,9 +483,9 @@ export POSTGRES_CA_FILE=/srv/consensus-first-deployment/secrets/postgres-tls/ca.
 sh ./scripts/ops/postgres/verify-observation-linux.sh
 ```
 
-**Success**: the read-only `verify-observation-receipt` command proves the independent observation receipt binds the same traffic authorization SHA-256 and readiness run; observation `startedAt` is not before traffic authorization approvedAt, and the operator additionally checks it is not before the separately recorded nginx `openedAt`; canonical `finishedAt-startedAt` is at least 60 minutes. Exact passed checks record health, pool saturation, slow queries, errors, business writes, disk/volume state, and PostgreSQL backup status. Closure additionally binds a new PostgreSQL backup created after observation began and a completed isolated restore test finishing after observation.
+**Success**: the read-only `verify-observation-receipt` command proves the independent observation receipt binds the same traffic authorization SHA-256 and readiness run; its typed `trafficOpenedAt` is not before traffic authorization approval, observation `startedAt` is not before `trafficOpenedAt`, and `startedAt` is therefore not before traffic authorization approvedAt; canonical `finishedAt-startedAt` is at least 60 minutes. Exact passed checks record health, pool saturation, slow queries, errors, business writes, disk/volume state, and PostgreSQL backup status. Closure additionally binds a new PostgreSQL backup created after observation began and a completed isolated restore test finishing after observation.
 
-**Stop**: observation before traffic authorization approval or manual nginx openedAt, under 60 minutes, missing metric, failed check, mismatched traffic/run hash, missing business-write fact, old/non-PostgreSQL backup, non-isolated restore, restore failure, or any attempt to let the validator generate/modify the observation receipt. The observation receipt remains independent; it is not folded into an automatic traffic PASS report.
+**Stop**: missing/future `trafficOpenedAt`, opening before traffic authorization approval, observation before actual opening, under 60 minutes, missing metric, failed check, mismatched traffic/run hash, missing business-write fact, old/non-PostgreSQL backup, non-isolated restore, restore failure, or any attempt to let the validator generate/modify the observation receipt. The observation receipt remains independent; it is not folded into an automatic traffic PASS report.
 
 **Evidence**: immutable observation receipt, raw monitoring windows, traffic authorization hash, new PostgreSQL backup identity, isolated restore receipt and hashes, plus the read-only validator output.
 

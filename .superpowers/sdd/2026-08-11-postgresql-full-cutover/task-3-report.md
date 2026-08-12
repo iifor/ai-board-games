@@ -41,12 +41,15 @@ SQL, or business schema changed.
    and traffic authorization. Independently valid mixed-freeze evidence fails.
 3. Production images are built from an independent, detached, clean checkout
    of candidate `a066a4bb1fb9e49e50c742aa08248239f1d9a136` through a named BuildKit
-   context. A deterministic Git-blob input manifest is computed independently,
+   context. A deterministic path-and-Git-blob input manifest is computed independently,
    embedded in the runtime image, atomically recorded, and revalidated against
    the independently recomputed candidate tree and input hash.
-4. Traffic authorization binds the exact 16/16 release report, freeze receipt,
-   build receipt, distinct runtime/ops image digests, candidate/tooling commits,
-   and three distinct human approvals with an expiry.
+4. Traffic authorization binds the exact 16/16 release report, its replayable
+   operator-signoff/report-manifest evidence closure, freeze receipt, build receipt,
+   distinct runtime/ops image digests, candidate/tooling commits, and three distinct
+   human approvals with an expiry. The traffic validator reloads every signed report
+   and artifact and independently reproduces the 16 gates; a bare self-declared
+   16/16 report is rejected.
 5. The nginx entrypoint clears ambient Compose overrides, checks the clean exact
    tooling checkout, rechecks the independent candidate tree/input manifest,
    image labels/digests, running app digest/health, and typed traffic receipt,
@@ -80,13 +83,33 @@ SQL, or business schema changed.
   closure, unsafe CSV glob expansion, Step 4 signal/privilege gaps, automatic
   master deployment, public default nginx startup, and self-consistent fake
   build receipts.
-- Final focused Task 3 unit/runbook suite: 26/26 passed.
-- Final deployment-gate migration coverage is included in migration 142/142.
+- A real Windows Docker Desktop named-context build then exposed one final
+  portability defect: BuildKit rewrote all 608 regular input modes to `100755`
+  even though every path and Git blob hash matched. A RED contract rejected
+  mode-bearing application manifests; the manifest now signs paths and blob
+  bytes only while the separately verified candidate Git tree remains the
+  authority for modes and symlink identity. The rebuilt runtime manifest and
+  independent checkout manifest both produced SHA-256
+  `0c7259665ec0d1b04b787c5fbdf010ebd4dfb21372dc4ee790d8ae1e3e1049c9`.
+- Final review then reproduced a traffic-gate bypass with a hand-authored bare
+  16/16 release JSON. RED proved it passed without signoff or upstream reports.
+  `release-readiness` now publishes a stable operator-signoff/report closure;
+  the traffic gate reloads the signed manifest, every report and artifact, and
+  independently recomputes all 16 gates, the maintenance window, and freeze
+  hash. Bare 16/16 and post-publication signoff/report drift are rejected.
+- The fail-closed traffic matrix was rebuilt so every stale/candidate/tooling/
+  image/freeze/build/identity mutation starts from a fresh valid real closure.
+  Independent final review approved the result with no Critical or Important
+  findings. Observation now also binds `trafficOpenedAt`, so the 60-minute
+  interval cannot begin before nginx actually opens.
+- Final focused Task 3 ops/runbook/Compose/release-config suite: 31/31 passed.
+- Final release/traffic focused coverage: 27/27 passed; the full fail-closed
+  matrix starts from valid signed evidence.
 
 ## Fresh verification
 
-- Migration: 142/142 passed, 0 failed, 0 skipped.
-- Unit: 388/388 passed, 0 failed, 0 skipped.
+- Migration: 144/144 passed, 0 failed, 0 skipped.
+- Unit: 389/389 passed, 0 failed, 0 skipped.
 - Workflow: 127/127 passed, 0 failed, 0 skipped.
 - PostgreSQL: 140/140 passed, 0 failed, 0 skipped. The suite used a disposable
   loopback PostgreSQL 16 instance and also ran the self-contained compiled TLS
@@ -96,7 +119,8 @@ SQL, or business schema changed.
 - Five-workspace TypeScript checks: passed.
 - Server/shared/client/admin production builds: passed. The existing admin
   bundle-size warning remains non-blocking.
-- Docker build-context test and runtime named-context static contract: passed.
+- Docker build-context test, runtime named-context static contract, and real
+  608-entry host/runtime manifest comparison: passed.
 - Real Alpine external signal delivery: SIGTERM=143 and SIGINT=130.
 - `git diff --check`: passed; only Git LF/CRLF conversion warnings were emitted.
 
