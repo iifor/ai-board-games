@@ -14,6 +14,7 @@ const testFiles = [
   'werewolfDebugActions.test.ts',
   'werewolfPresentation.test.ts',
   'eventProjection.test.ts',
+  'avalonWorkflow.test.ts',
   'werewolfWorkflowStatus.test.ts'
 ].map((file) => path.join(__dirname, file));
 

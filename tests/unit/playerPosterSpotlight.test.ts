@@ -131,7 +131,7 @@ test('scopes poster spotlight wiring to v2 game routes', () => {
   const werewolfArena = read('packages/client/src/features/werewolf-v2/components/WerewolfArenaV2/index.tsx');
   const werewolfCss = read('packages/client/src/features/werewolf-v2/components/WerewolfArenaV2/index.css');
   const undercoverGame = read('packages/client/src/features/undercover/UndercoverGame/index.tsx');
-  const app = read('packages/client/src/App.tsx');
+  const renderers = read('packages/client/src/games/renderers.tsx');
 
   assert.match(debateGame, /variant = 'classic'/);
   assert.match(debateGame, /showPlayerPoster=\{variant === 'v2'\}/);
@@ -153,7 +153,7 @@ test('scopes poster spotlight wiring to v2 game routes', () => {
   assert.doesNotMatch(werewolfCss, /player-poster-spotlight__backdrop/);
   assert.match(undercoverGame, /variant = 'classic'/);
   assert.match(undercoverGame, /showPlayerPoster=\{variant === 'v2'\}/);
-  assert.match(app, /variant=\{route\.version === 'v2' \? 'v2' : 'classic'\}/);
+  assert.match(renderers, /variant=\{version === 'v2' \? 'v2' : 'classic'\}/);
 });
 
 test('keeps the spotlight accessible and resilient', () => {

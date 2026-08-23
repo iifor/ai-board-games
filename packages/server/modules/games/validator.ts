@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const listGamesSchema = z.object({
-  gameType: z.enum(['debate', 'werewolf']).optional(),
+  gameType: z.string().trim().min(1).max(64).optional(),
   mode: z.string().optional(),
   skinId: z.string().optional(),
   winner: z.string().optional(),

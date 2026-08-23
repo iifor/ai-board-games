@@ -24,6 +24,7 @@ packages/shared/
 ├── schemas/
 │   ├── gameSchemas.ts
 │   ├── gameEngineSchemas.ts
+│   ├── avalon.ts
 │   ├── undercover.ts
 │   ├── skillRegistry.ts
 │   └── workflowSchemas.ts
@@ -33,6 +34,7 @@ packages/shared/
 │   ├── gameEngine.ts
 │   ├── gameEvent.ts
 │   ├── gameTypes.ts
+│   ├── avalon.ts
 │   ├── undercover.ts
 │   ├── speechTypes.ts
 │   └── workflowTypes.ts
@@ -72,6 +74,7 @@ tests/
 - `channelTypes.ts`：事件通道和可见性类型。
 - `gameEvent.ts`：游戏事件类型。
 - `gameEngine.ts`：通用游戏引擎类型，包括 `GameDefinition`、`DomainAction`、`WorkflowEffect`、`DomainEvent`、`ChannelPolicy`、debug state、invariant issue、状态投影契约。
+- `avalon.ts`：阿瓦隆标准 5 人公开玩家、任务、比分、终局身份揭示及角色/阵营类型。
 - `undercover.ts`：谁是卧底公开玩家、发言、汇总票型、终局揭示和 `standard-6` 公开状态。
 
 ### Schema
@@ -79,6 +82,7 @@ tests/
 - `gameSchemas.ts`：游戏参数校验 schema。
 - `workflowSchemas.ts`：工作流参数校验 schema。
 - `gameEngineSchemas.ts`：游戏引擎 schema，校验 definition、action、effect、event、channel policy 和可选 `projectState`。
+- `avalon.ts`：校验组队、组队表决、任务密投与刺杀结构；队伍人数和合法目标仍由服务端当前状态校验。
 - `undercover.ts`：校验固定 6 个唯一正整数玩家 ID、1-120 字描述和带 0-80 字可选原因的正整数投票目标。
 - `skillRegistry.ts`：技能注册相关 schema。
 
@@ -86,8 +90,10 @@ tests/
 
 `packages/shared/types/gameEngine.ts` 是 `packages/server/modules/game-engine` 的共享 contract：
 
-- `GameDefinition`：游戏接入点，声明 `gameType`、`version`、`workflowId`、action schema、effect resolver、channel policy 和可选 `projectState`。
-- `GameRuntime` / `GameRuntimeRunContext` / `GameSessionMetadata`：definition 驱动的新游戏接入点，声明 match 创建/运行、运行事件回调、可选 `GameRuntimeAbortSignal`、开场结束文案、玩家数量约束和播放预取参数；`GameRuntimeAbortSignal` 是与标准 `AbortSignal` 结构兼容的最小只读契约，避免 shared 包引入 DOM/Node lib，真实 WebSocket session 仍传入标准信号。公开游戏路由直接读取注册 definition 的 `session.playerSelection`，谁是卧底使用通用 runtime，辩论赛与狼人杀继续由两个兼容 runner 承接。
+- `GameDefinition`：游戏接入点，声明 `gameType`、`version`、`workflowId`、action schema、effect resolver、channel policy，以及可选 runtime、session preparation 和 presentation adapter。
+- `GameRuntime` / `GameRuntimeRunContext` / `GameSessionMetadata`：definition 驱动的实时游戏接入点；runtime 支持 `execute()` 或 `createMatch() + run()`，session metadata 声明开场结束事件、玩家数量约束和播放预取参数。`GameRuntimeAbortSignal` 是与标准 `AbortSignal` 结构兼容的最小只读契约，避免 shared 包引入 DOM/Node lib，真实 WebSocket session 仍传入标准信号。
+- `PrepareGameSession`：把可用玩家、请求玩家、已保存选择和 WebSocket 请求转换为本局玩家及额外 config；普通游戏复用 metadata 人数规则，辩论分队和狼人杀动态模式使用自定义实现。
+- `GamePresentationAdapter`：为单局创建带状态的公开事件/游戏投影器，避免 session service 内按游戏名处理可见性。
 - `DomainAction`：玩家或 AI 在 ActionWindow 内提交的结构化动作，不直接修改状态。
 - `WorkflowEffect`：由 action 派生的待结算效果，必须由 resolver 统一处理。
 - `DomainEvent`：唯一事实事件，必须带 `channel`，`scope` 事件必须带 `scopeKey`。
@@ -128,7 +134,7 @@ pnpm run test:migration
 测试目录：
 
 - `tests/unit`：通用单元测试，例如 event bus、game engine contract、socket session、skill event emitter、玩家记忆长度与会话裁剪。
-- `tests/workflow`：工作流测试，例如狼人杀 reducer/effects/action window、事件投影、辩论发言事件、谁是卧底有界流程和展示事件。
+- `tests/workflow`：工作流测试，例如狼人杀 reducer/effects/action window、事件投影，以及阿瓦隆有界调试全流程和秘密字段边界。
 - `tests/migration`：迁移和事件映射测试。
 
 测试选择建议：
@@ -157,6 +163,13 @@ Workflow 内部 `StatePatch` 使用路径操作表达状态增量：
 - `UndercoverVoteResult` 的公开消费只使用 `tally/tiedCandidateIds/eliminatedPlayerId/runoff`；服务端不发送逐人 ballot，C 端将 `votes` 归一为空对象以保持既有展示类型稳定。
 - `UndercoverReveal` 仅允许出现在 completed 的最终结果事件/状态中，包含平民词、卧底词和卧底玩家 ID。实时与回放使用同一公开类型。
 - 以上为内部 shared 类型/schema 扩展，没有新增 REST 响应、WebSocket start/control/ack 字段或数据库 schema；可配置玩法、词库管理、真人行动、MVP 和独立复盘契约均延后。
+
+## 阿瓦隆共享契约
+
+- `AvalonPublicState` 只包含座位、队长、公开队伍、任务状态、聚合票数、比分和可选终局结果；不包含 seed、玩家私有 role/faction、逐人 `teamVotes` 或逐人 `questVotes`。
+- `reveal` 仅在 `status = completed` 时出现，包含 5 个玩家的角色和阵营；客户端会再次执行这一终局约束。
+- `avalonProposalSchema`、`avalonTeamVoteSchema`、`avalonQuestVoteSchema`、`avalonAssassinationSchema` 只校验载荷形状；人数、候选范围、好人不能出失败票等上下文规则由服务端 handler 二次校验。
+- 阿瓦隆复用现有 WebSocket `start/control/ack` 和 workflow PostgreSQL 表，没有新增公共 HTTP API、数据库表或 migration。
 
 ## 扩展点与注意事项
 

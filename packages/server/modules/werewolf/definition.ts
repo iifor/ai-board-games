@@ -5,6 +5,7 @@ import type {
   DomainAction,
   DomainEvent,
   GameDefinition,
+  GameRuntime,
   StateProjectionContext,
   ViewerContext,
   WorkflowEffect,
@@ -13,6 +14,14 @@ import { WEREWOLF_WORKFLOW_ID } from './workflow';
 import { countTargets, topTarget } from './winCheck';
 import { buildWolfStrategySummary, getTopCandidateIds } from './utils';
 import { createNightResolutionResolver, projectNightResolutionStateFromEvent } from './engineNightResolution';
+import { getWerewolfModeConfig } from '../werewolf-config';
+import { preparePlayersByRule } from '../game-engine/session/sessionPreparation';
+import {
+  createProjectionContext,
+  projectWerewolfEvent,
+  projectWerewolfGame,
+} from './views/viewPolicy';
+import type { ProjectionContext } from './views/viewPolicy';
 
 const WEREWOLF_GAME_DEFINITION_VERSION = '1.0.0';
 
@@ -59,7 +68,7 @@ const werewolfChannelPolicy: ChannelPolicy = {
   },
 };
 
-function createWerewolfGameDefinition(): GameDefinition {
+function createWerewolfGameDefinition(runtime?: GameRuntime): GameDefinition {
   return {
     gameType: 'werewolf',
     version: WEREWOLF_GAME_DEFINITION_VERSION,
@@ -88,6 +97,8 @@ function createWerewolfGameDefinition(): GameDefinition {
       session: {
         startMessage: '游戏开始',
         doneMessage: '狼人杀结束，完整战报已生成。',
+        emitStartEvent: false,
+        completionEventType: 'workflow-completed',
         playerSelection: {
           min: 12,
           max: 12,
@@ -96,6 +107,48 @@ function createWerewolfGameDefinition(): GameDefinition {
         playback: { prefetchCount: 2 },
       },
     },
+    async prepareSession(input) {
+      const mode = await getWerewolfModeConfig(input.options.werewolfMode);
+      const totalPlayers = Number(mode.totalPlayers);
+      return {
+        ...preparePlayersByRule(input, {
+          min: totalPlayers,
+          max: totalPlayers,
+          defaultCount: totalPlayers,
+          errorMessage: `AI 狼人杀当前模式需要选择恰好 ${totalPlayers} 位 AI 玩家。`,
+        }),
+        config: { werewolfMode: input.options.werewolfMode || null },
+      };
+    },
+    presentation: {
+      createSession({ viewMode }) {
+        let projectionContext: ProjectionContext | null = null;
+        return {
+          projectEvent(event) {
+            if (event.channel === 'system' || event.visibility === 'system') return null;
+            if (viewMode !== 'player') return event;
+            if (event.game) {
+              projectionContext = createProjectionContext(
+                event.game as Record<string, unknown>,
+                { mode: viewMode },
+              );
+            }
+            if (!projectionContext && event.channel && event.channel !== 'public') return null;
+            return projectWerewolfEvent(
+              event as never,
+              projectionContext || { mode: 'player' },
+            ) as Record<string, unknown> | null;
+          },
+          projectGame(game) {
+            return projectWerewolfGame(
+              game,
+              projectionContext || createProjectionContext(game, { mode: viewMode }),
+            ) as Record<string, unknown>;
+          },
+        };
+      },
+    },
+    ...(runtime ? { runtime } : {}),
   };
 }
 

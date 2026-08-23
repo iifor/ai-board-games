@@ -5,16 +5,12 @@ import type {
 } from '../../../shared/types/gameEngine';
 import { getAiConfig } from '../../config/ai';
 import type { Match } from '../../types/workflow';
-import { createTraceContext, flushTrace, getActiveTrace, markTraceComplete, markTraceError } from '../observability';
 import {
   createWorkflowMatch,
-  drainAiTasks,
   getDebugState,
-  claimPendingOutbox,
-  markOutboxSent,
-  releaseOutboxClaim,
   registerWorkflow,
 } from '../workflow-engine';
+import { runWorkflowGameRuntime } from '../game-engine/runtime/workflowGameRuntime';
 import type { Workflow } from '../workflow-engine/workflowRegistry';
 import { createUndercoverHandlers } from './handlers';
 import { toUndercoverPublicState } from './presentation';
@@ -93,39 +89,17 @@ async function createUndercoverWorkflowMatch(config: UndercoverRuntimeConfig): P
 }
 
 async function runUndercoverWorkflow(matchId: string, context: GameRuntimeRunContext = {}): Promise<Record<string, unknown>> {
-  const initial = (await getDebugState(matchId))?.match;
-  if (!initial) throw new Error(`Undercover match not found: ${matchId}`);
-  const trace = initial.config.debugMode
-    ? null
-    : getActiveTrace(matchId) || createTraceContext(matchId, 'undercover', 'standard-6', initial.state.players as Array<Record<string, unknown>>);
-  try {
-    throwIfAborted(context.signal);
-    await flushOutbox(matchId, context.onEvent);
-    while (true) {
-      throwIfAborted(context.signal);
-      const { processed, match } = await drainAiTasks(matchId, { maxTasks: 1 });
-      await flushOutbox(matchId, context.onEvent);
-      throwIfAborted(context.signal);
-      if (match && TERMINAL_MATCH_STATUSES.has(match.status)) break;
-      if (!processed && await waitForUndercoverDebugControl(matchId, match, context.signal)) continue;
-      if (!processed) throw new Error(`Undercover workflow stalled: ${matchId}`);
-    }
-    const finalMatch = (await getDebugState(matchId))?.match;
-    if (!finalMatch) throw new Error(`Undercover match disappeared: ${matchId}`);
-    assertUndercoverWorkflowCompleted(finalMatch);
-    const publicState = toUndercoverPublicState(finalMatch.state as unknown as Parameters<typeof toUndercoverPublicState>[0]) as unknown as Record<string, unknown>;
-    if (trace) {
-      markTraceComplete(trace);
-      flushTrace(trace);
-    }
-    return publicState;
-  } catch (error) {
-    if (trace) {
-      markTraceError(trace, error instanceof Error ? error.message : String(error));
-      flushTrace(trace);
-    }
-    throw error;
-  }
+  return runWorkflowGameRuntime({
+    matchId,
+    gameType: 'undercover',
+    mode: 'standard-6',
+    errorLabel: '谁是卧底',
+    context,
+    waitForIdle: waitForUndercoverDebugControl,
+    projectState: (state) => toUndercoverPublicState(
+      state as unknown as Parameters<typeof toUndercoverPublicState>[0],
+    ) as unknown as Record<string, unknown>,
+  });
 }
 
 async function waitForUndercoverDebugControl(
@@ -158,7 +132,7 @@ async function waitForUndercoverDebugControl(
 }
 
 function waitForUndercoverDebugPoll(signal?: GameRuntimeAbortSignal): Promise<void> {
-  throwIfAborted(signal);
+  if (signal?.aborted) throw abortReason(signal);
   return new Promise<void>((resolve, reject) => {
     let settled = false;
     const finish = (callback: () => void): void => {
@@ -178,23 +152,10 @@ function waitForUndercoverDebugPoll(signal?: GameRuntimeAbortSignal): Promise<vo
   });
 }
 
-function throwIfAborted(signal?: GameRuntimeAbortSignal): void {
-  if (signal?.aborted) throw abortReason(signal);
-}
-
 function abortReason(signal?: GameRuntimeAbortSignal): Error {
   return signal?.reason instanceof Error
     ? signal.reason
     : new Error('Undercover runtime aborted');
-}
-
-function assertUndercoverWorkflowCompleted(match: Match): void {
-  if (match.status === 'completed') return;
-  const matchError = match.error && typeof match.error === 'object'
-    ? match.error as Record<string, unknown>
-    : {};
-  const detail = String(matchError.message || 'workflow stopped before completion');
-  throw new Error(`谁是卧底工作流异常停止（${match.status || 'unknown'}）：${detail}`);
 }
 
 async function resolvePlayers(config: UndercoverRuntimeConfig): Promise<UndercoverPlayerInput[]> {
@@ -203,21 +164,6 @@ async function resolvePlayers(config: UndercoverRuntimeConfig): Promise<Undercov
   return (await getAiConfig()).players
     .filter((player) => ids.includes(Number(player.id)))
     .map((player) => ({ id: player.id, nickname: player.nickname, avatar: player.avatar }));
-}
-
-async function flushOutbox(matchId: string, onEvent?: (event: Record<string, unknown>) => void): Promise<void> {
-  while (true) {
-    const message = await claimPendingOutbox(matchId);
-    if (!message) return;
-    try {
-      const storedEvent = message.payload as { payload?: Record<string, unknown> };
-      if (storedEvent.payload) await onEvent?.(storedEvent.payload);
-      await markOutboxSent(message.id as number);
-    } catch (error) {
-      await releaseOutboxClaim(message.id as number);
-      throw error;
-    }
-  }
 }
 
 export {

@@ -4,6 +4,7 @@ import type {
   EngineDefinitionSummary,
   EngineResult,
   GameDefinition,
+  GameRuntimeInput,
   GameRuntimeRunContext,
   WorkflowEffect,
 } from '@ai-presenter/shared/types/gameEngine';
@@ -23,7 +24,6 @@ interface GameEngineOptions {
   workflowRuntime?: WorkflowRuntime;
   actionWindowManager?: ActionWindowManager;
   effectQueue?: EffectQueue;
-  effectResolverRegistry?: EffectResolverRegistry;
   channelSystem?: ChannelSystem;
 }
 
@@ -41,7 +41,6 @@ class GameEngine {
   private workflowRuntime: WorkflowRuntime;
   private actionWindowManager: ActionWindowManager;
   private effectQueue: EffectQueue;
-  private effectResolverRegistry: EffectResolverRegistry;
   private channelSystem: ChannelSystem;
 
   constructor(options: GameEngineOptions = {}) {
@@ -49,13 +48,11 @@ class GameEngine {
     this.workflowRuntime = options.workflowRuntime || new WorkflowRuntime();
     this.actionWindowManager = options.actionWindowManager || new ActionWindowManager(this.store);
     this.effectQueue = options.effectQueue || new EffectQueue(this.store);
-    this.effectResolverRegistry = options.effectResolverRegistry || new EffectResolverRegistry();
     this.channelSystem = options.channelSystem || new ChannelSystem();
   }
 
   registerDefinition(definition: GameDefinition): this {
     this.definitions.register(definition);
-    this.effectResolverRegistry.registerMany(definition.effectResolvers || []);
     return this;
   }
 
@@ -96,12 +93,18 @@ class GameEngine {
    */
   async runGame(
     gameType: string,
-    input: { matchId?: string; config?: Record<string, unknown>; initialState?: Record<string, unknown> },
+    input: GameRuntimeInput,
     context?: GameRuntimeRunContext,
   ): Promise<Record<string, unknown>> {
     const definition = this.requireDefinition(gameType);
     if (!definition.runtime) {
       throw new Error(`GameDefinition "${gameType}" does not have a runtime. Use createMatch() + tick() instead.`);
+    }
+    if (definition.runtime.execute) {
+      return definition.runtime.execute(input, context);
+    }
+    if (!definition.runtime.createMatch || !definition.runtime.run) {
+      throw new Error(`GameDefinition "${gameType}" runtime requires execute() or createMatch() + run().`);
     }
     const match = await definition.runtime.createMatch(input);
     return definition.runtime.run(match.id, context);
@@ -145,7 +148,8 @@ class GameEngine {
     const match = await this.store.loadMatch(matchId);
     if (!match) return failure('MATCH_NOT_FOUND', `Match not found: ${matchId}`);
     const definition = this.requireDefinitionForMatch(match.gameType, match.config?.gameDefinitionVersion as string | undefined);
-    const service = new EffectResolutionService(this.store, this.effectResolverRegistry, this.channelSystem, {
+    const resolverRegistry = new EffectResolverRegistry(definition.effectResolvers || []);
+    const service = new EffectResolutionService(this.store, resolverRegistry, this.channelSystem, {
       projectState: definition.projectState,
     });
     const events = await service.resolvePending(matchId, match.state);

@@ -11,18 +11,12 @@ import {
 import { replayGameSession } from './replay';
 import type { GameSession, SessionEvent } from './session';
 import { getAiConfig } from '../../config';
-import { getWerewolfModeConfig } from '../werewolf-config';
-import {
-  createProjectionContext,
-  projectWerewolfEvent,
-  projectWerewolfGame,
-} from '../werewolf/views/viewPolicy';
-import type { ProjectionContext } from '../werewolf/views/viewPolicy';
 import { getActiveTrace, recordEvent, markTraceError, flushTrace } from '../observability';
 import { getSpectatorMode } from '../settings/service';
 import { sessionStartGuard } from './capacity';
 import { resolveGameRunner } from './gameRunner';
 import { getGameEngine } from '../engine-registry';
+import { preparePlayersByRule } from '../game-engine/session/sessionPreparation';
 
 // games is TS — import directly
 import { saveGameRecord } from '../games';
@@ -248,7 +242,7 @@ async function runSession(
   });
   let sessionStartEvent: SessionEvent | null = null;
   let capturedBeforeRuntimeCount = 0;
-  if (getGameEngine().getDefinition(safeGameType)?.runtime) {
+  if (resolved.session.emitStartEvent !== false) {
     const gamePlayers = config.players.map((player) => ({
       id: Number(player.id),
       name: player.name || player.nickname || '',
@@ -280,7 +274,11 @@ async function runSession(
     (error: unknown) => ({ error }),
   );
   const playbackSourceEvents: SessionEvent[] = [];
-  let liveProjectionContext: ProjectionContext | null = null;
+  const presentationSession = resolved.createPresentationSession?.(viewMode) || {
+    projectEvent: (event: Record<string, unknown>) =>
+      event.channel === 'system' || event.visibility === 'system' ? null : event,
+    projectGame: (value: Record<string, unknown>) => value,
+  };
 
   const runner = resolved.run;
   let game: GameRecord | null = null;
@@ -290,32 +288,7 @@ async function runSession(
       signal: session.signal,
       onEvent: (event: Record<string, unknown>) => {
         if (liveSource) {
-          if (safeGameType !== 'werewolf') {
-            const sessionEvent = withSessionDebugMode(event, debugMode);
-            if (isDisplayEvent(sessionEvent)) playbackSourceEvents.push(sessionEvent);
-            liveSource.push(sessionEvent);
-            return;
-          }
-          // 过滤 system channel / visibility 事件，不推送到 C 端
-          if (event.channel === 'system' || event.visibility === 'system') return;
-          if (viewMode === 'player' && event.game) {
-            liveProjectionContext = createProjectionContext(
-              event.game as Record<string, unknown>,
-              { mode: viewMode },
-            );
-          }
-          if (
-            viewMode === 'player'
-            && !liveProjectionContext
-            && event.channel
-            && event.channel !== 'public'
-          ) return;
-          const projected = viewMode === 'player'
-            ? projectWerewolfEvent(
-                event as never,
-                liveProjectionContext || { mode: 'player' },
-              ) as Record<string, unknown> | null
-            : event;
+          const projected = presentationSession.projectEvent(event);
           if (projected) {
             const sessionEvent = withSessionDebugMode(projected, debugMode);
             if (isDisplayEvent(sessionEvent)) playbackSourceEvents.push(sessionEvent);
@@ -332,15 +305,9 @@ async function runSession(
   if (runnerError) throw runnerError;
   if (!game) throw new Error('游戏流程未返回对局结果。');
   const completedEvent = withSessionDebugMode({
-    type:
-      safeGameType === 'debate' || safeGameType === 'werewolf'
-        ? 'workflow-completed'
-        : 'done',
+    type: resolved.session.completionEventType || 'done',
     message: resolved.session.doneMessage,
-    game:
-      safeGameType === 'werewolf'
-        ? projectWerewolfGame(game, createProjectionContext(game))
-        : game,
+    game: presentationSession.projectGame(game),
   }, debugMode) as SessionEvent;
   const capturedRuntimeEvents = playbackPipeline
     .freezeCapture()
@@ -441,10 +408,25 @@ async function getRequestConfig(
   options: RunSessionOptions = {},
 ): Promise<AiConfig & { mode: string }> {
   const config = await getAiConfig() as unknown as AiConfig;
-  const selected =
-    gameType === 'debate' && hasDebateTeamConfig(options.debateTeams)
-      ? selectDebateTeamPlayers(config, options.debateTeams!)
-      : await selectPlayersForGame(config, playerIds, gameType, options);
+  const definition = getGameEngine().getDefinition(gameType);
+  if (!definition) throw new Error(`GameDefinition not registered: ${gameType}`);
+  const savedPlayerIds = await getSavedPlayerIds(gameType);
+  const requestedPlayerIds = Array.isArray(playerIds) ? playerIds : [];
+  const preparationInput = {
+    availablePlayers: config.players,
+    requestedPlayerIds,
+    savedPlayerIds,
+    options: options as Record<string, unknown>,
+  };
+  const prepared = definition.prepareSession
+    ? await definition.prepareSession(preparationInput)
+    : preparePlayersByRule(preparationInput, definition.metadata?.session?.playerSelection || {
+        min: 1,
+        max: config.players.length,
+        defaultCount: config.players.length,
+        errorMessage: '游戏玩家配置无效。',
+      });
+  const selected = prepared.players as AiConfigPlayer[];
   const host = config.host; // 不再需要指定主持人席位，使用全局默认主持人
   const selectedProviders = new Set([
     ...selected.map((player: AiConfigPlayer) => player.provider),
@@ -474,6 +456,7 @@ async function getRequestConfig(
     debugMode: Boolean(options.debugMode),
     missingProviders: options.debugMode ? [] : missingProviders,
     realReady: Boolean(options.debugMode) || missingProviders.length === 0,
+    ...(prepared.config || {}),
   };
   if (mode !== 'real') throw new Error('全局已禁用 Mock 模式，只支持真实模式。');
   if (!scopedConfig.debugMode && scopedConfig.missingProviders.length) {
@@ -498,89 +481,29 @@ function publicSocketHost(host: AiConfigHost = {}): Record<string, unknown> {
   };
 }
 
-function hasDebateTeamConfig(value?: DebateTeams | null): boolean {
-  return Boolean(
-    value && Array.isArray(value.proIds) && Array.isArray(value.conIds),
-  );
-}
-
-function selectDebateTeamPlayers(
-  config: AiConfig,
-  debateTeams: DebateTeams,
-): AiConfigPlayer[] {
-  const ids = normalizeDebateTeamPlayerIds(debateTeams);
-  const selected = ids
-    .map((id) =>
-      config.players.find((player) => Number(player.id) === Number(id)),
-    )
-    .filter((p): p is AiConfigPlayer => Boolean(p));
-  if (selected.length < 8 || selected.length > 12) {
-    throw new Error('AI 辩论赛玩家配置无效：正方、反方和评委人数不正确。');
-  }
-  return selected;
-}
-
-function normalizeDebateTeamPlayerIds(debateTeams: DebateTeams): number[] {
-  const ids = [
-    ...normalizeIdList(debateTeams.proIds).slice(0, 4),
-    ...normalizeIdList(debateTeams.conIds).slice(0, 4),
-    ...normalizeIdList(debateTeams.judgeIds),
-  ];
-  return [...new Set(ids)];
-}
-
-function normalizeIdList(value: unknown): number[] {
-  if (!Array.isArray(value)) return [];
-  return value.map(Number).filter(Boolean);
-}
-
 async function selectPlayersForGame(
   config: AiConfig,
   playerIds: (number | string)[] | undefined,
   gameType: string,
   options: RunSessionOptions = {},
 ): Promise<AiConfigPlayer[]> {
-  const explicitIds = Array.isArray(playerIds)
-    ? playerIds.map(Number).filter(Boolean)
-    : [];
-  const ids = explicitIds.length ? explicitIds : await getSavedPlayerIds(gameType);
-  const selection = getGameEngine()
-    .getDefinition(gameType)
-    ?.metadata?.session?.playerSelection;
-  const expectedWerewolfCount =
-    gameType === 'werewolf'
-      ? (await getWerewolfModeConfig(options.werewolfMode)).totalPlayers
-      : 12;
-
-  const selected = ids.length
-    ? ids
-        .map((id) =>
-          config.players.find((player) => Number(player.id) === id),
-        )
-        .filter((p): p is AiConfigPlayer => Boolean(p))
-    : config.players.slice(0, gameType === 'debate' ? 12 : expectedWerewolfCount);
-
-  if (gameType === 'debate') {
-    if (selected.length < 8 || selected.length > 12) {
-      throw new Error('AI 辩论赛需要选择 8-12 位 AI 玩家。');
-    }
-    return selected;
-  }
-
-  if (gameType === 'werewolf') {
-    if (selected.length !== expectedWerewolfCount) {
-      throw new Error(
-        `AI 狼人杀当前模式需要选择恰好 ${expectedWerewolfCount} 位 AI 玩家。`,
-      );
-    }
-    return selected;
-  }
-
-  if (selection && (selected.length < selection.min || selected.length > selection.max)) {
-    throw new Error(selection.errorMessage);
-  }
-
-  return selected;
+  const definition = getGameEngine().getDefinition(gameType);
+  if (!definition) throw new Error(`GameDefinition not registered: ${gameType}`);
+  const input = {
+    availablePlayers: config.players,
+    requestedPlayerIds: Array.isArray(playerIds) ? playerIds : [],
+    savedPlayerIds: await getSavedPlayerIds(gameType),
+    options: options as Record<string, unknown>,
+  };
+  const prepared = definition.prepareSession
+    ? await definition.prepareSession(input)
+    : preparePlayersByRule(input, definition.metadata?.session?.playerSelection || {
+        min: 1,
+        max: config.players.length,
+        defaultCount: config.players.length,
+        errorMessage: '游戏玩家配置无效。',
+      });
+  return prepared.players as AiConfigPlayer[];
 }
 
 async function getSavedPlayerIds(gameType: string): Promise<number[]> {

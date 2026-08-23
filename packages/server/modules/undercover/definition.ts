@@ -23,9 +23,12 @@ function createUndercoverGameDefinition(): GameDefinition {
       session: {
         startMessage: '谁是卧底开始',
         doneMessage: '谁是卧底结束，身份已经揭晓。',
+        emitStartEvent: true,
+        completionEventType: 'done',
         playerSelection: {
           min: 6,
           max: 6,
+          defaultCount: 6,
           errorMessage: 'AI 谁是卧底需要选择恰好 6 位 AI 玩家。',
         },
         playback: { phaseLookahead: 1 },

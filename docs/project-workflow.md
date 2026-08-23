@@ -14,7 +14,7 @@ Observability writes are serialized per trace and can be awaited through `flushO
 
 ## 项目概述
 
-游戏工作流是服务端最复杂的部分，负责把辩论赛、狼人杀、谁是卧底等游戏拆成可持久化、可调试、可重放的步骤，并通过 WebSocket 按播放节奏推送给 C 端。
+游戏工作流是服务端最复杂的部分，负责把辩论赛、狼人杀、谁是卧底、阿瓦隆等游戏拆成可持久化、可调试、可重放的步骤，并通过 WebSocket 按播放节奏推送给 C 端。
 
 ## 技术栈
 
@@ -39,7 +39,7 @@ packages/server/modules/
 │   ├── narration.ts     # 事件旁白
 │   ├── media.ts         # 媒体资源处理
 │   ├── displayQueue.ts
-│   ├── gameRunner.ts    # definition 驱动的 runner 解析；只保留两个旧游戏兼容入口
+│   ├── gameRunner.ts    # 只按 GameDefinition 解析 runtime 与 presentation
 │   └── constants.ts
 ├── workflow-engine/
 │   ├── workflowRegistry.ts # workflow 和 step handler 注册
@@ -60,6 +60,8 @@ packages/server/modules/
 │   ├── effect/             # EffectQueue、EffectResolver
 │   ├── event/              # DomainEvent EventBus
 │   ├── channel/            # ChannelSystem 可见性校验
+│   ├── runtime/            # 通用持久化 workflow runner
+│   ├── session/            # 通用选人规则与 session preparation
 │   └── state/              # MatchStateStore 与 PostgreSQL adapter
 ├── engine-registry.ts      # GameEngine 单例 + 游戏注册
 ├── debate-runner.ts        # 辩论赛 GameEngine runner
@@ -96,6 +98,7 @@ packages/server/modules/
 │   ├── winCheck.ts
 │   └── wolfTeam.ts
 ├── undercover/              # 固定六人的规则、prompt、公开投影、workflow 与 definition runtime
+├── avalon/                  # 标准五人规则、私密身份、密投、workflow 与公开投影
 ├── agent-core/
 │   ├── playerAgent.ts
 │   ├── gameAgent.ts
@@ -127,6 +130,23 @@ packages/server/modules/
 - `GameEngine.runUntilBlocked()` 只做该 runtime 能力的公开委托；狼人杀 runner 不再自行复制 `while + drainAiTasks` 循环。
 - WebSocket ACK 驱动仍可按单事件调用底层 service，不改变播放节奏、暂停、跳过或连接协议。
 - 赛后 `mvp_vote/postgame_speech` 是 match 级动作，不得创建或修改无日期 round；所有 round-bound reducer 在创建 round 前必须具有正整数 `day`。
+
+### Definition 驱动的游戏扩展边界
+
+- `engine-registry.ts` 是服务端实时游戏的唯一注册点。每种游戏提供 `GameDefinition`；`game-socket/gameRunner.ts` 只调用 `GameEngine.runGame()`，不包含游戏名分支。
+- `GameDefinition.runtime` 可提供单体 `execute()`，也可提供 `createMatch() + run()`；后者由 `runWorkflowGameRuntime()` 统一负责加载 Match、消费 AI task、刷新 outbox、处理中止信号和校验终态。
+- `metadata.session` 声明开场/结束事件、人数范围、默认人数和播放预取；只有团队分配等超出通用人数规则的游戏才实现 `prepareSession`。
+- `presentation.createSession()` 持有单局投影视角。狼人杀继续复用其状态化视角策略；阿瓦隆由服务端公开投影保证终局前不出现角色、阵营、逐人组队票和逐人任务票。
+- effect resolver 只从当前 definition 构建，两个游戏可以使用同一个 effect type，不再因全局 resolver registry 冲突。
+- 旧对局回放仍包含狼人杀/辩论赛专用的历史重建兼容逻辑；这不参与新实时游戏的 runtime 分发。新游戏若要支持旧格式回放，应单独声明历史升级策略，不能把分支重新加回实时 runner。
+
+### 阿瓦隆标准 5 人工作流
+
+- 固定角色为梅林、派西维尔、忠臣、刺客、莫甘娜；好人 3、邪恶 2。身份按有种子洗牌分配，角色私有知识只进入对应 AI prompt。
+- 五个任务人数为 `2/3/2/3/3`，所有任务出现 1 张失败票即失败；组队需全员多数赞成，连续五次组队未通过则邪恶阵营获胜。
+- 三个任务失败时直接由邪恶阵营获胜；三个任务成功后进入刺杀，刺客命中梅林则邪恶逆转，否则好人获胜。
+- workflow 为有界步骤：每个任务最多五轮 `propose -> team_vote -> quest`，随后按比分跳转下一任务、刺杀或结果。
+- 调试模式运行完全相同的 handler、schema、状态转换和公开事件，只替换模型决策为确定性合法结果；工作流测试真实驱动所有 handler 跑到终态。
 
 ### Workflow 持久化性能与恢复
 
@@ -184,7 +204,7 @@ flowchart TD
 - `attachGameSocket(server)`：把 WebSocketServer 挂到 HTTP server。
 - `runSession`：根据首包启动真实游戏或回放。
 - `getRequestConfig`：解析玩家、主持人、模式和模型 key 状态。
-- `resolveGameRunner()`：从已注册 `GameDefinition` 解析 session/runtime；只有辩论赛和狼人杀走兼容 runner，其他已注册游戏走通用 definition runtime。
+- `resolveGameRunner()`：从已注册 `GameDefinition` 解析 session/runtime/presentation，并统一调用 `GameEngine.runGame()`；未注册或没有 runtime 的游戏显式失败。
 - `GameSession`：封装 `send`、`sendAndWait`、`resolveAck`、`pause`、`resume`、`skipCurrentPhase`。
 - `sender`：准备事件、维护音频资源并推送给前端。
 - `replay`：读取历史对局并按事件节奏回放。
@@ -201,7 +221,7 @@ flowchart TD
 
 ### game-engine
 
-`game-engine` 是所有游戏的统一注册入口。辩论赛和狼人杀通过兼容 runner 委托 `GameEngine` 创建对局；谁是卧底及后续定义型游戏直接运行 `GameDefinition.runtime`。
+`game-engine` 是所有实时游戏的统一注册和运行入口。辩论赛、狼人杀、谁是卧底和阿瓦隆都由 definition 提供 runtime；其中辩论赛和狼人杀的 `execute()` 适配现有成熟执行器，game-socket 不知道这种内部差异。
 
 - `GameEngine`：注册 `GameDefinition`、创建 match、tick、提交 action、解析 pending effect、运行自定义 runtime，并提供 `getDebugState(matchId)`。
 - `debate-runner` 创建 match 时复用 `createInitialDebateState(config)` 注入辩题、主持人和已分组玩家；仅保存 runtime config 不足以形成可播放的首帧状态。
@@ -209,7 +229,7 @@ flowchart TD
 - `WorkflowRuntime`：包装现有 `workflow-engine` 创建和推进能力。
 - `ActionWindowManager`：校验 ActionWindow 是否存在、是否打开、actor/actionType 是否合法。
 - `EffectQueue`：把合法 `DomainAction` 转为 `WorkflowEffect` 并写入队列。
-- `EffectResolutionService`：通过 resolver 把 effect 结算为 `DomainEvent`，再按游戏定义的 `projectState` 投影回 match state。
+- `EffectResolutionService`：只使用当前 Match definition 的 resolver 把 effect 结算为 `DomainEvent`，再按同一 definition 的 `projectState` 投影回 match state。
 - `ChannelSystem`：校验所有 `DomainEvent` 必须声明 channel，`scope` event 必须声明 `scopeKey`。
 - `InvariantChecker`：聚合 debug state 中的 channel、effect lifecycle、重复 idempotencyKey 等不变量问题。
 - `MatchStateStore`：隔离 core 与 PostgreSQL 细节，`PostgresMatchStateStore` 复用现有 `matches`、`pending_actions`、`workflow_effects`、`workflow_events`。
@@ -221,17 +241,14 @@ flowchart TD
 - 辩论赛：`createDebateGameDefinition()`（`debate/definition.ts`）
 - 狼人杀：`createWerewolfGameDefinition()`（`werewolf/definition.ts`）
 - 谁是卧底：`createUndercoverGameDefinition()`，注册 `undercover.workflow.standard.v1` 与 definition runtime
+- 阿瓦隆：`createAvalonGameDefinition()`，注册 `avalon.workflow.standard-5.v1` 与 definition runtime
 
 游戏运行入口：
 
-- `debate-runner.ts`：`runDebateViaEngine()` — 通过 `engine.createMatch()` 创建对局，`drainAiTasks()` 循环推进。
-- `werewolf-runner.ts`：`runWerewolfViaEngine()` — 通过 `engine.createMatch()` 创建对局，设置 EventBus 基础设施，`drainAiTasks()` 循环推进。
-- 其他已注册游戏：runner resolver 读取 definition 的 runtime、开场/结束文案、玩家数量与播放参数，再调用通用 `engine.runGame()`；未注册游戏或缺少 runtime 的游戏会显式失败，不回退到狼人杀。
+- `game-socket` 对所有注册游戏调用 `engine.runGame()`；definition 的 `execute()` 或 `createMatch() + run()` 决定内部执行路径。
+- `debate-runner.ts` 与 `werewolf-runner.ts` 仍保留为两个成熟游戏的内部执行器，并由各自 definition runtime 注入；它们不是 game-socket 的分发分支。
+- 谁是卧底与阿瓦隆复用 `runWorkflowGameRuntime()`，统一处理 workflow outbox、AI task、终态和中止信号。
 - `drainAiTasks()` 遇到 `running`、无 blocker 且暂无 AI task 的 match 时会继续 tick；这用于跨过单次 tick 预算耗尽或连续确定性/跳过步骤，不能把“当前无 task”当作流程结束。
-
-`debate`、`werewolf` 是仅有的两个 legacy compatibility runner。`game-socket` 不得为 `undercover` 或后续 definition-runtime 游戏增加按游戏类型分支。
-
-`game-socket` 的通用 runner resolver 只对这两个旧游戏选择兼容 runner，其余游戏走 definition runtime。
 
 当前狼人杀 adapter 只迁移低风险动作：
 

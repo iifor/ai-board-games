@@ -17,7 +17,7 @@ Every executed migration rehearsal now runs post-import validation and then a co
 
 主要功能：
 
-- C 端选择游戏、选择玩家、开始 AI 辩论赛、AI 狼人杀或 AI 谁是卧底、实时播放游戏事件、查看历史回放。
+- C 端选择游戏、选择玩家、开始 AI 辩论赛、AI 狼人杀、AI 谁是卧底或标准 5 人 AI 阿瓦隆，实时播放游戏事件、查看历史回放。
 - B 端管理玩家、模型供应商、模型、音色、狼人杀角色/模式、皮肤、历史对局、AI trace 和工作流调试。
 - 服务端负责游戏规则、AI 调度、工作流推进、事件投影、对局落库、静态资源和统一 API。
 
@@ -89,28 +89,25 @@ flowchart TD
   Admin["B 端 React"] -->|REST /api/admin/*| AdminApi["Admin API"]
   Socket --> Session["GameSession: ack/pause/resume/skip"]
   Socket --> Resolver{"registered GameDefinition"}
-  Resolver --> Debate["debate compatibility runner"]
-  Resolver --> Werewolf["werewolf compatibility runner"]
-  Resolver --> Runtime["generic definition runtime"]
-  Runtime --> Undercover["undercover workflow"]
-  Debate --> Engine["workflow-engine"]
-  Werewolf --> Engine
-  Undercover --> Engine
+  Resolver --> Runtime["GameDefinition.runtime"]
+  Runtime --> Games["debate / werewolf / undercover / avalon"]
+  Games --> Engine["workflow-engine"]
   Engine --> Db["PostgreSQL 16"]
   Engine --> Outbox["outbox_messages"]
   Outbox --> Socket
   Socket --> Client
   Debate --> Agent["agent-core / LLM / TTS"]
   Werewolf --> Agent
-  Socket --> Games["games record"]
-  Games --> Db
+  Socket --> Records["games record"]
+  Records --> Db
 ```
 
 关键原则：
 
 - 前端只负责展示和交互，不决定核心游戏结果。
 - 服务端通过 workflow-engine 管理 match、step、AI task、pending action、event、outbox。
-- `undercover` 是继 `debate`、`werewolf` 后注册的第三种游戏；新游戏优先由 `GameDefinition.runtime` 与 session metadata 接入，辩论赛和狼人杀暂保留两个兼容 runner。
+- 实时开局统一通过注册的 `GameDefinition` 解析 runtime、选人规则、session metadata 和公开投影；`game-socket` 不再按游戏名分支调用 runner。辩论赛和狼人杀的既有执行器由 definition 注入，谁是卧底与阿瓦隆使用通用持久化 runtime。
+- effect resolver 按当前 Match 的 definition 创建作用域，同名 effect 可以存在于不同游戏，不能跨游戏污染。
 - WebSocket 使用 `ackId` 等待前端播放完成后继续推进。
 - 游戏完成后保存完整对局快照，支持历史详情和回放。
 - 新狼人杀对局同时保存实际展示事件序列；实时和回放共用播放管线，旧对局继续从快照重建。
@@ -124,7 +121,7 @@ flowchart TD
 | --- | --- | --- |
 | 后端 API、数据库、配置、错误处理 | `docs/project-server.md` | 相关 controller/service/repository、迁移、配置读取和调用方 |
 | 游戏不推进、ack 卡住、回放异常 | `docs/project-workflow.md` | WebSocket session、workflow tick、outbox、回放投影的调用链 |
-| 辩论赛、狼人杀或谁是卧底流程异常 | `docs/project-workflow.md` | 对应游戏 workflow、step handler、reducer、presentation、runner 的影响面 |
+| 辩论赛、狼人杀、谁是卧底或阿瓦隆流程异常 | `docs/project-workflow.md` | 对应游戏 definition、workflow、step handler、presentation、runtime 的影响面 |
 | 狼人杀 AI prompt、行动理由、LLM trace | `docs/project-prompts.md` | prompt builder、PromptContext、agent-core、LLM record 的调用路径 |
 | C 端页面、播放、字幕、选人问题 | `docs/project-client.md` | 路由、feature 容器、socket hook、播放队列、service 调用方 |
 | B 端配置、历史、观测、调试页面 | `docs/project-admin.md` | 管理页面、admin API service、表单状态和后端资源模块 |

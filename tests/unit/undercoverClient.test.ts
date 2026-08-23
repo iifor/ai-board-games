@@ -281,7 +281,8 @@ test('Undercover v2 CSS defines side columns, one subtitle strip and a right con
 
 test('game selection exposes an accessible Undercover player editor entry', () => {
   const source = readFileSync(resolve('packages/client/src/pages/GameSelectPage/index.tsx'), 'utf8');
-  assert.match(source, /title: 'AI 谁是卧底'/);
+  const catalog = readFileSync(resolve('packages/client/src/games/catalog.ts'), 'utf8');
+  assert.match(catalog, /title: 'AI 谁是卧底'/);
   assert.match(source, /title=\{`选择 \$\{game\.title\}玩家`\}/);
   assert.match(source, /setEditingGame\(game\.key\)/);
   assert.match(source, />选择玩家<\/button>/);

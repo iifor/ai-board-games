@@ -64,6 +64,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   ,'debateStyle.test.ts'
   ,'debateSetup.test.ts'
   ,'werewolfDefaultConfig.test.ts'
+  ,'avalonArchitecture.test.ts'
   ,'edgeTts.test.ts'
 ]).map((file) => path.join(__dirname, file));
 

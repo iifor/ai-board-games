@@ -55,7 +55,11 @@ packages/client/
     │   │   ├── hooks/
     │   │   ├── utils/
     │   │   └── constants.tsx
-    │   └── undercover/            # 谁是卧底公开状态、控制器与六人展示
+    │   ├── undercover/            # 谁是卧底公开状态、控制器与六人展示
+    │   └── avalon/                # 阿瓦隆公开状态、控制器与五人任务板
+    ├── games/
+    │   ├── catalog.ts             # 游戏文案、人数、版本和历史标题注册表
+    │   └── renderers.tsx          # gameKey 到 feature 容器的渲染注册表
     ├── hooks/
     │   ├── speech/
     │   ├── useGameNavigation.ts
@@ -79,7 +83,8 @@ packages/client/
 `App.tsx` 只负责路由分发和页面组合，不承载复杂业务逻辑。业务逻辑按 feature、hook、service、utils 拆分：
 
 - 页面层：`HomePage`、`GameSelectPage` 负责页面布局和组合。
-- 业务模块：`features/debate`、`features/werewolf`、`features/undercover` 承载具体游戏 UI 和业务展示。
+- 业务模块：`features/debate`、`features/werewolf`、`features/undercover`、`features/avalon` 承载具体游戏 UI 和业务展示。
+- 游戏目录：`games/catalog.ts` 统一提供选择页、路由和人数约束；`games/renderers.tsx` 负责加载 feature。`App.tsx` 不按游戏名分支。
 - 服务层：`services/gameService.ts` 封装 REST 和 WebSocket。
 - hooks 层：封装导航、WebSocket session、语音播放、字幕队列。
 - 通用组件：弹窗、导航、状态视图、字幕等可复用 UI。
@@ -92,6 +97,8 @@ packages/client/
 - `/games/debate`：辩论赛。
 - `/games/werewolf`：狼人杀。
 - `/games/undercover`：谁是卧底经典入口。
+- `/games/avalon`：阿瓦隆经典入口。
+- `/game/v2/:gameKey`：注册游戏的 v2 入口，包括 `/game/v2/avalon`。
 - `/games/:gameKey?gameId=xxx`：历史对局回放。
 
 ## 核心模块
@@ -160,6 +167,16 @@ packages/client/
 - 回放跳过按钮通过无参数包装调用现有 session 控制函数，避免 React 点击事件进入公开状态消息；WebSocket 仍只发送既有 `skip-phase` 控制消息。
 - C 端不接收或推导词对、玩家私词、卧底身份、合法投票目标、胜负或淘汰规则；终局前即使收到异常 secret 字段也会清除，只有 completed 结果保留 `reveal`。
 - 首版不增加谁是卧底后台管理页、词库/人数/轮数配置、真人行动、MVP 或独立复盘 UI；需求确认后再扩展 shared 公共契约和 feature。
+
+### 阿瓦隆模块
+
+目录：`packages/client/src/features/avalon`
+
+- `AvalonGame` 只组合控制器、任务板和返回入口；经典与 v2 共用相同公开状态，v2 额外提供调试开关。
+- `useAvalonGame` 复用通用 WebSocket session、语音队列和 ACK，开局前要求恰好 5 个唯一正整数玩家 ID。
+- `AvalonArena` 只展示队长、当前队伍、五个任务、公开票数、比分和终局身份；客户端不会接收或推导私密身份和逐人密票。
+- reducer 会重新投影服务端状态：非 completed 状态丢弃异常 `reveal`，角色和阵营只在终局展示。
+- 选择页、路由和顶层渲染分别由 `games/catalog.ts`、`clientRouter.ts`、`games/renderers.tsx` 注册，不在 `App.tsx` 增加条件分支。
 
 ## WebSocket 客户端职责
 

@@ -6,7 +6,8 @@
  * GameEngine 通过 workflow-engine 路径驱动，definition 提供元数据和结构。
  */
 
-import type { GameDefinition } from '@ai-presenter/shared/types/gameEngine';
+import type { GameDefinition, GameRuntime } from '@ai-presenter/shared/types/gameEngine';
+import { preparePlayersByRule, selectPlayersByIds } from '../game-engine/session/sessionPreparation';
 import { DEBATE_WORKFLOW_ID } from './workflow';
 
 const DEBATE_DEFINITION_VERSION = '1.0.0';
@@ -22,7 +23,13 @@ const DEBATE_DEFINITION_VERSION = '1.0.0';
  * - `engine.tick(matchId)` 推进对局
  * - `engine.getDebugState(matchId)` 查看调试状态
  */
-function createDebateGameDefinition(): GameDefinition {
+function createDebateGameDefinition(runtime?: GameRuntime): GameDefinition {
+  const playerSelection = {
+    min: 8,
+    max: 12,
+    defaultCount: 12,
+    errorMessage: 'AI 辩论赛需要选择 8-12 位 AI 玩家。',
+  };
   return {
     gameType: 'debate',
     version: DEBATE_DEFINITION_VERSION,
@@ -36,15 +43,36 @@ function createDebateGameDefinition(): GameDefinition {
       session: {
         startMessage: '辩论赛开始',
         doneMessage: '辩论赛结束，完整赛果已生成。',
-        playerSelection: {
-          min: 8,
-          max: 12,
-          errorMessage: 'AI 辩论赛需要选择 8-12 位 AI 玩家。',
-        },
+        emitStartEvent: false,
+        completionEventType: 'workflow-completed',
+        playerSelection,
         playback: { phaseLookahead: 1 },
       },
     },
+    prepareSession(input) {
+      const teams = input.options.debateTeams as Record<string, unknown> | undefined;
+      if (!teams || !Array.isArray(teams.proIds) || !Array.isArray(teams.conIds)) {
+        return preparePlayersByRule(input, playerSelection);
+      }
+      const teamIds = [
+        ...normalizeTeamIds(teams.proIds).slice(0, 4),
+        ...normalizeTeamIds(teams.conIds).slice(0, 4),
+        ...normalizeTeamIds(teams.judgeIds),
+      ];
+      const players = selectPlayersByIds(input.availablePlayers, teamIds);
+      if (players.length < playerSelection.min || players.length > playerSelection.max) {
+        throw new Error('AI 辩论赛玩家配置无效：正方、反方和评委人数不正确。');
+      }
+      return { players };
+    },
+    ...(runtime ? { runtime } : {}),
   };
+}
+
+function normalizeTeamIds(value: unknown): number[] {
+  return Array.isArray(value)
+    ? value.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    : [];
 }
 
 export { createDebateGameDefinition, DEBATE_DEFINITION_VERSION };

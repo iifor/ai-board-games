@@ -1,21 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, MessagesSquare, Moon, UsersRound } from 'lucide-react';
+import { Check, Crown, MessagesSquare, Moon, UsersRound } from 'lucide-react';
 import type { Player } from '../../types';
 import { fetchAiPlayers, fetchPlayerSelections, fetchRecentGames, savePlayerSelection } from '../../services/gameService';
 import bgSelect from '../../asserts/aiboardgame.png';
+import {
+  CLIENT_GAME_DEFINITIONS,
+  getClientGameDefinition,
+  isValidGameSelection,
+} from '../../games/catalog';
 import './index.css';
-
-const GAME_RULES: Record<string, { min: number; max: number; recommended: number; label: string }> = {
-  debate: { min: 8, max: 12, recommended: 12, label: '8-12 人' },
-  werewolf: { min: 12, max: 12, recommended: 12, label: '固定 12 人' },
-  undercover: { min: 6, max: 6, recommended: 6, label: '固定 6 人' }
-};
-
-const games = [
-  { key: 'debate', title: 'AI 辩论赛', subtitle: '正反攻辩与评委点评', tone: 'debate', icon: <MessagesSquare size={34} /> },
-  { key: 'werewolf', title: 'AI 狼人杀', subtitle: '12人标准场与扩展模式', tone: 'wolf', icon: <Moon size={34} /> },
-  { key: 'undercover', title: 'AI 谁是卧底', subtitle: '6人语言推理局', tone: 'undercover', icon: <UsersRound size={34} /> }
-];
 
 interface GameSelectPageProps {
   onStartGame: (gameType: string, playerIds: number[]) => void;
@@ -49,7 +42,7 @@ export function GameSelectPage({ onStartGame, onReplayGame }: GameSelectPageProp
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all(games.map((game) => fetchRecentGames(game.key, 10).then((items) => [game.key, items]).catch(() => [game.key, []])))
+    Promise.all(CLIENT_GAME_DEFINITIONS.map((game) => fetchRecentGames(game.key, 10).then((items) => [game.key, items]).catch(() => [game.key, []])))
       .then((entries) => {
         if (!cancelled) setRecentGames(Object.fromEntries(entries));
       });
@@ -61,15 +54,16 @@ export function GameSelectPage({ onStartGame, onReplayGame }: GameSelectPageProp
   const playerMap = useMemo(() => new Map(players.map((player) => [Number(player.id), player])), [players]);
 
   function getSelection(gameKey: string): number[] {
-    const rule = GAME_RULES[gameKey];
+    const rule = getClientGameDefinition(gameKey)?.selection;
+    if (!rule) return [];
     const saved = Array.isArray(selections[gameKey]) ? selections[gameKey].map(Number).filter((id) => playerMap.has(id)) : [];
-    if (isValidSelection(gameKey, saved)) return saved;
+    if (isValidGameSelection(gameKey, saved)) return saved;
     return players.slice(0, rule.recommended).map((player) => player.id);
   }
 
   function startGame(gameKey: string) {
     const playerIds = getSelection(gameKey);
-    if (!isValidSelection(gameKey, playerIds)) return;
+    if (!isValidGameSelection(gameKey, playerIds)) return;
     onStartGame(gameKey, playerIds);
   }
 
@@ -78,7 +72,7 @@ export function GameSelectPage({ onStartGame, onReplayGame }: GameSelectPageProp
   }
 
   async function saveSelection(gameKey: string) {
-    if (!isValidSelection(gameKey, draftIds)) return;
+    if (!isValidGameSelection(gameKey, draftIds)) return;
     try {
       setSaveError('');
       await savePlayerSelection(gameKey, draftIds);
@@ -93,7 +87,7 @@ export function GameSelectPage({ onStartGame, onReplayGame }: GameSelectPageProp
     <main className="game-select-page">
       <div className="game-select-bg"><img src={bgSelect} alt="" /></div>
       <section className="game-entry-grid" aria-label="游戏选择">
-        {games.map((game) => {
+        {CLIENT_GAME_DEFINITIONS.map((game) => {
           const selectedIds = getSelection(game.key);
           const isEditing = editingGame === game.key;
           return (
@@ -102,15 +96,15 @@ export function GameSelectPage({ onStartGame, onReplayGame }: GameSelectPageProp
                 type="button"
                 className="game-entry-main"
                 title={`开始${game.title}`}
-                disabled={!isValidSelection(game.key, selectedIds)}
+                disabled={!isValidGameSelection(game.key, selectedIds)}
                 onClick={() => startGame(game.key)}
               >
-                <span className="game-entry-icon">{game.icon}</span>
+                <span className="game-entry-icon"><GameIcon name={game.icon} /></span>
                 <strong>{game.title}</strong>
                 <em>{game.subtitle}</em>
               </button>
               <div className="game-entry-actions">
-                <span>{selectedIds.length} / {GAME_RULES[game.key].label}</span>
+                <span>{selectedIds.length} / {game.selection.label}</span>
                 <button
                   type="button"
                   title={`选择 ${game.title}玩家`}
@@ -166,14 +160,7 @@ function RecentGameList({ gameType, games, onOpen }: RecentGameListProps) {
 }
 
 function getHistoryTitle(gameType: string, game: Record<string, unknown>): string {
-  if (game.topicTitle) return game.topicTitle as string;
-  const topic = game.topic as Record<string, unknown> | undefined;
-  const event = game.event as Record<string, unknown> | undefined;
-  const werewolfMode = event?.werewolfMode as Record<string, unknown> | undefined;
-  if (gameType === 'debate') return (topic?.title as string) || String(game.id);
-  if (gameType === 'werewolf') return (game.modeName as string) || (werewolfMode?.name as string) || (game.mode as string) || '标准局';
-  if (gameType === 'undercover') return (game.modeName as string) || '标准 6 人局';
-  return (game.skinName as string) || (event?.name as string) || String(game.id);
+  return getClientGameDefinition(gameType)?.historyTitle(game) || String(game.id);
 }
 
 function formatTime(value: string | undefined): string {
@@ -191,7 +178,7 @@ interface GamePlayerEditorProps {
 }
 
 function GamePlayerEditor({ gameKey, players, draftIds, onToggle, onSave, error }: GamePlayerEditorProps) {
-  const valid = isValidSelection(gameKey, draftIds);
+  const valid = isValidGameSelection(gameKey, draftIds);
   return (
     <div className="game-player-editor">
       <div className="game-player-options">
@@ -212,7 +199,10 @@ function GamePlayerEditor({ gameKey, players, draftIds, onToggle, onSave, error 
   );
 }
 
-function isValidSelection(gameKey: string, playerIds: number[]): boolean {
-  const rule = GAME_RULES[gameKey] || GAME_RULES.debate;
-  return playerIds.length >= rule.min && playerIds.length <= rule.max;
+function GameIcon({ name }: { name: 'debate' | 'werewolf' | 'undercover' | 'avalon' }) {
+  const props = { size: 34, 'aria-hidden': true } as const;
+  if (name === 'werewolf') return <Moon {...props} />;
+  if (name === 'undercover') return <UsersRound {...props} />;
+  if (name === 'avalon') return <Crown {...props} />;
+  return <MessagesSquare {...props} />;
 }

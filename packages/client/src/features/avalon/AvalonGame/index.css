@@ -1,0 +1,110 @@
+.avalon-shell {
+  min-height: 100vh;
+  padding: 28px clamp(18px, 4vw, 64px) 100px;
+  color: #f8f0d4;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(215, 168, 67, 0.22), transparent 35%),
+    linear-gradient(145deg, #100d1f, #21152d 48%, #0c1725);
+}
+
+.avalon-heading { text-align: center; }
+.avalon-heading p { margin: 0; color: #cba85d; letter-spacing: .22em; text-transform: uppercase; }
+.avalon-heading h1 { margin: 6px 0; font-size: clamp(32px, 4vw, 54px); }
+.avalon-heading span { color: rgba(248, 240, 212, .72); }
+
+.avalon-controls {
+  position: fixed;
+  z-index: 20;
+  right: 24px;
+  bottom: 22px;
+  left: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(219, 183, 103, .28);
+  border-radius: 16px;
+  background: rgba(12, 10, 25, .88);
+  backdrop-filter: blur(16px);
+}
+
+.avalon-controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(230, 205, 144, .35);
+  border-radius: 10px;
+  color: #f8f0d4;
+  background: rgba(255, 255, 255, .06);
+  cursor: pointer;
+}
+
+.avalon-controls button.is-primary { color: #24170a; background: #d9ae55; }
+.avalon-controls svg { width: 18px; }
+
+.avalon-arena { width: min(1180px, 100%); margin: 28px auto 0; }
+.avalon-scoreboard { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.avalon-scoreboard span { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+.avalon-scoreboard strong { color: #e8c875; }
+
+.avalon-missions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 22px 0; }
+.avalon-missions article {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid rgba(220, 192, 126, .24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .04);
+}
+.avalon-missions article.is-success { border-color: #63c79a; background: rgba(39, 132, 93, .22); }
+.avalon-missions article.is-fail { border-color: #dd6c75; background: rgba(139, 39, 55, .24); }
+.avalon-missions em { color: rgba(248, 240, 212, .64); font-size: 12px; font-style: normal; }
+
+.avalon-table { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.avalon-table > article {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px 10px;
+  border: 1px solid rgba(220, 192, 126, .2);
+  border-radius: 18px;
+  background: rgba(7, 9, 21, .48);
+  transition: transform .18s ease, border-color .18s ease;
+}
+.avalon-table > article.is-selected { transform: translateY(-6px); border-color: #e0bb65; box-shadow: 0 0 28px rgba(211, 167, 71, .2); }
+.avalon-avatar { position: relative; display: grid; place-items: center; width: 86px; height: 86px; border-radius: 50%; background: rgba(219, 183, 103, .12); overflow: visible; }
+.avalon-avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.avalon-leader { position: absolute; top: -12px; right: -4px; width: 28px; color: #f2c96b; }
+.avalon-table span { color: rgba(248, 240, 212, .6); font-size: 13px; }
+.avalon-table em { padding: 4px 9px; border-radius: 999px; font-size: 12px; font-style: normal; }
+.avalon-table em.is-good { color: #8ae0bb; background: rgba(44, 142, 100, .2); }
+.avalon-table em.is-evil { color: #ff9aa2; background: rgba(160, 49, 62, .22); }
+
+.avalon-narration, .avalon-empty, .avalon-result {
+  margin: 24px auto 0;
+  padding: 18px 22px;
+  border: 1px solid rgba(220, 192, 126, .22);
+  border-radius: 14px;
+  background: rgba(8, 8, 20, .56);
+  text-align: center;
+}
+.avalon-empty { width: min(760px, 100%); }
+.avalon-result.is-good { border-color: rgba(99, 199, 154, .7); }
+.avalon-result.is-evil { border-color: rgba(221, 108, 117, .7); }
+.avalon-debug-toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; cursor: pointer; }
+.avalon-debug-toggle span { display: inline-flex; align-items: center; gap: 6px; }
+.avalon-debug-toggle svg { width: 17px; }
+.avalon-error { color: #ffadb3; text-align: center; }
+
+@media (max-width: 820px) {
+  .avalon-shell { padding-inline: 14px; }
+  .avalon-table { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .avalon-missions { gap: 6px; }
+  .avalon-missions article { padding: 8px 3px; font-size: 12px; }
+  .avalon-controls { right: 10px; bottom: 10px; left: 10px; overflow-x: auto; justify-content: flex-start; }
+  .avalon-controls button { flex: 0 0 auto; }
+}

@@ -12,6 +12,11 @@ import { createWerewolfGameDefinition } from './werewolf/definition';
 import { registerWerewolfWorkflow } from './werewolf/workflow';
 import { createUndercoverGameDefinition } from './undercover/definition';
 import { registerUndercoverWorkflow } from './undercover/workflow';
+import { runDebateViaEngine } from './debate-runner';
+import { runWerewolfViaEngine } from './werewolf-runner';
+import type { DebateConfig } from './debate/utils';
+import { createAvalonGameDefinition } from './avalon/definition';
+import { registerAvalonWorkflow } from './avalon/workflow';
 
 let engine: GameEngine | null = null;
 
@@ -27,15 +32,26 @@ function getGameEngine(): GameEngine {
 
   // 注册辩论赛
   registerDebateWorkflow();
-  engine.registerDefinition(createDebateGameDefinition());
+  engine.registerDefinition(createDebateGameDefinition({
+    execute: async ({ config }, context) => runDebateViaEngine(
+      (config || {}) as unknown as DebateConfig,
+      context,
+    ) as unknown as Record<string, unknown>,
+  }));
 
   // 注册狼人杀
   registerWerewolfWorkflow();
-  engine.registerDefinition(createWerewolfGameDefinition());
+  engine.registerDefinition(createWerewolfGameDefinition({
+    execute: ({ config }, context) => runWerewolfViaEngine(config || {}, context),
+  }));
 
   // 注册谁是卧底
   registerUndercoverWorkflow();
   engine.registerDefinition(createUndercoverGameDefinition());
+
+  // 注册阿瓦隆（第四种 definition-runtime 游戏）
+  registerAvalonWorkflow();
+  engine.registerDefinition(createAvalonGameDefinition());
 
   return engine;
 }

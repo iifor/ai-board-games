@@ -1,10 +1,9 @@
 import type {
+  GamePresentationSession,
   GameRuntimeRunContext,
   GameSessionMetadata,
 } from '@ai-presenter/shared/types/gameEngine';
-import { runDebateViaEngine } from '../debate-runner';
 import { getGameEngine } from '../engine-registry';
-import { runWerewolfViaEngine } from '../werewolf-runner';
 
 type GameRunner = (
   config: Record<string, unknown>,
@@ -15,6 +14,7 @@ interface ResolvedGameRunner {
   gameType: string;
   run: GameRunner;
   session: GameSessionMetadata;
+  createPresentationSession?: (viewMode: string, replayView?: Record<string, unknown>) => GamePresentationSession;
 }
 
 function resolveGameRunner(gameType: string): ResolvedGameRunner {
@@ -27,12 +27,6 @@ function resolveGameRunner(gameType: string): ResolvedGameRunner {
     doneMessage: '游戏结束。',
   };
 
-  if (gameType === 'debate') {
-    return { gameType, run: runDebateViaEngine as unknown as GameRunner, session };
-  }
-  if (gameType === 'werewolf') {
-    return { gameType, run: runWerewolfViaEngine as GameRunner, session };
-  }
   if (!definition.runtime) {
     throw new Error(`GameDefinition runtime not registered: ${gameType}`);
   }
@@ -41,7 +35,15 @@ function resolveGameRunner(gameType: string): ResolvedGameRunner {
     gameType,
     session,
     run: (config, context) => engine.runGame(gameType, { config }, context),
+    createPresentationSession: (viewMode, replayView) => definition.presentation?.createSession({ viewMode, replayView }) || {
+      projectEvent: (event) => isInternalEvent(event) ? null : event,
+      projectGame: (game) => game,
+    },
   };
+}
+
+function isInternalEvent(event: Record<string, unknown>): boolean {
+  return event.channel === 'system' || event.visibility === 'system';
 }
 
 export { resolveGameRunner };

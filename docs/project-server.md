@@ -74,6 +74,8 @@ packages/server/
 │   ├── game-socket/
 │   ├── debate/
 │   ├── werewolf/
+│   ├── undercover/
+│   ├── avalon/
 │   ├── agent-core/
 │   ├── llm/
 │   ├── tts/
@@ -106,6 +108,7 @@ WebSocket：
 
 - `/api/toc/ws/game`
 - 入站消息使用按 `type` 区分的 Zod schema 校验；单条消息最大 64 KiB，无效消息返回 `INVALID_MESSAGE`。
+- 实时 `start` 通过 `engine-registry` 中的 `GameDefinition` 查找 runtime、选人规则、session metadata 和公开投影；`game-socket` 不按游戏名分发辩论赛、狼人杀、谁是卧底或阿瓦隆。
 
 统一响应结构来自 `responseFormatter` 和共享类型：
 

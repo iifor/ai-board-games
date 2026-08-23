@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Route } from '../types';
+import { isClientGameRoute } from '../games/catalog';
 
-const GAME_PATHS = new Set(['debate', 'werewolf', 'undercover']);
 type GameRouteVersion = 'v1' | 'v2';
 
 interface LocationState {
@@ -54,11 +54,11 @@ export function parseClientRoute(locationState: LocationState): Route {
   const segments = pathname.split('/').filter(Boolean);
   const searchParams = new URLSearchParams(locationState.search);
 
-  if (segments[0] === 'game' && segments[1] === 'v2' && GAME_PATHS.has(segments[2])) {
+  if (segments[0] === 'game' && segments[1] === 'v2' && isClientGameRoute(segments[2], 'v2')) {
     return { name: 'game', gameKey: segments[2], version: 'v2', searchParams };
   }
 
-  if (segments[0] === 'games' && GAME_PATHS.has(segments[1])) {
+  if (segments[0] === 'games' && isClientGameRoute(segments[1], 'v1')) {
     return { name: 'game', gameKey: segments[1], version: 'v1', searchParams };
   }
 

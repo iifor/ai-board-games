@@ -11,6 +11,10 @@ import type { MatchStateStore } from '../state/matchStateStore';
 class EffectResolverRegistry {
   private resolvers = new Map<string, EffectResolver>();
 
+  constructor(resolvers: EffectResolver[] = []) {
+    this.registerMany(resolvers);
+  }
+
   register(resolver: EffectResolver): this {
     if (!resolver?.effectType) throw new Error('EffectResolver requires effectType.');
     if (this.resolvers.has(resolver.effectType)) {

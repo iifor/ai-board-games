@@ -158,17 +158,61 @@ interface GameRuntimeRunContext {
   signal?: GameRuntimeAbortSignal;
 }
 
+interface GameRuntimeInput {
+  matchId?: string;
+  config?: Record<string, unknown>;
+  initialState?: Record<string, unknown>;
+}
+
 interface GameRuntime {
-  createMatch(input: { matchId?: string; config?: Record<string, unknown>; initialState?: Record<string, unknown> }): Promise<{ id: string }>;
-  run(matchId: string, context?: GameRuntimeRunContext): Promise<Record<string, unknown>>;
+  execute?: (input: GameRuntimeInput, context?: GameRuntimeRunContext) => Promise<Record<string, unknown>>;
+  createMatch?: (input: GameRuntimeInput) => Promise<{ id: string }>;
+  run?: (matchId: string, context?: GameRuntimeRunContext) => Promise<Record<string, unknown>>;
+}
+
+interface GameSessionPlayer extends Record<string, unknown> {
+  id?: ActorId;
+}
+
+interface GameSessionPreparationInput {
+  availablePlayers: GameSessionPlayer[];
+  requestedPlayerIds: ActorId[];
+  savedPlayerIds: ActorId[];
+  options: Record<string, unknown>;
+}
+
+interface GameSessionPreparationResult {
+  players: GameSessionPlayer[];
+  config?: Record<string, unknown>;
+}
+
+type PrepareGameSession = (
+  input: GameSessionPreparationInput,
+) => GameSessionPreparationResult | Promise<GameSessionPreparationResult>;
+
+interface GamePresentationContext {
+  viewMode: string;
+  replayView?: Record<string, unknown>;
+}
+
+interface GamePresentationSession {
+  projectEvent: (event: Record<string, unknown>) => Record<string, unknown> | null;
+  projectGame: (game: Record<string, unknown>) => Record<string, unknown>;
+}
+
+interface GamePresentationAdapter {
+  createSession: (context: GamePresentationContext) => GamePresentationSession;
 }
 
 interface GameSessionMetadata {
   startMessage: string;
   doneMessage: string;
+  emitStartEvent?: boolean;
+  completionEventType?: string;
   playerSelection?: {
     min: number;
     max: number;
+    defaultCount?: number;
     errorMessage: string;
   };
   playback?: {
@@ -192,6 +236,8 @@ interface GameDefinition {
   projectState?: ProjectStateFromEvent;
   channelPolicy?: ChannelPolicy;
   runtime?: GameRuntime;
+  prepareSession?: PrepareGameSession;
+  presentation?: GamePresentationAdapter;
   metadata?: GameDefinitionMetadata;
 }
 
@@ -246,7 +292,15 @@ export type {
   SkillDefinition,
   GameRuntimeAbortSignal,
   GameRuntimeRunContext,
+  GameRuntimeInput,
   GameRuntime,
+  GameSessionPlayer,
+  GameSessionPreparationInput,
+  GameSessionPreparationResult,
+  PrepareGameSession,
+  GamePresentationContext,
+  GamePresentationSession,
+  GamePresentationAdapter,
   GameSessionMetadata,
   GameDefinitionMetadata,
   GameDefinition,
