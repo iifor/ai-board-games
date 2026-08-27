@@ -28,6 +28,8 @@ class PostgresMatchStateStore implements MatchStateStore {
       matchId: events[0].matchId,
       events: events.map((event) => ({
         type: event.type,
+        eventSchemaVersion: event.eventSchemaVersion,
+        actorType: event.actorType,
         stepId: event.stepId,
         playerId: event.actorId,
         payload: event.payload,
@@ -35,6 +37,8 @@ class PostgresMatchStateStore implements MatchStateStore {
         scopeKey: event.scopeKey,
         visibility: toVisibility(event.channel),
         idempotencyKey: event.idempotencyKey || event.id,
+        causationId: event.causationId,
+        correlationId: event.correlationId,
       })),
     });
     return rows.map(toDomainEvent);
@@ -111,6 +115,8 @@ function toMatchSnapshot(match: Match | null): MatchSnapshot | null {
     status: match.status,
     currentStepIndex: Number(match.currentStepIndex || 0),
     version: Number(match.version || 0),
+    definitionVersion: match.definitionVersion,
+    stateSchemaVersion: match.stateSchemaVersion,
     config: match.config || {},
     state: match.state || {},
   };
@@ -122,12 +128,16 @@ function toDomainEvent(event: WorkflowEvent): DomainEvent {
     matchId: event.matchId,
     seq: event.seq,
     type: event.type,
+    eventSchemaVersion: event.eventSchemaVersion,
+    actorType: event.actorType,
     stepId: event.stepId,
     actorId: event.playerId,
     payload: toRecord(event.payload),
     channel: event.channel as DomainEvent['channel'],
     scopeKey: event.scopeKey,
     idempotencyKey: event.idempotencyKey,
+    causationId: event.causationId,
+    correlationId: event.correlationId,
     createdAt: event.createdAt,
   };
 }

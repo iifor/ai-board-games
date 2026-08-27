@@ -70,6 +70,21 @@ async function resetIdentities(client: MigrationClient, tables: readonly string[
   }
 }
 
+async function derivePlatformConfiguration(client: MigrationClient): Promise<void> {
+  await client.query(`INSERT INTO game_variants
+    (game_type, variant_key, definition_version, name, description, config_schema_version,
+     config_json, enabled, sort_order)
+    SELECT 'werewolf', id, '1.0.0', name, description, 1,
+      jsonb_build_object('werewolfMode', id), enabled <> 0, sort_order
+    FROM werewolf_modes
+    ON CONFLICT (game_type, variant_key) DO NOTHING`);
+  await client.query(`UPDATE games SET
+    variant_key = NULLIF(mode, ''),
+    variant_snapshot_json = CASE WHEN mode = '' THEN '{}'::jsonb
+      ELSE jsonb_build_object('legacyMode', mode, 'source', 'sqlite') END
+    WHERE variant_key IS NULL`);
+}
+
 const defaultDependencies: MigrationDependencies = {
   createClient: async (options) => new Client({ connectionString: options.targetUrl }) as unknown as MigrationClient,
 };
@@ -115,6 +130,7 @@ async function migrateOpenSqliteToPostgres(
     await assertEmptyTarget(client, schema);
     for (const table of IMPORT_TABLES) tables[table] = await importTable(sqlite, client, schema, table);
     await resetIdentities(client, IDENTITY_TABLES);
+    await derivePlatformConfiguration(client);
     for (const [table, counts] of Object.entries(tables)) {
       if (counts.sourceRows !== counts.targetRows) throw new Error(`Row-count mismatch for ${table}`);
     }

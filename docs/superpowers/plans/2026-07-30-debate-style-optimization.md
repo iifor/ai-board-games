@@ -67,7 +67,7 @@ Add `debateSetup.test.ts` beside the other `tests/unit/*.test.ts` entries in `te
 Run:
 
 ```powershell
-pnpm.cmd run test:unit -- tests/unit/debateSetup.test.ts
+pnpm.cmd run test:unit -- debateSetup.test.ts
 ```
 
 Expected: FAIL because `normalizeRandomizedDebateTeams` is not exported.
@@ -116,7 +116,7 @@ Throw `new Error('随机分配结果不完整')` when the response has no `debat
 Run:
 
 ```powershell
-pnpm.cmd run test:unit -- tests/unit/debateSetup.test.ts
+pnpm.cmd run test:unit -- debateSetup.test.ts
 pnpm.cmd --filter @ai-presenter/client run check
 ```
 
@@ -181,7 +181,7 @@ test('renders player and empty-slot assignment as keyboard-operable buttons', ()
 Run:
 
 ```powershell
-pnpm.cmd run test:unit -- tests/unit/debateSetup.test.ts
+pnpm.cmd run test:unit -- debateSetup.test.ts
 ```
 
 Expected: FAIL because the new props do not exist and `DraggableDebatePlayer` is still a `<div>`.
@@ -232,7 +232,7 @@ Render it above the footer with `role={randomizeError ? 'alert' : 'status'}`. Up
 Run:
 
 ```powershell
-pnpm.cmd run test:unit -- tests/unit/debateSetup.test.ts
+pnpm.cmd run test:unit -- debateSetup.test.ts
 pnpm.cmd --filter @ai-presenter/client run check
 ```
 
@@ -290,7 +290,7 @@ Add a concise `docs/project-client.md` note stating:
 Run:
 
 ```powershell
-pnpm.cmd run test:unit -- tests/unit/debateSetup.test.ts
+pnpm.cmd run test:unit -- debateSetup.test.ts
 pnpm.cmd --filter @ai-presenter/client run check
 pnpm.cmd --filter @ai-presenter/client run build
 git diff --check

@@ -2,10 +2,10 @@
   min-height: 100vh;
   overflow: auto;
   padding: 24px 0 48px;
-  color: #efffff;
+  color: var(--game-text);
   background:
-    radial-gradient(circle at 50% 0%, rgba(31, 156, 145, 0.28), transparent 36%),
-    linear-gradient(145deg, #031018, #071f2b 58%, #020b13);
+    radial-gradient(circle at 50% 0%, var(--game-accent-soft), transparent 36%),
+    linear-gradient(145deg, #031018, #071f2b 58%, var(--game-canvas));
 }
 
 .undercover-heading {
@@ -66,8 +66,8 @@
 .undercover-shell--v2 {
   overflow: hidden;
   padding: 12px 0;
-  color: #eff2ff;
-  background: #020612;
+  color: var(--game-text);
+  background: var(--game-canvas);
 }
 
 .undercover-shell--v2 .undercover-heading {
@@ -98,6 +98,7 @@
   min-height: 44px;
   margin-top: 20px;
   gap: 10px;
+  padding: 9px 12px;
   color: #dce5ff;
   cursor: pointer;
 }
@@ -105,7 +106,7 @@
 .undercover-debug-toggle input {
   width: 22px;
   height: 22px;
-  accent-color: #778cff;
+  accent-color: var(--game-accent);
 }
 
 .undercover-debug-toggle span,

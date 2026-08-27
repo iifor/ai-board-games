@@ -25,7 +25,9 @@ test('game history keeps playback order and preserves cross-game memories on del
         await gameRepo.insertOrReplaceGame({
           id: 'game-1', game_type: 'werewolf', mode: 'real', skin_id: null, skin_name: '',
           winner: 'good', win_reason: 'test', topic_json: '{}', players_json: '[]', rounds_json: '[]',
-          event_json: '{}', audio_resources_json: '[]', created_at: '2026-08-08T00:00:00.000Z',
+          event_json: '{}', audio_resources_json: '[]', definition_version: '1.0.0',
+          snapshot_schema_version: 1, variant_key: null, variant_revision: null,
+          variant_snapshot_json: '{}', created_at: '2026-08-08T00:00:00.000Z',
         }, transaction);
         await gameRepo.insertGamePlayer('game-1', 1, '{"id":1}', transaction);
         await playbackRepo.replacePlaybackEvents('game-1', [

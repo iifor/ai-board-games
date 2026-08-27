@@ -20,11 +20,17 @@ function fixture(skinJson = '["valid"]'): string {
     CREATE TABLE model_providers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, base_url TEXT NOT NULL,
       api_format TEXT NOT NULL, api_key_cipher TEXT NOT NULL, api_key_iv TEXT NOT NULL, api_key_tag TEXT NOT NULL,
       enabled INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE werewolf_modes (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL,
+      roles_json TEXT NOT NULL, rules_json TEXT NOT NULL, sheriff_json TEXT NOT NULL,
+      win_condition TEXT NOT NULL, enabled INTEGER NOT NULL, sort_order INTEGER NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
   `);
   db.prepare('INSERT INTO skins VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run('skin-1', 'Skin', 'v1', 'admin', skinJson,
     'bg', 'truth', '[]', '[]', '[]', 1, '2026-08-08T00:00:00.000Z', '2026-08-08T00:00:00.000Z');
   db.prepare('INSERT INTO model_providers VALUES (?,?,?,?,?,?,?,?,?,?)').run(7, 'Provider', '', 'openai-compatible', '', '', '', 1,
     '2026-08-08T00:00:00.000Z', '2026-08-08T00:00:00.000Z');
+  db.prepare('INSERT INTO werewolf_modes VALUES (?,?,?,?,?,?,?,?,?,?,?)').run('standard', '标准局', '', '[]', '{}', '{}',
+    'side', 1, 0, '2026-08-08T00:00:00.000Z', '2026-08-08T00:00:00.000Z');
   db.close();
   return file;
 }
@@ -58,6 +64,11 @@ test('SQLite importer validates rows, skips runtime history and resets identitie
       assert.equal(report.validation, 'passed');
       assert.equal(report.tables.skins.targetRows, 1);
       assert.ok(report.skippedTables.includes('workflow_events'));
+      const variant = await database.queryOne<{ variant_key: string; config_json: string }>(
+        'SELECT variant_key, config_json FROM game_variants',
+      );
+      assert.equal(variant?.variant_key, 'standard');
+      assert.deepEqual(JSON.parse(variant?.config_json || '{}'), { werewolfMode: 'standard' });
       const inserted = await database.queryOne<{ id: number }>(`INSERT INTO model_providers
         (name,base_url,api_format,api_key_cipher,api_key_iv,api_key_tag,enabled) VALUES ('next','','openai-compatible','','','',1) RETURNING id`);
       assert.equal(Number(inserted?.id), 8);

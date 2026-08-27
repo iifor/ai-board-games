@@ -53,6 +53,8 @@ interface DomainEvent {
   id: string;
   matchId: string;
   type: string;
+  eventSchemaVersion?: number;
+  actorType?: string;
   payload: Record<string, unknown>;
   channel: GameEngineChannel;
   scopeKey?: string;
@@ -88,6 +90,8 @@ interface MatchSnapshot {
   status: string;
   currentStepIndex: number;
   version: number;
+  definitionVersion: string;
+  stateSchemaVersion: number;
   config: Record<string, unknown>;
   state: Record<string, unknown>;
 }

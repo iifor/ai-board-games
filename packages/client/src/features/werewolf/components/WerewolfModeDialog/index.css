@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   padding: 42px 76px;
-  background: rgba(1, 6, 18, 0.68);
+  background: var(--game-overlay-backdrop);
   backdrop-filter: blur(10px);
 }
 
@@ -18,16 +18,12 @@
   max-height: 82vh;
   overflow: hidden;
   padding: 24px 38px;
-  border: 1px solid rgba(187, 171, 255, 0.5);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(18, 21, 55, 0.82), rgba(5, 8, 28, 0.78)),
-    rgba(5, 8, 28, 0.62);
-  box-shadow:
-    0 0 28px rgba(89, 58, 206, 0.22),
-    inset 0 0 28px rgba(110, 92, 255, 0.12);
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-lg);
+  background: var(--game-dialog-surface);
+  box-shadow: var(--game-dialog-shadow);
   backdrop-filter: blur(8px);
-  color: #eef7ff;
+  color: var(--game-text);
 }
 
 .werewolf-setup-dialog {
@@ -44,7 +40,7 @@
 
 .werewolf-mode-dialog h2 {
   margin: 0;
-  color: #fff;
+  color: var(--game-text);
   font-size: 34px;
 }
 
@@ -55,22 +51,23 @@
 .werewolf-mode-dialog header button,
 .werewolf-mode-dialog footer button {
   padding: 9px 18px;
-  border: 1px solid rgba(188, 169, 255, 0.42);
-  border-radius: 8px;
-  color: #eaf0ff;
-  background: rgba(8, 18, 50, 0.86);
+  border: 1px solid var(--game-control-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--game-text);
+  background: var(--game-control-surface);
   cursor: pointer;
 }
 
 .werewolf-mode-dialog footer .primary {
-  border-color: rgba(111, 240, 160, 0.54);
-  color: #d8ffe2;
+  border-color: var(--game-accent-strong);
+  color: var(--game-primary-contrast);
+  background: var(--game-primary);
 }
 
 .werewolf-mode-dialog footer span {
   min-width: 0;
   overflow: hidden;
-  color: rgba(226, 240, 255, 0.72);
+  color: var(--game-muted);
   font-size: 15px;
   font-weight: 800;
   text-overflow: ellipsis;
@@ -94,9 +91,9 @@
   flex: 1 1 0;
   padding: 14px;
   overflow: hidden;
-  border: 1px solid rgba(187, 171, 255, 0.2);
-  border-radius: 8px;
-  background: rgba(7, 12, 36, 0.44);
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-md);
+  background: var(--game-surface-soft);
 }
 
 .werewolf-mode-grid {
@@ -111,20 +108,20 @@
 .werewolf-mode-card {
   flex: 1 1 100%;
   padding: 14px 19px;
-  border: 1px solid rgba(149, 198, 255, 0.26);
+  border: 1px solid var(--game-control-border);
   border-radius: 8px;
-  color: #dfefff;
-  background: rgba(7, 24, 55, 0.68);
+  color: var(--game-text);
+  background: var(--game-control-surface);
   box-shadow: inset 0 0 18px rgba(70, 126, 255, 0.08);
   text-align: left;
   cursor: pointer;
 }
 
 .werewolf-mode-card.active {
-  border-color: rgba(255, 236, 162, 0.76);
-  color: #fff;
-  background: rgba(52, 40, 12, 0.78);
-  box-shadow: 0 0 22px rgba(255, 218, 91, 0.24), inset 0 0 18px rgba(255, 218, 91, 0.12);
+  border-color: var(--game-accent-strong);
+  color: var(--game-text);
+  background: var(--game-accent-soft);
+  box-shadow: 0 0 22px var(--game-accent-soft), inset 0 0 18px var(--game-accent-soft);
 }
 
 .werewolf-mode-card strong,
@@ -178,10 +175,10 @@
   gap: 8px;
   min-width: 0;
   padding: 9px 10px;
-  border: 1px solid rgba(149, 198, 255, 0.2);
+  border: 1px solid var(--game-control-border);
   border-radius: 7px;
-  color: rgba(226, 240, 255, 0.82);
-  background: rgba(7, 24, 55, 0.52);
+  color: var(--game-text);
+  background: var(--game-control-surface);
   cursor: pointer;
   text-align: left;
 }
@@ -196,10 +193,10 @@
 
 .werewolf-player-grid button.checked,
 .werewolf-host-grid button.checked {
-  border-color: rgba(139, 255, 170, 0.52);
-  color: #ffffff;
-  background: rgba(16, 58, 38, 0.62);
-  box-shadow: 0 0 16px rgba(81, 255, 148, 0.12), inset 0 0 14px rgba(81, 255, 148, 0.08);
+  border-color: var(--game-accent-strong);
+  color: var(--game-text);
+  background: var(--game-accent-soft);
+  box-shadow: 0 0 16px var(--game-accent-soft), inset 0 0 14px var(--game-accent-soft);
 }
 
 .werewolf-player-grid button span,
@@ -243,7 +240,7 @@
 
 .werewolf-setup-error {
   margin: -8px 0 0;
-  color: #ffd0d0;
+  color: var(--game-danger);
 }
 
 .werewolf-view-mode {
@@ -268,15 +265,15 @@
   gap: 2px 10px;
   min-height: 76px;
   padding: 12px;
-  border: 1px solid rgba(202, 221, 255, 0.18);
-  color: rgba(236, 243, 255, 0.92);
-  background: rgba(8, 16, 34, 0.72);
+  border: 1px solid var(--game-control-border);
+  color: var(--game-text);
+  background: var(--game-control-surface);
   text-align: left;
 }
 
 .werewolf-view-mode-switch button.active {
-  border-color: rgba(139, 255, 170, 0.52);
-  background: rgba(16, 58, 38, 0.62);
+  border-color: var(--game-accent-strong);
+  background: var(--game-accent-soft);
 }
 
 .werewolf-debug-toggle {
@@ -331,7 +328,62 @@
 }
 
 @media (max-width: 720px) {
+  .werewolf-mode-backdrop {
+    align-items: center;
+    padding: 0.75rem;
+  }
+
+  .werewolf-mode-dialog {
+    width: 100%;
+    max-height: calc(100vh - 1.5rem);
+    padding: 1.125rem;
+    font-size: 1rem;
+  }
+
+  .werewolf-mode-dialog h2 {
+    font-size: 1.5rem;
+  }
+
+  .werewolf-setup-grid {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .werewolf-setup-grid > section,
+  .werewolf-view-mode {
+    flex: none;
+    width: 100%;
+  }
+
+  .werewolf-player-grid,
+  .werewolf-host-grid {
+    max-height: 17.5rem;
+  }
+
   .werewolf-view-mode-switch {
-    grid-template-columns: 1fr;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .werewolf-debug-toggle {
+    min-height: 4rem;
+  }
+
+  .werewolf-mode-dialog :where(button, strong, span, p) {
+    font-size: 0.875rem;
+  }
+
+  .werewolf-mode-dialog :where(small) {
+    font-size: 0.75rem;
+  }
+
+  .werewolf-mode-dialog :where(button) {
+    min-height: 2.5rem;
+  }
+
+  .werewolf-mode-dialog svg {
+    width: 1.125rem;
+    height: 1.125rem;
   }
 }

@@ -11,6 +11,11 @@ import { preparePlayersByRule } from '../../packages/server/modules/game-engine/
 import { GameEngine } from '../../packages/server/modules/game-engine';
 import { MemoryMatchStateStore } from './gameEngineTestUtils';
 import type { GameDefinition } from '../../packages/shared/types/gameEngine';
+import {
+  AVALON_VISUAL_QA_GAME,
+  AVALON_VISUAL_QA_SPEECH,
+  isAvalonVisualQaEnabled,
+} from '../../packages/client/src/features/avalon/visualQa';
 
 const players = Array.from({ length: 5 }, (_, index) => ({
   id: index + 1,
@@ -117,4 +122,33 @@ test('client catalog, router and renderer registry expose Avalon without App bra
   assert.match(renderers, /avalon:\s*\(/);
   assert.match(router, /isClientGameRoute/);
   assert.doesNotMatch(app, /gameKey\s*===/);
+});
+
+test('Avalon v2 visual QA state is development-only and mirrors a legal public game state', () => {
+  assert.equal(isAvalonVisualQaEnabled('?visualQaAvalon=1', true), true);
+  assert.equal(isAvalonVisualQaEnabled('?visualQaAvalon=1', false), false);
+  assert.equal(isAvalonVisualQaEnabled('?visualQaAvalon=0', true), false);
+  assert.equal(AVALON_VISUAL_QA_GAME.status, 'team-vote');
+  assert.deepEqual(AVALON_VISUAL_QA_GAME.missions.map((mission) => mission.teamSize), [2, 3, 2, 3, 3]);
+  assert.deepEqual(AVALON_VISUAL_QA_GAME.currentTeamIds, [3, 4, 5]);
+  assert.equal(AVALON_VISUAL_QA_SPEECH.speakerRole, 'host');
+  assert.equal(AVALON_VISUAL_QA_GAME.reveal, undefined);
+});
+
+test('Avalon v2 reuses the shared stage and host cutout without exposing individual votes', () => {
+  const game = readFileSync(resolve('packages/client/src/features/avalon/AvalonGame/index.tsx'), 'utf8');
+  const arena = readFileSync(resolve('packages/client/src/features/avalon/components/AvalonArena.tsx'), 'utf8');
+  const styles = readFileSync(resolve('packages/client/src/features/avalon/AvalonGame/index.css'), 'utf8');
+
+  assert.match(game, /variant=\{variant\}/);
+  assert.match(game, /host=\{visibleHost\}/);
+  assert.match(game, /activeSpeech=\{visibleSpeech\}/);
+  assert.match(arena, /<PlayerPosterSpotlight/);
+  assert.match(arena, /variant="cutout"/);
+  assert.match(arena, /className="avalon-mission-track"/);
+  assert.match(arena, /publicVotes/);
+  assert.doesNotMatch(arena, /player\.vote|voteByPlayer|逐人/);
+  assert.match(styles, /stage-background\.png/);
+  assert.match(styles, /\.avalon-player-seat\.is-selected/);
+  assert.match(styles, /\.avalon-stage-narration/);
 });

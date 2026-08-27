@@ -42,6 +42,7 @@ Every executed migration rehearsal now runs post-import validation and then a co
 ├── CLAUDE.md                  # Claude/AI 协作规范
 ├── README.md                  # 项目基础说明
 ├── .env.example               # 环境变量示例
+├── docker-compose.dev.yml     # 本机 PostgreSQL 16 开发环境
 ├── package.json               # 根脚本和 workspace 聚合命令
 ├── pnpm-workspace.yaml        # pnpm workspace 包声明
 ├── pnpm-lock.yaml             # 依赖锁定
@@ -63,7 +64,9 @@ Every executed migration rehearsal now runs post-import validation and then a co
 │   ├── server/                 # Express API、WebSocket、游戏工作流
 │   ├── shared/                 # 前后端共享类型、schema、常量
 │   └── db-migrator/            # 不进入生产镜像的一次性导入/演练工具
-├── scripts/ops/postgres/       # 五个薄 PowerShell 运维入口
+├── scripts/
+│   ├── dev/                    # 本机开发环境启动编排
+│   └── ops/postgres/           # 五个薄 PowerShell 运维入口
 └── tests/
     ├── migration/
     ├── postgres/
@@ -131,7 +134,10 @@ flowchart TD
 
 根目录脚本：
 
-- `pnpm run dev`：并行启动 workspace 开发服务。
+- `pnpm run dev`：先通过独立开发 Compose 启动并等待本机 PostgreSQL 16 健康，再并行启动 workspace 开发服务。
+- `pnpm run dev:services`：仅并行启动 workspace 开发服务；调用方必须自行提供有效数据库环境变量。
+- `pnpm run dev:db`：仅启动本机开发数据库并等待健康。
+- `pnpm run dev:db:down`：停止本机开发数据库但保留开发数据卷。
 - `pnpm run dev:server`：启动服务端。
 - `pnpm run dev:client`：启动 C 端前台。
 - `pnpm run dev:admin`：启动 B 端后台。
@@ -142,6 +148,7 @@ flowchart TD
 - `pnpm run test:workflow`：运行工作流测试。
 - `pnpm run test:migration`：运行迁移测试。
 - `pnpm run test:concurrency`：对已启动的本地服务发起 5 局并发调试对局并输出结构化结果。
+- `pnpm run debug:flows`：启动本地 PostgreSQL 与隔离端口服务，依次跑完狼人杀、辩论赛调试对局；只有两局都收到并通过完整终态校验才返回成功，证据默认写入 `tmp/debug-flows/<runId>/`。
 
 服务端端口：
 
@@ -156,6 +163,7 @@ flowchart TD
 - Cloudflare：`CLOUDFLARE_ACCOUNT_ID`
 - 数据库模型密钥：`DATABASE_MODEL_API_KEY`
 - PostgreSQL：`DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_SSL`、`DATABASE_CA_PATH`、`DATABASE_POOL_MAX`、`DATABASE_CONNECTION_TIMEOUT_MS`、`DATABASE_STATEMENT_TIMEOUT_MS`。生产启用证书校验并使用最小权限应用角色；连接池总预算需按应用实例数核算。
+- 本机 Docker 开发：`docker-compose.dev.yml` 只把 PostgreSQL 映射到 `127.0.0.1:5432`，默认连接 `consensus_local_v2` 数据库中的 `consensus` schema，使用无密码 `consensus_dev` 角色和独立的 `consensus-postgres-dev-data` 卷。trust 认证仅用于这个回环地址开发环境，不代表生产安全配置；生产 Compose、TLS secrets 和 `consensus-postgres-data` 均不受影响。
 - 生产认证：`JWT_SECRET`（至少 32 字符）、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（至少 12 字符）。生产环境缺失或强度不足时服务拒绝启动。账号仅在管理员表为空时创建一次，首次登录必须改密；已有账号不会被环境变量覆盖。
 - Docker Compose：生产 `.env` 固定 `COMPOSE_PROJECT_NAME=consensus`，便于稳定识别资源和 PostgreSQL volume；数据库只在 Compose 私网暴露，app 在 PostgreSQL 的 TLS 应用角色健康查询通过后启动。
 
@@ -192,6 +200,7 @@ sh ./scripts/ops/postgres/start-postgres-only.sh
 - 新增后端资源模块优先遵循 `controller/service/repository/routes/validator` 分层。
 - 新增游戏或复杂流程时，需要同步考虑 workflow、WebSocket 事件、前端投影、对局保存、测试和文档。
 - 新增游戏优先注册包含 runtime、session metadata 与玩家数量约束的 `GameDefinition`；只有旧流程兼容需要才增加专用 runner 分支。
+- 新玩法优先创建绑定 definition 版本的 `game_variants` 配置；每局固化 revision 和配置快照。需要改变状态或事件形状时提升对应 schema version，并提供显式升级器。
 - 修改共享协议时，优先更新 `packages/shared`，再同步前后端消费方。
 
 ## 谁是卧底首版范围

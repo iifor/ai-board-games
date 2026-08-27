@@ -7,7 +7,11 @@ interface EncryptedApiKey {
 }
 
 function getSecretKey(): Buffer {
-  const secret = process.env.ADMIN_SECRET || process.env.API_KEY_SECRET || 'ai-presenter-local-admin-secret';
+  const apiKeySecret = process.env.API_KEY_SECRET?.trim();
+  if (!apiKeySecret && process.env.NODE_ENV === 'production') {
+    throw new Error('API_KEY_SECRET is required in production');
+  }
+  const secret = apiKeySecret || process.env.ADMIN_SECRET?.trim() || 'ai-presenter-local-admin-secret';
   return crypto.createHash('sha256').update(secret).digest();
 }
 

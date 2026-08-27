@@ -18,9 +18,18 @@ const sampler = setInterval(() => {
 function runGame(index) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(url);
+    let settled = false;
+    let completed = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { socket.close(); } catch {}
+      if (error) reject(error);
+      else resolve(value);
+    };
     const timer = setTimeout(() => {
-      socket.close();
-      reject(new Error(`game ${index} timed out`));
+      finish(new Error(`game ${index} timed out before workflow-completed`));
     }, timeoutMs);
     socket.addEventListener('open', () => socket.send(JSON.stringify({
       type: 'start',
@@ -34,21 +43,22 @@ function runGame(index) {
       const message = JSON.parse(String(messageEvent.data));
       if (message.ackId != null) socket.send(JSON.stringify({ type: 'ack', ackId: message.ackId }));
       if (message.type === 'error') {
-        clearTimeout(timer);
-        socket.close();
-        reject(new Error(`game ${index}: ${message.message}`));
+        finish(new Error(`game ${index}: ${message.message}`));
       }
       const payload = message.event || message.payload || message;
       if (payload.type === 'workflow-completed') {
-        clearTimeout(timer);
-        socket.close();
-        resolve({ index, gameId: payload.game?.id || null });
+        const gameId = payload.game?.id || null;
+        if (!gameId) {
+          finish(new Error(`game ${index}: workflow-completed did not include game.id`));
+          return;
+        }
+        completed = true;
+        finish(null, { index, gameId });
       }
     });
-    socket.addEventListener('error', () => reject(new Error(`game ${index}: WebSocket connection failed`)));
+    socket.addEventListener('error', () => finish(new Error(`game ${index}: WebSocket connection failed`)));
     socket.addEventListener('close', () => {
-      clearTimeout(timer);
-      resolve({ index, gameId: null });
+      if (!completed) finish(new Error(`game ${index}: socket closed before workflow-completed`));
     });
   });
 }

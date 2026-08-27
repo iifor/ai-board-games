@@ -29,6 +29,11 @@ interface SaveGameInput {
   fallbackAudit?: unknown[];
   audioResources?: unknown[];
   playbackEvents?: PlaybackEvent[];
+  definitionVersion?: string;
+  snapshotSchemaVersion?: number;
+  variantKey?: string | null;
+  variantRevision?: number | null;
+  variantSnapshot?: Record<string, unknown>;
   createdAt?: string;
 }
 
@@ -61,6 +66,11 @@ async function saveGameRecord(game: SaveGameInput): Promise<GameSummary[]> {
       ...(Array.isArray(game.fallbackAudit) ? { fallbackAudit: game.fallbackAudit } : {})
     }),
     audio_resources_json: toJson(game.audioResources || []),
+    definition_version: game.definitionVersion || '1.0.0',
+    snapshot_schema_version: game.snapshotSchemaVersion || 1,
+    variant_key: game.variantKey || game.mode || null,
+    variant_revision: game.variantRevision || null,
+    variant_snapshot_json: toJson(game.variantSnapshot || {}),
     created_at: game.createdAt || new Date().toISOString()
   };
 

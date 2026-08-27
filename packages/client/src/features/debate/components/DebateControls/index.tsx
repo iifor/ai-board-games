@@ -29,12 +29,12 @@ export function DebateControls({
   onSkipPhase
 }: DebateControlsProps) {
   return (
-    <nav className="debate-controls" aria-label="辩论赛操作">
+    <nav className="debate-controls game-control-rail" aria-label="辩论赛操作">
       <button type="button" title="返回游戏选择" onClick={onReturn}>
         <ArrowLeft size={18} />
         <span>返回</span>
       </button>
-      <button type="button" title={startTitle} onClick={onStart} disabled={startDisabled}>
+      <button className="game-primary-button" type="button" title={startTitle} onClick={onStart} disabled={startDisabled}>
         <RotateCcw size={18} />
         <span>{startLabel}</span>
       </button>

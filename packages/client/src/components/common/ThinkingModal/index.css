@@ -5,8 +5,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 6, 24, 0.46);
-  backdrop-filter: blur(3px);
+  background: var(--game-overlay-backdrop);
+  backdrop-filter: blur(10px);
 }
 
 .thinking-dialog {
@@ -14,11 +14,11 @@
   max-height: 62vh;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(92, 188, 255, 0.46);
-  border-radius: 10px;
-  background: rgba(5, 22, 54, 0.82);
-  box-shadow: 0 0 22px rgba(52, 163, 255, 0.22), inset 0 0 12px rgba(70, 176, 255, 0.08);
-  color: #bdeeff;
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-lg);
+  background: var(--game-dialog-surface);
+  box-shadow: var(--game-dialog-shadow);
+  color: var(--game-text);
   overflow: hidden;
 }
 
@@ -27,15 +27,15 @@
   align-items: center;
   gap: 10px;
   padding: 14px 18px;
-  border-bottom: 1px solid rgba(92, 188, 255, 0.18);
+  border-bottom: 1px solid var(--game-line);
   flex-shrink: 0;
 }
 
 .thinking-header span {
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(130, 218, 255, 0.28);
-  border-top-color: #82daff;
+  border: 2px solid var(--game-accent-soft);
+  border-top-color: var(--game-accent);
   border-radius: 12px;
   animation: thinkingSpin 820ms linear infinite;
 }
@@ -50,7 +50,7 @@
   padding: 18px 18px 22px;
   margin: 0;
   font-size: 14px;
-  color: rgba(189, 238, 255, 0.62);
+  color: var(--game-muted);
   text-align: center;
 }
 
@@ -68,7 +68,7 @@
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #bdeeff;
+  color: var(--game-text);
   background: none;
   border: none;
 }

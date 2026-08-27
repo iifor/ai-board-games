@@ -8,9 +8,9 @@ import type { PersistenceTiming } from './persistenceTiming';
 async function upsertSnapshot(match: Match, _timing?: PersistenceTiming, db: DbExecutor = getDbExecutor()): Promise<void> {
   const lastEventSeq = await getMaxEventSeq(match.id, db);
   await db.execute(`INSERT INTO match_snapshots
-    (match_id, version, status, current_step_index, last_event_seq, state_json, blockers_json, created_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [match.id, match.version, match.status,
-    match.currentStepIndex, lastEventSeq, toJson(match.state), toJson(match.blockers || []), nowIso()]);
+    (match_id, version, state_schema_version, status, current_step_index, last_event_seq, state_json, blockers_json, created_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [match.id, match.version, match.stateSchemaVersion,
+    match.status, match.currentStepIndex, lastEventSeq, toJson(match.state), toJson(match.blockers || []), nowIso()]);
   await pruneSnapshots(match.id, 3, db);
 }
 async function listSnapshots(matchId: string, limit = 20): Promise<MatchSnapshot[]> {

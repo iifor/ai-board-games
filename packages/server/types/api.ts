@@ -133,7 +133,12 @@ interface Game {
   players: unknown[];
   rounds: unknown[];
   event: Record<string, unknown>;
-  audioResources: unknown[];
+    audioResources: unknown[];
+    definitionVersion: string;
+    snapshotSchemaVersion: number;
+    variantKey: string | null;
+    variantRevision: number | null;
+    variantSnapshot: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -144,7 +149,10 @@ interface GameSummary {
   skinName: string;
   winner: string | null;
   winReason: string;
-  playerCount: number;
+    playerCount: number;
+    definitionVersion: string;
+    variantKey: string | null;
+    variantRevision: number | null;
   createdAt: string;
 }
 

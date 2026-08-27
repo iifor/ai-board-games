@@ -19,8 +19,6 @@ import {
   prepareGameDeletion,
 } from '../games/service';
 
-const MAX_AI_ATTEMPTS = 2;
-
 const TERMINAL_STATUSES: string[] = [MATCH_STATUS.COMPLETED, MATCH_STATUS.FAILED, MATCH_STATUS.PAUSED_DEBUG];
 const UNDERCOVER_DEBUG_ACTIONS = new Set(['continue', 'skip', 'continuous']);
 
@@ -83,6 +81,8 @@ async function createWorkflowMatch({ workflowId, gameType, config, initialState,
     status: MATCH_STATUS.RUNNING,
     current_step_index: 0,
     version: 0,
+    definition_version: typeof config?.gameDefinitionVersion === 'string' ? config.gameDefinitionVersion : '1.0.0',
+    state_schema_version: 1,
     config_json: toJson(config || {}),
     state_json: toJson(initialState || {}),
     blockers_json: '[]',
@@ -149,6 +149,10 @@ async function completeAiTask(taskId: string, result: AiTaskResult | Record<stri
   }
   const successPatch = {
     status: 'succeeded',
+    worker_id: '',
+    claimed_at: null,
+    claim_expires_at: null,
+    next_attempt_at: null,
     raw_output: typeof (result as AiTaskResult).rawOutput === 'string'
       ? (result as AiTaskResult).rawOutput
       : JSON.stringify((result as AiTaskResult).rawOutput ?? payload),
@@ -214,10 +218,15 @@ async function failAiTask(taskId: string, error: AiTaskError = {}): Promise<Matc
   if (!task) throw new Error(`AI task not found: ${taskId}`);
   const message = error.message || String(error || 'AI task failed');
   const severity = error.severity || 'medium';
-  const shouldPause = severity === 'critical' || severity === 'high' || Number(task.attempts || 0) >= MAX_AI_ATTEMPTS;
+  const shouldPause = severity === 'critical' || severity === 'high'
+    || Number(task.attempts || 0) >= Number(task.maxAttempts || 3);
   await repo.updateAiTask(task.id, {
     status: shouldPause ? 'failed' : 'retrying',
     error_json: toJson({ message, severity }),
+    worker_id: '',
+    claimed_at: null,
+    claim_expires_at: null,
+    next_attempt_at: shouldPause ? null : new Date(Date.now() + 1000).toISOString(),
   });
   await repo.commitWorkflowChange({
     matchId: task.matchId,

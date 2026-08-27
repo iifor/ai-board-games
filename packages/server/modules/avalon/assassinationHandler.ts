@@ -13,7 +13,7 @@ import type { AvalonWorkflowState } from './types';
 
 function createAssassinationHandler(): StepHandler {
   return {
-    async execute({ match, step, state }) {
+    async execute({ match, step, state, db }) {
       const current = state as unknown as AvalonWorkflowState;
       if (isComplete(current, step.id)) return done(current);
       if (current.status !== 'assassination') {
@@ -24,7 +24,7 @@ function createAssassinationHandler(): StepHandler {
       if (!assassin) throw new Error('Avalon assassin is missing');
       const legalIds = current.players.filter((player) => player.faction === 'good').map((player) => player.id);
       const taskKey = 'assassination';
-      const existing = await findAvalonTask(matchId, step.id, taskKey);
+      const existing = await findAvalonTask(matchId, step.id, taskKey, db);
       if (!existing || existing.status !== 'succeeded') {
         return {
           status: 'WAITING',
@@ -36,6 +36,7 @@ function createAssassinationHandler(): StepHandler {
             'avalon_assassinate',
             taskKey,
             { legalIds },
+            db,
           )],
           blockers: [taskBlocker(
             step.id,

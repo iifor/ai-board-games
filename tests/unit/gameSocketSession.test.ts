@@ -104,11 +104,13 @@ test('parseMessage accepts supported game commands', () => {
     gameType: 'undercover',
     playerIds: [1, '2'],
     debugMode: false,
+    variantKey: 'standard-6',
   })), {
     type: 'start',
     gameType: 'undercover',
     playerIds: [1, '2'],
     debugMode: false,
+    variantKey: 'standard-6',
   });
   assert.deepEqual(parseMessage('{"type":"ack","ackId":1}'), {
     type: 'ack',

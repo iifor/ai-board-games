@@ -1,9 +1,141 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as repository from '../../packages/server/modules/workflow-engine/repository';
+import * as workflowService from '../../packages/server/modules/workflow-engine/service';
+import { runWorkflowGameRuntime } from '../../packages/server/modules/game-engine/runtime/workflowGameRuntime';
+import {
+  avalonAssassinationSchema,
+  avalonProposalSchema,
+  avalonQuestVoteSchema,
+  avalonTeamVoteSchema,
+} from '../../packages/shared/schemas/avalon';
+import { buildAvalonFallbackPayload } from '../../packages/server/modules/avalon/ai';
 import { createAvalonHandlers } from '../../packages/server/modules/avalon/handlers';
 import { avalonWorkflow } from '../../packages/server/modules/avalon/workflow';
 import { createInitialAvalonState } from '../../packages/server/modules/avalon/rules';
+
+test('Avalon model fallback produces legal deterministic actions', () => {
+  const state = createInitialAvalonState(
+    Array.from({ length: 5 }, (_, index) => ({ id: index + 1, nickname: `玩家${index + 1}` })),
+    20260826,
+  );
+  const leaderId = state.players[state.leaderIndex].id;
+  const proposal = buildAvalonFallbackPayload('avalon_propose_team', state, leaderId, {
+    legalIds: state.players.map((player) => player.id),
+    teamSize: state.missions[0].teamSize,
+  });
+  assert.equal(avalonProposalSchema.parse(proposal).teamIds.length, state.missions[0].teamSize);
+  assert.equal(avalonTeamVoteSchema.parse(
+    buildAvalonFallbackPayload('avalon_team_vote', state, state.players[0].id),
+  ).approve, true);
+  assert.equal(avalonQuestVoteSchema.parse(
+    buildAvalonFallbackPayload('avalon_quest_vote', state, state.players.find((player) => player.faction === 'good')!.id),
+  ).success, true);
+  assert.equal(avalonAssassinationSchema.parse(
+    buildAvalonFallbackPayload('avalon_assassinate', state, state.players.find((player) => player.role === 'assassin')!.id, {
+      legalIds: [2, 3, 5],
+    }),
+  ).targetId, 2);
+});
+
+test('Avalon proposal handler reuses the workflow transaction when reading and creating AI tasks', async () => {
+  const repositoryApi = repository as unknown as {
+    listAiTasks: typeof repository.listAiTasks;
+    listEvents: typeof repository.listEvents;
+  };
+  const originals = {
+    listAiTasks: repositoryApi.listAiTasks,
+    listEvents: repositoryApi.listEvents,
+  };
+  const transactionDb = { scope: 'workflow-transaction' } as never;
+  let taskReadDb: unknown;
+  let eventReadDb: unknown;
+  repositoryApi.listAiTasks = async (_matchId, _status, db) => {
+    taskReadDb = db;
+    return [];
+  };
+  repositoryApi.listEvents = async (_matchId, db) => {
+    eventReadDb = db;
+    return [];
+  };
+
+  try {
+    const step = avalonWorkflow.steps.find((candidate) => candidate.type === 'avalon.propose');
+    assert.ok(step);
+    const state = {
+      ...createInitialAvalonState(
+        Array.from({ length: 5 }, (_, index) => ({ id: index + 1, nickname: `玩家${index + 1}` })),
+        20260826,
+      ),
+      status: 'proposing' as const,
+      completedSteps: { setup: true },
+    };
+    const result = await createAvalonHandlers()['avalon.propose'].execute({
+      match: { id: 'avalon-transaction-test', config: { debugMode: true }, state },
+      workflow: avalonWorkflow,
+      step,
+      state,
+      db: transactionDb,
+    });
+    assert.equal(result.status, 'WAITING');
+    assert.equal(result.tasks?.length, 1);
+    assert.equal(taskReadDb, transactionDb);
+    assert.equal(eventReadDb, transactionDb);
+  } finally {
+    repositoryApi.listAiTasks = originals.listAiTasks;
+    repositoryApi.listEvents = originals.listEvents;
+  }
+});
+
+test('workflow runtime waits for a retrying Avalon task instead of reporting stalled', async () => {
+  const api = workflowService as unknown as {
+    getDebugState: typeof workflowService.getDebugState;
+    drainAiTasks: typeof workflowService.drainAiTasks;
+    claimPendingOutbox: typeof workflowService.claimPendingOutbox;
+  };
+  const originals = {
+    getDebugState: api.getDebugState,
+    drainAiTasks: api.drainAiTasks,
+    claimPendingOutbox: api.claimPendingOutbox,
+  };
+  const waitingMatch = {
+    id: 'avalon-retry-test', gameType: 'avalon', status: 'waiting', currentStepIndex: 1,
+    config: { debugMode: true }, state: { players: [] }, error: null,
+  };
+  let debugReads = 0;
+  let drains = 0;
+  api.getDebugState = async () => {
+    debugReads += 1;
+    if (debugReads === 1) return { match: waitingMatch } as never;
+    if (debugReads === 2) return {
+      match: waitingMatch,
+      aiTasks: [{ status: 'retrying', nextAttemptAt: new Date(0).toISOString() }],
+    } as never;
+    return { match: { ...waitingMatch, status: 'completed', state: { result: 'ok' } } } as never;
+  };
+  api.drainAiTasks = async () => {
+    drains += 1;
+    return drains === 1
+      ? { processed: 0, match: waitingMatch }
+      : { processed: 1, match: { ...waitingMatch, status: 'completed' } };
+  };
+  api.claimPendingOutbox = async () => null;
+  try {
+    const result = await runWorkflowGameRuntime({
+      matchId: waitingMatch.id,
+      gameType: 'avalon',
+      mode: 'standard-5',
+      errorLabel: '阿瓦隆',
+      projectState: (state) => state,
+    });
+    assert.deepEqual(result, { result: 'ok' });
+    assert.equal(drains, 2);
+  } finally {
+    api.getDebugState = originals.getDebugState;
+    api.drainAiTasks = originals.drainAiTasks;
+    api.claimPendingOutbox = originals.claimPendingOutbox;
+  }
+});
 
 test('Avalon debug workflow completes a standard game without leaking secret votes or roles', async () => {
   const repositoryApi = repository as unknown as {

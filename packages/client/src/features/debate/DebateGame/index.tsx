@@ -253,7 +253,12 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
   }
 
   return (
-    <main className={classNames('game-shell debate-shell real-mode', variant === 'v2' && 'debate-shell--v2')} style={{ '--bg-debate': `url(${bgDebate})` } as React.CSSProperties}>
+    <main
+      className={classNames('game-shell debate-shell real-mode', variant === 'v2' && 'debate-shell--v2')}
+      data-game="debate"
+      data-variant={variant}
+      style={{ '--bg-debate': `url(${bgDebate})` } as React.CSSProperties}
+    >
       {variant === 'v2' && (
         <GameBroadcastHud
           title="AI Debate"
@@ -290,7 +295,7 @@ export function DebateGame({ replayGameId = '', onReturnToSelect, variant = 'cla
       />
 
       <ThinkingModal visible={Boolean(activeThinking)} player={activeThinking?.player} thinking={activeThinking?.thinking || ''} />
-      {status === 'error' && <p className="debate-error">{streamMessage}</p>}
+      {status === 'error' && <p className="debate-error game-feedback" data-tone="error" role="alert">{streamMessage}</p>}
 
       {resultModalOpen && (
         <DebateResultModal

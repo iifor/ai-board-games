@@ -6,7 +6,8 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.68);
+  background: var(--game-overlay-backdrop);
+  backdrop-filter: blur(10px);
 }
 
 .modal-close {
@@ -18,8 +19,9 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: 1px solid rgba(226, 194, 122, 0.38);
-  background: rgba(5, 10, 15, 0.8);
-  color: #f7ead2;
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-sm);
+  background: var(--game-surface-strong);
+  color: var(--game-muted);
   cursor: pointer;
 }

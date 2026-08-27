@@ -28,9 +28,9 @@ export function UndercoverControls({
 }: UndercoverControlsProps) {
   if (variant === 'classic') {
     return (
-      <nav className="undercover-controls" aria-label="对局控制">
+      <nav className="undercover-controls game-control-rail" aria-label="对局控制">
         <button type="button" title="返回游戏选择" onClick={onReturn}>返回选择</button>
-        <button type="button" title="开始谁是卧底对局" disabled={started || replayMode} onClick={onStart}>开始游戏</button>
+        <button className="game-primary-button" type="button" title="开始谁是卧底对局" disabled={started || replayMode} onClick={onStart}>开始游戏</button>
         <button
           type="button"
           title={autoPlay ? '暂停自动播放' : '继续自动播放'}
@@ -56,9 +56,9 @@ export function UndercoverControls({
   }
 
   return (
-    <nav className="undercover-controls undercover-controls--v2" aria-label="对局控制">
+    <nav className="undercover-controls undercover-controls--v2 game-control-rail" aria-label="对局控制">
       <button type="button" title="返回游戏选择" onClick={onReturn}><ArrowLeft aria-hidden="true" />返回</button>
-      {!started && !replayMode && <button type="button" className="is-primary" title="开始谁是卧底对局" onClick={onStart}><Power aria-hidden="true" />开始游戏</button>}
+      {!started && !replayMode && <button type="button" className="is-primary game-primary-button" title="开始谁是卧底对局" onClick={onStart}><Power aria-hidden="true" />开始游戏</button>}
       {started && (
         <button
           type="button"

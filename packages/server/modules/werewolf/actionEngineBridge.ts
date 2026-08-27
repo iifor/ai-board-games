@@ -127,6 +127,8 @@ function runEngineActionState(input: ActionEngineBridgeInput): { state: Record<s
             status: 'running',
             currentStepIndex: 0,
             version: 1,
+            definitionVersion: definition.version,
+            stateSchemaVersion: 1,
             config: {
               ...(input.match.config || {}),
               gameDefinitionVersion: definition.version,

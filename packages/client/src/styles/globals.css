@@ -1,19 +1,52 @@
 :root {
-  --bg: #050a10;
-  --panel: rgba(8, 15, 23, 0.88);
-  --panel-soft: rgba(13, 23, 34, 0.78);
-  --panel-bright: rgba(20, 35, 52, 0.88);
-  --line: rgba(222, 188, 116, 0.32);
+  /* Platform primitives: game features consume semantic aliases, not raw colors. */
+  --ui-bg-canvas: #050a10;
+  --ui-bg-surface: rgba(8, 15, 23, 0.88);
+  --ui-bg-surface-soft: rgba(13, 23, 34, 0.78);
+  --ui-bg-surface-strong: rgba(20, 35, 52, 0.92);
+  --ui-border: rgba(190, 207, 232, 0.26);
+  --ui-border-strong: rgba(217, 230, 255, 0.58);
+  --ui-text: #f5f8ff;
+  --ui-text-muted: rgba(221, 232, 255, 0.68);
+  --ui-text-dim: rgba(180, 198, 230, 0.52);
+  --ui-brand: #e2c27a;
+  --ui-brand-strong: #f0d48f;
+  --ui-brand-soft: rgba(226, 194, 122, 0.22);
+  --ui-on-brand: #211707;
+  --ui-info: #42c8ff;
+  --ui-info-soft: rgba(66, 200, 255, 0.2);
+  --ui-success: #72f0a4;
+  --ui-success-soft: rgba(114, 240, 164, 0.18);
+  --ui-warning: #ffd76a;
+  --ui-warning-soft: rgba(255, 215, 106, 0.2);
+  --ui-danger: #ff5d6c;
+  --ui-danger-soft: rgba(255, 93, 108, 0.2);
+  --ui-focus-ring: #8edcff;
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 12px;
+  --ui-radius-lg: 18px;
+  --ui-radius-pill: 999px;
+  --ui-shadow-elevated: 0 22px 60px rgba(0, 0, 0, 0.45);
+  --ui-shadow-focus: 0 0 0 3px rgba(142, 220, 255, 0.28);
+  --ui-motion-fast: 140ms;
+  --ui-motion-normal: 220ms;
+
+  /* Compatibility aliases for existing C-end components. */
+  --bg: var(--ui-bg-canvas);
+  --panel: var(--ui-bg-surface);
+  --panel-soft: var(--ui-bg-surface-soft);
+  --panel-bright: var(--ui-bg-surface-strong);
+  --line: var(--ui-border);
   --line-blue: rgba(70, 151, 232, 0.46);
-  --gold: #e2c27a;
+  --gold: var(--ui-brand);
   --gold-soft: #b8893f;
-  --blue: #4aa3ff;
+  --blue: var(--ui-info);
   --blue-soft: #12345a;
-  --green: #6ff0a0;
-  --red: #ff5d5d;
-  --text: #f7ead2;
-  --muted: #98a5b6;
-  --shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+  --green: var(--ui-success);
+  --red: var(--ui-danger);
+  --text: var(--ui-text);
+  --muted: var(--ui-text-muted);
+  --shadow: var(--ui-shadow-elevated);
 }
 
 * {
@@ -36,8 +69,17 @@ body {
   background-size: cover;
 }
 
-button {
+button,
+input,
+select,
+textarea {
   font: inherit;
+}
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ui-focus-ring);
+  outline-offset: 3px;
+  box-shadow: var(--ui-shadow-focus);
 }
 
 h1,
@@ -57,4 +99,15 @@ body,
 
 body {
   overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

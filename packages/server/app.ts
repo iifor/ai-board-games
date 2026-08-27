@@ -17,6 +17,8 @@ import * as settings from './modules/settings';
 import * as observability from './modules/observability';
 import * as workflowEngine from './modules/workflow-engine';
 import * as playerMemory from './modules/player-memory';
+import * as gameVariants from './modules/game-variants';
+import * as adminAudit from './modules/admin-audit';
 import { registerDebateWorkflow } from './modules/debate';
 import { authRouter, authMiddleware, seedAdminUser } from './modules/auth';
 import { readAuthConfig } from './modules/auth/config';
@@ -43,14 +45,22 @@ async function seedData(admin: AdminBootstrapConfig | null): Promise<void> {
   await voices.seedMissingAzureVoices();
   await voices.seedMissingMimoVoices();
   const { DEFAULT_WEREWOLF_ROLES, DEFAULT_WEREWOLF_MODES } = require('./db/seed');
-  for (const role of DEFAULT_WEREWOLF_ROLES) await werewolfConfig.upsertWerewolfRole(role);
-  for (const mode of DEFAULT_WEREWOLF_MODES) await werewolfConfig.upsertWerewolfMode(mode);
+  for (const role of DEFAULT_WEREWOLF_ROLES) {
+    if (!await rowExists(db, 'werewolf_roles', role.id)) await werewolfConfig.upsertWerewolfRole(role);
+  }
+  for (const mode of DEFAULT_WEREWOLF_MODES) {
+    if (!await rowExists(db, 'werewolf_modes', mode.id)) await werewolfConfig.upsertWerewolfMode(mode);
+  }
   await seedAdminUser(admin);
 }
 
 async function tableIsEmpty(db: ReturnType<typeof getDb>, table: string): Promise<boolean> {
   const row = await db.queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`);
   return Number(row?.count || 0) === 0;
+}
+
+async function rowExists(db: ReturnType<typeof getDb>, table: string, id: string): Promise<boolean> {
+  return Boolean(await db.queryOne(`SELECT 1 AS present FROM ${table} WHERE id = $1`, [id]));
 }
 
 async function createApp(): Promise<express.Application> {
@@ -84,6 +94,8 @@ async function createApp(): Promise<express.Application> {
   app.use('/api/admin', authMiddleware, observability.router);
   app.use('/api/admin', authMiddleware, workflowEngine.router);
   app.use('/api/admin', authMiddleware, playerMemory.router);
+  app.use('/api/admin', authMiddleware, gameVariants.router);
+  app.use('/api/admin', authMiddleware, adminAudit.router);
 
   // Game API routes
   app.use('/api/toc', gameSocket.router);

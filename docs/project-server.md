@@ -8,6 +8,12 @@
 
 数据库配置为 `DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_SSL`、`DATABASE_CA_PATH`、`DATABASE_POOL_MAX`、`DATABASE_CONNECTION_TIMEOUT_MS`、`DATABASE_STATEMENT_TIMEOUT_MS`。启用 TLS 时连接池固定 `rejectUnauthorized: true`，可从 CA 文件加载信任链；pool、连接超时和 statement timeout 都必须为正整数。`better-sqlite3` 仅存在于独立的 `packages/db-migrator` 一次性旧数据导入工具，不进入服务端生产依赖或镜像。
 
+### 本机 Docker 开发数据库
+
+根目录执行 `pnpm dev` 时，`scripts/dev/run-local.cjs` 会先用 `docker-compose.dev.yml` 启动 PostgreSQL 16 并等待健康，幂等创建开发业务 schema，再把本机开发数据库配置注入现有 workspace 服务。服务端仍走正式的 `readDatabaseConfig()`、migration 和 seed 路径；启动器只负责开发 schema bootstrap，不复制或绕过版本化 migration 与数据库初始化逻辑。
+
+开发库固定监听 `127.0.0.1:5432`，数据库为 `consensus_local_v2`，角色为 `consensus_dev`，schema 为 `consensus`，数据保存在独立卷 `consensus-postgres-dev-data`。旧的本机 `consensus` 数据库不再是默认运行目标，保留它只用于本地回退核对。该 Compose 的 trust 认证仅适用于回环地址上的个人开发环境，不能用于局域网或生产。`pnpm run dev:db:down` 只停止容器并保留数据；如需连接外部数据库，应直接运行 `pnpm run dev:services` 并显式提供数据库环境变量。
+
 ## PostgreSQL application smoke gate (2026-08-10)
 
 The server owns the compiled operations adapters. One `tsconfig.rehearsal.json` compilation emits the rehearsal migration adapter, production cutover migration adapter, and application smoke adapter under `packages/server/dist/ops`; the existing rehearsal entry remains available for compatibility. `packages/db-migrator` starts compiled adapters as child processes and sends the target URL only through stdin. It never imports server TypeScript, and the server never imports db-migrator.
@@ -67,6 +73,8 @@ packages/server/
 │   ├── models/
 │   ├── voices/
 │   ├── werewolf-config/
+│   ├── game-variants/       # 跨游戏可配置模式、definition 绑定和 revision
+│   ├── admin-audit/         # 只追加的后台变更审计
 │   ├── games/
 │   ├── settings/
 │   ├── observability/
@@ -169,6 +177,20 @@ WebSocket：
 - `observability`：trace、span、LLM、agent 决策观测。
 - `workflow-engine`：工作流调试 API。
 - `player-memory`：跨局玩家画像、本局 AI 会话快照、记忆统计与清除。
+- `game-variants`：跨游戏模式配置。写入时校验已注册的 `gameType@definitionVersion`，更新使用 revision 乐观锁，删除语义是停用而非物理删除。
+- `admin-audit`：只追加后台审计。模式新增、更新和停用与审计记录在同一数据库事务提交。
+
+### 平台数据库 V2
+
+`002_platform_foundation.sql` 在保留现有 JSONB 状态模型的同时增加明确演进边界：Match、快照、事件和完成对局分别保存 definition/state/event/snapshot schema version；AI task 和 outbox 保存下次尝试时间与过期 claim，进程中断后的任务可被其他 worker 安全接管。`003_outbox_and_audit_guards.sql` 为 outbox 增加最大尝试预算，并用数据库 trigger 阻止审计记录被更新或删除。`games` 固化 variant key、revision 和完整配置快照，后台后续修改模式不会改变历史局语义。
+
+管理 API 新增：
+
+- `GET/POST /api/admin/game-variants`
+- `GET/PUT/DELETE /api/admin/game-variants/:id`，其中 DELETE 只停用并要求当前 revision
+- `GET /api/admin/audit-logs`
+
+模型供应商新增 `credential_ref` 与 `encryption_key_version`，用于后续外部凭据托管和轮换。生产环境必须显式提供 `API_KEY_SECRET`，不允许使用本地兼容密钥；本地开发仍允许兼容旧 SQLite 密文。
 
 谁是卧底调试对局通过已鉴权的
 `POST /api/admin/workflow/matches/:matchId/debug-control` 接受

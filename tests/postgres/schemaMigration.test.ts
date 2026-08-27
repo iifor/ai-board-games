@@ -4,9 +4,9 @@ import { migratePostgres } from '../../packages/server/db/postgres/migrate';
 import { readTestDatabaseUrl, withTestSchema } from './helpers';
 
 const EXPECTED_TABLES = [
-  'action_window_epochs', 'admin_users', 'agent_decisions', 'ai_tasks', 'app_settings',
+  'action_window_epochs', 'admin_audit_log', 'admin_users', 'agent_decisions', 'ai_tasks', 'app_settings',
   'game_events', 'game_playback_events', 'game_player_selections', 'game_players', 'game_traces',
-  'games', 'llm_records', 'match_snapshots', 'matches', 'memory_snapshots', 'model_providers',
+  'game_variants', 'games', 'llm_records', 'match_snapshots', 'matches', 'memory_snapshots', 'model_providers',
   'models', 'outbox_messages', 'pending_actions', 'player_game_memories', 'players',
   'schema_migrations', 'skins', 'state_snapshots', 'trace_spans', 'voice_packages',
   'werewolf_modes', 'werewolf_roles', 'workflow_effects', 'workflow_events', 'workflow_interrupts',

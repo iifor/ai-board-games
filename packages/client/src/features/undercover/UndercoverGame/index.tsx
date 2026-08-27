@@ -33,7 +33,11 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', variant = 'c
   }
 
   return (
-    <main className={variant === 'v2' ? 'undercover-shell undercover-shell--v2' : 'undercover-shell'}>
+    <main
+      className={variant === 'v2' ? 'undercover-shell undercover-shell--v2' : 'undercover-shell'}
+      data-game="undercover"
+      data-variant={variant}
+    >
       {variant === 'classic' && (
         <header className="undercover-heading">
           <p>AI Social Deduction</p>
@@ -42,7 +46,7 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', variant = 'c
         </header>
       )}
 
-      {variant === 'v2' && <p className="undercover-status" aria-live="polite">{controller.message}</p>}
+      {variant === 'v2' && <p className="undercover-status game-feedback" data-tone="info" aria-live="polite">{controller.message}</p>}
 
       {variant === 'v2' && !replayGameId && debugMode && controller.started && (
         <section className="undercover-debug-panel" aria-label="调试模式">
@@ -100,7 +104,7 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', variant = 'c
           <h2>{replayGameId ? '正在载入回放' : '六人推理局'}</h2>
           <p>{replayGameId ? '历史事件将按原顺序播放。' : '词语和卧底身份会在终局统一揭晓。'}</p>
           {variant === 'v2' && !replayGameId && !controller.started && (
-            <label className="undercover-debug-toggle">
+            <label className="undercover-debug-toggle game-toggle-control game-native-switch">
               <input
                 type="checkbox"
                 role="switch"
@@ -113,7 +117,7 @@ export function UndercoverGame({ playerIds = [], replayGameId = '', variant = 'c
         </section>
       )}
 
-      {controller.error && <p className="undercover-error" role="alert">{controller.error}</p>}
+      {controller.error && <p className="undercover-error game-feedback" data-tone="error" role="alert">{controller.error}</p>}
     </main>
   );
 }

@@ -17,6 +17,7 @@ import { sessionStartGuard } from './capacity';
 import { resolveGameRunner } from './gameRunner';
 import { getGameEngine } from '../engine-registry';
 import { preparePlayersByRule } from '../game-engine/session/sessionPreparation';
+import { resolveEnabledVariant } from '../game-variants/service';
 
 // games is TS — import directly
 import { saveGameRecord } from '../games';
@@ -98,6 +99,7 @@ interface RunSessionOptions {
   replayGameId?: string;
   clientViewMode?: string;
   debugMode?: boolean;
+  variantKey?: string;
   replayView?: Record<string, unknown>;
 }
 
@@ -178,6 +180,7 @@ function attachGameSocket(server: import('http').Server): GameSocketHandle {
             replayGameId: message.replayGameId,
             clientViewMode: message.clientViewMode,
             debugMode: message.debugMode,
+            variantKey: message.variantKey,
             replayView: typeof message.replayView === 'object' ? message.replayView : undefined,
           },
         )).catch((error: unknown) => {
@@ -346,6 +349,10 @@ async function runSession(
         ),
         audioResources,
         playbackEvents: playbackEvents,
+        definitionVersion: String((config as Record<string, unknown>).gameDefinitionVersion || '1.0.0'),
+        variantKey: ((config as Record<string, unknown>).gameVariant as { key?: string } | null)?.key || null,
+        variantRevision: ((config as Record<string, unknown>).gameVariant as { revision?: number } | null)?.revision || null,
+        variantSnapshot: ((config as Record<string, unknown>).gameVariant as Record<string, unknown> | null) || {},
       } as unknown as SaveGameInput);
     } catch (error) {
       const err = error as Error;
@@ -408,7 +415,10 @@ async function getRequestConfig(
   options: RunSessionOptions = {},
 ): Promise<AiConfig & { mode: string }> {
   const config = await getAiConfig() as unknown as AiConfig;
-  const definition = getGameEngine().getDefinition(gameType);
+  const variant = options.variantKey
+    ? await resolveEnabledVariant(gameType, options.variantKey)
+    : null;
+  const definition = getGameEngine().getDefinition(gameType, variant?.definitionVersion);
   if (!definition) throw new Error(`GameDefinition not registered: ${gameType}`);
   const savedPlayerIds = await getSavedPlayerIds(gameType);
   const requestedPlayerIds = Array.isArray(playerIds) ? playerIds : [];
@@ -445,6 +455,7 @@ async function getRequestConfig(
     realReady: boolean;
   } = {
     ...config,
+    ...(variant?.config || {}),
     host,
     players: selected,
     selectedPlayerIds: selected.map((player: AiConfigPlayer) => player.id!),
@@ -454,6 +465,14 @@ async function getRequestConfig(
     werewolfMode: options.werewolfMode || null,
     clientViewMode: options.clientViewMode || 'god',
     debugMode: Boolean(options.debugMode),
+    gameDefinitionVersion: definition.version,
+    gameVariant: variant ? {
+      id: variant.id,
+      key: variant.variantKey,
+      revision: variant.revision,
+      configSchemaVersion: variant.configSchemaVersion,
+      config: variant.config,
+    } : null,
     missingProviders: options.debugMode ? [] : missingProviders,
     realReady: Boolean(options.debugMode) || missingProviders.length === 0,
     ...(prepared.config || {}),

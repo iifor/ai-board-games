@@ -499,7 +499,12 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect, variant = 'c
   };
 
   return (
-    <main className={classNames('game-shell werewolf-shell real-mode', variant === 'v2' && 'werewolf-shell--v2', variant === 'v2' && `werewolf-shell--${clientViewMode === 'player' ? 'player' : 'god'}`)} style={{ '--bg-werewolf': `url(${bgWerewolf})` } as React.CSSProperties}>
+    <main
+      className={classNames('game-shell werewolf-shell real-mode', variant === 'v2' && 'werewolf-shell--v2', variant === 'v2' && `werewolf-shell--${clientViewMode === 'player' ? 'player' : 'god'}`)}
+      data-game="werewolf"
+      data-variant={variant}
+      style={{ '--bg-werewolf': `url(${bgWerewolf})` } as React.CSSProperties}
+    >
       <WerewolfControls
         variant={variant}
         autoPlay={autoPlay}
@@ -547,7 +552,7 @@ export function WerewolfGame({ replayGameId = '', onReturnToSelect, variant = 'c
         />
       )}
 
-      {status === 'error' && streamMessage && !modeDialogOpen && <p className="werewolf-error">{streamMessage}</p>}
+      {status === 'error' && streamMessage && !modeDialogOpen && <p className="werewolf-error game-feedback" data-tone="error" role="alert">{streamMessage}</p>}
 
       {modeDialogOpen && (
         <WerewolfModeDialog

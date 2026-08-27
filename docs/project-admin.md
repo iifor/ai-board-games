@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-B 端位于 `packages/admin`，面向运营、配置和调试人员，负责玩家、模型供应商、模型、音色、狼人杀角色/模式、皮肤、历史对局、AI 观测和工作流调试。
+B 端位于 `packages/admin`，面向运营、配置和调试人员，负责玩家、模型供应商、模型、音色、狼人杀角色/模式、皮肤、历史对局、AI 观测和工作流调试。服务端已提供跨游戏模式配置和审计 API；对应可视化页面是独立后续工作，不应继续把新游戏配置塞进狼人杀专页。
 
 ## 技术栈
 
@@ -92,6 +92,15 @@ packages/admin/
 - `observability`
 - `workflow-engine`
 - `player-memories`
+- `game-variants`（服务端契约已就绪）
+- `audit-logs`（服务端只读查询契约已就绪）
+
+### 跨游戏模式与审计边界
+
+- `game-variants` 使用 `gameType + variantKey` 唯一标识，并绑定明确的 definition 版本与 config schema 版本。
+- 更新必须提交当前 revision；并发编辑冲突返回 409，后台应刷新后让用户重新确认，不能静默覆盖。
+- 删除操作只停用模式。历史对局保存 revision 和配置快照，因此停用或修改不影响历史回放。
+- `audit-logs` 只读展示 actor、action、entity、requestId、before/after、IP、user-agent 和时间；没有修改或删除接口。
 
 ### 页面模块
 

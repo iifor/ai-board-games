@@ -29,8 +29,11 @@ export function UndercoverArena({ game, host, activeSpeech, variant, showPlayerP
   variant ??= showPlayerPoster ? 'v2' : 'classic';
   const view = getUndercoverArenaViewModel(game, variant);
   const voteSummary = getUndercoverVoteSummary(game);
+  const hostNarration = activeSpeech?.speakerRole === 'host' && activeSpeech.text
+    ? activeSpeech
+    : null;
   const hostSpeaking = (
-    activeSpeech?.speakerRole === 'host' && Boolean(activeSpeech.text)
+    Boolean(hostNarration)
   ) || (
     view.variant === 'v2'
     && isVisualQaHostEnabled(
@@ -156,7 +159,21 @@ export function UndercoverArena({ game, host, activeSpeech, variant, showPlayerP
       </div>
 
       <section className="undercover-focus" aria-live="polite">
-        {game.status === 'speaking' && (
+        {hostNarration && (
+          <div className="undercover-speaker-strip">
+            <span className="undercover-speaker-identity">
+              <small>主持播报</small>
+              <strong>{hostNarration.speakerLabel || '主持人'}</strong>
+            </span>
+            <blockquote className="undercover-speaker-copy">{hostNarration.text}</blockquote>
+            <span className="undercover-next-player">
+              <small>当前阶段</small>
+              <strong>{getPhaseLabel(game.status, variant)}</strong>
+            </span>
+          </div>
+        )}
+
+        {!hostNarration && game.status === 'speaking' && (
           <div className="undercover-speaker-strip">
             <span className="undercover-speaker-identity">
               <small>当前发言</small>
@@ -180,7 +197,7 @@ export function UndercoverArena({ game, host, activeSpeech, variant, showPlayerP
           </div>
         )}
 
-        {game.status === 'voting' && (
+        {!hostNarration && game.status === 'voting' && (
           <>
             <p>{game.voteResult ? '票型公布' : '投票进行中'}</p>
             <h2>{game.voteResult?.eliminatedPlayerId
@@ -197,9 +214,9 @@ export function UndercoverArena({ game, host, activeSpeech, variant, showPlayerP
           </>
         )}
 
-        {game.status === 'setup' && <><p>六人推理局</p><h2>等待游戏开始</h2><small>词语与身份将在终局统一揭晓</small></>}
+        {!hostNarration && game.status === 'setup' && <><p>六人推理局</p><h2>等待游戏开始</h2><small>词语与身份将在终局统一揭晓</small></>}
 
-        {game.status === 'completed' && game.reveal && (
+        {!hostNarration && game.status === 'completed' && game.reveal && (
           <section className="undercover-reveal" aria-label="终局揭晓">
             <p>{game.winner === 'civilians' ? '平民阵营获胜' : '卧底阵营获胜'}</p>
             <h2>终局身份揭晓</h2>

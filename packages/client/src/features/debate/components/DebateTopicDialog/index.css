@@ -9,17 +9,18 @@
   width: 100%;
   height: 100%;
   padding: 28px;
-  background: rgba(0, 4, 14, 0.76);
+  background: var(--game-overlay-backdrop);
+  backdrop-filter: blur(10px);
 }
 
 .debate-topic-dialog {
   width: 1500px;
-  border: 1px solid rgba(95, 171, 255, 0.62);
-  border-radius: 18px;
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-lg);
   background:
-    radial-gradient(circle at 50% 0, rgba(35, 74, 148, 0.22), rgba(3, 12, 32, 0) 360px),
-    rgba(5, 15, 36, 0.96);
-  box-shadow: 0 0 46px rgba(28, 125, 255, 0.28), inset 0 0 34px rgba(91, 151, 255, 0.1);
+    radial-gradient(circle at 50% 0, var(--game-accent-soft), transparent 360px),
+    var(--game-dialog-surface);
+  box-shadow: var(--game-dialog-shadow);
 }
 
 .debate-topic-dialog {
@@ -51,15 +52,15 @@
   justify-content: center;
   width: 50px;
   height: 50px;
-  color: #45a7ff;
-  background: rgba(11, 46, 107, 0.62);
+  color: var(--game-accent);
+  background: var(--game-accent-soft);
   clip-path: polygon(50% 0, 92% 24%, 92% 76%, 50% 100%, 8% 76%, 8% 24%);
   box-shadow: inset 0 0 18px rgba(69, 161, 255, 0.18);
 }
 
 .debate-topic-dialog h2 {
   margin: 0;
-  color: #ffffff;
+  color: var(--game-text);
   font-size: 36px;
   font-weight: 950;
   letter-spacing: 0;
@@ -74,7 +75,7 @@
   height: 44px;
   border: 0 !important;
   background: transparent !important;
-  color: rgba(231, 240, 255, 0.74) !important;
+  color: var(--game-muted) !important;
   padding: 0 !important;
 }
 
@@ -89,10 +90,10 @@
   align-items: center;
   gap: 6px;
   padding: 6px 16px;
-  border: 1px solid rgba(95, 171, 255, 0.46);
-  border-radius: 8px;
-  background: rgba(11, 46, 107, 0.42);
-  color: #d4e6ff;
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-sm);
+  background: var(--game-accent-soft);
+  color: var(--game-text);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -100,8 +101,8 @@
 }
 
 .debate-randomize-btn:hover:not(:disabled) {
-  background: rgba(22, 70, 148, 0.56);
-  border-color: rgba(95, 171, 255, 0.74);
+  background: var(--game-control-surface-hover);
+  border-color: var(--game-accent-strong);
 }
 
 .debate-randomize-btn:disabled {
@@ -114,31 +115,30 @@
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  color: #d9ebff;
+  color: var(--game-text);
   font-size: 14px;
   font-weight: 600;
 }
 
 .debate-topic-dialog label b {
-  color: #ff5c5c;
+  color: var(--game-danger);
 }
 
 .debate-topic-dialog input {
   flex: 1 1 auto;
   height: 42px;
-  border: 1px solid rgba(132, 162, 204, 0.58);
-  border-radius: 7px;
+  border: 1px solid var(--game-control-border);
+  border-radius: var(--ui-radius-sm);
   padding: 0 14px;
-  color: #ffffff;
-  background: rgba(22, 32, 55, 0.86);
+  color: var(--game-text);
+  background: var(--game-control-surface);
   font-size: 16px;
   font-weight: 600;
-  outline: none;
 }
 
-.debate-topic-dialog input:focus {
-  border-color: rgba(88, 188, 255, 0.86);
-  box-shadow: 0 0 14px rgba(64, 170, 255, 0.22);
+.debate-topic-dialog input:focus-visible {
+  border-color: var(--game-accent);
+  box-shadow: var(--ui-shadow-focus), 0 0 14px var(--game-accent-soft);
 }
 
 .debate-topic-dialog input:disabled {
@@ -152,11 +152,11 @@
   width: 710px;
   min-height: 90px;
   resize: vertical;
-  border: 1px solid rgba(103, 171, 255, 0.38);
-  border-radius: 6px;
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-sm);
   padding: 12px;
-  color: #ffffff;
-  background: rgba(2, 9, 25, 0.86);
+  color: var(--game-text);
+  background: var(--game-surface-strong);
   font: inherit;
   line-height: 22px;
   user-select: text;
@@ -171,19 +171,20 @@
 }
 
 .debate-topic-dialog button {
-  border: 1px solid rgba(107, 180, 255, 0.48);
-  border-radius: 6px;
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-sm);
   padding: 6px 12px;
-  color: #eaf5ff;
-  background: rgba(14, 41, 85, 0.75);
+  color: var(--game-text);
+  background: var(--game-surface-soft);
   cursor: pointer;
   font-weight: 900;
 }
 
 .debate-topic-dialog button.primary {
-  border-color: rgba(88, 217, 255, 0.95);
-  background: linear-gradient(180deg, #1682ff, #0754bf);
-  box-shadow: 0 0 20px rgba(38, 170, 255, 0.36), inset 0 0 14px rgba(255, 255, 255, 0.14);
+  border-color: var(--game-accent-strong);
+  color: var(--game-primary-contrast);
+  background: var(--game-primary);
+  box-shadow: 0 0 20px var(--game-accent-soft), inset 0 0 14px rgba(255, 255, 255, 0.14);
 }
 
 .debate-topic-dialog button:disabled {
@@ -260,7 +261,7 @@
   width: 30px;
   height: 16px;
   border-radius: 18px;
-  background: rgba(255, 82, 82, 0.3);
+  background: var(--game-control-track-off);
   box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.55);
 }
 
@@ -276,7 +277,7 @@
 }
 
 .dialog-switch.active .switch-track {
-  background: rgba(60, 193, 255, 0.42);
+  background: var(--game-control-track-on);
 }
 
 .dialog-switch.active .switch-track i {
@@ -292,13 +293,13 @@
 
 .debate-setup-status {
   margin: 12px 0 0;
-  color: #ffe2a3;
+  color: var(--game-warning);
   font-size: 14px;
   font-weight: 700;
 }
 
 .debate-setup-status.error {
-  color: #ffb4c8;
+  color: var(--game-danger);
 }
 
 .debate-host-config {
@@ -368,4 +369,127 @@
   font-size: 12px;
   font-style: normal;
   font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .debate-topic-backdrop {
+    align-items: center;
+    padding: 0.75rem;
+  }
+
+  .debate-topic-dialog {
+    width: 100%;
+    max-height: calc(100vh - 1.5rem);
+    padding: 0.875rem;
+    font-size: 1rem;
+  }
+
+  .debate-topic-dialog header {
+    height: auto;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .debate-dialog-title {
+    justify-content: flex-start;
+  }
+
+  .debate-dialog-title > span {
+    width: 2.375rem;
+    height: 2.375rem;
+  }
+
+  .debate-topic-dialog h2 {
+    font-size: 1.5rem;
+  }
+
+  .debate-dialog-header-actions {
+    flex: 0 0 auto;
+  }
+
+  .debate-randomize-btn {
+    min-height: 2.5rem;
+    padding-inline: 0.625rem;
+  }
+
+  .debate-topic-fields {
+    padding: 0.75rem;
+  }
+
+  .debate-position-row,
+  .debate-topic-dialog .debate-team-board {
+    flex-direction: column;
+  }
+
+  .debate-topic-dialog label {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .debate-topic-dialog .debate-team-column {
+    min-height: auto;
+    padding: 0.75rem 1rem;
+  }
+
+  .debate-topic-dialog .debate-team-column h3 {
+    height: 2.25rem;
+    margin-bottom: 0.625rem;
+    font-size: 1.125rem;
+    line-height: 1.4;
+  }
+
+  .debate-topic-dialog .team-slot-list {
+    gap: 0.625rem;
+  }
+
+  .debate-topic-dialog .team-drop-slot {
+    gap: 0.75rem;
+    min-height: 3rem;
+  }
+
+  .debate-topic-dialog .team-slot-label {
+    flex-basis: 5rem;
+    font-size: 0.875rem;
+  }
+
+  .debate-topic-dialog .team-slot-empty {
+    height: 2.5rem;
+    font-size: 0.75rem;
+  }
+
+  .debate-topic-dialog :where(button, input, strong, span, p) {
+    font-size: 0.875rem;
+  }
+
+  .debate-topic-dialog :where(small, em) {
+    font-size: 0.75rem;
+  }
+
+  .debate-topic-dialog :where(button, input) {
+    min-height: 2.5rem;
+  }
+
+  .debate-topic-dialog input {
+    height: 2.625rem;
+    font-size: 0.875rem;
+  }
+
+  .debate-topic-dialog svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  .debate-topic-dialog footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .debate-topic-switches {
+    margin-right: 0;
+  }
+
+  .debate-start-submit {
+    width: 100%;
+    min-height: 2.75rem;
+  }
 }

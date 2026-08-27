@@ -19,6 +19,8 @@ import {
 } from '../../observability';
 
 const TERMINAL_MATCH_STATUSES = new Set(['completed', 'failed', 'paused_debug']);
+const RETRY_POLL_INTERVAL_MS = 100;
+const RETRY_POLL_MAX_MS = 1000;
 
 interface WorkflowGameRuntimeOptions {
   matchId: string;
@@ -62,6 +64,7 @@ async function runWorkflowGameRuntime({
       await flushWorkflowOutbox(matchId, context.onEvent);
       throwIfAborted(context.signal, errorLabel);
       if (match && TERMINAL_MATCH_STATUSES.has(match.status)) break;
+      if (!processed && await waitForRetryingAiTask(matchId, context.signal)) continue;
       if (!processed && waitForIdle && await waitForIdle(matchId, match, context.signal)) continue;
       if (!processed) throw new Error(`${errorLabel} workflow stalled: ${matchId}`);
     }
@@ -80,6 +83,37 @@ async function runWorkflowGameRuntime({
     }
     throw error;
   }
+}
+
+async function waitForRetryingAiTask(
+  matchId: string,
+  signal?: GameRuntimeAbortSignal,
+): Promise<boolean> {
+  const state = await getDebugState(matchId);
+  const retryingTask = state?.aiTasks?.find((task) =>
+    task.status === 'retrying' && Number(task.attempts || 0) < Number(task.maxAttempts || 3)
+  );
+  if (!retryingTask) return false;
+  const retryAt = Date.parse(retryingTask.nextAttemptAt || '');
+  const remaining = Number.isFinite(retryAt) ? retryAt - Date.now() : RETRY_POLL_INTERVAL_MS;
+  await waitForRetryDelay(Math.max(0, Math.min(RETRY_POLL_MAX_MS, remaining)), signal);
+  return true;
+}
+
+function waitForRetryDelay(delayMs: number, signal?: GameRuntimeAbortSignal): Promise<void> {
+  if (signal?.aborted) throwIfAborted(signal, 'Workflow');
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(signal?.reason instanceof Error ? signal.reason : new Error('Workflow runtime aborted'));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, delayMs);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 async function flushWorkflowOutbox(

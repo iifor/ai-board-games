@@ -15,13 +15,16 @@ import * as snapshotRepo from './snapshotRepository';
 
 interface MatchCreateRow {
   id: string; game_type: string; workflow_id: string; status: string; current_step_index: number;
-  version: number; config_json: string; state_json: string; blockers_json: string; error_json: string;
+  version: number; definition_version: string; state_schema_version: number;
+  config_json: string; state_json: string; blockers_json: string; error_json: string;
   created_at: string; updated_at: string; completed_at: string | null;
 }
 interface EventInput {
   matchId?: string; seq?: number; type: string; stepId?: string | null; playerId?: string | number | null;
+  eventSchemaVersion?: number; actorType?: string;
   payload?: unknown; visibility?: string; channel?: string; scopeKey?: string | null;
-  visibleToPlayerIds?: unknown[]; idempotencyKey?: string | null; createdAt?: string;
+  visibleToPlayerIds?: unknown[]; idempotencyKey?: string | null; causationId?: string | null;
+  correlationId?: string | null; createdAt?: string;
 }
 interface CommitChangeInput {
   matchId: string; events?: EventInput[]; matchPatch?: Record<string, unknown> | null; snapshot?: boolean;
@@ -32,6 +35,7 @@ interface AiTaskCreateInput {
   id: string; matchId: string; stepId: string; taskKey: string; epochId?: string | null;
   playerId?: string | number | null; action: string; status?: string; prompt?: unknown;
   promptContextSnapshot?: unknown; visibleEventSeqMax?: number; visibleEventIds?: unknown[];
+  maxAttempts?: number;
 }
 interface PendingActionCreateInput {
   id: string; matchId: string; stepId: string; epochId?: string | null; playerId?: string | number | null;
@@ -52,8 +56,8 @@ interface WorkflowInterruptInput {
 }
 interface OutboxRow extends OutboxMessageRow { payload?: unknown }
 
-const MATCH_COLUMNS = new Set(['status', 'current_step_index', 'version', 'config_json', 'state_json', 'blockers_json', 'error_json', 'completed_at']);
-const TASK_COLUMNS = new Set(['status', 'raw_output', 'result_json', 'error_json', 'attempts', 'worker_id', 'claimed_at']);
+const MATCH_COLUMNS = new Set(['status', 'current_step_index', 'version', 'definition_version', 'state_schema_version', 'config_json', 'state_json', 'blockers_json', 'error_json', 'completed_at']);
+const TASK_COLUMNS = new Set(['status', 'raw_output', 'result_json', 'error_json', 'attempts', 'max_attempts', 'worker_id', 'claimed_at', 'claim_expires_at', 'next_attempt_at']);
 const ACTION_COLUMNS = new Set(['status', 'payload_json', 'result_event_seq', 'idempotency_key']);
 const EFFECT_COLUMNS = new Set(['step_id', 'source_event_seq', 'effect_type', 'status', 'priority', 'payload_json', 'applied_event_seq']);
 const INTERRUPT_COLUMNS = new Set(['step_id', 'effect_id', 'interrupt_type', 'status', 'priority', 'payload_json', 'resolution_json']);
@@ -75,11 +79,12 @@ async function updateRow(db: DbExecutor, table: string, idColumn: string, id: st
 
 async function createMatch(row: MatchCreateRow, db: DbExecutor = getDbExecutor()): Promise<void> {
   await db.execute(`INSERT INTO matches
-    (id, game_type, workflow_id, status, current_step_index, version, config_json, state_json,
-     blockers_json, error_json, created_at, updated_at, completed_at)
-    VALUES (${Array.from({ length: 13 }, (_, i) => `$${i + 1}`).join(', ')})`,
+    (id, game_type, workflow_id, status, current_step_index, version, definition_version,
+     state_schema_version, config_json, state_json, blockers_json, error_json, created_at, updated_at, completed_at)
+    VALUES (${Array.from({ length: 15 }, (_, i) => `$${i + 1}`).join(', ')})`,
   [row.id, row.game_type, row.workflow_id, row.status, row.current_step_index, row.version,
-    row.config_json, row.state_json, row.blockers_json, row.error_json, row.created_at, row.updated_at, row.completed_at]);
+    row.definition_version, row.state_schema_version, row.config_json, row.state_json, row.blockers_json,
+    row.error_json, row.created_at, row.updated_at, row.completed_at]);
 }
 async function getMatchRow(matchId: string, db: DbExecutor = getDbExecutor(), lock = false): Promise<MatchRow | null> {
   return db.queryOne<MatchRow>(`SELECT * FROM matches WHERE id = $1${lock ? ' FOR UPDATE' : ''}`, [matchId]);
@@ -102,13 +107,15 @@ async function appendEvent(event: EventInput, _timing?: PersistenceTiming, db: D
   const seq = event.seq || await nextEventSeq(event.matchId!, db);
   const channel = event.channel || (event.visibility === 'system' ? 'system' : event.visibility === 'public' ? 'public' : 'scope');
   const inserted = await db.queryOne<WorkflowEventRow>(`INSERT INTO workflow_events
-    (match_id, seq, type, step_id, player_id, payload_json, visibility, channel, scope_key,
-     visible_to_player_ids_json, idempotency_key, created_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-    ON CONFLICT DO NOTHING RETURNING *`, [event.matchId, seq, event.type, event.stepId || null,
-    event.playerId == null ? null : String(event.playerId), toJson(event.payload || {}), event.visibility || 'public',
-    channel, event.scopeKey || null, toJson(event.visibleToPlayerIds || []), event.idempotencyKey || null,
-    event.createdAt || nowIso()]);
+    (match_id, seq, type, event_schema_version, actor_type, step_id, player_id, payload_json,
+     visibility, channel, scope_key, visible_to_player_ids_json, idempotency_key, causation_id,
+     correlation_id, created_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+    ON CONFLICT DO NOTHING RETURNING *`, [event.matchId, seq, event.type,
+    event.eventSchemaVersion || 1, event.actorType || (event.playerId == null ? 'system' : 'player'),
+    event.stepId || null, event.playerId == null ? null : String(event.playerId), toJson(event.payload || {}),
+    event.visibility || 'public', channel, event.scopeKey || null, toJson(event.visibleToPlayerIds || []),
+    event.idempotencyKey || null, event.causationId || null, event.correlationId || null, event.createdAt || nowIso()]);
   if (inserted) return inserted;
   const duplicate = event.idempotencyKey
     ? await db.queryOne<WorkflowEventRow>('SELECT * FROM workflow_events WHERE match_id = $1 AND idempotency_key = $2', [event.matchId, event.idempotencyKey])
@@ -155,12 +162,18 @@ async function listPendingOutbox(matchId: string): Promise<OutboxRow[]> {
     WHERE match_id = $1 AND status = 'pending' ORDER BY id ASC`, [matchId]));
 }
 async function claimPendingOutbox(matchId: string): Promise<OutboxRow | null> {
+  const claimedAt = nowIso();
+  const claimExpiresAt = new Date(Date.now() + 60_000).toISOString();
   return getDbExecutor().withTransaction(async (transaction) => {
     const row = await transaction.queryOne<OutboxMessageRow>(`WITH candidate AS (
-      SELECT id FROM outbox_messages WHERE match_id = $1 AND status = 'pending'
+      SELECT id FROM outbox_messages WHERE match_id = $1
+        AND attempts < max_attempts
+        AND ((status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= $2))
+          OR (status = 'sending' AND claim_expires_at <= $2))
       ORDER BY id ASC FOR UPDATE SKIP LOCKED LIMIT 1)
-      UPDATE outbox_messages o SET status = 'sending', updated_at = $2
-      FROM candidate c WHERE o.id = c.id RETURNING o.*`, [matchId, nowIso()]);
+      UPDATE outbox_messages o SET status = 'sending', attempts = o.attempts + 1,
+        worker_id = 'websocket-outbox', claim_expires_at = $3, updated_at = $2
+      FROM candidate c WHERE o.id = c.id RETURNING o.*`, [matchId, claimedAt, claimExpiresAt]);
     return row ? mapOutbox([row])[0] : null;
   });
 }
@@ -169,10 +182,15 @@ async function listOutboxMessages(matchId: string, limit = 200): Promise<OutboxR
   return mapOutbox(rows).reverse();
 }
 async function markOutboxSent(id: number): Promise<void> {
-  await getDbExecutor().execute(`UPDATE outbox_messages SET status = 'sent', updated_at = $1 WHERE id = $2`, [nowIso(), id]);
+  await getDbExecutor().execute(`UPDATE outbox_messages SET status = 'sent', worker_id = '',
+    claim_expires_at = NULL, next_attempt_at = NULL, error_json = 'null', sent_at = $1, updated_at = $1
+    WHERE id = $2`, [nowIso(), id]);
 }
 async function releaseOutboxClaim(id: number): Promise<void> {
-  await getDbExecutor().execute(`UPDATE outbox_messages SET status = 'pending', updated_at = $1 WHERE id = $2 AND status = 'sending'`, [nowIso(), id]);
+  await getDbExecutor().execute(`UPDATE outbox_messages SET
+    status = CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END, worker_id = '',
+    claim_expires_at = NULL, next_attempt_at = $1, updated_at = $1 WHERE id = $2 AND status = 'sending'`,
+  [new Date(Date.now() + 1000).toISOString(), id]);
 }
 
 const { upsertSnapshot, listSnapshots, getLatestSnapshot, getMaxEventSeq, countEventsAfter,
@@ -181,19 +199,26 @@ const { upsertSnapshot, listSnapshots, getLatestSnapshot, getMaxEventSeq, countE
 async function createAiTask(task: AiTaskCreateInput, db: DbExecutor = getDbExecutor()): Promise<void> {
   await db.execute(`INSERT INTO ai_tasks
     (id, match_id, step_id, task_key, epoch_id, player_id, action, status, prompt_json, context_json,
-     raw_output, result_json, error_json, attempts, visible_event_seq_max, visible_event_ids_json, created_at, updated_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'','null','null',0,$11,$12,$13,$13)
+     raw_output, result_json, error_json, attempts, max_attempts, visible_event_seq_max,
+     visible_event_ids_json, created_at, updated_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'','null','null',0,$11,$12,$13,$14,$14)
     ON CONFLICT(match_id, step_id, task_key) DO NOTHING`, [task.id, task.matchId, task.stepId, task.taskKey,
     task.epochId || null, task.playerId == null ? null : String(task.playerId), task.action, task.status || 'queued',
-    toJson(task.prompt || {}), toJson(task.promptContextSnapshot || {}), task.visibleEventSeqMax || 0,
-    toJson(task.visibleEventIds || []), nowIso()]);
+    toJson(task.prompt || {}), toJson(task.promptContextSnapshot || {}), task.maxAttempts || 3,
+    task.visibleEventSeqMax || 0, toJson(task.visibleEventIds || []), nowIso()]);
 }
 async function claimNextAiTask({ matchId = null, workerId = 'worker' }: { matchId?: string | null; workerId?: string } = {}): Promise<AiTask | null> {
+  const claimedAt = nowIso();
+  const claimExpiresAt = new Date(Date.now() + 120_000).toISOString();
   const row = await getDbExecutor().withTransaction((transaction) => transaction.queryOne<AiTaskRow>(`WITH candidate AS (
-    SELECT id FROM ai_tasks WHERE ($1::text IS NULL OR match_id = $1) AND status IN ('queued','retrying')
+    SELECT id FROM ai_tasks WHERE ($1::text IS NULL OR match_id = $1)
+      AND attempts < max_attempts
+      AND ((status IN ('queued','retrying') AND (next_attempt_at IS NULL OR next_attempt_at <= $3))
+        OR (status = 'running' AND claim_expires_at <= $3))
     ORDER BY created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1)
     UPDATE ai_tasks t SET status = 'running', attempts = t.attempts + 1, worker_id = $2,
-      claimed_at = $3, updated_at = $3 FROM candidate c WHERE t.id = c.id RETURNING t.*`, [matchId, workerId, nowIso()]));
+      claimed_at = $3, claim_expires_at = $4, next_attempt_at = NULL, updated_at = $3
+      FROM candidate c WHERE t.id = c.id RETURNING t.*`, [matchId, workerId, claimedAt, claimExpiresAt]));
   return rowToTask(row || undefined);
 }
 async function listAiTasks(matchId: string, status: string | null = null, db: DbExecutor = getDbExecutor()): Promise<AiTask[]> {
@@ -208,11 +233,13 @@ async function updateAiTask(id: string, patch: Record<string, unknown>, db: DbEx
   await updateRow(db, 'ai_tasks', 'id', id, patch, TASK_COLUMNS);
 }
 async function retryAiTask(id: string): Promise<AiTask | null> {
-  await updateAiTask(id, { status: 'retrying', error_json: 'null', worker_id: '', claimed_at: null });
+  await updateAiTask(id, { status: 'retrying', error_json: 'null', worker_id: '', claimed_at: null,
+    claim_expires_at: null, next_attempt_at: null });
   return getAiTask(id);
 }
 async function cancelAiTask(id: string, reason = 'cancelled'): Promise<AiTask | null> {
-  await updateAiTask(id, { status: 'cancelled', error_json: toJson({ message: reason }) });
+  await updateAiTask(id, { status: 'cancelled', error_json: toJson({ message: reason }), worker_id: '',
+    claimed_at: null, claim_expires_at: null, next_attempt_at: null });
   return getAiTask(id);
 }
 

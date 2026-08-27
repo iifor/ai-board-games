@@ -10,6 +10,7 @@ const requestedFiles = new Set(process.argv.slice(2).filter((value) => value.end
 const availableTestFiles = [
   'dbExecutor.test.ts',
   'schemaMigration.test.ts',
+  'platformFoundation.test.ts',
   'coreRepositories.test.ts',
   'authIntegration.test.ts',
   'llmQuotaIntegration.test.ts',

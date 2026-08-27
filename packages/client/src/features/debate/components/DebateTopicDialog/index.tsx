@@ -215,8 +215,8 @@ export function DebateTopicDialog({
   const validationMessage = randomizeError || missingRequirements.join('，');
 
   return (
-    <div className="debate-topic-backdrop" role="presentation">
-      <section className="debate-topic-dialog" role="dialog" aria-modal="true" aria-label="辩论赛设置">
+    <div className="debate-topic-backdrop game-dialog-backdrop" role="presentation">
+      <section className="debate-topic-dialog game-dialog-panel" role="dialog" aria-modal="true" aria-label="辩论赛设置">
         <header>
           <div className="debate-dialog-title">
             <span><MessageSquareText size={24} /></span>
@@ -225,7 +225,7 @@ export function DebateTopicDialog({
           <div className="debate-dialog-header-actions">
             <button
               type="button"
-              className="debate-randomize-btn"
+              className="debate-randomize-btn game-secondary-button"
               onClick={handleRandomize}
               disabled={randomizing || isReplayLocked}
               title="随机分配玩家阵营和辩位"
@@ -233,7 +233,7 @@ export function DebateTopicDialog({
               <Shuffle size={16} />
               <span>{randomizing ? '分配中...' : '随机分配'}</span>
             </button>
-            <button type="button" className="debate-topic-close" onClick={onCancel} aria-label="关闭">
+            <button type="button" className="debate-topic-close game-dialog-close" onClick={onCancel} aria-label="关闭">
               <X size={28} />
             </button>
           </div>
@@ -266,7 +266,11 @@ export function DebateTopicDialog({
           onReturnSelected={() => selectedPlayerId && removePlayerFromTeams(selectedPlayerId)}
         />
         {validationMessage && (
-          <p className={classNames('debate-setup-status', randomizeError && 'error')} role={randomizeError ? 'alert' : 'status'}>
+          <p
+            className={classNames('debate-setup-status', 'game-feedback', randomizeError && 'error')}
+            data-tone={randomizeError ? 'error' : 'info'}
+            role={randomizeError ? 'alert' : 'status'}
+          >
             {validationMessage}
           </p>
         )}

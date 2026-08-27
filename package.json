@@ -4,7 +4,10 @@
   "private": true,
   "description": "AI 表达者",
   "scripts": {
-    "dev": "pnpm -r --parallel run dev",
+    "dev": "node ./scripts/dev/run-local.cjs",
+    "dev:services": "pnpm -r --parallel run dev",
+    "dev:db": "node ./scripts/dev/run-local.cjs --database-only",
+    "dev:db:down": "docker compose -f docker-compose.dev.yml down",
     "dev:server": "pnpm --filter @ai-presenter/server run dev",
     "dev:client": "pnpm --filter @ai-presenter/client run dev",
     "dev:admin": "pnpm --filter @ai-presenter/admin run dev",
@@ -23,6 +26,7 @@
     "test:migration": "node --preserve-symlinks --preserve-symlinks-main ./tests/migration/runMigrationTests.cjs",
     "test:postgres": "node --preserve-symlinks --preserve-symlinks-main ./tests/postgres/runPostgresTests.cjs",
     "test:concurrency": "node ./tests/load/fiveConcurrentGames.cjs",
+    "debug:flows": "node ./scripts/dev/run-game-flow-debug.cjs",
     "verify:release": "pnpm run check && pnpm run build && pnpm run test:unit && pnpm run test:workflow && pnpm run test:migration && pnpm run test:postgres"
   },
   "devDependencies": {

@@ -9,6 +9,7 @@ const pnpmRoot = path.join(root, 'node_modules', '.pnpm');
 const requestedFiles = process.argv.slice(2).filter((file) => file !== '--');
 const testFiles = (requestedFiles.length ? requestedFiles : [
   'gameSocketSession.test.ts',
+  'gameFlowDebug.test.ts',
   'gameSocketClientSession.test.ts',
   'concurrencyLimiter.test.ts',
   'gameSessionConcurrency.test.ts',
@@ -17,11 +18,13 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   'authFirstPasswordChange.test.ts',
   'loginRateLimiter.test.ts',
   'authLoginRateLimit.test.ts',
+  'apiKeyCrypto.test.ts',
   'serverLifecycle.test.ts',
   'dockerBuildContext.test.ts',
   'deploymentConfig.test.ts',
   'releaseGateConfig.test.ts',
   'postgresProductionCompose.test.ts',
+  'localDevPostgres.test.ts',
   'postgresProductionEntrypoints.test.ts',
   'postgresOpsScripts.test.ts',
   'postgresLinuxOps.test.ts',
@@ -61,6 +64,7 @@ const testFiles = (requestedFiles.length ? requestedFiles : [
   ,'undercoverClient.test.ts'
   ,'playerPosterSpotlight.test.ts'
   ,'playerDetailModal.test.ts'
+  ,'clientDesignSystem.test.ts'
   ,'debateStyle.test.ts'
   ,'debateSetup.test.ts'
   ,'werewolfDefaultConfig.test.ts'

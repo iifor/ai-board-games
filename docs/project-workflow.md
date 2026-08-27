@@ -2,7 +2,7 @@
 
 ## PostgreSQL 工作流持久化契约
 
-所有工作流 repository、service、controller、runner 和 worker 均通过异步 `DbExecutor` 访问 PostgreSQL 16。`tickMatch` 在 serializable 事务开始时用 `SELECT ... FOR UPDATE` 锁定目标 Match，事件序号在锁内计算；Match、workflow event、snapshot 和 outbox 在同一事务提交，任一失败整体回滚。handler 在锁内创建或查询 action-window epoch、workflow effect、死亡结算子窗口，以及读取辩论 AI task/event 时，必须复用 tick 注入的 `DbExecutor`；AI task 成功结果与随后的 workflow 推进也在同一事务连接上提交，避免第二连接读取旧任务状态或让外键检查反向等待已锁定的 Match。AI task 与 outbox 通过 `FOR UPDATE SKIP LOCKED` 原子领取，多个实例不会重复消费同一记录。
+所有工作流 repository、service、controller、runner 和 worker 均通过异步 `DbExecutor` 访问 PostgreSQL 16。`tickMatch` 在 serializable 事务开始时用 `SELECT ... FOR UPDATE` 锁定目标 Match，事件序号在锁内计算；Match、workflow event、snapshot 和 outbox 在同一事务提交，任一失败整体回滚。handler 在锁内创建或查询 action-window epoch、workflow effect、死亡结算子窗口，以及读取辩论 AI task/event 时，必须复用 tick 注入的 `DbExecutor`；AI task 成功结果与随后的 workflow 推进也在同一事务连接上提交，避免第二连接读取旧任务状态或让外键检查反向等待已锁定的 Match。AI task 与 outbox 通过 `FOR UPDATE SKIP LOCKED` 原子领取，多个实例不会重复消费同一记录；claim 带过期时间，worker 崩溃后可重新领取，重试受 `max_attempts` 和 `next_attempt_at` 约束。
 
 终态 Match 删除仅接受 `completed`、`failed`、`paused_debug`。正式删除 API 在事务内清理同 ID game、game players、回放、workflow 子表和观测 trace 树；跨局 `player_game_memories` 保留，按 `game_type` 保存的 `game_player_selections` 也不属于单局删除范围。物理空间由 PostgreSQL autovacuum 和受控维护处理，删除 API 不承担文件缩减。
 
@@ -124,6 +124,8 @@ packages/server/modules/
 - `outbox_messages` 保存待推送给前端的消息。
 - `match_snapshots` 保存状态快照。
 
+Match 显式保存 `definition_version` 和 `state_schema_version`；snapshot 与 event 分别保存 `state_schema_version`、`event_schema_version`，事件还保存 actor、causation 和 correlation。版本字段是状态升级器和历史兼容的选择依据，不能再只从可变 JSON 形状猜测版本。
+
 ### 统一持续驱动入口
 
 - `WorkflowRuntime.runUntilBlocked()` 是离线 runner 持续推进 match 的统一入口，内部复用 `drainAiTasks()`，跨 tick 预算分批运行，直到没有可处理工作或进入 `completed/failed/paused_debug`。
@@ -139,6 +141,7 @@ packages/server/modules/
 - `presentation.createSession()` 持有单局投影视角。狼人杀继续复用其状态化视角策略；阿瓦隆由服务端公开投影保证终局前不出现角色、阵营、逐人组队票和逐人任务票。
 - effect resolver 只从当前 definition 构建，两个游戏可以使用同一个 effect type，不再因全局 resolver registry 冲突。
 - 旧对局回放仍包含狼人杀/辩论赛专用的历史重建兼容逻辑；这不参与新实时游戏的 runtime 分发。新游戏若要支持旧格式回放，应单独声明历史升级策略，不能把分支重新加回实时 runner。
+- WebSocket `start` 可选 `variantKey`。服务端只解析已启用且绑定到已注册 definition 版本的模式，把模式配置作为本局基线，并在终局记录 `variantKey`、revision 和配置快照。动态 topic、玩家选择等单局输入仍由专用 session preparation 处理，不能由后台配置越权覆盖。
 
 ### 阿瓦隆标准 5 人工作流
 
@@ -147,6 +150,7 @@ packages/server/modules/
 - 三个任务失败时直接由邪恶阵营获胜；三个任务成功后进入刺杀，刺客命中梅林则邪恶逆转，否则好人获胜。
 - workflow 为有界步骤：每个任务最多五轮 `propose -> team_vote -> quest`，随后按比分跳转下一任务、刺杀或结果。
 - 调试模式运行完全相同的 handler、schema、状态转换和公开事件，只替换模型决策为确定性合法结果；工作流测试真实驱动所有 handler 跑到终态。
+- 所有阿瓦隆 handler 读取 task 和事件时必须复用 tick 注入的 `DbExecutor`，保证在 PostgreSQL 事务内能立即读到刚完成的 AI task，不得切换连接读取旧状态。真实模式的结构化模型输出在两次尝试后仍不可用时，组队、表决、任务票和刺杀使用服务端确定性合法兜底并记录 fallback 原因；通用 workflow runtime 会等待 `retrying` task 的 `next_attempt_at`，只有无可重试任务且无法继续推进时才报告 stalled，终态失败保留原始 task 错误。
 
 ### Workflow 持久化性能与恢复
 
@@ -174,6 +178,13 @@ packages/server/modules/
 - 狼人杀调试模式只跳过真实模型与语音依赖，不跳过玩法分支。禁言长老、骑士、
   花蝴蝶、潜行者、狼美人、噩梦之影、摄梦人、魔术师等特殊技能，以及白狼王自爆，会按调试
   随机概率决定是否发动，结果继续进入原有 reducer、死亡链和播放管线。
+
+### 本地端到端调试闭环
+
+- `pnpm run debug:flows` 复用正式 `/api/toc/health` 和 `/api/toc/ws/game` 入口，不建立旁路 runner。脚本默认通过开发 Compose 准备 PostgreSQL，在 `3101` 启动隔离后端，然后顺序执行 `standard-12` 狼人杀和 12 人辩论赛。
+- 脚本自动确认全部 `ackId`，但不把 WebSocket close 当作成功；只有收到 `workflow-completed`，且游戏类型、12 名玩家、胜负、狼人杀回合、辩论阶段/非空发言/MVP、空 fallback audit 全部有效时才通过。任一环节超时、提前断线或结果缺失均以非零状态退出。
+- 调试事件携带 `debugMode: true`，因此媒体准备不会调用服务端 TTS，游戏决策不调用真实模型。每次运行生成唯一 JSON 证据，只记录计数、时长和终态摘要，不记录数据库连接串或密钥。
+- 这是实时规则、工作流、WebSocket ACK、事件准备与终态投影的闭环验证；`runSession` 按既有契约不会把 debug 对局写入正式游戏历史。正式落库、回放与删除链仍由 PostgreSQL application smoke 和集成测试验收，不能用本脚本结果替代。
 
 推进模型：
 

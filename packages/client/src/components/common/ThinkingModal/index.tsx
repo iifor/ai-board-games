@@ -16,8 +16,8 @@ export function ThinkingModal({ visible, player, thinking = '' }: ThinkingModalP
   const title = name ? `${name}思考中...` : '系统播报中...';
 
   return (
-    <div className="thinking-backdrop" role="presentation">
-      <div className="thinking-dialog" role="dialog" aria-modal="true" aria-label={`${name}正在思考`}>
+    <div className="thinking-backdrop game-dialog-backdrop" role="presentation">
+      <div className="thinking-dialog game-dialog-panel" role="dialog" aria-modal="true" aria-label={`${name}正在思考`}>
         <div className="thinking-header">
           <span />
           <strong>{title}</strong>

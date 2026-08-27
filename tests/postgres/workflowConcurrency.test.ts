@@ -60,7 +60,8 @@ registerWorkflow({ id: failingAiAdvanceWorkflowId, gameType: 'test', steps: [{ i
 async function seedMatch(id: string, registeredWorkflowId: string = workflowId): Promise<void> {
   const now = new Date().toISOString();
   await repo.createMatch({ id, game_type: 'test', workflow_id: registeredWorkflowId, status: 'running',
-    current_step_index: 0, version: 0, config_json: '{}', state_json: '{}', blockers_json: '[]',
+    current_step_index: 0, version: 0, definition_version: '1.0.0', state_schema_version: 1,
+    config_json: '{}', state_json: '{}', blockers_json: '[]',
     error_json: 'null', created_at: now, updated_at: now, completed_at: null });
 }
 
@@ -214,7 +215,7 @@ test('workflow transaction rolls back match, event and outbox together', async (
       await seedMatch('match-rollback');
       await assert.rejects(database.withTransaction(async (transaction) => {
         await repo.commitWorkflowChange({ matchId: 'match-rollback', events: [{ type: 'rolled_back', idempotencyKey: 'rollback' }],
-          matchPatch: { status: 'completed' } }, transaction);
+          matchPatch: { status: 'completed', completed_at: new Date().toISOString() } }, transaction);
         throw new Error('force rollback');
       }), /force rollback/);
       assert.equal((await repo.getMatch('match-rollback'))?.status, 'running');

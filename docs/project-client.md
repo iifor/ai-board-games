@@ -88,7 +88,30 @@ packages/client/
 - 服务层：`services/gameService.ts` 封装 REST 和 WebSocket。
 - hooks 层：封装导航、WebSocket session、语音播放、字幕队列。
 - 通用组件：弹窗、导航、状态视图、字幕等可复用 UI。
-- 样式层：`styles/game-theme.css` 提供 C 端狼人杀和辩论赛共用的沉浸竞技视觉变量，具体组件 CSS 只负责各玩法布局和状态表达。
+- 样式层：`styles/globals.css` 提供平台基础令牌和兼容别名，`styles/game-theme.css` 提供游戏语义令牌与主题映射；具体组件 CSS 只负责玩法布局和业务状态表达。
+
+### C 端统一设计系统
+
+C 端采用三层令牌，不以“所有游戏使用同一种颜色”代替设计系统：
+
+1. `--ui-*` 平台基础与语义令牌统一画布、表面、文字、边框、焦点、圆角、阴影、动效以及信息/成功/警告/危险状态。
+2. `--game-*` 把平台语义投影为游戏组件可消费的表面、主操作、强调色和状态色；历史变量保留为兼容别名，新增样式不得继续扩散新的基础色别名。
+3. 游戏根容器必须声明 `data-game` 和 `data-variant`。辩论赛使用正方青蓝/反方红/评审金，狼人杀使用紫色身份与红色危险语义，谁是卧底使用青绿色推理语义，阿瓦隆使用金色与紫色史诗语义。
+
+统一范围包括字体层级、面板层级、控制栏、主操作按钮、键盘焦点、禁用态、按压反馈和减少动态效果偏好；阵营、角色、胜负等业务颜色仍由各游戏主题表达。经典入口与 v2 入口共享令牌契约，但不因统一设计系统改变路由、布局或玩法协议。
+
+新增或修改 C 端样式时：
+
+- 基础视觉值优先消费 `--ui-*`，游戏内语义优先消费 `--game-*`，不要在组件中重新定义平台状态色。
+- 新游戏应在 `game-theme.css` 增加一个 `[data-game="..."]` 主题映射，并在根容器声明身份；无需复制全套控制栏和按钮样式。
+- 游戏专属 CSS 可以定义场景图、阵营色和空间布局，但共享控件应复用 `game-control-rail`、`game-primary-button` 等语义类。
+- 表单区、字段、输入框和次操作分别复用 `game-form-section`、`game-field`、`game-input|game-textarea`、`game-secondary-button`；可选卡片复用 `game-select-card`。
+- 布尔开关使用 `game-toggle-control` 并提供 `role="switch"`、`aria-checked`；带滑轨的开关复用 `game-switch-track`，原生复选框外层复用 `game-native-switch`。
+- 弹窗遮罩、面板和关闭操作分别复用 `game-dialog-backdrop`、`game-dialog-panel`、`game-dialog-close`；加载/错误卡片复用 `game-state-card`。
+- 运行反馈统一使用 `game-feedback` 和 `data-tone="info|error"`，字幕/播报容器使用 `game-subtitle-panel`；组件原有类继续负责定位和游戏专属布局。
+- 无障碍焦点和 `prefers-reduced-motion` 由全局层负责，组件不得移除可见焦点或强制动画。
+- 平台正文、危险文本和主操作前景/背景的固定色值由 `clientDesignSystem.test.ts` 执行 WCAG 对比度回归；游戏专属透明叠层仍需在真实页面做桌面与窄屏视觉验收。
+- C/B 端共享的 `px2vw` 构建规则只负责舞台布局缩放；正文和行高必须保有 `rem` 下限，边框与焦点轮廓不得缩放。组件仍可在手机断点使用显式 `rem` 覆盖复杂布局，但不得用页面特例重新实现单位转换。
 
 路由规则：
 
@@ -172,9 +195,9 @@ packages/client/
 
 目录：`packages/client/src/features/avalon`
 
-- `AvalonGame` 只组合控制器、任务板和返回入口；经典与 v2 共用相同公开状态，v2 额外提供调试开关。
+- `AvalonGame` 只组合控制器、任务板和返回入口；经典与 v2 共用相同公开状态，v2 额外提供调试开关，并允许开发环境通过 `visualQaAvalon=1` 注入只读公开态进行视觉回归。
 - `useAvalonGame` 复用通用 WebSocket session、语音队列和 ACK，开局前要求恰好 5 个唯一正整数玩家 ID。
-- `AvalonArena` 只展示队长、当前队伍、五个任务、公开票数、比分和终局身份；客户端不会接收或推导私密身份和逐人密票。
+- `AvalonArena` 只展示队长、当前队伍、五个任务、公开票数、比分和终局身份；v2 复用共享舞台背景与主持人透明立绘，采用顶部任务轴、两侧玩家席位和底部主持播报布局。客户端不会接收或推导私密身份和逐人密票。
 - reducer 会重新投影服务端状态：非 completed 状态丢弃异常 `reveal`，角色和阵营只在终局展示。
 - 选择页、路由和顶层渲染分别由 `games/catalog.ts`、`clientRouter.ts`、`games/renderers.tsx` 注册，不在 `App.tsx` 增加条件分支。
 

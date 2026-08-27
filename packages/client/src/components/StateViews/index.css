@@ -2,24 +2,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  width: 100%;
+  min-height: 100%;
+  padding: 24px;
+  color: var(--ui-text);
+  background: var(--ui-bg-canvas);
 }
 
 .ornate-card {
-  width: 620px;
+  width: min(620px, 100%);
   padding: 34px;
 }
 
 .eyebrow {
-  color: var(--blue);
+  color: var(--ui-info);
   font-size: 13px;
   font-weight: 900;
 }
 
 .gold-button {
-  border: 1px solid rgba(91, 166, 255, 0.7);
-  background: linear-gradient(180deg, #1d5ca2, #0a2a51);
-  color: #fff;
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid var(--ui-brand-strong);
+  border-radius: var(--ui-radius-sm);
+  color: var(--game-primary-contrast);
+  background: var(--ui-brand);
   cursor: pointer;
   font-weight: 900;
 }

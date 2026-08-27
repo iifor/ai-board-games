@@ -8,8 +8,8 @@
   overflow: hidden;
   padding: 5px 15px;
   transform: translateX(-50%);
-  border-radius: 10px;
-  color: #fff;
+  border-radius: var(--ui-radius-md);
+  color: var(--game-text);
   text-align: center;
   text-shadow: 0 2px 3px rgba(0, 0, 0, 0.86);
   pointer-events: none;
@@ -18,13 +18,13 @@
   font-size: 24px;
   min-width: 100px;
   white-space: normal;
-  transition: all 180ms ease-out;
+  transition: all var(--ui-motion-normal) ease-out;
 }
 
 .speech-subtitle__word {
   display: inline;
-  color: #fff;
-  transition: all 120ms ease-out;
+  color: var(--game-text);
+  transition: all var(--ui-motion-fast) ease-out;
 }
 
 .speech-subtitle__word.is-active {
@@ -33,7 +33,7 @@
 
 
 .speech-subtitle__word.is-punctuation {
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--game-muted);
   font-weight: inherit;
   text-shadow: none;
 }
@@ -44,7 +44,7 @@
   padding: 0;
   padding-right: 8px;
   font-size: 14px;
-  color: #ded5ff;
+  color: var(--game-accent-strong);
 }
 
 .speech-subtitle--fallback {
@@ -57,11 +57,11 @@
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(92, 188, 255, 0.46);
-  border-radius: 10px;
-  background: rgba(5, 22, 54, 0.95);
-  box-shadow: 0 0 22px rgba(52, 163, 255, 0.22), inset 0 0 12px rgba(70, 176, 255, 0.08);
-  color: #bdeeff;
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-lg);
+  background: var(--game-dialog-surface);
+  box-shadow: var(--game-dialog-shadow);
+  color: var(--game-text);
   overflow: hidden;
 }
 
@@ -70,7 +70,7 @@
   align-items: center;
   gap: 10px;
   padding: 14px 18px;
-  border-bottom: 1px solid rgba(92, 188, 255, 0.18);
+  border-bottom: 1px solid var(--game-line);
   flex-shrink: 0;
   font-size: 30px;
   font-weight: 950;
@@ -85,7 +85,7 @@
   text-align: left;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #bdeeff;
+  color: var(--game-text);
   background: none;
   border: none;
 }

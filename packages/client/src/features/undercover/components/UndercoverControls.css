@@ -11,16 +11,16 @@
 .undercover-controls button {
   min-height: 42px;
   padding: 0 18px;
-  border: 1px solid rgba(131, 231, 222, 0.48);
-  border-radius: 10px;
-  color: #efffff;
+  border: 1px solid var(--game-line);
+  border-radius: var(--ui-radius-md);
+  color: var(--game-text);
   background: rgba(7, 41, 52, 0.92);
   cursor: pointer;
   font-weight: 800;
 }
 
 .undercover-controls button:focus-visible {
-  outline: 3px solid #ffe18f;
+  outline: 3px solid var(--ui-focus-ring);
   outline-offset: 2px;
 }
 
@@ -40,7 +40,7 @@
   gap: 6px;
   padding: 6px;
   border: 1px solid rgba(88, 119, 198, 0.28);
-  border-radius: 999px;
+  border-radius: var(--ui-radius-pill);
   background: rgba(3, 8, 25, 0.8);
   backdrop-filter: blur(12px);
 }
@@ -53,9 +53,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-color: rgba(117, 151, 231, 0.62);
-  border-radius: 999px;
-  color: #f4f6ff;
+  border-color: var(--game-line);
+  border-radius: var(--ui-radius-pill);
+  color: var(--game-text);
   background: rgba(8, 20, 52, 0.9);
   font-size: 14px;
   font-weight: 700;
@@ -67,17 +67,17 @@
 }
 
 .undercover-controls--v2 button:hover:not(:disabled) {
-  border-color: #ff75aa;
+  border-color: var(--game-accent-strong);
   background: rgba(32, 25, 63, 0.95);
 }
 
 .undercover-controls--v2 button.is-primary {
-  border-color: #f16ca0;
-  background: rgba(118, 37, 85, 0.92);
+  border-color: var(--game-accent-strong);
+  background: var(--game-primary);
 }
 
 .undercover-controls--v2 button:focus-visible {
-  outline-color: #ff9dc2;
+  outline-color: var(--ui-focus-ring);
 }
 
 @media (max-width: 760px) {

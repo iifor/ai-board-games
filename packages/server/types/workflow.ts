@@ -7,6 +7,8 @@ interface Match {
   status: string;
   currentStepIndex: number;
   version: number;
+  definitionVersion: string;
+  stateSchemaVersion: number;
   config: Record<string, unknown>;
   state: Record<string, unknown>;
   blockers: StepBlocker[];
@@ -32,6 +34,8 @@ interface WorkflowEvent {
   matchId: string;
   seq: number;
   type: string;
+  eventSchemaVersion: number;
+  actorType: string;
   stepId: string | undefined;
   playerId: string | undefined;
   payload: unknown;
@@ -40,6 +44,8 @@ interface WorkflowEvent {
   scopeKey: string | undefined;
   visibleToPlayerIds: (string | number)[];
   idempotencyKey: string | undefined;
+  causationId: string | undefined;
+  correlationId: string | undefined;
   createdAt: string;
 }
 
@@ -58,8 +64,11 @@ interface AiTask {
   result: unknown;
   error: unknown;
   attempts: number;
+  maxAttempts: number;
   workerId: string | undefined;
   claimedAt: string | undefined;
+  claimExpiresAt: string | undefined;
+  nextAttemptAt: string | undefined;
   visibleEventSeqMax: number;
   createdAt: string;
   updatedAt: string;
@@ -85,6 +94,7 @@ interface MatchSnapshot {
   id: number;
   matchId: string;
   version: number;
+  stateSchemaVersion: number;
   status: string;
   currentStepIndex: number;
   lastEventSeq?: number;

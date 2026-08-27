@@ -1,7 +1,7 @@
 .game-shell.debate-shell--v2 {
-  --v2-blue: #52d7ff;
-  --v2-red: #ff6b72;
-  --v2-gold: #f3d58a;
+  --v2-blue: var(--game-team-a);
+  --v2-red: var(--game-team-b);
+  --v2-gold: var(--game-judge);
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -10,7 +10,7 @@
   padding: 0;
   overflow: hidden;
   border: 0 !important;
-  color: #f6f8fb;
+  color: var(--game-text);
   background: var(--bg-debate) center / cover no-repeat #080b12 !important;
 }
 

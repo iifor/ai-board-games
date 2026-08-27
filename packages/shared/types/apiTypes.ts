@@ -16,5 +16,35 @@ type ApiResponse<T = unknown> = {
 
 type ApiData<T> = T extends ApiResponse<infer Data> ? Data : T;
 
+interface GameVariant {
+  id: number;
+  gameType: string;
+  variantKey: string;
+  definitionVersion: string;
+  name: string;
+  description: string;
+  configSchemaVersion: number;
+  config: Record<string, unknown>;
+  enabled: boolean;
+  sortOrder: number;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AdminAuditEntry {
+  id: number;
+  actorAdminId: number | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  requestId: string;
+  before: unknown;
+  after: unknown;
+  ipAddress: string | null;
+  userAgent: string;
+  createdAt: string;
+}
+
 export { API_CODES, SUCCESS_RESPONSE };
-export type { ApiResponse, ApiData };
+export type { ApiResponse, ApiData, GameVariant, AdminAuditEntry };

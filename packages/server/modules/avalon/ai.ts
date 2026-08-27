@@ -4,6 +4,7 @@ import {
   avalonQuestVoteSchema,
   avalonTeamVoteSchema,
 } from '../../../shared/schemas/avalon';
+import type { DbExecutor } from '../../db/types';
 import { getAiConfig } from '../../config/ai';
 import type { AiTask } from '../../types/workflow';
 import { BasePlayerAgent } from '../agent-core/playerAgent';
@@ -60,16 +61,16 @@ async function runAvalonAiTask(
       { message: 'teamIds must be a legal unique mission team' },
     );
     const value = await agent.askJson(buildProposalPrompt(state, legalIds), requestOptions('avalon-propose', 'proposal', schema));
-    return aiResult(action, schema.parse(value));
+    return aiResult(action, value || buildAvalonFallbackPayload(action, state, actorId, context));
   }
   if (action === 'avalon_team_vote') {
     const value = await agent.askJson(buildTeamVotePrompt(state), requestOptions('avalon-team-vote', 'team-vote', avalonTeamVoteSchema));
-    return aiResult(action, avalonTeamVoteSchema.parse(value));
+    return aiResult(action, value || buildAvalonFallbackPayload(action, state, actorId, context));
   }
   if (action === 'avalon_quest_vote') {
     const value = await agent.askJson(buildQuestVotePrompt(state, actorId), requestOptions('avalon-quest-vote', 'quest', avalonQuestVoteSchema));
-    const parsed = avalonQuestVoteSchema.parse(value);
-    return aiResult(action, context.faction === 'good' ? { success: true } : parsed);
+    const parsed = value || buildAvalonFallbackPayload(action, state, actorId, context);
+    return aiResult(action, context.faction === 'good' ? { ...parsed, success: true } : parsed);
   }
   const legalIds = normalizeIds(context.legalIds);
   const schema = avalonAssassinationSchema.refine(
@@ -77,7 +78,28 @@ async function runAvalonAiTask(
     { message: 'targetId must be a legal assassination target' },
   );
   const value = await agent.askJson(buildAssassinationPrompt(state, legalIds), requestOptions('avalon-assassinate', 'assassination', schema));
-  return aiResult(action, schema.parse(value));
+  return aiResult(action, value || buildAvalonFallbackPayload(action, state, actorId, context));
+}
+
+function buildAvalonFallbackPayload(
+  action: AvalonAction,
+  state: AvalonWorkflowState,
+  actorId: number,
+  context: AvalonTaskContext = {},
+): Record<string, unknown> {
+  const fallbackReason = 'model-response-unavailable';
+  if (action === 'avalon_propose_team') {
+    return { ...buildDebugProposal(state), reason: '模型未返回合法结果，系统按座次生成任务队。', fallbackReason };
+  }
+  if (action === 'avalon_team_vote') {
+    return { ...buildDebugTeamVote(state, actorId), reason: '模型未返回合法结果，系统采用确定性表决。', fallbackReason };
+  }
+  if (action === 'avalon_quest_vote') {
+    return { ...buildDebugQuestVote(state, actorId), fallbackReason };
+  }
+  const targetId = normalizeIds(context.legalIds)[0];
+  if (!targetId) throw new Error('Avalon assassination fallback has no legal target');
+  return { targetId, reason: '模型未返回合法结果，系统选择首个合法目标。', fallbackReason };
 }
 
 function validateAvalonAiResult(rawTask: Record<string, unknown>, result: Record<string, unknown>): void {
@@ -117,6 +139,7 @@ async function createAvalonTask(
   action: AvalonAction,
   taskKey: string,
   context: AvalonTaskContext,
+  db?: DbExecutor,
 ) {
   return {
     id: stableTaskId(matchId, step.id, taskKey),
@@ -128,13 +151,18 @@ async function createAvalonTask(
     status: 'queued',
     prompt: { action },
     promptContextSnapshot: context,
-    visibleEventSeqMax: Math.max(0, ...(await repository.listEvents(matchId)).map((event) => event.seq)),
+    visibleEventSeqMax: Math.max(0, ...(await repository.listEvents(matchId, db)).map((event) => event.seq)),
     visibleEventIds: [],
   };
 }
 
-async function findAvalonTask(matchId: string, stepId: string, taskKey: string): Promise<AiTask | null> {
-  return (await repository.listAiTasks(matchId))
+async function findAvalonTask(
+  matchId: string,
+  stepId: string,
+  taskKey: string,
+  db?: DbExecutor,
+): Promise<AiTask | null> {
+  return (await repository.listAiTasks(matchId, null, db))
     .find((task) => task.stepId === stepId && task.taskKey === taskKey) || null;
 }
 
@@ -194,6 +222,7 @@ function normalizeIds(value: unknown): number[] {
 
 export {
   createAvalonTask,
+  buildAvalonFallbackPayload,
   findAvalonTask,
   runAvalonAiTask,
   taskBlocker,

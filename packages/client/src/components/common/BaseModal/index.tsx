@@ -30,9 +30,9 @@ export function BaseModal({
   titleId = 'base-modal-title'
 }: BaseModalProps) {
   return (
-    <div className={backdropClassName} role="presentation" onClick={onClose}>
+    <div className={`${backdropClassName} game-dialog-backdrop`} role="presentation" onClick={onClose}>
       <section
-        className={dialogClassName}
+        className={`${dialogClassName} game-dialog-panel`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
@@ -40,7 +40,7 @@ export function BaseModal({
         onClick={(event) => event.stopPropagation()}
       >
         {onClose && (
-          <button type="button" className={closeClassName} onClick={onClose} aria-label="关闭">
+          <button type="button" className={`${closeClassName} game-dialog-close`} onClick={onClose} aria-label="关闭">
             <X size={20} />
           </button>
         )}

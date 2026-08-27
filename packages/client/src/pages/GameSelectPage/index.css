@@ -366,3 +366,75 @@
 .game-recent-list button em {
   text-align: right;
 }
+
+@media (max-width: 720px) {
+  .game-select-page {
+    align-items: flex-start;
+    height: 100dvh;
+    padding: 1rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .game-entry-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    padding-block: 1rem;
+  }
+
+  .game-entry-card {
+    width: 100%;
+    height: auto;
+    min-height: 17rem;
+    gap: 0.75rem;
+    padding: 0.875rem;
+    border-radius: 1rem;
+  }
+
+  .game-entry-card:hover {
+    transform: none;
+  }
+
+  .game-entry-main {
+    flex-basis: auto;
+    min-height: 9rem;
+    gap: 0.75rem;
+  }
+
+  .game-entry-icon {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .game-entry-card strong {
+    font-size: 1.35rem;
+  }
+
+  .game-entry-card em {
+    font-size: 0.75rem;
+  }
+
+  .game-entry-actions {
+    flex: none;
+    min-height: 4.5rem;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .game-entry-actions button,
+  .game-player-save {
+    width: 100%;
+    min-height: 2.5rem;
+  }
+
+  .game-recent-list {
+    width: 100%;
+    max-height: 8rem;
+  }
+
+  .game-player-options button {
+    flex-basis: 100%;
+    min-height: 2.5rem;
+  }
+}

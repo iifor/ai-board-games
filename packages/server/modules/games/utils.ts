@@ -24,6 +24,11 @@ function rowToGame(row: GameRow | null | undefined): Game | null {
     rounds: parseJson<unknown[]>(row.rounds_json, []),
     event: parseJson<Record<string, unknown>>(row.event_json, {}),
     audioResources: parseJson<unknown[]>(row.audio_resources_json, []),
+    definitionVersion: row.definition_version,
+    snapshotSchemaVersion: row.snapshot_schema_version,
+    variantKey: row.variant_key,
+    variantRevision: row.variant_revision,
+    variantSnapshot: parseJson<Record<string, unknown>>(row.variant_snapshot_json, {}),
     createdAt: row.created_at
   };
 }
@@ -38,6 +43,9 @@ function rowToGameSummary(row: GameRow | null | undefined): GameSummary | null {
     winner: row.winner,
     winReason: row.win_reason,
     playerCount: parseJson<unknown[]>(row.players_json, []).length,
+    definitionVersion: row.definition_version,
+    variantKey: row.variant_key,
+    variantRevision: row.variant_revision,
     createdAt: row.created_at
   };
 }

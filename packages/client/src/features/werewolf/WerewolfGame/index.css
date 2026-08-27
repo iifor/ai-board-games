@@ -8,7 +8,8 @@
   overflow: hidden;
   padding: 0;
   border: 0;
-  background: var(--bg-werewolf) center / cover no-repeat, #02040c;
+  color: var(--game-text);
+  background: var(--bg-werewolf) center / cover no-repeat, var(--game-canvas);
 }
 
 .werewolf-shell > .werewolf-arena,

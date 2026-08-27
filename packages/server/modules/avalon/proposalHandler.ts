@@ -14,7 +14,7 @@ import type { AvalonWorkflowState } from './types';
 
 function createProposalHandler(): StepHandler {
   return {
-    async execute({ match, step, state }) {
+    async execute({ match, step, state, db }) {
       const current = state as unknown as AvalonWorkflowState;
       if (isComplete(current, step.id)) return done(current);
       const missionNumber = stepNumber(step, 'mission');
@@ -25,7 +25,7 @@ function createProposalHandler(): StepHandler {
       const matchId = String(match.id);
       const leaderId = getLeaderId(current);
       const taskKey = `proposal:${missionNumber}:${attempt}`;
-      const existing = await findAvalonTask(matchId, step.id, taskKey);
+      const existing = await findAvalonTask(matchId, step.id, taskKey, db);
       if (!existing || existing.status !== 'succeeded') {
         const taskId = existing?.id || `${matchId}:${step.id}:${taskKey}`;
         return {
@@ -41,6 +41,7 @@ function createProposalHandler(): StepHandler {
               legalIds: current.players.map((player) => player.id),
               teamSize: getCurrentMission(current).teamSize,
             },
+            db,
           )],
           blockers: [taskBlocker(step.id, taskKey, leaderId, taskId, existing?.status)],
         };

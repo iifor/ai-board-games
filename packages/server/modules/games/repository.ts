@@ -15,16 +15,23 @@ interface PlayerSelectionRow { gameType: string; playerIdsJson: string }
 
 async function insertOrReplaceGame(row: GameRow, db: DbExecutor = getDbExecutor()): Promise<void> {
   await db.execute(`
-    INSERT INTO games (id, game_type, mode, skin_id, skin_name, winner, win_reason, topic_json, players_json, rounds_json, event_json, audio_resources_json, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    INSERT INTO games (id, game_type, mode, skin_id, skin_name, winner, win_reason, topic_json,
+      players_json, rounds_json, event_json, audio_resources_json, definition_version,
+      snapshot_schema_version, variant_key, variant_revision, variant_snapshot_json, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     ON CONFLICT(id) DO UPDATE SET
       game_type = excluded.game_type, mode = excluded.mode, skin_id = excluded.skin_id,
       skin_name = excluded.skin_name, winner = excluded.winner, win_reason = excluded.win_reason,
       topic_json = excluded.topic_json, players_json = excluded.players_json,
       rounds_json = excluded.rounds_json, event_json = excluded.event_json,
-      audio_resources_json = excluded.audio_resources_json, created_at = excluded.created_at
+      audio_resources_json = excluded.audio_resources_json, definition_version = excluded.definition_version,
+      snapshot_schema_version = excluded.snapshot_schema_version, variant_key = excluded.variant_key,
+      variant_revision = excluded.variant_revision, variant_snapshot_json = excluded.variant_snapshot_json,
+      created_at = excluded.created_at
   `, [row.id, row.game_type, row.mode, row.skin_id, row.skin_name, row.winner, row.win_reason,
-    row.topic_json, row.players_json, row.rounds_json, row.event_json, row.audio_resources_json, row.created_at]);
+    row.topic_json, row.players_json, row.rounds_json, row.event_json, row.audio_resources_json,
+    row.definition_version, row.snapshot_schema_version, row.variant_key, row.variant_revision,
+    row.variant_snapshot_json, row.created_at]);
 }
 
 async function findAllGames(filters: GameListFilters = {}): Promise<GameRow[]> {

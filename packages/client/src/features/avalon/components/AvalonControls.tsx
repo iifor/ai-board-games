@@ -14,10 +14,10 @@ interface AvalonControlsProps {
 
 function AvalonControls(props: AvalonControlsProps) {
   return (
-    <nav className="avalon-controls" aria-label="阿瓦隆对局控制">
+    <nav className="avalon-controls game-control-rail" aria-label="阿瓦隆对局控制">
       <button type="button" onClick={props.onReturn}><ArrowLeft aria-hidden="true" />返回</button>
       {!props.started && !props.replayMode && (
-        <button type="button" className="is-primary" onClick={props.onStart}><Power aria-hidden="true" />开始游戏</button>
+        <button type="button" className="is-primary game-primary-button" onClick={props.onStart}><Power aria-hidden="true" />开始游戏</button>
       )}
       {props.started && (
         <button type="button" aria-pressed={props.autoPlay} onClick={() => props.onTogglePlayback(!props.autoPlay)}>

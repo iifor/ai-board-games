@@ -8,14 +8,14 @@
   border: 0;
   align-items: stretch;
   justify-content: normal;
-  color: #f4f7ff;
+  color: var(--game-text);
   background:
     linear-gradient(90deg, rgba(1, 6, 18, .74), rgba(4, 14, 38, .08) 28%, rgba(4, 14, 38, .08) 72%, rgba(1, 6, 18, .7)),
     linear-gradient(180deg, rgba(1, 8, 26, .05), rgba(1, 6, 20, .34)),
     #02091b;
 }
-.werewolf-shell--god { --v2-accent: #76b8ff; }
-.werewolf-shell--player { --v2-accent: #ff766f; }
+.werewolf-shell--god { --v2-accent: var(--game-info); }
+.werewolf-shell--player { --v2-accent: var(--game-accent-secondary); }
 .werewolf-shell--v2::before, .werewolf-shell--v2::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 .werewolf-shell--v2::before { background: linear-gradient(90deg, rgba(0, 4, 15, .48), transparent 16%, transparent 84%, rgba(0, 4, 15, .48)); }
 .werewolf-shell--v2::after { background: radial-gradient(ellipse at 50% 48%, transparent 0 52%, rgba(0, 4, 16, .2) 76%, rgba(0, 3, 12, .55) 100%); }

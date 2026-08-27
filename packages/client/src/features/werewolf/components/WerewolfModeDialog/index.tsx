@@ -53,11 +53,11 @@ export function WerewolfModeDialog({
   const selectedViewMode = viewMode === 'player' ? 'player' : 'god';
 
   return (
-    <div className="werewolf-mode-backdrop" role="presentation">
-      <section className="werewolf-mode-dialog werewolf-setup-dialog" role="dialog" aria-modal="true" aria-label="狼人杀开局配置">
+    <div className="werewolf-mode-backdrop game-dialog-backdrop" role="presentation">
+      <section className="werewolf-mode-dialog werewolf-setup-dialog game-dialog-panel" role="dialog" aria-modal="true" aria-label="狼人杀开局配置">
         <header>
           {compact ? <div className="werewolf-setup-heading"><small>月夜对局</small><h2>选择游戏模式</h2></div> : <h2>狼人杀开局配置</h2>}
-          <button type="button" onClick={onCancel}>返回</button>
+          <button type="button" className="game-secondary-button" onClick={onCancel}>返回</button>
         </header>
         <div className="werewolf-setup-grid">
           <section>
@@ -66,7 +66,8 @@ export function WerewolfModeDialog({
               {modes.length ? modes.map((mode) => (
                 <button
                   type="button"
-                  className={classNames('werewolf-mode-card', selectedMode?.id === mode.id && 'active')}
+                  className={classNames('werewolf-mode-card', 'game-select-card', selectedMode?.id === mode.id && 'active')}
+                  aria-pressed={selectedMode?.id === mode.id}
                   onClick={() => onSelect(mode)}
                   key={mode.id}
                 >
@@ -90,7 +91,8 @@ export function WerewolfModeDialog({
                 return (
                   <button
                     type="button"
-                    className={checked ? 'checked' : ''}
+                    className={classNames('game-select-card', checked && 'checked')}
+                    aria-pressed={checked}
                     draggable
                     onDragStart={(event) => {
                       event.dataTransfer.setData('text/plain', String(player.id));
@@ -111,12 +113,12 @@ export function WerewolfModeDialog({
           <section className="werewolf-view-mode">
             {compact ? (
               <div className="werewolf-compact-switches">
-                <button type="button" role="switch" aria-checked={selectedViewMode === 'player'} onClick={() => onViewModeChange(selectedViewMode === 'god' ? 'player' : 'god')}>
+                <button type="button" className="game-toggle-control" role="switch" aria-checked={selectedViewMode === 'player'} onClick={() => onViewModeChange(selectedViewMode === 'god' ? 'player' : 'god')}>
                   <span><Eye size={17} />观看视角</span>
                   <strong>{selectedViewMode === 'god' ? '上帝视角' : '玩家视角'}</strong>
                   <i aria-hidden="true" />
                 </button>
-                <button type="button" role="switch" aria-checked={debugMode} onClick={() => onDebugModeChange(!debugMode)}>
+                <button type="button" className="game-toggle-control" role="switch" aria-checked={debugMode} onClick={() => onDebugModeChange(!debugMode)}>
                   <span><Bug size={17} />调试模式</span>
                   <strong>{debugMode ? '开启' : '关闭'}</strong>
                   <i aria-hidden="true" />
@@ -125,18 +127,18 @@ export function WerewolfModeDialog({
             ) : <>
               <PanelHeader icon={<Eye size={18} />} title="C 端视角" />
               <div className="werewolf-view-mode-switch" role="group" aria-label="狼人杀观看视角">
-              <button type="button" className={classNames(selectedViewMode === 'god' && 'active')} onClick={() => onViewModeChange('god')}>
+              <button type="button" className={classNames('game-select-card', selectedViewMode === 'god' && 'active')} aria-pressed={selectedViewMode === 'god'} onClick={() => onViewModeChange('god')}>
                 <Eye size={18} />
                 <span>上帝视角</span>
                 <small>展示完整夜间与身份信息</small>
               </button>
-              <button type="button" className={classNames(selectedViewMode === 'player' && 'active')} onClick={() => onViewModeChange('player')}>
+              <button type="button" className={classNames('game-select-card', selectedViewMode === 'player' && 'active')} aria-pressed={selectedViewMode === 'player'} onClick={() => onViewModeChange('player')}>
                 <UserRound size={18} />
                 <span>玩家视角</span>
                 <small>开局随机代入一名玩家</small>
               </button>
             </div>
-            <button type="button" className={classNames('werewolf-debug-toggle', debugMode && 'active')} onClick={() => onDebugModeChange(!debugMode)}>
+            <button type="button" className={classNames('werewolf-debug-toggle', 'game-select-card', debugMode && 'active')} aria-pressed={debugMode} onClick={() => onDebugModeChange(!debugMode)}>
               <Bug size={18} />
               <span>调试模式</span>
               <small>固定发言，浏览器语音</small>
@@ -144,12 +146,12 @@ export function WerewolfModeDialog({
             </>}
           </section>
         </div>
-        {error && <p className="werewolf-setup-error">{error}</p>}
+        {error && <p className="werewolf-setup-error game-feedback" data-tone="error" role="alert">{error}</p>}
         <footer>
           <span></span>
           <button
             type="button"
-            className="primary"
+            className="primary game-primary-button"
             disabled={!canStart}
             onClick={() => selectedMode && onStart(
               selectedMode,

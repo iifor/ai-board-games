@@ -14,7 +14,7 @@ import type { AvalonWorkflowState } from './types';
 
 function createQuestHandler(): StepHandler {
   return {
-    async execute({ match, step, state }) {
+    async execute({ match, step, state, db }) {
       const current = state as unknown as AvalonWorkflowState;
       if (isComplete(current, step.id)) return done(current);
       const missionNumber = stepNumber(step, 'mission');
@@ -26,7 +26,7 @@ function createQuestHandler(): StepHandler {
       const teamPlayers = current.players.filter((player) => current.currentTeamIds.includes(player.id));
       const taskEntries = await Promise.all(teamPlayers.map(async (player) => {
         const taskKey = `quest:${missionNumber}:${player.id}`;
-        return { player, taskKey, existing: await findAvalonTask(matchId, step.id, taskKey) };
+        return { player, taskKey, existing: await findAvalonTask(matchId, step.id, taskKey, db) };
       }));
       const pending = taskEntries.filter(({ existing }) => existing?.status !== 'succeeded');
       if (pending.length) {
@@ -39,7 +39,15 @@ function createQuestHandler(): StepHandler {
             teamIds: current.currentTeamIds,
           })],
           tasks: await Promise.all(pending.filter(({ existing }) => !existing).map(({ player, taskKey }) =>
-            createAvalonTask(matchId, step, player.id, 'avalon_quest_vote', taskKey, { faction: player.faction }),
+            createAvalonTask(
+              matchId,
+              step,
+              player.id,
+              'avalon_quest_vote',
+              taskKey,
+              { faction: player.faction },
+              db,
+            ),
           )),
           blockers: pending.map(({ player, taskKey, existing }) => taskBlocker(
             step.id,

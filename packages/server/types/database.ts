@@ -56,6 +56,8 @@ interface ModelProviderRow {
   api_key_cipher: string;
   api_key_iv: string;
   api_key_tag: string;
+  credential_ref: string | null;
+  encryption_key_version: string | null;
   enabled: number;
   created_at: string;
   updated_at: string;
@@ -141,6 +143,11 @@ interface GameRow {
   rounds_json: string;
   event_json: string;
   audio_resources_json: string;
+  definition_version: string;
+  snapshot_schema_version: number;
+  variant_key: string | null;
+  variant_revision: number | null;
+  variant_snapshot_json: string;
   created_at: string;
 }
 
@@ -180,6 +187,8 @@ interface MatchRow {
   status: string;
   current_step_index: number;
   version: number;
+  definition_version: string;
+  state_schema_version: number;
   config_json: string;
   state_json: string;
   blockers_json: string;
@@ -193,6 +202,7 @@ interface MatchSnapshotRow {
   id: number;
   match_id: string;
   version: number;
+  state_schema_version: number;
   status: string;
   current_step_index: number;
   last_event_seq: number | null;
@@ -206,6 +216,8 @@ interface WorkflowEventRow {
   match_id: string;
   seq: number;
   type: string;
+  event_schema_version: number;
+  actor_type: string;
   step_id: string | null;
   player_id: string | null;
   payload_json: string;
@@ -214,6 +226,8 @@ interface WorkflowEventRow {
   scope_key: string | null;
   visible_to_player_ids_json: string;
   idempotency_key: string | null;
+  causation_id: string | null;
+  correlation_id: string | null;
   created_at: string;
 }
 
@@ -248,10 +262,13 @@ interface AiTaskRow {
   result_json: string;
   error_json: string;
   attempts: number;
+  max_attempts: number;
   visible_event_seq_max: number;
   visible_event_ids_json: string;
   worker_id: string;
   claimed_at: string | null;
+  claim_expires_at: string | null;
+  next_attempt_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -262,6 +279,13 @@ interface OutboxMessageRow {
   event_seq: number;
   status: string;
   payload_json: string;
+  attempts: number;
+  max_attempts: number;
+  worker_id: string;
+  claim_expires_at: string | null;
+  next_attempt_at: string | null;
+  error_json: string;
+  sent_at: string | null;
   created_at: string;
   updated_at: string;
 }

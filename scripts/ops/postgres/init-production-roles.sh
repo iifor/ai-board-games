@@ -1,4 +1,5 @@
 #!/bin/sh
+# This file is executed by Alpine /bin/sh and must remain LF-only.
 set -eu
 
 app_password_file="${POSTGRES_APP_PASSWORD_FILE:-/run/secrets/postgres_app_password}"

@@ -27,8 +27,8 @@ export function SpeechSubtitle({ speech, players = [], getSpeakerLabel, classNam
   if (!text) return null;
 
   const speaker = resolveSpeakerLabel(speech, players, getSpeakerLabel);
-  const rootClassName = ['speech-subtitle', className].filter(Boolean).join(' ');
-  const fallbackClassName = ['speech-subtitle', 'speech-subtitle--fallback', className].filter(Boolean).join(' ');
+  const rootClassName = ['speech-subtitle', 'game-subtitle-panel', className].filter(Boolean).join(' ');
+  const fallbackClassName = ['speech-subtitle', 'speech-subtitle--fallback', 'game-subtitle-panel', className].filter(Boolean).join(' ');
 
   if (hasWordBoundaries && !hasCurrentTime) return null;
 

@@ -102,6 +102,23 @@ test('Undercover v2 swaps the player poster for a host cutout only during host n
   }
 });
 
+test('Undercover v2 renders host narration as the active subtitle', () => {
+  const markup = renderToStaticMarkup(createElement(undercoverComponents.UndercoverArena, {
+    game: { ...speakingGame(1), status: 'voting' },
+    variant: 'v2',
+    activeSpeech: {
+      id: 'host-subtitle',
+      playerId: null,
+      text: '主持人宣布开始投票',
+      speakerLabel: '主持人',
+      speakerRole: 'host',
+    },
+  }));
+
+  assert.match(markup, /主持人宣布开始投票/);
+  assert.doesNotMatch(markup, /AI 玩家正在判断/);
+});
+
 test('Undercover controls keep classic behavior while v2 opts into the fixed control bar', () => {
   const props = {
     autoPlay: true,
@@ -123,12 +140,12 @@ test('Undercover controls keep classic behavior while v2 opts into the fixed con
     variant: 'v2'
   }));
 
-  assert.match(classic, /class="undercover-controls"/);
+  assert.match(classic, /class="undercover-controls game-control-rail"/);
   assert.match(classic, />返回选择</);
   assert.match(classic, /title="开始谁是卧底对局">开始游戏</);
   assert.match(classic, /title="暂停自动播放"[^>]*disabled=""/);
   assert.doesNotMatch(classic, /undercover-controls--v2/);
-  assert.match(v2, /class="undercover-controls undercover-controls--v2"/);
+  assert.match(v2, /class="undercover-controls undercover-controls--v2 game-control-rail"/);
   assert.match(v2, />返回</);
   assert.doesNotMatch(v2, /title="暂停自动播放"/);
 });
@@ -143,7 +160,7 @@ test('Undercover v2 pregame keeps classic marketing and v2 status gates separate
   assert.match(source, /\{variant === 'classic' && \(/);
   assert.match(
     source,
-    /\{variant === 'v2' && <p className="undercover-status" aria-live="polite">\{controller\.message\}<\/p>\}/,
+    /\{variant === 'v2' && <p className="undercover-status game-feedback" data-tone="info" aria-live="polite">\{controller\.message\}<\/p>\}/,
   );
   assert.equal(source.match(/role="alert"/g)?.length, 1);
 });

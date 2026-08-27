@@ -67,7 +67,7 @@ tests/
 
 ### 类型
 
-- `apiTypes.ts`：统一 API 响应类型。
+- `apiTypes.ts`：统一 API 响应类型，以及跨游戏 `GameVariant` 和 `AdminAuditEntry` 管理契约。
 - `gameTypes.ts`：游戏类型、游戏状态和通用游戏数据。
 - `workflowTypes.ts`：workflow、AI task、pending action、effect、interrupt 等类型。
 - `speechTypes.ts`：语音和字幕相关类型。
@@ -96,7 +96,8 @@ tests/
 - `GamePresentationAdapter`：为单局创建带状态的公开事件/游戏投影器，避免 session service 内按游戏名处理可见性。
 - `DomainAction`：玩家或 AI 在 ActionWindow 内提交的结构化动作，不直接修改状态。
 - `WorkflowEffect`：由 action 派生的待结算效果，必须由 resolver 统一处理。
-- `DomainEvent`：唯一事实事件，必须带 `channel`，`scope` 事件必须带 `scopeKey`。
+- `DomainEvent`：唯一事实事件，必须带 `channel`，`scope` 事件必须带 `scopeKey`；持久化事件可带 event schema version、actor type、causation 和 correlation。
+- `MatchSnapshot`：除运行版本外还包含 definition version 和 state schema version，状态升级不能依赖隐式 JSON 猜测。
 - `ProjectStateFromEvent`：Phase 2 引入的状态投影函数，用于把已落库的 event 投影到 match state。
 - `EngineDebugState` / `InvariantIssue`：内部调试和不变量检查输出，不作为公开 HTTP API。
 
@@ -105,7 +106,11 @@ tests/
 - `gameLimits.ts`：游戏限制常量。
 - `channelMaps.ts`：事件通道映射。
 - `channelResolution.ts`：通道解析工具。
-- `px2vw.mjs`：Vite 样式转换插件。
+- `px2vw.mjs`：Vite 样式转换插件；按属性处理像素单位，而不是全局字符串替换：
+  - 布局尺寸和间距继续按 1920 设计宽度转换为 `vw`。
+  - `font-size`、`line-height` 转换为带可读下限和原始上限的 `clamp(rem, vw, rem)`。
+  - `border*`、`outline*`、`stroke-width`、文字装饰线、平台圆角和焦点阴影保留物理像素，避免细线与焦点环在窄屏消失。
+  - `@media`、`@container` 条件内的像素断点必须原样保留；转换必须可重复执行且结果幂等，因为插件同时运行于 transform 和 bundle 阶段。
 
 ## API 响应约定
 
