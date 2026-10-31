@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ExecEnv } from '../runtime/env';
 import { toSeatNumbers } from '../runtime/seats';
 import type { VotePhase } from '../spec/phases';
-import { tallyBallots } from './tally';
+import { tallyBallots, type Tally } from './tally';
 import { done, issue, type AiPhaseExecutor, type StepOutcome } from './types';
 
 interface VoteState {
@@ -13,6 +13,8 @@ interface VoteState {
   candidates: Record<string, number[]>;
   /** 座位 → 目标；null 为弃票 */
   ballots: Record<string, number | null>;
+  /** 额外票：座位 → 票数（进入阶段时确定；旧快照中可能没有） */
+  readonly bonus?: Record<string, number>;
   issued: boolean;
 }
 
@@ -33,6 +35,13 @@ function abstainersOf(state: VoteState): number[] {
   return state.voters.filter((voter) => state.ballots[String(voter)] === null);
 }
 
+/** 本轮计票：额外票只计给本轮仍是候选人的座位 */
+function tallyRound(state: VoteState): Tally {
+  const open = new Set(Object.values(state.candidates).flat());
+  const bonus = Object.fromEntries(Object.entries(state.bonus ?? {}).filter(([seat]) => open.has(Number(seat))));
+  return tallyBallots(ballotsOf(state), bonus);
+}
+
 function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, tied: readonly number[]): StepOutcome {
   const state = env.phaseState<VoteState>();
   const title = phase.title ?? env.phaseId();
@@ -43,7 +52,7 @@ function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, tied: readon
     runoff: state.stage,
     ballots,
     abstained: abstainersOf(state),
-    tally: tallyBallots(ballots).rows,
+    tally: tallyRound(state).rows,
     tied: [...tied],
     outcome,
     channel: phase.channel ?? 'public',
@@ -65,7 +74,7 @@ function startRunoff(env: ExecEnv, phase: Phase, tied: readonly number[]): StepO
     runoff: state.stage,
     ballots,
     abstained: abstainersOf(state),
-    tally: tallyBallots(ballots).rows,
+    tally: tallyRound(state).rows,
     tied: [...tied],
     outcome: null,
     channel: phase.channel ?? 'public',
@@ -81,7 +90,7 @@ function startRunoff(env: ExecEnv, phase: Phase, tied: readonly number[]): StepO
 
 function resolve(env: ExecEnv, phase: Phase): StepOutcome {
   const state = env.phaseState<VoteState>();
-  const { top } = tallyBallots(ballotsOf(state));
+  const { top } = tallyRound(state);
   const [leader] = top;
   if (top.length === 1 && leader !== undefined) return finalize(env, phase, { kind: 'selected', seat: leader, byTieBreak: false }, []);
   if (top.length === 0) return finalize(env, phase, { kind: 'none' }, []);
@@ -101,12 +110,18 @@ export const voteExecutor: AiPhaseExecutor<Phase> = {
       if (!(weight > 0)) throw new Error(`阶段 ${env.phaseId()} 给 ${voter}号的票权必须为正数，收到 ${weight}`);
       return { voter, weight, candidates: toSeatNumbers(phase.candidates(ctx, seat)) };
     });
+    const bonus: Record<string, number> = {};
+    for (const { target, votes } of phase.bonus?.(ctx) ?? []) {
+      if (!(votes > 0)) throw new Error(`阶段 ${env.phaseId()} 给 ${target}号的额外票必须为正数，收到 ${votes}`);
+      bonus[String(target)] = (bonus[String(target)] ?? 0) + votes;
+    }
     env.setPhaseState<VoteState>({
       stage: 0,
       voters,
       weights: Object.fromEntries(entries.map(({ voter, weight }) => [String(voter), weight])),
       candidates: Object.fromEntries(entries.map(({ voter, candidates }) => [String(voter), candidates])),
       ballots: {},
+      bonus,
       issued: false,
     });
   },

@@ -55,6 +55,7 @@ export type {
   SpeakTurn,
   SpeechOutput,
   Transition,
+  VoteBonus,
   VotePhase,
 } from './spec/phases';
 export { expectResult, findResult } from './spec/results';

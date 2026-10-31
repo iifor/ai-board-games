@@ -102,9 +102,12 @@ export class ExecEnv {
     const roleSpec = change.role === undefined ? undefined : this.game.spec.roles[change.role];
     if (change.role !== undefined && !roleSpec) throw new Error(`角色 ${change.role} 未定义`);
     this.seat(seatNo);
+    const teamSince = this.s.log.length + 1;
     this.s.seats = deepFreeze(this.s.seats.map((seat) => {
       if (seat.seat !== seatNo) return seat;
-      return { ...seat, role: change.role ?? seat.role, team: change.team ?? roleSpec?.team ?? seat.team };
+      const team = change.team ?? roleSpec?.team ?? seat.team;
+      const next = { ...seat, role: change.role ?? seat.role, team };
+      return team === seat.team ? next : { ...next, teamSince };
     }));
   }
 

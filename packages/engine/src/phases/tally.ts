@@ -6,8 +6,9 @@ export interface Tally {
   readonly top: number[];
 }
 
-export function tallyBallots(ballots: readonly VoteBallot[]): Tally {
-  const counts = new Map<number, number>();
+/** bonus：座位 → 额外票数，与选票一起计入 */
+export function tallyBallots(ballots: readonly VoteBallot[], bonus: Readonly<Record<string, number>> = {}): Tally {
+  const counts = new Map<number, number>(Object.entries(bonus).map(([seat, votes]) => [Number(seat), votes]));
   for (const ballot of ballots) counts.set(ballot.target, (counts.get(ballot.target) ?? 0) + ballot.weight);
   const rows = [...counts.entries()]
     .map(([target, votes]) => ({ target, votes }))

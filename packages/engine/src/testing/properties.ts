@@ -1,7 +1,7 @@
 import type { CompiledGame } from '../compiler/compile';
 import type { EngineSnapshot, Seat } from '../runtime/types';
 import { audienceMode } from '../visibility/audienceView';
-import { seatCanSee } from '../visibility/channels';
+import { entryVisibleTo } from '../visibility/channels';
 import { roleVisibleTo } from '../visibility/roles';
 import { projectState } from '../visibility/stateProjection';
 import { runToEnd, type RunOptions, type RunRecord } from './harness';
@@ -31,7 +31,7 @@ function hiddenStrings(game: CompiledGame, snapshot: EngineSnapshot, viewer: Sea
   const hidden = new Set<string>();
   const visible = collectStrings(projectState(game, snapshot.state, viewer));
   for (const entry of snapshot.log) {
-    const canSee = viewer ? seatCanSee(entry.channel, viewer) : entry.channel === 'public';
+    const canSee = viewer ? entryVisibleTo(entry, viewer) : entry.channel === 'public';
     entryStrings(entry, canSee ? visible : hidden);
   }
   collectStrings(snapshot.state, hidden);

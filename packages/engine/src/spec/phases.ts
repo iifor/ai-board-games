@@ -92,6 +92,13 @@ export interface ActPhase<S, P> extends AiPhaseBase<S, P> {
   apply?(ctx: RuleContext<S, P>, decisions: readonly ActDecision[]): NoInfer<S>;
 }
 
+/** 不属于任何投票者的额外票（如乌鸦的诅咒）：计入每一轮计票，只对该轮的候选人有效 */
+export interface VoteBonus {
+  readonly target: number;
+  /** 正数 */
+  readonly votes: number;
+}
+
 export interface VotePhase<S, P> extends AiPhaseBase<S, P> {
   readonly kind: 'vote';
   voters(ctx: RuleContext<S, P>): SeatSelection;
@@ -104,6 +111,8 @@ export interface VotePhase<S, P> extends AiPhaseBase<S, P> {
   readonly eliminateCause?: string;
   /** 票权，默认 1（如警长 1.5） */
   weight?(ctx: RuleContext<S, P>, voter: Seat): number;
+  /** 额外票：进入阶段时计算一次，计入计票结果（日志 tally 中包含额外票，ballots 中不包含） */
+  bonus?(ctx: RuleContext<S, P>): readonly VoteBonus[];
   /** 允许弃票（输出 target: null） */
   readonly allowAbstain?: boolean;
   /** 兜底方式：random 随机合法目标，abstain 弃票；默认 random */
