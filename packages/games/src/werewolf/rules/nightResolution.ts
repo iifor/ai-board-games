@@ -12,6 +12,7 @@ import { brotherKill } from '../special/wolfBrothers';
 import { wolfSeedInfection } from '../special/wolfSeed';
 import type { PendingDeath, WerewolfState } from '../state';
 import { roleTraits } from './board';
+import { thirdPartyKill } from './thirdParty';
 import type { WerewolfContext } from './context';
 import { addDeath, isDying } from './tally';
 import type { NightStep, NightTally } from './types';
@@ -64,6 +65,7 @@ const NIGHT_STEPS: readonly NightStep[] = [
   stalkerAssassination,
   bigBadWolfKill,
   brotherKill,
+  thirdPartyKill,
   bigTreeShield,
   wolfSeedInfection,
   merchantBackfire,

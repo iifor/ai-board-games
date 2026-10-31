@@ -15,6 +15,7 @@ import { evilKnightPrompts } from './special/evilKnight';
 import { fortuneTellerPrompts } from './special/fortuneTeller';
 import { foxPrompts } from './special/fox';
 import { guardPrompts } from './special/guard';
+import { heavenlyEyePrompts } from './special/heavenlyEye';
 import { hiddenWolfPrompts } from './special/hiddenWolf';
 import { hybridPrompts } from './special/hybrid';
 import { knightPrompts } from './special/knight';
@@ -23,6 +24,7 @@ import { nightmarePrompts } from './special/nightmare';
 import { nineTailedFoxPrompts } from './special/nineTailedFox';
 import { oldRoguePrompts } from './special/oldRogue';
 import { penguinPrompts } from './special/penguin';
+import { requesterPrompts } from './special/requester';
 import { silenceElderPrompts } from './special/silenceElder';
 import { stalkerPrompts } from './special/stalker';
 import { whiteWolfKingPrompts } from './special/whiteWolfKing';
@@ -112,6 +114,8 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     bear: role('熊', 'good', bearPrompts.bear, 'god'),
     penguin: role('企鹅', 'good', penguinPrompts.penguin, 'god'),
     fox: role('狐狸', 'good', foxPrompts.fox, 'god'),
+    heavenly_eye: role('天眼', 'good', heavenlyEyePrompts.heavenlyEye, 'god'),
+    requester: role('祈求者', 'good', requesterPrompts.requester, 'god'),
     hybrid: role('混血儿', 'good', hybridPrompts.hybrid, 'villager'),
     old_rogue: role('老流氓', 'good', oldRoguePrompts.oldRogue, 'villager', { charmImmune: true, delayedDeath: true }),
     wild_child: role('野孩子', 'good', wildChildPrompts.wildChild, 'third'),

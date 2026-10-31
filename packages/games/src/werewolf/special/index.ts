@@ -16,6 +16,7 @@ import { fortuneTellerPhases, fortuneTellerPrompts } from './fortuneTeller';
 import { foxPhases, foxPrompts } from './fox';
 import { giftPhases, giftPrompts, giftTriggers } from './gifts';
 import { guardPhases, guardPrompts } from './guard';
+import { heavenlyEyePhases, heavenlyEyePrompts } from './heavenlyEye';
 import { hiddenWolfPhases, hiddenWolfPrompts, hiddenWolfTriggers } from './hiddenWolf';
 import { hybridPhases, hybridPrompts } from './hybrid';
 import { knightPhases, knightPrompts } from './knight';
@@ -24,6 +25,7 @@ import { nightmarePhases, nightmarePrompts } from './nightmare';
 import { nineTailedFoxPhases, nineTailedFoxPrompts, nineTailedFoxTriggers } from './nineTailedFox';
 import { oldRoguePhases, oldRoguePrompts, oldRogueTriggers } from './oldRogue';
 import { penguinPhases, penguinPrompts } from './penguin';
+import { requesterPhases, requesterPrompts } from './requester';
 import { silenceElderPhases, silenceElderPrompts } from './silenceElder';
 import { stalkerPhases, stalkerPrompts } from './stalker';
 import { whiteWolfKingPhases, whiteWolfKingPrompts, whiteWolfKingTriggers } from './whiteWolfKing';
@@ -67,6 +69,8 @@ export const specialPrompts = {
   ...penguinPrompts,
   ...foxPrompts,
   ...wolfSeedPrompts,
+  ...heavenlyEyePrompts,
+  ...requesterPrompts,
 };
 
 export const specialPhases: WerewolfPhases = {
@@ -99,6 +103,8 @@ export const specialPhases: WerewolfPhases = {
   ...penguinPhases,
   ...foxPhases,
   ...wolfSeedPhases,
+  ...heavenlyEyePhases,
+  ...requesterPhases,
 };
 
 /**

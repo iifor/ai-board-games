@@ -32,4 +32,10 @@ export const EXTENDED_BOARDS: readonly BoardDefinition[] = [
     roles: { wolf_seed: 1, hidden_wolf: 1, werewolf: 2, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
     config: { hiddenWolf: 'linked' },
   }),
+  board({
+    key: 'heavenly-eye-requester-12',
+    name: '天眼&祈求者',
+    description: '恶魔与 3 名狼人对抗天眼、女巫、猎人、祈求者与 4 名村民；天眼验出具体身份，祈求者首夜按祈求对象获得能力，祈求到狼人则成为第三方。',
+    roles: { demon: 1, werewolf: 3, heavenly_eye: 1, witch: 1, hunter: 1, requester: 1, villager: 'rest' },
+  }),
 ];
