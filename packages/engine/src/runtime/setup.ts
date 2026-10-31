@@ -31,6 +31,35 @@ function parseParams(game: CompiledGame, params: unknown): unknown {
   return parsed.data;
 }
 
+/** 游戏按局给出的分配（setup.deal）必须只引用已定义的角色，且合计恰好等于本局人数 */
+function checkDealt(game: CompiledGame, dealt: Assignment, playerCount: number): void {
+  const entries = Object.entries(dealt);
+  const issues: string[] = [];
+  const unknownRoles = entries.filter(([role]) => !game.spec.roles[role]).map(([role]) => role);
+  if (unknownRoles.length) issues.push(`setup.deal 引用了未定义的角色：${unknownRoles.join('、')}`);
+  const rest = entries.filter(([, count]) => count === 'rest').length;
+  const fixed = entries.reduce((sum, [, count]) => sum + (count === 'rest' ? 0 : count), 0);
+  const invalid = entries.some(([, count]) => count !== 'rest' && (!Number.isInteger(count) || count < 0));
+  if (invalid || rest > 1 || (rest === 0 ? fixed !== playerCount : fixed > playerCount)) {
+    issues.push(`setup.deal 的分配与人数 ${playerCount} 不符`);
+  }
+  if (issues.length) throw new SpecError(game.spec.key, issues);
+}
+
+/** 本局实际发出的角色：默认取变体或 setup 的 assign，游戏可用 setup.deal 按局改变 */
+function dealtAssignment(game: CompiledGame, input: CreateMatchInput, assign: Assignment, context: Omit<SetupContext<unknown>, 'seats' | 'random'>): Assignment {
+  const deal = game.spec.setup.deal;
+  if (!deal) return assign;
+  const dealt = deal({
+    ...context,
+    playerCount: input.players.length,
+    assign,
+    random: (label: string) => createRng(deriveSeed(input.seed, `deal:${label}`)),
+  });
+  checkDealt(game, dealt, input.players.length);
+  return dealt;
+}
+
 /** 按 assign 的声明顺序展开角色列表，rest 角色承接剩余人数 */
 function expandRoles(assign: Assignment, playerCount: number): string[] {
   const entries = Object.entries(assign);
@@ -69,10 +98,12 @@ export function createSnapshot(game: CompiledGame, input: CreateMatchInput): Eng
   const variant = resolveVariant(game, input.variant);
   validatePlayers(game, input.players, variant.spec?.players ?? game.spec.players);
   const params = deepFreeze(cloneJson(parseParams(game, input.params)));
-  const seats = deepFreeze(assignSeats(game, input, variant.spec?.assign ?? game.spec.setup.assign));
+  const variantInfo = variantContext(game, variant.key);
+  const assign = dealtAssignment(game, input, variant.spec?.assign ?? game.spec.setup.assign, { params, variant: variantInfo });
+  const seats = deepFreeze(assignSeats(game, input, assign));
   const setupContext: SetupContext<unknown> = {
     params,
-    variant: variantContext(game, variant.key),
+    variant: variantInfo,
     seats: new SeatQuery(seats),
     random: (label: string) => createRng(deriveSeed(input.seed, `setup:${label}`)),
   };

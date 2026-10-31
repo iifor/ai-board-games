@@ -2,7 +2,7 @@ import type { StageLayout } from '@battle/shared';
 import type { ZodType } from 'zod';
 import type { PromptTemplate } from '../prompt/template';
 import type { BreakpointSetting, Seat, TemplateVars } from '../runtime/types';
-import type { RuleContext, SetupContext, TriggerEvent, TriggerEventKind } from './context';
+import type { DealContext, RuleContext, SetupContext, TriggerEvent, TriggerEventKind } from './context';
 import type { PhaseSpec, SpeechOutput } from './phases';
 
 export interface RoleSpec {
@@ -37,6 +37,11 @@ export interface SetupSpec<S, P> {
   readonly assign: Readonly<Record<string, number | 'rest'>>;
   /** 是否用种子打乱身份分配，默认 true */
   readonly shuffle?: boolean;
+  /**
+   * 按局决定实际发出的角色（如盗贼板子开局先抽走两张底牌）：返回角色 → 数量（最多一个 rest），
+   * 合计必须等于本局人数；之后照常按种子打乱分配到座位。不提供时使用变体或 setup 的 assign。
+   */
+  deal?(ctx: DealContext<P>): Readonly<Record<string, number | 'rest'>>;
   /** 返回值不参与类型推断：S 只由 state.schema 决定 */
   init(ctx: SetupContext<P>): NoInfer<S>;
 }

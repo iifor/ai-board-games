@@ -31,6 +31,7 @@ export type {
 } from './runtime/types';
 export type {
   ActDecision,
+  DealContext,
   Judgement,
   PhaseResult,
   RuleContext,

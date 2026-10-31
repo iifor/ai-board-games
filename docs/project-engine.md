@@ -1,6 +1,6 @@
 # 引擎（packages/engine）
 
-> 状态：P1 完成引擎核心并接入辩论赛；P2 加入阶段栈、触发器、终局转入、发言附加动作、加权投票、可放弃动作与公开身份，并接入狼人杀标准局；P7 加入玩法变体、阶段开关、座位改派，以及投票额外票与改换阵营后的频道可见范围。
+> 状态：P1 完成引擎核心并接入辩论赛；P2 加入阶段栈、触发器、终局转入、发言附加动作、加权投票、可放弃动作与公开身份，并接入狼人杀标准局；P7 加入玩法变体、阶段开关、座位改派、投票额外票与改换阵营后的频道可见范围，以及按局发牌（`setup.deal`）。
 
 ## 职责与边界
 
@@ -45,7 +45,7 @@ GameSpec 关键字段：
 | `rulesText` / `roles[*].identity` | L2 / L3 模板 |
 | `roles` | `name`、`team`、`positions`（席位数）、`publicRole`（所有人可见）、`knowsTeammates`（知道队友身份） |
 | `seatLabel` | 座位称呼，用于日志与提示词，默认 `3号 张三` |
-| `setup` | `assign`（角色 → 数量，最多一个 `rest`）、`shuffle`（默认 true）、`init`（初始状态） |
+| `setup` | `assign`（角色 → 数量，最多一个 `rest`）、`shuffle`（默认 true）、`deal`（可选：按局决定实际发出的角色，如盗贼板子开局先抽走两张底牌；拿到默认分配、人数、变体与独立的种子随机数，返回的分配必须只含已定义角色且合计等于人数，否则抛 `SpecError`）、`init`（初始状态） |
 | `variants` / `defaultVariant` | 玩法变体（如狼人杀板子）：`name`、`description`、`assign`（替换角色分配）、`players`、`config`（规则通过 `ctx.variant.config` 读取，由游戏自行校验）；开局输入 `variant` 选择，缺省取 `defaultVariant` |
 | `state` | `schema` 决定状态类型；`visibility` 声明每个字段对 AI 的可见性，**未声明即不可见** |
 | `start` / `phases` | 阶段字典；`end` 是保留的终局目标 |
