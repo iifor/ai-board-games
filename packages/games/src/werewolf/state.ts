@@ -11,7 +11,13 @@ export const seerCheckSchema = z.object({
 });
 
 /** 夜间死亡的原因；天亮出局时作为触发器的 cause */
-export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'stalker']);
+export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'stalker', 'charm']);
+
+export const demonCheckSchema = z.object({
+  night: z.number().int().positive(),
+  target: seatNo,
+  result: z.enum(['神职', '平民']),
+});
 
 export const pendingDeathSchema = z.object({
   seat: seatNo,
@@ -39,6 +45,8 @@ export const werewolfStateSchema = z.object({
     hugged: seatNo.nullable(),
     /** 潜行者今晚暗杀的人 */
     stalked: seatNo.nullable(),
+    /** 狼美人今晚魅惑的人：狼美人当晚或次日白天出局时殉情；下一晚入夜时清空 */
+    charmed: seatNo.nullable(),
   }),
   /** 守卫上一晚守护的人（不能连续两晚守同一人） */
   guardLastTarget: seatNo.nullable(),
@@ -54,6 +62,7 @@ export const werewolfStateSchema = z.object({
   stalkerVote: seatNo.nullable(),
   /** 花蝴蝶已经抱人的次数 */
   butterflyHugs: z.number().int().nonnegative(),
+  demonChecks: z.array(demonCheckSchema),
   /** 白狼王自爆时选择带走的人，等待结算 */
   pendingBlast: seatNo.nullable(),
   potions: z.object({ antidote: z.boolean(), poison: z.boolean() }),
@@ -107,6 +116,7 @@ export const werewolfVisibility = {
   stalkerUsed: roleOnly('stalker'),
   stalkerVote: roleOnly('stalker'),
   butterflyHugs: roleOnly('butterfly'),
+  demonChecks: roleOnly('demon'),
   potions: roleOnly('witch'),
   lastNightDeaths: 'public',
   seerChecks: ownChecks,
@@ -116,7 +126,7 @@ export const werewolfVisibility = {
 } as const satisfies { readonly [K in keyof WerewolfState]?: Visibility };
 
 export function emptyNight(): WerewolfState['night'] {
-  return { wolfTarget: null, saved: false, poisoned: null, guarded: null, silenced: null, hugged: null, stalked: null };
+  return { wolfTarget: null, saved: false, poisoned: null, guarded: null, silenced: null, hugged: null, stalked: null, charmed: null };
 }
 
 export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): WerewolfState {
@@ -132,6 +142,7 @@ export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): Werewol
     stalkerUsed: false,
     stalkerVote: null,
     butterflyHugs: 0,
+    demonChecks: [],
     pendingBlast: null,
     potions: { antidote: true, poison: true },
     pendingDeaths: [],

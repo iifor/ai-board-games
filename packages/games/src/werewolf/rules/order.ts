@@ -13,6 +13,8 @@ export const NIGHT_ORDER = [
   'guard_protect',
   'wolf_chat',
   'wolf_kill',
+  'wolf_beauty_charm',
+  'demon_check',
   'seer_check',
   'witch_save',
   'witch_poison',

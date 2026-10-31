@@ -2,12 +2,14 @@ import type { PromptTemplate, RoleSpec } from '@battle/engine';
 import type { RoleCategory } from './boards';
 import { werewolfPrompts as prompts } from './prompts';
 import { butterflyPrompts } from './special/butterfly';
+import { demonPrompts } from './special/demon';
 import { guardPrompts } from './special/guard';
 import { hybridPrompts } from './special/hybrid';
 import { knightPrompts } from './special/knight';
 import { silenceElderPrompts } from './special/silenceElder';
 import { stalkerPrompts } from './special/stalker';
 import { whiteWolfKingPrompts } from './special/whiteWolfKing';
+import { wolfBeautyPrompts } from './special/wolfBeauty';
 
 /** 角色的静态特性，规则通过 roleTraits(seat) 读取 */
 export interface RoleTraits {
@@ -30,11 +32,16 @@ function role(name: string, team: 'werewolf' | 'good', identity: PromptTemplate,
   return { spec: { name, team, identity, ...(team === 'werewolf' ? { knowsTeammates: true } : {}) }, category, traits };
 }
 
+/** 恶魔、恶灵骑士：免疫毒药与夜间出局的猎人的枪，不能自爆 */
+const NIGHT_IMMUNE: RoleTraits = { noSelfDestruct: true, poisonImmune: true, nightShotImmune: true };
+
 /** 全部板子用到的角色；新增特殊角色时在此登记 */
 function buildCatalog(): Readonly<Record<string, RoleEntry>> {
   return {
     werewolf: role('狼人', 'werewolf', prompts.werewolf, 'wolf'),
     white_wolf_king: role('白狼王', 'werewolf', whiteWolfKingPrompts.whiteWolfKing, 'wolf'),
+    wolf_beauty: role('狼美人', 'werewolf', wolfBeautyPrompts.wolfBeauty, 'wolf', { noSelfDestruct: true }),
+    demon: role('恶魔', 'werewolf', demonPrompts.demon, 'wolf', NIGHT_IMMUNE),
     seer: role('预言家', 'good', prompts.seer, 'god'),
     witch: role('女巫', 'good', prompts.witch, 'god'),
     hunter: role('猎人', 'good', prompts.hunter, 'god'),

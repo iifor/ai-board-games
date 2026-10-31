@@ -66,6 +66,18 @@ export const BOARDS: readonly BoardDefinition[] = [
     description: '白狼王与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
     roles: { white_wolf_king: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
   }),
+  board({
+    key: 'wolf-beauty-guard-12',
+    name: '狼美人&守卫',
+    description: '狼美人与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
+    roles: { wolf_beauty: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'demon-guard-12',
+    name: '恶魔&守卫',
+    description: '恶魔与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
+    roles: { demon: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
 ];
 
 export const DEFAULT_BOARD = 'standard-12';
