@@ -135,6 +135,18 @@ export const BOARDS: readonly BoardDefinition[] = [
     roles: { hidden_wolf: 1, werewolf: 3, bear_tamer: 1, witch: 1, hunter: 1, idiot: 1, villager: 'rest' },
     config: { hiddenWolf: 'linked' },
   }),
+  board({
+    key: 'wild-child-12',
+    name: '野孩子',
+    description: '3 名狼人对抗预言家、女巫、猎人、白痴、野孩子与 4 名村民；野孩子的榜样出局时他会变成狼人。',
+    roles: { werewolf: 3, seer: 1, witch: 1, hunter: 1, idiot: 1, wild_child: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'bombman-12',
+    name: '炸弹人',
+    description: '4 名狼人对抗预言家、女巫、猎人、炸弹人与 4 名村民；炸弹人被放逐时可以炸死所有投票给他的人。',
+    roles: { werewolf: 4, seer: 1, witch: 1, hunter: 1, bombman: 1, villager: 'rest' },
+  }),
 ];
 
 export const DEFAULT_BOARD = 'standard-12';
