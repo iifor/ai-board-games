@@ -1,4 +1,5 @@
 import type { ActDecision, ComputeOutcome, Seat, VoteOutcome } from '@battle/engine';
+import { bloodlineHold } from '../special/magicWolf';
 import type { WerewolfState } from '../state';
 import { skillsLost } from './block';
 import { canVote, ring, type WerewolfContext } from './context';
@@ -55,7 +56,7 @@ export function recordExile(ctx: WerewolfContext, outcome: VoteOutcome): Werewol
   return { ...ctx.state, exileTarget: outcome.kind === 'selected' ? outcome.seat : null };
 }
 
-/** 白痴首次被放逐时翻牌免死；其他人出局；平票或全部弃票则无人出局 */
+/** 白痴首次被放逐时翻牌免死；最后一名狼人是魔狼时翻牌存活到次日天亮；其他人出局；平票或全部弃票则无人出局 */
 export function resolveExile(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const target = ctx.state.exileTarget;
   const state = { ...ctx.state, exileTarget: null };
@@ -67,5 +68,5 @@ export function resolveExile(ctx: WerewolfContext): ComputeOutcome<WerewolfState
       log: [{ kind: 'revealed', text: `${target}号翻牌，身份是白痴，免于出局，但此后失去投票权。`, data: { seat: target, role: 'idiot' } }],
     };
   }
-  return { state, eliminate: [{ seat: target, reason: '被放逐', cause: 'exile' }] };
+  return bloodlineHold(ctx, seat, state) ?? { state, eliminate: [{ seat: target, reason: '被放逐', cause: 'exile' }] };
 }

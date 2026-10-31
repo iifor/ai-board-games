@@ -21,7 +21,7 @@ const prompts = { ...werewolfPrompts, ...specialPrompts };
 
 export const werewolfSpec = defineGame<WerewolfState, WerewolfParams>({
   key: 'werewolf',
-  version: 5,
+  version: 6,
   title: 'AI 狼人杀',
   description: '狼人杀（多数板子 12 人），支持多个板子；首日竞选警长。',
   players: PLAYER_RANGE,

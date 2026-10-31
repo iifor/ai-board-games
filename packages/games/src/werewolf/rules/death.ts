@@ -1,5 +1,6 @@
 import type { ActDecision, ComputeOutcome, Seat, TriggerEvent } from '@battle/engine';
 import { woundRogue } from '../special/oldRogue';
+import { shieldedTonight } from '../special/spiritWolfSkills';
 import { NIGHT_DEATH_CAUSES, type WerewolfState } from '../state';
 import { hasRole, roleTraits } from './board';
 import { shotBlockedTonight, skillsLost } from './block';
@@ -85,7 +86,8 @@ export function settleShot(ctx: WerewolfContext, reason: string): ComputeOutcome
   // 猎人在夜里死亡（天亮出局）时开的枪算夜间开枪，其余（放逐、白天被带走等）算白天开枪
   const cause = ctx.trigger?.kind === 'seat_eliminated' && NIGHT_DEATH_CAUSES.has(ctx.trigger.cause) ? SHOT_BY_NIGHT : SHOT_BY_DAY;
   const traits = roleTraits(ctx.seats.get(target));
-  if (cause === SHOT_BY_NIGHT && traits.nightShotImmune) {
+  // 免疫夜间开枪：恶魔、恶灵骑士；当晚被灵狼庇护的人（天亮时仍读取当晚的记录）
+  if (cause === SHOT_BY_NIGHT && (traits.nightShotImmune || shieldedTonight(ctx, target))) {
     return { state, log: [{ kind: 'narration', text: `${target}号中枪后没有出局。` }] };
   }
   if (traits.delayedDeath) {

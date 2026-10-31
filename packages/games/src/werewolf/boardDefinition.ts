@@ -46,9 +46,12 @@ export interface BoardDefinition {
    */
   readonly extraCards?: Readonly<Record<string, number>>;
   readonly config?: z.input<typeof boardConfigSchema>;
+  /** 板子的特殊约定（如"白痴算作民牌"），接在角色规则之后 */
+  readonly notes?: readonly string[];
 }
 
-/** 规则说明由角色表与板子参数自动拼出（见 roleRules.ts） */
+/** 规则说明由角色表与板子参数自动拼出（见 roleRules.ts），再接上板子的特殊约定 */
 export function defineBoard(definition: Omit<BoardDefinition, 'rules'>): BoardDefinition {
-  return { ...definition, rules: describeRules(definition.roles, boardConfigSchema.parse(definition.config ?? {})) };
+  const rules = describeRules(definition.roles, boardConfigSchema.parse(definition.config ?? {}));
+  return { ...definition, rules: [rules, ...(definition.notes ?? [])].join('\n') };
 }

@@ -18,8 +18,9 @@ export function isPackWolf(seat: Seat): boolean {
   return seat.team === PACK_TEAM;
 }
 
-/** 翻牌的白痴失去投票权 */
+/** 翻牌的白痴失去投票权；翻牌存活、等待出局的魔狼（state.magicWolfDoom）也不能投票 */
 export function canVote(ctx: WerewolfContext, seat: Seat): boolean {
+  if (seat.role === 'magic_wolf' && ctx.state.magicWolfDoom !== null) return false;
   return seat.alive && !(seat.role === 'idiot' && ctx.state.idiotRevealed);
 }
 

@@ -6,6 +6,7 @@ import { initialKnownWolves } from './rules/loneWolf';
 import { emptyNight, type WerewolfParams, type WerewolfState } from './state';
 import { initialExtendedState } from './stateExtended';
 import { initialExtraState } from './stateExtras';
+import { initialFinalState } from './stateFinal';
 
 /** 开局状态：板子信息公开，其余字段按可见性声明投影给对应座位 */
 export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): WerewolfState {
@@ -39,5 +40,6 @@ export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): Werewol
     mvp: null,
     ...initialExtraState(initialKnownWolves(ctx.seats, boardConfig(ctx))),
     ...initialExtendedState(initialThief(board, ctx.seats)),
+    ...initialFinalState(),
   };
 }

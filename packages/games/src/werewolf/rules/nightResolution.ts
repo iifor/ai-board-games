@@ -2,11 +2,15 @@ import type { ComputeOutcome } from '@battle/engine';
 import { bigBadWolfKill } from '../special/bigBadWolf';
 import { bigTreeShield } from '../special/bigTree';
 import { merchantBackfire } from '../special/blackMerchant';
+import { demonHunt } from '../special/demonHunter';
 import { dreamDeaths, isDreamed } from '../special/dreamer';
 import { evilKnightReflect } from '../special/evilKnight';
+import { illusionSubstitution } from '../special/illusionist';
 import { loverNightLink } from '../special/lovers';
 import { swapTarget } from '../special/magician';
 import { woundRogue } from '../special/oldRogue';
+import { spiritShield } from '../special/spiritWolf';
+import { antidotedTonight } from '../special/spiritWolfSkills';
 import { stalkerAssassination } from '../special/stalker';
 import { wolfBeautyNightLink } from '../special/wolfBeauty';
 import { brotherKill } from '../special/wolfBrothers';
@@ -18,10 +22,11 @@ import type { WerewolfContext } from './context';
 import { addDeath, isDying } from './tally';
 import type { NightStep, NightTally } from './types';
 
-/** 今晚毒药实际落在谁身上（魔术师换号后）：女巫的毒药与赠送 / 祈求得到的毒药 */
+/** 今晚毒药实际落在谁身上（魔术师换号后）：女巫的毒药（被灵狼的解毒剂解救的除外）与赠送 / 祈求得到的毒药 */
 function poisonedSeats(ctx: WerewolfContext): number[] {
   const { poisoned, giftPoisoned } = ctx.state.night;
-  return [poisoned, giftPoisoned].flatMap((seat) => (seat === null ? [] : [swapTarget(ctx, seat)]));
+  const witchPoison = poisoned !== null && antidotedTonight(ctx, poisoned) ? null : poisoned;
+  return [witchPoison, giftPoisoned].flatMap((seat) => (seat === null ? [] : [swapTarget(ctx, seat)]));
 }
 
 /** 毒药能否直接毒死该座位：梦游者（毒药浪费）、免疫毒药者、老流氓（延迟出局）不会当晚死于毒药 */
@@ -55,7 +60,7 @@ const poison: NightStep = (ctx, tally) => poisonedSeats(ctx).reduce<NightTally>(
 }, tally);
 
 /**
- * 结算顺序：狼刀 → 毒药 → 特殊角色的结算步骤（按此顺序插入）。
+ * 结算顺序：狼刀 → 毒药 → 特殊角色的结算步骤（按此顺序插入；猎魔人的狩猎排在各种击杀之后，灵狼的庇护再挡下其中的狼刀与毒药，幻象随后替幻术师承受余下的狼刀或毒药）。
  * 恶灵骑士反伤排在狼刀、毒药之后（反伤对象已死亡则不消耗反伤）；大树要看全部狼刀，排在各种击杀之后；
  * 摄梦死亡要知道摄梦人当晚是否死亡，排在其他死亡之后；殉情最后，覆盖前面所有的死亡。
  */
@@ -67,6 +72,9 @@ const NIGHT_STEPS: readonly NightStep[] = [
   bigBadWolfKill,
   brotherKill,
   thirdPartyKill,
+  demonHunt,
+  spiritShield,
+  illusionSubstitution,
   bigTreeShield,
   wolfSeedInfection,
   merchantBackfire,
