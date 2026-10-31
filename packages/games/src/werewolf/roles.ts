@@ -1,6 +1,7 @@
 import type { PromptTemplate, RoleSpec } from '@battle/engine';
 import type { RoleCategory } from './boardDefinition';
 import { werewolfPrompts as prompts } from './prompts';
+import { bearPrompts } from './special/bear';
 import { bearTamerPrompts } from './special/bearTamer';
 import { bigBadWolfPrompts } from './special/bigBadWolf';
 import { bigTreePrompts } from './special/bigTree';
@@ -12,6 +13,7 @@ import { demonPrompts } from './special/demon';
 import { dreamerPrompts } from './special/dreamer';
 import { evilKnightPrompts } from './special/evilKnight';
 import { fortuneTellerPrompts } from './special/fortuneTeller';
+import { foxPrompts } from './special/fox';
 import { guardPrompts } from './special/guard';
 import { hiddenWolfPrompts } from './special/hiddenWolf';
 import { hybridPrompts } from './special/hybrid';
@@ -20,6 +22,7 @@ import { magicianPrompts } from './special/magician';
 import { nightmarePrompts } from './special/nightmare';
 import { nineTailedFoxPrompts } from './special/nineTailedFox';
 import { oldRoguePrompts } from './special/oldRogue';
+import { penguinPrompts } from './special/penguin';
 import { silenceElderPrompts } from './special/silenceElder';
 import { stalkerPrompts } from './special/stalker';
 import { whiteWolfKingPrompts } from './special/whiteWolfKing';
@@ -103,11 +106,15 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     bombman: role('炸弹人', 'good', bombmanPrompts.bombman, 'god'),
     nine_tailed_fox: role('九尾狐', 'good', nineTailedFoxPrompts.nineTailedFox, 'god'),
     black_merchant: role('黑商', 'good', blackMerchantPrompts.blackMerchant, 'god'),
+    bear: role('熊', 'good', bearPrompts.bear, 'god'),
+    penguin: role('企鹅', 'good', penguinPrompts.penguin, 'god'),
+    fox: role('狐狸', 'good', foxPrompts.fox, 'god'),
     hybrid: role('混血儿', 'good', hybridPrompts.hybrid, 'villager'),
     old_rogue: role('老流氓', 'good', oldRoguePrompts.oldRogue, 'villager', { charmImmune: true, delayedDeath: true }),
     wild_child: role('野孩子', 'good', wildChildPrompts.wildChild, 'third'),
     big_tree: role('大树', 'good', bigTreePrompts.bigTree, 'villager'),
     villager: role('村民', 'good', prompts.villager, 'villager'),
+    rabbit: role('兔兔', 'good', prompts.rabbit, 'villager'),
   };
 }
 

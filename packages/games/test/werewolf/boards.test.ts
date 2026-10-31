@@ -1,6 +1,6 @@
 import { assertDeterministic, assertNoLeak, assertTerminates } from '@battle/engine/testing';
 import { describe, expect, it } from 'vitest';
-import { BOARDS } from '../../src/werewolf/boards';
+import { boardPlayers, BOARDS } from '../../src/werewolf/boards';
 import { werewolfGame } from '../../src/werewolf';
 import { act, combine, eliminated, entries, first, play, requestsIn, roleSeats, stateOf, wolvesKill, type Override } from './helpers';
 
@@ -15,12 +15,14 @@ const [villager = 0, villagerB = 0] = roleSeats(SEED, 'villager', BOARD);
 const guardOn = (target: number | null, night: number): Override => act('guard_protect', guard, target === null ? [] : [target], night);
 
 describe('board registry', () => {
-  it('registers every board as a variant with 12 seats', () => {
+  it('registers every board as a variant with its player range', () => {
     for (const board of BOARDS) {
       const variant = werewolfGame.spec.variants?.[board.key];
       expect(variant?.name).toBe(board.name);
+      expect(variant?.players).toEqual(boardPlayers(board));
     }
     expect(werewolfGame.spec.defaultVariant).toBe('standard-12');
+    expect(werewolfGame.spec.players).toEqual({ min: 11, max: 12 });
   });
 
   it('puts the board rules into the rules layer', () => {
@@ -84,14 +86,14 @@ describe('white wolf king', () => {
   });
 });
 
-/** 每个板子 20 个种子；标准局另有 100 个种子的性质测试 */
-describe.each(BOARDS.map((board) => board.key))('board %s properties', (variant) => {
+/** 每个板子 20 个种子，按板子的最少人数（12 人以外的人数由服务端端到端测试覆盖）；标准局另有 100 个种子的性质测试 */
+describe.each(BOARDS.map((board) => [board.key, boardPlayers(board).min] as const))('board %s properties', (variant, playerCount) => {
   it('terminates, never leaks and is deterministic', { timeout: 30_000 }, () => {
-    const runs = assertTerminates(werewolfGame, Array.from({ length: 20 }, (_, index) => index + 1), { variant });
+    const runs = assertTerminates(werewolfGame, Array.from({ length: 20 }, (_, index) => index + 1), { variant, playerCount });
     for (const run of runs) {
       assertNoLeak(werewolfGame, run);
       expect(run.log.filter((entry) => entry.kind === 'fallback')).toHaveLength(0);
     }
-    expect(() => assertDeterministic(werewolfGame, { seed: 9, variant })).not.toThrow();
+    expect(() => assertDeterministic(werewolfGame, { seed: 9, variant, playerCount })).not.toThrow();
   });
 });

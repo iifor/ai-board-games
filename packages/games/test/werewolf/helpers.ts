@@ -19,21 +19,22 @@ export function passiveOutput(request: AiRequest): unknown {
   return { verdict: 'pro', comment: '无' };
 }
 
-export function play(seed: number, override: Override = () => undefined, variant?: string): RunRecord {
+/** players 默认 12 人（动物园等板子可以换人数） */
+export function play(seed: number, override: Override = () => undefined, variant?: string, players = 12): RunRecord {
   const agent: Agent = (request, snapshot) => ({ output: override(request, snapshot) ?? passiveOutput(request) });
-  return runToEnd(werewolfGame, { seed, agent, maxAdvances: 2000, ...(variant ? { variant } : {}) });
+  return runToEnd(werewolfGame, { seed, agent, maxAdvances: 2000, playerCount: players, ...(variant ? { variant } : {}) });
 }
 
-export function seatsOf(seed: number, variant?: string): readonly Seat[] {
-  return createSnapshot(werewolfGame, { seed, players: makePlayers(12), ...(variant ? { variant } : {}) }).seats;
+export function seatsOf(seed: number, variant?: string, players = 12): readonly Seat[] {
+  return createSnapshot(werewolfGame, { seed, players: makePlayers(players), ...(variant ? { variant } : {}) }).seats;
 }
 
-export function roleSeats(seed: number, role: string, variant?: string): number[] {
-  return seatsOf(seed, variant).filter((seat) => seat.role === role).map((seat) => seat.seat);
+export function roleSeats(seed: number, role: string, variant?: string, players = 12): number[] {
+  return seatsOf(seed, variant, players).filter((seat) => seat.role === role).map((seat) => seat.seat);
 }
 
-export function first(seed: number, role: string, variant?: string): number {
-  const [seat] = roleSeats(seed, role, variant);
+export function first(seed: number, role: string, variant?: string, players = 12): number {
+  const [seat] = roleSeats(seed, role, variant, players);
   if (seat === undefined) throw new Error(`种子 ${seed} 没有 ${role}`);
   return seat;
 }

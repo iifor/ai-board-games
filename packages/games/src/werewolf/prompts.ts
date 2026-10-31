@@ -20,6 +20,7 @@ export const werewolfPrompts = definePrompts({
   hunter: '你是{{me.label}}，身份是猎人。出局时（被毒杀除外）你可以开枪带走一名玩家。',
   idiot: '你是{{me.label}}，身份是白痴。被放逐时你会翻牌免于出局，但此后失去投票权。',
   villager: '你是{{me.label}}，身份是村民。你没有特殊技能，需要通过发言和投票找出狼人。',
+  rabbit: '你是{{me.label}}，身份是兔兔（平民）。你没有特殊技能，需要通过发言和投票找出狼人。',
   nightFalls: '天黑请闭眼。第 {{round}} 夜开始。',
   wolfChat: '现在是第 {{round}} 夜，狼人请睁眼。请和队友商量今晚击杀谁，不超过 80 字。',
   wolfKill: '请投票决定今晚击杀的玩家；狼人全部弃票则今晚不杀人。',

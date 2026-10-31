@@ -34,6 +34,26 @@ export function ring(ctx: WerewolfContext, start: number, step: 1 | -1): number[
   return order;
 }
 
+/** seat 左右两侧最近的、满足 present 的座位（不含自己；只剩一侧时只有一个） */
+export function nearestNeighbors(ctx: WerewolfContext, seat: number, present: (seat: number) => boolean): number[] {
+  const total = ctx.seats.count();
+  const found = ([1, -1] as const).map((step) => {
+    for (let offset = 1; offset < total; offset += 1) {
+      const candidate = ((((seat - 1 + step * offset) % total) + total) % total) + 1;
+      if (present(candidate)) return candidate;
+    }
+    return undefined;
+  });
+  return [...new Set(found.filter((item): item is number => item !== undefined))];
+}
+
+/** 按座位号环绕的相连号码：center 与左右各 radius 个号码（不论死活） */
+export function adjacentSeats(ctx: WerewolfContext, center: number, radius = 1): number[] {
+  const total = ctx.seats.count();
+  const wrap = (seat: number): number => ((((seat - 1) % total) + total) % total) + 1;
+  return [...new Set(Array.from({ length: radius * 2 + 1 }, (_, index) => wrap(center - radius + index)))];
+}
+
 /** 按座位号顺时针排列，从种子决定的位置开始 */
 export function seededRotation(ctx: WerewolfContext, seats: readonly number[], label: string): number[] {
   const sorted = [...seats].sort((a, b) => a - b);
