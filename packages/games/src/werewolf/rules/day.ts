@@ -1,5 +1,6 @@
 import type { ActDecision, ComputeOutcome, Seat, VoteOutcome } from '@battle/engine';
 import type { WerewolfState } from '../state';
+import { skillsLost } from './block';
 import { canVote, ring, type WerewolfContext } from './context';
 
 /** 警长左右两侧最近的存活玩家，警长从中选择发言起点 */
@@ -60,7 +61,7 @@ export function resolveExile(ctx: WerewolfContext): ComputeOutcome<WerewolfState
   const state = { ...ctx.state, exileTarget: null };
   if (target === null) return { state, log: [{ kind: 'narration', text: '本轮无人被放逐。' }] };
   const seat = ctx.seats.get(target);
-  if (seat.role === 'idiot' && !ctx.state.idiotRevealed) {
+  if (seat.role === 'idiot' && !ctx.state.idiotRevealed && !skillsLost(ctx, seat)) {
     return {
       state: { ...state, idiotRevealed: true },
       log: [{ kind: 'revealed', text: `${target}号翻牌，身份是白痴，免于出局，但此后失去投票权。`, data: { seat: target, role: 'idiot' } }],

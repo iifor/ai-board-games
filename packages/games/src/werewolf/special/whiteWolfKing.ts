@@ -20,7 +20,9 @@ function recordBlast(ctx: WerewolfContext, decisions: readonly ActDecision[]): W
 function resolveBlast(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const target = ctx.state.pendingBlast;
   const state = { ...ctx.state, pendingBlast: null };
-  return target === null ? { state } : { state, eliminate: [{ seat: target, reason: '被白狼王带走', cause: WHITE_WOLF_KING_BLAST }] };
+  // 选择与结算之间会先插入排队的触发器，被带走者可能已经出局
+  if (target === null || !ctx.seats.get(target).alive) return { state };
+  return { state, eliminate: [{ seat: target, reason: '被白狼王带走', cause: WHITE_WOLF_KING_BLAST }] };
 }
 
 export const whiteWolfKingPhases = {

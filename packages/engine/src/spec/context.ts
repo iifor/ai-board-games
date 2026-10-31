@@ -83,3 +83,14 @@ export interface SetupContext<P> {
   readonly seats: SeatQuery;
   random(label: string): Rng;
 }
+
+/** 按局决定角色分配时的上下文（见 SetupSpec.deal） */
+export interface DealContext<P> {
+  readonly params: ReadonlyValue<P>;
+  readonly variant: VariantContext | null;
+  readonly playerCount: number;
+  /** 变体（或 setup）声明的默认分配 */
+  readonly assign: Readonly<Record<string, number | 'rest'>>;
+  /** 由主种子与标签派生，与 SetupContext.random 互不相关 */
+  random(label: string): Rng;
+}

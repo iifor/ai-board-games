@@ -1,5 +1,6 @@
 import type { Visibility } from '@battle/engine';
 import { z } from 'zod';
+import { emptyExtendedNight, extendedNightShape, extendedStateShape, extendedVisibility } from './stateExtended';
 import { emptyExtraNight, extraNightShape, extraStateShape, extraVisibility } from './stateExtras';
 import { ownChecks, roleOnly } from './stateVisibility';
 
@@ -11,8 +12,11 @@ export const seerCheckSchema = z.object({
   result: z.enum(['好人', '狼人']),
 });
 
-/** 夜间死亡的原因；天亮出局时作为触发器的 cause */
-export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'reflect', 'stalker', 'charm', 'dream']);
+/**
+ * 夜间死亡的原因；天亮出局时作为触发器的 cause。
+ * merchant：黑商把技能交给了狼人；lover：情侣殉情；third_kill：第三方（祈求者、鬼魂新娘一方）的击杀。
+ */
+export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'reflect', 'stalker', 'charm', 'dream', 'merchant', 'lover', 'third_kill']);
 
 export const demonCheckSchema = z.object({
   night: z.number().int().positive(),
@@ -29,6 +33,8 @@ export const boardInfoSchema = z.object({
   key: z.string(),
   name: z.string(),
   rules: z.string(),
+  /** 本局人数 */
+  players: z.number().int().positive(),
 });
 
 export const werewolfStateSchema = z.object({
@@ -51,6 +57,7 @@ export const werewolfStateSchema = z.object({
     /** 狼美人今晚魅惑的人：狼美人当晚或次日白天出局时殉情；下一晚入夜时清空 */
     charmed: seatNo.nullable(),
     ...extraNightShape,
+    ...extendedNightShape,
   }),
   /** 守卫上一晚守护的人（不能连续两晚守同一人） */
   guardLastTarget: seatNo.nullable(),
@@ -92,6 +99,7 @@ export const werewolfStateSchema = z.object({
   winnerLock: z.enum(['werewolf']).nullable(),
   mvp: seatNo.nullable(),
   ...extraStateShape,
+  ...extendedStateShape,
 });
 
 export type WerewolfState = z.infer<typeof werewolfStateSchema>;
@@ -121,6 +129,7 @@ export const werewolfVisibility = {
   sheriffCandidates: 'public',
   idiotRevealed: 'public',
   ...extraVisibility,
+  ...extendedVisibility,
 } as const satisfies { readonly [K in keyof WerewolfState]?: Visibility };
 
 export function emptyNight(): WerewolfState['night'] {
@@ -135,5 +144,6 @@ export function emptyNight(): WerewolfState['night'] {
     stalked: null,
     charmed: null,
     ...emptyExtraNight(),
+    ...emptyExtendedNight(),
   };
 }

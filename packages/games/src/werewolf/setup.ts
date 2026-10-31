@@ -1,15 +1,17 @@
 import type { SetupContext } from '@battle/engine';
 import { DEFAULT_BOARD, findBoard } from './boards';
 import { boardConfig } from './rules/board';
+import { initialThief } from './rules/deal';
 import { initialKnownWolves } from './rules/loneWolf';
 import { emptyNight, type WerewolfParams, type WerewolfState } from './state';
+import { initialExtendedState } from './stateExtended';
 import { initialExtraState } from './stateExtras';
 
 /** 开局状态：板子信息公开，其余字段按可见性声明投影给对应座位 */
 export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): WerewolfState {
   const board = findBoard(ctx.variant?.key ?? DEFAULT_BOARD);
   return {
-    board: { key: board.key, name: board.name, rules: board.rules },
+    board: { key: board.key, name: board.name, rules: board.rules, players: ctx.seats.count() },
     night: emptyNight(),
     guardLastTarget: null,
     hybridMaster: null,
@@ -36,5 +38,6 @@ export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): Werewol
     winnerLock: null,
     mvp: null,
     ...initialExtraState(initialKnownWolves(ctx.seats, boardConfig(ctx))),
+    ...initialExtendedState(initialThief(board, ctx.seats)),
   };
 }

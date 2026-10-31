@@ -1,8 +1,10 @@
-import type { ComputeOutcome, LogDraft, SeatQuery } from '@battle/engine';
+import type { ComputeOutcome, LogDraft, Seat, SeatQuery } from '@battle/engine';
 import type { WerewolfState } from '../state';
+import { roleCategory } from './board';
 import { isPackWolf, type WerewolfContext } from './context';
 
-// 夜间技能封锁：花蝴蝶抱住、梦魇恐惧的人当晚夜间技能失效；被封锁的是狼人时整个狼队当晚不能击杀。
+// 夜间技能封锁：花蝴蝶抱住、梦魇恐惧、企鹅冰冻的人当晚夜间技能失效；被封锁的是狼人时整个狼队当晚不能击杀。
+// 另有永久失效：大树因狼刀以外的原因出局后，其余神职失去技能（state.godsDisabled）。
 
 interface BlockSource {
   readonly seat: number | null;
@@ -13,10 +15,11 @@ interface BlockSource {
 }
 
 function blockSources(ctx: WerewolfContext): BlockSource[] {
-  const { hugged, feared } = ctx.state.night;
+  const { hugged, feared, frozen } = ctx.state.night;
   return [
     { seat: hugged, by: '被花蝴蝶抱住', disablesShot: false },
     { seat: feared, by: '被梦魇恐惧', disablesShot: true },
+    { seat: frozen, by: '被企鹅冰冻', disablesShot: false },
   ];
 }
 
@@ -39,9 +42,19 @@ export function shotBlockedTonight(ctx: WerewolfContext, seat: number): boolean 
   return blockSources(ctx).some((source) => source.disablesShot && source.seat === seat);
 }
 
-/** 今晚能使用夜间技能的该角色玩家：存活且没有被封锁 */
+/** 大树倒下后神职失去技能（夜间技能、猎人开枪、白痴翻牌、额外技能等） */
+export function skillsLost(ctx: WerewolfContext, seat: Seat): boolean {
+  return ctx.state.godsDisabled && roleCategory(ctx, seat) === 'god';
+}
+
+/** 该座位今晚能否使用夜间技能：存活、没有被封锁、没有失去技能 */
+export function canUseNightSkill(ctx: WerewolfContext, seat: Seat): boolean {
+  return seat.alive && !isBlocked(ctx, seat.seat) && !skillsLost(ctx, seat);
+}
+
+/** 今晚能使用夜间技能的该角色玩家 */
 export function nightActors(ctx: WerewolfContext, role: string): SeatQuery {
-  return ctx.seats.alive().withRole(role).where((seat) => !isBlocked(ctx, seat.seat));
+  return ctx.seats.alive().withRole(role).where((seat) => canUseNightSkill(ctx, seat));
 }
 
 function notice(ctx: WerewolfContext, { seat, by, disablesShot }: BlockSource): LogDraft[] {

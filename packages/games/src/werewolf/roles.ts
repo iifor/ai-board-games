@@ -1,16 +1,23 @@
 import type { PromptTemplate, RoleSpec } from '@battle/engine';
-import type { RoleCategory } from './boards';
+import type { RoleCategory } from './boardDefinition';
 import { werewolfPrompts as prompts } from './prompts';
+import { bearPrompts } from './special/bear';
 import { bearTamerPrompts } from './special/bearTamer';
 import { bigBadWolfPrompts } from './special/bigBadWolf';
+import { bigTreePrompts } from './special/bigTree';
+import { blackMerchantPrompts } from './special/blackMerchant';
 import { bombmanPrompts } from './special/bombman';
 import { butterflyPrompts } from './special/butterfly';
 import { crowPrompts } from './special/crow';
+import { cupidPrompts } from './special/cupid';
 import { demonPrompts } from './special/demon';
 import { dreamerPrompts } from './special/dreamer';
 import { evilKnightPrompts } from './special/evilKnight';
 import { fortuneTellerPrompts } from './special/fortuneTeller';
+import { ghostBridePrompts } from './special/ghostBride';
+import { foxPrompts } from './special/fox';
 import { guardPrompts } from './special/guard';
+import { heavenlyEyePrompts } from './special/heavenlyEye';
 import { hiddenWolfPrompts } from './special/hiddenWolf';
 import { hybridPrompts } from './special/hybrid';
 import { knightPrompts } from './special/knight';
@@ -18,12 +25,18 @@ import { magicianPrompts } from './special/magician';
 import { nightmarePrompts } from './special/nightmare';
 import { nineTailedFoxPrompts } from './special/nineTailedFox';
 import { oldRoguePrompts } from './special/oldRogue';
+import { penguinPrompts } from './special/penguin';
+import { requesterPrompts } from './special/requester';
 import { silenceElderPrompts } from './special/silenceElder';
 import { stalkerPrompts } from './special/stalker';
+import { succubusPrompts } from './special/succubus';
+import { thiefPrompts } from './special/thief';
 import { whiteWolfKingPrompts } from './special/whiteWolfKing';
 import { wildChildPrompts } from './special/wildChild';
 import { wolfBeautyPrompts } from './special/wolfBeauty';
+import { wolfBrothersPrompts } from './special/wolfBrothers';
 import { wolfKingPrompts } from './special/wolfKing';
+import { wolfSeedPrompts } from './special/wolfSeed';
 
 /** 角色的静态特性，规则通过 roleTraits(seat) 读取 */
 export interface RoleTraits {
@@ -37,6 +50,10 @@ export interface RoleTraits {
   readonly hiddenFromPack?: boolean;
   /** 预言家查验为好人，熊不会因他咆哮（隐狼） */
   readonly appearsGood?: boolean;
+  /** 存活的该角色还在场时查验为好人（狼弟在狼兄出局前），见 rules/appearance.ts */
+  readonly appearsGoodWhile?: string;
+  /** 离群的狼只与该角色互相认识（狼弟与狼兄），见 rules/loneWolf.ts */
+  readonly pairedWith?: string;
   /** 不受狼美人魅惑影响（老流氓） */
   readonly charmImmune?: boolean;
   /** 被毒、被枪击时延迟到次日白天发言结束才出局（老流氓） */
@@ -50,8 +67,11 @@ export interface RoleEntry {
   readonly traits: RoleTraits;
 }
 
-/** werewolf：狼队（互相认识、共享狼队频道）；lone_wolf：离群的狼（狼人阵营，但不在狼队频道里）；good：好人阵营 */
-type RoleTeam = 'werewolf' | 'lone_wolf' | 'good';
+/**
+ * werewolf：狼队（互相认识、共享狼队频道）；lone_wolf：离群的狼（狼人阵营，但不在狼队频道里）；good：好人阵营；
+ * ghost_bride：鬼魂新娘的第三方阵营（共享第三方频道，见 special/ghostBride.ts）
+ */
+type RoleTeam = 'werewolf' | 'lone_wolf' | 'good' | 'ghost_bride';
 
 function role(name: string, team: RoleTeam, identity: PromptTemplate, category: RoleCategory, traits: RoleTraits = {}): RoleEntry {
   return { spec: { name, team, identity, ...(team === 'werewolf' ? { knowsTeammates: true } : {}) }, category, traits };
@@ -59,6 +79,9 @@ function role(name: string, team: RoleTeam, identity: PromptTemplate, category: 
 
 /** 恶魔、恶灵骑士：免疫毒药与夜间出局的猎人的枪，不能自爆 */
 const NIGHT_IMMUNE: RoleTraits = { noSelfDestruct: true, poisonImmune: true, nightShotImmune: true };
+
+/** 狼弟：只与狼兄相认，狼队不认识他；狼兄出局前查验为好人 */
+const YOUNGER_BROTHER: RoleTraits = { hiddenFromPack: true, appearsGoodWhile: 'wolf_elder_brother', pairedWith: 'wolf_elder_brother' };
 
 /** 全部板子用到的角色；新增特殊角色时在此登记 */
 function buildCatalog(): Readonly<Record<string, RoleEntry>> {
@@ -73,6 +96,12 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     wild_child_wolf: role('野孩子', 'werewolf', wildChildPrompts.wildChildWolf, 'wolf'),
     big_bad_wolf: role('大灰狼', 'lone_wolf', bigBadWolfPrompts.bigBadWolf, 'wolf', { noSelfDestruct: true }),
     hidden_wolf: role('隐狼', 'lone_wolf', hiddenWolfPrompts.hiddenWolf, 'wolf', { noSelfDestruct: true, hiddenFromPack: true, appearsGood: true }),
+    wolf_elder_brother: role('狼兄', 'werewolf', wolfBrothersPrompts.wolfElderBrother, 'wolf'),
+    wolf_younger_brother: role('狼弟', 'lone_wolf', wolfBrothersPrompts.wolfYoungerBrother, 'wolf', YOUNGER_BROTHER),
+    wolf_younger_brother_pack: role('狼弟', 'werewolf', wolfBrothersPrompts.wolfYoungerBrotherPack, 'wolf'),
+    wolf_seed: role('种狼', 'werewolf', wolfSeedPrompts.wolfSeed, 'wolf'),
+    infected_wolf: role('感染狼', 'werewolf', wolfSeedPrompts.infectedWolf, 'wolf'),
+    succubus: role('魅魔', 'werewolf', succubusPrompts.succubus, 'wolf'),
     seer: role('预言家', 'good', prompts.seer, 'god'),
     witch: role('女巫', 'good', prompts.witch, 'god'),
     hunter: role('猎人', 'good', prompts.hunter, 'god'),
@@ -89,10 +118,22 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     bear_tamer: role('驯熊师', 'good', bearTamerPrompts.bearTamer, 'god'),
     bombman: role('炸弹人', 'good', bombmanPrompts.bombman, 'god'),
     nine_tailed_fox: role('九尾狐', 'good', nineTailedFoxPrompts.nineTailedFox, 'god'),
+    black_merchant: role('黑商', 'good', blackMerchantPrompts.blackMerchant, 'god'),
+    bear: role('熊', 'good', bearPrompts.bear, 'god'),
+    penguin: role('企鹅', 'good', penguinPrompts.penguin, 'god'),
+    fox: role('狐狸', 'good', foxPrompts.fox, 'god'),
+    heavenly_eye: role('天眼', 'good', heavenlyEyePrompts.heavenlyEye, 'god'),
+    requester: role('祈求者', 'good', requesterPrompts.requester, 'god'),
+    thief: role('盗贼', 'good', thiefPrompts.thief, 'villager'),
+    cupid: role('丘比特', 'good', cupidPrompts.cupid, 'third'),
+    ghost_bride: role('鬼魂新娘', 'ghost_bride', ghostBridePrompts.ghostBride, 'third'),
+    betrayer_wolf: role('叛变的狼人', 'ghost_bride', ghostBridePrompts.betrayerWolf, 'third'),
     hybrid: role('混血儿', 'good', hybridPrompts.hybrid, 'villager'),
     old_rogue: role('老流氓', 'good', oldRoguePrompts.oldRogue, 'villager', { charmImmune: true, delayedDeath: true }),
     wild_child: role('野孩子', 'good', wildChildPrompts.wildChild, 'third'),
+    big_tree: role('大树', 'good', bigTreePrompts.bigTree, 'villager'),
     villager: role('村民', 'good', prompts.villager, 'villager'),
+    rabbit: role('兔兔', 'good', prompts.rabbit, 'villager'),
   };
 }
 

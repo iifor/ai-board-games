@@ -1,5 +1,6 @@
 import type { Seat } from '@battle/engine';
-import { boardConfigSchema, type BoardConfig, type RoleCategory } from '../boards';
+import { boardConfigSchema, type BoardConfig, type RoleCategory } from '../boardDefinition';
+import { DEFAULT_BOARD, findBoard } from '../boards';
 import { roleCatalog, type RoleTraits } from '../roles';
 import type { WerewolfContext } from './context';
 
@@ -15,9 +16,25 @@ export function boardConfig(ctx: Pick<WerewolfContext, 'variant'>): BoardConfig 
   return parsed;
 }
 
-/** 本局是否有该角色（不论存活） */
+const decks = new Map<string, ReadonlySet<string>>();
+
+/** 本局牌堆里的角色（含盗贼板子被抽作底牌的牌）：公开信息 */
+function deckRoles(ctx: Pick<WerewolfContext, 'variant'>): ReadonlySet<string> {
+  const key = ctx.variant?.key ?? DEFAULT_BOARD;
+  const cached = decks.get(key);
+  if (cached) return cached;
+  const board = findBoard(key);
+  const roles = new Set([...Object.keys(board.roles), ...Object.keys(board.extraCards ?? {})]);
+  decks.set(key, roles);
+  return roles;
+}
+
+/**
+ * 本局是否有该角色（不论存活）：牌堆里有这张牌，或有座位中途变成了该角色。
+ * 只依据公开信息——盗贼板子里被抽作底牌的角色也算"有"，否则有标题的阶段是否出现会暴露底牌。
+ */
 export function hasRole(ctx: WerewolfContext, role: string): boolean {
-  return ctx.seats.withRole(role).count() > 0;
+  return deckRoles(ctx).has(role) || ctx.seats.withRole(role).count() > 0;
 }
 
 export function roleCategory(ctx: WerewolfContext, seat: Seat): RoleCategory {

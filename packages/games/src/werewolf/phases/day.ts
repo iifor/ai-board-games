@@ -13,7 +13,7 @@ import {
 import { canSelfDestruct } from '../rules/death';
 import { announceDawn } from '../rules/dawn';
 import { dayAfter } from '../rules/order';
-import { sheriffWeight } from '../rules/sheriff';
+import { exileWeight } from '../rules/sheriff';
 import { crowBonus } from '../special/crow';
 import type { WerewolfPhases } from './types';
 
@@ -47,7 +47,7 @@ export const dayPhases = {
     title: '放逐投票',
     voters: exileVoters,
     candidates: exileCandidates,
-    weight: sheriffWeight,
+    weight: exileWeight,
     bonus: crowBonus,
     prompt: prompts.exileVote,
     allowAbstain: true,

@@ -1,7 +1,8 @@
 import { definePrompts, type ComputeOutcome } from '@battle/engine';
 import type { WerewolfPhases } from '../phases/types';
-import { hasRole, roleTraits } from '../rules/board';
-import { isWolf, ring, type WerewolfContext } from '../rules/context';
+import { checksAsWolf } from '../rules/appearance';
+import { hasRole } from '../rules/board';
+import { ring, type WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { DawnStep } from '../rules/types';
 import type { WerewolfState } from '../state';
@@ -22,10 +23,7 @@ function neighbors(ctx: WerewolfContext, tamer: number): number[] {
 function roars(ctx: WerewolfContext): boolean {
   const tamer = ctx.seats.alive().withRole('bear_tamer').ids()[0];
   if (tamer === undefined) return false;
-  return neighbors(ctx, tamer).some((seat) => {
-    const neighbor = ctx.seats.get(seat);
-    return isWolf(neighbor) && !roleTraits(neighbor).appearsGood;
-  });
+  return neighbors(ctx, tamer).some((seat) => checksAsWolf(ctx, ctx.seats.get(seat)));
 }
 
 function watch(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {

@@ -54,6 +54,32 @@ describe('variants', () => {
   });
 });
 
+describe('per-match deal', () => {
+  const dealing = (deal: NonNullable<GameSpec<SecretState, Params>['setup']['deal']>) => compileGame({
+    ...secretSpec,
+    setup: { ...secretSpec.setup, deal },
+  });
+
+  it('lets the game decide the dealt roles from the seed and the default assignment', () => {
+    const seen: unknown[] = [];
+    const game = dealing((ctx) => {
+      seen.push({ players: ctx.playerCount, assign: ctx.assign, variant: ctx.variant });
+      return { red: ctx.random('reds').int(2) + 1, blue: 'rest' };
+    });
+    const reds = [1, 2, 3, 4, 5, 6].map((seed) => createSnapshot(game, { seed, players: makePlayers(5) }).seats.filter((seat) => seat.team === 'red').length);
+    expect(new Set(reds)).toEqual(new Set([1, 2]));
+    expect(seen[0]).toEqual({ players: 5, assign: { red: 2, blue: 'rest' }, variant: null });
+    const again = createSnapshot(game, { seed: 3, players: makePlayers(5) });
+    expect(again.seats).toEqual(createSnapshot(game, { seed: 3, players: makePlayers(5) }).seats);
+  });
+
+  it('rejects a deal that does not fit the table', () => {
+    expect(() => createSnapshot(dealing(() => ({ red: 2, ghost: 3 })), { seed: 1, players: makePlayers(5) })).toThrow(/未定义的角色：ghost/);
+    expect(() => createSnapshot(dealing(() => ({ red: 2, blue: 2 })), { seed: 1, players: makePlayers(5) })).toThrow(/与人数 5 不符/);
+    expect(() => createSnapshot(dealing(() => ({ red: 6, blue: 'rest' })), { seed: 1, players: makePlayers(5) })).toThrow(SpecError);
+  });
+});
+
 describe('disabled phases and reassignment', () => {
   it('skips a disabled phase without logging or counting a visit', () => {
     const game = compileGame({
