@@ -5,6 +5,8 @@
 export const NIGHT_ORDER = [
   'night_start',
   'night_reset',
+  'hybrid_choose',
+  'elder_silence',
   'guard_protect',
   'wolf_chat',
   'wolf_kill',
@@ -14,7 +16,14 @@ export const NIGHT_ORDER = [
   'night_resolve',
 ] as const;
 
-export const DAY_ORDER = ['dawn', 'speech_direction', 'day_speech', 'exile_vote', 'exile_resolve'] as const;
+export const DAY_ORDER = [
+  'dawn',
+  'speech_direction',
+  'day_speech',
+  'knight_duel',
+  'exile_vote',
+  'exile_resolve',
+] as const;
 
 function after(order: readonly string[], id: string, last: string): string {
   const index = order.indexOf(id);

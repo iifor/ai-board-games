@@ -1,6 +1,6 @@
 import type { Seat } from '@battle/engine';
 import { boardConfigSchema, type BoardConfig, type RoleCategory } from '../boards';
-import { ROLE_CATALOG } from '../roles';
+import { roleCatalog, type RoleTraits } from '../roles';
 import type { WerewolfContext } from './context';
 
 const parsedConfigs = new Map<string, BoardConfig>();
@@ -21,5 +21,9 @@ export function hasRole(ctx: WerewolfContext, role: string): boolean {
 }
 
 export function roleCategory(ctx: WerewolfContext, seat: Seat): RoleCategory {
-  return boardConfig(ctx).categories[seat.role] ?? ROLE_CATALOG[seat.role]?.category ?? 'villager';
+  return boardConfig(ctx).categories[seat.role] ?? roleCatalog()[seat.role]?.category ?? 'villager';
+}
+
+export function roleTraits(seat: Seat): RoleTraits {
+  return roleCatalog()[seat.role]?.traits ?? {};
 }

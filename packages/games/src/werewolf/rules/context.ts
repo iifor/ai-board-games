@@ -1,10 +1,15 @@
-import type { RuleContext, Seat } from '@battle/engine';
+import type { RuleContext, Seat, SeatQuery } from '@battle/engine';
 import type { WerewolfParams, WerewolfState } from '../state';
 
 export type WerewolfContext = RuleContext<WerewolfState, WerewolfParams>;
 
 export function isWolf(seat: Seat): boolean {
   return seat.team === 'werewolf';
+}
+
+/** 今晚能行动的该角色玩家：存活 */
+export function nightActors(ctx: WerewolfContext, role: string): SeatQuery {
+  return ctx.seats.alive().withRole(role);
 }
 
 /** 翻牌的白痴失去投票权 */

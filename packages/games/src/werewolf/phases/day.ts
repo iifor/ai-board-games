@@ -10,7 +10,8 @@ import {
   recordExile,
   resolveExile,
 } from '../rules/day';
-import { announceDawn } from '../rules/night';
+import { canSelfDestruct } from '../rules/death';
+import { announceDawn } from '../rules/dawn';
 import { dayAfter } from '../rules/order';
 import { sheriffWeight } from '../rules/sheriff';
 import type { WerewolfPhases } from './types';
@@ -36,7 +37,7 @@ export const dayPhases = {
     output: speechOutput({ max: 150 }),
     fallback: () => ({ speech: '我先听听大家的意见，暂时没有更多信息。' }),
     declarations: {
-      selfDestruct: { label: '自爆', allowed: (_ctx, seat) => seat.team === 'werewolf' && seat.alive },
+      selfDestruct: { label: '自爆', allowed: (_ctx, seat) => canSelfDestruct(seat) },
     },
     next: dayAfter('day_speech'),
   },

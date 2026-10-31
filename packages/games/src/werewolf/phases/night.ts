@@ -9,12 +9,13 @@ import {
   recordSeerCheck,
   recordWolfKill,
   resetNight,
-  resolveNight,
   witchPoisonTargets,
   witchSaveTargets,
   wolfChatOrder,
   wolfKillTargets,
 } from '../rules/night';
+import { nightActors } from '../rules/context';
+import { resolveNight } from '../rules/nightResolution';
 import { nightAfter } from '../rules/order';
 import type { WerewolfPhases } from './types';
 
@@ -48,7 +49,7 @@ export const nightPhases = {
     title: '预言家查验',
     action: '查验',
     enabled: (ctx) => hasRole(ctx, 'seer'),
-    actors: (ctx) => ctx.seats.alive().withRole('seer'),
+    actors: (ctx) => nightActors(ctx, 'seer'),
     targets: (ctx, seat) => ctx.seats.alive().except(seat),
     prompt: prompts.seerCheck,
     describe: describeSeerCheck,
@@ -60,7 +61,7 @@ export const nightPhases = {
     title: '女巫用药',
     action: '使用解药',
     enabled: (ctx) => hasRole(ctx, 'witch'),
-    actors: (ctx) => ctx.seats.alive().withRole('witch'),
+    actors: (ctx) => nightActors(ctx, 'witch'),
     targets: witchSaveTargets,
     allowNone: true,
     prompt: prompts.witchSave,
@@ -71,7 +72,7 @@ export const nightPhases = {
     kind: 'act',
     action: '使用毒药',
     enabled: (ctx) => hasRole(ctx, 'witch'),
-    actors: (ctx) => ctx.seats.alive().withRole('witch'),
+    actors: (ctx) => nightActors(ctx, 'witch'),
     targets: witchPoisonTargets,
     allowNone: true,
     prompt: prompts.witchPoison,

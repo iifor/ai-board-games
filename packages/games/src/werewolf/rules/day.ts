@@ -22,8 +22,13 @@ export function describeDirection(_ctx: WerewolfContext, _seat: Seat, targets: r
  * 白天发言顺序：
  * - 存活警长选了起点：从起点出发、背离警长的方向依次发言，警长最后；
  * - 否则：从昨晚最大号死者的下一位开始顺时针；平安夜则从种子决定的位置开始顺时针。
+ * 今天被禁言的人跳过。
  */
 export function daySpeakers(ctx: WerewolfContext): number[] {
+  return speakingOrder(ctx).filter((seat) => seat !== ctx.state.silencedToday);
+}
+
+function speakingOrder(ctx: WerewolfContext): number[] {
   const { sheriff, speechStart, lastNightDeaths } = ctx.state;
   if (sheriff !== null && speechStart !== null && ctx.seats.get(sheriff).alive) {
     const clockwiseNeighbor = ring(ctx, sheriff, 1).find((seat) => seat !== sheriff);
