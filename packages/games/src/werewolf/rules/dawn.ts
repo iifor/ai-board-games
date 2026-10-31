@@ -4,7 +4,7 @@ import { publishSilence } from '../special/silenceElder';
 import type { PendingDeath, WerewolfState } from '../state';
 import type { WerewolfContext } from './context';
 import type { DawnDraft, DawnStep } from './types';
-import { sideEliminated } from './victory';
+import { wolvesSweep } from './victory';
 
 /** 天亮时与死讯一起公布的信息（禁言、熊的咆哮），按顺序接在死讯之后 */
 const DAWN_STEPS: readonly DawnStep[] = [publishSilence, bearRoarNote];
@@ -13,7 +13,7 @@ const DAWN_STEPS: readonly DawnStep[] = [publishSilence, bearRoarNote];
 function wolfKillLocksWin(ctx: WerewolfContext, deaths: readonly PendingDeath[]): boolean {
   const victims = deaths.filter((death) => death.cause === 'wolf').map((death) => death.seat);
   if (victims.length === 0) return false;
-  return sideEliminated(ctx, ctx.seats.alive().except(...victims).list());
+  return wolvesSweep(ctx, ctx.seats.alive().except(...victims).list());
 }
 
 /** 天亮公布死讯并让死者出局 */

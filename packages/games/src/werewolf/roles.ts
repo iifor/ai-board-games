@@ -1,8 +1,10 @@
 import type { PromptTemplate, RoleSpec } from '@battle/engine';
-import type { RoleCategory } from './boards';
+import type { RoleCategory } from './boardDefinition';
 import { werewolfPrompts as prompts } from './prompts';
 import { bearTamerPrompts } from './special/bearTamer';
 import { bigBadWolfPrompts } from './special/bigBadWolf';
+import { bigTreePrompts } from './special/bigTree';
+import { blackMerchantPrompts } from './special/blackMerchant';
 import { bombmanPrompts } from './special/bombman';
 import { butterflyPrompts } from './special/butterfly';
 import { crowPrompts } from './special/crow';
@@ -23,6 +25,7 @@ import { stalkerPrompts } from './special/stalker';
 import { whiteWolfKingPrompts } from './special/whiteWolfKing';
 import { wildChildPrompts } from './special/wildChild';
 import { wolfBeautyPrompts } from './special/wolfBeauty';
+import { wolfBrothersPrompts } from './special/wolfBrothers';
 import { wolfKingPrompts } from './special/wolfKing';
 
 /** 角色的静态特性，规则通过 roleTraits(seat) 读取 */
@@ -37,6 +40,10 @@ export interface RoleTraits {
   readonly hiddenFromPack?: boolean;
   /** 预言家查验为好人，熊不会因他咆哮（隐狼） */
   readonly appearsGood?: boolean;
+  /** 存活的该角色还在场时查验为好人（狼弟在狼兄出局前），见 rules/appearance.ts */
+  readonly appearsGoodWhile?: string;
+  /** 离群的狼只与该角色互相认识（狼弟与狼兄），见 rules/loneWolf.ts */
+  readonly pairedWith?: string;
   /** 不受狼美人魅惑影响（老流氓） */
   readonly charmImmune?: boolean;
   /** 被毒、被枪击时延迟到次日白天发言结束才出局（老流氓） */
@@ -60,6 +67,9 @@ function role(name: string, team: RoleTeam, identity: PromptTemplate, category: 
 /** 恶魔、恶灵骑士：免疫毒药与夜间出局的猎人的枪，不能自爆 */
 const NIGHT_IMMUNE: RoleTraits = { noSelfDestruct: true, poisonImmune: true, nightShotImmune: true };
 
+/** 狼弟：只与狼兄相认，狼队不认识他；狼兄出局前查验为好人 */
+const YOUNGER_BROTHER: RoleTraits = { hiddenFromPack: true, appearsGoodWhile: 'wolf_elder_brother', pairedWith: 'wolf_elder_brother' };
+
 /** 全部板子用到的角色；新增特殊角色时在此登记 */
 function buildCatalog(): Readonly<Record<string, RoleEntry>> {
   return {
@@ -73,6 +83,9 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     wild_child_wolf: role('野孩子', 'werewolf', wildChildPrompts.wildChildWolf, 'wolf'),
     big_bad_wolf: role('大灰狼', 'lone_wolf', bigBadWolfPrompts.bigBadWolf, 'wolf', { noSelfDestruct: true }),
     hidden_wolf: role('隐狼', 'lone_wolf', hiddenWolfPrompts.hiddenWolf, 'wolf', { noSelfDestruct: true, hiddenFromPack: true, appearsGood: true }),
+    wolf_elder_brother: role('狼兄', 'werewolf', wolfBrothersPrompts.wolfElderBrother, 'wolf'),
+    wolf_younger_brother: role('狼弟', 'lone_wolf', wolfBrothersPrompts.wolfYoungerBrother, 'wolf', YOUNGER_BROTHER),
+    wolf_younger_brother_pack: role('狼弟', 'werewolf', wolfBrothersPrompts.wolfYoungerBrotherPack, 'wolf'),
     seer: role('预言家', 'good', prompts.seer, 'god'),
     witch: role('女巫', 'good', prompts.witch, 'god'),
     hunter: role('猎人', 'good', prompts.hunter, 'god'),
@@ -89,9 +102,11 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     bear_tamer: role('驯熊师', 'good', bearTamerPrompts.bearTamer, 'god'),
     bombman: role('炸弹人', 'good', bombmanPrompts.bombman, 'god'),
     nine_tailed_fox: role('九尾狐', 'good', nineTailedFoxPrompts.nineTailedFox, 'god'),
+    black_merchant: role('黑商', 'good', blackMerchantPrompts.blackMerchant, 'god'),
     hybrid: role('混血儿', 'good', hybridPrompts.hybrid, 'villager'),
     old_rogue: role('老流氓', 'good', oldRoguePrompts.oldRogue, 'villager', { charmImmune: true, delayedDeath: true }),
     wild_child: role('野孩子', 'good', wildChildPrompts.wildChild, 'third'),
+    big_tree: role('大树', 'good', bigTreePrompts.bigTree, 'villager'),
     villager: role('村民', 'good', prompts.villager, 'villager'),
   };
 }

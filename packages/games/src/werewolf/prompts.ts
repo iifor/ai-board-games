@@ -2,10 +2,13 @@ import { definePrompts } from '@battle/engine';
 
 export const werewolfPrompts = definePrompts({
   rules: [
-    '这是一局 12 人狼人杀，板子：{{state.board.name}}。',
+    '这是一局 {{state.board.players}} 人狼人杀，板子：{{state.board.name}}。',
     '{{state.board.rules}}',
     '胜负：狼人全部出局则好人胜利；神职全部出局、村民全部出局，或狼人的有效票数多于好人时，狼人胜利。',
-    '对局进行到第 {{round}} 天（每天先经历夜晚，再进入白天）。'
+    '对局进行到第 {{round}} 天（每天先经历夜晚，再进入白天）。',
+    '{{#if state.seatNotes}}法官私下告诉你：{{#each state.seatNotes}}{{this}}{{/each}}{{/if}}',
+    '{{#if state.gifts.check}}你持有一次额外的查验（预言家的验），只能用一次。{{/if}}{{#if state.gifts.poison}}你持有一瓶额外的毒药（女巫的毒），只能用一次。{{/if}}{{#if state.gifts.gun}}你持有一把额外的枪（猎人的枪），出局时可以直接开枪、不翻牌。{{/if}}',
+    '{{#if state.giftChecks}}你用额外技能查验的结果：{{#each state.giftChecks}}第{{this.night}}夜查验 {{this.target}}号，结果是{{this.result}}；{{/each}}{{/if}}',
   ].join('\n'),
   werewolf: [
     '你是{{me.label}}，身份是狼人。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',

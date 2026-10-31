@@ -67,6 +67,12 @@ export function sheriffWeight(ctx: WerewolfContext, voter: Seat): number {
   return voter.seat === ctx.state.sheriff ? SHERIFF_VOTE_WEIGHT : 1;
 }
 
+/** 放逐投票的票权：警长 1.5 票；祈求到平民的祈求者再多 1 票（两者叠加） */
+export function exileWeight(ctx: WerewolfContext, voter: Seat): number {
+  const doubled = voter.role === 'requester' && ctx.state.requesterGift === 'double';
+  return sheriffWeight(ctx, voter) + (doubled ? 1 : 0);
+}
+
 export function applyBadgeTransfer(ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState {
   return { ...ctx.state, sheriff: decisions.flatMap((decision) => decision.targets)[0] ?? null };
 }

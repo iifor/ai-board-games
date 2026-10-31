@@ -1,5 +1,5 @@
 import { compileGame, defineGame } from '@battle/engine';
-import { boardVariants, DEFAULT_BOARD, findBoard } from './boards';
+import { boardVariants, DEFAULT_BOARD, findBoard, PLAYER_RANGE } from './boards';
 import { dayPhases } from './phases/day';
 import { deathPhases } from './phases/death';
 import { nightPhases } from './phases/night';
@@ -7,6 +7,7 @@ import { postgamePhases } from './phases/postgame';
 import { sheriffPhases } from './phases/sheriff';
 import { werewolfPrompts } from './prompts';
 import { roleSpecs } from './roles';
+import { dealBoard } from './rules/deal';
 import { decideWinner, werewolfResult } from './rules/victory';
 import { specialPhases, specialPrompts } from './special';
 import { initialWerewolfState } from './setup';
@@ -20,14 +21,14 @@ const prompts = { ...werewolfPrompts, ...specialPrompts };
 
 export const werewolfSpec = defineGame<WerewolfState, WerewolfParams>({
   key: 'werewolf',
-  version: 4,
+  version: 5,
   title: 'AI 狼人杀',
-  description: '12 人狼人杀，支持多个板子；首日竞选警长。',
-  players: { min: 12, max: 12 },
+  description: '狼人杀（多数板子 12 人），支持多个板子；首日竞选警长。',
+  players: PLAYER_RANGE,
   prompts,
   rulesText: werewolfPrompts.rules,
   roles: roleSpecs(),
-  setup: { assign: findBoard(DEFAULT_BOARD).roles, init: initialWerewolfState },
+  setup: { assign: findBoard(DEFAULT_BOARD).roles, deal: dealBoard, init: initialWerewolfState },
   variants: boardVariants(),
   defaultVariant: DEFAULT_BOARD,
   state: { schema: werewolfStateSchema, visibility: werewolfVisibility },

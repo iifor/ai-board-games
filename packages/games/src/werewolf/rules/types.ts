@@ -1,3 +1,4 @@
+import type { LogDraft, SeatReassignment } from '@battle/engine';
 import type { PendingDeath, WerewolfState } from '../state';
 import type { WerewolfContext } from './context';
 
@@ -5,6 +6,10 @@ import type { WerewolfContext } from './context';
 export interface NightTally {
   readonly state: WerewolfState;
   readonly deaths: readonly PendingDeath[];
+  /** 结算中改变身份的座位（如被种狼感染） */
+  readonly reassign?: readonly SeatReassignment[];
+  /** 结算时私下告知的信息（如大树被刀中一次） */
+  readonly log?: readonly LogDraft[];
 }
 
 export type NightStep = (ctx: WerewolfContext, tally: NightTally) => NightTally;

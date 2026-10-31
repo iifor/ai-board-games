@@ -2,7 +2,7 @@ import type { ActDecision, ComputeOutcome, Seat, TriggerEvent } from '@battle/en
 import { woundRogue } from '../special/oldRogue';
 import { NIGHT_DEATH_CAUSES, type WerewolfState } from '../state';
 import { hasRole, roleTraits } from './board';
-import { shotBlockedTonight } from './block';
+import { shotBlockedTonight, skillsLost } from './block';
 import { isWolf, type WerewolfContext } from './context';
 
 /** 猎人枪杀的 cause 记录开枪时机：白天被放逐后开枪 / 夜里死亡后开枪 */
@@ -12,9 +12,11 @@ export const SHOT_BY_NIGHT = 'shot_by_night';
 export const CHARM_BY_DAY = 'charm_day';
 /** 被炸弹人炸死：不能发动技能 */
 export const BOMBED = 'bomb';
+/** 白天随情侣殉情（夜里的殉情使用夜间死亡原因 lover） */
+export const LOVER_BY_DAY = 'lover_day';
 
-/** 因这些原因出局的猎人不能开枪：被毒杀、殉情、被炸死 */
-export const NO_SHOT_CAUSES: ReadonlySet<string> = new Set(['poison', 'charm', CHARM_BY_DAY, BOMBED]);
+/** 因这些原因出局的猎人不能开枪：被毒杀、殉情（狼美人、情侣）、被炸死 */
+export const NO_SHOT_CAUSES: ReadonlySet<string> = new Set(['poison', 'charm', CHARM_BY_DAY, BOMBED, 'lover', LOVER_BY_DAY]);
 
 /** 有狼王的板子里猎人与狼王开枪都不翻牌：共用中性的"开枪"阶段，播报不说明开枪者身份 */
 export function anonymousShots(ctx: WerewolfContext): boolean {
@@ -39,11 +41,17 @@ export function canSelfDestruct(seat: Seat): boolean {
   return isWolf(seat) && seat.alive && !roleTraits(seat).noSelfDestruct;
 }
 
-/** 猎人被毒杀、殉情以外的出局都能开枪；被梦魇恐惧的当晚被狼刀也不能开枪 */
-export function canHunterShoot(ctx: WerewolfContext, event: TriggerEvent): boolean {
-  if (event.kind !== 'seat_eliminated' || ctx.seats.get(event.seat).role !== 'hunter') return false;
+/** 出局原因允许发动出局技能（开枪）：被毒杀、殉情、被炸死以外；被梦魇恐惧的当晚被狼刀也不行 */
+export function shotAllowed(ctx: WerewolfContext, event: TriggerEvent): boolean {
+  if (event.kind !== 'seat_eliminated') return false;
   if (event.cause === 'wolf' && shotBlockedTonight(ctx, event.seat)) return false;
   return !NO_SHOT_CAUSES.has(event.cause);
+}
+
+/** 猎人开枪：出局原因允许，且没有因大树倒下失去技能 */
+export function canHunterShoot(ctx: WerewolfContext, event: TriggerEvent): boolean {
+  if (event.kind !== 'seat_eliminated' || ctx.seats.get(event.seat).role !== 'hunter') return false;
+  return shotAllowed(ctx, event) && !skillsLost(ctx, ctx.seats.get(event.seat));
 }
 
 export function isSheriffDeath(ctx: WerewolfContext, event: TriggerEvent): boolean {
@@ -65,6 +73,11 @@ export function describeShot(ctx: WerewolfContext, _seat: unknown, targets: read
 }
 
 export function resolveShot(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
+  return settleShot(ctx, anonymousShots(ctx) ? '被枪杀' : '被猎人带走');
+}
+
+/** 结算 pendingShot：reason 是被带走者的出局说明（不翻牌的枪统一写"被枪杀"） */
+export function settleShot(ctx: WerewolfContext, reason: string): ComputeOutcome<WerewolfState> {
   const target = ctx.state.pendingShot;
   const state = { ...ctx.state, pendingShot: null };
   if (target === null) return { state };
@@ -77,7 +90,7 @@ export function resolveShot(ctx: WerewolfContext): ComputeOutcome<WerewolfState>
   if (traits.delayedDeath) {
     return { state: woundRogue(state, target, ctx.round, true), log: [{ kind: 'narration', text: `${target}号中枪后进入负伤状态，没有立即出局。` }] };
   }
-  return { state, eliminate: [{ seat: target, reason: anonymousShots(ctx) ? '被枪杀' : '被猎人带走', cause }] };
+  return { state, eliminate: [{ seat: target, reason, cause }] };
 }
 
 /** 自爆：狼人出局，当天放逐取消，直接入夜 */
