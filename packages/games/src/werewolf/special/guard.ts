@@ -1,5 +1,6 @@
 import { definePrompts, type ActDecision, type Seat } from '@battle/engine';
 import { hasRole } from '../rules/board';
+import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
@@ -27,7 +28,7 @@ export const guardPhases = {
     title: '守卫守护',
     action: '守护',
     enabled: (ctx) => hasRole(ctx, 'guard'),
-    actors: (ctx) => ctx.seats.alive().withRole('guard'),
+    actors: (ctx) => nightActors(ctx, 'guard'),
     targets: guardTargets,
     allowNone: true,
     prompt: guardPrompts.guardProtect,

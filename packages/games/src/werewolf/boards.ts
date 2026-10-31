@@ -1,5 +1,6 @@
 import type { VariantSpec } from '@battle/engine';
 import { z } from 'zod';
+import { describeRules } from './roleRules';
 
 export const ROLE_CATEGORIES = ['god', 'villager', 'wolf', 'third'] as const;
 export type RoleCategory = (typeof ROLE_CATEGORIES)[number];
@@ -23,32 +24,72 @@ export interface BoardDefinition {
   readonly config?: z.input<typeof boardConfigSchema>;
 }
 
-const COMMON_RULES = [
-  '狼人每晚共同击杀一名玩家；预言家每晚查验一名玩家的阵营；女巫有一瓶解药和一瓶毒药，同一晚只能使用一瓶。',
-  '猎人出局时可以开枪带走一名玩家（被女巫毒杀时不能开枪）。',
-  '第一天白天先竞选警长，警长拥有 1.5 票并决定发言顺序，出局时可移交或撕毁警徽。',
-  '狼人可以在自己的白天发言中宣布自爆：自爆者出局，当天放逐取消，直接进入黑夜。',
-];
+/** 规则说明由角色表自动拼出（见 roleRules.ts） */
+function board(definition: Omit<BoardDefinition, 'rules'>): BoardDefinition {
+  return { ...definition, rules: describeRules(definition.roles) };
+}
 
 export const BOARDS: readonly BoardDefinition[] = [
-  {
+  board({
     key: 'standard-12',
     name: '预女猎白',
     description: '12 人标准局：预言家、女巫、猎人、白痴、4 名村民对抗 4 名狼人。',
-    rules: [...COMMON_RULES, '白痴被放逐时翻牌免于出局，但此后失去投票权。'].join('\n'),
     roles: { werewolf: 4, seer: 1, witch: 1, hunter: 1, idiot: 1, villager: 'rest' },
-  },
-  {
+  }),
+  board({
+    key: 'hybrid-12',
+    name: '预女猎白混',
+    description: '预女猎白加混血儿：混血儿首夜选择主人，胜负跟随主人的阵营。',
+    roles: { werewolf: 4, seer: 1, witch: 1, hunter: 1, idiot: 1, hybrid: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'silence-elder-knight-12',
+    name: '禁言长老&骑士',
+    description: '预言家、女巫、骑士、禁言长老与 4 名村民对抗 4 名狼人。',
+    roles: { werewolf: 4, seer: 1, witch: 1, knight: 1, silence_elder: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'silence-elder-stalker-12',
+    name: '禁言长老&潜行者',
+    description: '预言家、女巫、潜行者、禁言长老与 4 名村民对抗 4 名狼人。',
+    roles: { werewolf: 4, seer: 1, witch: 1, stalker: 1, silence_elder: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'butterfly-12',
+    name: '花蝴蝶',
+    description: '预言家、花蝴蝶、潜行者、猎人与 4 名村民对抗 4 名狼人，没有女巫。',
+    roles: { werewolf: 4, seer: 1, butterfly: 1, stalker: 1, hunter: 1, villager: 'rest' },
+  }),
+  board({
     key: 'white-wolf-king-guard-12',
     name: '白狼王&守卫',
     description: '白狼王与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
-    rules: [
-      ...COMMON_RULES,
-      '白狼王是特殊的狼人，自爆时可以带走一名玩家。',
-      '守卫每晚可以守护一名玩家（可以守自己，也可以空守），但不能连续两晚守护同一人；被守护的人当晚不会被狼人杀死；若被守护的人同时被女巫解药救下，反而会死亡。',
-    ].join('\n'),
     roles: { white_wolf_king: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
-  },
+  }),
+  board({
+    key: 'wolf-beauty-guard-12',
+    name: '狼美人&守卫',
+    description: '狼美人与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
+    roles: { wolf_beauty: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'demon-guard-12',
+    name: '恶魔&守卫',
+    description: '恶魔与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
+    roles: { demon: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'evil-knight-guard-12',
+    name: '恶灵骑士&守卫',
+    description: '恶灵骑士与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
+    roles: { evil_knight: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'nightmare-guard-12',
+    name: '梦魇&守卫',
+    description: '梦魇与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
+    roles: { nightmare: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
 ];
 
 export const DEFAULT_BOARD = 'standard-12';

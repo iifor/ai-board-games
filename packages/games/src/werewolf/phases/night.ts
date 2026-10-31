@@ -1,5 +1,6 @@
 import { speechOutput } from '@battle/engine';
 import { werewolfPrompts as prompts } from '../prompts';
+import { announceBlocks, blockedSeats, nightActors, wolvesBlocked } from '../rules/block';
 import { boardConfig, hasRole } from '../rules/board';
 import {
   aliveWolves,
@@ -9,21 +10,28 @@ import {
   recordSeerCheck,
   recordWolfKill,
   resetNight,
-  resolveNight,
   witchPoisonTargets,
   witchSaveTargets,
   wolfChatOrder,
   wolfKillTargets,
 } from '../rules/night';
+import { resolveNight } from '../rules/nightResolution';
 import { nightAfter } from '../rules/order';
 import type { WerewolfPhases } from './types';
 
 export const nightPhases = {
   night_start: { kind: 'announce', title: '黑夜', text: prompts.nightFalls, next: nightAfter('night_start') },
   night_reset: { kind: 'compute', run: resetNight, next: nightAfter('night_reset') },
+  night_blocks: {
+    kind: 'compute',
+    enabled: (ctx) => blockedSeats(ctx).length > 0,
+    run: announceBlocks,
+    next: nightAfter('night_blocks'),
+  },
   wolf_chat: {
     kind: 'speak',
     title: '狼人夜聊',
+    enabled: (ctx) => !wolvesBlocked(ctx),
     actors: wolfChatOrder,
     prompt: prompts.wolfChat,
     output: speechOutput({ max: 80 }),
@@ -34,6 +42,7 @@ export const nightPhases = {
   wolf_kill: {
     kind: 'vote',
     title: '狼人击杀',
+    enabled: (ctx) => !wolvesBlocked(ctx),
     voters: aliveWolves,
     candidates: wolfKillTargets,
     prompt: prompts.wolfKill,
@@ -48,7 +57,7 @@ export const nightPhases = {
     title: '预言家查验',
     action: '查验',
     enabled: (ctx) => hasRole(ctx, 'seer'),
-    actors: (ctx) => ctx.seats.alive().withRole('seer'),
+    actors: (ctx) => nightActors(ctx, 'seer'),
     targets: (ctx, seat) => ctx.seats.alive().except(seat),
     prompt: prompts.seerCheck,
     describe: describeSeerCheck,
@@ -60,7 +69,7 @@ export const nightPhases = {
     title: '女巫用药',
     action: '使用解药',
     enabled: (ctx) => hasRole(ctx, 'witch'),
-    actors: (ctx) => ctx.seats.alive().withRole('witch'),
+    actors: (ctx) => nightActors(ctx, 'witch'),
     targets: witchSaveTargets,
     allowNone: true,
     prompt: prompts.witchSave,
@@ -71,7 +80,7 @@ export const nightPhases = {
     kind: 'act',
     action: '使用毒药',
     enabled: (ctx) => hasRole(ctx, 'witch'),
-    actors: (ctx) => ctx.seats.alive().withRole('witch'),
+    actors: (ctx) => nightActors(ctx, 'witch'),
     targets: witchPoisonTargets,
     allowNone: true,
     prompt: prompts.witchPoison,

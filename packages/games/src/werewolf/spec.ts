@@ -8,8 +8,7 @@ import { sheriffPhases } from './phases/sheriff';
 import { werewolfPrompts } from './prompts';
 import { roleSpecs } from './roles';
 import { decideWinner, werewolfResult } from './rules/victory';
-import { guardPhases, guardPrompts } from './special/guard';
-import { whiteWolfKingPhases, whiteWolfKingPrompts } from './special/whiteWolfKing';
+import { specialPhases, specialPrompts } from './special';
 import {
   initialWerewolfState,
   werewolfStateSchema,
@@ -22,11 +21,11 @@ import { werewolfTriggers } from './triggers';
 /** 天数上限：第 6 天结束仍未分胜负时按存活情况判定 */
 export const MAX_DAYS = 6;
 
-const prompts = { ...werewolfPrompts, ...guardPrompts, ...whiteWolfKingPrompts };
+const prompts = { ...werewolfPrompts, ...specialPrompts };
 
 export const werewolfSpec = defineGame<WerewolfState, WerewolfParams>({
   key: 'werewolf',
-  version: 2,
+  version: 3,
   title: 'AI 狼人杀',
   description: '12 人狼人杀，支持多个板子；首日竞选警长。',
   players: { min: 12, max: 12 },
@@ -40,11 +39,10 @@ export const werewolfSpec = defineGame<WerewolfState, WerewolfParams>({
   start: 'night_start',
   phases: {
     ...nightPhases,
-    ...guardPhases,
     ...sheriffPhases,
     ...dayPhases,
     ...deathPhases,
-    ...whiteWolfKingPhases,
+    ...specialPhases,
     ...postgamePhases,
   },
   triggers: werewolfTriggers,

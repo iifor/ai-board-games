@@ -101,6 +101,9 @@ describe('vote', () => {
     for (const { request } of runoffRequests) expect(request.legalTargets?.every((seat) => [1, 3].includes(seat))).toBe(true);
     const final = tallies[1];
     expect(final?.outcome).toMatchObject({ kind: 'selected', byTieBreak: true });
+    // 阶段结果带有最后一轮（复投）的选票，规则可据此知道每个人投给了谁
+    expect(final?.ballots).toHaveLength(4);
+    expect(run.snapshot.results.vote).toMatchObject({ kind: 'vote', rounds: 2, tied: [1, 3], ballots: final?.ballots });
     const again = runToEnd(secretGame, { seed: 9, playerCount: 4, params: { rounds: 1 }, agent: tieAgent });
     expect(again.log).toEqual(run.log);
   });

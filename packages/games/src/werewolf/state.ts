@@ -10,9 +10,18 @@ export const seerCheckSchema = z.object({
   result: z.enum(['好人', '狼人']),
 });
 
+/** 夜间死亡的原因；天亮出局时作为触发器的 cause */
+export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'reflect', 'stalker', 'charm']);
+
+export const demonCheckSchema = z.object({
+  night: z.number().int().positive(),
+  target: seatNo,
+  result: z.enum(['神职', '平民']),
+});
+
 export const pendingDeathSchema = z.object({
   seat: seatNo,
-  cause: z.enum(['wolf', 'poison']),
+  cause: nightDeathCauseSchema,
 });
 
 export const boardInfoSchema = z.object({
@@ -30,9 +39,36 @@ export const werewolfStateSchema = z.object({
     saved: z.boolean(),
     poisoned: seatNo.nullable(),
     guarded: seatNo.nullable(),
+    /** 禁言长老今晚禁言的人，天亮时公布 */
+    silenced: seatNo.nullable(),
+    /** 花蝴蝶今晚抱的人：当晚夜间技能失效 */
+    hugged: seatNo.nullable(),
+    /** 梦魇今晚恐惧的人：当晚夜间技能失效，猎人当晚被狼刀时不能开枪 */
+    feared: seatNo.nullable(),
+    /** 潜行者今晚暗杀的人 */
+    stalked: seatNo.nullable(),
+    /** 狼美人今晚魅惑的人：狼美人当晚或次日白天出局时殉情；下一晚入夜时清空 */
+    charmed: seatNo.nullable(),
   }),
   /** 守卫上一晚守护的人（不能连续两晚守同一人） */
   guardLastTarget: seatNo.nullable(),
+  /** 混血儿选择的主人 */
+  hybridMaster: seatNo.nullable(),
+  /** 禁言长老上一晚禁言的人（不能连续两晚禁言同一人） */
+  elderLastTarget: seatNo.nullable(),
+  /** 今天白天被禁言的人（天亮公布，入夜清空） */
+  silencedToday: seatNo.nullable(),
+  knightDuelUsed: z.boolean(),
+  stalkerUsed: z.boolean(),
+  /** 潜行者在当天放逐投票中投给的人；当晚可暗杀（若他没有出局），夜里用过即清空 */
+  stalkerVote: seatNo.nullable(),
+  /** 花蝴蝶已经抱人的次数 */
+  butterflyHugs: z.number().int().nonnegative(),
+  demonChecks: z.array(demonCheckSchema),
+  /** 恶灵骑士的反伤已经发动过（全场一次） */
+  evilKnightReflected: z.boolean(),
+  /** 梦魇上一晚恐惧的人（不能连续两晚恐惧同一人） */
+  nightmareLastTarget: seatNo.nullable(),
   /** 白狼王自爆时选择带走的人，等待结算 */
   pendingBlast: seatNo.nullable(),
   potions: z.object({ antidote: z.boolean(), poison: z.boolean() }),
@@ -58,10 +94,15 @@ export const werewolfStateSchema = z.object({
 export type WerewolfState = z.infer<typeof werewolfStateSchema>;
 export type WerewolfParams = Record<string, never>;
 export type PendingDeath = z.infer<typeof pendingDeathSchema>;
+export type NightDeathCause = z.infer<typeof nightDeathCauseSchema>;
 
-const witchOnly: Visibility = {
-  project: (value: unknown, viewer: Seat) => (viewer.role === 'witch' ? value : undefined),
-};
+/** 天亮出局时使用这些原因，可据此区分夜间死亡与白天死亡 */
+export const NIGHT_DEATH_CAUSES: ReadonlySet<string> = new Set(nightDeathCauseSchema.options);
+
+/** 只有该角色本人能看到 */
+function roleOnly(role: string): Visibility {
+  return { project: (value: unknown, viewer: Seat) => (viewer.role === role ? value : undefined) };
+}
 
 /** 预言家只能看到自己的查验记录；还没查验时为空列表 */
 const ownChecks: Visibility = {
@@ -73,8 +114,17 @@ const ownChecks: Visibility = {
 
 export const werewolfVisibility = {
   board: 'public',
-  guardLastTarget: { project: (value: unknown, viewer: Seat) => (viewer.role === 'guard' ? value : undefined) },
-  potions: witchOnly,
+  guardLastTarget: roleOnly('guard'),
+  hybridMaster: roleOnly('hybrid'),
+  elderLastTarget: roleOnly('silence_elder'),
+  silencedToday: 'public',
+  knightDuelUsed: roleOnly('knight'),
+  stalkerUsed: roleOnly('stalker'),
+  stalkerVote: roleOnly('stalker'),
+  butterflyHugs: roleOnly('butterfly'),
+  demonChecks: roleOnly('demon'),
+  nightmareLastTarget: roleOnly('nightmare'),
+  potions: roleOnly('witch'),
   lastNightDeaths: 'public',
   seerChecks: ownChecks,
   sheriff: 'public',
@@ -82,12 +132,36 @@ export const werewolfVisibility = {
   idiotRevealed: 'public',
 } as const satisfies { readonly [K in keyof WerewolfState]?: Visibility };
 
+export function emptyNight(): WerewolfState['night'] {
+  return {
+    wolfTarget: null,
+    saved: false,
+    poisoned: null,
+    guarded: null,
+    silenced: null,
+    hugged: null,
+    feared: null,
+    stalked: null,
+    charmed: null,
+  };
+}
+
 export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): WerewolfState {
   const board = findBoard(ctx.variant?.key ?? DEFAULT_BOARD);
   return {
     board: { key: board.key, name: board.name, rules: board.rules },
-    night: { wolfTarget: null, saved: false, poisoned: null, guarded: null },
+    night: emptyNight(),
     guardLastTarget: null,
+    hybridMaster: null,
+    elderLastTarget: null,
+    silencedToday: null,
+    knightDuelUsed: false,
+    stalkerUsed: false,
+    stalkerVote: null,
+    butterflyHugs: 0,
+    demonChecks: [],
+    evilKnightReflected: false,
+    nightmareLastTarget: null,
     pendingBlast: null,
     potions: { antidote: true, poison: true },
     pendingDeaths: [],

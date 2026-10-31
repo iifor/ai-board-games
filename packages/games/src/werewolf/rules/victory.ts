@@ -1,4 +1,5 @@
 import type { EndResult, Seat } from '@battle/engine';
+import { hybridSummary } from '../special/hybrid';
 import { roleCategory } from './board';
 import { canVote, type WerewolfContext } from './context';
 import { SHERIFF_VOTE_WEIGHT } from './sheriff';
@@ -40,12 +41,19 @@ function winReason(ctx: WerewolfContext, winner: WerewolfWinner): string {
   return '狼人票数已占优势';
 }
 
+/** 胜负说明后附加特殊角色的个人结果（如混血儿跟随主人） */
+function withNotes(ctx: WerewolfContext, winner: WerewolfWinner, summary: string): string {
+  const note = hybridSummary(ctx, winner);
+  return note === null ? summary : `${summary}；${note}`;
+}
+
 export function werewolfResult(ctx: WerewolfContext): EndResult {
   const mvp = ctx.state.mvp;
   if (ctx.endReason === 'budget') {
     const winner: WerewolfWinner = ctx.seats.alive().inTeam('werewolf').count() > 0 ? 'werewolf' : 'good';
-    return { winner, winnerLabel: LABELS[winner], summary: `达到天数上限，按存活情况判定${LABELS[winner]}`, mvp };
+    return { winner, winnerLabel: LABELS[winner], summary: withNotes(ctx, winner, `达到天数上限，按存活情况判定${LABELS[winner]}`), mvp };
   }
   const winner = decideWinner(ctx) ?? 'good';
-  return { winner, winnerLabel: LABELS[winner], summary: `${LABELS[winner]}：${winReason(ctx, winner)}（第 ${ctx.round} 天）`, mvp };
+  const summary = withNotes(ctx, winner, `${LABELS[winner]}：${winReason(ctx, winner)}（第 ${ctx.round} 天）`);
+  return { winner, winnerLabel: LABELS[winner], summary, mvp };
 }
