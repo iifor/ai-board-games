@@ -3,9 +3,11 @@ import type { WerewolfPhases } from '../phases/types';
 import type { WerewolfParams, WerewolfState } from '../state';
 import { butterflyPhases, butterflyPrompts } from './butterfly';
 import { demonPhases, demonPrompts } from './demon';
+import { evilKnightPrompts } from './evilKnight';
 import { guardPhases, guardPrompts } from './guard';
 import { hybridPhases, hybridPrompts } from './hybrid';
 import { knightPhases, knightPrompts } from './knight';
+import { nightmarePhases, nightmarePrompts } from './nightmare';
 import { silenceElderPhases, silenceElderPrompts } from './silenceElder';
 import { stalkerPhases, stalkerPrompts } from './stalker';
 import { whiteWolfKingPhases, whiteWolfKingPrompts, whiteWolfKingTriggers } from './whiteWolfKing';
@@ -23,6 +25,8 @@ export const specialPrompts = {
   ...butterflyPrompts,
   ...wolfBeautyPrompts,
   ...demonPrompts,
+  ...evilKnightPrompts,
+  ...nightmarePrompts,
 };
 
 export const specialPhases: WerewolfPhases = {
@@ -35,6 +39,7 @@ export const specialPhases: WerewolfPhases = {
   ...butterflyPhases,
   ...wolfBeautyPhases,
   ...demonPhases,
+  ...nightmarePhases,
 };
 
 /** 出局后的特殊技能，排在猎人开枪之后、移交警徽之前 */

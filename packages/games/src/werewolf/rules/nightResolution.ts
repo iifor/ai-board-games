@@ -1,4 +1,5 @@
 import type { ComputeOutcome } from '@battle/engine';
+import { evilKnightReflect } from '../special/evilKnight';
 import { stalkerAssassination } from '../special/stalker';
 import { wolfBeautyNightLink } from '../special/wolfBeauty';
 import type { PendingDeath, WerewolfState } from '../state';
@@ -22,8 +23,11 @@ const poison: NightStep = (ctx, tally) => {
   return addDeath(tally, poisoned, 'poison');
 };
 
-/** 结算顺序：狼刀 → 毒药 → 特殊角色的结算步骤（按此顺序插入）；殉情最后，覆盖前面所有的死亡 */
-const NIGHT_STEPS: readonly NightStep[] = [wolfKill, poison, stalkerAssassination, wolfBeautyNightLink];
+/**
+ * 结算顺序：狼刀 → 毒药 → 特殊角色的结算步骤（按此顺序插入）。
+ * 恶灵骑士反伤排在狼刀、毒药之后（反伤对象已死亡则不消耗反伤），殉情最后，覆盖前面所有的死亡。
+ */
+const NIGHT_STEPS: readonly NightStep[] = [wolfKill, poison, evilKnightReflect, stalkerAssassination, wolfBeautyNightLink];
 
 /** 夜间结算：只算出死亡名单，天亮公布时才真正出局 */
 export function resolveNight(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {

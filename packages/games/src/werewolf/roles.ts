@@ -3,9 +3,11 @@ import type { RoleCategory } from './boards';
 import { werewolfPrompts as prompts } from './prompts';
 import { butterflyPrompts } from './special/butterfly';
 import { demonPrompts } from './special/demon';
+import { evilKnightPrompts } from './special/evilKnight';
 import { guardPrompts } from './special/guard';
 import { hybridPrompts } from './special/hybrid';
 import { knightPrompts } from './special/knight';
+import { nightmarePrompts } from './special/nightmare';
 import { silenceElderPrompts } from './special/silenceElder';
 import { stalkerPrompts } from './special/stalker';
 import { whiteWolfKingPrompts } from './special/whiteWolfKing';
@@ -42,6 +44,8 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     white_wolf_king: role('白狼王', 'werewolf', whiteWolfKingPrompts.whiteWolfKing, 'wolf'),
     wolf_beauty: role('狼美人', 'werewolf', wolfBeautyPrompts.wolfBeauty, 'wolf', { noSelfDestruct: true }),
     demon: role('恶魔', 'werewolf', demonPrompts.demon, 'wolf', NIGHT_IMMUNE),
+    evil_knight: role('恶灵骑士', 'werewolf', evilKnightPrompts.evilKnight, 'wolf', NIGHT_IMMUNE),
+    nightmare: role('梦魇', 'werewolf', nightmarePrompts.nightmare, 'wolf'),
     seer: role('预言家', 'good', prompts.seer, 'god'),
     witch: role('女巫', 'good', prompts.witch, 'god'),
     hunter: role('猎人', 'good', prompts.hunter, 'god'),

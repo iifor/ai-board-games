@@ -1,6 +1,7 @@
 import type { ActDecision, ComputeOutcome, Seat, TriggerEvent } from '@battle/engine';
 import { NIGHT_DEATH_CAUSES, type WerewolfState } from '../state';
 import { roleTraits } from './board';
+import { shotBlockedTonight } from './block';
 import { isWolf, type WerewolfContext } from './context';
 
 /** 猎人枪杀的 cause 记录开枪时机：白天被放逐后开枪 / 夜里死亡后开枪 */
@@ -30,9 +31,11 @@ export function canSelfDestruct(seat: Seat): boolean {
   return isWolf(seat) && seat.alive && !roleTraits(seat).noSelfDestruct;
 }
 
-/** 猎人被毒杀、殉情以外的出局都能开枪 */
+/** 猎人被毒杀、殉情以外的出局都能开枪；被梦魇恐惧的当晚被狼刀也不能开枪 */
 export function canHunterShoot(ctx: WerewolfContext, event: TriggerEvent): boolean {
-  return event.kind === 'seat_eliminated' && ctx.seats.get(event.seat).role === 'hunter' && !NO_SHOT_CAUSES.has(event.cause);
+  if (event.kind !== 'seat_eliminated' || ctx.seats.get(event.seat).role !== 'hunter') return false;
+  if (event.cause === 'wolf' && shotBlockedTonight(ctx, event.seat)) return false;
+  return !NO_SHOT_CAUSES.has(event.cause);
 }
 
 export function isSheriffDeath(ctx: WerewolfContext, event: TriggerEvent): boolean {

@@ -1,5 +1,6 @@
 import { speechOutput } from '@battle/engine';
 import { werewolfPrompts as prompts } from '../prompts';
+import { announceBlocks, blockedSeats, nightActors, wolvesBlocked } from '../rules/block';
 import { boardConfig, hasRole } from '../rules/board';
 import {
   aliveWolves,
@@ -14,7 +15,6 @@ import {
   wolfChatOrder,
   wolfKillTargets,
 } from '../rules/night';
-import { announceBlocks, blockedSeats, nightActors, wolvesBlocked } from '../rules/block';
 import { resolveNight } from '../rules/nightResolution';
 import { nightAfter } from '../rules/order';
 import type { WerewolfPhases } from './types';

@@ -11,7 +11,7 @@ export const seerCheckSchema = z.object({
 });
 
 /** 夜间死亡的原因；天亮出局时作为触发器的 cause */
-export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'stalker', 'charm']);
+export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'reflect', 'stalker', 'charm']);
 
 export const demonCheckSchema = z.object({
   night: z.number().int().positive(),
@@ -43,6 +43,8 @@ export const werewolfStateSchema = z.object({
     silenced: seatNo.nullable(),
     /** 花蝴蝶今晚抱的人：当晚夜间技能失效 */
     hugged: seatNo.nullable(),
+    /** 梦魇今晚恐惧的人：当晚夜间技能失效，猎人当晚被狼刀时不能开枪 */
+    feared: seatNo.nullable(),
     /** 潜行者今晚暗杀的人 */
     stalked: seatNo.nullable(),
     /** 狼美人今晚魅惑的人：狼美人当晚或次日白天出局时殉情；下一晚入夜时清空 */
@@ -63,6 +65,10 @@ export const werewolfStateSchema = z.object({
   /** 花蝴蝶已经抱人的次数 */
   butterflyHugs: z.number().int().nonnegative(),
   demonChecks: z.array(demonCheckSchema),
+  /** 恶灵骑士的反伤已经发动过（全场一次） */
+  evilKnightReflected: z.boolean(),
+  /** 梦魇上一晚恐惧的人（不能连续两晚恐惧同一人） */
+  nightmareLastTarget: seatNo.nullable(),
   /** 白狼王自爆时选择带走的人，等待结算 */
   pendingBlast: seatNo.nullable(),
   potions: z.object({ antidote: z.boolean(), poison: z.boolean() }),
@@ -117,6 +123,7 @@ export const werewolfVisibility = {
   stalkerVote: roleOnly('stalker'),
   butterflyHugs: roleOnly('butterfly'),
   demonChecks: roleOnly('demon'),
+  nightmareLastTarget: roleOnly('nightmare'),
   potions: roleOnly('witch'),
   lastNightDeaths: 'public',
   seerChecks: ownChecks,
@@ -126,7 +133,17 @@ export const werewolfVisibility = {
 } as const satisfies { readonly [K in keyof WerewolfState]?: Visibility };
 
 export function emptyNight(): WerewolfState['night'] {
-  return { wolfTarget: null, saved: false, poisoned: null, guarded: null, silenced: null, hugged: null, stalked: null, charmed: null };
+  return {
+    wolfTarget: null,
+    saved: false,
+    poisoned: null,
+    guarded: null,
+    silenced: null,
+    hugged: null,
+    feared: null,
+    stalked: null,
+    charmed: null,
+  };
 }
 
 export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): WerewolfState {
@@ -143,6 +160,8 @@ export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): Werewol
     stalkerVote: null,
     butterflyHugs: 0,
     demonChecks: [],
+    evilKnightReflected: false,
+    nightmareLastTarget: null,
     pendingBlast: null,
     potions: { antidote: true, poison: true },
     pendingDeaths: [],

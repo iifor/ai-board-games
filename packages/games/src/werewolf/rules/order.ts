@@ -6,6 +6,7 @@ export const NIGHT_ORDER = [
   'night_start',
   'night_reset',
   'hybrid_choose',
+  'nightmare_fear',
   'butterfly_hug',
   'night_blocks',
   'stalker_assassinate',

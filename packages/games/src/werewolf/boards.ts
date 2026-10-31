@@ -78,6 +78,18 @@ export const BOARDS: readonly BoardDefinition[] = [
     description: '恶魔与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
     roles: { demon: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
   }),
+  board({
+    key: 'evil-knight-guard-12',
+    name: '恶灵骑士&守卫',
+    description: '恶灵骑士与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
+    roles: { evil_knight: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'nightmare-guard-12',
+    name: '梦魇&守卫',
+    description: '梦魇与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
+    roles: { nightmare: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
 ];
 
 export const DEFAULT_BOARD = 'standard-12';
