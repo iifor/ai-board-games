@@ -10,6 +10,15 @@ const envSchema = z.object({
   SECRET_KEY: z.string().refine((value) => Buffer.from(value, 'base64').length === 32, 'SECRET_KEY 必须是 32 字节随机数的 base64'),
   ADMIN_USERNAME: z.string().trim().min(3).max(32).optional(),
   ADMIN_PASSWORD: z.string().min(12, 'ADMIN_PASSWORD 至少 12 个字符').optional(),
+  AZURE_SPEECH_KEY: z.string().min(1).optional(),
+  AZURE_SPEECH_REGION: z.string().min(1).optional(),
+  MIMO_API_KEY: z.string().min(1).optional(),
+  MIMO_BASE_URL: z.url().default('https://api.xiaomimimo.com/v1'),
+  MIMO_TTS_MODEL: z.string().min(1).default('mimo-v2.5-tts'),
+  /** 同时执行的 AI 任务数 */
+  AI_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
+  /** C 端同时进行中的公开对局上限 */
+  MAX_ACTIVE_MATCHES: z.coerce.number().int().min(1).max(1000).default(5),
 });
 
 export interface AppConfig {
@@ -20,6 +29,12 @@ export interface AppConfig {
   readonly secretKey: Buffer;
   /** 管理员表为空时用于创建首个账号 */
   readonly bootstrapAdmin: { readonly username: string; readonly password: string } | null;
+  readonly tts: {
+    readonly azure: { readonly key: string; readonly region: string } | null;
+    readonly mimo: { readonly apiKey: string; readonly baseUrl: string; readonly model: string } | null;
+  };
+  readonly ai: { readonly concurrency: number };
+  readonly matches: { readonly maxActive: number };
 }
 
 export class ConfigError extends Error {
@@ -46,5 +61,11 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>> = p
     jwtSecret: value.JWT_SECRET,
     secretKey: Buffer.from(value.SECRET_KEY, 'base64'),
     bootstrapAdmin,
+    tts: {
+      azure: value.AZURE_SPEECH_KEY && value.AZURE_SPEECH_REGION ? { key: value.AZURE_SPEECH_KEY, region: value.AZURE_SPEECH_REGION } : null,
+      mimo: value.MIMO_API_KEY ? { apiKey: value.MIMO_API_KEY, baseUrl: value.MIMO_BASE_URL, model: value.MIMO_TTS_MODEL } : null,
+    },
+    ai: { concurrency: value.AI_CONCURRENCY },
+    matches: { maxActive: value.MAX_ACTIVE_MATCHES },
   };
 }

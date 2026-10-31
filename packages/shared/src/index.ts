@@ -14,6 +14,20 @@ export type {
   VoiceInput,
   VoiceProvider,
 } from './api/resources';
+export type {
+  AiCallDto,
+  AudioRef,
+  ClientMessage,
+  CreateDebugMatchRequest,
+  CreateMatchRequest,
+  DebugCommandRequest,
+  MatchDetailDto,
+  MatchPacing,
+  MatchSeatDto,
+  MatchStatus,
+  MatchSummaryDto,
+  ServerMessage,
+} from './api/matches';
 export type { GameCatalogItem, GameVariantItem, StageLayout } from './catalog';
 export type {
   AudienceSeat,

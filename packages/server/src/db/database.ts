@@ -14,5 +14,9 @@ export function createDatabase(config: AppConfig['database']): Db {
     max: config.poolMax,
     options: `-c search_path=${config.schema}`,
   });
-  return new Kysely<Database>({ dialect: new PostgresDialect({ pool }), plugins: [new CamelCasePlugin()] });
+  // 只转换列名；jsonb 中的键（如阶段 ID visits.guard_protect）必须原样保留
+  return new Kysely<Database>({
+    dialect: new PostgresDialect({ pool }),
+    plugins: [new CamelCasePlugin({ maintainNestedObjectKeys: true })],
+  });
 }

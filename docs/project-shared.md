@@ -26,9 +26,16 @@
 - `AudienceView`：`gameKey`、`title`、`round`、`phase`、`status`、`seats`（不可见的身份字段为 null）、`extra`（游戏自定义的公开数据）、`result`。每个事件都附带事件发生当时的视图，前端可直接渲染，不需要自己累积状态。
 - `GameResult`：`winner`、`winnerLabel`、`summary`、`mvp`、`endReason`（`normal` / `budget`）。
 
+## REST 契约（api/*）
+
+- `common.ts`：`ApiResponse` 统一响应、`API_ERROR_CODES`、`isApiSuccess` 类型守卫。
+- `auth.ts`：登录、改密、当前管理员。
+- `resources.ts`：供应商（只有 `apiKeyMasked`）、模型、音色、玩家及公开玩家信息；`*Input` 中的可选字段允许 `undefined`（与 zod optional 一致）。
+- `matches.ts`：开局请求、调试局请求、对局概要与详情、AI 调用记录、调试指令，以及 WebSocket 的 `ClientMessage`（hello / ack）与 `ServerMessage`（event + audio / status / end / error）。
+
 ## 游戏目录（catalog.ts）
 
-`GameCatalogItem`：`key`、`title`、`description`、`players`、`layout`（`versus` / `circle`）。服务端从游戏注册表生成，前端不硬编码游戏列表。
+`GameCatalogItem`：`key`、`title`、`description`、`players`、`layout`（`versus` / `circle`）、`variants`（key、name、description、players）、`defaultVariant`。服务端从游戏注册表生成，前端不硬编码游戏列表。
 
 ## 测试约定
 

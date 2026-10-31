@@ -60,10 +60,96 @@ export interface PlayersTable {
   updatedAt: UpdatedAt;
 }
 
+/** jsonb 列：写入时由 repository 序列化为字符串，读取时为解析后的值 */
+type Json<T> = ColumnType<T, string, string>;
+
+export interface MatchesTable {
+  id: string;
+  gameKey: string;
+  variantKey: string | null;
+  specVersion: number;
+  specHash: string;
+  seed: ColumnType<string, number, number>;
+  params: Json<unknown>;
+  status: string;
+  debug: boolean;
+  scripted: boolean;
+  pacing: string;
+  snapshot: Json<unknown>;
+  version: Generated<number>;
+  lastSeq: Generated<number>;
+  ackedSeq: Generated<number>;
+  result: Json<unknown> | null;
+  error: string | null;
+  createdAt: CreatedAt;
+  updatedAt: UpdatedAt;
+  completedAt: Date | null;
+}
+
+export interface MatchSeatsTable {
+  matchId: string;
+  seat: number;
+  playerId: number | null;
+  playerName: string;
+  modelId: number | null;
+  voiceId: number | null;
+}
+
+export interface AiTasksTable {
+  matchId: string;
+  requestId: string;
+  seat: number;
+  request: Json<unknown>;
+  status: Generated<string>;
+  claimedUntil: Date | null;
+  output: Json<unknown> | null;
+  error: string | null;
+  createdAt: CreatedAt;
+  updatedAt: UpdatedAt;
+}
+
+export interface MatchStageEventsTable {
+  matchId: string;
+  seq: number;
+  event: Json<unknown>;
+  createdAt: CreatedAt;
+}
+
+export interface AiCallsTable {
+  id: Generated<number>;
+  matchId: string;
+  requestId: string;
+  seat: number;
+  modelId: number | null;
+  modelName: string;
+  prompt: Json<unknown>;
+  rawResponse: string | null;
+  output: Json<unknown> | null;
+  error: string | null;
+  latencyMs: number;
+  usage: Json<unknown> | null;
+  createdAt: CreatedAt;
+}
+
+export interface MediaAssetsTable {
+  id: string;
+  provider: string;
+  voiceName: string;
+  mime: string;
+  data: Buffer;
+  createdAt: CreatedAt;
+}
+
 export interface Database {
   adminUsers: AdminUsersTable;
   modelProviders: ModelProvidersTable;
   models: ModelsTable;
   voices: VoicesTable;
   players: PlayersTable;
+  matches: MatchesTable;
+  matchSeats: MatchSeatsTable;
+  aiTasks: AiTasksTable;
+  matchStageEvents: MatchStageEventsTable;
+  aiCalls: AiCallsTable;
+  mediaAssets: MediaAssetsTable;
 }

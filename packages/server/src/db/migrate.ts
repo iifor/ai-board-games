@@ -2,10 +2,12 @@ import { sql } from 'kysely';
 import { Migrator, type Migration, type MigrationProvider } from 'kysely/migration';
 import type { Db } from './database';
 import * as init from './migrations/001_init';
+import * as matches from './migrations/002_matches';
 
 /** 迁移按 key 排序执行；新增迁移在此登记 */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {
   '001_init': init,
+  '002_matches': matches,
 };
 
 const provider: MigrationProvider = { getMigrations: async () => MIGRATIONS };

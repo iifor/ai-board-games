@@ -212,7 +212,9 @@ interface AiRequest {
 
 `server/src/{config, db, middlewares, utils, modules}`；HTTP 与 WebSocket 用 Hono（`@hono/node-server`），参数校验用 zod 中间件，client/admin 通过 `hono/client` 获得类型化 API；数据库访问用 Kysely。模块按 `controller / service / repository / routes / validator / types` 分层。`db/migrations/001_init.sql` 建全部表；启动时执行迁移，失败则拒绝启动。统一错误响应 `{ code, message, data? }`，不暴露内部错误。模块：`auth`（JWT、首次登录改密）、`providers`（API Key 用 AES-GCM 加密，响应只返回掩码）、`models`、`voices`、`players`。
 
-### P4 对局运行时
+### P4 对局运行时（已完成）
+
+> 实现说明：Azure 语音改用 REST 接口（不引入 SDK）；音频存于 `media_assets`（bytea）；调试与脚本化拆成 `debug`（断点）与 `scripted`（不调用模型）两个开关；`pacing` 区分按确认节奏推进与不等待。
 
 模块：`games`（目录接口，来自注册表）、`matches`（创建 / 列表 / 详情 / 删除）、`match-runtime`（事务内调用 `advance`，写快照、任务、事件）、`ai-worker`（`SKIP LOCKED` 领取、传输层重试、备用模型、写 `ai_calls`）、`llm`（OpenAI 兼容客户端与 JSON 修复）、`tts`（Azure / Mimo，带缓存）、`realtime`（WebSocket：start / ack / pause / resume，`prefetch` 窗口，断线续播）、`debug`（调试指令接口，仅后台可用）。
 

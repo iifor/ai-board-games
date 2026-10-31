@@ -4,7 +4,7 @@ import { isApiSuccess, type ApiResponse } from '@battle/shared';
 import { sql } from 'kysely';
 import { createApp } from '../../src/app';
 import type { AppConfig } from '../../src/config/env';
-import { createServices } from '../../src/container';
+import { createServices, type ExternalDeps } from '../../src/container';
 import { createDatabase } from '../../src/db/database';
 import { migrateToLatest } from '../../src/db/migrate';
 
@@ -12,22 +12,25 @@ export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://ba
 export const ADMIN = { username: 'admin', password: 'initial-password-123' } as const;
 
 /** 每个测试文件一个独立 schema，结束后删除 */
-export async function createTestApp(overrides: Partial<AppConfig> = {}) {
+export async function createTestApp(overrides: Partial<AppConfig> = {}, external: ExternalDeps = {}) {
   const schema = `test_${randomBytes(6).toString('hex')}`;
   const config: AppConfig = {
     env: 'test',
     port: 0,
-    database: { url: TEST_DATABASE_URL, schema, poolMax: 4 },
+    database: { url: TEST_DATABASE_URL, schema, poolMax: 3 },
     jwtSecret: randomBytes(32).toString('hex'),
     secretKey: randomBytes(32),
     bootstrapAdmin: ADMIN,
+    tts: { azure: null, mimo: null },
+    ai: { concurrency: 4 },
+    matches: { maxActive: 5 },
     ...overrides,
   };
   const db = createDatabase(config.database);
   await migrateToLatest(db, schema);
-  const services = createServices(db, config, gameRegistry);
+  const services = createServices(db, config, gameRegistry, { sleep: async () => {}, ...external });
   await services.auth.bootstrap();
-  const app = createApp(db, services);
+  const { app, injectWebSocket } = createApp(db, services);
 
   async function call<T>(method: string, path: string, options: { body?: unknown; token?: string } = {}) {
     const headers: Record<string, string> = {};
@@ -48,11 +51,12 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}) {
   }
 
   async function cleanup(): Promise<void> {
+    await services.worker.stop();
     await sql`drop schema if exists ${sql.id(schema)} cascade`.execute(db);
     await db.destroy();
   }
 
-  return { app, db, services, config, call, adminToken, cleanup };
+  return { app, injectWebSocket, db, services, config, call, adminToken, cleanup };
 }
 
 export type TestApp = Awaited<ReturnType<typeof createTestApp>>;
