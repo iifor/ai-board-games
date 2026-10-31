@@ -23,7 +23,9 @@ export function formatEntry(game: CompiledGame, s: EngineSnapshot, entry: LogEnt
     case 'action':
       return `${label(entry.seat)}：${entry.text}`;
     case 'vote_tallied': {
-      const ballots = entry.ballots.map((ballot) => `${ballot.voter}号→${ballot.target}号`).join('，') || '无人投票';
+      const votes = entry.ballots.map((ballot) => `${ballot.voter}号→${ballot.target}号`);
+      const abstained = entry.abstained.length ? [`弃票：${entry.abstained.map((seat) => `${seat}号`).join('、')}`] : [];
+      const ballots = [...votes, ...abstained].join('，') || '无人投票';
       const outcome = entry.outcome?.kind === 'selected'
         ? `结果：${label(entry.outcome.seat)}`
         : entry.outcome ? '结果：无人当选' : `平票：${entry.tied.map((seat) => `${seat}号`).join('、')}，进入复投`;

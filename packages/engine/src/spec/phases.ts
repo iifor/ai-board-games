@@ -102,6 +102,10 @@ export interface VotePhase<S, P> extends AiPhaseBase<S, P> {
   readonly eliminateCause?: string;
   /** 票权，默认 1（如警长 1.5） */
   weight?(ctx: RuleContext<S, P>, voter: Seat): number;
+  /** 允许弃票（输出 target: null） */
+  readonly allowAbstain?: boolean;
+  /** 兜底方式：random 随机合法目标，abstain 弃票；默认 random */
+  readonly fallbackMode?: 'random' | 'abstain';
   apply?(ctx: RuleContext<S, P>, outcome: VoteOutcome): NoInfer<S>;
   /** 计票结果的公开范围，默认 public */
   readonly channel?: Channel;

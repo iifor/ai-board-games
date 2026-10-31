@@ -94,6 +94,22 @@ describe('weighted votes and declining actions', () => {
     expect(entries(run.log, 'seat_eliminated')[0]?.seat).toBe(5);
   });
 
+  it('records abstentions and resolves to no one when everyone abstains', () => {
+    const base = chainSpec();
+    const vote = base.phases.vote;
+    if (vote?.kind !== 'vote') throw new Error('fixture 中 vote 应为投票阶段');
+    const game = compileGame({ ...base, phases: { ...base.phases, vote: { ...vote, allowAbstain: true } } });
+    const run = runToEnd(game, {
+      seed: 1,
+      playerCount: 5,
+      maxAdvances: 200,
+      agent: agentWith(game, (request) => (request.phaseId === 'vote' ? { output: { target: null } } : undefined)),
+    });
+    const tally = entries(run.log, 'vote_tallied')[0];
+    expect(tally).toMatchObject({ ballots: [], abstained: [1, 2, 3, 4, 5], outcome: { kind: 'none' } });
+    expect(run.requests.find(({ request }) => request.phaseId === 'vote')?.request.prompt.output).toContain('null 表示弃票');
+  });
+
   it('lets the hunter decline to shoot', () => {
     const run = runToEnd(chainGame, { seed: 1, playerCount: 5, agent: scenario({ 1: { 1: 3, 2: 1, 3: 1, 4: 1, 5: 1 } }, null) });
     expect(entries(run.log, 'action').find((entry) => entry.seat === 1)).toMatchObject({ targets: [], text: '放弃开枪' });

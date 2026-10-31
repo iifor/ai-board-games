@@ -11,24 +11,26 @@ interface VoteState {
   readonly voters: number[];
   readonly weights: Record<string, number>;
   candidates: Record<string, number[]>;
-  ballots: Record<string, number>;
+  /** 座位 → 目标；null 为弃票 */
+  ballots: Record<string, number | null>;
   issued: boolean;
 }
 
 interface VoteOutput {
-  readonly target: number;
+  readonly target: number | null;
 }
 
 type Phase = VotePhase<unknown, unknown>;
 
 function ballotsOf(state: VoteState): VoteBallot[] {
-  return state.voters
-    .filter((voter) => state.ballots[String(voter)] !== undefined)
-    .map((voter) => ({
-      voter,
-      target: state.ballots[String(voter)] as number,
-      weight: state.weights[String(voter)] ?? 1,
-    }));
+  return state.voters.flatMap((voter) => {
+    const target = state.ballots[String(voter)];
+    return typeof target === 'number' ? [{ voter, target, weight: state.weights[String(voter)] ?? 1 }] : [];
+  });
+}
+
+function abstainersOf(state: VoteState): number[] {
+  return state.voters.filter((voter) => state.ballots[String(voter)] === null);
 }
 
 function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, tied: readonly number[]): StepOutcome {
@@ -40,6 +42,7 @@ function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, tied: readon
     title,
     runoff: state.stage,
     ballots,
+    abstained: abstainersOf(state),
     tally: tallyBallots(ballots).rows,
     tied: [...tied],
     outcome,
@@ -61,6 +64,7 @@ function startRunoff(env: ExecEnv, phase: Phase, tied: readonly number[]): StepO
     title: phase.title ?? env.phaseId(),
     runoff: state.stage,
     ballots,
+    abstained: abstainersOf(state),
     tally: tallyBallots(ballots).rows,
     tied: [...tied],
     outcome: null,
@@ -124,19 +128,27 @@ export const voteExecutor: AiPhaseExecutor<Phase> = {
     return drafts.length ? issue(drafts) : resolve(env, phase);
   },
 
-  schema() {
+  schema(_env, phase) {
+    const seat = z.number().int();
     return z.object({
-      target: z.number().int().describe('投票对象的座位号，必须是合法目标之一'),
+      target: phase.allowAbstain
+        ? seat.nullable().describe('投票对象的座位号，必须是合法目标之一；null 表示弃票')
+        : seat.describe('投票对象的座位号，必须是合法目标之一'),
       reason: z.string().max(300).optional().describe('简短理由'),
     });
   },
 
-  check(_env, _phase, pending, value) {
+  check(_env, phase, pending, value) {
     const { target } = value as VoteOutput;
+    if (target === null) return phase.allowAbstain ? null : '不允许弃票';
     return (pending.legalTargets ?? []).includes(target) ? null : `${target} 不是合法的投票对象`;
   },
 
-  fallback(env, _phase, pending) {
+  fallback(env, phase, pending) {
+    if (phase.fallbackMode === 'abstain') {
+      if (!phase.allowAbstain) throw new Error(`阶段 ${env.phaseId()} 不允许弃票，fallbackMode 不能为 abstain`);
+      return { target: null };
+    }
     return { target: env.ctx().random(`fallback:${pending.id}`).pick(pending.legalTargets ?? []) };
   },
 

@@ -1,5 +1,7 @@
 // @battle/engine 公开 API：编写游戏、编译、创建对局、推进、调试输出。
 
+export type { Channel, GameResult, VoteOutcome } from '@battle/shared';
+
 export { compileGame, END_PHASE, RETURN_PHASE, type CompiledGame } from './compiler/compile';
 export { scriptedOutput } from './debug/scriptedAgent';
 export { EngineInputError, SpecError, TemplateError } from './errors';

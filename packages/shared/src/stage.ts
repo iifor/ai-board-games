@@ -44,6 +44,8 @@ export type StagePayload =
       readonly title: string;
       readonly runoff: number;
       readonly ballots: readonly VoteBallot[];
+      /** 弃票的座位 */
+      readonly abstained: readonly number[];
       readonly tally: readonly VoteTallyRow[];
       readonly tied: readonly number[];
       readonly outcome: VoteOutcome | null;
