@@ -1,5 +1,6 @@
 import type { AddressInfo } from 'node:net';
 import { serve, type ServerType } from '@hono/node-server';
+import { gameRegistry } from '@battle/games';
 import type { MatchSummaryDto, ServerMessage, StageEvent } from '@battle/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fakeTts, scriptedLlm, seedPlayers } from './support/fixtures';
@@ -86,6 +87,30 @@ describe('realtime playback', () => {
     expect(replay.events[replay.events.length - 1]?.kind).toBe('game_over');
     expect(replay.events[replay.events.length - 1]?.view.status).toBe('completed');
   });
+
+  /** 每个已注册游戏的每个变体：脚本化调试局经 WebSocket 播放到终局 */
+  const cases = [...gameRegistry.values()].flatMap((game) => {
+    const variants = Object.keys(game.spec.variants ?? {});
+    return (variants.length ? variants : [null]).map((variant) => ({ game, variant }));
+  });
+  it.each(cases.map(({ game, variant }) => [`${game.spec.key}${variant ? `/${variant}` : ''}`, game, variant] as const))(
+    'plays a scripted %s match to the end over WebSocket',
+    async (_name, game, variant) => {
+      const playerIds = await seedPlayers(t, game.spec.players.max);
+      const match = await t.services.matches.createDebug({
+        gameKey: game.spec.key,
+        ...(variant ? { variant } : {}),
+        playerIds,
+        scripted: true,
+        pacing: 'free',
+        seed: 5,
+      });
+      const watched = await watch(match.id, 0);
+      expect(watched.end).toMatchObject({ type: 'end', result: { winner: expect.anything() } });
+      expect(watched.events[watched.events.length - 1]?.kind).toBe('game_over');
+      expect(watched.events.every((event) => event.channel === 'public')).toBe(true);
+    },
+  );
 
   it('reports a missing match', async () => {
     const result = await watch('m_missing', 0);
