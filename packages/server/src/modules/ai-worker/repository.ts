@@ -19,7 +19,8 @@ export interface SeatModel {
   readonly fallbackModelId: number | null;
 }
 
-const CLAIM_TTL = '2 minutes';
+/** 必须大于单个任务的最长耗时（2 个模型 × 2 次 × 60 秒超时 + 退避），否则会被重复领取、重复调用模型 */
+const CLAIM_TTL = '10 minutes';
 
 export function createAiTaskRepository(db: Db) {
   async function modelById(id: number): Promise<SeatModel | undefined> {
