@@ -1,9 +1,6 @@
-import type { Seat, Visibility } from '@battle/engine';
+import type { Seat, SetupContext, Visibility } from '@battle/engine';
 import { z } from 'zod';
-
-export const ROLE_KEYS = ['werewolf', 'seer', 'witch', 'hunter', 'idiot', 'villager'] as const;
-export type WerewolfRole = (typeof ROLE_KEYS)[number];
-export const GOD_ROLES: readonly WerewolfRole[] = ['seer', 'witch', 'hunter', 'idiot'];
+import { DEFAULT_BOARD, findBoard } from './boards';
 
 const seatNo = z.number().int().positive();
 
@@ -18,13 +15,26 @@ export const pendingDeathSchema = z.object({
   cause: z.enum(['wolf', 'poison']),
 });
 
+export const boardInfoSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  rules: z.string(),
+});
+
 export const werewolfStateSchema = z.object({
+  /** 本局板子（公开） */
+  board: boardInfoSchema,
   /** 当晚的临时决定，入夜时重置 */
   night: z.object({
     wolfTarget: seatNo.nullable(),
     saved: z.boolean(),
     poisoned: seatNo.nullable(),
+    guarded: seatNo.nullable(),
   }),
+  /** 守卫上一晚守护的人（不能连续两晚守同一人） */
+  guardLastTarget: seatNo.nullable(),
+  /** 白狼王自爆时选择带走的人，等待结算 */
+  pendingBlast: seatNo.nullable(),
   potions: z.object({ antidote: z.boolean(), poison: z.boolean() }),
   /** 夜间结算出的死亡，天亮公布时才真正出局 */
   pendingDeaths: z.array(pendingDeathSchema),
@@ -62,6 +72,8 @@ const ownChecks: Visibility = {
 };
 
 export const werewolfVisibility = {
+  board: 'public',
+  guardLastTarget: { project: (value: unknown, viewer: Seat) => (viewer.role === 'guard' ? value : undefined) },
   potions: witchOnly,
   lastNightDeaths: 'public',
   seerChecks: ownChecks,
@@ -70,9 +82,13 @@ export const werewolfVisibility = {
   idiotRevealed: 'public',
 } as const satisfies { readonly [K in keyof WerewolfState]?: Visibility };
 
-export function initialWerewolfState(): WerewolfState {
+export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): WerewolfState {
+  const board = findBoard(ctx.variant?.key ?? DEFAULT_BOARD);
   return {
-    night: { wolfTarget: null, saved: false, poisoned: null },
+    board: { key: board.key, name: board.name, rules: board.rules },
+    night: { wolfTarget: null, saved: false, poisoned: null, guarded: null },
+    guardLastTarget: null,
+    pendingBlast: null,
     potions: { antidote: true, poison: true },
     pendingDeaths: [],
     lastNightDeaths: [],

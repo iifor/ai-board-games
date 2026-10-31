@@ -1,14 +1,10 @@
-import type { RuleContext, Seat, SeatQuery } from '@battle/engine';
-import { GOD_ROLES, type WerewolfParams, type WerewolfState } from '../state';
+import type { RuleContext, Seat } from '@battle/engine';
+import type { WerewolfParams, WerewolfState } from '../state';
 
 export type WerewolfContext = RuleContext<WerewolfState, WerewolfParams>;
 
 export function isWolf(seat: Seat): boolean {
   return seat.team === 'werewolf';
-}
-
-export function aliveGods(seats: SeatQuery): SeatQuery {
-  return seats.alive().withRole(...GOD_ROLES);
 }
 
 /** 翻牌的白痴失去投票权 */

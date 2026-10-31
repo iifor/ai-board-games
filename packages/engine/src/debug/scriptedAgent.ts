@@ -3,13 +3,13 @@ import { EngineInputError } from '../errors';
 import { ExecEnv } from '../runtime/env';
 import { phaseTitle, seatLabel } from '../runtime/labels';
 import type { AiRequest, EngineSnapshot } from '../runtime/types';
-import { cloneJson } from '../utils/json';
 
 /** 调试局的确定性输出：不调用模型，结果只由种子与请求 ID 决定，且一定合法 */
 export function scriptedOutput(game: CompiledGame, snapshot: EngineSnapshot, request: AiRequest): unknown {
   const pending = snapshot.pending.find((item) => item.id === request.id);
   if (!pending) throw new EngineInputError(`快照中没有 AI 请求 ${request.id}`);
-  const env = new ExecEnv(game, cloneJson(snapshot), { log: [], stageEvents: [], aiRequests: [] });
+  // 只读使用：不写日志、不改状态，因此无需拷贝快照
+  const env = new ExecEnv(game, snapshot, { log: [], stageEvents: [], aiRequests: [] });
   const phase = env.phase();
   const seat = env.seat(pending.seat);
   const ctx = env.ctx();

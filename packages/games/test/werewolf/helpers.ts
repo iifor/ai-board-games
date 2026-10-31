@@ -19,21 +19,21 @@ export function passiveOutput(request: AiRequest): unknown {
   return { verdict: 'pro', comment: '无' };
 }
 
-export function play(seed: number, override: Override = () => undefined): RunRecord {
+export function play(seed: number, override: Override = () => undefined, variant?: string): RunRecord {
   const agent: Agent = (request, snapshot) => ({ output: override(request, snapshot) ?? passiveOutput(request) });
-  return runToEnd(werewolfGame, { seed, agent, maxAdvances: 2000 });
+  return runToEnd(werewolfGame, { seed, agent, maxAdvances: 2000, ...(variant ? { variant } : {}) });
 }
 
-export function seatsOf(seed: number): readonly Seat[] {
-  return createSnapshot(werewolfGame, { seed, players: makePlayers(12) }).seats;
+export function seatsOf(seed: number, variant?: string): readonly Seat[] {
+  return createSnapshot(werewolfGame, { seed, players: makePlayers(12), ...(variant ? { variant } : {}) }).seats;
 }
 
-export function roleSeats(seed: number, role: string): number[] {
-  return seatsOf(seed).filter((seat) => seat.role === role).map((seat) => seat.seat);
+export function roleSeats(seed: number, role: string, variant?: string): number[] {
+  return seatsOf(seed, variant).filter((seat) => seat.role === role).map((seat) => seat.seat);
 }
 
-export function first(seed: number, role: string): number {
-  const [seat] = roleSeats(seed, role);
+export function first(seed: number, role: string, variant?: string): number {
+  const [seat] = roleSeats(seed, role, variant);
   if (seat === undefined) throw new Error(`种子 ${seed} 没有 ${role}`);
   return seat;
 }

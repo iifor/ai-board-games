@@ -11,14 +11,34 @@ import type { AdvanceResult, EngineInput, EngineSnapshot } from './types';
 
 const MAX_STEPS_PER_ADVANCE = 10_000;
 
-/** 工作副本：JSON 拷贝后冻结规则函数会读到的部分 */
+/** 已冻结的值由引擎产生、不会再被修改，可以直接复用；否则（如刚从数据库读出）拷贝后冻结 */
+function frozen<T>(value: T): T {
+  return value !== null && typeof value === 'object' && !Object.isFrozen(value) ? deepFreeze(cloneJson(value)) : value;
+}
+
+/**
+ * 工作副本：只拷贝本次推进会修改的部分（游标、计数、队列等），
+ * 状态、座位、参数、阶段结果和日志条目都是不可变的，复用引用以避免每次推进深拷贝整份快照。
+ */
 function workingCopy(snapshot: EngineSnapshot): EngineSnapshot {
-  const s = cloneJson(snapshot);
-  deepFreeze(s.seats);
-  deepFreeze(s.state);
-  deepFreeze(s.params);
-  Object.values(s.results).forEach(deepFreeze);
-  return s;
+  return {
+    ...snapshot,
+    seats: frozen(snapshot.seats),
+    state: frozen(snapshot.state),
+    params: frozen(snapshot.params),
+    cursor: cloneJson(snapshot.cursor),
+    visits: { ...snapshot.visits },
+    results: Object.fromEntries(Object.entries(snapshot.results).map(([key, result]) => [key, frozen(result)])),
+    stack: snapshot.stack.map((frame) => frozen(frame)),
+    triggerQueue: snapshot.triggerQueue.map((item) => frozen(item)),
+    activeTrigger: frozen(snapshot.activeTrigger),
+    jump: frozen(snapshot.jump),
+    log: snapshot.log.map((entry) => frozen(entry)),
+    pending: snapshot.pending.map((item) => frozen(item)),
+    budgetUsed: { ...snapshot.budgetUsed },
+    result: frozen(snapshot.result),
+    debug: snapshot.debug ? cloneJson(snapshot.debug) : null,
+  };
 }
 
 /** 持续推进，直到需要 AI 输出、命中断点或终局 */

@@ -1,17 +1,17 @@
 import type { ActDecision, ComputeOutcome, Seat, SeatQuery, VoteOutcome } from '@battle/engine';
 import type { PendingDeath, WerewolfState } from '../state';
+import { boardConfig } from './board';
 import { isWolf, seededRotation, type WerewolfContext } from './context';
 import { sideEliminated } from './victory';
 
-/** 规则口径，见 docs/games/werewolf.md */
-export const NIGHT_RULES = {
-  /** 女巫能否自救：仅首夜 */
-  witchSelfSave: 'first_night_only' as 'never' | 'first_night_only' | 'always',
-};
-
 export function resetNight(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return {
-    state: { ...ctx.state, night: { wolfTarget: null, saved: false, poisoned: null }, pendingDeaths: [], speechStart: null },
+    state: {
+      ...ctx.state,
+      night: { wolfTarget: null, saved: false, poisoned: null, guarded: null },
+      pendingDeaths: [],
+      speechStart: null,
+    },
   };
 }
 
@@ -56,7 +56,8 @@ export function witchSaveTargets(ctx: WerewolfContext, witch: Seat): number[] {
   const victim = ctx.state.night.wolfTarget;
   if (!ctx.state.potions.antidote || victim === null) return [];
   if (victim === witch.seat) {
-    const allowed = NIGHT_RULES.witchSelfSave === 'always' || (NIGHT_RULES.witchSelfSave === 'first_night_only' && ctx.round === 1);
+    const rule = boardConfig(ctx).witchSelfSave;
+    const allowed = rule === 'always' || (rule === 'first_night_only' && ctx.round === 1);
     if (!allowed) return [];
   }
   return [victim];
@@ -82,10 +83,12 @@ export function applyWitchPoison(ctx: WerewolfContext, decisions: readonly ActDe
 
 /** 夜间结算：只算出死亡名单，天亮公布时才真正出局 */
 export function resolveNight(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
-  const { wolfTarget, saved, poisoned } = ctx.state.night;
+  const { wolfTarget, saved, poisoned, guarded } = ctx.state.night;
   const deaths: PendingDeath[] = [];
+  // 守护与解药各自能挡下狼刀，同守同救则死亡
+  const blocked = (guarded !== null && guarded === wolfTarget) !== saved;
   // 狼刀与毒药同一人时按毒杀记（猎人因此不能开枪）
-  if (wolfTarget !== null && !saved && wolfTarget !== poisoned) deaths.push({ seat: wolfTarget, cause: 'wolf' });
+  if (wolfTarget !== null && !blocked && wolfTarget !== poisoned) deaths.push({ seat: wolfTarget, cause: 'wolf' });
   if (poisoned !== null) deaths.push({ seat: poisoned, cause: 'poison' });
   return { state: { ...ctx.state, pendingDeaths: deaths.sort((a, b) => a.seat - b.seat) } };
 }
@@ -94,7 +97,7 @@ export function resolveNight(ctx: WerewolfContext): ComputeOutcome<WerewolfState
 function wolfKillLocksWin(ctx: WerewolfContext, deaths: readonly PendingDeath[]): boolean {
   const victim = deaths.find((death) => death.cause === 'wolf')?.seat;
   if (victim === undefined) return false;
-  return sideEliminated(ctx.seats.alive().except(victim).list());
+  return sideEliminated(ctx, ctx.seats.alive().except(victim).list());
 }
 
 /** 天亮公布死讯并让死者出局 */

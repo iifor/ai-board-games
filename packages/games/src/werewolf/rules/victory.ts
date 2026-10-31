@@ -1,5 +1,5 @@
 import type { EndResult, Seat } from '@battle/engine';
-import { GOD_ROLES } from '../state';
+import { roleCategory } from './board';
 import { canVote, type WerewolfContext } from './context';
 import { SHERIFF_VOTE_WEIGHT } from './sheriff';
 
@@ -7,10 +7,10 @@ export type WerewolfWinner = 'good' | 'werewolf';
 
 const LABELS: Readonly<Record<WerewolfWinner, string>> = { good: '好人阵营胜利', werewolf: '狼人阵营胜利' };
 
-/** 屠边：只看给定的存活座位，判断是否有神职或村民被全部淘汰 */
-export function sideEliminated(alive: readonly Seat[]): boolean {
-  const gods = alive.filter((seat) => (GOD_ROLES as readonly string[]).includes(seat.role)).length;
-  const villagers = alive.filter((seat) => seat.role === 'villager').length;
+/** 屠边：只看给定的存活座位，判断神职或村民（按本局角色类别）是否已被全部淘汰 */
+export function sideEliminated(ctx: WerewolfContext, alive: readonly Seat[]): boolean {
+  const gods = alive.filter((seat) => roleCategory(ctx, seat) === 'god').length;
+  const villagers = alive.filter((seat) => roleCategory(ctx, seat) === 'villager').length;
   return gods === 0 || villagers === 0;
 }
 
@@ -28,7 +28,7 @@ export function decideWinner(ctx: WerewolfContext): WerewolfWinner | null {
   const alive = ctx.seats.alive();
   if (ctx.state.winnerLock === 'werewolf') return 'werewolf';
   if (alive.inTeam('werewolf').count() === 0) return 'good';
-  if (sideEliminated(alive.list())) return 'werewolf';
+  if (sideEliminated(ctx, alive.list())) return 'werewolf';
   if (effectiveVotes(ctx, true) > effectiveVotes(ctx, false)) return 'werewolf';
   return null;
 }
@@ -36,7 +36,7 @@ export function decideWinner(ctx: WerewolfContext): WerewolfWinner | null {
 function winReason(ctx: WerewolfContext, winner: WerewolfWinner): string {
   if (ctx.state.winnerLock === 'werewolf') return '狼刀达成屠边';
   if (winner === 'good') return '狼人全部出局';
-  if (sideEliminated(ctx.seats.alive().list())) return '屠边成功';
+  if (sideEliminated(ctx, ctx.seats.alive().list())) return '屠边成功';
   return '狼人票数已占优势';
 }
 

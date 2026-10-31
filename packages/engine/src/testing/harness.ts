@@ -37,6 +37,7 @@ export interface RunOptions {
   /** 未提供 players 时生成的人数，默认 players.max */
   readonly playerCount?: number;
   readonly params?: unknown;
+  readonly variant?: string;
   readonly agent?: Agent;
   readonly debug?: CreateMatchInput['debug'];
   /** 调试局暂停时自动下达的指令，默认 continue */
@@ -70,6 +71,7 @@ export function runToEnd(game: CompiledGame, options: RunOptions): RunRecord {
     seed: options.seed,
     players,
     params: options.params,
+    ...(options.variant ? { variant: options.variant } : {}),
     ...(options.debug ? { debug: options.debug } : {}),
   });
   let advances = 0;

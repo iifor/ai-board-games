@@ -79,6 +79,7 @@ export class ExecEnv {
       round: s.round,
       phaseId: s.cursor.phaseId,
     } as LogEntry;
+    deepFreeze(entry);
     s.log.push(entry);
     this.out.log.push(entry);
     if (entry.kind !== 'fallback' && audienceCanSee(entry.channel, audienceMode(this.game))) {

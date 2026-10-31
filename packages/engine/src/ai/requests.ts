@@ -4,6 +4,7 @@ import { assemblePrompt } from '../prompt/assemble';
 import { budgetLimits } from '../runtime/budget';
 import type { ExecEnv } from '../runtime/env';
 import type { PendingRequest } from '../runtime/types';
+import { cloneJson, deepFreeze } from '../utils/json';
 import { toJsonSchema } from './outputContract';
 
 /** 登记 pending 并渲染完整的 AiRequest；超出 AI 调用预算时返回 false */
@@ -37,7 +38,7 @@ export function issueRequest(env: ExecEnv, draft: RequestDraft, attempt = 1, pre
     previousError,
   });
 
-  s.pending.push(pending);
+  s.pending.push(deepFreeze(cloneJson(pending)));
   s.budgetUsed.aiRequests += 1;
   env.out.aiRequests.push({
     id: pending.id,

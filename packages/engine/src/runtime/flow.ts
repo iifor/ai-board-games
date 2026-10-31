@@ -34,7 +34,7 @@ function moveTo(env: ExecEnv, target: ResumeTarget): void {
       budgetEnd(env, `触发器嵌套超过上限，按预算终局`);
       return;
     }
-    s.stack.push({ resume: target, trigger: s.activeTrigger });
+    s.stack.push(deepFreeze({ resume: target, trigger: s.activeTrigger }));
     s.activeTrigger = queued.event;
     s.cursor = emptyCursor(queued.phaseId);
     return;

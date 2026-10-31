@@ -11,11 +11,12 @@ import {
   resolveExile,
 } from '../rules/day';
 import { announceDawn } from '../rules/night';
+import { dayAfter } from '../rules/order';
 import { sheriffWeight } from '../rules/sheriff';
 import type { WerewolfPhases } from './types';
 
 export const dayPhases = {
-  dawn: { kind: 'compute', title: '天亮', run: announceDawn, next: 'speech_direction' },
+  dawn: { kind: 'compute', title: '天亮', run: announceDawn, next: dayAfter('dawn') },
   speech_direction: {
     kind: 'act',
     action: '指定发言顺序',
@@ -25,7 +26,7 @@ export const dayPhases = {
     channel: () => 'public',
     describe: describeDirection,
     apply: applyDirection,
-    next: 'day_speech',
+    next: dayAfter('speech_direction'),
   },
   day_speech: {
     kind: 'speak',
@@ -37,7 +38,7 @@ export const dayPhases = {
     declarations: {
       selfDestruct: { label: '自爆', allowed: (_ctx, seat) => seat.team === 'werewolf' && seat.alive },
     },
-    next: 'exile_vote',
+    next: dayAfter('day_speech'),
   },
   exile_vote: {
     kind: 'vote',
@@ -49,7 +50,7 @@ export const dayPhases = {
     allowAbstain: true,
     tie: { runoff: 0, then: 'none' },
     apply: recordExile,
-    next: 'exile_resolve',
+    next: dayAfter('exile_vote'),
   },
   exile_resolve: { kind: 'compute', run: resolveExile, next: [{ goto: 'night_start', round: 'increment' }] },
 } satisfies WerewolfPhases;
