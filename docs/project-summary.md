@@ -44,6 +44,7 @@ packages/
 | `pnpm test` / `pnpm test:watch` | 运行全部 vitest 项目 |
 | `pnpm dev` | 并行启动各包的 dev 脚本（server `3100`、client `5173`、admin `5174`；server 读取根目录 `.env`） |
 | `pnpm build` | 构建有 build 脚本的包 |
+| `pnpm dev:seed` | 通过后台接口创建演示数据（占位模型、浏览器音色、12 名玩家）；`-- --matches` 再创建两局脚本化调试局；需要 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 环境变量 |
 | `pnpm db:up` / `pnpm db:down` | 启动 / 停止本机 PostgreSQL 16（`docker-compose.dev.yml`，默认 `127.0.0.1:5433`） |
 
 前端开发服务器把 `/api`（含 WebSocket）代理到 `http://127.0.0.1:3100`。

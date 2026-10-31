@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:up": "docker compose -f docker-compose.dev.yml up -d --wait",
-    "db:down": "docker compose -f docker-compose.dev.yml down"
+    "db:down": "docker compose -f docker-compose.dev.yml down",
+    "dev:seed": "node scripts/dev/seed-demo.mjs"
   },
   "devDependencies": {
     "@types/node": "catalog:",
