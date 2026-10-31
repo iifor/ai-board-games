@@ -68,9 +68,9 @@ GameSpec 关键字段：
 | `announce` | 用**公开上下文**渲染模板，写入主持播报 | — |
 | `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆） | `output` schema（标准为 `speechOutput({ max })`）；有权声明的座位额外获得可选的 `declare` 字段 |
 | `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }` |
-| `vote` | 投票后计票，`weight` 设定票权；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }` |
+| `vote` | 投票后计票，`weight` 设定票权，`allowAbstain` 允许弃票（`fallbackMode: 'abstain'` 时兜底为弃票）；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null |
 | `judge` | 评委依次判定，`verdicts` 定义选项与含义；多数决，无评委或并列时取 `tieVerdict` | 自动生成 `{ verdict, comment }`，选项含义写入 schema 描述 |
-| `compute` | 纯函数结算：返回新状态、淘汰列表、日志 | — |
+| `compute` | 纯函数结算：返回新状态、日志、淘汰列表，按此顺序生效（播报先于出局事件） | — |
 | `reveal` | 写入一条揭示日志；`revealRoles` 向所有玩家与观众公开全部身份，并在日志 `data.roles` 中给出身份表 | — |
 
 跳转：`next` 为阶段 ID、`end`、`return`，或 `{ when?, goto, round? }` 列表（按顺序取第一个命中项，最后一项必须无条件）；`round: 'increment'` 使轮次加一。编译期检查跳转目标存在、所有阶段可达（从 `start`、触发器目标、`gameOver.goto` 出发），且只有触发器插入的阶段链可以 `return`。

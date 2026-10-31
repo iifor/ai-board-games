@@ -282,16 +282,19 @@ advance(game: CompiledGame, snapshot: EngineSnapshot, input: EngineInput): Advan
 
 | 环节 | 表达方式 |
 | --- | --- |
-| 狼人夜聊与刀人 | `speak`（`team:wolf` 频道）+ `vote`（狼人内部计票） |
+| 狼人夜聊与刀人 | `speak`（`team:werewolf` 频道）+ `vote`（狼人内部计票，可弃票，不能刀狼人） |
 | 预言家查验 | `act`；结果作为 `private:<seat>` 日志写入 |
 | 女巫用药 | `compute` 先把刀口写入女巫私密日志，再 `act`（`allowNone`；解药、毒药各限一次，由状态约束合法选项） |
 | 夜晚结算 | `compute: rules.resolveNight` |
-| 警长竞选 | 报名 `act` → 竞选发言 `speak` → 退水 `act` → 投票 `vote` → 平票复投 |
+| 警长竞选 | 报名 `act` → 竞选发言 `speak` → 退水 `act` → 投票 `vote` → 平票时 PK 发言 `speak` + PK 投票 `vote` |
 | 白天发言顺序 | 警长决定方向，`speak` 的 `order` 由函数按状态计算 |
-| 放逐投票 | `vote`，带警长 `weight`；白痴被放逐时翻牌存活并失去投票权（`voters` 选择器排除） |
+| 放逐投票 | `vote`，带警长 `weight`、可弃票，平票无人出局；白痴被放逐时翻牌存活并失去投票权（`voters` 选择器排除） |
 | 遗言、猎人开枪、警徽移交 | `triggers` 的 `push`；猎人被毒时不能开枪由 `when` 判断 |
-| 狼人自爆 | 发言输出中的附加动作 → `action_declared` 触发器 `jump` 入夜 |
-| 赛后 | MVP `vote` + 赛后发言 `speak` |
+| 狼人自爆 | 白天发言输出中的附加动作 → `action_declared` 触发器 `jump` 到自爆结算，再入夜 |
+| 胜负 | `gameOver`：每个阶段完成后判定，命中即转入赛后 |
+| 赛后 | `reveal`（公开身份）+ MVP `vote` + 赛后发言 `speak` |
+
+完整规则口径与旧实现的差异见 `docs/games/werewolf.md`。P2 实现时新增的引擎能力：投票弃权（`allowAbstain`）、`gameOver` 转入、`reveal` 的 `revealRoles`、compute 中"播报先于出局"的生效顺序。
 
 ### 后续板子
 

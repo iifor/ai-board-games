@@ -15,10 +15,10 @@
 | `narration` | `text` | 主持播报 |
 | `speech` | `seat`、`text` | 玩家发言 |
 | `action` | `seat`、`action`、`targets`、`text` | 玩家动作（默认私密，公开模式下观众看不到） |
-| `vote_tallied` | `title`、`runoff`、`ballots`、`tally`、`tied`、`outcome` | 一轮计票；`outcome` 为 null 表示平票进入复投 |
+| `vote_tallied` | `title`、`runoff`、`ballots`、`abstained`、`tally`、`tied`、`outcome` | 一轮计票；`ballots` 含票权，`abstained` 为弃票座位，`outcome` 为 null 表示平票进入复投 |
 | `judgement` | `seat`、`verdict`、`verdictLabel`、`comment` | 评委判定 |
 | `seat_eliminated` | `seat`、`reason` | 出局 |
-| `revealed` | `text`、`data` | 揭示信息 |
+| `revealed` | `text`、`data` | 揭示信息；公开全部身份时 `data.roles` 为 `{ seat, role, team }[]` |
 | `fallback` | `seat`、`reason` | 兜底记录，仅 host 频道，不进入观众视图 |
 | `game_over` | `result` | 终局结果 |
 
