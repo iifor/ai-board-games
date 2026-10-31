@@ -11,6 +11,12 @@ export const boardConfigSchema = z.object({
   sheriff: z.boolean().default(true),
   /** 覆盖角色的屠边类别（如某些板子中白痴算作民边） */
   categories: z.record(z.string(), z.enum(ROLE_CATEGORIES)).default({}),
+  /** 狼美人被女巫毒杀时是否仍带走被魅惑者（狼美人&老流氓板子中削弱为 false） */
+  wolfBeautyPoisonLink: z.boolean().default(true),
+  /** 隐狼口径：inherit 由法官告知狼同伴、狼同伴全灭后继承击杀权；linked 与狼人互不相认、不能击杀，狼人全灭时随之出局 */
+  hiddenWolf: z.enum(['inherit', 'linked']).default('inherit'),
+  /** 被乌鸦诅咒者在次日放逐投票中额外获得的票数 */
+  crowVotes: z.number().int().positive().default(1),
 });
 export type BoardConfig = z.infer<typeof boardConfigSchema>;
 
@@ -24,9 +30,9 @@ export interface BoardDefinition {
   readonly config?: z.input<typeof boardConfigSchema>;
 }
 
-/** 规则说明由角色表自动拼出（见 roleRules.ts） */
+/** 规则说明由角色表与板子参数自动拼出（见 roleRules.ts） */
 function board(definition: Omit<BoardDefinition, 'rules'>): BoardDefinition {
-  return { ...definition, rules: describeRules(definition.roles) };
+  return { ...definition, rules: describeRules(definition.roles, boardConfigSchema.parse(definition.config ?? {})) };
 }
 
 export const BOARDS: readonly BoardDefinition[] = [
@@ -89,6 +95,63 @@ export const BOARDS: readonly BoardDefinition[] = [
     name: '梦魇&守卫',
     description: '梦魇与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
     roles: { nightmare: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'wolf-beauty-rogue-12',
+    name: '狼美人&老流氓',
+    description: '狼美人与 3 名狼人对抗预言家、女巫、猎人、白痴、老流氓与 3 名村民；本板子的狼美人被毒杀时不能带人。',
+    roles: { wolf_beauty: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, idiot: 1, old_rogue: 1, villager: 'rest' },
+    config: { wolfBeautyPoisonLink: false },
+  }),
+  board({
+    key: 'wolf-king-dreamer-12',
+    name: '狼王&摄梦人',
+    description: '狼王与 3 名狼人对抗预言家、女巫、猎人、摄梦人与 4 名村民；猎人与狼王开枪都不翻牌。',
+    roles: { wolf_king: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, dreamer: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'wolf-king-magician-12',
+    name: '狼王&魔术师',
+    description: '狼王与 3 名狼人对抗预言家、女巫、猎人、魔术师与 4 名村民；猎人与狼王开枪都不翻牌。',
+    roles: { wolf_king: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, magician: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'big-bad-wolf-fortune-teller-12',
+    name: '大灰狼&占卜师',
+    description: '大灰狼与 3 名狼人对抗预言家、女巫、猎人、占卜师与 4 名村民；大灰狼离群行动，全场可单独击杀一次。',
+    roles: { big_bad_wolf: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, fortune_teller: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'hidden-wolf-crow-12',
+    name: '隐狼&乌鸦',
+    description: '隐狼与 3 名狼人对抗预言家、女巫、猎人、乌鸦与 4 名村民；隐狼查验为好人，狼同伴全灭后继承击杀权。',
+    roles: { hidden_wolf: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, crow: 1, villager: 'rest' },
+    config: { hiddenWolf: 'inherit' },
+  }),
+  board({
+    key: 'bear-tamer-hidden-wolf-12',
+    name: '驯熊师&隐狼',
+    description: '隐狼与 3 名狼人对抗驯熊师、女巫、猎人、白痴与 4 名村民；隐狼与狼人互不相认，狼人全灭时随之出局。',
+    roles: { hidden_wolf: 1, werewolf: 3, bear_tamer: 1, witch: 1, hunter: 1, idiot: 1, villager: 'rest' },
+    config: { hiddenWolf: 'linked' },
+  }),
+  board({
+    key: 'wild-child-12',
+    name: '野孩子',
+    description: '3 名狼人对抗预言家、女巫、猎人、白痴、野孩子与 4 名村民；野孩子的榜样出局时他会变成狼人。',
+    roles: { werewolf: 3, seer: 1, witch: 1, hunter: 1, idiot: 1, wild_child: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'bombman-12',
+    name: '炸弹人',
+    description: '4 名狼人对抗预言家、女巫、猎人、炸弹人与 4 名村民；炸弹人被放逐时可以炸死所有投票给他的人。',
+    roles: { werewolf: 4, seer: 1, witch: 1, hunter: 1, bombman: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'nine-tailed-fox-12',
+    name: '九尾狐',
+    description: '4 名狼人对抗预言家、女巫、猎人、九尾狐与 4 名村民；九尾狐随好人出局失去尾巴，尾巴掉光时出局。',
+    roles: { werewolf: 4, seer: 1, witch: 1, hunter: 1, nine_tailed_fox: 1, villager: 'rest' },
   }),
 ];
 

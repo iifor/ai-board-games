@@ -7,7 +7,11 @@ export const werewolfPrompts = definePrompts({
     '胜负：狼人全部出局则好人胜利；神职全部出局、村民全部出局，或狼人的有效票数多于好人时，狼人胜利。',
     '对局进行到第 {{round}} 天（每天先经历夜晚，再进入白天）。'
   ].join('\n'),
-  werewolf: '你是{{me.label}}，身份是狼人。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。你们要隐藏身份、误导好人。白天发言时你可以在发言后宣布自爆，自爆会让你出局并跳过当天的放逐投票，直接进入黑夜。',
+  werewolf: [
+    '你是{{me.label}}，身份是狼人。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
+    '{{#if state.knownWolves}}你还认识离群的狼同伴：{{#each state.knownWolves}}{{this}}号 {{/each}}（夜里你们不能交流，也看不见彼此的刀法）。{{/if}}',
+    '你们要隐藏身份、误导好人。白天发言时你可以在发言后宣布自爆，自爆会让你出局并跳过当天的放逐投票，直接进入黑夜。',
+  ].join(''),
   seer: '你是{{me.label}}，身份是预言家。{{#if state.seerChecks}}你的查验记录：{{#each state.seerChecks}}第{{this.night}}夜查验 {{this.target}}号，结果是{{this.result}}；{{/each}}{{else}}你还没有查验过任何人。{{/if}}',
   witch: '你是{{me.label}}，身份是女巫。{{#if state.potions.antidote}}你还有解药。{{else}}你的解药已用完。{{/if}}{{#if state.potions.poison}}你还有毒药。{{else}}你的毒药已用完。{{/if}}',
   hunter: '你是{{me.label}}，身份是猎人。出局时（被毒杀除外）你可以开枪带走一名玩家。',

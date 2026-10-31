@@ -1,6 +1,7 @@
-import type { Seat, SetupContext, Visibility } from '@battle/engine';
+import type { Visibility } from '@battle/engine';
 import { z } from 'zod';
-import { DEFAULT_BOARD, findBoard } from './boards';
+import { emptyExtraNight, extraNightShape, extraStateShape, extraVisibility } from './stateExtras';
+import { ownChecks, roleOnly } from './stateVisibility';
 
 const seatNo = z.number().int().positive();
 
@@ -11,7 +12,7 @@ export const seerCheckSchema = z.object({
 });
 
 /** 夜间死亡的原因；天亮出局时作为触发器的 cause */
-export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'reflect', 'stalker', 'charm']);
+export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'reflect', 'stalker', 'charm', 'dream']);
 
 export const demonCheckSchema = z.object({
   night: z.number().int().positive(),
@@ -49,6 +50,7 @@ export const werewolfStateSchema = z.object({
     stalked: seatNo.nullable(),
     /** 狼美人今晚魅惑的人：狼美人当晚或次日白天出局时殉情；下一晚入夜时清空 */
     charmed: seatNo.nullable(),
+    ...extraNightShape,
   }),
   /** 守卫上一晚守护的人（不能连续两晚守同一人） */
   guardLastTarget: seatNo.nullable(),
@@ -89,6 +91,7 @@ export const werewolfStateSchema = z.object({
   /** 狼刀本身已达成狼人胜利条件时锁定胜负，同夜毒杀或枪杀最后一名狼人也不改变结果 */
   winnerLock: z.enum(['werewolf']).nullable(),
   mvp: seatNo.nullable(),
+  ...extraStateShape,
 });
 
 export type WerewolfState = z.infer<typeof werewolfStateSchema>;
@@ -98,19 +101,6 @@ export type NightDeathCause = z.infer<typeof nightDeathCauseSchema>;
 
 /** 天亮出局时使用这些原因，可据此区分夜间死亡与白天死亡 */
 export const NIGHT_DEATH_CAUSES: ReadonlySet<string> = new Set(nightDeathCauseSchema.options);
-
-/** 只有该角色本人能看到 */
-function roleOnly(role: string): Visibility {
-  return { project: (value: unknown, viewer: Seat) => (viewer.role === role ? value : undefined) };
-}
-
-/** 预言家只能看到自己的查验记录；还没查验时为空列表 */
-const ownChecks: Visibility = {
-  project: (value: unknown, viewer: Seat) => {
-    if (viewer.role !== 'seer' || value === null || typeof value !== 'object') return undefined;
-    return (value as Record<string, unknown>)[String(viewer.seat)] ?? [];
-  },
-};
 
 export const werewolfVisibility = {
   board: 'public',
@@ -130,6 +120,7 @@ export const werewolfVisibility = {
   sheriff: 'public',
   sheriffCandidates: 'public',
   idiotRevealed: 'public',
+  ...extraVisibility,
 } as const satisfies { readonly [K in keyof WerewolfState]?: Visibility };
 
 export function emptyNight(): WerewolfState['night'] {
@@ -143,37 +134,6 @@ export function emptyNight(): WerewolfState['night'] {
     feared: null,
     stalked: null,
     charmed: null,
-  };
-}
-
-export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): WerewolfState {
-  const board = findBoard(ctx.variant?.key ?? DEFAULT_BOARD);
-  return {
-    board: { key: board.key, name: board.name, rules: board.rules },
-    night: emptyNight(),
-    guardLastTarget: null,
-    hybridMaster: null,
-    elderLastTarget: null,
-    silencedToday: null,
-    knightDuelUsed: false,
-    stalkerUsed: false,
-    stalkerVote: null,
-    butterflyHugs: 0,
-    demonChecks: [],
-    evilKnightReflected: false,
-    nightmareLastTarget: null,
-    pendingBlast: null,
-    potions: { antidote: true, poison: true },
-    pendingDeaths: [],
-    lastNightDeaths: [],
-    seerChecks: {},
-    sheriff: null,
-    sheriffCandidates: [],
-    speechStart: null,
-    idiotRevealed: false,
-    exileTarget: null,
-    pendingShot: null,
-    winnerLock: null,
-    mvp: null,
+    ...emptyExtraNight(),
   };
 }

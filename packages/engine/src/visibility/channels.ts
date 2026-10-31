@@ -19,6 +19,15 @@ export function seatCanSee(channel: Channel, viewer: Seat): boolean {
   return channel === privateChannel(viewer.seat);
 }
 
+/**
+ * AI 玩家能否看到某条日志：频道可见，且阵营频道的内容不早于该玩家加入阵营的时间
+ * （中途改变阵营的座位看不到新阵营此前的内部记录，见 Seat.teamSince）
+ */
+export function entryVisibleTo(entry: { readonly channel: Channel; readonly seq: number }, viewer: Seat): boolean {
+  if (!seatCanSee(entry.channel, viewer)) return false;
+  return !(entry.channel.startsWith('team:') && viewer.teamSince !== undefined && entry.seq < viewer.teamSince);
+}
+
 /** 观众能否看到；host 频道是运营信息（如兜底记录），不进入观众视图 */
 export function audienceCanSee(channel: Channel, mode: AudienceMode): boolean {
   if (channel === 'host') return false;

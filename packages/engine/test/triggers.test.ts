@@ -110,6 +110,30 @@ describe('weighted votes and declining actions', () => {
     expect(run.requests.find(({ request }) => request.phaseId === 'vote')?.request.prompt.output).toContain('null 表示弃票');
   });
 
+  it('adds bonus votes to the tally, limited to candidates, and shows them in the history', () => {
+    const base = chainSpec();
+    const vote = base.phases.vote;
+    if (vote?.kind !== 'vote') throw new Error('fixture 中 vote 应为投票阶段');
+    const game = compileGame({
+      ...base,
+      phases: { ...base.phases, vote: { ...vote, bonus: (ctx) => (ctx.round === 1 ? [{ target: 5, votes: 1 }, { target: 9, votes: 3 }] : []) } },
+    });
+    const votes: Record<number, number> = { 1: 4, 2: 4, 3: 5, 4: 1, 5: 1 };
+    const run = runToEnd(game, {
+      seed: 1,
+      playerCount: 5,
+      agent: agentWith(game, (request, snapshot) => (request.phaseId === 'vote' && snapshot.round === 1
+        ? { output: { target: votes[request.seat] } }
+        : undefined)),
+    });
+    const tally = entries(run.log, 'vote_tallied')[0];
+    expect(tally?.tally).toEqual([{ target: 5, votes: 3 }, { target: 1, votes: 2 }, { target: 4, votes: 2 }]);
+    expect(tally?.ballots.reduce((sum, ballot) => sum + ballot.weight, 0)).toBe(6);
+    expect(entries(run.log, 'seat_eliminated')[0]?.seat).toBe(5);
+    const later = run.requests.find(({ snapshot }) => snapshot.round === 2);
+    expect(later?.request.prompt.history).toContain('额外票：5号+1');
+  });
+
   it('lets the hunter decline to shoot', () => {
     const run = runToEnd(chainGame, { seed: 1, playerCount: 5, agent: scenario({ 1: { 1: 3, 2: 1, 3: 1, 4: 1, 5: 1 } }, null) });
     expect(entries(run.log, 'action').find((entry) => entry.seat === 1)).toMatchObject({ targets: [], text: '放弃开枪' });

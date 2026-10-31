@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compileGame, createSnapshot, EngineInputError, SpecError, type GameSpec } from '../src';
-import { makePlayers, runToEnd } from '../src/testing';
+import { assertNoLeak, makePlayers, runToEnd } from '../src/testing';
 import { secretSpec, type SecretState } from './fixtures/secretGame';
 
 type Params = { readonly rounds: number };
@@ -84,5 +84,39 @@ describe('disabled phases and reassignment', () => {
     const chat = run.requests.filter(({ request }) => request.phaseId === 'red_chat');
     expect(chat).toHaveLength(3);
     expect(chat[0]?.request.prompt.identity.match(/号 玩家/g)?.length).toBe(3);
+  });
+
+  it('hides the new team’s earlier channel history from a seat that joins mid-game', () => {
+    const vote = secretSpec.phases.vote;
+    if (vote?.kind !== 'vote') throw new Error('fixture 中 vote 应为投票阶段');
+    const game = compileGame({
+      ...secretSpec,
+      phases: {
+        ...secretSpec.phases,
+        vote: { ...vote, next: [{ when: (ctx) => ctx.round >= ctx.params.rounds, goto: 'finale' }, { goto: 'recruit', round: 'increment' }] },
+        recruit: {
+          kind: 'compute',
+          run: (ctx) => {
+            const recruit = ctx.seats.alive().inTeam('blue').ids()[0];
+            return recruit === undefined ? {} : {
+              reassign: [{ seat: recruit, role: 'red' }],
+              log: [{ kind: 'narration', text: `欢迎 ${recruit}号 加入红队`, channel: 'team:red' }],
+            };
+          },
+          next: 'talk',
+        },
+      },
+    });
+    const run = runToEnd(game, { seed: 2, playerCount: 5 });
+    const recruit = run.snapshot.seats.find((seat) => seat.teamSince !== undefined);
+    expect(recruit?.team).toBe('red');
+    const roundTwo = run.requests.filter(({ request, snapshot }) => request.phaseId === 'talk' && snapshot.round === 2);
+    const joined = roundTwo.find(({ request }) => request.seat === recruit?.seat)?.request.prompt.history ?? '';
+    const veteran = roundTwo.find(({ request, snapshot }) => request.seat !== recruit?.seat
+      && snapshot.seats.find((seat) => seat.seat === request.seat)?.team === 'red')?.request.prompt.history ?? '';
+    expect(joined).toContain(`欢迎 ${recruit?.seat}号 加入红队`);
+    expect(joined).not.toContain('在「红队密谈」的发言');
+    expect(veteran).toContain('在「红队密谈」的发言');
+    for (const item of [run]) expect(() => assertNoLeak(game, item)).not.toThrow();
   });
 });

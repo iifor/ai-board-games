@@ -1,7 +1,7 @@
 import { expectResult, type ComputeOutcome } from '@battle/engine';
 import type { WerewolfState } from '../state';
 import type { WerewolfContext } from './context';
-import { decideWinner } from './victory';
+import { decideWinner, onWinningSide } from './victory';
 
 /**
  * MVP：得票最多者当选；并列时优先胜利阵营，再取座位号最小者；无人投票时取胜利阵营中座位号最小者。
@@ -12,9 +12,9 @@ export function resolveMvp(ctx: WerewolfContext): ComputeOutcome<WerewolfState> 
   if (outcome.kind === 'selected') {
     mvp = outcome.seat;
   } else {
-    const winnerTeam = decideWinner(ctx) === 'werewolf' ? 'werewolf' : 'good';
+    const winner = decideWinner(ctx) ?? 'good';
     const pool = tied.length ? [...tied] : ctx.seats.ids();
-    const preferred = pool.filter((seat) => ctx.seats.get(seat).team === winnerTeam);
+    const preferred = pool.filter((seat) => onWinningSide(ctx, seat, winner));
     mvp = Math.min(...(preferred.length ? preferred : pool));
   }
   return { state: { ...ctx.state, mvp }, log: [{ kind: 'narration', text: `本局 MVP：${mvp}号。` }] };

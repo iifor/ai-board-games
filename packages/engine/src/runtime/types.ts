@@ -17,6 +17,8 @@ export interface Seat {
   /** 角色内席位编号（如一辩到四辩），没有席位的角色为 null */
   readonly position: number | null;
   readonly alive: boolean;
+  /** 中途改变阵营时记录：只能看到新阵营频道中序号不小于此值的日志（开局即在阵营中则没有此字段） */
+  readonly teamSince?: number;
 }
 
 export type LogEntry = StagePayload & StageEventMeta;

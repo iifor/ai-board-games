@@ -1,6 +1,6 @@
 # 引擎（packages/engine）
 
-> 状态：P1 完成引擎核心并接入辩论赛；P2 加入阶段栈、触发器、终局转入、发言附加动作、加权投票、可放弃动作与公开身份，并接入狼人杀标准局。
+> 状态：P1 完成引擎核心并接入辩论赛；P2 加入阶段栈、触发器、终局转入、发言附加动作、加权投票、可放弃动作与公开身份，并接入狼人杀标准局；P7 加入玩法变体、阶段开关、座位改派，以及投票额外票与改换阵营后的频道可见范围。
 
 ## 职责与边界
 
@@ -69,9 +69,9 @@ GameSpec 关键字段：
 | `announce` | 用**公开上下文**渲染模板，写入主持播报 | — |
 | `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆） | `output` schema（标准为 `speechOutput({ max })`）；有权声明的座位额外获得可选的 `declare` 字段 |
 | `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }` |
-| `vote` | 投票后计票，`weight` 设定票权，`allowAbstain` 允许弃票（`fallbackMode: 'abstain'` 时兜底为弃票）；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者、`ballots` 给出最后一轮的有效选票（不含弃票，规则可据此知道谁投了谁）；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null |
+| `vote` | 投票后计票，`weight` 设定票权，`bonus` 给出不属于任何投票者的额外票（如乌鸦诅咒，进入阶段时计算一次，每轮只计给该轮候选人；日志的 `tally` 含额外票、`ballots` 不含，AI 历史中显示为"额外票：5号+1"），`allowAbstain` 允许弃票（`fallbackMode: 'abstain'` 时兜底为弃票）；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者、`ballots` 给出最后一轮的有效选票（不含弃票，规则可据此知道谁投了谁）；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null |
 | `judge` | 评委依次判定，`verdicts` 定义选项与含义；多数决，无评委或并列时取 `tieVerdict` | 自动生成 `{ verdict, comment }`，选项含义写入 schema 描述 |
-| `compute` | 纯函数结算：返回新状态、`reassign`（改变座位的角色或阵营）、日志、淘汰列表，按此顺序生效（播报先于出局事件） | — |
+| `compute` | 纯函数结算：返回新状态、`reassign`（改变座位的角色或阵营；阵营改变时座位记录 `teamSince`，见"可见性"）、日志、淘汰列表，按此顺序生效（播报先于出局事件） | — |
 | `reveal` | 写入一条揭示日志；`revealRoles` 向所有玩家与观众公开全部身份，并在日志 `data.roles` 中给出身份表 | — |
 
 阶段可声明 `enabled(ctx)`：返回 false 时静默跳过（不记录、不计访问次数），直接按 `next` 跳转（此时 `ctx.result` 为 null），用于本局不存在的角色。
@@ -105,6 +105,7 @@ GameSpec 关键字段：
 ## 可见性
 
 - 频道：`public`、`team:<team>`、`private:<seat>`、`host`（运营信息，AI 与观众都看不到）。
+- 中途改变阵营的座位（`reassign` 改了 team，如野孩子变狼）只能看到新阵营频道中加入之后的日志（`Seat.teamSince` 记录加入时的日志序号，同一个 compute 中 reassign 之后写的日志可见）；L4 历史与泄露检查都按此过滤（`entryVisibleTo`）。
 - 状态可见性：`public`、`host`、`ownerOnly`（按座位号索引，只能看到自己那项）、`{ team }`、`{ project(value, viewer) }`。
 - 身份可见：本人、`publicRole` 角色、`knowsTeammates` 角色的同阵营。
 - 观众视图：`public` 模式只推送 public 频道事件，身份按公开规则显示，终局按 `revealOnEnd` 揭示；`omniscient` 模式推送除 host 外的全部频道并显示全部身份。
