@@ -147,6 +147,12 @@ export const BOARDS: readonly BoardDefinition[] = [
     description: '4 名狼人对抗预言家、女巫、猎人、炸弹人与 4 名村民；炸弹人被放逐时可以炸死所有投票给他的人。',
     roles: { werewolf: 4, seer: 1, witch: 1, hunter: 1, bombman: 1, villager: 'rest' },
   }),
+  board({
+    key: 'nine-tailed-fox-12',
+    name: '九尾狐',
+    description: '4 名狼人对抗预言家、女巫、猎人、九尾狐与 4 名村民；九尾狐随好人出局失去尾巴，尾巴掉光时出局。',
+    roles: { werewolf: 4, seer: 1, witch: 1, hunter: 1, nine_tailed_fox: 1, villager: 'rest' },
+  }),
 ];
 
 export const DEFAULT_BOARD = 'standard-12';
