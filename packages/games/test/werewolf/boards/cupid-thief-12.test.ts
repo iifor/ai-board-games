@@ -63,6 +63,15 @@ describe('cupid', () => {
     expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
   });
 
+  it('settles the day link before a shot aimed at the partner, who then cannot shoot back', () => {
+    const run = play(SEED, combine(link(king, hunter), everyoneVotes('exile_vote', king, 1), act('death_shot', king, [hunter])), BOARD);
+    expect(eliminated(run).slice(0, 2)).toEqual([
+      { seat: king, round: 1, reason: '被放逐' },
+      { seat: hunter, round: 1, reason: '殉情' },
+    ]);
+    expect(requestsIn(run, 'death_shot').map((request) => request.seat)).toEqual([king]);
+  });
+
   it('takes the partner down by day when a lover is exiled; the lone cupid then plays on as an ordinary seat', () => {
     const run = play(SEED, combine(link(wolf, villager), everyoneVotes('exile_vote', villager, 1)), BOARD);
     expect(eliminated(run).slice(0, 2)).toEqual([
