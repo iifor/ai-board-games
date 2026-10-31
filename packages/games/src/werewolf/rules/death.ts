@@ -1,6 +1,7 @@
 import type { ActDecision, ComputeOutcome, Seat, TriggerEvent } from '@battle/engine';
+import { woundRogue } from '../special/oldRogue';
 import { NIGHT_DEATH_CAUSES, type WerewolfState } from '../state';
-import { roleTraits } from './board';
+import { hasRole, roleTraits } from './board';
 import { shotBlockedTonight } from './block';
 import { isWolf, type WerewolfContext } from './context';
 
@@ -9,9 +10,16 @@ export const SHOT_BY_DAY = 'shot_by_day';
 export const SHOT_BY_NIGHT = 'shot_by_night';
 /** 白天随狼美人殉情（夜里的殉情使用夜间死亡原因 charm） */
 export const CHARM_BY_DAY = 'charm_day';
+/** 被炸弹人炸死：不能发动技能 */
+export const BOMBED = 'bomb';
 
-/** 因这些原因出局的猎人不能开枪：被毒杀、殉情 */
-const NO_SHOT_CAUSES: ReadonlySet<string> = new Set(['poison', 'charm', CHARM_BY_DAY]);
+/** 因这些原因出局的猎人不能开枪：被毒杀、殉情、被炸死 */
+export const NO_SHOT_CAUSES: ReadonlySet<string> = new Set(['poison', 'charm', CHARM_BY_DAY, BOMBED]);
+
+/** 有狼王的板子里猎人与狼王开枪都不翻牌：共用中性的"开枪"阶段，播报不说明开枪者身份 */
+export function anonymousShots(ctx: WerewolfContext): boolean {
+  return hasRole(ctx, 'wolf_king');
+}
 
 /** 白天出局且有遗言的原因 */
 const DAY_LAST_WORDS: ReadonlySet<string> = new Set(['exile', SHOT_BY_DAY]);
@@ -50,9 +58,10 @@ export function recordShot(ctx: WerewolfContext, decisions: readonly ActDecision
   return { ...ctx.state, pendingShot: decisions.flatMap((decision) => decision.targets)[0] ?? null };
 }
 
-export function describeShot(_ctx: WerewolfContext, _seat: unknown, targets: readonly number[]): string {
+export function describeShot(ctx: WerewolfContext, _seat: unknown, targets: readonly number[]): string {
   const [target] = targets;
-  return target === undefined ? '猎人放弃开枪' : `猎人开枪带走 ${target}号`;
+  const shooter = anonymousShots(ctx) ? '' : '猎人';
+  return target === undefined ? `${shooter}放弃开枪` : `${shooter}开枪带走 ${target}号`;
 }
 
 export function resolveShot(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
@@ -61,10 +70,14 @@ export function resolveShot(ctx: WerewolfContext): ComputeOutcome<WerewolfState>
   if (target === null) return { state };
   // 猎人在夜里死亡（天亮出局）时开的枪算夜间开枪，其余（放逐、白天被带走等）算白天开枪
   const cause = ctx.trigger?.kind === 'seat_eliminated' && NIGHT_DEATH_CAUSES.has(ctx.trigger.cause) ? SHOT_BY_NIGHT : SHOT_BY_DAY;
-  if (cause === SHOT_BY_NIGHT && roleTraits(ctx.seats.get(target)).nightShotImmune) {
+  const traits = roleTraits(ctx.seats.get(target));
+  if (cause === SHOT_BY_NIGHT && traits.nightShotImmune) {
     return { state, log: [{ kind: 'narration', text: `${target}号中枪后没有出局。` }] };
   }
-  return { state, eliminate: [{ seat: target, reason: '被猎人带走', cause }] };
+  if (traits.delayedDeath) {
+    return { state: woundRogue(state, target, ctx.round, true), log: [{ kind: 'narration', text: `${target}号中枪后进入负伤状态，没有立即出局。` }] };
+  }
+  return { state, eliminate: [{ seat: target, reason: anonymousShots(ctx) ? '被枪杀' : '被猎人带走', cause }] };
 }
 
 /** 自爆：狼人出局，当天放逐取消，直接入夜 */

@@ -1,6 +1,6 @@
 import type { ComputeOutcome, LogDraft, SeatQuery } from '@battle/engine';
 import type { WerewolfState } from '../state';
-import { isWolf, type WerewolfContext } from './context';
+import { isPackWolf, type WerewolfContext } from './context';
 
 // 夜间技能封锁：花蝴蝶抱住、梦魇恐惧的人当晚夜间技能失效；被封锁的是狼人时整个狼队当晚不能击杀。
 
@@ -31,7 +31,7 @@ export function isBlocked(ctx: WerewolfContext, seat: number): boolean {
 
 /** 封锁到狼人时整个狼队当晚不能击杀（也不夜聊） */
 export function wolvesBlocked(ctx: WerewolfContext): boolean {
-  return blockedSeats(ctx).some((seat) => isWolf(ctx.seats.get(seat)));
+  return blockedSeats(ctx).some((seat) => isPackWolf(ctx.seats.get(seat)));
 }
 
 /** 该座位今晚被狼刀出局时不能开枪（被梦魇恐惧）；天亮出局时仍读取当晚的记录 */
@@ -47,7 +47,7 @@ export function nightActors(ctx: WerewolfContext, role: string): SeatQuery {
 function notice(ctx: WerewolfContext, { seat, by, disablesShot }: BlockSource): LogDraft[] {
   if (seat === null) return [];
   const target = ctx.seats.get(seat);
-  if (isWolf(target)) return [{ kind: 'narration', text: `今晚有狼人${by}，狼队今晚不能击杀。`, channel: 'team:werewolf' }];
+  if (isPackWolf(target)) return [{ kind: 'narration', text: `今晚有狼人${by}，狼队今晚不能击杀。`, channel: 'team:werewolf' }];
   const text = disablesShot && target.role === 'hunter'
     ? `你今晚${by}：今晚若被狼人击杀，你将不能开枪。`
     : `你今晚${by}，今晚的夜间技能失效。`;

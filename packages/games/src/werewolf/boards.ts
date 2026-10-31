@@ -11,6 +11,12 @@ export const boardConfigSchema = z.object({
   sheriff: z.boolean().default(true),
   /** 覆盖角色的屠边类别（如某些板子中白痴算作民边） */
   categories: z.record(z.string(), z.enum(ROLE_CATEGORIES)).default({}),
+  /** 狼美人被女巫毒杀时是否仍带走被魅惑者（狼美人&老流氓板子中削弱为 false） */
+  wolfBeautyPoisonLink: z.boolean().default(true),
+  /** 隐狼口径：inherit 由法官告知狼同伴、狼同伴全灭后继承击杀权；linked 与狼人互不相认、不能击杀，狼人全灭时随之出局 */
+  hiddenWolf: z.enum(['inherit', 'linked']).default('inherit'),
+  /** 被乌鸦诅咒者在次日放逐投票中额外获得的票数 */
+  crowVotes: z.number().int().positive().default(1),
 });
 export type BoardConfig = z.infer<typeof boardConfigSchema>;
 
@@ -24,9 +30,9 @@ export interface BoardDefinition {
   readonly config?: z.input<typeof boardConfigSchema>;
 }
 
-/** 规则说明由角色表自动拼出（见 roleRules.ts） */
+/** 规则说明由角色表与板子参数自动拼出（见 roleRules.ts） */
 function board(definition: Omit<BoardDefinition, 'rules'>): BoardDefinition {
-  return { ...definition, rules: describeRules(definition.roles) };
+  return { ...definition, rules: describeRules(definition.roles, boardConfigSchema.parse(definition.config ?? {})) };
 }
 
 export const BOARDS: readonly BoardDefinition[] = [

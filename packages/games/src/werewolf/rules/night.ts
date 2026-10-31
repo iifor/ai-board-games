@@ -1,6 +1,8 @@
 import type { ActDecision, ComputeOutcome, Seat, SeatQuery, VoteOutcome } from '@battle/engine';
+import { withinMark } from '../special/fortuneTeller';
+import { swapTarget } from '../special/magician';
 import { emptyNight, type WerewolfState } from '../state';
-import { boardConfig } from './board';
+import { boardConfig, roleTraits } from './board';
 import { isWolf, seededRotation, type WerewolfContext } from './context';
 
 export function resetNight(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
@@ -24,9 +26,9 @@ export function wolfChatOrder(ctx: WerewolfContext): number[] {
   return seededRotation(ctx, aliveWolves(ctx).ids(), 'wolf-chat');
 }
 
-/** 狼人只能击杀存活的非狼人玩家（不能自刀） */
+/** 狼人只能击杀存活的非狼人玩家（不能自刀；狼队不认识的隐狼可以被选中），有占卜师标记时只能在标记范围内 */
 export function wolfKillTargets(ctx: WerewolfContext): SeatQuery {
-  return ctx.seats.alive().where((seat) => !isWolf(seat));
+  return ctx.seats.alive().where((seat) => !(isWolf(seat) && !roleTraits(seat).hiddenFromPack) && withinMark(ctx, seat.seat));
 }
 
 export function recordWolfKill(ctx: WerewolfContext, outcome: VoteOutcome): WerewolfState {
@@ -34,10 +36,16 @@ export function recordWolfKill(ctx: WerewolfContext, outcome: VoteOutcome): Were
   return { ...ctx.state, night: { ...ctx.state.night, wolfTarget } };
 }
 
+/** 查验结果：魔术师当晚交换了号码时得到换过去的那名玩家的身份；隐狼被视为好人 */
+function seerVerdict(ctx: WerewolfContext, target: number): '好人' | '狼人' {
+  const actual = ctx.seats.get(swapTarget(ctx, target));
+  return isWolf(actual) && !roleTraits(actual).appearsGood ? '狼人' : '好人';
+}
+
 export function describeSeerCheck(ctx: WerewolfContext, _seat: Seat, targets: readonly number[]): string {
   const [target] = targets;
   if (target === undefined) return '没有查验';
-  return `查验 ${target}号：${isWolf(ctx.seats.get(target)) ? '狼人' : '好人'}`;
+  return `查验 ${target}号：${seerVerdict(ctx, target)}`;
 }
 
 export function recordSeerCheck(ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState {
@@ -45,7 +53,7 @@ export function recordSeerCheck(ctx: WerewolfContext, decisions: readonly ActDec
   for (const { seat, targets } of decisions) {
     const [target] = targets;
     if (target === undefined) continue;
-    const result = isWolf(ctx.seats.get(target)) ? '狼人' : '好人';
+    const result = seerVerdict(ctx, target);
     seerChecks[String(seat)] = [...(seerChecks[String(seat)] ?? []), { night: ctx.round, target, result }];
   }
   return { ...ctx.state, seerChecks };

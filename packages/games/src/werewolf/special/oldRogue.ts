@@ -1,0 +1,60 @@
+import { definePrompts, type ComputeOutcome, type TriggerSpec } from '@battle/engine';
+import type { WerewolfPhases } from '../phases/types';
+import { hasRole } from '../rules/board';
+import type { WerewolfContext } from '../rules/context';
+import { dayAfter } from '../rules/order';
+import type { WerewolfParams, WerewolfState } from '../state';
+
+// 老流氓：算作村民，不受狼美人魅惑影响（角色特性 charmImmune）。被女巫毒、被猎人枪击时不会立即出局（特性 delayedDeath）：
+// 被毒进入中毒状态（不公布），被枪击进入负伤状态（公布），都在次日白天发言环节结束后出局；
+// 当天发言被自爆打断时，在自爆结算后出局。毒药与枪击分别在夜间结算与开枪结算中调用 woundRogue。
+
+export const oldRoguePrompts = definePrompts({
+  oldRogue: '你是{{me.label}}，身份是老流氓（算作村民）。你不受狼美人魅惑的影响；被女巫毒杀或被猎人枪击时不会立即出局，而是在次日白天发言环节结束后出局。',
+});
+
+export const ROGUE_DOOM = 'rogue_doom';
+
+/** 进入中毒或负伤状态：次日白天发言结束后出局；已有记录时保留更早的期限 */
+export function woundRogue(state: WerewolfState, seat: number, round: number, shot: boolean): WerewolfState {
+  const current = state.rogueWound;
+  if (current !== null) return { ...state, rogueWound: { ...current, shot: current.shot || shot } };
+  return { ...state, rogueWound: { seat, dueDay: round + 1, shot } };
+}
+
+/** 今天到期、仍然存活的老流氓 */
+function dueRogue(ctx: WerewolfContext): number | null {
+  const wound = ctx.state.rogueWound;
+  if (wound === null || wound.dueDay > ctx.round || !ctx.seats.get(wound.seat).alive) return null;
+  return wound.seat;
+}
+
+function resolveDoom(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
+  const seat = dueRogue(ctx);
+  const wound = ctx.state.rogueWound;
+  if (seat === null || wound === null) return {};
+  return {
+    state: { ...ctx.state, rogueWound: null },
+    eliminate: [{ seat, reason: wound.shot ? '伤重出局' : '发言结束后出局', cause: ROGUE_DOOM }],
+  };
+}
+
+export const oldRoguePhases = {
+  old_rogue_doom: {
+    kind: 'compute',
+    enabled: (ctx) => hasRole(ctx, 'old_rogue'),
+    run: resolveDoom,
+    next: dayAfter('old_rogue_doom'),
+  },
+  old_rogue_doom_cut: { kind: 'compute', run: resolveDoom, next: 'return' },
+} satisfies WerewolfPhases;
+
+/** 白天发言被自爆打断：到期的老流氓在自爆结算后出局 */
+export const oldRogueTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+  {
+    id: 'old-rogue-doom-cut',
+    on: 'seat_eliminated',
+    when: (ctx, event) => event.kind === 'seat_eliminated' && event.cause === 'self_destruct' && dueRogue(ctx) !== null,
+    push: 'old_rogue_doom_cut',
+  },
+];

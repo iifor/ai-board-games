@@ -3,8 +3,19 @@ import type { WerewolfParams, WerewolfState } from '../state';
 
 export type WerewolfContext = RuleContext<WerewolfState, WerewolfParams>;
 
+/** 与狼队一起夜聊、击杀的狼（共享 team:werewolf 频道） */
+export const PACK_TEAM = 'werewolf';
+/** 离群的狼（大灰狼、隐狼）：属于狼人阵营，但不在狼队频道里 */
+export const LONE_WOLF_TEAM = 'lone_wolf';
+
+/** 狼人阵营（胜负、计票、骑士决斗等都按此判断） */
 export function isWolf(seat: Seat): boolean {
-  return seat.team === 'werewolf';
+  return seat.team === PACK_TEAM || seat.team === LONE_WOLF_TEAM;
+}
+
+/** 狼队成员：一起夜聊、击杀，被封锁时整个狼队受影响 */
+export function isPackWolf(seat: Seat): boolean {
+  return seat.team === PACK_TEAM;
 }
 
 /** 翻牌的白痴失去投票权 */

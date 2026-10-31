@@ -1,7 +1,7 @@
 import { definePrompts, type ActDecision, type Seat } from '@battle/engine';
 import type { WerewolfPhases } from '../phases/types';
 import { hasRole } from '../rules/board';
-import type { WerewolfContext } from '../rules/context';
+import { isWolf, type WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
 
@@ -36,10 +36,10 @@ export const hybridPhases = {
   },
 } satisfies WerewolfPhases;
 
-/** 混血儿最终所属的阵营：跟随主人；没有主人时算好人 */
+/** 混血儿最终所属的阵营：跟随主人（离群的狼也算狼人阵营）；没有主人时算好人 */
 export function hybridSide(ctx: WerewolfContext, seat: Seat): string {
   const master = ctx.state.hybridMaster;
-  return master === null ? seat.team : ctx.seats.get(master).team;
+  return isWolf(master === null ? seat : ctx.seats.get(master)) ? 'werewolf' : 'good';
 }
 
 /** 终局说明中的混血儿结果；本局没有混血儿时为 null */
