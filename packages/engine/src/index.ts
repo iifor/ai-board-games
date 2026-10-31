@@ -1,6 +1,6 @@
 // @battle/engine 公开 API：编写游戏、编译、创建对局、推进、调试输出。
 
-export { compileGame, END_PHASE, type CompiledGame } from './compiler/compile';
+export { compileGame, END_PHASE, RETURN_PHASE, type CompiledGame } from './compiler/compile';
 export { scriptedOutput } from './debug/scriptedAgent';
 export { EngineInputError, SpecError, TemplateError } from './errors';
 export { toChatMessages, type ChatMessage } from './prompt/assemble';
@@ -27,13 +27,14 @@ export type {
   SeatProfile,
   TemplateVars,
 } from './runtime/types';
-export type { ActDecision, Judgement, PhaseResult, RuleContext, SetupContext } from './spec/context';
+export type { ActDecision, Judgement, PhaseResult, RuleContext, SetupContext, TriggerEvent, TriggerEventKind } from './spec/context';
 export { defineGame, definePrompts, speechOutput } from './spec/define';
 export type {
   ActPhase,
   AnnouncePhase,
   ComputeOutcome,
   ComputePhase,
+  DeclarationSpec,
   JudgePhase,
   NextSpec,
   PhaseSpec,
@@ -49,11 +50,13 @@ export type {
   BudgetSpec,
   DebugSpec,
   EndResult,
+  GameOverSpec,
   GameSpec,
   PresentationSpec,
   RoleSpec,
   SetupSpec,
   StateSpec,
+  TriggerSpec,
   Visibility,
 } from './spec/types';
 export { privateChannel, teamChannel } from './visibility/channels';

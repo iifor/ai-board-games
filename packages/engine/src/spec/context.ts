@@ -13,11 +13,30 @@ export interface Judgement {
   readonly comment: string;
 }
 
+/** 触发器监听的引擎事件；触发后进入的阶段可通过 `ctx.trigger` 读取 */
+export type TriggerEvent =
+  | {
+      readonly kind: 'seat_eliminated';
+      readonly seat: number;
+      /** 机器可读的出局原因，如 exile、poison */
+      readonly cause: string;
+      readonly reason: string;
+    }
+  | { readonly kind: 'action_declared'; readonly seat: number; readonly action: string };
+
+export type TriggerEventKind = TriggerEvent['kind'];
+
 /** 阶段完成后的结构化结果，保存在 `ctx.results[phaseId]`（同一阶段多次访问时保留最近一次） */
 export type PhaseResult =
   | { readonly kind: 'speak'; readonly speeches: readonly { readonly seat: number; readonly text: string }[] }
   | { readonly kind: 'act'; readonly decisions: readonly ActDecision[] }
-  | { readonly kind: 'vote'; readonly outcome: VoteOutcome; readonly rounds: number }
+  | {
+      readonly kind: 'vote';
+      readonly outcome: VoteOutcome;
+      readonly rounds: number;
+      /** 最终仍并列的座位（包括被种子打破的并列）；没有并列时为空 */
+      readonly tied: readonly number[];
+    }
   | {
       readonly kind: 'judge';
       readonly verdict: string;
@@ -42,6 +61,8 @@ export interface RuleContext<S, P> {
   readonly result: PhaseResult | null;
   /** 只在 end 中有意义 */
   readonly endReason: EndReason;
+  /** 由触发器进入的阶段链中，触发它的事件；否则为 null */
+  readonly trigger: TriggerEvent | null;
   /** 种子随机数：由主种子、当前阶段、访问次数与标签派生 */
   random(label: string): Rng;
 }

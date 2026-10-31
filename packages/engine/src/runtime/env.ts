@@ -7,6 +7,7 @@ import { audienceCanSee } from '../visibility/channels';
 import { audienceMode, buildAudienceView } from '../visibility/audienceView';
 import { createRng, deriveSeed } from './rng';
 import { SeatQuery } from './seats';
+import { fireEvent } from './triggers';
 import type { AiRequest, EngineSnapshot, LogDraft, LogEntry, Seat } from './types';
 
 export interface Emitted {
@@ -54,6 +55,7 @@ export class ExecEnv {
       results: Object.freeze({ ...s.results }),
       result,
       endReason,
+      trigger: s.activeTrigger,
       random: (label: string) => createRng(deriveSeed(s.seed, `${scope}:${label}`)),
     };
   }
@@ -92,10 +94,12 @@ export class ExecEnv {
     this.s.state = deepFreeze(cloneJson(parsed.data));
   }
 
-  eliminate(seatNo: number, reason: string): void {
+  /** 淘汰座位并派发 seat_eliminated 事件；cause 是给触发器判断用的机器可读原因 */
+  eliminate(seatNo: number, reason: string, cause: string = reason): void {
     const target = this.seat(seatNo);
     if (!target.alive) throw new Error(`座位 ${seatNo} 已经出局，不能再次淘汰`);
     this.s.seats = deepFreeze(this.s.seats.map((seat) => (seat.seat === seatNo ? { ...seat, alive: false } : seat)));
     this.log({ kind: 'seat_eliminated', seat: seatNo, reason });
+    fireEvent(this, { kind: 'seat_eliminated', seat: seatNo, cause, reason });
   }
 }

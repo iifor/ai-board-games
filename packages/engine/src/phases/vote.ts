@@ -9,6 +9,7 @@ import { done, issue, type AiPhaseExecutor, type StepOutcome } from './types';
 interface VoteState {
   stage: number;
   readonly voters: number[];
+  readonly weights: Record<string, number>;
   candidates: Record<string, number[]>;
   ballots: Record<string, number>;
   issued: boolean;
@@ -23,71 +24,87 @@ type Phase = VotePhase<unknown, unknown>;
 function ballotsOf(state: VoteState): VoteBallot[] {
   return state.voters
     .filter((voter) => state.ballots[String(voter)] !== undefined)
-    .map((voter) => ({ voter, target: state.ballots[String(voter)] as number, weight: 1 }));
+    .map((voter) => ({
+      voter,
+      target: state.ballots[String(voter)] as number,
+      weight: state.weights[String(voter)] ?? 1,
+    }));
 }
 
-function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, title: string): StepOutcome {
+function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, tied: readonly number[]): StepOutcome {
   const state = env.phaseState<VoteState>();
+  const title = phase.title ?? env.phaseId();
   const ballots = ballotsOf(state);
-  const tally = tallyBallots(ballots);
   env.log({
     kind: 'vote_tallied',
     title,
     runoff: state.stage,
     ballots,
-    tally: tally.rows,
-    tied: tally.top.length > 1 ? tally.top : [],
+    tally: tallyBallots(ballots).rows,
+    tied: [...tied],
     outcome,
     channel: phase.channel ?? 'public',
   });
   if (phase.onResult === 'eliminate' && outcome.kind === 'selected') {
-    env.eliminate(outcome.seat, phase.eliminateReason ?? `${title}出局`);
+    env.eliminate(outcome.seat, phase.eliminateReason ?? `${title}出局`, phase.eliminateCause ?? env.phaseId());
   }
-  const result = { kind: 'vote', outcome, rounds: state.stage + 1 } as const;
+  const result = { kind: 'vote', outcome, rounds: state.stage + 1, tied: [...tied] } as const;
   if (phase.apply) env.setState(phase.apply(env.ctx(result), outcome));
   return done(result);
 }
 
+function startRunoff(env: ExecEnv, phase: Phase, tied: readonly number[]): StepOutcome {
+  const state = env.phaseState<VoteState>();
+  const ballots = ballotsOf(state);
+  env.log({
+    kind: 'vote_tallied',
+    title: phase.title ?? env.phaseId(),
+    runoff: state.stage,
+    ballots,
+    tally: tallyBallots(ballots).rows,
+    tied: [...tied],
+    outcome: null,
+    channel: phase.channel ?? 'public',
+  });
+  state.stage += 1;
+  state.candidates = Object.fromEntries(
+    state.voters.map((voter) => [String(voter), (state.candidates[String(voter)] ?? []).filter((seat) => tied.includes(seat))]),
+  );
+  state.ballots = {};
+  state.issued = false;
+  return voteExecutor.step(env, phase);
+}
+
 function resolve(env: ExecEnv, phase: Phase): StepOutcome {
   const state = env.phaseState<VoteState>();
-  const title = phase.title ?? env.phaseId();
-  const { top, rows } = tallyBallots(ballotsOf(state));
+  const { top } = tallyBallots(ballotsOf(state));
   const [leader] = top;
-  if (top.length === 1 && leader !== undefined) return finalize(env, phase, { kind: 'selected', seat: leader, byTieBreak: false }, title);
-  if (top.length === 0) return finalize(env, phase, { kind: 'none' }, title);
-
-  if (state.stage < phase.tie.runoff) {
-    env.log({
-      kind: 'vote_tallied',
-      title,
-      runoff: state.stage,
-      ballots: ballotsOf(state),
-      tally: rows,
-      tied: top,
-      outcome: null,
-      channel: phase.channel ?? 'public',
-    });
-    state.stage += 1;
-    state.candidates = Object.fromEntries(
-      state.voters.map((voter) => [String(voter), (state.candidates[String(voter)] ?? []).filter((seat) => top.includes(seat))]),
-    );
-    state.ballots = {};
-    state.issued = false;
-    return voteExecutor.step(env, phase);
-  }
-  if (phase.tie.then === 'none') return finalize(env, phase, { kind: 'none' }, title);
+  if (top.length === 1 && leader !== undefined) return finalize(env, phase, { kind: 'selected', seat: leader, byTieBreak: false }, []);
+  if (top.length === 0) return finalize(env, phase, { kind: 'none' }, []);
+  if (state.stage < phase.tie.runoff) return startRunoff(env, phase, top);
+  if (phase.tie.then === 'none') return finalize(env, phase, { kind: 'none' }, top);
   const picked = env.ctx().random(`tiebreak:${state.stage}`).pick(top);
-  return finalize(env, phase, { kind: 'selected', seat: picked, byTieBreak: true }, title);
+  return finalize(env, phase, { kind: 'selected', seat: picked, byTieBreak: true }, top);
 }
 
 export const voteExecutor: AiPhaseExecutor<Phase> = {
   enter(env, phase) {
     const ctx = env.ctx();
     const voters = toSeatNumbers(phase.voters(ctx));
-    const candidates = Object.fromEntries(
-      voters.map((voter) => [String(voter), toSeatNumbers(phase.candidates(ctx, env.seat(voter)))]),
-    );
-    env.setPhaseState<VoteState>({ stage: 0, voters, candidates, ballots: {}, issued: false });
+    const entries = voters.map((voter) => {
+      const seat = env.seat(voter);
+      const weight = phase.weight?.(ctx, seat) ?? 1;
+      if (!(weight > 0)) throw new Error(`阶段 ${env.phaseId()} 给 ${voter}号的票权必须为正数，收到 ${weight}`);
+      return { voter, weight, candidates: toSeatNumbers(phase.candidates(ctx, seat)) };
+    });
+    env.setPhaseState<VoteState>({
+      stage: 0,
+      voters,
+      weights: Object.fromEntries(entries.map(({ voter, weight }) => [String(voter), weight])),
+      candidates: Object.fromEntries(entries.map(({ voter, candidates }) => [String(voter), candidates])),
+      ballots: {},
+      issued: false,
+    });
   },
 
   step(env, phase) {

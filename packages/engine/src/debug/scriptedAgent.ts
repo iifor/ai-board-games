@@ -23,6 +23,7 @@ export function scriptedOutput(game: CompiledGame, snapshot: EngineSnapshot, req
       return phase.output.safeParse(scripted).success ? scripted : phase.fallback(ctx, seat);
     }
     case 'act':
+      if (phase.allowNone && rng.next() < 0.5) return { targets: [] };
       return { targets: rng.shuffle(legal).slice(0, Math.min(phase.count ?? 1, legal.length)) };
     case 'vote':
       return { target: rng.pick(legal) };

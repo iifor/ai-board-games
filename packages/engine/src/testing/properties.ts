@@ -58,6 +58,11 @@ export function assertDeterministic(game: CompiledGame, options: RunOptions): vo
   }
 }
 
+/** 事件发生时身份是否已被 revealRoles 公开（揭示事件会携带 data.roles） */
+function eventRevealed(run: RunRecord, seq: number): boolean {
+  return run.log.some((entry) => entry.kind === 'revealed' && entry.seq <= seq && 'roles' in entry.data);
+}
+
 /** 每个 AI 请求都不含其不可见的内容；公开视角的舞台事件只来自公开频道且不暴露隐藏身份 */
 export function assertNoLeak(game: CompiledGame, run: RunRecord): void {
   const problems: string[] = [];
@@ -80,7 +85,8 @@ export function assertNoLeak(game: CompiledGame, run: RunRecord): void {
       if (event.view.status === 'completed') continue;
       for (const seat of event.view.seats) {
         const actual = run.snapshot.seats.find((item) => item.seat === seat.seat);
-        if (actual && seat.role !== null && !roleVisibleTo(game, actual, null)) {
+        const unrevealed = { ...run.snapshot, rolesRevealed: false };
+        if (actual && seat.role !== null && !roleVisibleTo(game, unrevealed, actual, null) && !eventRevealed(run, event.seq)) {
           problems.push(`舞台事件 #${event.seq} 暴露了 ${seat.seat}号的身份`);
         }
       }

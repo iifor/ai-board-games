@@ -9,8 +9,8 @@ export interface SeatContextExtras {
   readonly legalTargets: readonly number[] | null;
 }
 
-function seatView(game: CompiledGame, seat: Seat, viewer: Seat | null): Record<string, unknown> {
-  const visible = roleVisibleTo(game, seat, viewer);
+function seatView(game: CompiledGame, s: EngineSnapshot, seat: Seat, viewer: Seat | null): Record<string, unknown> {
+  const visible = roleVisibleTo(game, s, seat, viewer);
   const role = game.spec.roles[seat.role];
   return {
     seat: seat.seat,
@@ -25,7 +25,7 @@ function seatView(game: CompiledGame, seat: Seat, viewer: Seat | null): Record<s
 }
 
 function sharedContext(game: CompiledGame, s: EngineSnapshot, viewer: Seat | null): Record<string, unknown> {
-  const seats = s.seats.map((seat) => seatView(game, seat, viewer));
+  const seats = s.seats.map((seat) => seatView(game, s, seat, viewer));
   return {
     title: game.spec.title,
     round: s.round,
@@ -52,11 +52,11 @@ export function buildSeatContext(
   const base = sharedContext(game, s, viewer);
   const knowsTeammates = Boolean(game.spec.roles[viewer.role]?.knowsTeammates);
   const teammates = knowsTeammates
-    ? s.seats.filter((seat) => seat.team === viewer.team && seat.seat !== viewer.seat).map((seat) => seatView(game, seat, viewer))
+    ? s.seats.filter((seat) => seat.team === viewer.team && seat.seat !== viewer.seat).map((seat) => seatView(game, s, seat, viewer))
     : [];
   return {
     ...base,
-    me: { ...seatView(game, viewer, viewer), persona: viewer.profile.persona },
+    me: { ...seatView(game, s, viewer, viewer), persona: viewer.profile.persona },
     teammates,
     turn: extras.turn,
     legalTargets: extras.legalTargets ?? [],

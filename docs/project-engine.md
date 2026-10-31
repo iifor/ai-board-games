@@ -1,6 +1,6 @@
 # 引擎（packages/engine）
 
-> 状态：P1 完成引擎核心，辩论赛已接入。阶段栈、触发器、附加动作、加权投票、可放弃动作在 P2 随狼人杀加入。
+> 状态：P1 完成引擎核心并接入辩论赛；P2 加入阶段栈、触发器、终局转入、发言附加动作、加权投票、可放弃动作与公开身份，并接入狼人杀标准局。
 
 ## 职责与边界
 
@@ -49,7 +49,9 @@ GameSpec 关键字段：
 | `state` | `schema` 决定状态类型；`visibility` 声明每个字段对 AI 的可见性，**未声明即不可见** |
 | `start` / `phases` | 阶段字典；`end` 是保留的终局目标 |
 | `end` | 胜者判定，返回 `winner`、`winnerLabel`、`summary`、`mvp` |
-| `budget` | `maxRounds`、`maxPhaseVisits`（默认 100）、`maxAiRequests`（默认 1000）；超限按 `endReason: 'budget'` 终局 |
+| `triggers` | 事件触发器，见下文"阶段栈与触发器" |
+| `gameOver` | `{ when, goto }`：每个阶段完成后检查，命中时清空阶段栈与排队的触发器，转入 `goto`（赛后环节或 `end`），只触发一次 |
+| `budget` | `maxRounds`、`maxPhaseVisits`（默认 100）、`maxAiRequests`（默认 1000）、`maxStackDepth`（默认 8）；超限按 `endReason: 'budget'` 终局 |
 | `presentation` | `layout`、`audienceView`（默认 public）、`areas`、`revealOnEnd`、`view`（观众视图附加数据，作者负责只放公开信息） |
 | `debug` | 默认断点、调试发言内容 |
 
@@ -57,21 +59,30 @@ GameSpec 关键字段：
 
 ### 规则上下文 `ctx`
 
-`state`、`params`（深度冻结）、`seats`（`SeatQuery`：`alive`、`dead`、`withRole`、`inTeam`、`position`、`except`、`where`、`get`、`ids`、`count`）、`round`、`phaseId`、`results`（各阶段最近一次结果，配合 `expectResult` / `findResult` 读取）、`result`（当前阶段结果，仅在 `next` / `apply` 中有值）、`endReason`、`random(label)`（由种子、阶段、访问次数与标签派生）。
+`state`、`params`（深度冻结）、`seats`（`SeatQuery`：`alive`、`dead`、`withRole`、`inTeam`、`position`、`except`、`where`、`get`、`ids`、`count`）、`round`、`phaseId`、`results`（各阶段最近一次结果，配合 `expectResult` / `findResult` 读取）、`result`（当前阶段结果，仅在 `next` / `apply` 中有值）、`endReason`、`random(label)`（由种子、阶段、访问次数与标签派生）、`trigger`（由触发器进入的阶段链中，触发它的事件）。
 
 ### 基础动作
 
 | kind | 行为 | AI 输出 |
 | --- | --- | --- |
 | `announce` | 用**公开上下文**渲染模板，写入主持播报 | — |
-| `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public） | `output` schema（标准为 `speechOutput({ max })`） |
-| `act` | 每个 actor 在 `targets` 中选 `count` 个；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }` |
-| `vote` | 投票后计票；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`）；`onResult: 'eliminate'` 淘汰当选者；`apply` 写回状态 | 自动生成 `{ target, reason? }` |
+| `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆） | `output` schema（标准为 `speechOutput({ max })`）；有权声明的座位额外获得可选的 `declare` 字段 |
+| `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }` |
+| `vote` | 投票后计票，`weight` 设定票权；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }` |
 | `judge` | 评委依次判定，`verdicts` 定义选项与含义；多数决，无评委或并列时取 `tieVerdict` | 自动生成 `{ verdict, comment }`，选项含义写入 schema 描述 |
 | `compute` | 纯函数结算：返回新状态、淘汰列表、日志 | — |
-| `reveal` | 写入一条揭示日志 | — |
+| `reveal` | 写入一条揭示日志；`revealRoles` 向所有玩家与观众公开全部身份，并在日志 `data.roles` 中给出身份表 | — |
 
-跳转：`next` 为阶段 ID，或 `{ when?, goto, round? }` 列表（按顺序取第一个命中项，最后一项必须无条件）；`round: 'increment'` 使轮次加一。编译期检查跳转目标存在、所有阶段从 `start` 可达。
+跳转：`next` 为阶段 ID、`end`、`return`，或 `{ when?, goto, round? }` 列表（按顺序取第一个命中项，最后一项必须无条件）；`round: 'increment'` 使轮次加一。编译期检查跳转目标存在、所有阶段可达（从 `start`、触发器目标、`gameOver.goto` 出发），且只有触发器插入的阶段链可以 `return`。
+
+### 阶段栈与触发器
+
+- 事件：`seat_eliminated`（`seat`、`cause`、`reason`，任何淘汰都会派发）与 `action_declared`（`seat`、`action`，来自发言声明）。
+- 触发器 `{ id, on, when?(ctx, event), push | jump, round? }` 按声明顺序匹配。
+- `push`：排入队列，等当前阶段完成后插入；原本要去的目标（含轮次加一）压入阶段栈，插入链末尾 `return` 时再继续前往。队列中的多个插入依次执行，插入链中再触发的事件同样排队，所以遗言、开枪、被枪杀者的遗言会按触发顺序串起来。
+- `jump`：立即中止当前阶段（作废其未完成的 AI 请求），清空阶段栈与队列后跳转，可附带轮次加一。
+- 插入链中的阶段通过 `ctx.trigger` 读取触发事件（如出局者座位）。
+- `gameOver` 命中后不再派发任何触发器。
 
 ## 提示词分层
 
@@ -110,6 +121,5 @@ GameSpec 关键字段：
 
 ## 尚未实现
 
-- 阶段栈、触发器（`push` / `jump`）、发言附加动作、加权投票、`allowNone`：P2。
 - token 预算：目前只限制 AI 请求次数，token 用量待服务端接入后补充。
 - 变体（`variants`）：P7 随狼人杀板子加入。

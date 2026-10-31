@@ -19,7 +19,7 @@ export const computeExecutor: PhaseExecutor<ComputePhase<unknown, unknown>> = {
   step(env, phase) {
     const outcome = phase.run(env.ctx());
     if (outcome.state !== undefined) env.setState(outcome.state);
-    for (const { seat, reason } of outcome.eliminate ?? []) env.eliminate(seat, reason);
+    for (const { seat, reason, cause } of outcome.eliminate ?? []) env.eliminate(seat, reason, cause ?? reason);
     for (const draft of outcome.log ?? []) env.log(draft);
     return done();
   },
@@ -29,7 +29,12 @@ export const revealExecutor: PhaseExecutor<RevealPhase<unknown, unknown>> = {
   enter() {},
   step(env, phase) {
     const content = phase.content(env.ctx());
-    env.log({ kind: 'revealed', text: content.text, data: content.data ?? {}, channel: phase.channel ?? 'public' });
+    const data: Record<string, unknown> = { ...content.data };
+    if (phase.revealRoles) {
+      env.s.rolesRevealed = true;
+      data.roles = env.s.seats.map((seat) => ({ seat: seat.seat, role: seat.role, team: seat.team }));
+    }
+    env.log({ kind: 'revealed', text: content.text, data, channel: phase.channel ?? 'public' });
     return done();
   },
 };

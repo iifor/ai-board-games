@@ -1,5 +1,5 @@
 import type { Channel, GameResult, StageEvent, StageEventMeta, StagePayload } from '@battle/shared';
-import type { PhaseResult } from '../spec/context';
+import type { PhaseResult, TriggerEvent } from '../spec/context';
 
 export interface SeatProfile {
   readonly playerId: string;
@@ -59,6 +59,29 @@ export interface DebugState {
   passKey: string | null;
 }
 
+export interface ResumeTarget {
+  readonly goto: string;
+  readonly round: boolean;
+}
+
+export interface StackFrame {
+  /** 插入的阶段链结束后要去的地方 */
+  readonly resume: ResumeTarget;
+  /** 进入插入链之前生效的触发事件，return 时恢复 */
+  readonly trigger: TriggerEvent | null;
+}
+
+export interface QueuedTrigger {
+  readonly phaseId: string;
+  readonly event: TriggerEvent;
+}
+
+export interface PendingJump {
+  readonly phaseId: string;
+  readonly round: boolean;
+  readonly event: TriggerEvent;
+}
+
 export interface EngineSnapshot {
   readonly engineVersion: 1;
   readonly gameKey: string;
@@ -73,6 +96,13 @@ export interface EngineSnapshot {
   cursor: Cursor;
   visits: Record<string, number>;
   results: Record<string, PhaseResult>;
+  stack: StackFrame[];
+  /** 已触发、等待当前阶段结束后插入的阶段 */
+  triggerQueue: QueuedTrigger[];
+  activeTrigger: TriggerEvent | null;
+  jump: PendingJump | null;
+  gameOverTriggered: boolean;
+  rolesRevealed: boolean;
   log: LogEntry[];
   pending: PendingRequest[];
   budgetUsed: { aiRequests: number };

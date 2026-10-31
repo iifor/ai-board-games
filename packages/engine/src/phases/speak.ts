@@ -1,3 +1,4 @@
+import { applyDeclaration, speakSchema } from '../ai/declarations';
 import type { ExecEnv } from '../runtime/env';
 import { toSeatNumbers, type SeatSelection } from '../runtime/seats';
 import type { TemplateVars } from '../runtime/types';
@@ -69,8 +70,8 @@ export const speakExecutor: AiPhaseExecutor<Phase> = {
     return issue([draft(env, turn, state.next)]);
   },
 
-  schema(_env, phase) {
-    return phase.output;
+  schema(env, phase, pending) {
+    return speakSchema(env, phase, env.seat(pending.seat));
   },
 
   check(env, phase, pending, value) {
@@ -91,5 +92,6 @@ export const speakExecutor: AiPhaseExecutor<Phase> = {
       state.next += 1;
       state.issued = false;
     }
+    applyDeclaration(env, phase, seat, value);
   },
 };

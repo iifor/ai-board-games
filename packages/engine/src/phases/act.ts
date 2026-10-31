@@ -60,10 +60,13 @@ export const actExecutor: AiPhaseExecutor<Phase> = {
   },
 
   schema(_env, phase, pending) {
-    return z.object({
-      targets: z.array(z.number().int()).length(targetCount(phase, pending)).describe(`${phase.action}的目标座位号`),
-      reason: z.string().max(300).optional().describe('简短理由'),
-    });
+    const count = targetCount(phase, pending);
+    const targets = phase.allowNone
+      ? z.array(z.number().int()).max(count)
+        .refine((list) => list.length === 0 || list.length === count, `只能选择 ${count} 个目标，或输出空数组表示放弃`)
+        .describe(`${phase.action}的目标座位号；输出空数组表示放弃`)
+      : z.array(z.number().int()).length(count).describe(`${phase.action}的目标座位号`);
+    return z.object({ targets, reason: z.string().max(300).optional().describe('简短理由') });
   },
 
   check(_env, _phase, pending, value) {
@@ -75,6 +78,11 @@ export const actExecutor: AiPhaseExecutor<Phase> = {
   },
 
   fallback(env, phase, pending) {
+    const mode = phase.fallbackMode ?? (phase.allowNone ? 'none' : 'random');
+    if (mode === 'none') {
+      if (!phase.allowNone) throw new Error(`阶段 ${env.phaseId()} 不允许放弃，fallbackMode 不能为 none`);
+      return { targets: [] };
+    }
     const rng = env.ctx().random(`fallback:${pending.id}`);
     return { targets: rng.shuffle(pending.legalTargets ?? []).slice(0, targetCount(phase, pending)) };
   },
@@ -85,7 +93,10 @@ export const actExecutor: AiPhaseExecutor<Phase> = {
     const { targets } = value as ActOutput;
     state.decisions[String(seat.seat)] = targets;
     const ctx = env.ctx();
-    const text = phase.describe?.(ctx, seat, targets) ?? `${phase.action}：${targets.map((target) => `${target}号`).join('、')}`;
+    const fallbackText = targets.length
+      ? `${phase.action}：${targets.map((target) => `${target}号`).join('、')}`
+      : `放弃${phase.action}`;
+    const text = phase.describe?.(ctx, seat, targets) ?? fallbackText;
     env.log({
       kind: 'action',
       seat: seat.seat,

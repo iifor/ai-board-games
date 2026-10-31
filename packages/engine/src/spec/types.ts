@@ -2,7 +2,7 @@ import type { StageLayout } from '@battle/shared';
 import type { ZodType } from 'zod';
 import type { PromptTemplate } from '../prompt/template';
 import type { BreakpointSetting, Seat, TemplateVars } from '../runtime/types';
-import type { RuleContext, SetupContext } from './context';
+import type { RuleContext, SetupContext, TriggerEvent, TriggerEventKind } from './context';
 import type { PhaseSpec, SpeechOutput } from './phases';
 
 export interface RoleSpec {
@@ -62,6 +62,29 @@ export interface BudgetSpec {
   readonly maxRounds?: number;
   readonly maxPhaseVisits?: number;
   readonly maxAiRequests?: number;
+  /** 触发器嵌套插入阶段的最大深度，默认 8 */
+  readonly maxStackDepth?: number;
+}
+
+/**
+ * 事件触发器：
+ * - push：当前阶段结束后插入一段阶段链，链末 `return` 回到原本要去的地方（遗言、开枪、移交警徽）；
+ * - jump：立即中止当前阶段，清空阶段栈后跳转（自爆后直接入夜）。
+ */
+export interface TriggerSpec<S, P> {
+  readonly id: string;
+  readonly on: TriggerEventKind;
+  when?(ctx: RuleContext<S, P>, event: TriggerEvent): boolean;
+  readonly push?: string;
+  readonly jump?: string;
+  /** 仅 jump：跳转时轮次加一 */
+  readonly round?: 'increment';
+}
+
+/** 胜负已分时转入的阶段（赛后环节或 end）；每个阶段完成后检查一次，只会触发一次 */
+export interface GameOverSpec<S, P> {
+  when(ctx: RuleContext<S, P>): boolean;
+  readonly goto: string;
 }
 
 export interface DebugSpec<S, P> {
@@ -90,6 +113,8 @@ export interface GameSpec<S, P> {
   readonly start: string;
   readonly phases: Readonly<Record<string, PhaseSpec<S, P>>>;
   end(ctx: RuleContext<S, P>): EndResult;
+  readonly triggers?: readonly TriggerSpec<S, P>[];
+  readonly gameOver?: GameOverSpec<S, P>;
   readonly budget?: BudgetSpec;
   readonly presentation: PresentationSpec<S, P>;
   readonly debug?: DebugSpec<S, P>;

@@ -1,21 +1,17 @@
 import { SpecError } from '../errors';
 import type { PromptTemplate } from '../prompt/template';
-import type { NextSpec, PhaseSpec } from '../spec/phases';
 import type { AnyGameSpec, GameSpec } from '../spec/types';
 import { checkTemplates } from './checkTemplates';
+import { checkPhaseGraph } from './graph';
 import { computeSpecHash } from './specHash';
 
-export const END_PHASE = 'end';
+export { END_PHASE, RETURN_PHASE } from './graph';
 
 export interface CompiledGame<S = unknown, P = unknown> {
   readonly spec: GameSpec<S, P>;
   readonly hash: string;
   /** 模板名 → 模板，用于按名字找回发言轮次覆盖的模板 */
   readonly prompts: ReadonlyMap<string, PromptTemplate>;
-}
-
-function targetsOf(next: NextSpec<unknown, unknown>): string[] {
-  return typeof next === 'string' ? [next] : next.map((transition) => transition.goto);
 }
 
 function checkPlayersAndRoles(spec: AnyGameSpec): string[] {
@@ -43,37 +39,6 @@ function checkPlayersAndRoles(spec: AnyGameSpec): string[] {
       issues.push(`角色 ${role} 有 ${positions} 个席位，但最少只分到 ${minimum} 人`);
     }
   }
-  return issues;
-}
-
-function checkPhaseGraph(spec: AnyGameSpec): string[] {
-  const issues: string[] = [];
-  const phases = spec.phases as Readonly<Record<string, PhaseSpec<unknown, unknown>>>;
-  if (END_PHASE in phases) issues.push(`"${END_PHASE}" 是保留字，不能作为阶段 ID`);
-  if (!phases[spec.start]) issues.push(`start 指向不存在的阶段 "${spec.start}"`);
-
-  for (const [id, phase] of Object.entries(phases)) {
-    if (typeof phase.next !== 'string') {
-      const last = phase.next[phase.next.length - 1];
-      if (!last) issues.push(`阶段 ${id} 的 next 不能为空列表`);
-      else if (last.when) issues.push(`阶段 ${id} 的 next 最后一项必须无条件`);
-    }
-    for (const target of targetsOf(phase.next)) {
-      if (target !== END_PHASE && !phases[target]) issues.push(`阶段 ${id} 跳转到不存在的阶段 "${target}"`);
-    }
-  }
-
-  const reachable = new Set<string>();
-  const queue = phases[spec.start] ? [spec.start] : [];
-  while (queue.length) {
-    const id = queue.shift() as string;
-    if (reachable.has(id)) continue;
-    reachable.add(id);
-    const phase = phases[id];
-    if (phase) queue.push(...targetsOf(phase.next).filter((target) => target !== END_PHASE));
-  }
-  const unreachable = Object.keys(phases).filter((id) => !reachable.has(id));
-  if (unreachable.length) issues.push(`以下阶段从 start 不可达：${unreachable.join('、')}`);
   return issues;
 }
 

@@ -5,7 +5,7 @@ import { EngineInputError } from '../errors';
 import { executorFor } from '../phases/registry';
 import { cloneJson, deepFreeze } from '../utils/json';
 import { ExecEnv, type Emitted } from './env';
-import { completePhase, enterPhase, finishGame } from './flow';
+import { applyJump, completePhase, enterPhase, finishGame } from './flow';
 import { applyInput } from './input';
 import type { AdvanceResult, EngineInput, EngineSnapshot } from './types';
 
@@ -26,6 +26,10 @@ function runUntilBlocked(env: ExecEnv): void {
   const { s } = env;
   for (let step = 0; step < MAX_STEPS_PER_ADVANCE; step += 1) {
     if (s.status !== 'running') return;
+    if (s.jump) {
+      applyJump(env);
+      continue;
+    }
     if (s.pending.length > 0) {
       s.status = 'waiting_ai';
       return;
@@ -39,7 +43,8 @@ function runUntilBlocked(env: ExecEnv): void {
     }
     const phase = env.phase();
     const outcome = executorFor(phase).step(env, phase);
-    if (outcome.kind === 'done') completePhase(env, outcome.result);
+    if (outcome.kind === 'done' && s.jump) applyJump(env);
+    else if (outcome.kind === 'done') completePhase(env, outcome.result);
     else if (!issueDrafts(env, outcome.drafts)) finishGame(env, 'budget');
   }
   throw new Error(`单次推进超过 ${MAX_STEPS_PER_ADVANCE} 步，spec 中可能存在不消耗 AI 的死循环`);

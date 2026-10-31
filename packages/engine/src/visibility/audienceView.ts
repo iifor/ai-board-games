@@ -20,7 +20,7 @@ export function buildAudienceView(
   const omniscient = audienceMode(game) === 'omniscient';
   const revealRoles = completed && (game.spec.presentation.revealOnEnd ?? []).includes('roles');
   const seats: AudienceSeat[] = s.seats.map((seat) => {
-    const visible = omniscient || revealRoles || roleVisibleTo(game, seat, null);
+    const visible = omniscient || revealRoles || roleVisibleTo(game, s, seat, null);
     return {
       seat: seat.seat,
       name: seat.profile.name,
