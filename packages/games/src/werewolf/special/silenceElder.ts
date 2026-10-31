@@ -1,7 +1,8 @@
 import { definePrompts, type ActDecision, type Seat } from '@battle/engine';
 import type { WerewolfPhases } from '../phases/types';
 import { hasRole } from '../rules/board';
-import { nightActors, type WerewolfContext } from '../rules/context';
+import { nightActors } from '../rules/block';
+import type { WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { DawnStep } from '../rules/types';
 import type { WerewolfState } from '../state';

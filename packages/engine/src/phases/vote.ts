@@ -51,7 +51,7 @@ function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, tied: readon
   if (phase.onResult === 'eliminate' && outcome.kind === 'selected') {
     env.eliminate(outcome.seat, phase.eliminateReason ?? `${title}出局`, phase.eliminateCause ?? env.phaseId());
   }
-  const result = { kind: 'vote', outcome, rounds: state.stage + 1, tied: [...tied] } as const;
+  const result = { kind: 'vote', outcome, rounds: state.stage + 1, tied: [...tied], ballots } as const;
   if (phase.apply) env.setState(phase.apply(env.ctx(result), outcome));
   return done(result);
 }

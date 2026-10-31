@@ -6,6 +6,9 @@ export const NIGHT_ORDER = [
   'night_start',
   'night_reset',
   'hybrid_choose',
+  'butterfly_hug',
+  'night_blocks',
+  'stalker_assassinate',
   'elder_silence',
   'guard_protect',
   'wolf_chat',
@@ -22,6 +25,7 @@ export const DAY_ORDER = [
   'day_speech',
   'knight_duel',
   'exile_vote',
+  'stalker_mark',
   'exile_resolve',
 ] as const;
 

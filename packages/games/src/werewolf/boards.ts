@@ -49,6 +49,18 @@ export const BOARDS: readonly BoardDefinition[] = [
     roles: { werewolf: 4, seer: 1, witch: 1, knight: 1, silence_elder: 1, villager: 'rest' },
   }),
   board({
+    key: 'silence-elder-stalker-12',
+    name: '禁言长老&潜行者',
+    description: '预言家、女巫、潜行者、禁言长老与 4 名村民对抗 4 名狼人。',
+    roles: { werewolf: 4, seer: 1, witch: 1, stalker: 1, silence_elder: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'butterfly-12',
+    name: '花蝴蝶',
+    description: '预言家、花蝴蝶、潜行者、猎人与 4 名村民对抗 4 名狼人，没有女巫。',
+    roles: { werewolf: 4, seer: 1, butterfly: 1, stalker: 1, hunter: 1, villager: 'rest' },
+  }),
+  board({
     key: 'white-wolf-king-guard-12',
     name: '白狼王&守卫',
     description: '白狼王与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',

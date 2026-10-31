@@ -46,6 +46,7 @@ GameSpec 关键字段：
 | `roles` | `name`、`team`、`positions`（席位数）、`publicRole`（所有人可见）、`knowsTeammates`（知道队友身份） |
 | `seatLabel` | 座位称呼，用于日志与提示词，默认 `3号 张三` |
 | `setup` | `assign`（角色 → 数量，最多一个 `rest`）、`shuffle`（默认 true）、`init`（初始状态） |
+| `variants` / `defaultVariant` | 玩法变体（如狼人杀板子）：`name`、`description`、`assign`（替换角色分配）、`players`、`config`（规则通过 `ctx.variant.config` 读取，由游戏自行校验）；开局输入 `variant` 选择，缺省取 `defaultVariant` |
 | `state` | `schema` 决定状态类型；`visibility` 声明每个字段对 AI 的可见性，**未声明即不可见** |
 | `start` / `phases` | 阶段字典；`end` 是保留的终局目标 |
 | `end` | 胜者判定，返回 `winner`、`winnerLabel`、`summary`、`mvp` |
@@ -59,7 +60,7 @@ GameSpec 关键字段：
 
 ### 规则上下文 `ctx`
 
-`state`、`params`（深度冻结）、`seats`（`SeatQuery`：`alive`、`dead`、`withRole`、`inTeam`、`position`、`except`、`where`、`get`、`ids`、`count`）、`round`、`phaseId`、`results`（各阶段最近一次结果，配合 `expectResult` / `findResult` 读取）、`result`（当前阶段结果，仅在 `next` / `apply` 中有值）、`endReason`、`random(label)`（由种子、阶段、访问次数与标签派生）、`trigger`（由触发器进入的阶段链中，触发它的事件）。
+`state`、`params`（深度冻结）、`seats`（`SeatQuery`：`alive`、`dead`、`withRole`、`inTeam`、`position`、`except`、`where`、`get`、`ids`、`count`）、`round`、`phaseId`、`results`（各阶段最近一次结果，配合 `expectResult` / `findResult` 读取）、`result`（当前阶段结果，仅在 `next` / `apply` 中有值）、`endReason`、`random(label)`（由种子、阶段、访问次数与标签派生）、`trigger`（由触发器进入的阶段链中，触发它的事件）、`variant`（本局变体 `{ key, name, config }`，游戏没有变体时为 null）。
 
 ### 基础动作
 
@@ -68,10 +69,12 @@ GameSpec 关键字段：
 | `announce` | 用**公开上下文**渲染模板，写入主持播报 | — |
 | `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆） | `output` schema（标准为 `speechOutput({ max })`）；有权声明的座位额外获得可选的 `declare` 字段 |
 | `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }` |
-| `vote` | 投票后计票，`weight` 设定票权，`allowAbstain` 允许弃票（`fallbackMode: 'abstain'` 时兜底为弃票）；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null |
+| `vote` | 投票后计票，`weight` 设定票权，`allowAbstain` 允许弃票（`fallbackMode: 'abstain'` 时兜底为弃票）；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者、`ballots` 给出最后一轮的有效选票（不含弃票，规则可据此知道谁投了谁）；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null |
 | `judge` | 评委依次判定，`verdicts` 定义选项与含义；多数决，无评委或并列时取 `tieVerdict` | 自动生成 `{ verdict, comment }`，选项含义写入 schema 描述 |
-| `compute` | 纯函数结算：返回新状态、日志、淘汰列表，按此顺序生效（播报先于出局事件） | — |
+| `compute` | 纯函数结算：返回新状态、`reassign`（改变座位的角色或阵营）、日志、淘汰列表，按此顺序生效（播报先于出局事件） | — |
 | `reveal` | 写入一条揭示日志；`revealRoles` 向所有玩家与观众公开全部身份，并在日志 `data.roles` 中给出身份表 | — |
+
+阶段可声明 `enabled(ctx)`：返回 false 时静默跳过（不记录、不计访问次数），直接按 `next` 跳转（此时 `ctx.result` 为 null），用于本局不存在的角色。
 
 跳转：`next` 为阶段 ID、`end`、`return`，或 `{ when?, goto, round? }` 列表（按顺序取第一个命中项，最后一项必须无条件）；`round: 'increment'` 使轮次加一。编译期检查跳转目标存在、所有阶段可达（从 `start`、触发器目标、`gameOver.goto` 出发），且只有触发器插入的阶段链可以 `return`。
 
@@ -122,4 +125,3 @@ GameSpec 关键字段：
 ## 尚未实现
 
 - token 预算：目前只限制 AI 请求次数，token 用量待服务端接入后补充。
-- 变体（`variants`）：P7 随狼人杀板子加入。

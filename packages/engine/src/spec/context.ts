@@ -1,4 +1,4 @@
-import type { EndReason, VoteOutcome } from '@battle/shared';
+import type { EndReason, VoteBallot, VoteOutcome } from '@battle/shared';
 import type { Rng } from '../runtime/rng';
 import type { SeatQuery } from '../runtime/seats';
 
@@ -36,6 +36,8 @@ export type PhaseResult =
       readonly rounds: number;
       /** 最终仍并列的座位（包括被种子打破的并列）；没有并列时为空 */
       readonly tied: readonly number[];
+      /** 最后一轮（含复投）的有效选票，不含弃票 */
+      readonly ballots: readonly VoteBallot[];
     }
   | {
       readonly kind: 'judge';

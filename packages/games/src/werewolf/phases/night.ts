@@ -14,7 +14,7 @@ import {
   wolfChatOrder,
   wolfKillTargets,
 } from '../rules/night';
-import { nightActors } from '../rules/context';
+import { announceBlocks, blockedSeats, nightActors, wolvesBlocked } from '../rules/block';
 import { resolveNight } from '../rules/nightResolution';
 import { nightAfter } from '../rules/order';
 import type { WerewolfPhases } from './types';
@@ -22,9 +22,16 @@ import type { WerewolfPhases } from './types';
 export const nightPhases = {
   night_start: { kind: 'announce', title: '黑夜', text: prompts.nightFalls, next: nightAfter('night_start') },
   night_reset: { kind: 'compute', run: resetNight, next: nightAfter('night_reset') },
+  night_blocks: {
+    kind: 'compute',
+    enabled: (ctx) => blockedSeats(ctx).length > 0,
+    run: announceBlocks,
+    next: nightAfter('night_blocks'),
+  },
   wolf_chat: {
     kind: 'speak',
     title: '狼人夜聊',
+    enabled: (ctx) => !wolvesBlocked(ctx),
     actors: wolfChatOrder,
     prompt: prompts.wolfChat,
     output: speechOutput({ max: 80 }),
@@ -35,6 +42,7 @@ export const nightPhases = {
   wolf_kill: {
     kind: 'vote',
     title: '狼人击杀',
+    enabled: (ctx) => !wolvesBlocked(ctx),
     voters: aliveWolves,
     candidates: wolfKillTargets,
     prompt: prompts.wolfKill,

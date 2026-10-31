@@ -11,7 +11,7 @@ export const seerCheckSchema = z.object({
 });
 
 /** 夜间死亡的原因；天亮出局时作为触发器的 cause */
-export const nightDeathCauseSchema = z.enum(['wolf', 'poison']);
+export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'stalker']);
 
 export const pendingDeathSchema = z.object({
   seat: seatNo,
@@ -35,6 +35,10 @@ export const werewolfStateSchema = z.object({
     guarded: seatNo.nullable(),
     /** 禁言长老今晚禁言的人，天亮时公布 */
     silenced: seatNo.nullable(),
+    /** 花蝴蝶今晚抱的人：当晚夜间技能失效 */
+    hugged: seatNo.nullable(),
+    /** 潜行者今晚暗杀的人 */
+    stalked: seatNo.nullable(),
   }),
   /** 守卫上一晚守护的人（不能连续两晚守同一人） */
   guardLastTarget: seatNo.nullable(),
@@ -45,6 +49,11 @@ export const werewolfStateSchema = z.object({
   /** 今天白天被禁言的人（天亮公布，入夜清空） */
   silencedToday: seatNo.nullable(),
   knightDuelUsed: z.boolean(),
+  stalkerUsed: z.boolean(),
+  /** 潜行者在当天放逐投票中投给的人；当晚可暗杀（若他没有出局），夜里用过即清空 */
+  stalkerVote: seatNo.nullable(),
+  /** 花蝴蝶已经抱人的次数 */
+  butterflyHugs: z.number().int().nonnegative(),
   /** 白狼王自爆时选择带走的人，等待结算 */
   pendingBlast: seatNo.nullable(),
   potions: z.object({ antidote: z.boolean(), poison: z.boolean() }),
@@ -95,6 +104,9 @@ export const werewolfVisibility = {
   elderLastTarget: roleOnly('silence_elder'),
   silencedToday: 'public',
   knightDuelUsed: roleOnly('knight'),
+  stalkerUsed: roleOnly('stalker'),
+  stalkerVote: roleOnly('stalker'),
+  butterflyHugs: roleOnly('butterfly'),
   potions: roleOnly('witch'),
   lastNightDeaths: 'public',
   seerChecks: ownChecks,
@@ -104,7 +116,7 @@ export const werewolfVisibility = {
 } as const satisfies { readonly [K in keyof WerewolfState]?: Visibility };
 
 export function emptyNight(): WerewolfState['night'] {
-  return { wolfTarget: null, saved: false, poisoned: null, guarded: null, silenced: null };
+  return { wolfTarget: null, saved: false, poisoned: null, guarded: null, silenced: null, hugged: null, stalked: null };
 }
 
 export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): WerewolfState {
@@ -117,6 +129,9 @@ export function initialWerewolfState(ctx: SetupContext<WerewolfParams>): Werewol
     elderLastTarget: null,
     silencedToday: null,
     knightDuelUsed: false,
+    stalkerUsed: false,
+    stalkerVote: null,
+    butterflyHugs: 0,
     pendingBlast: null,
     potions: { antidote: true, poison: true },
     pendingDeaths: [],
