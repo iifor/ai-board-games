@@ -1,10 +1,10 @@
-import { PACKAGE_NAME as GAMES_PACKAGE_NAME } from '@battle/games';
+import { gameRegistry } from '@battle/games';
 import { describe, expect, it } from 'vitest';
 import { PACKAGE_NAME } from './index';
 
 describe('@battle/server', () => {
-  it('resolves its workspace dependency on @battle/games', () => {
+  it('resolves the game registry from @battle/games', () => {
     expect(PACKAGE_NAME).toBe('@battle/server');
-    expect(GAMES_PACKAGE_NAME).toBe('@battle/games');
+    expect(gameRegistry.has('debate')).toBe(true);
   });
 });
