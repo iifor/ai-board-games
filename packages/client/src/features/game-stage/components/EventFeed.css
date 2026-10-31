@@ -1,0 +1,24 @@
+.event-feed {
+  display: grid;
+  gap: 6px;
+  max-height: 420px;
+  margin: 0;
+  padding: 12px;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 13px;
+}
+
+.event-feed li span {
+  margin-right: 6px;
+  color: var(--text-muted);
+}
+
+.event-feed-phase_started {
+  margin-top: 6px;
+  color: var(--accent);
+}
+
+.event-feed-game_over {
+  font-weight: 600;
+}

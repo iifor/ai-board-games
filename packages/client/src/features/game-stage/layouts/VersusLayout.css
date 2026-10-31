@@ -1,0 +1,61 @@
+.versus-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 2.2fr) minmax(180px, 1fr);
+  gap: 16px;
+}
+
+.versus-side {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.versus-side h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.versus-side-pro h3 { color: var(--pro); }
+.versus-side-con h3 { color: var(--con); }
+
+.versus-center {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.versus-topic {
+  padding: 14px 18px;
+}
+
+.versus-topic h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.versus-topic p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.versus-pro,
+.versus-con {
+  margin-right: 8px;
+  font-weight: 600;
+}
+
+.versus-pro { color: var(--pro); }
+.versus-con { color: var(--con); }
+
+.versus-bench {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .versus-layout {
+    grid-template-columns: 1fr;
+  }
+}

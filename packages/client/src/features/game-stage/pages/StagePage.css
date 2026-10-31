@@ -1,0 +1,10 @@
+.stage-page {
+  display: grid;
+  gap: 16px;
+}
+
+.stage-feed h2 {
+  margin: 0;
+  padding: 12px 12px 0;
+  font-size: 15px;
+}

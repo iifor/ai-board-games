@@ -12,7 +12,10 @@
   "dependencies": {
     "@battle/shared": "workspace:*",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "react-router": "catalog:",
+    "antd": "catalog:",
+    "@ant-design/icons": "catalog:"
   },
   "devDependencies": {
     "@types/react": "catalog:",

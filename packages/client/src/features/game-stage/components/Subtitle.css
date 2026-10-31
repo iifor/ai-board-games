@@ -1,0 +1,26 @@
+.subtitle {
+  display: grid;
+  gap: 4px;
+  min-height: 96px;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.subtitle p {
+  margin: 0;
+  font-size: 17px;
+  white-space: pre-wrap;
+}
+
+.subtitle-speaker {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.subtitle-idle {
+  place-items: center;
+  color: var(--text-muted);
+}

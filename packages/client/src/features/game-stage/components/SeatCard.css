@@ -1,0 +1,63 @@
+.seat-card {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.seat-card-speaking {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  transform: translateY(-2px);
+}
+
+.seat-card-out {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}
+
+.seat-card-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  font-weight: 600;
+}
+
+.seat-card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.seat-card-body {
+  display: grid;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.seat-card-body strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.seat-card-role,
+.seat-card-badges {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.seat-team-pro { border-left: 3px solid var(--pro); }
+.seat-team-con { border-left: 3px solid var(--con); }
+.seat-team-werewolf { border-left: 3px solid var(--wolf); }
+.seat-team-good { border-left: 3px solid var(--good); }

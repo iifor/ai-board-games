@@ -1,0 +1,29 @@
+.topic-fields {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.topic-fields label {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.topic-fields input {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.topic-fields-hint {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}

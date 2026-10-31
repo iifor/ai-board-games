@@ -218,7 +218,9 @@ interface AiRequest {
 
 模块：`games`（目录接口，来自注册表）、`matches`（创建 / 列表 / 详情 / 删除）、`match-runtime`（事务内调用 `advance`，写快照、任务、事件）、`ai-worker`（`SKIP LOCKED` 领取、传输层重试、备用模型、写 `ai_calls`）、`llm`（OpenAI 兼容客户端与 JSON 修复）、`tts`（Azure / Mimo，带缓存）、`realtime`（WebSocket：start / ack / pause / resume，`prefetch` 窗口，断线续播）、`debug`（调试指令接口，仅后台可用）。
 
-### P5 C 端
+### P5 C 端（已完成）
+
+> 实现说明：路由用 react-router 7；暂停语义为不再开始新的事件（不打断当前事件）；`.claude/launch.json` 提供 server / client / admin 三个本地启动配置。
 
 `client/src/features/{lobby, game-stage, history}`；GameStage 包含 `versus`（辩论）与 `circle`（狼人杀）两种布局、`useMatchStream`、`usePlayback`、字幕与音频组件、专用组件注册表（警徽、昼夜指示）；`services/` 封装 REST 调用。
 

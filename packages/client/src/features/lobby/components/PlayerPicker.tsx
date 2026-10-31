@@ -1,0 +1,28 @@
+import type { PublicPlayerDto } from '@battle/shared';
+import './PlayerPicker.css';
+
+interface PlayerPickerProps {
+  readonly players: readonly PublicPlayerDto[];
+  readonly selected: readonly number[];
+  readonly onToggle: (id: number) => void;
+}
+
+/** 选人：按点击顺序就座，卡片上显示座位号 */
+export function PlayerPicker({ players, selected, onToggle }: PlayerPickerProps) {
+  return (
+    <ul className="player-picker">
+      {players.map((player) => {
+        const seat = selected.indexOf(player.id) + 1;
+        return (
+          <li key={player.id}>
+            <button type="button" className={`player-option ${seat ? 'player-option-selected' : ''}`} aria-pressed={seat > 0} onClick={() => onToggle(player.id)}>
+              <span className="player-option-seat">{seat || '+'}</span>
+              <span className="player-option-name">{player.name}</span>
+              {player.persona ? <span className="player-option-persona">{player.persona}</span> : null}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

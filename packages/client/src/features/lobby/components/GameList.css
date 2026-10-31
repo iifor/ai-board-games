@@ -1,0 +1,34 @@
+.game-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+}
+
+.game-card h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.game-card p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.game-card-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.game-card .button {
+  justify-self: start;
+  text-decoration: none;
+}
