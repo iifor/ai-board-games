@@ -1,7 +1,9 @@
 import type { ActDecision, ComputeOutcome, Seat, SeatQuery, VoteOutcome } from '@battle/engine';
 import { withinMark } from '../special/fortuneTeller';
 import { swapTarget } from '../special/magician';
+import { shieldedTonight } from '../special/spiritWolfSkills';
 import { emptyNight, type WerewolfState } from '../state';
+import { SEER_NO_RESULT, type SeerResult } from '../stateFinal';
 import { checksAsWolf } from './appearance';
 import { boardConfig, roleTraits } from './board';
 import { isWolf, seededRotation, type WerewolfContext } from './context';
@@ -37,9 +39,14 @@ export function recordWolfKill(ctx: WerewolfContext, outcome: VoteOutcome): Were
   return { ...ctx.state, night: { ...ctx.state.night, wolfTarget } };
 }
 
-/** 查验结果：魔术师当晚交换了号码时得到换过去的那名玩家的身份；隐狼等被视为好人（见 rules/appearance.ts） */
-export function seerVerdict(ctx: WerewolfContext, target: number): '好人' | '狼人' {
-  return checksAsWolf(ctx, ctx.seats.get(swapTarget(ctx, target))) ? '狼人' : '好人';
+/**
+ * 查验结果：魔术师当晚交换了号码时得到换过去的那名玩家的身份；隐狼等被视为好人（见 rules/appearance.ts）；
+ * 当晚被灵狼庇护的玩家查验不出结果。
+ */
+export function seerVerdict(ctx: WerewolfContext, target: number): SeerResult {
+  const actual = swapTarget(ctx, target);
+  if (shieldedTonight(ctx, actual)) return SEER_NO_RESULT;
+  return checksAsWolf(ctx, ctx.seats.get(actual)) ? '狼人' : '好人';
 }
 
 export function describeSeerCheck(ctx: WerewolfContext, _seat: Seat, targets: readonly number[]): string {

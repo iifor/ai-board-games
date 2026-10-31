@@ -29,4 +29,10 @@ export const FINAL_BOARDS: readonly BoardDefinition[] = [
     description: '魔狼与 3 名狼人对抗预言家、女巫、猎魔人、白痴与 4 名村民；魔狼自爆后当晚封印所有神职，猎魔人从第二夜起每晚可以狩猎一名玩家。',
     roles: { magic_wolf: 1, werewolf: 3, seer: 1, witch: 1, demon_hunter: 1, idiot: 1, villager: 'rest' },
   }),
+  board({
+    key: 'spirit-wolf-12',
+    name: '灵狼',
+    description: '灵狼与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民；灵狼首夜学习一名好人的技能，在女巫之后、预言家之前行动。',
+    roles: { spirit_wolf: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+  }),
 ];

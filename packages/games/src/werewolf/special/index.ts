@@ -33,6 +33,7 @@ import { penguinPhases, penguinPrompts } from './penguin';
 import { requesterPhases, requesterPrompts } from './requester';
 import { saplingPhases, saplingPrompts, saplingTriggers } from './sapling';
 import { silenceElderPhases, silenceElderPrompts } from './silenceElder';
+import { spiritWolfPhases, spiritWolfPrompts, spiritWolfTriggers } from './spiritWolf';
 import { stalkerPhases, stalkerPrompts } from './stalker';
 import { succubusPhases, succubusPrompts } from './succubus';
 import { thiefPhases, thiefPrompts } from './thief';
@@ -86,6 +87,7 @@ export const specialPrompts = {
   ...saplingPrompts,
   ...magicWolfPrompts,
   ...demonHunterPrompts,
+  ...spiritWolfPrompts,
 };
 
 export const specialPhases: WerewolfPhases = {
@@ -128,16 +130,18 @@ export const specialPhases: WerewolfPhases = {
   ...saplingPhases,
   ...magicWolfPhases,
   ...demonHunterPhases,
+  ...spiritWolfPhases,
 };
 
 /**
  * 出局后的特殊处理，排在遗言、猎人开枪之后、移交警徽之前（声明顺序即执行顺序）：
- * 中性开枪（狼王局）→ 额外的枪 → 白狼王带人 → 魔狼封印 → 狼美人殉情 → 情侣殉情 → 炸弹人引爆 → 野孩子变狼 → 隐狼随狼队出局 → 九尾狐失去全部尾巴
+ * 中性开枪（狼王局）→ 额外的枪 → 灵狼翻牌带人 → 白狼王带人 → 魔狼封印 → 狼美人殉情 → 情侣殉情 → 炸弹人引爆 → 野孩子变狼 → 隐狼随狼队出局 → 九尾狐失去全部尾巴
  * → 树苗全部出局时大树随之出局 → 老流氓到期出局 → 大树倒下 → 记录狼兄出局。
  */
 export const specialDeathTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
   ...wolfKingTriggers,
   ...giftTriggers,
+  ...spiritWolfTriggers,
   ...whiteWolfKingTriggers,
   ...magicWolfTriggers,
   ...wolfBeautyTriggers,

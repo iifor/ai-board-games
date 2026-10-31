@@ -1,4 +1,4 @@
-import { speechOutput } from '@battle/engine';
+import { speechOutput, type ActPhase } from '@battle/engine';
 import { werewolfPrompts as prompts } from '../prompts';
 import { announceBlocks, blockedSeats, nightActors, wolvesBlocked } from '../rules/block';
 import { boardConfig, hasRole } from '../rules/board';
@@ -17,7 +17,21 @@ import {
 } from '../rules/night';
 import { resolveNight } from '../rules/nightResolution';
 import { nightAfter } from '../rules/order';
+import { seerWakesLate } from '../special/spiritWolfSkills';
+import type { WerewolfParams, WerewolfState } from '../state';
 import type { WerewolfPhases } from './types';
+
+/** 预言家查验；有灵狼的板子里预言家在灵狼之后睁眼（seer_check_late），两个位置只会启用一个 */
+const seerCheck = {
+  kind: 'act',
+  title: '预言家查验',
+  action: '查验',
+  actors: (ctx) => nightActors(ctx, 'seer'),
+  targets: (ctx, seat) => ctx.seats.alive().except(seat),
+  prompt: prompts.seerCheck,
+  describe: describeSeerCheck,
+  apply: recordSeerCheck,
+} as const satisfies Omit<ActPhase<WerewolfState, WerewolfParams>, 'next'>;
 
 export const nightPhases = {
   night_start: { kind: 'announce', title: '黑夜', text: prompts.nightFalls, next: nightAfter('night_start') },
@@ -52,18 +66,8 @@ export const nightPhases = {
     apply: recordWolfKill,
     next: nightAfter('wolf_kill'),
   },
-  seer_check: {
-    kind: 'act',
-    title: '预言家查验',
-    action: '查验',
-    enabled: (ctx) => hasRole(ctx, 'seer'),
-    actors: (ctx) => nightActors(ctx, 'seer'),
-    targets: (ctx, seat) => ctx.seats.alive().except(seat),
-    prompt: prompts.seerCheck,
-    describe: describeSeerCheck,
-    apply: recordSeerCheck,
-    next: nightAfter('seer_check'),
-  },
+  seer_check: { ...seerCheck, enabled: (ctx) => hasRole(ctx, 'seer') && !seerWakesLate(ctx), next: nightAfter('seer_check') },
+  seer_check_late: { ...seerCheck, enabled: (ctx) => hasRole(ctx, 'seer') && seerWakesLate(ctx), next: nightAfter('seer_check_late') },
   witch_save: {
     kind: 'act',
     title: '女巫用药',

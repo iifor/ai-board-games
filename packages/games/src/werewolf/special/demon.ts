@@ -18,7 +18,8 @@ export const demonPrompts = definePrompts({
   demonCheck: '恶魔请睁眼，选择一名好人阵营玩家，查验他是神职还是平民。',
 });
 
-function godOrVillager(ctx: WerewolfContext, seat: number): '神职' | '平民' {
+/** 神职或平民（按屠边类别：神职以外都算平民），恶魔与学到预言家的灵狼共用 */
+export function godOrVillager(ctx: WerewolfContext, seat: number): '神职' | '平民' {
   return roleCategory(ctx, ctx.seats.get(seat)) === 'god' ? '神职' : '平民';
 }
 

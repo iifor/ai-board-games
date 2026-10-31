@@ -31,6 +31,7 @@ import { penguinPrompts } from './special/penguin';
 import { requesterPrompts } from './special/requester';
 import { saplingPrompts } from './special/sapling';
 import { silenceElderPrompts } from './special/silenceElder';
+import { spiritWolfPrompts } from './special/spiritWolf';
 import { stalkerPrompts } from './special/stalker';
 import { succubusPrompts } from './special/succubus';
 import { thiefPrompts } from './special/thief';
@@ -110,6 +111,7 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     infected_wolf: role('感染狼', 'werewolf', wolfSeedPrompts.infectedWolf, 'wolf'),
     succubus: role('魅魔', 'werewolf', succubusPrompts.succubus, 'wolf'),
     magic_wolf: role('魔狼', 'werewolf', magicWolfPrompts.magicWolf, 'wolf'),
+    spirit_wolf: role('灵狼', 'werewolf', spiritWolfPrompts.spiritWolf, 'wolf'),
     seer: role('预言家', 'good', prompts.seer, 'god'),
     witch: role('女巫', 'good', prompts.witch, 'god'),
     hunter: role('猎人', 'good', prompts.hunter, 'god'),

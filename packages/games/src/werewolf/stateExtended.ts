@@ -1,5 +1,6 @@
 import type { Seat, Visibility } from '@battle/engine';
 import { z } from 'zod';
+import { seerResultSchema } from './stateFinal';
 import { ownList, roleOnly } from './stateVisibility';
 
 // 第三批特殊角色（黑商、大树、狼兄弟、企鹅、狐狸、熊、种狼、天眼、祈求者、盗贼、丘比特、魅魔、鬼魂新娘）的状态字段，
@@ -19,7 +20,7 @@ export const NO_GIFTS: GiftSet = { check: false, gun: false, poison: false };
 export const giftCheckSchema = z.object({
   night: z.number().int().positive(),
   target: seatNo,
-  result: z.enum(['好人', '狼人']),
+  result: seerResultSchema,
 });
 
 export const foxCheckSchema = z.object({

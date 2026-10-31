@@ -2,7 +2,7 @@ import type { Visibility } from '@battle/engine';
 import { z } from 'zod';
 import { emptyExtendedNight, extendedNightShape, extendedStateShape, extendedVisibility } from './stateExtended';
 import { emptyExtraNight, extraNightShape, extraStateShape, extraVisibility } from './stateExtras';
-import { emptyFinalNight, finalNightShape, finalStateShape, finalVisibility } from './stateFinal';
+import { emptyFinalNight, finalNightShape, finalStateShape, finalVisibility, seerResultSchema } from './stateFinal';
 import { ownChecks, roleOnly } from './stateVisibility';
 
 const seatNo = z.number().int().positive();
@@ -10,7 +10,7 @@ const seatNo = z.number().int().positive();
 export const seerCheckSchema = z.object({
   night: z.number().int().positive(),
   target: seatNo,
-  result: z.enum(['好人', '狼人']),
+  result: seerResultSchema,
 });
 
 /**
