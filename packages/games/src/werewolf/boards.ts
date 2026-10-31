@@ -96,6 +96,19 @@ export const BOARDS: readonly BoardDefinition[] = [
     description: '梦魇与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民。',
     roles: { nightmare: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
   }),
+  board({
+    key: 'wolf-beauty-rogue-12',
+    name: '狼美人&老流氓',
+    description: '狼美人与 3 名狼人对抗预言家、女巫、猎人、白痴、老流氓与 3 名村民；本板子的狼美人被毒杀时不能带人。',
+    roles: { wolf_beauty: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, idiot: 1, old_rogue: 1, villager: 'rest' },
+    config: { wolfBeautyPoisonLink: false },
+  }),
+  board({
+    key: 'wolf-king-dreamer-12',
+    name: '狼王&摄梦人',
+    description: '狼王与 3 名狼人对抗预言家、女巫、猎人、摄梦人与 4 名村民；猎人与狼王开枪都不翻牌。',
+    roles: { wolf_king: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, dreamer: 1, villager: 'rest' },
+  }),
 ];
 
 export const DEFAULT_BOARD = 'standard-12';
