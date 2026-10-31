@@ -16,7 +16,22 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # P3 起在这里加入 PostgreSQL 16 service，供服务端集成测试使用。
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: battle
+          POSTGRES_DB: battle
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U battle -d battle"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://battle@127.0.0.1:5433/battle
     steps:
       - uses: actions/checkout@v4
 

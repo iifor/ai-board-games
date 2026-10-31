@@ -23,3 +23,6 @@ artifacts/
 .npm-cache/
 .superpowers/
 .DS_Store
+
+# 子任务的 git worktree
+.claude/worktrees/

@@ -206,7 +206,9 @@ interface AiRequest {
 
 ## P3–P8 里程碑要点
 
-### P3 服务端基础
+### P3 服务端基础（已完成）
+
+> 实现说明：前后端契约改为 `@battle/shared` 中显式的 DTO 类型 + 服务端 `satisfies` 绑定的 zod schema，不使用 `hono/client` 推断；资源模块共用 `utils/crud.ts`；本机开发端口改为 API 3100、数据库 5433（避开本机已占用端口）。
 
 `server/src/{config, db, middlewares, utils, modules}`；HTTP 与 WebSocket 用 Hono（`@hono/node-server`），参数校验用 zod 中间件，client/admin 通过 `hono/client` 获得类型化 API；数据库访问用 Kysely。模块按 `controller / service / repository / routes / validator / types` 分层。`db/migrations/001_init.sql` 建全部表；启动时执行迁移，失败则拒绝启动。统一错误响应 `{ code, message, data? }`，不暴露内部错误。模块：`auth`（JWT、首次登录改密）、`providers`（API Key 用 AES-GCM 加密，响应只返回掩码）、`models`、`voices`、`players`。
 

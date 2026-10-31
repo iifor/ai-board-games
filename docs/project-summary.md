@@ -4,7 +4,7 @@
 
 通用 AI 对战平台。一个游戏 = `GameSpec`（声明式阶段图）+ 规则纯函数 + 提示词模板；引擎负责流程推进、AI 调度、合法性校验、信息隔离、重试兜底、调试与回放；前台用通用舞台播放对局。
 
-首版游戏：辩论赛、狼人杀标准 12 人局。当前进度：P2 完成（引擎核心、辩论赛与狼人杀标准局都已在内存中跑通），详见实施计划。
+首版游戏：辩论赛、狼人杀标准 12 人局。当前进度：P3 完成（引擎、辩论赛、狼人杀板子框架与服务端基础），详见实施计划。
 
 ## 技术栈
 
@@ -42,11 +42,11 @@ packages/
 | `pnpm install` | 安装依赖 |
 | `pnpm check` | 各包 TypeScript 检查 |
 | `pnpm test` / `pnpm test:watch` | 运行全部 vitest 项目 |
-| `pnpm dev` | 并行启动各包的 dev 脚本（目前为 client `5173`、admin `5174`） |
+| `pnpm dev` | 并行启动各包的 dev 脚本（server `3100`、client `5173`、admin `5174`；server 读取根目录 `.env`） |
 | `pnpm build` | 构建有 build 脚本的包 |
-| `pnpm db:up` / `pnpm db:down` | 启动 / 停止本机 PostgreSQL 16（`docker-compose.dev.yml`） |
+| `pnpm db:up` / `pnpm db:down` | 启动 / 停止本机 PostgreSQL 16（`docker-compose.dev.yml`，默认 `127.0.0.1:5433`） |
 
-前端开发服务器把 `/api`（含 WebSocket）代理到 `http://127.0.0.1:3001`。
+前端开发服务器把 `/api`（含 WebSocket）代理到 `http://127.0.0.1:3100`。
 
 ## 环境变量
 
@@ -54,7 +54,7 @@ packages/
 
 ## CI
 
-`.github/workflows/ci.yml`：PR 以及 `master`、`rewrite/**` 分支的 push 触发，执行 install、check、test。P3 起加入 PostgreSQL service。
+`.github/workflows/ci.yml`：PR 以及 `master`、`rewrite/**` 分支的 push 触发，执行 install、check、test；PostgreSQL 16 service 供服务端集成测试使用（`TEST_DATABASE_URL`）。
 
 ## 历史
 
