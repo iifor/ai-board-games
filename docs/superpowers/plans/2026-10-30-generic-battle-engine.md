@@ -7,7 +7,7 @@
 
 **架构**：`packages/engine`（纯运行时）+ `packages/games`（游戏定义）+ `packages/server`（适配与 IO）+ `packages/client` / `packages/admin`（展示）+ `packages/shared`（协议）。
 
-**技术栈**：pnpm 9.5 workspace（catalog）、TypeScript 7 strict、zod 4、vitest 5、React 19 + Vite 8、antd（仅后台）、Express + ws + pg、PostgreSQL 16。
+**技术栈**：pnpm 9.5 workspace（catalog）、TypeScript 7 strict、zod 4、vitest 5、React 19 + Vite 8、antd（仅后台）、Node 22 + Hono + Kysely（pg）、PostgreSQL 16。
 
 ## 全局约束
 
@@ -70,7 +70,7 @@
 | --- | --- |
 | `index.ts` | 公开 API 出口 |
 | `spec/types.ts` | `GameSpec`、各 kind 的 `PhaseSpec`、`RoleSpec`、`StateSpec`、`PresentationSpec`、`BudgetSpec` |
-| `spec/define.ts` | `defineGame`、`defineRules`、`definePrompts`：只做类型推断与规则命名 |
+| `spec/define.ts` | `defineGame`、`definePrompts`、`speechOutput`：只做类型推断与模板解析 |
 | `compiler/compile.ts` | spec → `CompiledGame`：填默认值、阶段引用与可达性校验、计算 `specHash` |
 | `compiler/checkTemplates.ts` | 用调试夹具渲染全部模板，校验变量存在且可见 |
 | `runtime/types.ts` | `EngineSnapshot`、`EngineInput`、`AdvanceResult`、`AiRequest`、`LogEntry` |
@@ -101,6 +101,8 @@
 
 `packages/shared/src`：`stage.ts`（StageEvent 联合类型、观众视图）、`catalog.ts`（游戏目录 DTO）。
 
+> 实现后的文件划分与上表略有不同（以代码为准）：`runtime/transitions.ts` 与 `stack` 相关逻辑合并为 `runtime/flow.ts`；新增 `runtime/env.ts`（执行环境）、`runtime/input.ts`（输入分发）、`runtime/labels.ts`；announce/compute/reveal 合并为 `phases/simple.ts`；可见性拆为 `visibility/roles.ts`、`visibility/stateProjection.ts`；指纹在 `compiler/specHash.ts`；AI 请求登记在 `ai/requests.ts`。
+
 ### 核心类型（定稿以实现为准）
 
 ```ts
@@ -129,23 +131,23 @@ interface AiRequest {
 
 ### 任务（每项都先写测试）
 
-- [ ] **P1-1 基础类型与工具**：`spec/types.ts`、`spec/define.ts`、`runtime/rng.ts`、`runtime/seats.ts`、`runtime/context.ts`。测试：同一种子产生同一序列，派生出的子序列互不相关；座位查询（含 `position`）组合正确；冻结后的 `ctx` 被写入时抛错。
-- [ ] **P1-2 编译器**：`compile.ts`。测试：引用不存在的阶段、存在不可达阶段、人数范围与角色分配矛盾，均报出带路径的错误；`specHash` 稳定。
-- [ ] **P1-3 主循环（不含 AI）**：`advance.ts`、`setup.ts`、`transitions.ts`、`budget.ts`、`log.ts`、`announce.ts`、`compute.ts`。测试：只含 announce/compute 的示例游戏能循环 N 轮后终局；`maxVisits` 与 `maxRounds` 超限按 budget 终局；`start` 输入只接受一次；`params` 校验失败拒绝开局。
-- [ ] **P1-4 提示词**：`template.ts`、`visibleContext.ts`、`history.ts`、`assemble.ts`、`outputContract.ts`、`checkTemplates.ts`。测试：三种语法；未知变量报错；`ownerOnly`、`team`、`host` 字段对其他座位不可见；L4 只含可见频道；L6 含合法目标。
-- [ ] **P1-5 AI 动作**：`pipeline.ts`、`speak.ts`、`act.ts`、`vote.ts`、`tally.ts`、`judge.ts`、`reveal.ts`。测试：顺序发言一次只发一个请求，后发言者能看到前面的发言；并行动作一次发出全部请求；非法 JSON、非法目标、内容违规各自触发重试，再失败走兜底并留痕；平票按策略处理，种子随机结果稳定；`judge` 多数汇总与平局；重复或过期的 `requestId` 被拒绝。
-- [ ] **P1-6 可见性与舞台事件**：`channels.ts`、`audienceView.ts`、`stageEvents.ts`。测试：`public` 视角的事件不含私密内容；`omniscient` 视角包含；终局 `revealOnEnd` 生效。用一个带私密频道的合成示例游戏覆盖（辩论赛本身没有隐藏信息）。
-- [ ] **P1-7 调试**：`breakpoints.ts`、`scriptedAgent.ts`。测试：断点暂停、单步、跳过、连续运行；脚本化输出必定合法。
-- [ ] **P1-8 测试夹具与性质检查**：`harness.ts`、`properties.ts`。测试：对合成示例游戏运行三项性质检查。
-- [ ] **P1-9 辩论赛**：`packages/games/src/debate/{spec,rules,prompts,topics,debug}.ts` 与 `debate.test.ts`，以及 `packages/games/src/index.ts` 注册表。规则测试：
+- [x] **P1-1 基础类型与工具**：`spec/types.ts`、`spec/define.ts`、`runtime/rng.ts`、`runtime/seats.ts`、`runtime/context.ts`。测试：同一种子产生同一序列，派生出的子序列互不相关；座位查询（含 `position`）组合正确；冻结后的 `ctx` 被写入时抛错。
+- [x] **P1-2 编译器**：`compile.ts`。测试：引用不存在的阶段、存在不可达阶段、人数范围与角色分配矛盾，均报出带路径的错误；`specHash` 稳定。
+- [x] **P1-3 主循环（不含 AI）**：`advance.ts`、`setup.ts`、`transitions.ts`、`budget.ts`、`log.ts`、`announce.ts`、`compute.ts`。测试：只含 announce/compute 的示例游戏能循环 N 轮后终局；`maxVisits` 与 `maxRounds` 超限按 budget 终局；`start` 输入只接受一次；`params` 校验失败拒绝开局。
+- [x] **P1-4 提示词**：`template.ts`、`visibleContext.ts`、`history.ts`、`assemble.ts`、`outputContract.ts`、`checkTemplates.ts`。测试：三种语法；未知变量报错；`ownerOnly`、`team`、`host` 字段对其他座位不可见；L4 只含可见频道；L6 含合法目标。
+- [x] **P1-5 AI 动作**：`pipeline.ts`、`speak.ts`、`act.ts`、`vote.ts`、`tally.ts`、`judge.ts`、`reveal.ts`。测试：顺序发言一次只发一个请求，后发言者能看到前面的发言；并行动作一次发出全部请求；非法 JSON、非法目标、内容违规各自触发重试，再失败走兜底并留痕；平票按策略处理，种子随机结果稳定；`judge` 多数汇总与平局；重复或过期的 `requestId` 被拒绝。
+- [x] **P1-6 可见性与舞台事件**：`channels.ts`、`audienceView.ts`、`stageEvents.ts`。测试：`public` 视角的事件不含私密内容；`omniscient` 视角包含；终局 `revealOnEnd` 生效。用一个带私密频道的合成示例游戏覆盖（辩论赛本身没有隐藏信息）。
+- [x] **P1-7 调试**：`breakpoints.ts`、`scriptedAgent.ts`。测试：断点暂停、单步、跳过、连续运行；脚本化输出必定合法。
+- [x] **P1-8 测试夹具与性质检查**：`harness.ts`、`properties.ts`。测试：对合成示例游戏运行三项性质检查。
+- [x] **P1-9 辩论赛**：`packages/games/src/debate/{spec,rules,prompts,topics,debug}.ts` 与 `debate.test.ts`，以及 `packages/games/src/index.ts` 注册表。规则测试：
   - 9–12 人开局；正反方各 4 人席位正确，其余为评委；少于 9 人拒绝开局。
   - 发言顺序：立论正一、反一 → 四组攻辩一问一答交替 → 总结反四、正四。
   - 指定辩题时使用该辩题；不指定时同一种子抽到同一辩题。
   - 评委多数决定胜方，票数相同记为平局；评委输出非法时重试，再失败走兜底并留痕。
   - MVP 只能从辩手中选，结果写入终局。
   - 性质测试：100 个种子全部终止、可复现。
-- [ ] **P1-10 文档**：完成 `docs/project-engine.md`（spec 写法、基础动作、提示词分层、可见性、调试、如何新增一个游戏）。
-- [ ] **P1-11 验收与提交**：`pnpm check && pnpm test` 全绿；按任务分别提交。
+- [x] **P1-10 文档**：完成 `docs/project-engine.md`（spec 写法、基础动作、提示词分层、可见性、调试、如何新增一个游戏）。
+- [x] **P1-11 验收与提交**：`pnpm check && pnpm test` 全绿；按任务分别提交。
 
 ---
 
@@ -204,7 +206,7 @@ interface AiRequest {
 
 ### P3 服务端基础
 
-`server/src/{config, db, middlewares, utils, modules}`；模块按 `controller / service / repository / routes / validator / types` 分层。`db/migrations/001_init.sql` 建全部表；启动时执行迁移，失败则拒绝启动。统一错误响应 `{ code, message, data? }`，不暴露内部错误。模块：`auth`（JWT、首次登录改密）、`providers`（API Key 用 AES-GCM 加密，响应只返回掩码）、`models`、`voices`、`players`。
+`server/src/{config, db, middlewares, utils, modules}`；HTTP 与 WebSocket 用 Hono（`@hono/node-server`），参数校验用 zod 中间件，client/admin 通过 `hono/client` 获得类型化 API；数据库访问用 Kysely。模块按 `controller / service / repository / routes / validator / types` 分层。`db/migrations/001_init.sql` 建全部表；启动时执行迁移，失败则拒绝启动。统一错误响应 `{ code, message, data? }`，不暴露内部错误。模块：`auth`（JWT、首次登录改密）、`providers`（API Key 用 AES-GCM 加密，响应只返回掩码）、`models`、`voices`、`players`。
 
 ### P4 对局运行时
 

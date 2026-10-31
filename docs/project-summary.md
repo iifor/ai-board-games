@@ -4,13 +4,13 @@
 
 通用 AI 对战平台。一个游戏 = `GameSpec`（声明式阶段图）+ 规则纯函数 + 提示词模板；引擎负责流程推进、AI 调度、合法性校验、信息隔离、重试兜底、调试与回放；前台用通用舞台播放对局。
 
-首版游戏：辩论赛、狼人杀标准 12 人局。当前进度见实施计划。
+首版游戏：辩论赛、狼人杀标准 12 人局。当前进度：P1 完成（引擎核心 + 辩论赛在内存中跑通），详见实施计划。
 
 ## 技术栈
 
 - pnpm workspace（9.5，使用 catalog 统一依赖版本）、TypeScript 7 strict、zod 4、vitest 5。
 - 前端：React 19 + Vite 8；后台另用 antd（P6 引入）。
-- 服务端：Express + ws + pg（P3 引入）；数据库 PostgreSQL 16。
+- 服务端：Node 22 LTS + Hono（HTTP 与 WebSocket）+ Kysely（pg），P3 引入；数据库 PostgreSQL 16。选型理由见设计文档"服务端选型"。
 
 ## 包结构与依赖方向
 
@@ -26,7 +26,7 @@ packages/
 
 依赖方向：`games → engine → shared`；`server → engine + games + shared`；`client / admin → shared`。
 
-内部包直接导出 TypeScript 源码（`exports: ./src/index.ts`），由 Vite、vitest 和服务端运行时处理编译；服务端生产构建方式在 P8 确定。
+内部包直接导出 TypeScript 源码（`exports: ./src/index.ts`；engine 另有只供测试使用的 `@battle/engine/testing` 子路径），由 Vite、vitest 和服务端运行时处理编译；服务端生产构建方式在 P8 确定。
 
 ## 纯度约束
 

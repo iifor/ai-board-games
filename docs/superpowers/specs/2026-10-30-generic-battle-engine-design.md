@@ -68,7 +68,7 @@ flowchart LR
 | `phases` | 阶段字典：每个阶段是一种基础动作 + 跳转 |
 | `triggers` | 事件触发的插入阶段（压栈执行后返回），用于死亡链、开枪、遗言 |
 | `end` | 胜者判定函数 |
-| `budget` | 最大轮次、默认阶段访问上限、AI 调用上限、token 上限、超限终局 |
+| `budget` | 最大轮次、默认阶段访问上限、AI 调用上限（token 上限待服务端接入后补）、超限终局 |
 | `presentation` | 布局、座位分区、观众视角、公开视图函数、终局揭示、专用组件 |
 | `variants` | 同一游戏的玩法变体：角色集与参数覆盖（如狼人杀板子） |
 | `debug` | 确定性脚本、默认断点 |
@@ -83,7 +83,7 @@ flowchart LR
 | `speak` | 一组玩家发言 | `actors`、`order`（座位 / 函数 / 种子随机 / 并行）、输出 schema、内容校验、兜底 |
 | `act` | 在合法集合内选择 | `actors`、`targets`、数量、`allowNone`（可放弃，如女巫不用药）、输出 schema、`apply`（写回状态）、兜底 |
 | `vote` | `act` + 计票 | 投票者、候选人、`weight`（如警长 1.5 票）、平票策略（复投 N 次后种子随机 / 无人出局 / 函数）、`onResult` |
-| `judge` | AI 评委按评分表打分 | 评委、rubric、分数 schema、汇总函数 |
+| `judge` | AI 评委给出判定与点评 | 评委、判定选项及含义、并列时的判定、点评字数 |
 | `compute` | 纯函数结算 | `(ctx) → { state, log }`，复杂规则的唯一出口 |
 | `reveal` | 把信息公开到指定频道 | 揭示内容函数、目标频道 |
 
@@ -192,7 +192,7 @@ export default defineGame({
 | L5 阶段指令 | 阶段 `prompt` 模板，可按角色覆盖 | 是 |
 | L6 输出契约 | 由输出 zod schema 与合法目标自动生成 | 否 |
 
-- 模板写在 `prompts.ts` 中，用 `{{path}}`、`{{#each}}`、`{{#if}}` 三种语法，由引擎自带的小型渲染器处理（不引入模板库，以便做变量校验）。
+- 模板写在 `prompts.ts` 中，用 `{{path}}`、`{{#each}}`、`{{#if}}` 三种语法，由引擎自带的小型渲染器处理（不引入模板库，以便做变量校验）。阶段使用固定模板；发言的单个轮次可以覆盖模板并带 `turn.*` 变量（如攻辩的提问对象）。
 - 模板变量来自**按当前玩家可见范围生成的上下文**：`me`、`round`、`aliveSeats`、`legalTargets`、以及 `state` 中对该玩家可见的字段（`visibility` 为 `public`、`ownerOnly`、`team`、`host` 或函数）。`host` 字段永远不会出现在 AI 上下文里。
 - 编译期用 debug 夹具渲染一遍所有模板：未知变量或引用了不可见字段，测试与启动都会失败。
 - 每次调用的各层渲染结果、模板 hash、模型、用量、耗时写入 `ai_calls`，后台 Trace 按层展示。
@@ -213,13 +213,24 @@ export default defineGame({
 - 观众视角 `audienceView`：`public`（默认，终局才揭示）或 `omniscient`。观众视图由 `presentation.view(ctx, audience)` 生成，引擎在投影后再做一次频道过滤。
 - 引擎级泄露测试：每局每次渲染的 prompt 不含其不可见频道日志和不可见状态字段；`public` 视角的 StageEvent 不含私密内容。所有游戏自动适用。
 
+## P1 实现时的设计调整（2026-10-30）
+
+实现过程中对上文的取舍做了以下修正，最终以 `docs/project-engine.md` 为准：
+
+- 不提供 `defineRules`：规则函数直接引用，函数源码参与 spec 指纹。spec 指纹不覆盖闭包捕获的常量，行为变化时必须提升 `version`。
+- 所有回调使用方法语法，使 `GameSpec<具体类型>` 可交给按 unknown 处理的引擎内部使用，免去类型断言。
+- `act`、`vote`、`judge` 的输出结构由引擎生成（`{ targets }`、`{ target }`、`{ verdict, comment }`），选项含义写进 JSON Schema 的描述；只有 `speak` 由游戏提供输出 schema。
+- 新增输入 `ai_failed`：服务端传输层重试后仍失败时直接兜底，不再重问。
+- 预算暂只限制 AI 请求次数；token 预算待服务端接入用量后再加。
+- `ctx` 中的状态、参数、座位、结果在所有环境下都深度冻结（引擎无法读取环境变量，也没有必要区分环境）。
+
 ## 运行时与持久化
 
 ### 解释器
 
 ```ts
 advance(game: CompiledGame, snapshot: EngineSnapshot, input: EngineInput): AdvanceResult
-// input:  { kind: 'start' } | { kind: 'ai_result', requestId, output, usage } | { kind: 'debug', command }
+// input:  { kind: 'start' } | { kind: 'ai_result', requestId, output } | { kind: 'ai_failed', requestId, reason } | { kind: 'debug', command }
 // result: { snapshot, log, stageEvents, aiRequests, status }
 ```
 
@@ -259,7 +270,7 @@ advance(game: CompiledGame, snapshot: EngineSnapshot, input: EngineInput): Advan
 
 - `client/src/features/game-stage/`：容器 + `useMatchStream`（WebSocket + ACK）+ `usePlayback`（队列、字幕、音频）+ 布局 + 专用组件注册表。
 - 布局：`circle`（环形座位：狼人杀）、`versus`（双方阵营 + 评委席：辩论）。
-- StageEvent 固定词表：`phase_started`、`narration`、`speech`、`action_public`、`vote_tallied`、`seat_eliminated`、`revealed`、`score_updated`、`game_over`。每个事件附带当时的观众视图。
+- StageEvent 固定词表：`phase_started`、`narration`、`speech`、`action`、`vote_tallied`、`judgement`、`seat_eliminated`、`revealed`、`game_over`（另有仅 host 频道的 `fallback`，不进入观众视图）。每个事件附带当时的观众视图。定义见 `docs/project-shared.md`。
 - 专用组件：spec 在 `presentation.widgets` 中声明名字（如狼人杀的警徽与昼夜指示），前端按名字渲染，未注册时忽略。
 - 游戏目录由 `GET /api/toc/games` 下发（来自 spec 注册表），前端不硬编码游戏列表。
 
@@ -291,10 +302,20 @@ advance(game: CompiledGame, snapshot: EngineSnapshot, input: EngineInput): Advan
 
 - pnpm workspace（catalog 统一版本），TypeScript 7 strict，zod 4。
 - 前端：React 19 + Vite 8 + React Router；后台另用 antd。
-- 服务端：Express + ws + pg（repository 里手写 SQL，行映射有类型）。
+- 服务端：Node 22 LTS + Hono（HTTP 与 WebSocket）+ Kysely（基于 pg 的类型安全 SQL 构建器）；迁移用纯 SQL 文件。
 - 测试：vitest（engine、games、server、client 统一使用）。
 - 不再使用 OpenTelemetry：Trace 直接写 `ai_calls`，减少依赖与链路复杂度。
 - 部署：单个 Dockerfile + docker compose（postgres、app、nginx），启动时自动执行迁移。
+
+### 服务端选型（2026-10-30 复核）
+
+用户允许不使用 Node。按第一性原理复核后的结论：**语言保持 TypeScript，框架从 Express 换成 Hono，数据库访问用 Kysely。**
+
+- **为什么仍是 TypeScript**：权威裁判是引擎与游戏定义，它们是 TS 纯函数，服务端必须能直接执行；StageEvent 等协议类型与前端共享。负载是 IO 密集（LLM 单次调用以秒计、TTS、数据库事务、WebSocket 推送），换 Go/Rust 带来的性能提升感知不到，代价却是要么用另一种语言重写引擎和全部游戏，要么跨语言调用引擎。Python 的 AI 生态优势也用不上，我们只需要 OpenAI 兼容的 HTTP 调用。
+- **为什么是 Hono**：路由与参数校验（zod 中间件）天然类型化；`hono/client` 让 client/admin 直接获得端到端类型化的 API 调用，不需要代码生成；同一套代码可运行在 Node、Bun、Deno，日后切换运行时成本很低。
+- **为什么是 Kysely**：比手写 SQL 字符串多了表结构与返回值的类型检查，又不是 ORM，repository 里的查询依旧清晰可控。
+- **运行时先用 Node 22 LTS**：生态与工具链（vitest、调试、部署镜像）最成熟；Bun 自带 TS、WebSocket、SQL 客户端，依赖更少，但不是瓶颈所在，暂不切换。
+- **考虑过但不选**：Cloudflare Durable Objects（"一局一个有状态 actor"与本设计非常契合，但锁定厂商，且部署在腾讯云）。
 
 旧实现中可以**参考着重写**（不直接搬）的部分：OpenAI 兼容调用与 JSON 修复、Azure/Mimo TTS、ACK 播放队列与字幕、`SKIP LOCKED` 任务领取、管理员鉴权。
 
