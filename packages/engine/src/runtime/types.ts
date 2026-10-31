@@ -87,6 +87,7 @@ export interface EngineSnapshot {
   readonly gameKey: string;
   readonly specVersion: number;
   readonly specHash: string;
+  readonly variantKey: string | null;
   readonly seed: number;
   readonly params: unknown;
   status: EngineStatus;
@@ -160,6 +161,8 @@ export interface CreateMatchInput {
   readonly seed: number;
   readonly players: readonly SeatProfile[];
   readonly params?: unknown;
+  /** 玩法变体 key；游戏定义了变体而未指定时使用 defaultVariant */
+  readonly variant?: string;
   /** 传入即为调试局：可暂停、单步、跳过 */
   readonly debug?: { readonly breakpoints?: BreakpointSetting };
 }

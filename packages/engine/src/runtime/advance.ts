@@ -35,6 +35,11 @@ function runUntilBlocked(env: ExecEnv): void {
       return;
     }
     if (!s.cursor.entered) {
+      const next = env.phase();
+      if (next.enabled && !next.enabled(env.ctx())) {
+        completePhase(env, null);
+        continue;
+      }
       if (shouldPauseBeforeEnter(s)) {
         s.status = 'paused';
         return;

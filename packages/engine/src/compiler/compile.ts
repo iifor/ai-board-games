@@ -14,31 +14,48 @@ export interface CompiledGame<S = unknown, P = unknown> {
   readonly prompts: ReadonlyMap<string, PromptTemplate>;
 }
 
-function checkPlayersAndRoles(spec: AnyGameSpec): string[] {
+type Assignment = Readonly<Record<string, number | 'rest'>>;
+
+function checkAssignment(spec: AnyGameSpec, assign: Assignment, players: { min: number; max: number }, where: string): string[] {
   const issues: string[] = [];
-  const { min, max } = spec.players;
+  const { min, max } = players;
   if (!Number.isInteger(min) || !Number.isInteger(max) || min < 1 || min > max) {
-    issues.push(`players 范围无效：${min}-${max}`);
+    issues.push(`${where} 的人数范围无效：${min}-${max}`);
   }
-  const entries = Object.entries(spec.setup.assign);
+  const entries = Object.entries(assign);
   const unknownRoles = entries.filter(([role]) => !spec.roles[role]).map(([role]) => role);
-  if (unknownRoles.length) issues.push(`setup.assign 引用了未定义的角色：${unknownRoles.join('、')}`);
+  if (unknownRoles.length) issues.push(`${where} 引用了未定义的角色：${unknownRoles.join('、')}`);
   const restRoles = entries.filter(([, count]) => count === 'rest');
-  if (restRoles.length > 1) issues.push('setup.assign 最多只能有一个角色取 rest');
+  if (restRoles.length > 1) issues.push(`${where} 最多只能有一个角色取 rest`);
   const fixed = entries.reduce((sum, [, count]) => sum + (count === 'rest' ? 0 : count), 0);
   if (restRoles.length === 0 && (fixed !== min || fixed !== max)) {
-    issues.push(`没有 rest 角色时，固定人数 ${fixed} 必须同时等于 players.min 与 players.max`);
+    issues.push(`${where} 没有 rest 角色时，固定人数 ${fixed} 必须同时等于人数下限与上限`);
   }
   if (restRoles.length === 1 && fixed >= min) {
-    issues.push(`固定人数 ${fixed} 不少于 players.min ${min}，rest 角色 ${restRoles[0]?.[0]} 将没有人`);
+    issues.push(`${where} 固定人数 ${fixed} 不少于人数下限 ${min}，rest 角色 ${restRoles[0]?.[0]} 将没有人`);
   }
   for (const [role, count] of entries) {
     const positions = spec.roles[role]?.positions;
     const minimum = count === 'rest' ? min - fixed : count;
     if (positions !== undefined && positions > minimum) {
-      issues.push(`角色 ${role} 有 ${positions} 个席位，但最少只分到 ${minimum} 人`);
+      issues.push(`${where} 中角色 ${role} 有 ${positions} 个席位，但最少只分到 ${minimum} 人`);
     }
   }
+  return issues;
+}
+
+function checkPlayersAndRoles(spec: AnyGameSpec): string[] {
+  const issues = checkAssignment(spec, spec.setup.assign, spec.players, 'setup.assign');
+  const variants = Object.entries(spec.variants ?? {});
+  if (variants.length && (!spec.defaultVariant || !spec.variants?.[spec.defaultVariant])) {
+    issues.push(`defaultVariant 必须指向已定义的变体，当前为 "${spec.defaultVariant ?? ''}"`);
+  }
+  if (!variants.length && spec.defaultVariant) issues.push('没有定义 variants 时不能设置 defaultVariant');
+  for (const [key, variant] of variants) {
+    issues.push(...checkAssignment(spec, variant.assign, variant.players ?? spec.players, `变体 ${key}`));
+  }
+  const misnamed = Object.entries(spec.prompts).filter(([key, template]) => key !== template.name).map(([key]) => key);
+  if (misnamed.length) issues.push(`spec.prompts 的 key 必须与模板名一致：${misnamed.join('、')}`);
   return issues;
 }
 

@@ -49,6 +49,12 @@ export type PhaseResultKind = PhaseResult['kind'];
 /** 顶层只读（运行时还会深度冻结）；对 unknown 保持 unknown，便于引擎内部按擦除类型处理 */
 export type ReadonlyValue<T> = T extends object ? Readonly<T> : T;
 
+export interface VariantContext {
+  readonly key: string;
+  readonly name: string;
+  readonly config: Readonly<Record<string, unknown>>;
+}
+
 /** 规则函数、条件、选择器拿到的只读上下文 */
 export interface RuleContext<S, P> {
   readonly state: ReadonlyValue<S>;
@@ -63,12 +69,15 @@ export interface RuleContext<S, P> {
   readonly endReason: EndReason;
   /** 由触发器进入的阶段链中，触发它的事件；否则为 null */
   readonly trigger: TriggerEvent | null;
+  /** 本局的玩法变体；游戏没有定义变体时为 null */
+  readonly variant: VariantContext | null;
   /** 种子随机数：由主种子、当前阶段、访问次数与标签派生 */
   random(label: string): Rng;
 }
 
 export interface SetupContext<P> {
   readonly params: ReadonlyValue<P>;
+  readonly variant: VariantContext | null;
   readonly seats: SeatQuery;
   random(label: string): Rng;
 }

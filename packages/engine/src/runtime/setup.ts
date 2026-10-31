@@ -6,9 +6,12 @@ import { cloneJson, deepFreeze } from '../utils/json';
 import { createRng, deriveSeed } from './rng';
 import { SeatQuery } from './seats';
 import type { CreateMatchInput, EngineSnapshot, Seat, SeatProfile } from './types';
+import { resolveVariant, variantContext } from './variants';
 
-function validatePlayers(game: CompiledGame, players: readonly SeatProfile[]): void {
-  const { min, max } = game.spec.players;
+type Assignment = Readonly<Record<string, number | 'rest'>>;
+
+function validatePlayers(game: CompiledGame, players: readonly SeatProfile[], range: { min: number; max: number }): void {
+  const { min, max } = range;
   if (players.length < min || players.length > max) {
     throw new EngineInputError(`${game.spec.title}需要 ${min}-${max} 名玩家，实际 ${players.length} 名`);
   }
@@ -29,14 +32,14 @@ function parseParams(game: CompiledGame, params: unknown): unknown {
 }
 
 /** 按 assign 的声明顺序展开角色列表，rest 角色承接剩余人数 */
-function expandRoles(game: CompiledGame, playerCount: number): string[] {
-  const entries = Object.entries(game.spec.setup.assign);
+function expandRoles(assign: Assignment, playerCount: number): string[] {
+  const entries = Object.entries(assign);
   const fixed = entries.reduce((sum, [, count]) => sum + (count === 'rest' ? 0 : count), 0);
   return entries.flatMap(([role, count]) => Array.from({ length: count === 'rest' ? playerCount - fixed : count }, () => role));
 }
 
-function assignSeats(game: CompiledGame, input: CreateMatchInput): Seat[] {
-  const baseRoles = expandRoles(game, input.players.length);
+function assignSeats(game: CompiledGame, input: CreateMatchInput, assign: Assignment): Seat[] {
+  const baseRoles = expandRoles(assign, input.players.length);
   const roles = game.spec.setup.shuffle === false
     ? baseRoles
     : createRng(deriveSeed(input.seed, 'setup:roles')).shuffle(baseRoles);
@@ -63,11 +66,13 @@ function assignSeats(game: CompiledGame, input: CreateMatchInput): Seat[] {
 /** 创建一局：校验玩家与参数、分配身份、生成初始状态；返回 status 为 created 的快照 */
 export function createSnapshot(game: CompiledGame, input: CreateMatchInput): EngineSnapshot {
   if (!Number.isInteger(input.seed)) throw new EngineInputError('seed 必须是整数');
-  validatePlayers(game, input.players);
+  const variant = resolveVariant(game, input.variant);
+  validatePlayers(game, input.players, variant.spec?.players ?? game.spec.players);
   const params = deepFreeze(cloneJson(parseParams(game, input.params)));
-  const seats = deepFreeze(assignSeats(game, input));
+  const seats = deepFreeze(assignSeats(game, input, variant.spec?.assign ?? game.spec.setup.assign));
   const setupContext: SetupContext<unknown> = {
     params,
+    variant: variantContext(game, variant.key),
     seats: new SeatQuery(seats),
     random: (label: string) => createRng(deriveSeed(input.seed, `setup:${label}`)),
   };
@@ -81,6 +86,7 @@ export function createSnapshot(game: CompiledGame, input: CreateMatchInput): Eng
     gameKey: game.spec.key,
     specVersion: game.spec.version,
     specHash: game.hash,
+    variantKey: variant.key,
     seed: input.seed >>> 0,
     params,
     status: 'created',

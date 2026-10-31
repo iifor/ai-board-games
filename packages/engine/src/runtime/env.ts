@@ -8,6 +8,7 @@ import { audienceMode, buildAudienceView } from '../visibility/audienceView';
 import { createRng, deriveSeed } from './rng';
 import { SeatQuery } from './seats';
 import { fireEvent } from './triggers';
+import { variantContext } from './variants';
 import type { AiRequest, EngineSnapshot, LogDraft, LogEntry, Seat } from './types';
 
 export interface Emitted {
@@ -56,6 +57,7 @@ export class ExecEnv {
       result,
       endReason,
       trigger: s.activeTrigger,
+      variant: variantContext(this.game, s.variantKey),
       random: (label: string) => createRng(deriveSeed(s.seed, `${scope}:${label}`)),
     };
   }
@@ -92,6 +94,17 @@ export class ExecEnv {
       throw new Error(`规则返回的状态不符合 state.schema：${parsed.error.message}`);
     }
     this.s.state = deepFreeze(cloneJson(parsed.data));
+  }
+
+  /** 改变座位的角色或阵营；角色必须已在 spec.roles 中定义 */
+  reassign(seatNo: number, change: { readonly role?: string; readonly team?: string }): void {
+    const roleSpec = change.role === undefined ? undefined : this.game.spec.roles[change.role];
+    if (change.role !== undefined && !roleSpec) throw new Error(`角色 ${change.role} 未定义`);
+    this.seat(seatNo);
+    this.s.seats = deepFreeze(this.s.seats.map((seat) => {
+      if (seat.seat !== seatNo) return seat;
+      return { ...seat, role: change.role ?? seat.role, team: change.team ?? roleSpec?.team ?? seat.team };
+    }));
   }
 
   /** 淘汰座位并派发 seat_eliminated 事件；cause 是给触发器判断用的机器可读原因 */

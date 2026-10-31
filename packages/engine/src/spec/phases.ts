@@ -23,6 +23,8 @@ export type NextSpec<S, P> = string | readonly Transition<S, P>[];
 interface PhaseBase<S, P> {
   readonly title?: string;
   readonly next: NextSpec<S, P>;
+  /** 返回 false 时静默跳过本阶段（不记录、不计访问次数），直接按 next 跳转；用于本局不存在的角色 */
+  enabled?(ctx: RuleContext<S, P>): boolean;
   /** 单局内最多进入次数，默认取 budget.maxPhaseVisits */
   readonly maxVisits?: number;
 }
@@ -128,9 +130,19 @@ export interface JudgePhase<S, P> extends AiPhaseBase<S, P> {
   fallback?(ctx: RuleContext<S, P>, seat: Seat): JudgeFallback;
 }
 
+export interface SeatReassignment {
+  readonly seat: number;
+  /** 新角色；阵营默认取新角色的 team */
+  readonly role?: string;
+  /** 只改阵营（如混血儿跟随主人）；与 role 同时给出时以此为准 */
+  readonly team?: string;
+}
+
 export interface ComputeOutcome<S> {
   readonly state?: NoInfer<S>;
   readonly log?: readonly LogDraft[];
+  /** 改变座位的角色或阵营（如盗贼换牌、野孩子变狼） */
+  readonly reassign?: readonly SeatReassignment[];
   readonly eliminate?: readonly { readonly seat: number; readonly reason: string; readonly cause?: string }[];
 }
 

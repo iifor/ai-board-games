@@ -41,6 +41,17 @@ export interface SetupSpec<S, P> {
   init(ctx: SetupContext<P>): NoInfer<S>;
 }
 
+/** 玩法变体（如狼人杀的不同板子）：替换角色分配，可带变体参数，由开局输入选择 */
+export interface VariantSpec {
+  readonly name: string;
+  readonly description?: string;
+  readonly assign: Readonly<Record<string, number | 'rest'>>;
+  /** 不提供时沿用 GameSpec.players */
+  readonly players?: { readonly min: number; readonly max: number };
+  /** 规则可读取的变体参数（`ctx.variant.config`），由游戏自行校验与解释 */
+  readonly config?: Readonly<Record<string, unknown>>;
+}
+
 export interface EndResult {
   readonly winner: string | null;
   readonly winnerLabel: string;
@@ -109,6 +120,9 @@ export interface GameSpec<S, P> {
   /** 座位在日志与提示词中的称呼，默认 "3号 张三" */
   seatLabel?(seat: Seat): string;
   readonly setup: SetupSpec<S, P>;
+  readonly variants?: Readonly<Record<string, VariantSpec>>;
+  /** 有 variants 时必填：开局未指定变体时使用 */
+  readonly defaultVariant?: string;
   readonly state: StateSpec<S>;
   readonly start: string;
   readonly phases: Readonly<Record<string, PhaseSpec<S, P>>>;

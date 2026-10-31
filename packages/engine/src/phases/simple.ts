@@ -20,6 +20,7 @@ export const computeExecutor: PhaseExecutor<ComputePhase<unknown, unknown>> = {
     const outcome = phase.run(env.ctx());
     // 先写状态与播报，再执行淘汰：淘汰会派发触发器，且播报应先于出局事件
     if (outcome.state !== undefined) env.setState(outcome.state);
+    for (const { seat, ...change } of outcome.reassign ?? []) env.reassign(seat, change);
     for (const draft of outcome.log ?? []) env.log(draft);
     for (const { seat, reason, cause } of outcome.eliminate ?? []) env.eliminate(seat, reason, cause ?? reason);
     return done();

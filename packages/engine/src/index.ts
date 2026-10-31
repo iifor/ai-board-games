@@ -29,7 +29,16 @@ export type {
   SeatProfile,
   TemplateVars,
 } from './runtime/types';
-export type { ActDecision, Judgement, PhaseResult, RuleContext, SetupContext, TriggerEvent, TriggerEventKind } from './spec/context';
+export type {
+  ActDecision,
+  Judgement,
+  PhaseResult,
+  RuleContext,
+  SetupContext,
+  TriggerEvent,
+  TriggerEventKind,
+  VariantContext,
+} from './spec/context';
 export { defineGame, definePrompts, speechOutput } from './spec/define';
 export type {
   ActPhase,
@@ -37,6 +46,7 @@ export type {
   ComputeOutcome,
   ComputePhase,
   DeclarationSpec,
+  SeatReassignment,
   JudgePhase,
   NextSpec,
   PhaseSpec,
@@ -59,6 +69,7 @@ export type {
   SetupSpec,
   StateSpec,
   TriggerSpec,
+  VariantSpec,
   Visibility,
 } from './spec/types';
 export { privateChannel, teamChannel } from './visibility/channels';
