@@ -23,7 +23,9 @@ import { hiddenWolfPhases, hiddenWolfPrompts, hiddenWolfTriggers } from './hidde
 import { hybridPhases, hybridPrompts } from './hybrid';
 import { knightPhases, knightPrompts } from './knight';
 import { loversPhases, loversTriggers } from './lovers';
+import { demonHunterPhases, demonHunterPrompts } from './demonHunter';
 import { magicianPhases, magicianPrompts } from './magician';
+import { magicWolfPhases, magicWolfPrompts, magicWolfTriggers } from './magicWolf';
 import { nightmarePhases, nightmarePrompts } from './nightmare';
 import { nineTailedFoxPhases, nineTailedFoxPrompts, nineTailedFoxTriggers } from './nineTailedFox';
 import { oldRoguePhases, oldRoguePrompts, oldRogueTriggers } from './oldRogue';
@@ -82,6 +84,8 @@ export const specialPrompts = {
   ...succubusPrompts,
   ...ghostBridePrompts,
   ...saplingPrompts,
+  ...magicWolfPrompts,
+  ...demonHunterPrompts,
 };
 
 export const specialPhases: WerewolfPhases = {
@@ -122,17 +126,20 @@ export const specialPhases: WerewolfPhases = {
   ...ghostBridePhases,
   ...loversPhases,
   ...saplingPhases,
+  ...magicWolfPhases,
+  ...demonHunterPhases,
 };
 
 /**
  * 出局后的特殊处理，排在遗言、猎人开枪之后、移交警徽之前（声明顺序即执行顺序）：
- * 中性开枪（狼王局）→ 额外的枪 → 白狼王带人 → 狼美人殉情 → 情侣殉情 → 炸弹人引爆 → 野孩子变狼 → 隐狼随狼队出局 → 九尾狐失去全部尾巴
+ * 中性开枪（狼王局）→ 额外的枪 → 白狼王带人 → 魔狼封印 → 狼美人殉情 → 情侣殉情 → 炸弹人引爆 → 野孩子变狼 → 隐狼随狼队出局 → 九尾狐失去全部尾巴
  * → 树苗全部出局时大树随之出局 → 老流氓到期出局 → 大树倒下 → 记录狼兄出局。
  */
 export const specialDeathTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
   ...wolfKingTriggers,
   ...giftTriggers,
   ...whiteWolfKingTriggers,
+  ...magicWolfTriggers,
   ...wolfBeautyTriggers,
   ...loversTriggers,
   ...bombmanTriggers,

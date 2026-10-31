@@ -23,4 +23,10 @@ export const FINAL_BOARDS: readonly BoardDefinition[] = [
     config: { categories: { idiot: 'villager' } },
     notes: ['本板子的白痴算作民牌：屠边时计入村民（村民一边是白痴、大树与树苗）。'],
   }),
+  board({
+    key: 'magic-wolf-demon-hunter-12',
+    name: '猎魔人&魔狼',
+    description: '魔狼与 3 名狼人对抗预言家、女巫、猎魔人、白痴与 4 名村民；魔狼自爆后当晚封印所有神职，猎魔人从第二夜起每晚可以狩猎一名玩家。',
+    roles: { magic_wolf: 1, werewolf: 3, seer: 1, witch: 1, demon_hunter: 1, idiot: 1, villager: 'rest' },
+  }),
 ];

@@ -2,6 +2,7 @@ import type { EndResult, Seat } from '@battle/engine';
 import { cupidSide, cupidSummary } from '../special/cupid';
 import { hiddenWolfDoomed } from '../special/hiddenWolf';
 import { hybridSummary } from '../special/hybrid';
+import { bloodlineDoomed } from '../special/magicWolf';
 import { roleCategory } from './board';
 import { canVote, isWolf, type WerewolfContext } from './context';
 import { exileWeight } from './sheriff';
@@ -90,9 +91,9 @@ function withNotes(ctx: WerewolfContext, winner: WerewolfWinner, summary: string
   return [summary, ...notes].join('；');
 }
 
-/** 达到天数上限：第三方以外还有狼人 → 狼人胜；否则还有第三方 → 第三方胜；都没有 → 好人胜 */
+/** 达到天数上限：第三方以外还有狼人 → 狼人胜（翻牌存活、等待出局的魔狼视为已出局）；否则还有第三方 → 第三方胜；都没有 → 好人胜 */
 function budgetWinner(ctx: WerewolfContext): WerewolfWinner {
-  if (contenders(ctx, ctx.seats.alive().list()).some(isWolf)) return 'werewolf';
+  if (contenders(ctx, ctx.seats.alive().list()).some((seat) => isWolf(seat) && !bloodlineDoomed(ctx, seat))) return 'werewolf';
   const third = ctx.state.thirdParty;
   return third && thirdPartyStanding(ctx) ? third.kind : 'good';
 }

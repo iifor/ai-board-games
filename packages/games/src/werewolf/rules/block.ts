@@ -4,7 +4,8 @@ import { roleCategory } from './board';
 import { isPackWolf, type WerewolfContext } from './context';
 
 // 夜间技能封锁：花蝴蝶抱住、梦魇恐惧、企鹅冰冻的人当晚夜间技能失效；被封锁的是狼人时整个狼队当晚不能击杀。
-// 另有永久失效：大树因狼刀以外的原因出局后，其余神职失去技能（state.godsDisabled）。
+// 另有永久失效：大树因狼刀以外的原因出局后，其余神职失去技能（state.godsDisabled）；
+// 以及魔狼自爆后的那一晚，所有神职的夜间技能被封印（state.godsSealedNight）。
 
 interface BlockSource {
   readonly seat: number | null;
@@ -47,9 +48,14 @@ export function skillsLost(ctx: WerewolfContext, seat: Seat): boolean {
   return ctx.state.godsDisabled && roleCategory(ctx, seat) === 'god';
 }
 
-/** 该座位今晚能否使用夜间技能：存活、没有被封锁、没有失去技能 */
+/** 魔狼自爆后的那一晚：神职的夜间技能被封印（只影响夜间技能） */
+function sealedTonight(ctx: WerewolfContext, seat: Seat): boolean {
+  return ctx.state.godsSealedNight === ctx.round && roleCategory(ctx, seat) === 'god';
+}
+
+/** 该座位今晚能否使用夜间技能：存活、没有被封锁或封印、没有失去技能 */
 export function canUseNightSkill(ctx: WerewolfContext, seat: Seat): boolean {
-  return seat.alive && !isBlocked(ctx, seat.seat) && !skillsLost(ctx, seat);
+  return seat.alive && !isBlocked(ctx, seat.seat) && !sealedTonight(ctx, seat) && !skillsLost(ctx, seat);
 }
 
 /** 今晚能使用夜间技能的该角色玩家 */

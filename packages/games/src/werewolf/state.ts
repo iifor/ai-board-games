@@ -2,6 +2,7 @@ import type { Visibility } from '@battle/engine';
 import { z } from 'zod';
 import { emptyExtendedNight, extendedNightShape, extendedStateShape, extendedVisibility } from './stateExtended';
 import { emptyExtraNight, extraNightShape, extraStateShape, extraVisibility } from './stateExtras';
+import { emptyFinalNight, finalNightShape, finalStateShape, finalVisibility } from './stateFinal';
 import { ownChecks, roleOnly } from './stateVisibility';
 
 const seatNo = z.number().int().positive();
@@ -14,9 +15,9 @@ export const seerCheckSchema = z.object({
 
 /**
  * 夜间死亡的原因；天亮出局时作为触发器的 cause。
- * merchant：黑商把技能交给了狼人；lover：情侣殉情；third_kill：第三方（祈求者、鬼魂新娘一方）的击杀。
+ * merchant：黑商把技能交给了狼人；lover：情侣殉情；third_kill：第三方（祈求者、鬼魂新娘一方）的击杀；hunt：猎魔人的狩猎。
  */
-export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'reflect', 'stalker', 'charm', 'dream', 'merchant', 'lover', 'third_kill']);
+export const nightDeathCauseSchema = z.enum(['wolf', 'poison', 'reflect', 'stalker', 'charm', 'dream', 'merchant', 'lover', 'third_kill', 'hunt']);
 
 export const demonCheckSchema = z.object({
   night: z.number().int().positive(),
@@ -58,6 +59,7 @@ export const werewolfStateSchema = z.object({
     charmed: seatNo.nullable(),
     ...extraNightShape,
     ...extendedNightShape,
+    ...finalNightShape,
   }),
   /** 守卫上一晚守护的人（不能连续两晚守同一人） */
   guardLastTarget: seatNo.nullable(),
@@ -100,6 +102,7 @@ export const werewolfStateSchema = z.object({
   mvp: seatNo.nullable(),
   ...extraStateShape,
   ...extendedStateShape,
+  ...finalStateShape,
 });
 
 export type WerewolfState = z.infer<typeof werewolfStateSchema>;
@@ -130,6 +133,7 @@ export const werewolfVisibility = {
   idiotRevealed: 'public',
   ...extraVisibility,
   ...extendedVisibility,
+  ...finalVisibility,
 } as const satisfies { readonly [K in keyof WerewolfState]?: Visibility };
 
 export function emptyNight(): WerewolfState['night'] {
@@ -145,5 +149,6 @@ export function emptyNight(): WerewolfState['night'] {
     charmed: null,
     ...emptyExtraNight(),
     ...emptyExtendedNight(),
+    ...emptyFinalNight(),
   };
 }

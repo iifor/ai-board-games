@@ -53,6 +53,7 @@ export const NIGHT_ORDER = [
   'merchant_deal',
   'gift_check',
   'gift_poison',
+  'demon_hunter_hunt',
   'requester_kill',
   'ghost_bride_kill',
   'crow_curse',
@@ -62,6 +63,7 @@ export const NIGHT_ORDER = [
 
 export const DAY_ORDER = [
   'dawn',
+  'magic_wolf_fade',
   'speech_direction',
   'day_speech',
   'old_rogue_doom',

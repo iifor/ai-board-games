@@ -2,6 +2,7 @@ import type { ComputeOutcome } from '@battle/engine';
 import { bigBadWolfKill } from '../special/bigBadWolf';
 import { bigTreeShield } from '../special/bigTree';
 import { merchantBackfire } from '../special/blackMerchant';
+import { demonHunt } from '../special/demonHunter';
 import { dreamDeaths, isDreamed } from '../special/dreamer';
 import { evilKnightReflect } from '../special/evilKnight';
 import { loverNightLink } from '../special/lovers';
@@ -55,7 +56,7 @@ const poison: NightStep = (ctx, tally) => poisonedSeats(ctx).reduce<NightTally>(
 }, tally);
 
 /**
- * 结算顺序：狼刀 → 毒药 → 特殊角色的结算步骤（按此顺序插入）。
+ * 结算顺序：狼刀 → 毒药 → 特殊角色的结算步骤（按此顺序插入；猎魔人的狩猎排在各种击杀之后）。
  * 恶灵骑士反伤排在狼刀、毒药之后（反伤对象已死亡则不消耗反伤）；大树要看全部狼刀，排在各种击杀之后；
  * 摄梦死亡要知道摄梦人当晚是否死亡，排在其他死亡之后；殉情最后，覆盖前面所有的死亡。
  */
@@ -67,6 +68,7 @@ const NIGHT_STEPS: readonly NightStep[] = [
   bigBadWolfKill,
   brotherKill,
   thirdPartyKill,
+  demonHunt,
   bigTreeShield,
   wolfSeedInfection,
   merchantBackfire,

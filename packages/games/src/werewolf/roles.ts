@@ -21,7 +21,9 @@ import { heavenlyEyePrompts } from './special/heavenlyEye';
 import { hiddenWolfPrompts } from './special/hiddenWolf';
 import { hybridPrompts } from './special/hybrid';
 import { knightPrompts } from './special/knight';
+import { demonHunterPrompts } from './special/demonHunter';
 import { magicianPrompts } from './special/magician';
+import { magicWolfPrompts } from './special/magicWolf';
 import { nightmarePrompts } from './special/nightmare';
 import { nineTailedFoxPrompts } from './special/nineTailedFox';
 import { oldRoguePrompts } from './special/oldRogue';
@@ -107,6 +109,7 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     wolf_seed: role('种狼', 'werewolf', wolfSeedPrompts.wolfSeed, 'wolf'),
     infected_wolf: role('感染狼', 'werewolf', wolfSeedPrompts.infectedWolf, 'wolf'),
     succubus: role('魅魔', 'werewolf', succubusPrompts.succubus, 'wolf'),
+    magic_wolf: role('魔狼', 'werewolf', magicWolfPrompts.magicWolf, 'wolf'),
     seer: role('预言家', 'good', prompts.seer, 'god'),
     witch: role('女巫', 'good', prompts.witch, 'god'),
     hunter: role('猎人', 'good', prompts.hunter, 'god'),
@@ -129,6 +132,7 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     fox: role('狐狸', 'good', foxPrompts.fox, 'god'),
     heavenly_eye: role('天眼', 'good', heavenlyEyePrompts.heavenlyEye, 'god'),
     requester: role('祈求者', 'good', requesterPrompts.requester, 'god'),
+    demon_hunter: role('猎魔人', 'good', demonHunterPrompts.demonHunter, 'god', { poisonImmune: true }),
     thief: role('盗贼', 'good', thiefPrompts.thief, 'villager'),
     cupid: role('丘比特', 'good', cupidPrompts.cupid, 'third'),
     ghost_bride: role('鬼魂新娘', 'ghost_bride', ghostBridePrompts.ghostBride, 'third'),
