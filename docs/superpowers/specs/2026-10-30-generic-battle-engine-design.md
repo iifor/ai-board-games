@@ -289,8 +289,8 @@ advance(game: CompiledGame, snapshot: EngineSnapshot, input: EngineInput): Advan
 
 ## 技术栈
 
-- pnpm workspace，TypeScript strict，zod 4。
-- 前端：React 18 + Vite + React Router；后台另用 antd。
+- pnpm workspace（catalog 统一版本），TypeScript 7 strict，zod 4。
+- 前端：React 19 + Vite 8 + React Router；后台另用 antd。
 - 服务端：Express + ws + pg（repository 里手写 SQL，行映射有类型）。
 - 测试：vitest（engine、games、server、client 统一使用）。
 - 不再使用 OpenTelemetry：Trace 直接写 `ai_calls`，减少依赖与链路复杂度。

@@ -1,0 +1,15 @@
+{
+  "name": "@battle/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@battle/engine": "workspace:*",
+    "@battle/games": "workspace:*",
+    "@battle/shared": "workspace:*",
+    "zod": "catalog:"
+  }
+}

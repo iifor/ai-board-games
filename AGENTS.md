@@ -33,11 +33,12 @@
 
 首次访问项目时，必须先阅读 `docs/README.md` 和 `docs/project-summary.md`，再按任务阅读对应文档：
 
-- 后端服务：`docs/project-server.md`
-- 游戏流程、AI 调度、WebSocket：`docs/project-workflow.md`
+- 引擎、GameSpec、提示词、可见性、调试：`docs/project-engine.md`
+- 某个游戏的规则口径：`docs/games/<game>.md`
+- 后端服务、对局运行时、AI 调用、WebSocket：`docs/project-server.md`
 - C 端游戏前台：`docs/project-client.md`
 - B 端管理后台：`docs/project-admin.md`
-- 共享类型、schema、常量、测试：`docs/project-shared.md`
+- 共享协议类型、schema、测试约定：`docs/project-shared.md`
 
 不允许在未阅读项目文档前直接进行无目的全局扫代码。文档用于建立项目地图；源码用于核实具体实现细节。
 

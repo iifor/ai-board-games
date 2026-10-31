@@ -1,12 +1,25 @@
+# 依赖与构建产物
 node_modules/
 dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# 本地环境与密钥
+.env
+.env.*
+!.env.example
+
+# 本地运行数据
 logs/
 data/
-.env
 audio/
+tmp/
+artifacts/
+
+# 工具缓存与本地工作区
 .worktrees/
 .pnpm-store/
-.superpowers
-artifacts
-tmp
-design-qa.md
+.npm-cache/
+.superpowers/
+.DS_Store

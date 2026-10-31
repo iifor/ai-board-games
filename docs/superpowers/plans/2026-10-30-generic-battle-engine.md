@@ -7,7 +7,7 @@
 
 **架构**：`packages/engine`（纯运行时）+ `packages/games`（游戏定义）+ `packages/server`（适配与 IO）+ `packages/client` / `packages/admin`（展示）+ `packages/shared`（协议）。
 
-**技术栈**：pnpm workspace、TypeScript strict、zod 4、vitest、React 18 + Vite、antd（仅后台）、Express + ws + pg、PostgreSQL 16。
+**技术栈**：pnpm 9.5 workspace（catalog）、TypeScript 7 strict、zod 4、vitest 5、React 19 + Vite 8、antd（仅后台）、Express + ws + pg、PostgreSQL 16。
 
 ## 全局约束
 
@@ -51,14 +51,14 @@
 
 ### 任务
 
-- [ ] **P0-1 打 tag 与开分支**：`git tag legacy-final 88821d6 && git push origin legacy-final`；`git switch -c rewrite/battle-engine`。
-- [ ] **P0-2 清空**：按上面的清单删除和移动，单独提交 `chore: remove legacy implementation`。
-- [ ] **P0-3 根配置**：`package.json`（脚本：`dev`、`build`、`check`、`test`、`test:watch`、`db:up`、`db:down`）、`pnpm-workspace.yaml`、`tsconfig.base.json`（strict、`noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）、`vitest.workspace.ts`、`.gitignore`（删掉现有的 `superpowers/` 规则：它会让 `docs/superpowers/` 下新增的设计与计划文档被忽略）、`.env.example`、`docker-compose.dev.yml`（只有 PostgreSQL 16，绑定 `127.0.0.1`）。
-- [ ] **P0-4 包骨架**：`shared`、`engine`、`games`、`server`、`client`、`admin` 各自的 `package.json`、`tsconfig.json`、`src/index.ts`、一条冒烟测试；包名 `@battle/<name>`。
-- [ ] **P0-5 引擎纯度检查**：测试扫描 `packages/engine/src`，出现禁用的 import 或全局调用即失败。
-- [ ] **P0-6 CI**：`.github/workflows/ci.yml`：PR 与 push 时执行 install、check、test（PostgreSQL service 从 P3 开始启用）。
-- [ ] **P0-7 文档骨架**：重写 `docs/README.md`、`project-summary.md`，新增 `project-engine.md`（取代旧的 `project-workflow.md` 与 `project-prompts.md`），以及 `project-server.md`、`project-client.md`、`project-admin.md`、`project-shared.md` 空壳；同步更新 `CLAUDE.md`、`AGENTS.md` 中的文档路由。
-- [ ] **P0-8 验收**：`pnpm install && pnpm check && pnpm test` 通过；提交 `chore: scaffold battle engine workspace`。
+- [x] **P0-1 打 tag 与开分支**：`git tag legacy-final 88821d6 && git push origin legacy-final`；`git switch -c rewrite/battle-engine`。
+- [x] **P0-2 清空**：按上面的清单删除和移动，单独提交 `chore: remove legacy implementation`。
+- [x] **P0-3 根配置**：`package.json`（脚本：`dev`、`build`、`check`、`test`、`test:watch`、`db:up`、`db:down`）、`pnpm-workspace.yaml`、`tsconfig.base.json`（strict、`noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`）、`vitest.config.ts`（vitest 5 用 `test.projects` 取代 workspace 文件）、`.gitignore`（删掉现有的 `superpowers/` 规则：它会让 `docs/superpowers/` 下新增的设计与计划文档被忽略）、`.env.example`、`docker-compose.dev.yml`（只有 PostgreSQL 16，绑定 `127.0.0.1`）。
+- [x] **P0-4 包骨架**：`shared`、`engine`、`games`、`server`、`client`、`admin` 各自的 `package.json`、`tsconfig.json`、`src/index.ts`、一条冒烟测试；包名 `@battle/<name>`。
+- [x] **P0-5 引擎纯度检查**：类型层（engine/games/shared 的 `tsconfig.json` 用 `types: []`）+ 测试层（`packages/engine/test/purity.test.ts` 扫描 engine 与 games 源码的依赖白名单和禁用调用）。
+- [x] **P0-6 CI**：`.github/workflows/ci.yml`：PR 与 push 时执行 install、check、test（PostgreSQL service 从 P3 开始启用）。
+- [x] **P0-7 文档骨架**：重写 `docs/README.md`、`project-summary.md`，新增 `project-engine.md`（取代旧的 `project-workflow.md` 与 `project-prompts.md`），以及 `project-server.md`、`project-client.md`、`project-admin.md`、`project-shared.md` 空壳；同步更新 `CLAUDE.md`、`AGENTS.md` 中的文档路由。
+- [x] **P0-8 验收**：`pnpm install && pnpm check && pnpm test` 通过；提交 `chore: scaffold battle engine workspace`。
 
 ---
 

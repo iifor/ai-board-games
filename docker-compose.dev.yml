@@ -1,0 +1,22 @@
+# 仅用于本机开发：数据库只绑定回环地址，并使用 trust 认证，不能用于任何共享或生产环境。
+name: battle-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: battle
+      POSTGRES_DB: battle
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:${BATTLE_DB_PORT:-5432}:5432"
+    volumes:
+      - battle-postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U battle -d battle"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  battle-postgres-dev-data:
