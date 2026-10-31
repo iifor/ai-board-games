@@ -23,6 +23,7 @@ export const NIGHT_ORDER = [
   'younger_brother_join',
   'wolf_chat',
   'wolf_kill',
+  'wolf_seed_infect',
   'hidden_wolf_kill',
   'younger_brother_kill',
   'big_bad_wolf_decide',

@@ -30,6 +30,7 @@ import { wildChildPrompts } from './special/wildChild';
 import { wolfBeautyPrompts } from './special/wolfBeauty';
 import { wolfBrothersPrompts } from './special/wolfBrothers';
 import { wolfKingPrompts } from './special/wolfKing';
+import { wolfSeedPrompts } from './special/wolfSeed';
 
 /** 角色的静态特性，规则通过 roleTraits(seat) 读取 */
 export interface RoleTraits {
@@ -89,6 +90,8 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     wolf_elder_brother: role('狼兄', 'werewolf', wolfBrothersPrompts.wolfElderBrother, 'wolf'),
     wolf_younger_brother: role('狼弟', 'lone_wolf', wolfBrothersPrompts.wolfYoungerBrother, 'wolf', YOUNGER_BROTHER),
     wolf_younger_brother_pack: role('狼弟', 'werewolf', wolfBrothersPrompts.wolfYoungerBrotherPack, 'wolf'),
+    wolf_seed: role('种狼', 'werewolf', wolfSeedPrompts.wolfSeed, 'wolf'),
+    infected_wolf: role('感染狼', 'werewolf', wolfSeedPrompts.infectedWolf, 'wolf'),
     seer: role('预言家', 'good', prompts.seer, 'god'),
     witch: role('女巫', 'good', prompts.witch, 'god'),
     hunter: role('猎人', 'good', prompts.hunter, 'god'),

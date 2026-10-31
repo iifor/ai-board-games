@@ -9,6 +9,7 @@ import { woundRogue } from '../special/oldRogue';
 import { stalkerAssassination } from '../special/stalker';
 import { wolfBeautyNightLink } from '../special/wolfBeauty';
 import { brotherKill } from '../special/wolfBrothers';
+import { wolfSeedInfection } from '../special/wolfSeed';
 import type { PendingDeath, WerewolfState } from '../state';
 import { roleTraits } from './board';
 import type { WerewolfContext } from './context';
@@ -64,6 +65,7 @@ const NIGHT_STEPS: readonly NightStep[] = [
   bigBadWolfKill,
   brotherKill,
   bigTreeShield,
+  wolfSeedInfection,
   merchantBackfire,
   dreamDeaths,
   wolfBeautyNightLink,

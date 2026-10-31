@@ -31,6 +31,7 @@ import { wildChildPhases, wildChildPrompts, wildChildTriggers } from './wildChil
 import { wolfBeautyPhases, wolfBeautyPrompts, wolfBeautyTriggers } from './wolfBeauty';
 import { wolfBrothersPhases, wolfBrothersPrompts, wolfBrothersTriggers } from './wolfBrothers';
 import { wolfKingPhases, wolfKingPrompts, wolfKingTriggers } from './wolfKing';
+import { wolfSeedPhases, wolfSeedPrompts } from './wolfSeed';
 
 // 特殊角色模块的汇总入口；规则模块不要从这里引用，避免循环依赖。
 
@@ -65,6 +66,7 @@ export const specialPrompts = {
   ...bearPrompts,
   ...penguinPrompts,
   ...foxPrompts,
+  ...wolfSeedPrompts,
 };
 
 export const specialPhases: WerewolfPhases = {
@@ -96,6 +98,7 @@ export const specialPhases: WerewolfPhases = {
   ...wolfBrothersPhases,
   ...penguinPhases,
   ...foxPhases,
+  ...wolfSeedPhases,
 };
 
 /**

@@ -25,4 +25,11 @@ export const EXTENDED_BOARDS: readonly BoardDefinition[] = [
     players: { min: 11, max: 12 },
     config: { crowVotes: 2 },
   }),
+  board({
+    key: 'wolf-seed-hidden-wolf-12',
+    name: '种狼',
+    description: '种狼、隐狼与 2 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民；种狼全场可以把一名被害者感染为狼人，隐狼与狼人互不相认。',
+    roles: { wolf_seed: 1, hidden_wolf: 1, werewolf: 2, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
+    config: { hiddenWolf: 'linked' },
+  }),
 ];
