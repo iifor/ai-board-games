@@ -1,6 +1,7 @@
 import type { VariantSpec } from '@battle/engine';
 import { DEFAULT_BOARD_PLAYERS, boardConfigSchema, defineBoard as board, type BoardDefinition, type BoardPlayers } from './boardDefinition';
 import { EXTENDED_BOARDS } from './boardsExtended';
+import { FINAL_BOARDS } from './boardsFinal';
 
 export { boardConfigSchema, ROLE_CATEGORIES } from './boardDefinition';
 export type { BoardConfig, BoardDefinition, BoardPlayers, RoleCategory } from './boardDefinition';
@@ -125,7 +126,7 @@ const CLASSIC_BOARDS: readonly BoardDefinition[] = [
   }),
 ];
 
-export const BOARDS: readonly BoardDefinition[] = [...CLASSIC_BOARDS, ...EXTENDED_BOARDS];
+export const BOARDS: readonly BoardDefinition[] = [...CLASSIC_BOARDS, ...EXTENDED_BOARDS, ...FINAL_BOARDS];
 
 export const DEFAULT_BOARD = 'standard-12';
 

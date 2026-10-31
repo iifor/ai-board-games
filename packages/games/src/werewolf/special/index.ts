@@ -29,6 +29,7 @@ import { nineTailedFoxPhases, nineTailedFoxPrompts, nineTailedFoxTriggers } from
 import { oldRoguePhases, oldRoguePrompts, oldRogueTriggers } from './oldRogue';
 import { penguinPhases, penguinPrompts } from './penguin';
 import { requesterPhases, requesterPrompts } from './requester';
+import { saplingPhases, saplingPrompts, saplingTriggers } from './sapling';
 import { silenceElderPhases, silenceElderPrompts } from './silenceElder';
 import { stalkerPhases, stalkerPrompts } from './stalker';
 import { succubusPhases, succubusPrompts } from './succubus';
@@ -80,6 +81,7 @@ export const specialPrompts = {
   ...cupidPrompts,
   ...succubusPrompts,
   ...ghostBridePrompts,
+  ...saplingPrompts,
 };
 
 export const specialPhases: WerewolfPhases = {
@@ -119,12 +121,13 @@ export const specialPhases: WerewolfPhases = {
   ...succubusPhases,
   ...ghostBridePhases,
   ...loversPhases,
+  ...saplingPhases,
 };
 
 /**
  * 出局后的特殊处理，排在遗言、猎人开枪之后、移交警徽之前（声明顺序即执行顺序）：
  * 中性开枪（狼王局）→ 额外的枪 → 白狼王带人 → 狼美人殉情 → 情侣殉情 → 炸弹人引爆 → 野孩子变狼 → 隐狼随狼队出局 → 九尾狐失去全部尾巴
- * → 老流氓到期出局 → 大树倒下 → 记录狼兄出局。
+ * → 树苗全部出局时大树随之出局 → 老流氓到期出局 → 大树倒下 → 记录狼兄出局。
  */
 export const specialDeathTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
   ...wolfKingTriggers,
@@ -136,6 +139,7 @@ export const specialDeathTriggers: readonly TriggerSpec<WerewolfState, WerewolfP
   ...wildChildTriggers,
   ...hiddenWolfTriggers,
   ...nineTailedFoxTriggers,
+  ...saplingTriggers,
   ...oldRogueTriggers,
   ...bigTreeTriggers,
   ...wolfBrothersTriggers,

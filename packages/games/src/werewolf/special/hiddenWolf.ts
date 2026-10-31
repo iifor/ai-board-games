@@ -20,6 +20,11 @@ export const hiddenWolfPrompts = definePrompts({
     '{{else}}你和狼人互不相认，你不能参与击杀；狼人全部出局时你也会随之出局。{{/if}}',
   ].join(''),
   hiddenWolfKill: '隐狼请睁眼。你的狼同伴已全部出局，由你继承击杀权：选择今晚要击杀的玩家，也可以输出空数组不杀人。',
+  /** 火力全开的隐狼（hidden_wolf_pack）：狼队成员，白狼王出局前查验为好人（特性 appearsGoodWhile） */
+  hiddenWolfPack: [
+    '你是{{me.label}}，身份是隐狼（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
+    '你与狼队互相认识、一起夜聊与击杀；白狼王出局前，查验会把你视为好人，之后视为狼人。你不能自爆。',
+  ].join(''),
 });
 
 export const WOLVES_GONE = 'wolves_gone';

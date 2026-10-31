@@ -27,6 +27,7 @@ import { nineTailedFoxPrompts } from './special/nineTailedFox';
 import { oldRoguePrompts } from './special/oldRogue';
 import { penguinPrompts } from './special/penguin';
 import { requesterPrompts } from './special/requester';
+import { saplingPrompts } from './special/sapling';
 import { silenceElderPrompts } from './special/silenceElder';
 import { stalkerPrompts } from './special/stalker';
 import { succubusPrompts } from './special/succubus';
@@ -80,6 +81,9 @@ function role(name: string, team: RoleTeam, identity: PromptTemplate, category: 
 /** 恶魔、恶灵骑士：免疫毒药与夜间出局的猎人的枪，不能自爆 */
 const NIGHT_IMMUNE: RoleTraits = { noSelfDestruct: true, poisonImmune: true, nightShotImmune: true };
 
+/** 火力全开的隐狼：与狼队互认、一起击杀，白狼王出局前查验为好人，不能自爆 */
+const PACK_HIDDEN_WOLF: RoleTraits = { noSelfDestruct: true, appearsGoodWhile: 'white_wolf_king' };
+
 /** 狼弟：只与狼兄相认，狼队不认识他；狼兄出局前查验为好人 */
 const YOUNGER_BROTHER: RoleTraits = { hiddenFromPack: true, appearsGoodWhile: 'wolf_elder_brother', pairedWith: 'wolf_elder_brother' };
 
@@ -96,6 +100,7 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     wild_child_wolf: role('野孩子', 'werewolf', wildChildPrompts.wildChildWolf, 'wolf'),
     big_bad_wolf: role('大灰狼', 'lone_wolf', bigBadWolfPrompts.bigBadWolf, 'wolf', { noSelfDestruct: true }),
     hidden_wolf: role('隐狼', 'lone_wolf', hiddenWolfPrompts.hiddenWolf, 'wolf', { noSelfDestruct: true, hiddenFromPack: true, appearsGood: true }),
+    hidden_wolf_pack: role('隐狼', 'werewolf', hiddenWolfPrompts.hiddenWolfPack, 'wolf', PACK_HIDDEN_WOLF),
     wolf_elder_brother: role('狼兄', 'werewolf', wolfBrothersPrompts.wolfElderBrother, 'wolf'),
     wolf_younger_brother: role('狼弟', 'lone_wolf', wolfBrothersPrompts.wolfYoungerBrother, 'wolf', YOUNGER_BROTHER),
     wolf_younger_brother_pack: role('狼弟', 'werewolf', wolfBrothersPrompts.wolfYoungerBrotherPack, 'wolf'),
@@ -134,6 +139,7 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     big_tree: role('大树', 'good', bigTreePrompts.bigTree, 'villager'),
     villager: role('村民', 'good', prompts.villager, 'villager'),
     rabbit: role('兔兔', 'good', prompts.rabbit, 'villager'),
+    sapling: role('树苗', 'good', saplingPrompts.sapling, 'villager'),
   };
 }
 
