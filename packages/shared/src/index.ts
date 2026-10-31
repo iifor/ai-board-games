@@ -26,6 +26,8 @@ export type {
   MatchSeatDto,
   MatchStatus,
   MatchSummaryDto,
+  PhaseGraphDto,
+  PhaseNodeDto,
   ServerMessage,
 } from './api/matches';
 export type { GameCatalogItem, GameVariantItem, StageLayout } from './catalog';

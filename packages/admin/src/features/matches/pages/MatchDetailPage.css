@@ -1,0 +1,26 @@
+.match-detail {
+  display: grid;
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.match-detail-debug {
+  display: grid;
+  gap: 16px;
+}
+
+.trace-detail {
+  display: grid;
+  gap: 10px;
+}
+
+.trace-block pre {
+  max-height: 260px;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.04);
+  font-size: 12px;
+  white-space: pre-wrap;
+}

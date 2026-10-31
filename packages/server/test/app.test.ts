@@ -23,6 +23,16 @@ describe('public endpoints', () => {
   });
 });
 
+describe('admin game metadata', () => {
+  it('exposes the phase graph for the debug console', async () => {
+    const token = await t.adminToken();
+    const graph = dataOf(await t.call<{ start: string; phases: { id: string; next: string[] }[] }>('GET', '/api/admin/games/debate/phases', { token }));
+    expect(graph.start).toBe('topic_reveal');
+    expect(graph.phases.find((phase) => phase.id === 'mvp')?.next).toEqual(['end']);
+    expect((await t.call('GET', '/api/admin/games/nope/phases', { token })).status).toBe(404);
+  });
+});
+
 describe('error handling', () => {
   it('answers unknown routes with a JSON 404', async () => {
     expect(await t.call('GET', '/api/nope')).toMatchObject({ status: 404, body: { code: 40401 } });

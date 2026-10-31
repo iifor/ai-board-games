@@ -81,3 +81,18 @@ export type ServerMessage =
 export type ClientMessage =
   | { readonly type: 'hello'; readonly afterSeq: number }
   | { readonly type: 'ack'; readonly seq: number };
+
+/** 调试台展示的阶段图 */
+export interface PhaseNodeDto {
+  readonly id: string;
+  readonly kind: string;
+  readonly title: string | null;
+  /** 可能的跳转目标（含 end / return） */
+  readonly next: readonly string[];
+}
+
+export interface PhaseGraphDto {
+  readonly gameKey: string;
+  readonly start: string;
+  readonly phases: readonly PhaseNodeDto[];
+}

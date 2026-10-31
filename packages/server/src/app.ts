@@ -6,7 +6,7 @@ import { requireAdmin } from './middlewares/auth';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { requestId } from './middlewares/requestId';
 import { authRoutes } from './modules/auth';
-import { gameRoutes } from './modules/games';
+import { adminGameRoutes, gameRoutes } from './modules/games';
 import { healthRoutes } from './modules/health/routes';
 import { adminMatchRoutes, publicMatchRoutes } from './modules/matches';
 import { modelRoutes } from './modules/models';
@@ -43,5 +43,6 @@ export function createApp(db: Db, services: Services) {
   app.route('/api/admin/voices', guarded(voiceRoutes(services.voices)));
   app.route('/api/admin/players', guarded(playerRoutes(services.players)));
   app.route('/api/admin/matches', guarded(adminMatchRoutes(services.matches)));
+  app.route('/api/admin/games', guarded(adminGameRoutes(services.games)));
   return { app, injectWebSocket };
 }

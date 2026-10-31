@@ -224,7 +224,9 @@ interface AiRequest {
 
 `client/src/features/{lobby, game-stage, history}`；GameStage 包含 `versus`（辩论）与 `circle`（狼人杀）两种布局、`useMatchStream`、`usePlayback`、字幕与音频组件、专用组件注册表（警徽、昼夜指示）；`services/` 封装 REST 调用。
 
-### P6 B 端
+### P6 B 端（已完成）
+
+> 实现说明：新增 `GET /api/admin/games/:key/phases` 供阶段图使用；登录后的页面未做浏览器端到端测试（本地验证时读取测试令牌的操作被权限策略拒绝），由类型检查、组件测试与服务端集成测试覆盖。
 
 `admin/src/features/{auth, providers, models, voices, players, matches, traces, debug-console}`；Trace 按 L1–L6 分层展示，并支持按兜底原因筛选；调试台根据 `CompiledGame` 的阶段图展示当前位置与断点。验收后把 `rewrite/battle-engine` 合并到 `master`。
 

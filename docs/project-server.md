@@ -49,6 +49,7 @@ src/
 | `GET/POST /api/admin/matches` | 全部对局（筛选 status、debug）/ 创建调试局（seed、breakpoints、pacing、scripted） | 管理员 |
 | `GET /api/admin/matches/:id`、`/log`、`/ai-calls` | 详情、完整日志（含私密与 host 频道）、AI 调用记录（分层 prompt、原始响应、耗时） | 管理员 |
 | `POST /api/admin/matches/:id/debug`、`DELETE /api/admin/matches/:id` | 调试指令（continue / step / run / skip）、删除对局 | 管理员 |
+| `GET /api/admin/games/:key/phases` | 游戏阶段图（阶段、类型、标题、跳转目标），供调试台使用 | 管理员 |
 
 ## 鉴权
 

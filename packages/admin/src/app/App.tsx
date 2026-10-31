@@ -1,10 +1,17 @@
-import './App.css';
+import { App as AntApp, ConfigProvider } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
+import { RouterProvider } from 'react-router';
+import { AuthProvider } from '../features/auth';
+import { router } from './router';
 
 export function App() {
   return (
-    <main className="app-placeholder">
-      <h1>AI 对战 · 管理后台</h1>
-      <p>通用对战引擎重建中</p>
-    </main>
+    <ConfigProvider locale={zhCN}>
+      <AntApp>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </AntApp>
+    </ConfigProvider>
   );
 }
