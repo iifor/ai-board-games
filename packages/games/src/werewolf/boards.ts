@@ -109,6 +109,18 @@ export const BOARDS: readonly BoardDefinition[] = [
     description: '狼王与 3 名狼人对抗预言家、女巫、猎人、摄梦人与 4 名村民；猎人与狼王开枪都不翻牌。',
     roles: { wolf_king: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, dreamer: 1, villager: 'rest' },
   }),
+  board({
+    key: 'wolf-king-magician-12',
+    name: '狼王&魔术师',
+    description: '狼王与 3 名狼人对抗预言家、女巫、猎人、魔术师与 4 名村民；猎人与狼王开枪都不翻牌。',
+    roles: { wolf_king: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, magician: 1, villager: 'rest' },
+  }),
+  board({
+    key: 'big-bad-wolf-fortune-teller-12',
+    name: '大灰狼&占卜师',
+    description: '大灰狼与 3 名狼人对抗预言家、女巫、猎人、占卜师与 4 名村民；大灰狼离群行动，全场可单独击杀一次。',
+    roles: { big_bad_wolf: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, fortune_teller: 1, villager: 'rest' },
+  }),
 ];
 
 export const DEFAULT_BOARD = 'standard-12';
