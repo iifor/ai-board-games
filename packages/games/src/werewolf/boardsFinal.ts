@@ -35,4 +35,10 @@ export const FINAL_BOARDS: readonly BoardDefinition[] = [
     description: '灵狼与 3 名狼人对抗预言家、女巫、猎人、守卫与 4 名村民；灵狼首夜学习一名好人的技能，在女巫之后、预言家之前行动。',
     roles: { spirit_wolf: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 'rest' },
   }),
+  board({
+    key: 'illusionist-wolf-witch-12',
+    name: '幻术师&狼巫',
+    description: '狼巫与 3 名狼人对抗预言家、女巫、猎人、幻术师与 4 名村民；狼巫每晚率先诅咒一名好人使他暂时不能发动技能，幻术师的幻象会替他挡下狼刀与毒药。',
+    roles: { wolf_witch: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, illusionist: 1, villager: 'rest' },
+  }),
 ];

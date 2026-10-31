@@ -21,6 +21,7 @@ import { guardPhases, guardPrompts } from './guard';
 import { heavenlyEyePhases, heavenlyEyePrompts } from './heavenlyEye';
 import { hiddenWolfPhases, hiddenWolfPrompts, hiddenWolfTriggers } from './hiddenWolf';
 import { hybridPhases, hybridPrompts } from './hybrid';
+import { illusionistPhases, illusionistPrompts } from './illusionist';
 import { knightPhases, knightPrompts } from './knight';
 import { loversPhases, loversTriggers } from './lovers';
 import { demonHunterPhases, demonHunterPrompts } from './demonHunter';
@@ -43,6 +44,7 @@ import { wolfBeautyPhases, wolfBeautyPrompts, wolfBeautyTriggers } from './wolfB
 import { wolfBrothersPhases, wolfBrothersPrompts, wolfBrothersTriggers } from './wolfBrothers';
 import { wolfKingPhases, wolfKingPrompts, wolfKingTriggers } from './wolfKing';
 import { wolfSeedPhases, wolfSeedPrompts } from './wolfSeed';
+import { wolfWitchPhases, wolfWitchPrompts } from './wolfWitch';
 
 // 特殊角色模块的汇总入口；规则模块不要从这里引用，避免循环依赖。
 
@@ -88,6 +90,8 @@ export const specialPrompts = {
   ...magicWolfPrompts,
   ...demonHunterPrompts,
   ...spiritWolfPrompts,
+  ...wolfWitchPrompts,
+  ...illusionistPrompts,
 };
 
 export const specialPhases: WerewolfPhases = {
@@ -131,6 +135,8 @@ export const specialPhases: WerewolfPhases = {
   ...magicWolfPhases,
   ...demonHunterPhases,
   ...spiritWolfPhases,
+  ...wolfWitchPhases,
+  ...illusionistPhases,
 };
 
 /**

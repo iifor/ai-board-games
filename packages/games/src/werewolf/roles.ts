@@ -20,6 +20,7 @@ import { guardPrompts } from './special/guard';
 import { heavenlyEyePrompts } from './special/heavenlyEye';
 import { hiddenWolfPrompts } from './special/hiddenWolf';
 import { hybridPrompts } from './special/hybrid';
+import { illusionistPrompts } from './special/illusionist';
 import { knightPrompts } from './special/knight';
 import { demonHunterPrompts } from './special/demonHunter';
 import { magicianPrompts } from './special/magician';
@@ -41,6 +42,7 @@ import { wolfBeautyPrompts } from './special/wolfBeauty';
 import { wolfBrothersPrompts } from './special/wolfBrothers';
 import { wolfKingPrompts } from './special/wolfKing';
 import { wolfSeedPrompts } from './special/wolfSeed';
+import { wolfWitchPrompts } from './special/wolfWitch';
 
 /** 角色的静态特性，规则通过 roleTraits(seat) 读取 */
 export interface RoleTraits {
@@ -54,7 +56,7 @@ export interface RoleTraits {
   readonly hiddenFromPack?: boolean;
   /** 预言家查验为好人，熊不会因他咆哮（隐狼） */
   readonly appearsGood?: boolean;
-  /** 存活的该角色还在场时查验为好人（狼弟在狼兄出局前），见 rules/appearance.ts */
+  /** 存活的该角色还在场时查验为好人（狼弟在狼兄出局前、火力全开的隐狼在白狼王出局前），见 rules/appearance.ts */
   readonly appearsGoodWhile?: string;
   /** 离群的狼只与该角色互相认识（狼弟与狼兄），见 rules/loneWolf.ts */
   readonly pairedWith?: string;
@@ -112,6 +114,7 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     succubus: role('魅魔', 'werewolf', succubusPrompts.succubus, 'wolf'),
     magic_wolf: role('魔狼', 'werewolf', magicWolfPrompts.magicWolf, 'wolf'),
     spirit_wolf: role('灵狼', 'werewolf', spiritWolfPrompts.spiritWolf, 'wolf'),
+    wolf_witch: role('狼巫', 'werewolf', wolfWitchPrompts.wolfWitch, 'wolf'),
     seer: role('预言家', 'good', prompts.seer, 'god'),
     witch: role('女巫', 'good', prompts.witch, 'god'),
     hunter: role('猎人', 'good', prompts.hunter, 'god'),
@@ -135,6 +138,7 @@ function buildCatalog(): Readonly<Record<string, RoleEntry>> {
     heavenly_eye: role('天眼', 'good', heavenlyEyePrompts.heavenlyEye, 'god'),
     requester: role('祈求者', 'good', requesterPrompts.requester, 'god'),
     demon_hunter: role('猎魔人', 'good', demonHunterPrompts.demonHunter, 'god', { poisonImmune: true }),
+    illusionist: role('幻术师', 'good', illusionistPrompts.illusionist, 'god'),
     thief: role('盗贼', 'good', thiefPrompts.thief, 'villager'),
     cupid: role('丘比特', 'good', cupidPrompts.cupid, 'third'),
     ghost_bride: role('鬼魂新娘', 'ghost_bride', ghostBridePrompts.ghostBride, 'third'),
