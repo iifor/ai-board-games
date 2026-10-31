@@ -1,0 +1,112 @@
+import type { ActDecision, ComputeOutcome, Seat, SeatQuery, VoteOutcome } from '@battle/engine';
+import type { PendingDeath, WerewolfState } from '../state';
+import { isWolf, seededRotation, type WerewolfContext } from './context';
+import { sideEliminated } from './victory';
+
+/** 规则口径，见 docs/games/werewolf.md */
+export const NIGHT_RULES = {
+  /** 女巫能否自救：仅首夜 */
+  witchSelfSave: 'first_night_only' as 'never' | 'first_night_only' | 'always',
+};
+
+export function resetNight(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
+  return {
+    state: { ...ctx.state, night: { wolfTarget: null, saved: false, poisoned: null }, pendingDeaths: [], speechStart: null },
+  };
+}
+
+export function aliveWolves(ctx: WerewolfContext): SeatQuery {
+  return ctx.seats.alive().inTeam('werewolf');
+}
+
+/** 狼人夜聊：种子决定的狼人先发言，之后按座位号顺时针 */
+export function wolfChatOrder(ctx: WerewolfContext): number[] {
+  return seededRotation(ctx, aliveWolves(ctx).ids(), 'wolf-chat');
+}
+
+/** 狼人只能击杀存活的非狼人玩家（不能自刀） */
+export function wolfKillTargets(ctx: WerewolfContext): SeatQuery {
+  return ctx.seats.alive().where((seat) => !isWolf(seat));
+}
+
+export function recordWolfKill(ctx: WerewolfContext, outcome: VoteOutcome): WerewolfState {
+  const wolfTarget = outcome.kind === 'selected' ? outcome.seat : null;
+  return { ...ctx.state, night: { ...ctx.state.night, wolfTarget } };
+}
+
+export function describeSeerCheck(ctx: WerewolfContext, _seat: Seat, targets: readonly number[]): string {
+  const [target] = targets;
+  if (target === undefined) return '没有查验';
+  return `查验 ${target}号：${isWolf(ctx.seats.get(target)) ? '狼人' : '好人'}`;
+}
+
+export function recordSeerCheck(ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState {
+  const seerChecks = { ...ctx.state.seerChecks };
+  for (const { seat, targets } of decisions) {
+    const [target] = targets;
+    if (target === undefined) continue;
+    const result = isWolf(ctx.seats.get(target)) ? '狼人' : '好人';
+    seerChecks[String(seat)] = [...(seerChecks[String(seat)] ?? []), { night: ctx.round, target, result }];
+  }
+  return { ...ctx.state, seerChecks };
+}
+
+/** 女巫只有在解药未用、当晚有狼刀目标时才会被告知刀口并可以救人 */
+export function witchSaveTargets(ctx: WerewolfContext, witch: Seat): number[] {
+  const victim = ctx.state.night.wolfTarget;
+  if (!ctx.state.potions.antidote || victim === null) return [];
+  if (victim === witch.seat) {
+    const allowed = NIGHT_RULES.witchSelfSave === 'always' || (NIGHT_RULES.witchSelfSave === 'first_night_only' && ctx.round === 1);
+    if (!allowed) return [];
+  }
+  return [victim];
+}
+
+export function applyWitchSave(ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState {
+  const saved = decisions.some((decision) => decision.targets.length > 0);
+  if (!saved) return ctx.state;
+  return { ...ctx.state, night: { ...ctx.state.night, saved: true }, potions: { ...ctx.state.potions, antidote: false } };
+}
+
+/** 同一晚只能用一瓶药：当晚已救人则不能再毒 */
+export function witchPoisonTargets(ctx: WerewolfContext, witch: Seat): number[] {
+  if (!ctx.state.potions.poison || ctx.state.night.saved) return [];
+  return ctx.seats.alive().except(witch).ids();
+}
+
+export function applyWitchPoison(ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState {
+  const poisoned = decisions.flatMap((decision) => decision.targets)[0] ?? null;
+  if (poisoned === null) return ctx.state;
+  return { ...ctx.state, night: { ...ctx.state.night, poisoned }, potions: { ...ctx.state.potions, poison: false } };
+}
+
+/** 夜间结算：只算出死亡名单，天亮公布时才真正出局 */
+export function resolveNight(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
+  const { wolfTarget, saved, poisoned } = ctx.state.night;
+  const deaths: PendingDeath[] = [];
+  // 狼刀与毒药同一人时按毒杀记（猎人因此不能开枪）
+  if (wolfTarget !== null && !saved && wolfTarget !== poisoned) deaths.push({ seat: wolfTarget, cause: 'wolf' });
+  if (poisoned !== null) deaths.push({ seat: poisoned, cause: 'poison' });
+  return { state: { ...ctx.state, pendingDeaths: deaths.sort((a, b) => a.seat - b.seat) } };
+}
+
+/** 只计狼刀时狼人是否已经屠边：此时锁定狼人胜利 */
+function wolfKillLocksWin(ctx: WerewolfContext, deaths: readonly PendingDeath[]): boolean {
+  const victim = deaths.find((death) => death.cause === 'wolf')?.seat;
+  if (victim === undefined) return false;
+  return sideEliminated(ctx.seats.alive().except(victim).list());
+}
+
+/** 天亮公布死讯并让死者出局 */
+export function announceDawn(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
+  const deaths = ctx.state.pendingDeaths;
+  const winnerLock = wolfKillLocksWin(ctx, deaths) ? 'werewolf' : ctx.state.winnerLock;
+  const text = deaths.length
+    ? `天亮了，昨晚死亡的是：${deaths.map((death) => `${death.seat}号`).join('、')}。`
+    : '天亮了，昨晚是平安夜。';
+  return {
+    state: { ...ctx.state, pendingDeaths: [], lastNightDeaths: deaths.map((death) => death.seat), winnerLock },
+    log: [{ kind: 'narration', text }],
+    eliminate: deaths.map((death) => ({ seat: death.seat, reason: '昨晚死亡', cause: death.cause })),
+  };
+}

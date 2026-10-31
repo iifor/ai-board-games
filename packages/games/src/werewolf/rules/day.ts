@@ -1,0 +1,65 @@
+import type { ActDecision, ComputeOutcome, Seat, VoteOutcome } from '@battle/engine';
+import type { WerewolfState } from '../state';
+import { canVote, ring, type WerewolfContext } from './context';
+
+/** 警长左右两侧最近的存活玩家，警长从中选择发言起点 */
+export function directionTargets(ctx: WerewolfContext, sheriff: Seat): number[] {
+  const clockwise = ring(ctx, sheriff.seat, 1).find((seat) => seat !== sheriff.seat);
+  const counterclockwise = ring(ctx, sheriff.seat, -1).find((seat) => seat !== sheriff.seat);
+  return [...new Set([clockwise, counterclockwise].filter((seat): seat is number => seat !== undefined))];
+}
+
+export function applyDirection(ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState {
+  return { ...ctx.state, speechStart: decisions.flatMap((decision) => decision.targets)[0] ?? null };
+}
+
+export function describeDirection(_ctx: WerewolfContext, _seat: Seat, targets: readonly number[]): string {
+  const [start] = targets;
+  return start === undefined ? '没有指定发言顺序' : `指定从 ${start}号 开始发言`;
+}
+
+/**
+ * 白天发言顺序：
+ * - 存活警长选了起点：从起点出发、背离警长的方向依次发言，警长最后；
+ * - 否则：从昨晚最大号死者的下一位开始顺时针；平安夜则从种子决定的位置开始顺时针。
+ */
+export function daySpeakers(ctx: WerewolfContext): number[] {
+  const { sheriff, speechStart, lastNightDeaths } = ctx.state;
+  if (sheriff !== null && speechStart !== null && ctx.seats.get(sheriff).alive) {
+    const clockwiseNeighbor = ring(ctx, sheriff, 1).find((seat) => seat !== sheriff);
+    const step: 1 | -1 = speechStart === clockwiseNeighbor ? 1 : -1;
+    return [...ring(ctx, speechStart, step).filter((seat) => seat !== sheriff), sheriff];
+  }
+  const total = ctx.seats.count();
+  const lastDeath = lastNightDeaths.length ? Math.max(...lastNightDeaths) : null;
+  const start = lastDeath !== null ? (lastDeath % total) + 1 : ctx.random('speech-start').int(total) + 1;
+  return ring(ctx, start, 1);
+}
+
+export function exileVoters(ctx: WerewolfContext): Seat[] {
+  return ctx.seats.alive().where((seat) => canVote(ctx, seat)).list().slice();
+}
+
+/** 不能投自己；翻牌的白痴不能再被放逐 */
+export function exileCandidates(ctx: WerewolfContext, voter: Seat): number[] {
+  return ctx.seats.alive().except(voter).where((seat) => !(seat.role === 'idiot' && ctx.state.idiotRevealed)).ids();
+}
+
+export function recordExile(ctx: WerewolfContext, outcome: VoteOutcome): WerewolfState {
+  return { ...ctx.state, exileTarget: outcome.kind === 'selected' ? outcome.seat : null };
+}
+
+/** 白痴首次被放逐时翻牌免死；其他人出局；平票或全部弃票则无人出局 */
+export function resolveExile(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
+  const target = ctx.state.exileTarget;
+  const state = { ...ctx.state, exileTarget: null };
+  if (target === null) return { state, log: [{ kind: 'narration', text: '本轮无人被放逐。' }] };
+  const seat = ctx.seats.get(target);
+  if (seat.role === 'idiot' && !ctx.state.idiotRevealed) {
+    return {
+      state: { ...state, idiotRevealed: true },
+      log: [{ kind: 'revealed', text: `${target}号翻牌，身份是白痴，免于出局，但此后失去投票权。`, data: { seat: target, role: 'idiot' } }],
+    };
+  }
+  return { state, eliminate: [{ seat: target, reason: '被放逐', cause: 'exile' }] };
+}
