@@ -121,6 +121,20 @@ export const BOARDS: readonly BoardDefinition[] = [
     description: '大灰狼与 3 名狼人对抗预言家、女巫、猎人、占卜师与 4 名村民；大灰狼离群行动，全场可单独击杀一次。',
     roles: { big_bad_wolf: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, fortune_teller: 1, villager: 'rest' },
   }),
+  board({
+    key: 'hidden-wolf-crow-12',
+    name: '隐狼&乌鸦',
+    description: '隐狼与 3 名狼人对抗预言家、女巫、猎人、乌鸦与 4 名村民；隐狼查验为好人，狼同伴全灭后继承击杀权。',
+    roles: { hidden_wolf: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, crow: 1, villager: 'rest' },
+    config: { hiddenWolf: 'inherit' },
+  }),
+  board({
+    key: 'bear-tamer-hidden-wolf-12',
+    name: '驯熊师&隐狼',
+    description: '隐狼与 3 名狼人对抗驯熊师、女巫、猎人、白痴与 4 名村民；隐狼与狼人互不相认，狼人全灭时随之出局。',
+    roles: { hidden_wolf: 1, werewolf: 3, bear_tamer: 1, witch: 1, hunter: 1, idiot: 1, villager: 'rest' },
+    config: { hiddenWolf: 'linked' },
+  }),
 ];
 
 export const DEFAULT_BOARD = 'standard-12';
