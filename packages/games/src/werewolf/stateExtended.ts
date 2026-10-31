@@ -38,6 +38,8 @@ export const roleCheckSchema = z.object({
 export const thirdPartySchema = z.object({
   kind: z.enum(['lovers', 'requester']),
   seats: z.array(seatNo),
+  /** 核心成员：全部出局后第三方失败，其余成员回到普通胜负（丘比特的第三方以情侣为核心，其他第三方是全部成员） */
+  core: z.array(seatNo),
 });
 export type ThirdParty = z.infer<typeof thirdPartySchema>;
 

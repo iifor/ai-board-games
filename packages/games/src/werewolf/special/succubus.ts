@@ -29,7 +29,7 @@ function bond(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const state: WerewolfState = {
     ...ctx.state,
     lovers: [succubus, partner].sort((a, b) => a - b),
-    thirdParty: { kind: 'lovers', seats: [succubus, partner].sort((a, b) => a - b) },
+    thirdParty: { kind: 'lovers', seats: [succubus, partner].sort((a, b) => a - b), core: [succubus, partner].sort((a, b) => a - b) },
   };
   return {
     state: addSeatNote(addSeatNote(state, succubus, `你与 ${partner}号 结为情侣，组成第三方阵营。`), partner, text),

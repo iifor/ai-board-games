@@ -58,7 +58,7 @@ function bless(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
     state: {
       ...granted,
       requesterGift: gift,
-      thirdParty: gift === 'third' ? { kind: 'requester', seats: [requester] } : granted.thirdParty,
+      thirdParty: gift === 'third' ? { kind: 'requester', seats: [requester], core: [requester] } : granted.thirdParty,
     },
     log: [{ kind: 'narration', text, channel: `private:${requester}` }],
   };

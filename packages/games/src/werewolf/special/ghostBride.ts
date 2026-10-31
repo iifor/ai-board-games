@@ -52,7 +52,8 @@ function bond(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   if (bride === undefined || groom === undefined || witness === undefined) return {};
   const groomText = `鬼魂新娘 ${bride}号 选你作为新郎：你背叛原有阵营，与她和证婚人 ${witness}号 组成第三方阵营，需要让其他所有玩家出局才能获胜；你与新娘一方出局时另一方随之殉情。`;
   const witnessText = `鬼魂新娘 ${bride}号 与新郎 ${groom}号（身份是${roleName(ctx, groom)}）结为情侣，你被选为证婚人：你背叛原有阵营，与他们组成第三方阵营，需要让其他所有玩家出局才能获胜；情侣都出局后由你行使击杀。`;
-  let state: WerewolfState = { ...ctx.state, thirdParty: { kind: 'lovers', seats: [bride, groom, witness].sort((a, b) => a - b) } };
+  const members = [bride, groom, witness].sort((a, b) => a - b);
+  let state: WerewolfState = { ...ctx.state, thirdParty: { kind: 'lovers', seats: members, core: members } };
   state = addSeatNote(addSeatNote(addSeatNote(state, bride, `证婚人是 ${witness}号。`), groom, groomText), witness, witnessText);
   return {
     state,

@@ -58,17 +58,19 @@ describe('cupid', () => {
 
   it('forms a third party with a mixed couple; the wolf lover can void the kill', () => {
     const run = play(SEED, combine(link(wolf, villager), wolfVotes({ [wolf]: villagerC, [wolfB]: villagerB, [king]: villagerB })), BOARD);
-    expect(stateOf(run.snapshot).thirdParty).toEqual({ kind: 'lovers', seats: [wolf, villager, cupid].sort((a, b) => a - b) });
+    expect(stateOf(run.snapshot).thirdParty).toEqual({ kind: 'lovers', seats: [wolf, villager, cupid].sort((a, b) => a - b), core: [wolf, villager] });
     expect(entries(run, 'vote_tallied', 'wolf_kill')[0]?.outcome).toMatchObject({ kind: 'selected', seat: villagerB });
     expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
   });
 
-  it('takes the partner down by day when a lover is exiled', () => {
+  it('takes the partner down by day when a lover is exiled; the lone cupid then plays on as an ordinary seat', () => {
     const run = play(SEED, combine(link(wolf, villager), everyoneVotes('exile_vote', villager, 1)), BOARD);
     expect(eliminated(run).slice(0, 2)).toEqual([
       { seat: villager, round: 1, reason: '被放逐' },
       { seat: wolf, round: 1, reason: '殉情' },
     ]);
     expect(entries(run, 'speech', 'last_words').map((entry) => entry.seat)).toEqual([villager]);
+    expect(run.snapshot.seats.find((seat) => seat.seat === cupid)?.alive).toBe(true);
+    expect(run.snapshot.result?.winner).not.toBe('lovers');
   });
 });

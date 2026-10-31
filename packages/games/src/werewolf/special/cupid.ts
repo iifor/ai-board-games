@@ -30,7 +30,7 @@ function bond(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   let state: WerewolfState = {
     ...ctx.state,
     lovers: [first, second],
-    thirdParty: mixed ? { kind: 'lovers', seats: [...new Set([decision.seat, first, second])].sort((a, b) => a - b) } : ctx.state.thirdParty,
+    thirdParty: mixed ? { kind: 'lovers', seats: [...new Set([decision.seat, first, second])].sort((a, b) => a - b), core: [first, second] } : ctx.state.thirdParty,
   };
   state = addSeatNote(state, decision.seat, `你让 ${first}号 与 ${second}号 成为了情侣。`);
   state = addSeatNote(addSeatNote(state, first, loverNote(second)), second, loverNote(first));
