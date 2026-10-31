@@ -4,6 +4,7 @@ import { bigTreeShield } from '../special/bigTree';
 import { merchantBackfire } from '../special/blackMerchant';
 import { dreamDeaths, isDreamed } from '../special/dreamer';
 import { evilKnightReflect } from '../special/evilKnight';
+import { loverNightLink } from '../special/lovers';
 import { swapTarget } from '../special/magician';
 import { woundRogue } from '../special/oldRogue';
 import { stalkerAssassination } from '../special/stalker';
@@ -71,6 +72,7 @@ const NIGHT_STEPS: readonly NightStep[] = [
   merchantBackfire,
   dreamDeaths,
   wolfBeautyNightLink,
+  loverNightLink,
 ];
 
 /** 夜间结算：只算出死亡名单，天亮公布时才真正出局；结算中改变身份的座位与私下告知的信息随之生效 */

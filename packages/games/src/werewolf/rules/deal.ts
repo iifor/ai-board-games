@@ -16,7 +16,8 @@ function deckOf(board: BoardDefinition, seats: number): string[] {
   return [...cards, ...Object.entries(board.extraCards ?? {}).flatMap(([role, count]) => Array.from({ length: count }, () => role))];
 }
 
-function isWolfCard(role: string): boolean {
+/** 狼人阵营的牌（盗贼抽到时必须拿走） */
+export function isWolfCard(role: string): boolean {
   const team = roleCatalog()[role]?.spec.team;
   return team === 'werewolf' || team === 'lone_wolf';
 }
@@ -61,16 +62,11 @@ export function dealBoard(ctx: DealContext<WerewolfParams>): Assignment {
 export function initialThief(board: BoardDefinition, seats: SeatQuery): WerewolfState['thief'] {
   if (!board.extraCards) return null;
   const remaining = countRoles(seats.list().map((seat) => seat.role));
-  const cards: { role: string; name: string }[] = [];
+  const cards: string[] = [];
   for (const role of deckOf(board, seats.count())) {
     if ((remaining[role] ?? 0) > 0) remaining[role] = (remaining[role] ?? 0) - 1;
-    else cards.push({ role, name: roleCatalog()[role]?.spec.name ?? role });
+    else cards.push(role);
   }
-  const [first, second] = cards;
-  return {
-    seat: seats.withRole('thief').ids()[0] ?? null,
-    cards,
-    first: first?.name ?? '',
-    second: second?.name ?? '',
-  };
+  const label = (role: string | undefined): string => (role === undefined ? '' : `「${roleCatalog()[role]?.spec.name ?? role}」`);
+  return { seat: seats.withRole('thief').ids()[0] ?? null, cards, first: label(cards[0]), second: label(cards[1]) };
 }

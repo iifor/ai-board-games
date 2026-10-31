@@ -1,4 +1,5 @@
 import type { EndResult, Seat } from '@battle/engine';
+import { cupidSide, cupidSummary } from '../special/cupid';
 import { hiddenWolfDoomed } from '../special/hiddenWolf';
 import { hybridSummary } from '../special/hybrid';
 import { roleCategory } from './board';
@@ -69,6 +70,8 @@ export function onWinningSide(ctx: WerewolfContext, seat: number, winner: Werewo
   if (winner === 'bombman') return target.role === 'bombman';
   if (winner === 'lovers' || winner === 'requester') return inThirdParty(ctx, seat);
   if (inThirdParty(ctx, seat)) return false;
+  const side = cupidSide(ctx, target);
+  if (side !== null) return side === winner;
   return isWolf(target) === (winner === 'werewolf');
 }
 
@@ -81,10 +84,10 @@ function winReason(ctx: WerewolfContext, winner: WerewolfWinner): string {
   return '狼人票数已占优势';
 }
 
-/** 胜负说明后附加特殊角色的个人结果（如混血儿跟随主人） */
+/** 胜负说明后附加特殊角色的个人结果（混血儿跟随主人、丘比特跟随情侣） */
 function withNotes(ctx: WerewolfContext, winner: WerewolfWinner, summary: string): string {
-  const note = hybridSummary(ctx, winner);
-  return note === null ? summary : `${summary}；${note}`;
+  const notes = [hybridSummary(ctx, winner), cupidSummary(ctx, winner)].filter((note): note is string => note !== null);
+  return [summary, ...notes].join('；');
 }
 
 /** 达到天数上限：第三方以外还有狼人 → 狼人胜；否则还有第三方 → 第三方胜；都没有 → 好人胜 */

@@ -44,8 +44,9 @@ export type ThirdParty = z.infer<typeof thirdPartySchema>;
 export const thiefSchema = z.object({
   /** 本局的盗贼；盗贼牌被抽作底牌时为 null */
   seat: seatNo.nullable(),
-  /** 法官手中两张底牌的角色 key 与名称 */
-  cards: z.array(z.object({ role: z.string(), name: z.string() })),
+  /** 两张底牌的角色 key（按牌堆顺序） */
+  cards: z.array(z.string()),
+  /** 两张底牌的展示名（带书名号，避免与公开规则里的角色名相同而被当作泄露） */
   first: z.string(),
   second: z.string(),
 });

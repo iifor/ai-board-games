@@ -3,6 +3,7 @@ import type { WerewolfPhases } from '../phases/types';
 import { hasRole, roleCategory } from '../rules/board';
 import { nightActors } from '../rules/block';
 import { isWolf, type WerewolfContext } from '../rules/context';
+import { addSeatNote } from '../rules/notes';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
 import type { GiftSkill } from '../stateExtended';
@@ -52,14 +53,12 @@ function bless(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const gift = giftFor(ctx, ctx.seats.get(target));
   const text = `你祈求了 ${target}号，${OUTCOMES[gift]}。`;
   const skill = GIFT_SKILLS[gift];
-  const granted = skill === undefined ? ctx.state : grantGift(ctx.state, requester, skill);
-  const notes = ctx.state.seatNotes[String(requester)] ?? [];
+  const granted = addSeatNote(skill === undefined ? ctx.state : grantGift(ctx.state, requester, skill), requester, text);
   return {
     state: {
       ...granted,
       requesterGift: gift,
       thirdParty: gift === 'third' ? { kind: 'requester', seats: [requester] } : granted.thirdParty,
-      seatNotes: { ...granted.seatNotes, [String(requester)]: [...notes, text] },
     },
     log: [{ kind: 'narration', text, channel: `private:${requester}` }],
   };

@@ -38,4 +38,25 @@ export const EXTENDED_BOARDS: readonly BoardDefinition[] = [
     description: '恶魔与 3 名狼人对抗天眼、女巫、猎人、祈求者与 4 名村民；天眼验出具体身份，祈求者首夜按祈求对象获得能力，祈求到狼人则成为第三方。',
     roles: { demon: 1, werewolf: 3, heavenly_eye: 1, witch: 1, hunter: 1, requester: 1, villager: 'rest' },
   }),
+  board({
+    key: 'cupid-thief-12',
+    name: '丘比特&盗贼',
+    description: '14 张身份牌（开局抽出两张底牌）：盗贼、狼王、2 名狼人、预言家、女巫、猎人、白痴、丘比特与 5 名平民；丘比特首夜连出情侣，人狼恋时与情侣组成第三方。',
+    roles: { thief: 1, wolf_king: 1, werewolf: 2, seer: 1, witch: 1, hunter: 1, idiot: 1, cupid: 1, villager: 3 },
+    extraCards: { villager: 2 },
+  }),
+  board({
+    key: 'succubus-thief-12',
+    name: '魅魔&盗贼',
+    description: '14 张身份牌（开局抽出两张底牌）：盗贼、魅魔、3 名狼人、预言家、女巫、猎人、守卫与 5 名平民；魅魔混在狼队中，首夜与一名好人结为第三方情侣。',
+    roles: { thief: 1, succubus: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 3 },
+    extraCards: { villager: 2 },
+  }),
+  board({
+    key: 'ghost-bride-thief-12',
+    name: '鬼魂新娘&盗贼',
+    description: '14 张身份牌（开局抽出两张底牌）：盗贼、鬼魂新娘、3 名狼人、预言家、女巫、猎人、守卫与 5 名平民；鬼魂新娘与新郎、证婚人组成第三方。',
+    roles: { thief: 1, ghost_bride: 1, werewolf: 3, seer: 1, witch: 1, hunter: 1, guard: 1, villager: 3 },
+    extraCards: { villager: 2 },
+  }),
 ];
