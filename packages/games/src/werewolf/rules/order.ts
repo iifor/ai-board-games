@@ -96,3 +96,8 @@ export function nightAfter(id: (typeof NIGHT_ORDER)[number]): string {
 export function dayAfter(id: (typeof DAY_ORDER)[number]): string {
   return after(DAY_ORDER, id, 'night_start');
 }
+
+/** 当前阶段是否属于夜晚（含夜间结算）；开局尚无阶段时按夜晚算，游戏从天黑开始 */
+export function isNightPhase(phaseId: string | null): boolean {
+  return phaseId === null || phaseId.startsWith('night') || (NIGHT_ORDER as readonly string[]).includes(phaseId);
+}

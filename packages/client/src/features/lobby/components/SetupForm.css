@@ -1,31 +1,38 @@
 .setup-form {
   display: grid;
-  gap: 18px;
+  gap: 20px;
 }
 
 .setup-variant {
   display: grid;
-  gap: 4px;
-  max-width: 420px;
+  gap: 6px;
+  max-width: 480px;
+  padding: 16px 18px;
+  font-weight: 700;
 }
 
 .setup-variant select {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
+  padding: 8px 12px;
+  border: 1px solid rgba(149, 198, 255, 0.28);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: rgba(7, 24, 55, 0.68);
+}
+
+.setup-variant select option {
+  color: #111;
 }
 
 .setup-variant span {
-  color: var(--text-muted);
+  color: var(--ui-text-muted);
   font-size: 13px;
+  font-weight: 400;
 }
 
 .setup-players {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+  padding: 18px;
 }
 
 .setup-players-head {
@@ -36,20 +43,28 @@
 
 .setup-players-head h2 {
   margin: 0 auto 0 0;
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .setup-hint {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--ui-warning);
+  font-size: 14px;
 }
 
 .setup-error {
   margin: 0;
-  color: var(--danger);
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 105, 119, 0.4);
+  border-radius: var(--ui-radius-sm);
+  color: #ffd9dd;
+  background: rgba(91, 19, 35, 0.4);
 }
 
 .setup-form > .button-primary {
   justify-self: start;
-  padding: 8px 24px;
+  min-width: 180px;
+  min-height: 44px;
+  padding: 8px 28px;
+  font-size: 16px;
 }

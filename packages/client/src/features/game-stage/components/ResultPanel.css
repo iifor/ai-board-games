@@ -1,17 +1,84 @@
 .result-panel {
-  padding: 16px 20px;
-  border-color: var(--accent);
+  position: absolute;
+  z-index: 60;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 40%, rgba(18, 52, 111, 0.3), transparent 50%), rgba(1, 5, 17, 0.72);
+  backdrop-filter: blur(10px);
+  animation: result-backdrop var(--ui-motion-slow) ease both;
 }
 
-.result-panel h2 {
+.result-card {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  width: min(560px, calc(100% - 48px));
+  padding: 28px 32px 30px;
+  border-color: var(--ui-brand-soft);
+  text-align: center;
+  animation: result-card 0.7s var(--ui-ease-elastic) both;
+}
+
+.result-card h2 {
   margin: 0;
-  color: var(--accent);
+  color: var(--ui-brand-strong);
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 30px var(--ui-brand-soft);
 }
 
-.result-panel p {
-  margin: 6px 0 0;
+.result-card > p {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: 15px;
+}
+
+.result-mvp-block {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) 0.4s both;
+}
+
+.result-mvp-avatar {
+  display: grid;
+  place-items: center;
+  width: 110px;
+  height: 110px;
+  overflow: hidden;
+  border: 3px solid var(--ui-brand-strong);
+  border-radius: 50%;
+  background: rgba(5, 18, 45, 0.9);
+  box-shadow: 0 0 40px var(--ui-brand-soft);
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.result-mvp-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
 }
 
 .result-mvp {
-  font-weight: 600;
+  margin: 0;
+  color: #fff;
+  font-weight: 900;
+}
+
+@keyframes result-backdrop {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes result-card {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
 }

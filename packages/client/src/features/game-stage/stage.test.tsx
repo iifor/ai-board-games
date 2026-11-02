@@ -2,10 +2,14 @@ import type { AudienceView, StageEvent } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { matchStreamUrl } from '../../services/matches';
+import { resolvePoster } from '../../utils/posters';
 import { ResultPanel } from './components/ResultPanel';
+import { SubtitleBar } from './components/SubtitleBar';
+import { VoteBoard } from './components/VoteBoard';
 import { CircleLayout } from './layouts/CircleLayout';
 import { VersusLayout } from './layouts/VersusLayout';
 import { describeEvent, displayDuration, shouldSpeak } from './playback/describe';
+import { periodOf } from './utils';
 
 const seat = (no: number, team: string | null, position: number | null = null) => ({
   seat: no, name: `玩家${no}`, avatar: null, label: `${no}号 玩家${no}`, alive: no !== 3,
@@ -64,6 +68,42 @@ describe('layouts', () => {
     const html = renderToStaticMarkup(<ResultPanel result={{ winner: 'pro', winnerLabel: '正方胜出', summary: '正方胜出（评委 2:1）', mvp: 1, endReason: 'normal' }} view={view} />);
     expect(html).toContain('正方胜出');
     expect(html).toContain('MVP：1号 玩家1');
+  });
+});
+
+describe('stage visuals', () => {
+  it('maps player names to the built-in posters and falls back to the avatar', () => {
+    expect(resolvePoster('豆包', null)).toBe('/player-poster-cutouts/doubao.webp');
+    expect(resolvePoster('Claude', null, 'poster')).toBe('/player-posters/claude-code.webp');
+    expect(resolvePoster('通义 千问', null)).toBe('/player-poster-cutouts/qwen.webp');
+    expect(resolvePoster('阿明', 'https://x/a.png')).toBe('https://x/a.png');
+    expect(resolvePoster('阿明', null)).toBeNull();
+  });
+
+  it('derives day or night from the view, preferring what the game reports', () => {
+    expect(periodOf(null)).toBe('night');
+    expect(periodOf({ ...view, gameKey: 'werewolf', extra: { period: 'day' }, phase: { id: 'x', title: '天黑请闭眼' } })).toBe('day');
+    expect(periodOf({ ...view, gameKey: 'werewolf', extra: {}, phase: { id: 'x', title: '天黑请闭眼' } })).toBe('night');
+    expect(periodOf({ ...view, gameKey: 'werewolf', extra: {}, phase: { id: 'x', title: '白天发言' } })).toBe('day');
+    expect(periodOf(view)).toBe('day');
+  });
+
+  it('renders the subtitle bar with the speaker and the vote board with bars', () => {
+    const speech: StageEvent = { ...meta, kind: 'speech', seat: 1, text: '我的观点是' };
+    const subtitle = renderToStaticMarkup(<SubtitleBar item={{ event: speech, audio: null }} view={view} />);
+    expect(subtitle).toContain('玩家1');
+    expect(subtitle).toContain('我的观点是');
+    expect(subtitle).toContain('发言');
+    expect(renderToStaticMarkup(<SubtitleBar item={null} view={view} />)).toContain('is-idle');
+    const tally: StageEvent = {
+      ...meta, kind: 'vote_tallied', title: '评委投票', runoff: 0, ballots: [], abstained: [],
+      tally: [{ target: 1, votes: 2 }, { target: 2, votes: 1 }], tied: [], outcome: { kind: 'selected', seat: 1, byTieBreak: false },
+    };
+    const board = renderToStaticMarkup(<VoteBoard event={tally} view={view} />);
+    expect(board).toContain('评委投票');
+    expect(board).toContain('width:100%');
+    expect(board).toContain('width:50%');
+    expect(board).toContain('玩家1 当选');
   });
 });
 

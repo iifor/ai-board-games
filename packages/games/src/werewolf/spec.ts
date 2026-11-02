@@ -8,6 +8,7 @@ import { sheriffPhases } from './phases/sheriff';
 import { werewolfPrompts } from './prompts';
 import { roleSpecs } from './roles';
 import { dealBoard } from './rules/deal';
+import { isNightPhase } from './rules/order';
 import { decideWinner, werewolfResult } from './rules/victory';
 import { specialPhases, specialPrompts } from './special';
 import { initialWerewolfState } from './setup';
@@ -48,7 +49,13 @@ export const werewolfSpec = defineGame<WerewolfState, WerewolfParams>({
   presentation: {
     layout: 'circle',
     revealOnEnd: ['roles'],
-    view: (ctx) => ({ board: ctx.state.board.name, sheriff: ctx.state.sheriff, idiotRevealed: ctx.state.idiotRevealed }),
+    view: (ctx) => ({
+      board: ctx.state.board.name,
+      sheriff: ctx.state.sheriff,
+      idiotRevealed: ctx.state.idiotRevealed,
+      /** 昼夜，供舞台切换背景 */
+      period: isNightPhase(ctx.phaseId) ? 'night' : 'day',
+    }),
   },
 });
 

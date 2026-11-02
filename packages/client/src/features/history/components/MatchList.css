@@ -1,21 +1,41 @@
 .match-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.match-list li {
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) both;
+  transition: transform var(--ui-motion-normal) var(--ui-ease-out), border-color var(--ui-motion-fast) ease;
+}
+
+.match-list li:hover {
+  transform: translateX(6px);
+  border-color: var(--ui-border-strong);
 }
 
 .match-list a {
   display: grid;
   grid-template-columns: 1fr auto auto;
   gap: 16px;
-  padding: 12px 16px;
-  color: var(--text);
+  align-items: center;
+  padding: 14px 20px;
+  color: var(--ui-text);
   text-decoration: none;
 }
 
+.match-list span {
+  padding: 2px 12px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--game-accent-soft);
+  color: var(--game-accent-strong);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .match-list time {
-  color: var(--text-muted);
+  color: var(--ui-text-muted);
   font-size: 13px;
 }

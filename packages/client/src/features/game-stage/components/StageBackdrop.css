@@ -1,0 +1,75 @@
+.stage-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #02091b;
+  pointer-events: none;
+}
+
+.stage-backdrop-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background-position: center;
+  background-size: cover;
+  transition: opacity 1.2s ease-in-out, clip-path 1.5s ease-in-out;
+  will-change: opacity, clip-path;
+}
+
+.stage-backdrop-layer.is-night {
+  opacity: 1;
+  background-image:
+    linear-gradient(90deg, rgba(1, 6, 18, 0.66), transparent 28%, transparent 72%, rgba(1, 6, 18, 0.62)),
+    linear-gradient(180deg, rgba(1, 8, 26, 0.02), rgba(1, 6, 20, 0.3)),
+    url('/stage/werewolf-night.png');
+}
+
+.stage-backdrop-layer.is-day {
+  background-image:
+    linear-gradient(90deg, rgba(14, 25, 43, 0.48), transparent 28%, transparent 72%, rgba(25, 19, 14, 0.42)),
+    linear-gradient(180deg, rgba(246, 206, 137, 0.02), rgba(8, 18, 33, 0.2)),
+    url('/stage/werewolf-day.png');
+  clip-path: circle(0% at 50% 42%);
+}
+
+/* 天亮：白天图从中心圆形扩散揭开；夜晚图等揭开完成后再淡出 */
+.stage-backdrop[data-period='day'] .is-day {
+  opacity: 1;
+  clip-path: circle(125% at 50% 42%);
+}
+
+.stage-backdrop[data-period='day'] .is-night {
+  opacity: 0;
+  transition-delay: 1s;
+}
+
+.stage-backdrop-layer.is-debate {
+  opacity: 1;
+  background-image:
+    linear-gradient(90deg, rgba(3, 6, 14, 0.6), transparent 26%, transparent 74%, rgba(3, 6, 14, 0.6)),
+    linear-gradient(180deg, rgba(3, 6, 14, 0.1), rgba(3, 6, 14, 0.5)),
+    url('/stage/debate.png');
+}
+
+.stage-backdrop-layer.is-default {
+  opacity: 1;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(36, 74, 140, 0.45), transparent 48%),
+    linear-gradient(180deg, #071337, #02091b);
+}
+
+.stage-backdrop-grid {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(120, 170, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 170, 255, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px, 92px 92px;
+  mask-image: radial-gradient(circle at 50% 45%, black, transparent 78%);
+}
+
+.stage-backdrop-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 48%, transparent 0 48%, rgba(0, 4, 16, 0.32) 76%, rgba(0, 3, 12, 0.72) 100%);
+}

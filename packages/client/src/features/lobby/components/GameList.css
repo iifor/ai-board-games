@@ -1,34 +1,99 @@
 .game-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 420px));
+  gap: 24px;
+  justify-content: center;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .game-card {
+  position: relative;
   display: grid;
-  gap: 8px;
-  padding: 18px;
+  gap: 10px;
+  justify-items: center;
+  min-height: 360px;
+  padding: 36px 28px 28px;
+  overflow: hidden;
+  border: 1px solid rgba(160, 210, 255, 0.3);
+  border-radius: 22px;
+  color: #edf7ff;
+  background: linear-gradient(180deg, rgba(14, 30, 64, 0.84), rgba(6, 14, 36, 0.86));
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.38), inset 0 0 34px rgba(104, 171, 255, 0.1);
+  text-align: center;
+  transition: transform var(--ui-motion-normal) var(--ui-ease-out), border-color var(--ui-motion-normal) ease, box-shadow var(--ui-motion-normal) ease;
+}
+
+.game-card::before {
+  content: '';
+  position: absolute;
+  inset: -40% -20% auto;
+  height: 70%;
+  background: radial-gradient(circle at 50% 100%, var(--game-accent-soft), transparent 60%);
+  opacity: 0.8;
+  transition: opacity var(--ui-motion-normal) ease, transform var(--ui-motion-slow) var(--ui-ease-out);
+  pointer-events: none;
+}
+
+.game-card:hover {
+  transform: translateY(-8px);
+  border-color: rgba(224, 241, 255, 0.72);
+  box-shadow: 0 34px 96px rgba(0, 0, 0, 0.48), 0 0 34px var(--game-accent-soft);
+}
+
+.game-card:hover::before {
+  opacity: 1;
+  transform: translateY(8%);
+}
+
+.game-card[data-game='werewolf'] {
+  background: linear-gradient(180deg, rgba(63, 20, 50, 0.82), rgba(6, 13, 31, 0.86));
+}
+
+.game-card[data-game='debate'] {
+  background: linear-gradient(180deg, rgba(25, 50, 110, 0.82), rgba(6, 13, 31, 0.86));
+}
+
+.game-card-icon {
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 86px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(231, 245, 255, 0.38);
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.08), 0 0 28px var(--game-accent-soft);
+  transition: transform var(--ui-motion-slow) var(--ui-ease-elastic);
+}
+
+.game-card:hover .game-card-icon {
+  transform: scale(1.08) rotate(-6deg);
 }
 
 .game-card h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1.1;
 }
 
 .game-card p {
   margin: 0;
-  color: var(--text-muted);
+  color: rgba(226, 239, 255, 0.76);
+  font-size: 15px;
 }
 
 .game-card-meta {
+  color: rgba(224, 238, 255, 0.7);
   font-size: 13px;
-  color: var(--text-muted);
+  font-weight: 700;
 }
 
 .game-card .button {
-  justify-self: start;
-  text-decoration: none;
+  align-self: end;
+  min-width: 140px;
+  margin-top: 8px;
 }

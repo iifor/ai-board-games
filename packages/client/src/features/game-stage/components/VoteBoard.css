@@ -1,0 +1,86 @@
+.vote-board {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 360px);
+  padding: 12px 16px;
+  pointer-events: auto;
+  animation: ui-pop-in var(--ui-motion-slow) var(--ui-ease-out) both;
+}
+
+.vote-board ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vote-board li {
+  display: grid;
+  grid-template-columns: minmax(56px, auto) 1fr 28px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  animation: ui-slide-in-left var(--ui-motion-slow) var(--ui-ease-out) both;
+}
+
+.vote-board li span {
+  overflow: hidden;
+  font-weight: 800;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.vote-board li i {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vote-board li b {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--game-accent), var(--game-accent-strong));
+  box-shadow: 0 0 12px var(--game-accent-soft);
+  transform-origin: left;
+  animation: vote-bar-grow 0.6s var(--ui-ease-out) both;
+}
+
+.vote-board li strong {
+  text-align: right;
+  font-weight: 900;
+}
+
+.vote-board li.is-selected span,
+.vote-board li.is-selected strong {
+  color: var(--ui-warning);
+}
+
+.vote-board li.is-selected b {
+  background: linear-gradient(90deg, #ffb347, var(--ui-warning));
+  box-shadow: 0 0 14px rgba(255, 215, 106, 0.6);
+}
+
+.vote-board-empty {
+  color: var(--ui-text-muted);
+}
+
+.vote-board-outcome {
+  margin: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--ui-border);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  text-align: center;
+  animation: ui-pop-in var(--ui-motion-slow) var(--ui-ease-elastic) both;
+}
+
+@keyframes vote-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+}

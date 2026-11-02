@@ -1,63 +1,207 @@
 .seat-card {
+  --seat-ring: rgba(105, 159, 239, 0.6);
+  position: relative;
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid rgba(149, 198, 255, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(12, 25, 56, 0.78), rgba(5, 11, 28, 0.86));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(8px);
+  transition: transform var(--ui-motion-normal) var(--ui-ease-out), opacity var(--ui-motion-slow) ease, filter var(--ui-motion-slow) ease, box-shadow var(--ui-motion-normal) ease;
 }
 
-.seat-card-speaking {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-  transform: translateY(-2px);
-}
-
-.seat-card-out {
-  opacity: 0.45;
-  filter: grayscale(0.8);
+.seat-card-stack {
+  flex-direction: column;
+  gap: 6px;
+  width: 118px;
+  padding: 10px 8px 8px;
+  text-align: center;
 }
 
 .seat-card-avatar {
+  position: relative;
   display: grid;
   flex: none;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  overflow: hidden;
+  width: 56px;
+  height: 56px;
+  border: 2px solid var(--seat-ring);
   border-radius: 50%;
-  background: var(--surface-muted);
-  font-weight: 600;
+  background: rgba(3, 13, 35, 0.9);
+  box-shadow: 0 0 18px rgba(39, 104, 219, 0.16);
+  font-weight: 900;
+  transition: border-color var(--ui-motion-fast) ease, box-shadow var(--ui-motion-normal) ease, transform var(--ui-motion-normal) ease;
+}
+
+.seat-card-stack .seat-card-avatar {
+  width: 72px;
+  height: 72px;
 }
 
 .seat-card-avatar img {
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  border-radius: 50%;
   object-fit: cover;
+  object-position: top;
+}
+
+.seat-card-no {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 11px;
+  color: #061024;
+  background: #dfe9ff;
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .seat-card-body {
   display: grid;
   min-width: 0;
+  gap: 1px;
   font-size: 13px;
 }
 
 .seat-card-body strong {
   overflow: hidden;
+  font-size: 14px;
+  font-weight: 800;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.seat-card-role,
-.seat-card-badges {
-  color: var(--text-muted);
+.seat-card-role {
+  overflow: hidden;
+  color: var(--ui-text-muted);
   font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.seat-team-pro { border-left: 3px solid var(--pro); }
-.seat-team-con { border-left: 3px solid var(--con); }
-.seat-team-werewolf { border-left: 3px solid var(--wolf); }
-.seat-team-good { border-left: 3px solid var(--good); }
+.seat-card-badges {
+  display: flex;
+  gap: 4px;
+  justify-content: inherit;
+}
+
+.seat-card-stack .seat-card-badges {
+  justify-content: center;
+}
+
+.seat-card-badges em {
+  padding: 0 7px;
+  border: 1px solid rgba(255, 211, 94, 0.7);
+  border-radius: var(--ui-radius-pill);
+  color: #fff1b4;
+  background: rgba(85, 57, 9, 0.9);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  box-shadow: 0 0 16px rgba(255, 196, 61, 0.4);
+  animation: seat-badge-pop var(--ui-motion-slow) var(--ui-ease-elastic) both;
+}
+
+/* 正在发言：扩散光环 + 头像呼吸 */
+.seat-card-speaking {
+  border-color: var(--game-accent-strong);
+  box-shadow: 0 0 34px var(--game-accent-soft), 0 12px 30px rgba(0, 0, 0, 0.32);
+  transform: translateY(-4px) scale(1.04);
+}
+
+.seat-card-speaking .seat-card-avatar {
+  border-color: var(--game-accent-strong);
+  box-shadow: 0 0 36px var(--game-accent-soft);
+  animation: seat-speaker-avatar 0.8s ease-in-out infinite alternate;
+}
+
+.seat-card-speaking .seat-card-avatar::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--game-accent-strong);
+  border-radius: 50%;
+  animation: seat-speaker-ring 1s ease-out infinite;
+}
+
+.seat-card-speaking strong {
+  color: #fff;
+  text-shadow: 0 0 16px var(--game-accent-soft);
+}
+
+/* 出局：变灰 + 盖戳 */
+.seat-card-out {
+  opacity: 0.55;
+  filter: grayscale(0.9);
+}
+
+.seat-card-stamp {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  padding: 1px 8px;
+  border: 2px solid rgba(255, 93, 108, 0.9);
+  border-radius: 6px;
+  color: #ffd0d6;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  transform: rotate(-12deg);
+  animation: seat-stamp var(--ui-motion-slow) var(--ui-ease-elastic) both;
+}
+
+.seat-team-pro { --seat-ring: var(--team-pro); }
+.seat-team-con { --seat-ring: var(--team-con); }
+.seat-team-judge { --seat-ring: var(--team-judge); }
+.seat-team-werewolf { --seat-ring: var(--team-werewolf); }
+.seat-team-good { --seat-ring: var(--team-good); }
+
+/* 窄一些的窗口：环形布局的座位卡片缩小，避免相互遮挡 */
+@media (max-width: 1100px) {
+  .seat-card-stack {
+    width: 96px;
+    padding: 8px 6px 6px;
+  }
+
+  .seat-card-stack .seat-card-avatar {
+    width: 56px;
+    height: 56px;
+  }
+
+  .seat-card-stack .seat-card-body strong {
+    font-size: 13px;
+  }
+
+  .seat-card-stack .seat-card-role {
+    font-size: 11px;
+  }
+}
+
+@keyframes seat-speaker-ring {
+  0% { opacity: 0.9; transform: scale(0.9); }
+  80%, 100% { opacity: 0; transform: scale(1.4); }
+}
+
+@keyframes seat-speaker-avatar {
+  to { transform: scale(1.06); filter: brightness(1.15); }
+}
+
+@keyframes seat-stamp {
+  from { opacity: 0; transform: rotate(-12deg) scale(2); }
+}
+
+@keyframes seat-badge-pop {
+  from { opacity: 0; transform: scale(0.6); }
+}

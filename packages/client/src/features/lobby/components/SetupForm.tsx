@@ -22,7 +22,7 @@ export function SetupForm({ game, players }: SetupFormProps) {
   return (
     <form className="setup-form" onSubmit={(event) => { event.preventDefault(); void start(); }}>
       {game.variants.length ? (
-        <label className="setup-variant">
+        <label className="setup-variant glass-panel">
           板子
           <select value={setup.variant ?? ''} onChange={(event) => setup.setVariant(event.target.value)}>
             {game.variants.map((variant) => <option key={variant.key} value={variant.key}>{variant.name}</option>)}
@@ -30,7 +30,7 @@ export function SetupForm({ game, players }: SetupFormProps) {
           <span>{game.variants.find((variant) => variant.key === setup.variant)?.description}</span>
         </label>
       ) : null}
-      <section className="setup-players">
+      <section className="setup-players glass-panel">
         <div className="setup-players-head">
           <h2>选择玩家（{setup.selected.length} / {setup.range.min === setup.range.max ? setup.range.max : `${setup.range.min}–${setup.range.max}`}）</h2>
           <button type="button" className="button" onClick={setup.fillRandom}>随机补满</button>

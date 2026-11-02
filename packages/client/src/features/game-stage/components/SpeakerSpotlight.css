@@ -1,0 +1,59 @@
+.speaker-spotlight {
+  position: absolute;
+  z-index: 2;
+  top: 104px;
+  bottom: 172px;
+  left: 50%;
+  width: min(42vw, 520px);
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: spotlight-in 0.55s var(--ui-ease-out) both;
+}
+
+.speaker-spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 10% -20% -6%;
+  background: radial-gradient(ellipse at 50% 70%, var(--game-accent-soft), transparent 62%);
+  filter: blur(10px);
+}
+
+.speaker-spotlight img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.45));
+}
+
+.speaker-spotlight.is-host {
+  left: auto;
+  right: clamp(8px, 3vw, 48px);
+  bottom: 176px;
+  width: min(26vw, 300px);
+  height: min(44vh, 420px);
+  top: auto;
+  transform: none;
+  animation-name: spotlight-in-right;
+}
+
+@keyframes spotlight-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(14px) scale(0.97);
+  }
+}
+
+@keyframes spotlight-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@media (max-width: 860px) {
+  .speaker-spotlight {
+    display: none;
+  }
+}

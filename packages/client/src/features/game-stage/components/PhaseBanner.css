@@ -1,0 +1,54 @@
+.phase-banner {
+  position: absolute;
+  z-index: 35;
+  top: 30%;
+  left: 0;
+  right: 0;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 18px 0;
+  background: linear-gradient(90deg, transparent, rgba(4, 12, 34, 0.86) 20%, rgba(4, 12, 34, 0.86) 80%, transparent);
+  pointer-events: none;
+  animation: phase-banner 2.4s ease-in-out both;
+}
+
+.phase-banner::before,
+.phase-banner::after {
+  content: '';
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--game-accent-strong), transparent);
+}
+
+.phase-banner::before { top: 0; }
+.phase-banner::after { bottom: 0; }
+
+.phase-banner strong {
+  color: #fff;
+  font-size: clamp(28px, 3.6vw, 48px);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 30px var(--game-accent-soft), 0 6px 20px rgba(0, 0, 0, 0.6);
+}
+
+@keyframes phase-banner {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  16% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+  78% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 0 100%);
+  }
+}

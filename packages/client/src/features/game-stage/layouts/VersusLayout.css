@@ -1,61 +1,104 @@
 .versus-layout {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(0, 2.2fr) minmax(180px, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(200px, 300px) minmax(0, 1fr) minmax(200px, 300px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 16px 24px;
+  width: min(100%, 1280px);
+  height: 100%;
 }
 
 .versus-side {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 10px;
+  min-width: 0;
 }
 
-.versus-side h3 {
-  margin: 0;
-  font-size: 14px;
+.versus-side h3,
+.versus-bench h3 {
+  margin: 0 0 4px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid currentcolor;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
 }
 
-.versus-side-pro h3 { color: var(--pro); }
-.versus-side-con h3 { color: var(--con); }
+.versus-side-pro h3 {
+  color: var(--team-pro);
+  text-shadow: 0 0 18px rgba(82, 215, 255, 0.35);
+}
+
+.versus-side-con h3 {
+  color: var(--team-con);
+  text-align: right;
+  text-shadow: 0 0 18px rgba(255, 107, 114, 0.3);
+}
+
+.versus-bench h3 {
+  color: var(--team-judge);
+  font-size: 15px;
+  text-align: center;
+}
 
 .versus-center {
   display: grid;
   align-content: start;
+  justify-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .versus-topic {
-  padding: 14px 18px;
+  display: grid;
+  gap: 6px;
+  width: min(100%, 560px);
+  padding: 16px 22px;
+  text-align: center;
 }
 
 .versus-topic h2 {
-  margin: 0 0 8px;
-  font-size: 18px;
+  margin: 0;
+  font-size: clamp(18px, 1.8vw, 24px);
+  font-weight: 900;
 }
 
 .versus-topic p {
-  margin: 4px 0;
+  margin: 0;
+  color: var(--ui-text-muted);
   font-size: 14px;
 }
 
 .versus-pro,
 .versus-con {
   margin-right: 8px;
-  font-weight: 600;
+  font-weight: 800;
 }
 
-.versus-pro { color: var(--pro); }
-.versus-con { color: var(--con); }
+.versus-pro { color: var(--team-pro); }
+.versus-con { color: var(--team-con); }
 
 .versus-bench {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 8px;
 }
 
-@media (max-width: 760px) {
+.versus-bench-seats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+@media (max-width: 860px) {
   .versus-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    height: auto;
+  }
+
+  .versus-side-con h3 {
+    text-align: left;
   }
 }

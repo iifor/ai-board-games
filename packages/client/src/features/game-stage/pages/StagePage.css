@@ -1,10 +1,110 @@
-.stage-page {
+.stage-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  color: var(--ui-text);
+  background: #02091b;
+  isolation: isolate;
+}
+
+/* 层级：背景 0 → 聚光立绘 2 → 座位与舞台中央 4 → 阶段横幅 35 → HUD / 控制条 / 记录 40 → 终局 60 */
+.stage-arena {
+  position: absolute;
+  z-index: 4;
+  inset: 96px 24px 170px;
   display: grid;
-  gap: 16px;
+  place-items: center;
+  min-width: 0;
+}
+
+.stage-waiting {
+  color: var(--ui-text-muted);
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  animation: stage-waiting 1.6s ease-in-out infinite;
+}
+
+@keyframes stage-waiting {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.stage-feed {
+  position: absolute;
+  z-index: 40;
+  top: 96px;
+  right: 24px;
+  bottom: 170px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(380px, calc(100vw - 48px));
+  transform: translateX(calc(100% + 48px));
+  transition: transform var(--ui-motion-slow) var(--ui-ease-out);
+}
+
+.stage-feed.is-open {
+  transform: none;
+}
+
+.stage-feed header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .stage-feed h2 {
   margin: 0;
-  padding: 12px 12px 0;
   font-size: 15px;
+}
+
+.stage-exit {
+  position: absolute;
+  z-index: 40;
+  bottom: 22px;
+  left: 24px;
+}
+
+.stage-error {
+  position: absolute;
+  z-index: 50;
+  top: 96px;
+  left: 50%;
+  padding: 0 16px;
+  transform: translateX(-50%);
+}
+
+/* 窄屏退化为自上而下的普通页面 */
+@media (max-width: 860px) {
+  .stage-shell {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 100vh;
+    padding: 12px;
+    overflow: visible;
+  }
+
+  .stage-shell > :not(.stage-backdrop) {
+    position: static;
+    inset: auto;
+    width: auto;
+    max-width: none;
+    transform: none;
+  }
+
+  .stage-backdrop {
+    position: fixed;
+  }
+
+  .stage-feed {
+    max-height: 360px;
+  }
+
+  .stage-feed:not(.is-open) {
+    display: none;
+  }
 }

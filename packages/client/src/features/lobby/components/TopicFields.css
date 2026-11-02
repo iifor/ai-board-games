@@ -1,29 +1,44 @@
 .topic-fields {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  padding: 16px 18px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-bg-surface-soft);
+}
+
+.topic-fields legend {
+  padding: 0 6px;
+  color: var(--ui-text-muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .topic-fields label {
   display: grid;
   gap: 4px;
   font-size: 14px;
+  font-weight: 700;
 }
 
 .topic-fields input {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
+  padding: 8px 12px;
+  border: 1px solid rgba(149, 198, 255, 0.28);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: rgba(7, 24, 55, 0.68);
+  font-weight: 400;
+  transition: border-color var(--ui-motion-fast) ease, box-shadow var(--ui-motion-fast) ease;
+}
+
+.topic-fields input:focus {
+  border-color: var(--game-accent-strong);
+  box-shadow: 0 0 14px var(--game-accent-soft);
 }
 
 .topic-fields-hint {
   margin: 0;
-  color: var(--danger);
+  color: var(--ui-warning);
   font-size: 13px;
 }

@@ -1,24 +1,46 @@
 .event-feed {
   display: grid;
-  gap: 6px;
-  max-height: 420px;
+  gap: 8px;
+  min-height: 0;
   margin: 0;
-  padding: 12px;
+  padding: 12px 14px;
   overflow-y: auto;
   list-style: none;
   font-size: 13px;
+  scrollbar-width: thin;
+}
+
+.event-feed li {
+  padding: 8px 10px;
+  border-radius: var(--ui-radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  line-height: 1.5;
+  animation: ui-slide-in-left var(--ui-motion-normal) var(--ui-ease-out) both;
 }
 
 .event-feed li span {
   margin-right: 6px;
-  color: var(--text-muted);
+  color: var(--game-accent-strong);
+  font-weight: 800;
 }
 
 .event-feed-phase_started {
-  margin-top: 6px;
-  color: var(--accent);
+  margin-top: 4px;
+  background: transparent !important;
+  color: var(--ui-text-muted);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.event-feed-seat_eliminated {
+  border-left: 3px solid var(--ui-danger);
+}
+
+.event-feed-vote_tallied {
+  border-left: 3px solid var(--ui-warning);
 }
 
 .event-feed-game_over {
-  font-weight: 600;
+  border-left: 3px solid var(--ui-brand);
+  font-weight: 800;
 }

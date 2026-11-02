@@ -1,12 +1,32 @@
 .status-view {
   display: grid;
   place-items: center;
-  gap: 8px;
-  padding: 48px 16px;
-  color: var(--text-muted);
+  gap: 10px;
+  padding: 56px 16px;
+  color: var(--ui-text-muted);
   text-align: center;
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) both;
+}
+
+.status-view-loading p::after {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 10px;
+  border: 2px solid var(--game-accent-soft);
+  border-top-color: var(--game-accent-strong);
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: status-spin 0.9s linear infinite;
 }
 
 .status-view-error {
-  color: var(--danger);
+  color: #ffd9dd;
+}
+
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
