@@ -1,5 +1,5 @@
 import { API_ERROR_CODES, type MatchDetailDto, type MatchSummaryDto, type ModelDto } from '@battle/shared';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { failingLlm, quotaExhaustedLlm, runUntilSettled, scriptedLlm, seedPlayers } from './support/fixtures';
 import { createTestApp, dataOf, type TestApp } from './support/testApp';
 
@@ -167,6 +167,52 @@ describe('public matches', () => {
   it('lists only completed public matches in history', async () => {
     const history = dataOf(await t.call<MatchSummaryDto[]>('GET', '/api/toc/matches'));
     expect(history.every((match) => match.status === 'completed' && !match.debug)).toBe(true);
+  });
+});
+
+describe('match listing and viewer progress', () => {
+  let t: TestApp;
+  let token: string;
+  const created: MatchSummaryDto[] = [];
+  beforeAll(async () => {
+    t = await createTestApp();
+    token = await t.adminToken();
+    // worker 不启动：对局停在开局后的 waiting_ai，事件数稳定
+    for (let index = 0; index < 3; index += 1) {
+      const playerIds = await seedPlayers(t, 9);
+      created.push(await t.services.matches.createDebug({ gameKey: 'debate', playerIds, scripted: true, pacing: 'free' }));
+    }
+  });
+  afterAll(async () => t.cleanup());
+
+  it('lists seats for every match in a bounded number of queries', async () => {
+    const listed = dataOf(await t.call<MatchSummaryDto[]>('GET', '/api/admin/matches', { token }));
+    expect(listed.map((match) => match.id).sort()).toEqual(created.map((match) => match.id).sort());
+    // 列表里每局的座位与单独查该局时一致，且按座位号排序
+    for (const match of listed) {
+      expect(match.seats).toEqual(dataOf(await t.call<MatchSummaryDto>('GET', `/api/admin/matches/${match.id}`, { token })).seats);
+      expect(match.seats.map((seat) => seat.seat)).toEqual(match.seats.map((_seat, index) => index + 1));
+    }
+    // 对局一查、座位一查：查询次数不随对局数增加
+    const executeQuery = vi.spyOn(t.db.getExecutor(), 'executeQuery');
+    try {
+      const again = await t.services.matches.list({ limit: 50 });
+      expect(again).toEqual(listed);
+      expect(executeQuery).toHaveBeenCalledTimes(2);
+    } finally {
+      executeQuery.mockRestore();
+    }
+  });
+
+  it('never records an acknowledgement beyond the events that exist', async () => {
+    const id = created[0]?.id ?? '';
+    const before = await t.services.repositories.matches.find(id);
+    expect(before?.lastSeq).toBeGreaterThan(0);
+    // 重连时客户端报的 afterSeq 若超过已有事件，确认进度只记到 last_seq，ack 节奏的闸门不会被抬到事件之前；也只增不减
+    await t.services.repositories.matches.markAcked(id, 1_000_000);
+    expect((await t.services.repositories.matches.find(id))?.ackedSeq).toBe(before?.lastSeq);
+    await t.services.repositories.matches.markAcked(id, 0);
+    expect((await t.services.repositories.matches.find(id))?.ackedSeq).toBe(before?.lastSeq);
   });
 });
 

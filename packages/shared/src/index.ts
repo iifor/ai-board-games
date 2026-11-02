@@ -37,6 +37,9 @@ export type {
   ServerMessage,
 } from './api/matches';
 export type { GameCatalogItem, GameVariantItem, StageLayout, VariantRoleItem } from './catalog';
+export { formatMatchTitle } from './format';
+export { speechOf } from './speech';
+export type { SpeechContent } from './speech';
 export type {
   AudienceSeat,
   AudienceView,

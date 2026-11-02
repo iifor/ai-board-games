@@ -6,6 +6,8 @@ import { z } from 'zod';
 export const MAX_CLIENT_FRAME_BYTES = 16 * 1024;
 /** WebSocket 关闭码：违反协议约定（帧过大） */
 export const POLICY_VIOLATION_CODE = 1008;
+/** ws 自身按 maxPayload 拒绝过大帧时使用的关闭码（message too big） */
+export const MESSAGE_TOO_BIG_CODE = 1009;
 
 const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('hello'), afterSeq: z.number().int().min(0) }),

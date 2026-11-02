@@ -1,4 +1,4 @@
-import type { AudioRef, StageEvent } from '@battle/shared';
+import { speechOf, type AudioRef, type StageEvent } from '@battle/shared';
 import type { MatchRepository } from '../matches/repository';
 import type { TtsService, VoiceChoice } from '../tts';
 import type { VoiceRepository } from '../voices/repository';
@@ -12,25 +12,10 @@ export interface AudioResolverDeps {
   readonly tts: Pick<TtsService, 'audioFor'>;
 }
 
-function speakable(event: StageEvent): { text: string; seat: number | null } | null {
-  switch (event.kind) {
-    case 'speech':
-      return { text: event.text, seat: event.seat };
-    case 'judgement':
-      return { text: event.comment, seat: event.seat };
-    case 'narration':
-    case 'revealed':
-      return { text: event.text, seat: null };
-    case 'action':
-      return { text: event.text, seat: null };
-    case 'game_over':
-      return { text: event.result.summary, seat: null };
-    default:
-      return null;
-  }
-}
-
-/** 为舞台事件准备语音：按座位音色合成，结果在进程内去重并由 TTS 服务持久缓存 */
+/**
+ * 为舞台事件准备语音：按座位音色合成，结果在进程内去重并由 TTS 服务持久缓存。
+ * 哪些事件朗读、读什么由 @battle/shared 的 speechOf 决定，与客户端的浏览器朗读共用同一口径。
+ */
 export function createAudioResolver(deps: AudioResolverDeps) {
   const inflight = new Map<string, Promise<AudioRef | null>>();
 
@@ -43,7 +28,7 @@ export function createAudioResolver(deps: AudioResolverDeps) {
 
   return {
     audioFor(matchId: string, event: StageEvent, scripted: boolean): Promise<AudioRef | null> {
-      const content = scripted ? null : speakable(event);
+      const content = scripted ? null : speechOf(event);
       if (!content) return Promise.resolve(null);
       const key = `${matchId}:${event.seq}`;
       const existing = inflight.get(key);

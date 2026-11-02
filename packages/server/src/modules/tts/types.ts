@@ -17,6 +17,8 @@ export interface VoiceSpec {
 
 /** 云端语音合成；browser 音色由前端自己朗读，不经过服务端 */
 export interface TtsProvider {
+  /** 合成器自身会改变音频的参数（模型名、输出格式等），参与音频缓存键：换模型不会命中旧缓存 */
+  readonly signature: string;
   synthesize(text: string, voice: VoiceSpec): Promise<SynthesizedAudio>;
 }
 

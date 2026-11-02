@@ -12,7 +12,7 @@ Node 22 LTS + Hono（HTTP 与 WebSocket）+ Kysely（pg，类型安全 SQL 构�
 
 ```txt
 src/
-  index.ts          入口：加载配置 → 连接数据库 → 迁移 → 初始化管理员 → 启动 HTTP，处理优雅关闭
+  index.ts          入口：加载配置 → 连接数据库 → 迁移 → 初始化管理员 → 启动 HTTP，处理有上限的优雅关闭（见"优雅关闭"）
   app.ts            路由装配与全局中间件；路由只拿到 service（含 health、realtime），不直接接触仓储或数据库
   container.ts      组合根：创建 repository / service 并注入依赖
   types.ts          Hono 上下文类型（requestId、admin）
@@ -48,13 +48,17 @@ src/
 | `POST /api/admin/voices/import-defaults` | 导入内置音色目录（`modules/voices/catalog.ts`，沿用旧版默认语音包），按（来源、音色名、风格）与名称去重，可重复执行 | 管理员 |
 | 同上 `/api/admin/players` | AI 玩家（模型、音色引用检查） | 管理员 |
 | `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`）；每来源每小时 10 局（来源默认是连接地址，`TRUST_PROXY=true` 时才取 `X-Forwarded-For`），进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制（上限判断与插入在同一事务内用 advisory lock 串行化，并发请求不会一起越过）；公开接口请求体上限 64 KB | 无 |
-| `GET /api/toc/matches`、`GET /api/toc/matches/:id` | 已完成的公开对局历史、对局概要（含舞台布局 `layout`，前端不必再查游戏目录；游戏已不在注册表时为 `circle`） | 无 |
+| `GET /api/toc/matches`、`GET /api/toc/matches/:id` | 已完成的公开对局历史、对局概要（含舞台布局 `layout`，前端不必再查游戏目录；游戏已不在注册表时为 `circle`）。调试局的可见性见"调试局对外可见性" | 无 |
 | `GET /api/media/:id` | 合成音频（按音色与文本哈希寻址，长期缓存） | 无 |
-| `WS /api/toc/ws/matches/:id` | 播放流，见下文"实时推送"；客户端帧超过 16 KB 直接以 1008 关闭 | 无 |
-| `GET/POST /api/admin/matches` | 全部对局（筛选 status、debug）/ 创建调试局（seed、breakpoints、pacing、scripted） | 管理员 |
+| `WS /api/toc/ws/matches/:id` | 播放流，见下文"实时推送"；客户端帧超过 16 KB 直接以 1008 关闭；对局可见性与 `GET /api/toc/matches/:id` 同一口径 | 无 |
+| `GET/POST /api/admin/matches` | 全部对局（筛选 status、debug；公开历史与这里的列表都是对局一查、座位一查，不随条数增加查询）/ 创建调试局（seed、breakpoints、pacing、scripted） | 管理员 |
 | `GET /api/admin/matches/:id`、`/log`、`/ai-calls` | 详情、完整日志（含私密与 host 频道）、AI 调用记录（分层 prompt、原始响应、耗时） | 管理员 |
 | `POST /api/admin/matches/:id/debug`、`DELETE /api/admin/matches/:id` | 调试指令（continue / step / run / skip）、删除对局 | 管理员 |
 | `GET /api/admin/games/:key/phases` | 游戏阶段图（阶段、类型、标题、跳转目标），供调试台使用 | 管理员 |
+
+### 调试局对外可见性
+
+调试局（`debug = true`）从不出现在公开历史列表里；按 ID 的公开概要与播放流是否能看到它由 `MatchService` 的 `debugVisibleToPublic` 决定（组合根按 `NODE_ENV` 注入，不是全局变量）：生产环境视为不存在（概要 404，播放流回 `error: 对局不存在`），开发与测试环境可见，因为验收脚本化调试局时要用 C 端舞台观看。后台接口不受影响。播放流的 `find` 走 `MatchService.findPublic`，与概要接口共用同一判断。
 
 ## 鉴权
 
@@ -71,10 +75,11 @@ src/
 
 - **推进**（`modules/matches/runtime.ts`）：一个事务内 `SELECT … FOR UPDATE` 锁定对局行 → 调用引擎 `advance` → 写回快照、新的 AI 任务、舞台事件，以及（来自 worker 时）完成的任务；提交后通过进程内事件总线通知 worker 与实时网关。引擎计算放在 try 内：`EngineInputError` 对 AI 结果视为过期（任务记为 cancelled），对其他输入返回 409；引擎其他异常把对局标为 failed。数据库错误不吞掉，整个事务回滚并向上抛出。完结任务只作用于仍为 queued / running 的任务：迟到的重复结果不会把已 succeeded 的任务改写成 cancelled。
 - **AI worker**（`modules/ai-worker`）：事件驱动 + 每秒兜底轮询。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型），每次领取 `attempts` 加一。执行或推进抛错（如数据库故障）时只记日志等待重新领取；领取次数达到 `AI_TASK_MAX_ATTEMPTS`（默认 3）仍失败则由 `runtime.failMatch` 把对局标为 failed（错误"AI 处理多次失败，对局已终止"）、任务记为 failed、其余任务取消，并通过总线通知在线观众，不再无限重试、重复付费调用模型。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；否则依次尝试座位玩家的主模型与备用模型中仍启用的部分（主模型被停用时直接用备用模型），每个模型最多 2 次传输层尝试（429 / 5xx / 超时可重试），全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`。
+- **优雅关闭**（`src/index.ts`）：收到 SIGINT / SIGTERM 后先停回收器，再 `worker.stop()`：不再领取新任务，等待进行中的任务最多 `SHUTDOWN_TIMEOUT_MS`（默认 10 秒），超时则记录还没结束的任务（matchId、requestId）并继续关闭——它们的领取在 10 分钟后过期，由下一个实例重新领取。随后关闭监听与连接池；整个关闭流程超过 2 倍 `SHUTDOWN_TIMEOUT_MS` 仍没结束（例如被卡住的任务占着连接）就直接退出。
 - **无人观看回收**（`modules/matches/reaper.ts`）：每分钟把 `MATCH_IDLE_MINUTES` 内没有动静（既没推进也没有观众确认，`updated_at` 在确认时也会刷新）的 ack 节奏公开对局标为 failed 并取消其排队任务，通过总线通知在线观众；调试局不回收。进行中计数也只算这个窗口内有动静的对局。
 - **额度耗尽自动停用**：供应商返回 4xx 且错误码在 `modules/llm/quota.ts` 的列表中（百炼 `Arrearage` / `AllocationQuota.FreeTierOnly`、火山 `*BillOverdue`、OpenAI `insufficient_quota` 等）时，LLM 客户端抛出 `quotaExhausted` 的 `LlmError`；worker 不重试，把该模型标为 `enabled = false`、`disabled_reason = 'quota_exhausted'` 并切换备用模型。管理员补充额度后在后台"测试"通过再"重新启用"（`PUT` 时 `enabled: true` 清除原因）。普通限流（429 但没有这些错误码）仍只是重试。
 - **LLM**（`modules/llm`）：OpenAI 兼容 Chat Completions，要求 JSON 对象输出，`toChatMessages` 排布分层 prompt；从回复中提取 JSON（兼容代码块），取不出时把原文交给引擎校验并重问。
-- **TTS**（`modules/tts`）：Azure（REST，不依赖 SDK；SSML 带语言、`mstts:express-as` 风格、prosody 语速与音调）与 Mimo（OpenAI 兼容；风格作为前置的 user 指令）；`browser` 音色与脚本化对局不合成。音频存入 `media_assets`，按（来源、音色名、语言、风格、语速、音调、文本）哈希去重；对局播放中合成失败只记日志，前端退回浏览器朗读或字幕；后台试听走同一条 `synthesize`，失败则以 50201 把原因返回给管理员。主持播报使用名为"主持人"的音色（没有则不合成）。
+- **TTS**（`modules/tts`）：Azure（REST，不依赖 SDK；SSML 带语言、`mstts:express-as` 风格、prosody 语速与音调）与 Mimo（OpenAI 兼容；风格作为前置的 user 指令）；`browser` 音色与脚本化对局不合成。哪些舞台事件朗读、读什么，由 `@battle/shared` 的 `speechOf` 决定（`realtime/audio.ts` 直接调用，与客户端的浏览器朗读同一口径）：玩家发言按座位音色；评委判定连同点评一起读（`判定。点评`）按座位音色；播报、揭示、行动（开枪、自爆……）、终局总结由名为"主持人"的音色读（没有则不合成）；阶段标题、计票、出局、兜底记录不朗读。音频存入 `media_assets`，按（来源、合成器签名、音色名、语言、风格、语速、音调、文本）哈希去重——合成器签名是每个 `TtsProvider` 的 `signature`（Mimo 为模型名与音频格式，Azure 为输出格式），换模型不会命中旧缓存；对局播放中合成失败只记日志，前端退回浏览器朗读或字幕；后台试听走同一条 `synthesize`，失败则以 50201 把原因返回给管理员。
 
 ## 实时推送
 
@@ -84,9 +89,9 @@ src/
 2. 服务端逐个推送 `{ type: 'event', event, audio }`，客户端播放完毕发送 `{ type: 'ack', seq }` 后才推送下一个；推送时预先为之后的 3 个事件准备语音。
 3. 暂时没有新事件时推送 `status`（状态没变不重复发）；对局结束且事件推完后推送 `{ type: 'end', result }` 并关闭；失败推送 `status: failed`。推送进行中收到的总线通知会记为"待重查"，本轮结束后再查一次，不会丢掉唤醒。
 4. 等待"尚未产生的事件"期间，每 `STREAM_POLL_MS`（默认 2000 毫秒）兜底重查一次数据库：事件总线只在进程内，另一实例的 worker 提交的事件靠它发现；等待观众 ack 期间不查（推送由 ack 驱动），连接关闭时清掉定时器。
-5. 断线重连用最后确认的 seq 作为 `afterSeq` 续播；已结束的对局从 0 开始即为回放，与实时走同一条路径。
-6. 多个观众时，`matches.acked_seq` 取最大确认值。
-7. 客户端帧上限 16 KB（`MAX_CLIENT_FRAME_BYTES`，按 UTF-8 字节计）：超过的帧不解析，直接以 1008（policy violation）关闭。`createNodeWebSocket` 不能透传 ws 的 `maxPayload`，所以检查发生在整帧收到之后；ws 自身的上限仍是默认的 100 MB。
+5. 断线重连用最后确认的 seq 作为 `afterSeq` 续播；已结束的对局从 0 开始即为回放，与实时走同一条路径。`afterSeq > 0` 同时视为对该进度的一次确认：第一次查到对局后补记 `markAcked(afterSeq)`（断线前最后一次 ack 可能没送到，后台"观众确认"不会少一个；补记失败只记日志不影响续播），对公开接口不可见的对局不补记。
+6. 多个观众时，`matches.acked_seq` 取最大确认值；确认进度只增不减，且不超过 `last_seq`（客户端报的 `afterSeq` 不能把 ack 节奏的闸门抬到事件之前）。
+7. 客户端帧上限 16 KB（`MAX_CLIENT_FRAME_BYTES`，按 UTF-8 字节计）：`app.ts` 把它设成 ws 服务器的 `maxPayload`（`createNodeWebSocket` 不透传选项，但 ws 在升级连接时才读取 `wss.options`），超过的帧在协议层就以 1009（message too big）关闭、不会先缓冲整帧；网关在解析前再按字节数检查一次，命中时以 1008 关闭，作为第二道防线。
 
 ### 多实例限制
 
@@ -112,7 +117,7 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 
 ## 配置
 
-见 `.env.example`：`PORT`（默认 3100）、`DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_POOL_MAX`、`JWT_SECRET`（≥32 字符）、`SECRET_KEY`、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（≥12 字符）、`AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`、`MIMO_API_KEY` / `MIMO_BASE_URL` / `MIMO_TTS_MODEL`、`AI_CONCURRENCY`（默认 4）、`AI_TASK_MAX_ATTEMPTS`（默认 3，一个 AI 任务最多领取几次）、`MAX_ACTIVE_MATCHES`（默认 5）、`MATCH_IDLE_MINUTES`（默认 30）、`STREAM_POLL_MS`（默认 2000，播放流等待新事件时的兜底重查间隔）、`TRUST_PROXY`（默认 false）。`pnpm --filter @battle/server dev` 读取根目录 `.env`。
+见 `.env.example`：`PORT`（默认 3100）、`DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_POOL_MAX`、`JWT_SECRET`（≥32 字符）、`SECRET_KEY`、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（≥12 字符）、`AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`、`MIMO_API_KEY` / `MIMO_BASE_URL` / `MIMO_TTS_MODEL`、`AI_CONCURRENCY`（默认 4）、`AI_TASK_MAX_ATTEMPTS`（默认 3，一个 AI 任务最多领取几次）、`MAX_ACTIVE_MATCHES`（默认 5）、`MATCH_IDLE_MINUTES`（默认 30）、`STREAM_POLL_MS`（默认 2000，播放流等待新事件时的兜底重查间隔）、`SHUTDOWN_TIMEOUT_MS`（默认 10000，优雅关闭时最多等待进行中 AI 任务的毫秒数）、`TRUST_PROXY`（默认 false）；`NODE_ENV` 为 `production` 时调试局对公开接口不可见。`pnpm --filter @battle/server dev` 读取根目录 `.env`。
 
 ## 测试
 

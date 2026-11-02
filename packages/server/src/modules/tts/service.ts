@@ -3,15 +3,15 @@ import type { AudioRef, VoiceProvider } from '@battle/shared';
 import { badRequest, upstream } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import type { MediaRepository } from './repository';
-import type { TtsProviders, VoiceSpec } from './types';
+import type { TtsProvider, TtsProviders, VoiceSpec } from './types';
 
 export interface VoiceChoice extends VoiceSpec {
   readonly provider: VoiceProvider;
 }
 
-/** 音频按（来源、音色及其参数、文本）哈希寻址，参数不同不会复用缓存 */
-function assetId(voice: VoiceChoice, text: string): string {
-  const key = [voice.provider, voice.voiceName, voice.language, voice.style, voice.rate, voice.pitch, text].join('\u0000');
+/** 音频按（来源、合成器签名、音色及其参数、文本）哈希寻址：换模型、改参数都不会复用旧缓存 */
+export function assetId(provider: Pick<TtsProvider, 'signature'>, voice: VoiceChoice, text: string): string {
+  const key = [voice.provider, provider.signature, voice.voiceName, voice.language, voice.style, voice.rate, voice.pitch, text].join('\u0000');
   return createHash('sha256').update(key).digest('hex').slice(0, 40);
 }
 
@@ -21,7 +21,7 @@ export function createTtsService(providers: TtsProviders, repository: MediaRepos
     if (voice.provider === 'browser') throw badRequest('浏览器朗读的音色由前端直接试听');
     const provider = providers[voice.provider];
     if (!provider) throw upstream(`${voice.provider} 语音服务未配置，请检查服务端环境变量`);
-    const id = assetId(voice, text);
+    const id = assetId(provider, voice, text);
     const url = `/api/media/${id}`;
     if (await repository.exists(id)) return { url, mime: 'audio/mpeg' };
     let audio;

@@ -7,8 +7,7 @@ import type { CreationLimiter } from './limits';
 import { toAiCall, toDetail, toSummary } from './mapper';
 import type { MatchRepository } from './repository';
 import type { MatchRuntime } from './runtime';
-import type { SeatRow } from './types';
-
+import type { MatchRow, SeatRow } from './types';
 
 export interface MatchServiceDeps {
   readonly repository: MatchRepository;
@@ -20,6 +19,8 @@ export interface MatchServiceDeps {
   readonly maxActive: number;
   /** 多久没有动静（推进或观众确认）就不再算进行中 */
   readonly idleMs: number;
+  /** 调试局是否能从公开接口（概要、播放流）按 ID 看到：生产环境不能，开发与测试时用 C 端舞台验收脚本化调试局 */
+  readonly debugVisibleToPublic: boolean;
 }
 
 export function createMatchService(deps: MatchServiceDeps) {
@@ -90,6 +91,13 @@ export function createMatchService(deps: MatchServiceDeps) {
     return toSummary(row, seats, game);
   }
 
+  /** 公开接口能看到的对局：不存在、或生产环境下的调试局，都视为不存在 */
+  async function findPublic(id: string): Promise<MatchRow | undefined> {
+    const row = await repository.find(id);
+    if (!row || (row.debug && !deps.debugVisibleToPublic)) return undefined;
+    return row;
+  }
+
   return {
     /** C 端开局：按来源限流 + 同时进行的公开对局数上限（上限判断与插入在同一事务里串行化，并发请求不会一起越过） */
     async createPublic(request: CreateMatchRequest, source: string): Promise<MatchSummaryDto> {
@@ -104,15 +112,25 @@ export function createMatchService(deps: MatchServiceDeps) {
 
     createDebug: (request: CreateDebugMatchRequest) => create(request, request, null),
     summary,
+    findPublic,
+
+    /** C 端按 ID 查看概要：对公开接口不可见的对局返回 404 */
+    async publicSummary(id: string): Promise<MatchSummaryDto> {
+      const row = await findPublic(id);
+      if (!row) throw notFound('对局');
+      return toSummary(row, await repository.seats(id), deps.tryGame(row.gameKey));
+    },
 
     async detail(id: string): Promise<MatchDetailDto> {
       const { row, seats, game } = await load(id);
       return toDetail(row, seats, game);
     },
 
+    /** 列表：对局一查、座位一查，不随条数增加查询次数 */
     async list(filter: { readonly debug?: boolean; readonly status?: MatchStatus; readonly limit: number }): Promise<MatchSummaryDto[]> {
       const rows = await repository.list(filter);
-      return Promise.all(rows.map(async (row) => toSummary(row, await repository.seats(row.id), deps.tryGame(row.gameKey))));
+      const seatsByMatch = await repository.seatsByMatch(rows.map((row) => row.id));
+      return rows.map((row) => toSummary(row, seatsByMatch.get(row.id) ?? [], deps.tryGame(row.gameKey)));
     },
 
     /** 后台查看完整日志（包含私密频道与兜底记录） */

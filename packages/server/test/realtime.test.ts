@@ -3,7 +3,7 @@ import { serve, type ServerType } from '@hono/node-server';
 import { gameRegistry } from '@battle/games';
 import type { MatchSummaryDto, ServerMessage, StageEvent } from '@battle/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MAX_CLIENT_FRAME_BYTES, POLICY_VIOLATION_CODE } from '../src/modules/realtime';
+import { MAX_CLIENT_FRAME_BYTES, MESSAGE_TOO_BIG_CODE } from '../src/modules/realtime';
 import { fakeTts, scriptedLlm, seedPlayers } from './support/fixtures';
 import { createTestApp, dataOf, type TestApp } from './support/testApp';
 
@@ -132,7 +132,7 @@ describe('realtime playback', () => {
         resolve({ code: event.code, events });
       });
     });
-    // 过大的帧不会被当作 hello 解析：没有推送任何事件，直接以 1008 关闭
-    expect(closed).toEqual({ code: POLICY_VIOLATION_CODE, events: 0 });
+    // 过大的帧在 ws 协议层就被拒绝（1009 message too big），不会被当作 hello 解析：没有推送任何事件
+    expect(closed).toEqual({ code: MESSAGE_TOO_BIG_CODE, events: 0 });
   });
 });

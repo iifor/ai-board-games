@@ -27,6 +27,8 @@ const envSchema = z.object({
   MATCH_IDLE_MINUTES: z.coerce.number().int().min(1).max(1440).default(30),
   /** 只有部署在可信反向代理之后才读取 X-Forwarded-For 作为限流来源 */
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
+  /** 优雅关闭时最多等待进行中的 AI 任务多少毫秒；超时后直接退出，未完成任务的领取过期后由下一个实例重新领取 */
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).max(600_000).default(10_000),
 });
 
 export interface AppConfig {
@@ -45,6 +47,7 @@ export interface AppConfig {
   readonly matches: { readonly maxActive: number; readonly idleMs: number };
   readonly realtime: { readonly pollMs: number };
   readonly http: { readonly trustProxy: boolean };
+  readonly shutdown: { readonly timeoutMs: number };
 }
 
 export class ConfigError extends Error {
@@ -79,5 +82,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>> = p
     matches: { maxActive: value.MAX_ACTIVE_MATCHES, idleMs: value.MATCH_IDLE_MINUTES * 60_000 },
     realtime: { pollMs: value.STREAM_POLL_MS },
     http: { trustProxy: value.TRUST_PROXY === 'true' },
+    shutdown: { timeoutMs: value.SHUTDOWN_TIMEOUT_MS },
   };
 }

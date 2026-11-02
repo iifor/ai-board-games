@@ -42,6 +42,8 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
   let dirty = false;
   /** 上一次在"没有新事件"时告知观众的状态；兜底重查查到状态没变时不重复发 */
   let lastStatus: MatchStatus | null = null;
+  /** 续播时客户端报的 afterSeq：观众已经播到这里，第一次查到对局后把它当作一次确认补记 */
+  let pendingAck: number | null = null;
   let pollTimer: NodeJS.Timeout | null = null;
   const unsubscribes = [
     deps.bus.on('match:events', (payload) => payload.matchId === matchId && void pump()),
@@ -82,6 +84,26 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
     void prefetchAudio(event.seq, scripted);
   }
 
+  async function markAcked(seq: number): Promise<void> {
+    await deps.matches.markAcked(matchId, seq);
+    deps.bus.emit('match:acked', { matchId, seq });
+  }
+
+  /**
+   * 断线前最后一次 ack 可能没送到：重连带来的 afterSeq 就是观众已播完的进度，补记为确认，
+   * 后台"观众确认"不会少一个，ack 节奏的闸门也不会卡住。记录失败只记日志，不影响续播。
+   */
+  async function settlePendingAck(): Promise<void> {
+    if (pendingAck === null) return;
+    const seq = pendingAck;
+    pendingAck = null;
+    try {
+      await markAcked(seq);
+    } catch (error) {
+      logger.warn('补记观众续播进度失败', { matchId, seq, error: (error as Error).message });
+    }
+  }
+
   /** 推送一步：有下一个事件就推，没有就按对局状态发 status / end */
   async function step(): Promise<void> {
     const match = await deps.matches.find(matchId);
@@ -90,6 +112,7 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
       close();
       return;
     }
+    await settlePendingAck();
     const next = await deps.matches.nextEvent(matchId, cursor);
     if (next) {
       await send(next, match.scripted);
@@ -145,14 +168,14 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
       if (started) return;
       started = true;
       cursor = afterSeq;
+      if (afterSeq > 0) pendingAck = afterSeq;
       void pump();
     },
     async ack(seq: number): Promise<void> {
       if (awaiting === null || seq !== awaiting) return;
       cursor = seq;
       awaiting = null;
-      await deps.matches.markAcked(matchId, seq);
-      deps.bus.emit('match:acked', { matchId, seq });
+      await markAcked(seq);
       await pump();
     },
     dispose(): void {

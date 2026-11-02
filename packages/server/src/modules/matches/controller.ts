@@ -21,7 +21,7 @@ export function createMatchController(service: MatchService, options: MatchContr
       const { limit } = parseQuery(c, listQuerySchema);
       return ok(c, await service.list({ debug: false, status: 'completed', limit }));
     },
-    summary: async (c: Context<AppEnv>) => ok(c, await service.summary(matchId(c))),
+    summary: async (c: Context<AppEnv>) => ok(c, await service.publicSummary(matchId(c))),
 
     adminList: async (c: Context<AppEnv>) => {
       const { limit, status, debug } = parseQuery(c, listQuerySchema);

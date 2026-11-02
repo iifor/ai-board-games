@@ -37,6 +37,11 @@
 
 `GameCatalogItem`：`key`、`title`、`description`、`players`、`layout`（`versus` / `circle`）、`variants`（key、name、description、players，以及展示用的角色构成 `roles`：角色名、阵营、数量，`rest` 按人数上限折算）、`defaultVariant`。服务端从游戏注册表生成，前端不硬编码游戏列表。
 
+## 两端共用的口径（speech.ts、format.ts）
+
+- `speechOf(event)`：哪些舞台事件要朗读、读什么——返回 `{ text, seat }`（`seat` 为 null 表示主持人声音）或 null（阶段标题、计票、出局提示、兜底记录只展示不朗读）。服务端据此合成语音，客户端据此决定是否朗读与朗读文本，两边只认这一处：评委点评连同判定一起读（`判定。点评`），行动（开枪、自爆……）、播报、揭示、终局总结由主持人读。
+- `formatMatchTitle(match)`："游戏 · 板子"，没有板子时只有游戏名；C 端与 B 端共用。
+
 ## 测试约定
 
 - 所有包统一使用 vitest，测试文件命名 `*.test.ts(x)`。engine 的测试放在 `packages/engine/test/`（含合成游戏 fixture 与跨包纯度测试），其余包的测试与源码同目录。

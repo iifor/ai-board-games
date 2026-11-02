@@ -52,6 +52,18 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
     findGame: games.find,
     sleep: external.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
   });
+  const matches = createMatchService({
+    repository: repositories.matches,
+    players: repositories.players,
+    runtime,
+    findGame: games.find,
+    tryGame: (key) => registry.get(key) ?? null,
+    limiter: createCreationLimiter(),
+    maxActive: config.matches.maxActive,
+    idleMs: config.matches.idleMs,
+    // 生产环境里调试局不对外；开发与测试用 C 端舞台验收脚本化调试局
+    debugVisibleToPublic: config.env !== 'production',
+  });
   return {
     bus,
     repositories,
@@ -63,21 +75,21 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
     models,
     voices: createVoiceService(repositories.voices, tts),
     players: createPlayerService(repositories.players, repositories.models, repositories.voices),
-    matches: createMatchService({
-      repository: repositories.matches,
-      players: repositories.players,
-      runtime,
-      findGame: games.find,
-      tryGame: (key) => registry.get(key) ?? null,
-      limiter: createCreationLimiter(),
-      maxActive: config.matches.maxActive,
-      idleMs: config.matches.idleMs,
-    }),
+    matches,
     reaper: createMatchReaper({ repository: repositories.matches, bus }, { idleMs: config.matches.idleMs }),
     audio,
-    realtime: createRealtimeService({ matches: repositories.matches, bus, audio }, { pollMs: config.realtime.pollMs }),
+    // 播放流是公开接口：对局的可见性与 C 端概要接口同一口径
+    realtime: createRealtimeService({
+      matches: { find: matches.findPublic, nextEvent: repositories.matches.nextEvent, markAcked: repositories.matches.markAcked },
+      bus,
+      audio,
+    }, { pollMs: config.realtime.pollMs }),
     health: createHealthService(repositories.health),
-    worker: createAiWorker({ tasks: repositories.aiTasks, executor, runtime, bus }, { concurrency: config.ai.concurrency, maxAttempts: config.ai.maxAttempts }),
+    worker: createAiWorker({ tasks: repositories.aiTasks, executor, runtime, bus }, {
+      concurrency: config.ai.concurrency,
+      maxAttempts: config.ai.maxAttempts,
+      stopTimeoutMs: config.shutdown.timeoutMs,
+    }),
   };
 }
 

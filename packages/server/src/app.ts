@@ -12,7 +12,7 @@ import { adminMatchRoutes, publicMatchRoutes } from './modules/matches';
 import { modelRoutes } from './modules/models';
 import { playerRoutes, publicPlayerRoutes } from './modules/players';
 import { providerRoutes } from './modules/providers';
-import { realtimeRoutes } from './modules/realtime';
+import { MAX_CLIENT_FRAME_BYTES, realtimeRoutes } from './modules/realtime';
 import { mediaRoutes } from './modules/tts';
 import { voiceRoutes } from './modules/voices';
 import type { AppEnv } from './types';
@@ -30,7 +30,9 @@ const ADMIN_BODY_LIMIT = 1024 * 1024;
 /** 路由装配：/api/toc 为 C 端公开接口，/api/admin 为需要管理员登录的后台接口；路由只拿到 service，不直接接触仓储或数据库 */
 export function createApp(services: Services, options: AppOptions = { trustProxy: false }) {
   const app = new Hono<AppEnv>();
-  const { upgradeWebSocket, injectWebSocket } = createNodeWebSocket({ app });
+  const { upgradeWebSocket, injectWebSocket, wss } = createNodeWebSocket({ app });
+  // ws 在升级连接时读取 options.maxPayload：超过上限的帧在协议层就以 1009 关闭，不会先缓冲整帧；网关里的字节检查是第二道
+  wss.options.maxPayload = MAX_CLIENT_FRAME_BYTES;
   app.use('*', requestId);
   app.use('/api/toc/*', bodyLimit({ maxSize: PUBLIC_BODY_LIMIT }));
   app.use('/api/admin/*', bodyLimit({ maxSize: ADMIN_BODY_LIMIT }));

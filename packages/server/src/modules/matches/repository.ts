@@ -27,6 +27,8 @@ export interface NewMatch {
   readonly snapshot: EngineSnapshot;
 }
 
+const SEAT_COLUMNS = ['seat', 'playerId', 'playerName', 'modelId', 'voiceId'] as const;
+
 const MATCH_COLUMNS = [
   'id', 'gameKey', 'variantKey', 'status', 'debug', 'scripted', 'pacing', 'snapshot', 'version',
   'lastSeq', 'ackedSeq', 'result', 'error', 'createdAt', 'completedAt',
@@ -123,8 +125,21 @@ export function createMatchRepository(db: Db) {
     },
 
     async seats(matchId: string): Promise<SeatRow[]> {
-      return db.selectFrom('matchSeats').select(['seat', 'playerId', 'playerName', 'modelId', 'voiceId'])
-        .where('matchId', '=', matchId).orderBy('seat').execute();
+      return db.selectFrom('matchSeats').select(SEAT_COLUMNS).where('matchId', '=', matchId).orderBy('seat').execute();
+    },
+
+    /** 一次查出多局的座位并按对局分组（列表接口用，避免每局一查）；没有座位的对局不在结果里 */
+    async seatsByMatch(matchIds: readonly string[]): Promise<Map<string, SeatRow[]>> {
+      const grouped = new Map<string, SeatRow[]>();
+      if (!matchIds.length) return grouped;
+      const rows = await db.selectFrom('matchSeats').select(['matchId', ...SEAT_COLUMNS])
+        .where('matchId', 'in', matchIds).orderBy('matchId').orderBy('seat').execute();
+      for (const { matchId, ...seat } of rows) {
+        const seats = grouped.get(matchId);
+        if (seats) seats.push(seat);
+        else grouped.set(matchId, [seat]);
+      }
+      return grouped;
     },
 
     /** 座位绑定的、仍启用的音色参数，供对局播放合成语音 */
@@ -134,9 +149,12 @@ export function createMatchRepository(db: Db) {
         .where('matchSeats.matchId', '=', matchId).where('matchSeats.seat', '=', seat).where('voices.enabled', '=', true)
         .executeTakeFirst(),
 
-    /** 观众确认也算"有人在看"：updated_at 一并刷新，供进行中计数与回收器判断 */
+    /**
+     * 观众确认也算"有人在看"：updated_at 一并刷新，供进行中计数与回收器判断。
+     * 确认进度只增不减，且不超过已产生的事件数：续播时客户端报的 afterSeq 不能把 ack 节奏的闸门抬到事件之前。
+     */
     markAcked: (id: string, seq: number) =>
-      db.updateTable('matches').set({ ackedSeq: sql`greatest(acked_seq, ${seq})`, updatedAt: new Date() }).where('id', '=', id).execute(),
+      db.updateTable('matches').set({ ackedSeq: sql`greatest(acked_seq, least(last_seq, ${seq}))`, updatedAt: new Date() }).where('id', '=', id).execute(),
 
     /** 近期有动静的进行中公开对局数；传入事务时与 lockPublicCreation 在同一事务内判断 */
     async countActivePublic(since: Date, executor: Executor = db): Promise<number> {

@@ -47,10 +47,11 @@ export function quotaExhaustedLlm(exhaustedModels: readonly string[]): LlmClient
   };
 }
 
-export function fakeTts(): TtsProvider & { texts: string[] } {
+export function fakeTts(signature = 'fake:v1'): TtsProvider & { texts: string[] } {
   const texts: string[] = [];
   return {
     texts,
+    signature,
     synthesize: async (text) => {
       texts.push(text);
       return { data: Buffer.from(`audio:${text}`), mime: 'audio/mpeg' };

@@ -26,6 +26,7 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, external
     matches: { maxActive: 5, idleMs: 30 * 60_000 },
     realtime: { pollMs: 2000 },
     http: { trustProxy: false },
+    shutdown: { timeoutMs: 10_000 },
     ...overrides,
   };
   const db = createDatabase(config.database);

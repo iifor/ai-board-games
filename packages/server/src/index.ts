@@ -24,6 +24,12 @@ async function main(): Promise<void> {
   const shutdown = (signal: string) => {
     logger.info('正在关闭服务', { signal });
     services.reaper.stop();
+    // worker.stop 自己有上限；关闭监听与连接池同样不能无限等（被卡住的任务可能还占着连接）
+    const deadline = setTimeout(() => {
+      logger.warn('关闭超时，直接退出', { timeoutMs: config.shutdown.timeoutMs });
+      process.exit(0);
+    }, config.shutdown.timeoutMs * 2);
+    deadline.unref();
     void services.worker.stop().then(() => {
       server.close(() => {
         void db.destroy().finally(() => process.exit(0));

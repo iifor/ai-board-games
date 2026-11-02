@@ -1,10 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import type { StageEvent } from '@battle/shared';
 import { ConfigError, loadConfig } from '../src/config/env';
 import { isQuotaExhausted } from '../src/modules/llm';
-import { createMatchStream, frameBytes, MAX_CLIENT_FRAME_BYTES, type StreamMatch } from '../src/modules/realtime';
-import { createEventBus } from '../src/utils/eventBus';
 import { buildAzureSsml } from '../src/modules/tts/azureSsml';
 import { azureSpeaker, DEFAULT_VOICES } from '../src/modules/voices';
 import { decryptSecret, encryptSecret, hashPassword, maskSecret, verifyPassword } from '../src/utils/crypto';
@@ -19,10 +16,15 @@ describe('config', () => {
   it('loads a valid environment with defaults', () => {
     const config = loadConfig(valid);
     expect(config).toMatchObject({ env: 'development', port: 3100, database: { schema: 'public' }, bootstrapAdmin: null });
-    expect(config).toMatchObject({ ai: { concurrency: 4, maxAttempts: 3 }, realtime: { pollMs: 2000 } });
+    expect(config).toMatchObject({ ai: { concurrency: 4, maxAttempts: 3 }, realtime: { pollMs: 2000 }, shutdown: { timeoutMs: 10_000 } });
     expect(config.secretKey).toHaveLength(32);
     expect(loadConfig({ ...valid, AI_TASK_MAX_ATTEMPTS: '5', STREAM_POLL_MS: '500' })).toMatchObject({ ai: { maxAttempts: 5 }, realtime: { pollMs: 500 } });
     expect(() => loadConfig({ ...valid, STREAM_POLL_MS: '10' })).toThrow(ConfigError);
+  });
+
+  it('reads the shutdown timeout and rejects a negative one', () => {
+    expect(loadConfig({ ...valid, SHUTDOWN_TIMEOUT_MS: '2500' })).toMatchObject({ shutdown: { timeoutMs: 2500 } });
+    expect(() => loadConfig({ ...valid, SHUTDOWN_TIMEOUT_MS: '-1' })).toThrow(ConfigError);
   });
 
   it('reports every invalid field without leaking values', () => {
@@ -97,84 +99,5 @@ describe('voice catalog', () => {
     expect(azureSpeaker('zh-CN-Xiaoxiao:DragonHDFlashLatestNeural')).toBe('Xiaoxiao HD Flash');
     expect(azureSpeaker('zh-CN-liaoning-XiaobeiNeural')).toBe('Xiaobei');
     expect(azureSpeaker('yue-CN-YunSongNeural')).toBe('YunSong');
-  });
-});
-
-describe('realtime stream', () => {
-  const view: StageEvent['view'] = { gameKey: 'debate', title: 'AI 辩论赛', round: 1, phase: null, status: 'running', seats: [], extra: {}, result: null };
-  const narration = (seq: number): StageEvent => ({ kind: 'narration', text: `第 ${seq} 段`, seq, round: 1, phaseId: null, channel: 'public', view });
-
-  it('does not lose a wake-up that arrives while it is already pumping', async () => {
-    const bus = createEventBus();
-    const events: StageEvent[] = [];
-    const match: StreamMatch = { status: 'waiting_ai', scripted: true, result: null, error: null };
-    let release: (() => void) | null = null;
-    const sent: string[] = [];
-    const stream = createMatchStream('m_1', { send: (data) => sent.push(data), close: () => {} }, {
-      bus,
-      audio: { audioFor: async () => null },
-      matches: {
-        find: async () => match,
-        // 第一次查询在提交之前就定下了结果，然后挂起：模拟 worker 在这期间提交了新事件并发出通知
-        nextEvent: async (_id, after) => {
-          const found = events.find((event) => event.seq > after);
-          if (release === null) await new Promise<void>((resolve) => { release = resolve; });
-          return found;
-        },
-        markAcked: async () => {},
-      },
-    }, { pollMs: 60_000 });
-    stream.hello(0);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    events.push(narration(1));
-    bus.emit('match:events', { matchId: 'm_1', lastSeq: 1 });
-    const unblock = release as (() => void) | null;
-    expect(unblock).not.toBeNull();
-    unblock?.();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    // 旧实现：第一轮只发出过期的 status，通知被丢掉，观众一直挂着；现在会再查一次并推出事件
-    const kinds = sent.map((data) => (JSON.parse(data) as { type: string }).type);
-    expect(kinds).toEqual(['status', 'event']);
-    stream.dispose();
-  });
-
-  it('delivers an event committed without any bus notification through the fallback poll', async () => {
-    // 多实例部署：事件由另一个实例的 worker 提交，本进程的总线不会收到通知
-    const events: StageEvent[] = [];
-    const sent: string[] = [];
-    let queries = 0;
-    const stream = createMatchStream('m_2', { send: (data) => sent.push(data), close: () => {} }, {
-      bus: createEventBus(),
-      audio: { audioFor: async () => null },
-      matches: {
-        find: async (): Promise<StreamMatch> => ({ status: 'waiting_ai', scripted: true, result: null, error: null }),
-        nextEvent: async (_id, after) => {
-          queries += 1;
-          return events.find((event) => event.seq > after);
-        },
-        markAcked: async () => {},
-      },
-    }, { pollMs: 10 });
-    stream.hello(0);
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    events.push(narration(1));
-    await new Promise((resolve) => setTimeout(resolve, 40));
-    const messages = sent.map((data) => JSON.parse(data) as { type: string; status?: string; event?: StageEvent });
-    // 等待期间状态没变，兜底重查不会反复发 status；查到事件后推送，然后等 ack，不再轮询
-    expect(messages.map((message) => message.type)).toEqual(['status', 'event']);
-    expect(messages[1]?.event?.seq).toBe(1);
-    const queriesAfterEvent = queries;
-    await new Promise((resolve) => setTimeout(resolve, 40));
-    expect(queries).toBe(queriesAfterEvent);
-    stream.dispose();
-  });
-});
-
-describe('realtime protocol', () => {
-  it('measures client frames in bytes, not characters', () => {
-    expect(frameBytes('abc')).toBe(3);
-    expect(frameBytes('中文')).toBe(6);
-    expect(frameBytes(new ArrayBuffer(8))).toBe(8);
-    expect(frameBytes('x'.repeat(MAX_CLIENT_FRAME_BYTES))).toBe(MAX_CLIENT_FRAME_BYTES);
   });
 });
