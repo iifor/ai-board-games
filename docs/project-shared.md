@@ -31,7 +31,7 @@
 - `common.ts`：`ApiResponse` 统一响应、`API_ERROR_CODES`、`isApiSuccess` 类型守卫。
 - `auth.ts`：登录、改密、当前管理员。
 - `resources.ts`：供应商（只有 `apiKeyMasked`，含 `modelCount`）、模型（含 `disabledReason` / `disabledAt`，以及连接测试结果 `ModelTestResult`）、音色（`language`、`gender`、`style`、`rate`、`pitch`、`sampleText`、`description`，以及试听请求/结果与导入结果）、玩家及公开玩家信息；`*Input` 中的可选字段允许 `undefined`（与 zod optional 一致）。四种资源的 `enabled` 都是：创建时省略默认 true，更新时省略保留原值。
-- `matches.ts`：开局请求、调试局请求、对局概要与详情、AI 调用记录、调试指令，以及 WebSocket 的 `ClientMessage`（hello / ack）与 `ServerMessage`（event + audio / status / end / error）。`MatchSummaryDto.layout`（`StageLayout`，必填）取自游戏的 presentation，前端渲染舞台不必再查游戏目录；游戏已不在注册表时服务端给 `circle`。
+- `matches.ts`：开局请求、调试局请求（`CreateDebugMatchRequest`：`seed`、`breakpoints`、`pacing`、`scripted`，以及 `chaos`——脚本化输出改用引擎的混沌脚本，只在 `scripted: true` 时有意义，服务端会拒绝"混沌但不脚本化"）、对局概要与详情（`MatchSummaryDto` 的 `debug` / `scripted` / `chaos` 三个标记一起出现，详情继承概要）、AI 调用记录、调试指令，以及 WebSocket 的 `ClientMessage`（hello / ack）与 `ServerMessage`（event + audio / status / end / error）。`MatchSummaryDto.layout`（`StageLayout`，必填）取自游戏的 presentation，前端渲染舞台不必再查游戏目录；游戏已不在注册表时服务端给 `circle`。
 
 ## 游戏目录（catalog.ts）
 

@@ -1,4 +1,4 @@
-import { advance, createSnapshot, type AiRequest } from '@battle/engine';
+import { advance, CHAOS_FAILURE_REASON, createSnapshot, type AiRequest, type EngineInput } from '@battle/engine';
 import { gameRegistry } from '@battle/games';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AI_GIVE_UP_ERROR, createAiWorker, type ClaimedTask, type WorkerDeps } from '../src/modules/ai-worker';
@@ -54,6 +54,49 @@ describe('ai worker attempt cap', () => {
     // 第 1 次失败只记日志等待重试；第 2 次达到上限终止对局；第 3 次（上限之后仍被领到）同样终止，而不是继续付费重试
     expect(failures.map((failure) => failure.completion.requestId)).toEqual([request.id, request.id]);
     expect(failures[0]).toMatchObject({ matchId: 'm_1', error: AI_GIVE_UP_ERROR, completion: { status: 'failed', error: '数据库连接中断' } });
+  });
+
+  it('hands a simulated failure to the runtime as a completed task instead of counting it against the cap', async () => {
+    const request = firstRequest();
+    let claimed = false;
+    const advanced: { input: EngineInput; completion: TaskCompletion | undefined }[] = [];
+    let gaveUp = 0;
+    const worker = createAiWorker({
+      // 领取次数早已超过上限：只要执行器正常返回，worker 就不该终止对局
+      tasks: {
+        claim: async (): Promise<ClaimedTask[]> => {
+          if (claimed) return [];
+          claimed = true;
+          return [{ matchId: 'm_chaos', requestId: request.id, seat: request.seat, request, attempts: 5 }];
+        },
+      },
+      executor: {
+        execute: async (task) => ({
+          input: { kind: 'ai_failed', requestId: task.requestId, reason: CHAOS_FAILURE_REASON },
+          completion: { requestId: task.requestId, status: 'failed', output: null, error: CHAOS_FAILURE_REASON },
+        }),
+      },
+      runtime: {
+        advanceMatch: async (_matchId, input, completion) => {
+          advanced.push({ input, completion });
+          return { status: 'running', events: [], tasks: [], stale: false };
+        },
+        failMatch: async () => {
+          gaveUp += 1;
+          return true;
+        },
+      },
+      bus: createEventBus(),
+    }, { concurrency: 1, maxAttempts: 2, pollMs: 5 });
+
+    worker.start();
+    await worker.idle();
+    await worker.stop();
+    expect(advanced).toEqual([{
+      input: { kind: 'ai_failed', requestId: request.id, reason: CHAOS_FAILURE_REASON },
+      completion: { requestId: request.id, status: 'failed', output: null, error: CHAOS_FAILURE_REASON },
+    }]);
+    expect(gaveUp).toBe(0);
   });
 });
 

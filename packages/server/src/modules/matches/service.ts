@@ -72,6 +72,8 @@ export function createMatchService(deps: MatchServiceDeps) {
         params: snapshot.params,
         debug: debug !== null,
         scripted: debug?.scripted ?? false,
+        // 混沌脚本只在脚本化对局里有意义；校验层已拒绝"混沌但不脚本化"，这里再兜一次底
+        chaos: debug?.scripted === true && debug.chaos === true,
         pacing: debug?.pacing ?? 'ack',
         snapshot,
       }, seats);

@@ -1,5 +1,14 @@
-import type { MatchDetailDto, MatchStatus } from '@battle/shared';
+import type { MatchDetailDto, MatchStatus, MatchSummaryDto } from '@battle/shared';
 import type { LogEntryDto } from '../../services/matches';
+
+/** 列表与详情共用的对局类型文案：公开 / 调试 / 调试 · 脚本化 / 调试 · 脚本化 · 混沌 */
+export function matchTypeLabel(match: Pick<MatchSummaryDto, 'debug' | 'scripted' | 'chaos'>): string {
+  if (!match.debug) return '公开';
+  const parts = ['调试'];
+  if (match.scripted) parts.push('脚本化');
+  if (match.scripted && match.chaos) parts.push('混沌');
+  return parts.join(' · ');
+}
 
 export const STATUS_LABELS: Readonly<Record<MatchStatus, { label: string; color: string }>> = {
   created: { label: '已创建', color: 'default' },

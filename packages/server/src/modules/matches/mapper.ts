@@ -17,6 +17,7 @@ export function toSummary(row: MatchRow, seats: readonly SeatRow[], game: Compil
     status: row.status,
     debug: row.debug,
     scripted: row.scripted,
+    chaos: row.chaos,
     seats: seats.map((seat) => ({ seat: seat.seat, playerId: seat.playerId, name: seat.playerName })),
     result: row.result,
     createdAt: row.createdAt.toISOString(),

@@ -19,6 +19,8 @@ export interface CreateDebugMatchRequest extends CreateMatchRequest {
   readonly pacing?: MatchPacing | undefined;
   /** true：使用脚本化输出，不调用真实模型与云端 TTS */
   readonly scripted?: boolean | undefined;
+  /** true：脚本化输出改用混沌脚本（弃票 / 放弃 / 自爆等声明 / 非法输出 / 模拟调用失败）；只在 scripted 为 true 时有意义 */
+  readonly chaos?: boolean | undefined;
 }
 
 export interface MatchSeatDto {
@@ -38,6 +40,8 @@ export interface MatchSummaryDto {
   readonly status: MatchStatus;
   readonly debug: boolean;
   readonly scripted: boolean;
+  /** 脚本化调试局是否使用混沌脚本 */
+  readonly chaos: boolean;
   readonly seats: readonly MatchSeatDto[];
   readonly result: GameResult | null;
   readonly createdAt: string;

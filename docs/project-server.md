@@ -51,7 +51,7 @@ src/
 | `GET /api/toc/matches`、`GET /api/toc/matches/:id` | 已完成的公开对局历史、对局概要（含舞台布局 `layout`，前端不必再查游戏目录；游戏已不在注册表时为 `circle`）。调试局的可见性见"调试局对外可见性" | 无 |
 | `GET /api/media/:id` | 合成音频（按音色与文本哈希寻址，长期缓存） | 无 |
 | `WS /api/toc/ws/matches/:id` | 播放流，见下文"实时推送"；客户端帧超过 16 KB 直接以 1008 关闭；对局可见性与 `GET /api/toc/matches/:id` 同一口径 | 无 |
-| `GET/POST /api/admin/matches` | 全部对局（筛选 status、debug；公开历史与这里的列表都是对局一查、座位一查，不随条数增加查询）/ 创建调试局（seed、breakpoints、pacing、scripted） | 管理员 |
+| `GET/POST /api/admin/matches` | 全部对局（筛选 status、debug；公开历史与这里的列表都是对局一查、座位一查，不随条数增加查询）/ 创建调试局（seed、breakpoints、pacing、scripted、chaos；`chaos: true` 必须同时 `scripted: true`，否则 40001） | 管理员 |
 | `GET /api/admin/matches/:id`、`/log`、`/ai-calls` | 详情、完整日志（含私密与 host 频道）、AI 调用记录（分层 prompt、原始响应、耗时） | 管理员 |
 | `POST /api/admin/matches/:id/debug`、`DELETE /api/admin/matches/:id` | 调试指令（continue / step / run / skip）、删除对局 | 管理员 |
 | `GET /api/admin/games/:key/phases` | 游戏阶段图（阶段、类型、标题、跳转目标），供调试台使用 | 管理员 |
@@ -74,7 +74,7 @@ src/
 ## 对局运行时
 
 - **推进**（`modules/matches/runtime.ts`）：一个事务内 `SELECT … FOR UPDATE` 锁定对局行 → 调用引擎 `advance` → 写回快照、新的 AI 任务、舞台事件，以及（来自 worker 时）完成的任务；提交后通过进程内事件总线通知 worker 与实时网关。引擎计算放在 try 内：`EngineInputError` 对 AI 结果视为过期（任务记为 cancelled），对其他输入返回 409；引擎其他异常把对局标为 failed。数据库错误不吞掉，整个事务回滚并向上抛出。完结任务只作用于仍为 queued / running 的任务：迟到的重复结果不会把已 succeeded 的任务改写成 cancelled。
-- **AI worker**（`modules/ai-worker`）：事件驱动 + 每秒兜底轮询。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型），每次领取 `attempts` 加一。执行或推进抛错（如数据库故障）时只记日志等待重新领取；领取次数达到 `AI_TASK_MAX_ATTEMPTS`（默认 3）仍失败则由 `runtime.failMatch` 把对局标为 failed（错误"AI 处理多次失败，对局已终止"）、任务记为 failed、其余任务取消，并通过总线通知在线观众，不再无限重试、重复付费调用模型。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；否则依次尝试座位玩家的主模型与备用模型中仍启用的部分（主模型被停用时直接用备用模型），每个模型最多 2 次传输层尝试（429 / 5xx / 超时可重试），全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`。
+- **AI worker**（`modules/ai-worker`）：事件驱动 + 每秒兜底轮询。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型），每次领取 `attempts` 加一。执行或推进抛错（如数据库故障）时只记日志等待重新领取；领取次数达到 `AI_TASK_MAX_ATTEMPTS`（默认 3）仍失败则由 `runtime.failMatch` 把对局标为 failed（错误"AI 处理多次失败，对局已终止"）、任务记为 failed、其余任务取消，并通过总线通知在线观众，不再无限重试、重复付费调用模型。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；开启混沌脚本（`chaos`）的脚本化对局改用引擎的 `chaosReply`：按对局种子与请求 ID 以固定概率弃票、放弃可放弃的动作、附带自爆等声明、给出非法输出（引擎重问后再兜底）或模拟一次调用失败——模拟失败是一次"已完成但失败"的任务（任务记为 failed、以 `ai_failed` 交回引擎走兜底，对局继续），不是执行异常，不计入下面的领取次数上限。否则依次尝试座位玩家的主模型与备用模型中仍启用的部分（主模型被停用时直接用备用模型），每个模型最多 2 次传输层尝试（429 / 5xx / 超时可重试），全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`（脚本化与混沌对局不写）。
 - **优雅关闭**（`src/index.ts`）：收到 SIGINT / SIGTERM 后先停回收器，再 `worker.stop()`：不再领取新任务，等待进行中的任务最多 `SHUTDOWN_TIMEOUT_MS`（默认 10 秒），超时则记录还没结束的任务（matchId、requestId）并继续关闭——它们的领取在 10 分钟后过期，由下一个实例重新领取。随后关闭监听与连接池；整个关闭流程超过 2 倍 `SHUTDOWN_TIMEOUT_MS` 仍没结束（例如被卡住的任务占着连接）就直接退出。
 - **无人观看回收**（`modules/matches/reaper.ts`）：每分钟把 `MATCH_IDLE_MINUTES` 内没有动静（既没推进也没有观众确认，`updated_at` 在确认时也会刷新）的 ack 节奏公开对局标为 failed 并取消其排队任务，通过总线通知在线观众；调试局不回收。进行中计数也只算这个窗口内有动静的对局。
 - **额度耗尽自动停用**：供应商返回 4xx 且错误码在 `modules/llm/quota.ts` 的列表中（百炼 `Arrearage` / `AllocationQuota.FreeTierOnly`、火山 `*BillOverdue`、OpenAI `insufficient_quota` 等）时，LLM 客户端抛出 `quotaExhausted` 的 `LlmError`；worker 不重试，把该模型标为 `enabled = false`、`disabled_reason = 'quota_exhausted'` 并切换备用模型。管理员补充额度后在后台"测试"通过再"重新启用"（`PUT` 时 `enabled: true` 清除原因）。普通限流（429 但没有这些错误码）仍只是重试。
@@ -108,7 +108,7 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 | `models` | 模型参数、备用模型（自引用，删除时置空）、系统停用原因与时间（`disabled_reason` / `disabled_at`，迁移 003） |
 | `voices` | 音色：来源、音色名、语言、性别、风格、语速、音调、试听文本、说明（迁移 003） |
 | `players` | AI 玩家（模型删除受限，音色删除时置空） |
-| `matches` | 对局：游戏、变体、spec 版本与 hash、种子、状态、debug / scripted / pacing、引擎快照、版本号、`last_seq` / `acked_seq`、结果 |
+| `matches` | 对局：游戏、变体、spec 版本与 hash、种子、状态、debug / scripted / pacing、`chaos`（脚本化调试局是否用混沌脚本，迁移 005）、引擎快照、版本号、`last_seq` / `acked_seq`、结果 |
 | `match_seats` | 座位 → 玩家、模型、音色（开局时固化，玩家删除后保留名字） |
 | `ai_tasks` | AI 请求队列（queued / running / succeeded / failed / cancelled，领取过期时间，领取次数 `attempts`，迁移 004） |
 | `match_stage_events` | 按 seq 的舞台事件，实时推送与回放共用 |

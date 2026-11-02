@@ -8,6 +8,8 @@ export interface MatchRow {
   readonly status: MatchStatus;
   readonly debug: boolean;
   readonly scripted: boolean;
+  /** 脚本化调试局是否使用混沌脚本 */
+  readonly chaos: boolean;
   readonly pacing: MatchPacing;
   readonly snapshot: EngineSnapshot;
   readonly version: number;

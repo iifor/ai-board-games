@@ -23,6 +23,7 @@ export interface NewMatch {
   readonly params: unknown;
   readonly debug: boolean;
   readonly scripted: boolean;
+  readonly chaos: boolean;
   readonly pacing: MatchPacing;
   readonly snapshot: EngineSnapshot;
 }
@@ -30,7 +31,7 @@ export interface NewMatch {
 const SEAT_COLUMNS = ['seat', 'playerId', 'playerName', 'modelId', 'voiceId'] as const;
 
 const MATCH_COLUMNS = [
-  'id', 'gameKey', 'variantKey', 'status', 'debug', 'scripted', 'pacing', 'snapshot', 'version',
+  'id', 'gameKey', 'variantKey', 'status', 'debug', 'scripted', 'chaos', 'pacing', 'snapshot', 'version',
   'lastSeq', 'ackedSeq', 'result', 'error', 'createdAt', 'completedAt',
 ] as const;
 

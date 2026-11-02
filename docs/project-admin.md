@@ -32,7 +32,7 @@ src/
     auth/         AuthContext、LoginPage、ChangePasswordPage、RequireAuth
     resources/    ResourcePage（通用列表 + 筛选 + 新建/编辑弹窗 + 删除 + 行操作/标题栏扩展）、utils（客户端筛选）、StatusTag（启用 / 停用，四个资源页共用）、四个资源页面配置，
                   ModelActions（测试 / 重新启用）、VoiceFormFields、VoiceActions（试听 / 导入默认音色）、playback（音频与浏览器朗读）
-    matches/      列表、详情、TracePanel、LogPanel、DebugControls、PhaseGraph、CreateDebugMatchModal、useMatchDetail、utils（状态标签、日志描述、进度标记）
+    matches/      列表、详情、TracePanel、LogPanel、DebugControls、PhaseGraph、CreateDebugMatchModal、useMatchDetail、utils（状态标签、对局类型文案、日志描述、进度标记）
 ```
 
 ## 约定
@@ -42,10 +42,10 @@ src/
 - 模型："测试"真实调用一次模型（`POST /models/:id/test`），结果以提示展示（成功含耗时与是否为 JSON 输出，失败含原因）。被系统因额度耗尽停用的模型显示"额度已用完"与时间，"重新启用"先测试，通过后以 `enabled: true` 保存。
 - 音色：云端音色"试听"调用 `POST /voices/:id/preview` 得到 `/api/media/:id` 后播放；浏览器音色直接用 `speechSynthesis` 朗读。"导入默认音色"把内置目录（Azure 63、Mimo 12、浏览器 2）写入，已存在的跳过。
 - 对局详情未结束时每 2 秒只轮询详情；完整日志与 AI 调用（带六层提示词与原始回复，体积大）只在事件进度 `lastSeq` 或状态变化时重新拉取（`progressChanged`），调试指令执行后强制全量刷新。
-- 调试：调试局暂停时可单步、继续、跳过、连续运行；阶段图来自 `GET /api/admin/games/:key/phases`，高亮当前阶段。创建调试局可选种子、断点（含"全部阶段"）、推进节奏（连续生成 / 按观众确认）与脚本化。
+- 调试：调试局暂停时可单步、继续、跳过、连续运行；阶段图来自 `GET /api/admin/games/:key/phases`，高亮当前阶段。创建调试局可选种子、断点（含"全部阶段"）、推进节奏（连续生成 / 按观众确认）、脚本化，以及只在脚本化打开时可用的"混沌脚本"（弃票 / 放弃 / 自爆 / 非法输出 / 模拟调用失败，用于检查舞台对这些情况的呈现；关掉脚本化会一并关掉它）。列表与详情的类型文案由 `matchTypeLabel` 统一给出：公开 / 调试 / 调试 · 脚本化 / 调试 · 脚本化 · 混沌。
 - Trace：每次模型调用按 L1–L6 展示提示词，以及原始响应、解析结果、错误与耗时，可只看失败调用。完整日志包含私密、阵营与 host 频道（兜底记录），可按频道筛选或只看兜底。
 - 名为"主持人"的音色用于 C 端主持播报的语音合成。
 
 ## 测试
 
-日志描述、令牌与鉴权事件处理（mock fetch）、Trace 面板静态渲染。登录后的页面交互没有做浏览器端到端测试；对应接口由服务端集成测试覆盖。
+日志描述、对局类型文案、令牌与鉴权事件处理（mock fetch）、Trace 面板静态渲染。登录后的页面交互（含创建调试局弹窗）没有做浏览器端到端测试；对应接口由服务端集成测试覆盖。

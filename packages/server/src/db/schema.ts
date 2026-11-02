@@ -84,6 +84,8 @@ export interface MatchesTable {
   status: string;
   debug: boolean;
   scripted: boolean;
+  /** 脚本化调试局是否使用混沌脚本（迁移 005） */
+  chaos: boolean;
   pacing: string;
   snapshot: Json<unknown>;
   version: Generated<number>;

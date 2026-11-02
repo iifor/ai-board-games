@@ -11,13 +11,16 @@ const base = {
 
 export const createMatchSchema = z.object(base) satisfies z.ZodType<CreateMatchRequest>;
 
+export const CHAOS_REQUIRES_SCRIPTED = '混沌脚本只能用于脚本化对局，请同时开启 scripted';
+
 export const createDebugMatchSchema = z.object({
   ...base,
   seed: z.number().int().min(0).max(0xffffffff).optional(),
   breakpoints: z.union([z.literal('all'), z.array(z.string().min(1).max(64)).max(100)]).optional(),
   pacing: z.enum(['ack', 'free']).optional(),
   scripted: z.boolean().optional(),
-}) satisfies z.ZodType<CreateDebugMatchRequest>;
+  chaos: z.boolean().optional(),
+}).refine((value) => !value.chaos || value.scripted === true, { message: CHAOS_REQUIRES_SCRIPTED, path: ['chaos'] }) satisfies z.ZodType<CreateDebugMatchRequest>;
 
 export const debugCommandSchema = z.object({
   command: z.enum(['continue', 'step', 'run', 'skip']),

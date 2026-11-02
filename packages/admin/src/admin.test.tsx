@@ -2,7 +2,7 @@ import { API_ERROR_CODES, formatMatchTitle } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TracePanel } from './features/matches/components/TracePanel';
-import { channelColor, describeLog, progressChanged } from './features/matches/utils';
+import { channelColor, describeLog, matchTypeLabel, progressChanged } from './features/matches/utils';
 import { applyFilters, enabledFilter, uniqueOptions, type ResourceFilter } from './features/resources/utils';
 import { AUTH_EVENTS, http } from './services/http';
 import { tokenStore } from './services/tokenStore';
@@ -27,6 +27,15 @@ describe('match utils', () => {
     expect(progressChanged(marker, { ...marker })).toBe(false);
     expect(progressChanged(marker, { ...marker, lastSeq: 13 })).toBe(true);
     expect(progressChanged(marker, { ...marker, status: 'paused' })).toBe(true);
+  });
+
+  it('labels the match type for the list and the detail, adding 混沌 only to scripted debug matches', () => {
+    expect(matchTypeLabel({ debug: false, scripted: false, chaos: false })).toBe('公开');
+    expect(matchTypeLabel({ debug: true, scripted: false, chaos: false })).toBe('调试');
+    expect(matchTypeLabel({ debug: true, scripted: true, chaos: false })).toBe('调试 · 脚本化');
+    expect(matchTypeLabel({ debug: true, scripted: true, chaos: true })).toBe('调试 · 脚本化 · 混沌');
+    // 混沌只在脚本化对局里有意义：服务端不会存成这样，前端也不显示
+    expect(matchTypeLabel({ debug: true, scripted: false, chaos: true })).toBe('调试');
   });
 
   it('formats the match title with the shared helper, with the board when there is one', () => {

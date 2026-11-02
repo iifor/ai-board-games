@@ -6,7 +6,7 @@ import { LogPanel } from '../components/LogPanel';
 import { PhaseGraph } from '../components/PhaseGraph';
 import { TracePanel } from '../components/TracePanel';
 import { useMatchDetail } from '../hooks/useMatchDetail';
-import { STATUS_LABELS } from '../utils';
+import { matchTypeLabel, STATUS_LABELS } from '../utils';
 import './MatchDetailPage.css';
 
 export function MatchDetailPage() {
@@ -24,7 +24,7 @@ export function MatchDetailPage() {
       <Descriptions size="small" bordered column={{ xs: 1, md: 3 }}>
         <Descriptions.Item label="状态"><Tag color={STATUS_LABELS[detail.status].color}>{STATUS_LABELS[detail.status].label}</Tag></Descriptions.Item>
         <Descriptions.Item label="当前阶段">{detail.phaseId ?? '—'}</Descriptions.Item>
-        <Descriptions.Item label="类型">{detail.debug ? (detail.scripted ? '调试 · 脚本化' : '调试') : '公开'} · {detail.pacing === 'ack' ? '按确认推进' : '连续生成'}</Descriptions.Item>
+        <Descriptions.Item label="类型">{matchTypeLabel(detail)} · {detail.pacing === 'ack' ? '按确认推进' : '连续生成'}</Descriptions.Item>
         <Descriptions.Item label="事件进度">已推送 {detail.lastSeq} / 观众确认 {detail.ackedSeq}</Descriptions.Item>
         <Descriptions.Item label="模型调用">{calls.length} 次（失败 {calls.filter((call) => call.error).length}）</Descriptions.Item>
         <Descriptions.Item label="兜底">{fallbacks} 次</Descriptions.Item>

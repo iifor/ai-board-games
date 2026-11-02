@@ -7,7 +7,7 @@ import { errorMessage } from '../../../services/http';
 import { deleteMatch, listMatches } from '../../../services/matches';
 import { formatTime } from '../../../utils/format';
 import { CreateDebugMatchModal } from '../components/CreateDebugMatchModal';
-import { STATUS_LABELS } from '../utils';
+import { matchTypeLabel, STATUS_LABELS } from '../utils';
 
 export function MatchListPage() {
   const { message } = App.useApp();
@@ -49,7 +49,7 @@ export function MatchListPage() {
         columns={[
           { title: '对局', key: 'title', render: (_, match) => <Link to={`/matches/${match.id}`}>{formatMatchTitle(match)}</Link> },
           { title: '状态', dataIndex: 'status', render: (value: MatchStatus) => <Tag color={STATUS_LABELS[value].color}>{STATUS_LABELS[value].label}</Tag> },
-          { title: '类型', key: 'type', render: (_, match) => (match.debug ? <Tag color="orange">{match.scripted ? '调试 · 脚本化' : '调试'}</Tag> : <Tag>公开</Tag>) },
+          { title: '类型', key: 'type', render: (_, match) => (match.debug ? <Tag color="orange">{matchTypeLabel(match)}</Tag> : <Tag>{matchTypeLabel(match)}</Tag>) },
           { title: '结果', key: 'result', render: (_, match) => match.result?.winnerLabel ?? '—' },
           { title: '创建时间', dataIndex: 'createdAt', render: (value: string) => formatTime(value) },
           {

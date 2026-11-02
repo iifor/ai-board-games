@@ -1,4 +1,4 @@
-import { scriptedOutput, toChatMessages, type CompiledGame, type EngineInput } from '@battle/engine';
+import { chaosReply, scriptedOutput, toChatMessages, type CompiledGame, type EngineInput } from '@battle/engine';
 import { logger } from '../../utils/logger';
 import { extractJson, LlmError, type LlmClient } from '../llm';
 import type { MatchRepository } from '../matches/repository';
@@ -79,11 +79,18 @@ export function createTaskExecutor(deps: ExecutorDeps) {
   }
 
   return {
-    /** 执行一个任务：脚本化对局直接给出确定性输出；否则依次尝试主模型与备用模型 */
+    /** 执行一个任务：脚本化对局直接给出确定性输出（混沌脚本可能模拟一次调用失败）；否则依次尝试主模型与备用模型 */
     async execute(task: ClaimedTask): Promise<TaskResult> {
       const match = await deps.matches.find(task.matchId);
       if (!match) return failed(task, '对局不存在');
-      if (match.scripted) return succeeded(task, scriptedOutput(deps.findGame(match.gameKey), match.snapshot, task.request));
+      if (match.scripted) {
+        const game = deps.findGame(match.gameKey);
+        if (!match.chaos) return succeeded(task, scriptedOutput(game, match.snapshot, task.request));
+        // 模拟的调用失败是一次"已完成但失败"的任务：以 ai_failed 交回引擎走兜底，对局继续；
+        // 它不是执行异常，不会计入 worker 的领取次数上限
+        const reply = chaosReply(game, match.snapshot, task.request);
+        return 'failed' in reply ? failed(task, reply.failed) : succeeded(task, reply.output);
+      }
 
       const chain = await modelChain(task);
       if (!chain.length) return failed(task, '座位没有可用的模型');
