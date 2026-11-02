@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { advance, compileGame, createSnapshot, EngineInputError, type LogEntry } from '../src';
+import { advance, compileGame, createSnapshot, EngineInputError, SPEECH_LENGTH_TOLERANCE, speechOutput, type LogEntry } from '../src';
+import { toJsonSchema } from '../src/ai/outputContract';
 import { makePlayers, runToEnd } from '../src/testing';
 import { agentWith } from './fixtures/agents';
 import { secretGame, secretSpec, type SecretState } from './fixtures/secretGame';
@@ -58,6 +59,29 @@ describe('speak', () => {
     expect(speeches(run.log).some((entry) => entry.text.includes('机密词'))).toBe(false);
   });
 
+  it('accepts a speech up to twice the stated limit without retry or fallback', () => {
+    // talk 的提示词说"不超过 80 字"：略超的发言仍然可用，不该被重试、兜底整段丢掉
+    const long = '长'.repeat(80 * SPEECH_LENGTH_TOLERANCE);
+    const run = runToEnd(secretGame, {
+      seed: 3,
+      agent: agentWith(secretGame, (request) => (request.phaseId === 'talk' && request.seat === 1 ? { output: { speech: long } } : undefined)),
+    });
+    expect(speeches(run.log).find((entry) => entry.seat === 1)?.text).toBe(long);
+    expect(run.requests.filter(({ request }) => request.phaseId === 'talk' && request.seat === 1 && request.attempt > 1)).toHaveLength(0);
+    expect(run.log.some((entry) => entry.kind === 'fallback' && entry.seat === 1)).toBe(false);
+  });
+
+  it('still rejects a speech beyond twice the stated limit', () => {
+    const tooLong = '长'.repeat(80 * SPEECH_LENGTH_TOLERANCE + 1);
+    const run = runToEnd(secretGame, {
+      seed: 3,
+      agent: agentWith(secretGame, (request) => (request.phaseId === 'talk' && request.seat === 1 ? { output: { speech: tooLong } } : undefined)),
+    });
+    const retry = run.requests.find(({ request }) => request.phaseId === 'talk' && request.seat === 1 && request.attempt === 2);
+    expect(retry?.request.prompt.output).toContain('上一次的输出不合法');
+    expect(speeches(run.log).find((entry) => entry.seat === 1)?.text).toBe('1号没有想好怎么说');
+  });
+
   it('falls back immediately when the transport reports failure', () => {
     const run = runToEnd(secretGame, {
       seed: 4,
@@ -65,6 +89,17 @@ describe('speak', () => {
     });
     expect(run.requests.filter(({ request }) => request.phaseId === 'talk' && request.attempt > 1)).toHaveLength(0);
     expect(run.log.filter((entry) => entry.kind === 'fallback' && entry.reason.includes('timeout')).length).toBeGreaterThan(0);
+  });
+});
+
+describe('speechOutput', () => {
+  it('tells the model the target length while enforcing the tolerated hard limit', () => {
+    const schema = speechOutput({ max: 60 });
+    expect(schema.safeParse({ speech: 'x'.repeat(60 * SPEECH_LENGTH_TOLERANCE) }).success).toBe(true);
+    expect(schema.safeParse({ speech: 'x'.repeat(60 * SPEECH_LENGTH_TOLERANCE + 1) }).success).toBe(false);
+    expect(toJsonSchema(schema)).toMatchObject({
+      properties: { speech: { maxLength: 60 * SPEECH_LENGTH_TOLERANCE, description: expect.stringContaining('60 字') } },
+    });
   });
 });
 

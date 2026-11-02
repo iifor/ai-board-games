@@ -51,7 +51,7 @@ GameSpec 关键字段：
 | `start` / `phases` | 阶段字典；`end` 是保留的终局目标 |
 | `end` | 胜者判定，返回 `winner`、`winnerLabel`、`summary`、`mvp` |
 | `triggers` | 事件触发器，见下文"阶段栈与触发器" |
-| `gameOver` | `{ when, goto }`：每个阶段完成后检查，命中时清空阶段栈与排队的触发器，转入 `goto`（赛后环节或 `end`），只触发一次 |
+| `gameOver` | `{ when, goto }`：阶段完成后检查，但只在主流程上（阶段栈为空）且没有排队的触发器链时判定——已触发的出局连锁（遗言、开枪……）先全部结算，开枪带走狼人可以推翻票数判定；命中时转入 `goto`（赛后环节或 `end`），只触发一次 |
 | `budget` | `maxRounds`、`maxPhaseVisits`（默认 100）、`maxAiRequests`（默认 1000）、`maxStackDepth`（默认 8）；超限按 `endReason: 'budget'` 终局 |
 | `presentation` | `layout`、`audienceView`（默认 public）、`areas`、`revealOnEnd`、`view`（观众视图附加数据，作者负责只放公开信息） |
 | `debug` | 默认断点、调试发言内容 |
@@ -67,7 +67,7 @@ GameSpec 关键字段：
 | kind | 行为 | AI 输出 |
 | --- | --- | --- |
 | `announce` | 用**公开上下文**渲染模板，写入主持播报 | — |
-| `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆） | `output` schema（标准为 `speechOutput({ max })`）；有权声明的座位额外获得可选的 `declare` 字段 |
+| `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆） | `output` schema（标准为 `speechOutput({ max })`：`max` 是提示词告诉模型的目标字数，schema 的硬上限是它的 `SPEECH_LENGTH_TOLERANCE`（2）倍，略超目标的发言照常采用，超过硬上限才重试、兜底）；有权声明的座位额外获得可选的 `declare` 字段 |
 | `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }` |
 | `vote` | 投票后计票，`weight` 设定票权，`bonus` 给出不属于任何投票者的额外票（如乌鸦诅咒，进入阶段时计算一次，每轮只计给该轮候选人；日志的 `tally` 含额外票、`ballots` 不含，AI 历史中显示为"额外票：5号+1"），`allowAbstain` 允许弃票（`fallbackMode: 'abstain'` 时兜底为弃票）；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者、`ballots` 给出最后一轮的有效选票（不含弃票，规则可据此知道谁投了谁）；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null |
 | `judge` | 评委依次判定，`verdicts` 定义选项与含义；多数决，无评委或并列时取 `tieVerdict` | 自动生成 `{ verdict, comment }`，选项含义写入 schema 描述 |
@@ -85,7 +85,7 @@ GameSpec 关键字段：
 - `push`：排入队列，等主流程上的当前阶段完成后插入；原本要去的目标（含轮次加一）压入阶段栈，插入链末尾 `return` 时再继续前往。队列只在主流程（阶段栈为空）上被消费：一条链内部的转换（如开枪 → 结算）不会被别的触发器插队，链 `return` 后才按排队顺序执行下一条。插入链中再触发的事件同样排队，所以遗言、开枪、被枪杀者的遗言会按触发顺序串起来。
 - `jump`：立即中止当前阶段（作废其未完成的 AI 请求），清空阶段栈与队列后跳转，可附带轮次加一。
 - 插入链中的阶段通过 `ctx.trigger` 读取触发事件（如出局者座位）。
-- `gameOver` 命中后不再派发任何触发器。
+- 胜负判定（`gameOver.when`）只在主流程上、队列为空时进行：插入链 `return` 回到主流程且没有排队的链之后才判定，所以天亮出局的猎人一定先开枪，被放逐的最后一头狼也仍有遗言。`gameOver` 命中后不再派发任何触发器。
 
 ## 提示词分层
 
@@ -94,7 +94,7 @@ GameSpec 关键字段：
 | L1 平台契约 | 引擎内置 |
 | L2 游戏规则 | `rulesText` |
 | L3 身份 | 角色 `identity` + 玩家人设 |
-| L4 可见历史 | 按该玩家可见频道过滤的日志，超过 120 行时保留最近部分 |
+| L4 可见历史 | 按该玩家可见频道过滤的日志（可见性先于压缩）。最近 2 轮（含当前轮）完整保留；更早的轮次只留播报、投票、出局、揭示等结构性记录，发言正文（公开发言、队内密谈、遗言）合并为一条“（第 N 轮的 K 条发言已省略）”放在该轮第一条发言的位置；压缩后仍超过 400 行时只保留最近 400 行（`prompt/history.ts`、`prompt/historyCompression.ts`） |
 | L5 阶段指令 | 阶段或发言轮次的模板 |
 | L6 输出契约 | 由输出 schema 生成的 JSON Schema、合法目标、上一次的错误原因 |
 

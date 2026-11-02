@@ -56,11 +56,16 @@ function moveTo(env: ExecEnv, target: ResumeTarget): void {
   else s.cursor = emptyCursor(target.goto);
 }
 
-/** 胜负已分：清空阶段栈与排队的触发器，转入 gameOver.goto（只触发一次） */
+/**
+ * 胜负判定只在主流程（阶段栈为空）且没有排队的触发器时进行：已触发的出局连锁
+ * （遗言、殉情、开枪、移交警徽……）先全部结算，再看胜负——猎人在天亮出局后开枪带走狼人，
+ * 可能推翻"狼人票数已占优势"的结论。命中后清空阶段栈与队列，转入 gameOver.goto（只触发一次）。
+ */
 function checkGameOver(env: ExecEnv, result: PhaseResult | null): boolean {
   const { s } = env;
   const gameOver = env.game.spec.gameOver;
-  if (!gameOver || s.gameOverTriggered || !gameOver.when(env.ctx(result))) return false;
+  if (!gameOver || s.gameOverTriggered || s.stack.length > 0 || s.triggerQueue.length > 0) return false;
+  if (!gameOver.when(env.ctx(result))) return false;
   s.gameOverTriggered = true;
   s.stack = [];
   s.triggerQueue = [];
@@ -89,22 +94,26 @@ export function enterPhase(env: ExecEnv): boolean {
   return true;
 }
 
+/** 插入链 return：弹出阶段栈，恢复进入插入链之前的触发事件，返回链结束后要去的地方 */
+function popChain(env: ExecEnv, phaseId: string): ResumeTarget {
+  const frame = env.s.stack.pop();
+  if (!frame) throw new Error(`阶段 ${phaseId} 在阶段栈为空时 return`);
+  env.s.activeTrigger = frame.trigger;
+  return frame.resume;
+}
+
 export function completePhase(env: ExecEnv, result: PhaseResult | null): void {
   const { s } = env;
   const phaseId = env.phaseId();
   if (result) s.results[phaseId] = deepFreeze(cloneJson(result));
-  if (checkGameOver(env, result)) return;
   const transition = resolveNext(env, env.phase().next, result);
+  const target: ResumeTarget = transition.goto === RETURN_PHASE
+    ? popChain(env, phaseId)
+    : { goto: transition.goto, round: transition.round === 'increment' };
+  // 先处理 return 再判定：插入链结束、阶段栈重新为空时才轮到判定胜负
+  if (checkGameOver(env, result)) return;
   s.cursor = emptyCursor(null);
-
-  if (transition.goto === RETURN_PHASE) {
-    const frame = s.stack.pop();
-    if (!frame) throw new Error(`阶段 ${phaseId} 在阶段栈为空时 return`);
-    s.activeTrigger = frame.trigger;
-    moveTo(env, frame.resume);
-    return;
-  }
-  moveTo(env, { goto: transition.goto, round: transition.round === 'increment' });
+  moveTo(env, target);
 }
 
 /** 执行 jump 触发器：中止当前阶段及其未完成的 AI 请求，清空阶段栈后跳转 */

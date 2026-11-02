@@ -97,7 +97,7 @@ export interface TriggerSpec<S, P> {
   readonly round?: 'increment';
 }
 
-/** 胜负已分时转入的阶段（赛后环节或 end）；每个阶段完成后检查一次，只会触发一次 */
+/** 胜负已分时转入的阶段（赛后环节或 end）；在主流程上、排队的触发器链全部结算后检查，只会触发一次 */
 export interface GameOverSpec<S, P> {
   when(ctx: RuleContext<S, P>): boolean;
   readonly goto: string;

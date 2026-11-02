@@ -40,7 +40,7 @@ export type {
   TriggerEventKind,
   VariantContext,
 } from './spec/context';
-export { defineGame, definePrompts, speechOutput } from './spec/define';
+export { defineGame, definePrompts, SPEECH_LENGTH_TOLERANCE, speechOutput } from './spec/define';
 export type {
   ActPhase,
   AnnouncePhase,

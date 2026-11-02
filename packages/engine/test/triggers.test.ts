@@ -62,7 +62,8 @@ describe('push triggers', () => {
       .map((entry) => (entry.kind === 'phase_started' ? `${entry.title}@${entry.round}` : `出局${entry.seat}@${entry.round}`));
     expect(order.slice(0, 7)).toEqual(['发言@1', '放逐@1', '出局1@1', '遗言@1', '开枪@1', '出局4@1', '遗言@1']);
     expect(order[7]).toBe('发言@2');
-    expect(entries(run.log, 'speech').filter((entry) => entry.phaseId === 'last_words').map((entry) => entry.seat)).toEqual([1, 4]);
+    // 第 2 轮放逐爆破手（2 号）后胜负已分，但排队的遗言先说完才判定
+    expect(entries(run.log, 'speech').filter((entry) => entry.phaseId === 'last_words').map((entry) => entry.seat)).toEqual([1, 4, 2]);
     expect(run.snapshot.stack).toEqual([]);
   });
 
@@ -71,10 +72,10 @@ describe('push triggers', () => {
     expect(shot).toMatchObject({ seat: 1, targets: [4], channel: 'private:1' });
   });
 
-  it('turns to the game-over phase and drops pending last words', () => {
-    const lastPhase = entries(run.log, 'phase_started').map((entry) => entry.title);
-    expect(lastPhase[lastPhase.length - 1]).toBe('复盘');
-    expect(entries(run.log, 'speech').filter((entry) => entry.phaseId === 'last_words').map((entry) => entry.seat)).not.toContain(2);
+  it('turns to the game-over phase only after the exiled bomber’s queued last words', () => {
+    const titles = entries(run.log, 'phase_started').map((entry) => entry.title);
+    expect(titles.slice(-2)).toEqual(['遗言', '复盘']);
+    expect(entries(run.log, 'speech').filter((entry) => entry.phaseId === 'last_words').map((entry) => entry.seat)).toContain(2);
     expect(run.snapshot.result).toMatchObject({ winner: 'town' });
   });
 
@@ -84,6 +85,39 @@ describe('push triggers', () => {
     const lastEvent = run.stageEvents[run.stageEvents.length - 1];
     expect(lastEvent?.view.seats.every((seat) => seat.role !== null)).toBe(true);
     expect(run.stageEvents.find((event) => event.kind === 'speech')?.view.seats.every((seat) => seat.role === null)).toBe(true);
+  });
+});
+
+describe('game over waits for queued chains', () => {
+  // 胜负条件改为"只剩 3 人"：第 2 轮放逐猎手时条件已成立，但猎手的枪还在队列里
+  const game = compileGame(chainSpec({ gameOver: { when: (ctx) => ctx.seats.alive().count() <= 3, goto: 'postgame' } }));
+  const phaseOrder = (log: readonly LogEntry[]) => log
+    .filter((entry) => entry.kind === 'phase_started' || entry.kind === 'seat_eliminated')
+    .map((entry) => (entry.kind === 'phase_started' ? entry.title : `出局${entry.seat}`));
+
+  it('lets a dead hunter fire before judging, so the shot can flip the result', () => {
+    const run = runToEnd(game, {
+      seed: 1,
+      playerCount: 5,
+      agent: agentWith(game, (request, snapshot) => {
+        if (request.phaseId === 'vote') {
+          const target = snapshot.round === 1 ? 5 : 1;
+          return { output: { target: request.seat === target ? 3 : target } };
+        }
+        if (request.phaseId === 'hunter_shot') return { output: { targets: [2] } };
+        return undefined;
+      }),
+    });
+    expect(phaseOrder(run.log)).toEqual(['发言', '放逐', '出局5', '遗言', '发言', '放逐', '出局1', '遗言', '开枪', '出局2', '遗言', '复盘']);
+    expect(run.snapshot.result).toMatchObject({ winner: 'town', endReason: 'normal' });
+  });
+
+  it('still ends by maxRounds once the chain returns into the round increment', () => {
+    const budgeted = compileGame(chainSpec({ budget: { maxRounds: 1 } }));
+    const run = runToEnd(budgeted, { seed: 1, playerCount: 5, agent: scenario({ 1: { 1: 3, 2: 1, 3: 1, 4: 1, 5: 1 } }, 4) });
+    expect(phaseOrder(run.log)).toEqual(['发言', '放逐', '出局1', '遗言', '开枪', '出局4', '遗言']);
+    expect(run.snapshot.result?.endReason).toBe('budget');
+    expect(run.snapshot.round).toBe(1);
   });
 });
 

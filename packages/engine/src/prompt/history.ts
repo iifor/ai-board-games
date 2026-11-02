@@ -2,8 +2,17 @@ import type { CompiledGame } from '../compiler/compile';
 import { seatLabel } from '../runtime/labels';
 import type { EngineSnapshot, LogEntry, Seat } from '../runtime/types';
 import { entryVisibleTo } from '../visibility/channels';
+import { compressOlderRounds, type HistoryLine } from './historyCompression';
 
-export const DEFAULT_HISTORY_LIMIT = 120;
+/** 压缩后仍超过此行数时只保留最近的部分：整体上限，防止提示词无限增长 */
+export const DEFAULT_HISTORY_LIMIT = 400;
+/** 完整保留的最近轮数（含当前轮）；更早的轮次只留结构性记录 */
+export const DEFAULT_FULL_ROUNDS = 2;
+
+export interface HistoryOptions {
+  readonly fullRounds?: number;
+  readonly limit?: number;
+}
 
 function labelOf(game: CompiledGame, s: EngineSnapshot, seatNo: number): string {
   const seat = s.seats.find((item) => item.seat === seatNo);
@@ -54,19 +63,21 @@ export function formatEntry(game: CompiledGame, s: EngineSnapshot, entry: LogEnt
   }
 }
 
-/** L4：只包含该玩家可见频道的记录，过长时保留最近的部分 */
-export function formatHistory(
-  game: CompiledGame,
-  s: EngineSnapshot,
-  viewer: Seat,
-  limit = DEFAULT_HISTORY_LIMIT,
-): string {
+/**
+ * L4：只包含该玩家可见频道的记录（可见性先于压缩）。最近几轮完整保留，更早的轮次省略发言正文、
+ * 保留播报 / 投票 / 出局等结构性记录；压缩后仍超过 limit 时只保留最近的部分。
+ */
+export function formatHistory(game: CompiledGame, s: EngineSnapshot, viewer: Seat, options: HistoryOptions = {}): string {
   const lines = s.log
     .filter((entry) => entryVisibleTo(entry, viewer))
-    .map((entry) => formatEntry(game, s, entry))
-    .filter((line): line is string => line !== null);
+    .flatMap((entry): HistoryLine[] => {
+      const text = formatEntry(game, s, entry);
+      return text === null ? [] : [{ text, round: entry.round, kind: entry.kind }];
+    });
   if (lines.length === 0) return '（对局刚开始，还没有任何记录）';
-  if (lines.length <= limit) return lines.join('\n');
-  const omitted = lines.length - limit;
-  return [`（更早的 ${omitted} 条记录已省略）`, ...lines.slice(-limit)].join('\n');
+  const compressed = compressOlderRounds(lines, s.round, options.fullRounds ?? DEFAULT_FULL_ROUNDS);
+  const limit = options.limit ?? DEFAULT_HISTORY_LIMIT;
+  if (compressed.length <= limit) return compressed.join('\n');
+  const omitted = compressed.length - limit;
+  return [`（更早的 ${omitted} 条记录已省略）`, ...compressed.slice(-limit)].join('\n');
 }

@@ -16,7 +16,16 @@ export function definePrompts<const T extends Readonly<Record<string, string>>>(
   return Object.fromEntries(entries) as { readonly [K in keyof T]: PromptTemplate };
 }
 
-/** 发言阶段的标准输出：{ speech } */
+/**
+ * 发言长度容差：schema 的硬上限是提示词所述字数的 2 倍。
+ * 模型略超目标字数的发言仍然可用，不该因为重试、兜底而被整段丢弃；超过硬上限才算不合法。
+ */
+export const SPEECH_LENGTH_TOLERANCE = 2;
+
+/** 发言阶段的标准输出：{ speech }；max 是提示词告诉模型的目标字数，硬上限为其 SPEECH_LENGTH_TOLERANCE 倍 */
 export function speechOutput(options: { readonly max: number; readonly min?: number }): ZodType<SpeechOutput> {
-  return z.object({ speech: z.string().trim().min(options.min ?? 1).max(options.max) });
+  const hardMax = options.max * SPEECH_LENGTH_TOLERANCE;
+  return z.object({
+    speech: z.string().trim().min(options.min ?? 1).max(hardMax).describe(`发言内容，目标不超过 ${options.max} 字`),
+  });
 }
