@@ -16,7 +16,7 @@ export const view: AudienceView = {
 export const meta = { seq: 1, round: 1, phaseId: 'opening', channel: 'public' as const, view };
 
 export const summary: MatchSummaryDto = {
-  id: 'm_1', gameKey: 'debate', gameTitle: 'AI 辩论赛', variantKey: null, variantName: null, layout: 'versus', status: 'completed', debug: false, scripted: true,
+  id: 'm_1', gameKey: 'debate', gameTitle: 'AI 辩论赛', variantKey: null, variantName: null, layout: 'versus', status: 'completed', debug: false, scripted: true, chaos: false,
   seats: [{ seat: 1, playerId: 5, name: '玩家1' }, { seat: 2, playerId: null, name: '玩家2' }],
   result: { winner: 'pro', winnerLabel: '正方胜出', summary: '正方胜出（评委 2:1）', mvp: 1, endReason: 'normal' },
   createdAt: '2026-11-01T00:00:00Z', completedAt: null,

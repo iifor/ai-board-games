@@ -19,7 +19,7 @@
 
 动效全部用 CSS（无动画库），`prefers-reduced-motion` 下全部关闭：
 - 大厅与开局：卡片错峰淡入上浮（`.ui-fade-up` + `--i` / `animationDelay`）、悬停上浮与强调色光晕、选中座位号弹出。
-- 舞台：狼人杀昼夜背景按 `view.extra.period` 圆形揭开切换（`StageBackdrop`）；进入新阶段时大标题横扫而过（`PhaseBanner`）；发言者座位亮起扩散光环、立绘站在圆桌中央（`SpeakerSpotlight`，主持人也站在这里）；字幕栏从下方滑入、文字从左向右揭开，进度条跟随真实播放进度（`SubtitleBar` + `SubtitleProgress`）；计票时票数条依次长出、当选者金色高亮（`VoteBoard`）；出局座位变灰并盖"出局"戳；终局结果以对话框弹出，展示 MVP 立绘、按阵营揭示的阵容与"同样阵容再来一局 / 从头回放"（`ResultPanel`、`ResultRoster`），可关闭后再用"查看结果"打开。
+- 舞台：狼人杀昼夜背景按 `view.extra.period` 圆形揭开切换（`StageBackdrop`）；进入新阶段时大标题横扫而过（`PhaseBanner`）；发言者座位亮起扩散光环、立绘站在圆桌中央（`SpeakerSpotlight`，主持人也站在这里；行动事件如开枪、自爆由当事座位站到中央）；字幕栏从下方滑入、文字从左向右揭开，进度条跟随真实播放进度（`SubtitleBar` + `SubtitleProgress`）；计票时票数条依次长出、当选者金色高亮（`VoteBoard`）；出局座位变灰并盖"出局"戳；终局结果以对话框弹出，展示 MVP 立绘、按阵营揭示的阵容与"同样阵容再来一局 / 从头回放"（`ResultPanel`、`ResultRoster`），可关闭后再用"查看结果"打开。
 
 通用小部件：`components/Avatar`（内置海报 → 玩家头像 → 首字，`round` 圆形 / `figure` 立绘，座位卡、字幕栏、终局 MVP、选人卡片都用它）；胶囊标签统一用 `global.css` 的 `.ui-pill`（修饰类 `-accent` / `-brand` / `-outline` / `-soft`，使用处只覆盖颜色）；"游戏 · 板子"用 `@battle/shared` 的 `formatMatchTitle`（与 B 端共用），胜方、日期时间用 `utils/format.ts`（`formatWinner` / `formatDateTime`，24 小时制）。样式不用 `!important`：需要盖过通用规则时提高选择器具体度（如 `.playback-rail .playback-toggle:hover`），需要被媒体查询改写的值走自定义属性而不是内联样式（终局阵容列数 `--roster-columns`）；只有 `prefers-reduced-motion` 的全局关动效例外。
 

@@ -38,8 +38,9 @@ export const KIND_LABELS: Readonly<Record<StageEvent['kind'], string>> = {
 };
 
 /** 这些事件播放时把说话人的立绘放到舞台中央 */
+/** 中央立绘聚光的事件：发言、点评、播报、揭示、终局，以及行动（开枪、自爆……当事座位站到中央，主持人声音读出） */
 export function hasSpotlight(kind: StageEvent['kind']): boolean {
-  return kind === 'speech' || kind === 'judgement' || kind === 'narration' || kind === 'revealed' || kind === 'game_over';
+  return kind === 'speech' || kind === 'judgement' || kind === 'narration' || kind === 'revealed' || kind === 'game_over' || kind === 'action';
 }
 
 /** 本轮夜晚已经走过的阶段标题（含当前），只用公开的 phase_started 事件 */

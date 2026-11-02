@@ -53,7 +53,7 @@ describe('lobby utils', () => {
   it('builds the rematch state the setup page accepts, skipping seats without a player', () => {
     const summary: MatchSummaryDto = {
       id: 'm_1', gameKey: 'werewolf', gameTitle: 'AI 狼人杀', variantKey: 'standard-12', variantName: '预女猎白', layout: 'circle', status: 'completed',
-      debug: false, scripted: false, seats: [{ seat: 1, playerId: 5, name: 'a' }, { seat: 2, playerId: null, name: 'b' }, { seat: 3, playerId: 7, name: 'c' }],
+      debug: false, scripted: false, chaos: false, seats: [{ seat: 1, playerId: 5, name: 'a' }, { seat: 2, playerId: null, name: 'b' }, { seat: 3, playerId: 7, name: 'c' }],
       result: null, createdAt: '2026-11-01T12:00:00Z', completedAt: null,
     };
     const state = rematchStateOf(summary);
@@ -86,7 +86,7 @@ describe('lobby components', () => {
   it('tells a failed history apart from an empty one and keeps the lobby around it', () => {
     const summary: MatchSummaryDto = {
       id: 'm_1', gameKey: 'werewolf', gameTitle: 'AI 狼人杀', variantKey: 'standard-12', variantName: '预女猎白', layout: 'circle', status: 'completed',
-      debug: false, scripted: false, seats: [], result: null, createdAt: '2026-11-01T12:00:00Z', completedAt: null,
+      debug: false, scripted: false, chaos: false, seats: [], result: null, createdAt: '2026-11-01T12:00:00Z', completedAt: null,
     };
     const render = (node: ReactNode) => renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>);
     const failed = render(<RecentMatches history={{ status: 'error', message: '网络连接失败' }} onRetry={() => {}} />);

@@ -13,9 +13,16 @@ import { VoteBoard } from './components/VoteBoard';
 import { SegmentControl } from './playback/segment';
 import { meta, summary, view } from './stage.fixtures';
 import type { StreamItem } from './types';
-import { judgeBadges, nightStepsOf, periodOf, rosterByTeam, speechOrderOf } from './utils';
+import { hasSpotlight, judgeBadges, nightStepsOf, periodOf, rosterByTeam, speechOrderOf } from './utils';
 
 describe('stage derivations', () => {
+  it('puts the acting seat in the spotlight for actions but not for tallies or phase titles', () => {
+    expect(hasSpotlight('action')).toBe(true);
+    expect(hasSpotlight('speech')).toBe(true);
+    expect(hasSpotlight('vote_tallied')).toBe(false);
+    expect(hasSpotlight('phase_started')).toBe(false);
+  });
+
   const item = (event: StageEvent): StreamItem => ({ event, audio: null });
   const nightView: AudienceView = { ...view, gameKey: 'werewolf', phase: { id: 'wolf_kill', title: '狼人击杀' }, extra: { period: 'night' } };
 
