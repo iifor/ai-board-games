@@ -7,6 +7,8 @@ export interface ClaimedTask {
   readonly requestId: string;
   readonly seat: number;
   readonly request: AiRequest;
+  /** 含本次在内被领取的次数 */
+  readonly attempts: number;
 }
 
 export interface SeatModel {
@@ -33,12 +35,13 @@ export function createAiTaskRepository(db: Db) {
 
   return {
     /**
-     * 原子领取任务（SKIP LOCKED，多实例不会重复领取；领取过期后可被重新领取）。
+     * 原子领取任务（SKIP LOCKED，多实例不会重复领取；领取过期后可被重新领取，每次领取 attempts 加一）。
      * ack 节奏的对局只在观众未确认的事件不超过 prefetch 时才继续生成，无人观看时自然停止消耗。
      */
     async claim(limit: number, prefetch: number): Promise<ClaimedTask[]> {
       const result = await sql<ClaimedTask>`
-        update ai_tasks t set status = 'running', claimed_until = now() + ${CLAIM_TTL}::interval, updated_at = now()
+        update ai_tasks t
+        set status = 'running', claimed_until = now() + ${CLAIM_TTL}::interval, attempts = t.attempts + 1, updated_at = now()
         from (
           select t2.match_id, t2.request_id from ai_tasks t2
           join matches m on m.id = t2.match_id
@@ -52,7 +55,7 @@ export function createAiTaskRepository(db: Db) {
           for update of t2 skip locked
         ) picked
         where t.match_id = picked.match_id and t.request_id = picked.request_id
-        returning t.match_id as "matchId", t.request_id as "requestId", t.seat, t.request`.execute(db.withoutPlugins());
+        returning t.match_id as "matchId", t.request_id as "requestId", t.seat, t.request, t.attempts`.execute(db.withoutPlugins());
       return result.rows;
     },
 

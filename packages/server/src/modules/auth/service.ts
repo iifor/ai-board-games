@@ -5,27 +5,25 @@ import type { AdminIdentity } from '../../types';
 import { hashPassword, verifyPassword } from '../../utils/crypto';
 import { badRequest, tooManyRequests, unauthorized } from '../../utils/errors';
 import { logger } from '../../utils/logger';
-import { FAILED_LOGIN_WINDOW_MS, MAX_FAILED_LOGINS, TOKEN_TTL_SECONDS } from './constants';
+import { createWindowCounter } from '../../utils/windowCounter';
+import { FAILED_LOGIN_WINDOW_MS, MAX_FAILED_LOGINS, MAX_FAILED_LOGINS_PER_SOURCE, TOKEN_TTL_SECONDS } from './constants';
 import type { AuthRepository } from './repository';
 
-interface FailedLogins {
-  count: number;
-  since: number;
-}
-
 export function createAuthService(repository: AuthRepository, config: Pick<AppConfig, 'jwtSecret' | 'bootstrapAdmin'>) {
-  const failures = new Map<string, FailedLogins>();
+  /** 进程内计数：来源 + 用户名 的失败次数，以及来源的累计失败次数；过期条目会被清理 */
+  const accountFailures = createWindowCounter(FAILED_LOGIN_WINDOW_MS);
+  const sourceFailures = createWindowCounter(FAILED_LOGIN_WINDOW_MS);
+  const accountKey = (source: string, username: string) => `${source}\u0000${username}`;
 
-  function assertNotLocked(username: string, now: number): void {
-    const entry = failures.get(username);
-    if (entry && now - entry.since < FAILED_LOGIN_WINDOW_MS && entry.count >= MAX_FAILED_LOGINS) {
-      throw tooManyRequests('登录失败次数过多，请稍后再试');
-    }
+  function assertNotLocked(source: string, username: string, now: number): void {
+    const locked = accountFailures.count(accountKey(source, username), now) >= MAX_FAILED_LOGINS
+      || sourceFailures.count(source, now) >= MAX_FAILED_LOGINS_PER_SOURCE;
+    if (locked) throw tooManyRequests('登录失败次数过多，请稍后再试');
   }
 
-  function recordFailure(username: string, now: number): void {
-    const entry = failures.get(username);
-    failures.set(username, !entry || now - entry.since >= FAILED_LOGIN_WINDOW_MS ? { count: 1, since: now } : { ...entry, count: entry.count + 1 });
+  function recordFailure(source: string, username: string, now: number): void {
+    accountFailures.record(accountKey(source, username), now);
+    sourceFailures.record(source, now);
   }
 
   return {
@@ -40,14 +38,15 @@ export function createAuthService(repository: AuthRepository, config: Pick<AppCo
       logger.info('已创建初始管理员账号', { username: config.bootstrapAdmin.username });
     },
 
-    async login(username: string, password: string, now = Date.now()): Promise<AdminLoginResponse> {
-      assertNotLocked(username, now);
+    /** source 是请求来源（连接地址或可信代理给出的地址），锁定按来源 + 用户名计 */
+    async login(username: string, password: string, source: string, now = Date.now()): Promise<AdminLoginResponse> {
+      assertNotLocked(source, username, now);
       const user = await repository.findByUsername(username);
       if (!user || !(await verifyPassword(password, user.passwordHash))) {
-        recordFailure(username, now);
+        recordFailure(source, username, now);
         throw unauthorized('用户名或密码错误');
       }
-      failures.delete(username);
+      accountFailures.clear(accountKey(source, username));
       const exp = Math.floor(now / 1000) + TOKEN_TTL_SECONDS;
       const token = await sign({ sub: user.id, exp }, config.jwtSecret, 'HS256');
       return { token, expiresAt: new Date(exp * 1000).toISOString(), mustChangePassword: user.mustChangePassword };

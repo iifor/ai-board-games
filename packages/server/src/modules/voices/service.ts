@@ -4,6 +4,7 @@ import {
 } from '@battle/shared';
 import type { Selectable } from 'kysely';
 import type { VoicesTable } from '../../db/schema';
+import { enabledUpdate } from '../../utils/enabled';
 import { notFound } from '../../utils/errors';
 import type { TtsService } from '../tts';
 import { DEFAULT_VOICES } from './catalog';
@@ -54,7 +55,6 @@ export function createVoiceService(repository: VoiceRepository, tts: Pick<TtsSer
     pitch: input.pitch ?? DEFAULT_PERCENT,
     sampleText: input.sampleText ?? '',
     description: input.description ?? '',
-    enabled: input.enabled ?? true,
   });
 
   return {
@@ -66,10 +66,11 @@ export function createVoiceService(repository: VoiceRepository, tts: Pick<TtsSer
       return toDto(row);
     },
 
-    create: async (input: VoiceInput): Promise<VoiceDto> => toDto(await repository.create(values(input))),
+    create: async (input: VoiceInput): Promise<VoiceDto> => toDto(await repository.create({ ...values(input), enabled: input.enabled ?? true })),
 
+    /** 省略 enabled 时保留原值 */
     async update(id: number, input: VoiceInput): Promise<VoiceDto> {
-      const row = await repository.update(id, values(input));
+      const row = await repository.update(id, { ...values(input), ...enabledUpdate(input) });
       if (!row) throw notFound('音色');
       return toDto(row);
     },
@@ -102,7 +103,7 @@ export function createVoiceService(repository: VoiceRepository, tts: Pick<TtsSer
       let created = 0;
       for (const voice of DEFAULT_VOICES) {
         if (signatures.has(signature(voice)) || names.has(voice.name)) continue;
-        await repository.create(values(voice));
+        await repository.create({ ...values(voice), enabled: true });
         signatures.add(signature(voice));
         names.add(voice.name);
         created += 1;

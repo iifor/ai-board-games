@@ -1,3 +1,4 @@
+import type { StageLayout } from '../catalog';
 import type { GameResult, StageEvent } from '../stage';
 
 export type MatchStatus = 'created' | 'running' | 'waiting_ai' | 'paused' | 'completed' | 'failed';
@@ -32,6 +33,8 @@ export interface MatchSummaryDto {
   readonly gameTitle: string;
   readonly variantKey: string | null;
   readonly variantName: string | null;
+  /** 舞台布局，取自游戏的 presentation；前端据此渲染，不必再查游戏目录 */
+  readonly layout: StageLayout;
   readonly status: MatchStatus;
   readonly debug: boolean;
   readonly scripted: boolean;

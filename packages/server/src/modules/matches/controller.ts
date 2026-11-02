@@ -1,7 +1,7 @@
-import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context } from 'hono';
 import type { AppEnv } from '../../types';
 import { ok } from '../../utils/response';
+import { requestSource } from '../../utils/source';
 import { parseJson, parseQuery } from '../../utils/validate';
 import type { MatchService } from './service';
 import { createDebugMatchSchema, createMatchSchema, debugCommandSchema, listQuerySchema } from './validator';
@@ -11,23 +11,12 @@ export interface MatchControllerOptions {
   readonly trustProxy: boolean;
 }
 
-/** 限流用的来源标识 */
-function sourceOf(c: Context<AppEnv>, trustProxy: boolean): string {
-  const forwarded = trustProxy ? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() : undefined;
-  if (forwarded) return forwarded;
-  try {
-    return getConnInfo(c).remote.address ?? 'unknown';
-  } catch {
-    return 'unknown';
-  }
-}
-
 const matchId = (c: Context<AppEnv>) => c.req.param('id') ?? '';
 
 export function createMatchController(service: MatchService, options: MatchControllerOptions = { trustProxy: false }) {
   return {
     createPublic: async (c: Context<AppEnv>) =>
-      ok(c, await service.createPublic(await parseJson(c, createMatchSchema), sourceOf(c, options.trustProxy)), 201),
+      ok(c, await service.createPublic(await parseJson(c, createMatchSchema), requestSource(c, options.trustProxy)), 201),
     history: async (c: Context<AppEnv>) => {
       const { limit } = parseQuery(c, listQuerySchema);
       return ok(c, await service.list({ debug: false, status: 'completed', limit }));

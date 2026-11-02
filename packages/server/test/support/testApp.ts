@@ -22,8 +22,9 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, external
     secretKey: randomBytes(32),
     bootstrapAdmin: ADMIN,
     tts: { azure: null, mimo: null },
-    ai: { concurrency: 4 },
+    ai: { concurrency: 4, maxAttempts: 3 },
     matches: { maxActive: 5, idleMs: 30 * 60_000 },
+    realtime: { pollMs: 2000 },
     http: { trustProxy: false },
     ...overrides,
   };
@@ -31,7 +32,7 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, external
   await migrateToLatest(db, schema);
   const services = createServices(db, config, gameRegistry, { sleep: async () => {}, ...external });
   await services.auth.bootstrap();
-  const { app, injectWebSocket } = createApp(db, services, { trustProxy: config.http.trustProxy });
+  const { app, injectWebSocket } = createApp(services, { trustProxy: config.http.trustProxy });
 
   async function call<T>(method: string, path: string, options: { body?: unknown; token?: string; headers?: Record<string, string> } = {}) {
     const headers: Record<string, string> = { ...options.headers };

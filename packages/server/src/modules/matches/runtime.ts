@@ -56,7 +56,24 @@ export function createMatchRuntime(repository: MatchRepository, findGame: (key: 
     return outcome;
   }
 
-  return { advanceMatch };
+  /**
+   * AI 任务多次失败后由 worker 调用：对局标为失败、记下任务错误、取消其余任务，并通知在线观众。
+   * 已结束的对局不再改动。
+   */
+  async function failMatch(matchId: string, error: string, completion: TaskCompletion): Promise<boolean> {
+    const failed = await repository.transaction(async (trx) => {
+      const row = await repository.lock(trx, matchId);
+      if (!row || TERMINAL_STATUSES.has(row.status)) return false;
+      await repository.markFailed(trx, matchId, error);
+      await repository.completeTask(trx, matchId, completion);
+      await repository.cancelOpenTasks(trx, [matchId]);
+      return true;
+    });
+    if (failed) bus.emit('match:status', { matchId, status: 'failed' });
+    return failed;
+  }
+
+  return { advanceMatch, failMatch };
 }
 
 export type MatchRuntime = ReturnType<typeof createMatchRuntime>;

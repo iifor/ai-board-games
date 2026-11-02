@@ -54,4 +54,37 @@ describe('admin auth', () => {
       await fresh.cleanup();
     }
   });
+
+  it('locks per source, so a stranger guessing passwords cannot lock the admin out from another address', async () => {
+    const fresh = await createTestApp({ http: { trustProxy: true } });
+    try {
+      const from = (address: string) => ({ 'x-forwarded-for': address });
+      for (let i = 0; i < 10; i += 1) {
+        await fresh.call('POST', '/api/admin/auth/login', { body: { username: ADMIN.username, password: `bad-${i}` }, headers: from('203.0.113.9') });
+      }
+      const stranger = await fresh.call('POST', '/api/admin/auth/login', { body: ADMIN, headers: from('203.0.113.9') });
+      expect(stranger).toMatchObject({ status: 429, body: { code: API_ERROR_CODES.tooManyRequests } });
+      const admin = await fresh.call('POST', '/api/admin/auth/login', { body: ADMIN, headers: from('198.51.100.7') });
+      expect(admin.status).toBe(200);
+    } finally {
+      await fresh.cleanup();
+    }
+  });
+
+  it('caps failures per source across usernames', async () => {
+    const fresh = await createTestApp({ http: { trustProxy: true } });
+    try {
+      const headers = { 'x-forwarded-for': '203.0.113.50' };
+      for (let i = 0; i < 30; i += 1) {
+        const attempt = await fresh.call('POST', '/api/admin/auth/login', { body: { username: `guess-${i}`, password: 'whatever' }, headers });
+        expect(attempt.status).toBe(401);
+      }
+      const capped = await fresh.call('POST', '/api/admin/auth/login', { body: ADMIN, headers });
+      expect(capped).toMatchObject({ status: 429, body: { code: API_ERROR_CODES.tooManyRequests } });
+      const elsewhere = await fresh.call('POST', '/api/admin/auth/login', { body: ADMIN, headers: { 'x-forwarded-for': '203.0.113.51' } });
+      expect(elsewhere.status).toBe(200);
+    } finally {
+      await fresh.cleanup();
+    }
+  });
 });

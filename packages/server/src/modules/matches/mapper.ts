@@ -12,6 +12,8 @@ export function toSummary(row: MatchRow, seats: readonly SeatRow[], game: Compil
     gameTitle: game?.spec.title ?? row.gameKey,
     variantKey: row.variantKey,
     variantName: variant?.name ?? null,
+    // 游戏已不在注册表时退回通用的环形布局，前端仍能渲染
+    layout: game?.spec.presentation.layout ?? 'circle',
     status: row.status,
     debug: row.debug,
     scripted: row.scripted,

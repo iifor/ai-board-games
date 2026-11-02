@@ -17,6 +17,10 @@ const envSchema = z.object({
   MIMO_TTS_MODEL: z.string().min(1).default('mimo-v2.5-tts'),
   /** 同时执行的 AI 任务数 */
   AI_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
+  /** 一个 AI 任务最多领取几次：执行或推进反复失败时终止对局，不再无限重试、重复付费调用模型 */
+  AI_TASK_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(3),
+  /** 播放流等待新事件时的兜底重查间隔（毫秒）：事件总线只在进程内，其他实例产生的事件靠它发现 */
+  STREAM_POLL_MS: z.coerce.number().int().min(100).max(60_000).default(2000),
   /** C 端同时进行中的公开对局上限 */
   MAX_ACTIVE_MATCHES: z.coerce.number().int().min(1).max(1000).default(5),
   /** 公开对局多少分钟无人确认视为无人观看：不再计入进行中数量，并由回收器结束 */
@@ -37,8 +41,9 @@ export interface AppConfig {
     readonly azure: { readonly key: string; readonly region: string } | null;
     readonly mimo: { readonly apiKey: string; readonly baseUrl: string; readonly model: string } | null;
   };
-  readonly ai: { readonly concurrency: number };
+  readonly ai: { readonly concurrency: number; readonly maxAttempts: number };
   readonly matches: { readonly maxActive: number; readonly idleMs: number };
+  readonly realtime: { readonly pollMs: number };
   readonly http: { readonly trustProxy: boolean };
 }
 
@@ -70,8 +75,9 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>> = p
       azure: value.AZURE_SPEECH_KEY && value.AZURE_SPEECH_REGION ? { key: value.AZURE_SPEECH_KEY, region: value.AZURE_SPEECH_REGION } : null,
       mimo: value.MIMO_API_KEY ? { apiKey: value.MIMO_API_KEY, baseUrl: value.MIMO_BASE_URL, model: value.MIMO_TTS_MODEL } : null,
     },
-    ai: { concurrency: value.AI_CONCURRENCY },
+    ai: { concurrency: value.AI_CONCURRENCY, maxAttempts: value.AI_TASK_MAX_ATTEMPTS },
     matches: { maxActive: value.MAX_ACTIVE_MATCHES, idleMs: value.MATCH_IDLE_MINUTES * 60_000 },
+    realtime: { pollMs: value.STREAM_POLL_MS },
     http: { trustProxy: value.TRUST_PROXY === 'true' },
   };
 }

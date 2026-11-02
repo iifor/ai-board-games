@@ -19,9 +19,10 @@ describe('scripted debug matches', () => {
       token,
       body: { gameKey: 'debate', playerIds, scripted: true, pacing: 'free' },
     }));
+    expect(created.layout).toBe('versus');
     await runUntilSettled(t, created.id);
     const detail = dataOf(await t.call<MatchDetailDto>('GET', `/api/admin/matches/${created.id}`, { token }));
-    expect(detail).toMatchObject({ status: 'completed', debug: true, scripted: true });
+    expect(detail).toMatchObject({ status: 'completed', debug: true, scripted: true, layout: 'versus' });
     expect(detail.result?.winner).toMatch(/pro|con|draw/);
     expect(dataOf(await t.call<unknown[]>('GET', `/api/admin/matches/${created.id}/ai-calls`, { token }))).toEqual([]);
     const log = dataOf(await t.call<{ kind: string }[]>('GET', `/api/admin/matches/${created.id}/log`, { token }));
@@ -36,7 +37,7 @@ describe('scripted debug matches', () => {
     }));
     await runUntilSettled(t, created.id);
     const paused = dataOf(await t.call<MatchDetailDto>('GET', `/api/admin/matches/${created.id}`, { token }));
-    expect(paused).toMatchObject({ status: 'paused', phaseId: 'dawn', variantName: '白狼王&守卫' });
+    expect(paused).toMatchObject({ status: 'paused', phaseId: 'dawn', variantName: '白狼王&守卫', layout: 'circle' });
     const resumed = dataOf(await t.call<MatchDetailDto>('POST', `/api/admin/matches/${created.id}/debug`, { token, body: { command: 'run' } }));
     expect(resumed.status).not.toBe('paused');
     await runUntilSettled(t, created.id);

@@ -18,6 +18,7 @@ export interface ProviderInput {
   readonly baseUrl: string;
   /** 更新时省略表示保留原值 */
   readonly apiKey?: string | undefined;
+  /** 创建时默认 true；更新时省略表示保留原值 */
   readonly enabled?: boolean | undefined;
 }
 
@@ -47,7 +48,10 @@ export interface ModelInput {
   readonly temperature?: number | undefined;
   readonly maxTokens?: number | undefined;
   readonly fallbackModelId?: number | null | undefined;
-  /** 设为 true 会清除系统停用原因（管理员确认额度已恢复后重新启用） */
+  /**
+   * 创建时默认 true；更新时省略表示保留原值（系统可能因额度耗尽停用了它，不能被无意重新启用）。
+   * 设为 true 会清除系统停用原因（管理员确认额度已恢复后重新启用）
+   */
   readonly enabled?: boolean | undefined;
 }
 
@@ -94,6 +98,7 @@ export interface VoiceInput {
   readonly pitch?: string | undefined;
   readonly sampleText?: string | undefined;
   readonly description?: string | undefined;
+  /** 创建时默认 true；更新时省略表示保留原值 */
   readonly enabled?: boolean | undefined;
 }
 
@@ -131,6 +136,7 @@ export interface PlayerInput {
   readonly persona?: string | undefined;
   readonly modelId: number;
   readonly voiceId?: number | null | undefined;
+  /** 创建时默认 true；更新时省略表示保留原值 */
   readonly enabled?: boolean | undefined;
 }
 

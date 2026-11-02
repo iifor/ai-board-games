@@ -1,9 +1,16 @@
 import type { AudioRef, StageEvent } from '@battle/shared';
-import type { Db } from '../../db/database';
+import type { MatchRepository } from '../matches/repository';
 import type { TtsService, VoiceChoice } from '../tts';
+import type { VoiceRepository } from '../voices/repository';
 
 /** 主持播报使用名为"主持人"的音色；没有则交给前端朗读 */
 export const HOST_VOICE_NAME = '主持人';
+
+export interface AudioResolverDeps {
+  readonly voices: Pick<VoiceRepository, 'findEnabledByName'>;
+  readonly matches: Pick<MatchRepository, 'seatVoice'>;
+  readonly tts: Pick<TtsService, 'audioFor'>;
+}
 
 function speakable(event: StageEvent): { text: string; seat: number | null } | null {
   switch (event.kind) {
@@ -24,17 +31,13 @@ function speakable(event: StageEvent): { text: string; seat: number | null } | n
 }
 
 /** 为舞台事件准备语音：按座位音色合成，结果在进程内去重并由 TTS 服务持久缓存 */
-export function createAudioResolver(db: Db, tts: TtsService) {
+export function createAudioResolver(deps: AudioResolverDeps) {
   const inflight = new Map<string, Promise<AudioRef | null>>();
 
   async function voiceFor(matchId: string, seat: number | null): Promise<VoiceChoice | null> {
-    const query = seat === null
-      ? db.selectFrom('voices').select(['provider', 'voiceName', 'language', 'style', 'rate', 'pitch'])
-        .where('name', '=', HOST_VOICE_NAME).where('enabled', '=', true)
-      : db.selectFrom('matchSeats').innerJoin('voices', 'voices.id', 'matchSeats.voiceId')
-        .select(['voices.provider', 'voices.voiceName', 'voices.language', 'voices.style', 'voices.rate', 'voices.pitch'])
-        .where('matchSeats.matchId', '=', matchId).where('matchSeats.seat', '=', seat).where('voices.enabled', '=', true);
-    const row = await query.executeTakeFirst();
+    const row = seat === null
+      ? await deps.voices.findEnabledByName(HOST_VOICE_NAME)
+      : await deps.matches.seatVoice(matchId, seat);
     return row ? { ...row, provider: row.provider as VoiceChoice['provider'] } : null;
   }
 
@@ -45,7 +48,7 @@ export function createAudioResolver(db: Db, tts: TtsService) {
       const key = `${matchId}:${event.seq}`;
       const existing = inflight.get(key);
       if (existing) return existing;
-      const job = voiceFor(matchId, content.seat).then((voice) => tts.audioFor(content.text, voice));
+      const job = voiceFor(matchId, content.seat).then((voice) => deps.tts.audioFor(content.text, voice));
       inflight.set(key, job);
       void job.finally(() => setTimeout(() => inflight.delete(key), 60_000));
       return job;

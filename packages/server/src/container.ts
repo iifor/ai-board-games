@@ -4,12 +4,13 @@ import type { Db } from './db/database';
 import { createAiTaskRepository, createAiWorker, createTaskExecutor } from './modules/ai-worker';
 import { createAuthRepository, createAuthService } from './modules/auth';
 import { createGameService } from './modules/games';
+import { createHealthRepository, createHealthService } from './modules/health';
 import { createOpenAiCompatibleClient, type LlmClient } from './modules/llm';
 import { createCreationLimiter, createMatchReaper, createMatchRepository, createMatchRuntime, createMatchService } from './modules/matches';
 import { createModelRepository, createModelService } from './modules/models';
 import { createPlayerRepository, createPlayerService } from './modules/players';
 import { createProviderRepository, createProviderService } from './modules/providers';
-import { createAudioResolver } from './modules/realtime';
+import { createAudioResolver, createRealtimeService } from './modules/realtime';
 import { createMediaRepository, createTtsService, ttsProvidersFromConfig, type TtsProviders } from './modules/tts';
 import { createVoiceRepository, createVoiceService } from './modules/voices';
 import { createEventBus } from './utils/eventBus';
@@ -34,12 +35,14 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
     matches: createMatchRepository(db),
     aiTasks: createAiTaskRepository(db),
     media: createMediaRepository(db),
+    health: createHealthRepository(db),
   };
   const llm = external.llm ?? createOpenAiCompatibleClient();
   const providers = createProviderService(repositories.providers, config.secretKey, repositories.models.countByProvider);
   const models = createModelService({ repository: repositories.models, providers: repositories.providers, credentials: providers.credentials, llm });
   const runtime = createMatchRuntime(repositories.matches, games.find, bus);
   const tts = createTtsService(external.ttsProviders ?? ttsProvidersFromConfig(config.tts), repositories.media);
+  const audio = createAudioResolver({ voices: repositories.voices, matches: repositories.matches, tts });
   const executor = createTaskExecutor({
     tasks: repositories.aiTasks,
     matches: repositories.matches,
@@ -71,8 +74,10 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
       idleMs: config.matches.idleMs,
     }),
     reaper: createMatchReaper({ repository: repositories.matches, bus }, { idleMs: config.matches.idleMs }),
-    audio: createAudioResolver(db, tts),
-    worker: createAiWorker({ tasks: repositories.aiTasks, executor, runtime, bus }, { concurrency: config.ai.concurrency }),
+    audio,
+    realtime: createRealtimeService({ matches: repositories.matches, bus, audio }, { pollMs: config.realtime.pollMs }),
+    health: createHealthService(repositories.health),
+    worker: createAiWorker({ tasks: repositories.aiTasks, executor, runtime, bus }, { concurrency: config.ai.concurrency, maxAttempts: config.ai.maxAttempts }),
   };
 }
 

@@ -1,6 +1,7 @@
 import type { PlayerDto, PlayerInput, PublicPlayerDto } from '@battle/shared';
 import type { Selectable } from 'kysely';
 import type { PlayersTable } from '../../db/schema';
+import { enabledUpdate } from '../../utils/enabled';
 import { badRequest, notFound } from '../../utils/errors';
 import type { ModelRepository } from '../models/repository';
 import type { VoiceRepository } from '../voices/repository';
@@ -35,7 +36,6 @@ export function createPlayerService(repository: PlayerRepository, models: ModelR
       persona: input.persona ?? '',
       modelId: input.modelId,
       voiceId,
-      enabled: input.enabled ?? true,
     };
   }
 
@@ -47,9 +47,10 @@ export function createPlayerService(repository: PlayerRepository, models: ModelR
       if (!row) throw notFound('玩家');
       return toDto(row);
     },
-    create: async (input: PlayerInput): Promise<PlayerDto> => toDto(await repository.create(await values(input))),
+    create: async (input: PlayerInput): Promise<PlayerDto> => toDto(await repository.create({ ...(await values(input)), enabled: input.enabled ?? true })),
+    /** 省略 enabled 时保留原值 */
     async update(id: number, input: PlayerInput): Promise<PlayerDto> {
-      const row = await repository.update(id, await values(input));
+      const row = await repository.update(id, { ...(await values(input)), ...enabledUpdate(input) });
       if (!row) throw notFound('玩家');
       return toDto(row);
     },

@@ -15,7 +15,7 @@ async function main(): Promise<void> {
   const services = createServices(db, config, gameRegistry);
   await services.auth.bootstrap();
 
-  const { app, injectWebSocket } = createApp(db, services, { trustProxy: config.http.trustProxy });
+  const { app, injectWebSocket } = createApp(services, { trustProxy: config.http.trustProxy });
   const server = serve({ fetch: app.fetch, port: config.port }, ({ port }) => logger.info('服务已启动', { port }));
   injectWebSocket(server);
   services.worker.start();

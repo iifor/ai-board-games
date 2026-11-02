@@ -46,9 +46,12 @@ export function createModelService({ repository, providers, credentials, llm }: 
     if (!(await repository.find(fallback))) throw badRequest('备用模型不存在');
   }
 
-  /** 重新启用时清除系统停用原因；管理员停用时保留原因，便于知道之前为何被停用 */
+  /**
+   * 更新时省略 enabled 保留原值：额度耗尽被系统停用的模型不能被一次普通更新悄悄重新启用。
+   * 重新启用时清除系统停用原因；管理员停用时保留原因，便于知道之前为何被停用
+   */
   function values(input: ModelInput, existing: Selectable<ModelsTable> | null) {
-    const enabled = input.enabled ?? true;
+    const enabled = input.enabled ?? existing?.enabled ?? true;
     return {
       providerId: input.providerId,
       name: input.name,

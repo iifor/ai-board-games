@@ -144,6 +144,38 @@ describe('model connection test and quota status', () => {
     const enabled = dataOf(await t.call<ModelDto>('PUT', `/api/admin/models/${model.id}`, { token, body: { ...body, enabled: true } }));
     expect(enabled).toMatchObject({ enabled: true, disabledReason: null, disabledAt: null });
   });
+
+  it('keeps a quota-disabled model disabled when an update omits enabled', async () => {
+    const provider = await createProvider('额度保留');
+    const model = await createModel(provider.id, '额度保留模型');
+    await t.services.models.markQuotaExhausted(model.id);
+    const body = { providerId: provider.id, name: '改了名字', model: 'gpt-y' };
+    const updated = dataOf(await t.call<ModelDto>('PUT', `/api/admin/models/${model.id}`, { token, body }));
+    expect(updated).toMatchObject({ name: '改了名字', model: 'gpt-y', enabled: false, disabledReason: 'quota_exhausted' });
+    expect(updated.disabledAt).not.toBeNull();
+    // 创建时省略 enabled 仍默认启用
+    expect((await createModel(provider.id, '默认启用')).enabled).toBe(true);
+  });
+});
+
+describe('enabled is preserved on update when omitted', () => {
+  it('for providers, voices and players', async () => {
+    const provider = await createProvider('停用保留');
+    await t.call('PUT', `/api/admin/providers/${provider.id}`, { token, body: { name: '停用保留', baseUrl: 'https://api.example.com/v1', enabled: false } });
+    const providerKept = dataOf(await t.call<ProviderDto>('PUT', `/api/admin/providers/${provider.id}`, { token, body: { name: '停用保留2', baseUrl: 'https://api.example.com/v1' } }));
+    expect(providerKept).toMatchObject({ name: '停用保留2', enabled: false });
+
+    const voice = dataOf(await t.call<VoiceDto>('POST', '/api/admin/voices', { token, body: { name: '停用音色', provider: 'browser', voiceName: 'zh-CN', enabled: false } }));
+    const voiceKept = dataOf(await t.call<VoiceDto>('PUT', `/api/admin/voices/${voice.id}`, { token, body: { name: '停用音色', provider: 'browser', voiceName: 'zh-TW' } }));
+    expect(voiceKept).toMatchObject({ voiceName: 'zh-TW', enabled: false });
+    const voiceOn = dataOf(await t.call<VoiceDto>('PUT', `/api/admin/voices/${voice.id}`, { token, body: { name: '停用音色', provider: 'browser', voiceName: 'zh-TW', enabled: true } }));
+    expect(voiceOn.enabled).toBe(true);
+
+    const model = await createModel(provider.id, '玩家用模型');
+    const player = dataOf(await t.call<PlayerDto>('POST', '/api/admin/players', { token, body: { name: '停用玩家', modelId: model.id, enabled: false } }));
+    const playerKept = dataOf(await t.call<PlayerDto>('PUT', `/api/admin/players/${player.id}`, { token, body: { name: '停用玩家改名', modelId: model.id } }));
+    expect(playerKept).toMatchObject({ name: '停用玩家改名', enabled: false });
+  });
 });
 
 describe('voice parameters, preview and catalog import', () => {

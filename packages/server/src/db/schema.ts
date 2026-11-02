@@ -112,6 +112,8 @@ export interface AiTasksTable {
   request: Json<unknown>;
   status: Generated<string>;
   claimedUntil: Date | null;
+  /** 被领取的次数，超过上限后 worker 放弃并终止对局 */
+  attempts: Generated<number>;
   output: Json<unknown> | null;
   error: string | null;
   createdAt: CreatedAt;

@@ -2,6 +2,7 @@ import type { ProviderDto, ProviderInput } from '@battle/shared';
 import type { Selectable } from 'kysely';
 import type { ModelProvidersTable } from '../../db/schema';
 import { decryptSecret, encryptSecret, maskSecret } from '../../utils/crypto';
+import { enabledUpdate } from '../../utils/enabled';
 import { badRequest, notFound } from '../../utils/errors';
 import type { ProviderRepository } from './repository';
 
@@ -61,9 +62,10 @@ export function createProviderService(repository: ProviderRepository, secretKey:
       return toDto(row, 0);
     },
 
+    /** 省略 apiKey 或 enabled 时保留原值 */
     async update(id: number, input: ProviderInput): Promise<ProviderDto> {
       const key = input.apiKey ? { apiKeyEncrypted: encryptSecret(input.apiKey, secretKey), apiKeyHint: maskSecret(input.apiKey) } : {};
-      const row = await repository.update(id, { name: input.name, baseUrl: input.baseUrl, enabled: input.enabled ?? true, ...key });
+      const row = await repository.update(id, { name: input.name, baseUrl: input.baseUrl, ...enabledUpdate(input), ...key });
       if (!row) throw notFound('模型供应商');
       return withCount(row);
     },

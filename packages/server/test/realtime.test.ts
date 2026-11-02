@@ -3,6 +3,7 @@ import { serve, type ServerType } from '@hono/node-server';
 import { gameRegistry } from '@battle/games';
 import type { MatchSummaryDto, ServerMessage, StageEvent } from '@battle/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { MAX_CLIENT_FRAME_BYTES, POLICY_VIOLATION_CODE } from '../src/modules/realtime';
 import { fakeTts, scriptedLlm, seedPlayers } from './support/fixtures';
 import { createTestApp, dataOf, type TestApp } from './support/testApp';
 
@@ -115,5 +116,23 @@ describe('realtime playback', () => {
   it('reports a missing match', async () => {
     const result = await watch('m_missing', 0);
     expect(result.end).toMatchObject({ type: 'error', message: '对局不存在' });
+  });
+
+  it('closes the connection with a policy violation when a client frame exceeds the size limit', async () => {
+    const [finished] = dataOf(await t.call<MatchSummaryDto[]>('GET', '/api/toc/matches'));
+    if (!finished) throw new Error('没有已完成的对局');
+    const closed = await new Promise<{ code: number; events: number }>((resolve, reject) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}/api/toc/ws/matches/${finished.id}`);
+      const timer = setTimeout(() => reject(new Error('没有被关闭')), 10_000);
+      let events = 0;
+      socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'hello', afterSeq: 0, padding: 'x'.repeat(MAX_CLIENT_FRAME_BYTES) })));
+      socket.addEventListener('message', () => { events += 1; });
+      socket.addEventListener('close', (event) => {
+        clearTimeout(timer);
+        resolve({ code: event.code, events });
+      });
+    });
+    // 过大的帧不会被当作 hello 解析：没有推送任何事件，直接以 1008 关闭
+    expect(closed).toEqual({ code: POLICY_VIOLATION_CODE, events: 0 });
   });
 });

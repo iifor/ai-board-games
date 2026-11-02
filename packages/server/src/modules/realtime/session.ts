@@ -23,11 +23,16 @@ export interface StreamDeps {
   readonly audio: Pick<AudioResolver, 'audioFor'>;
 }
 
+export interface StreamOptions {
+  /** 等待新事件期间的兜底重查间隔：总线只在本进程内，其他实例的 worker 产生的事件靠它发现 */
+  readonly pollMs: number;
+}
+
 /**
  * 一个连接上的播放流：按 seq 逐个推送舞台事件，客户端播放完 ack 后才推送下一个；
- * 没有新事件时等待总线通知；对局结束且事件推送完毕后发送 end。实时与回放走同一条路径。
+ * 没有新事件时等待总线通知，并按 pollMs 兜底重查；对局结束且事件推送完毕后发送 end。实时与回放走同一条路径。
  */
-export function createMatchStream(matchId: string, socket: StreamSocket, deps: StreamDeps) {
+export function createMatchStream(matchId: string, socket: StreamSocket, deps: StreamDeps, options: StreamOptions) {
   let cursor = 0;
   let awaiting: number | null = null;
   let started = false;
@@ -35,10 +40,28 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
   let pumping = false;
   /** 推送进行中又收到了通知：这一轮结束后必须再查一次，否则这次唤醒就丢了 */
   let dirty = false;
+  /** 上一次在"没有新事件"时告知观众的状态；兜底重查查到状态没变时不重复发 */
+  let lastStatus: MatchStatus | null = null;
+  let pollTimer: NodeJS.Timeout | null = null;
   const unsubscribes = [
     deps.bus.on('match:events', (payload) => payload.matchId === matchId && void pump()),
     deps.bus.on('match:status', (payload) => payload.matchId === matchId && void pump()),
   ];
+
+  function clearPoll(): void {
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+
+  /** 只在等待"尚未产生的事件"时安排重查；等待观众 ack 期间推送由 ack 驱动，不查 */
+  function schedulePoll(): void {
+    clearPoll();
+    if (closed) return;
+    pollTimer = setTimeout(() => {
+      pollTimer = null;
+      void pump();
+    }, options.pollMs);
+  }
 
   async function prefetchAudio(after: number, scripted: boolean): Promise<void> {
     let seq = after;
@@ -54,6 +77,7 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
     const audio = await deps.audio.audioFor(matchId, event, scripted);
     if (closed) return;
     awaiting = event.seq;
+    lastStatus = null;
     socket.send(encode({ type: 'event', event, audio }));
     void prefetchAudio(event.seq, scripted);
   }
@@ -75,7 +99,11 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
         : { type: 'end', result: match.result }));
       close();
     } else {
-      socket.send(encode({ type: 'status', status: match.status, error: null }));
+      if (match.status !== lastStatus) {
+        lastStatus = match.status;
+        socket.send(encode({ type: 'status', status: match.status, error: null }));
+      }
+      schedulePoll();
     }
   }
 
@@ -86,6 +114,7 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
       return;
     }
     pumping = true;
+    clearPoll();
     try {
       do {
         dirty = false;
@@ -99,10 +128,15 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
     }
   }
 
+  function teardown(): void {
+    closed = true;
+    clearPoll();
+    unsubscribes.forEach((unsubscribe) => unsubscribe());
+  }
+
   function close(): void {
     if (closed) return;
-    closed = true;
-    unsubscribes.forEach((unsubscribe) => unsubscribe());
+    teardown();
     socket.close(1000);
   }
 
@@ -122,8 +156,7 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
       await pump();
     },
     dispose(): void {
-      closed = true;
-      unsubscribes.forEach((unsubscribe) => unsubscribe());
+      teardown();
     },
   };
 }

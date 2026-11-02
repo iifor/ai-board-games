@@ -3,12 +3,15 @@ import type { GameResult, MatchPacing, MatchStatus, StageEvent } from '@battle/s
 import { sql, type Transaction } from 'kysely';
 import type { Db } from '../../db/database';
 import type { Database } from '../../db/schema';
+import { VOICE_CHOICE_COLUMNS } from '../voices/repository';
 import type { MatchRow, SeatRow, TaskCompletion } from './types';
 
 type Executor = Db | Transaction<Database>;
 
 /** 公开开局用的事务级 advisory lock 键（任意固定整数，只需全库唯一） */
 const PUBLIC_CREATION_LOCK = 7201;
+/** 还没有结果的任务状态 */
+const OPEN_TASK_STATUSES = ['queued', 'running'] as const;
 
 export interface NewMatch {
   readonly id: string;
@@ -34,6 +37,11 @@ function toRow(row: Record<string, unknown>): MatchRow {
 }
 
 export function createMatchRepository(db: Db) {
+  /** 取消这些对局里还没完成的任务（对局失败或被回收时） */
+  const cancelOpenTasks = (trx: Executor, matchIds: readonly string[]) =>
+    trx.updateTable('aiTasks').set({ status: 'cancelled', updatedAt: new Date() })
+      .where('matchId', 'in', matchIds).where('status', 'in', OPEN_TASK_STATUSES).execute();
+
   return {
     transaction: <T>(work: (trx: Transaction<Database>) => Promise<T>) => db.transaction().execute(work),
 
@@ -91,6 +99,7 @@ export function createMatchRepository(db: Db) {
         .execute();
     },
 
+    /** 只有还在排队或执行中的任务才能被完结：迟到的结果不能把已 succeeded 的任务改成 cancelled */
     completeTask: (trx: Executor, matchId: string, task: TaskCompletion) =>
       trx.updateTable('aiTasks').set({
         status: task.status,
@@ -98,7 +107,9 @@ export function createMatchRepository(db: Db) {
         error: task.error,
         claimedUntil: null,
         updatedAt: new Date(),
-      }).where('matchId', '=', matchId).where('requestId', '=', task.requestId).execute(),
+      }).where('matchId', '=', matchId).where('requestId', '=', task.requestId).where('status', 'in', OPEN_TASK_STATUSES).execute(),
+
+    cancelOpenTasks,
 
     async insertEvents(trx: Executor, matchId: string, events: readonly StageEvent[]): Promise<void> {
       if (!events.length) return;
@@ -115,6 +126,13 @@ export function createMatchRepository(db: Db) {
       return db.selectFrom('matchSeats').select(['seat', 'playerId', 'playerName', 'modelId', 'voiceId'])
         .where('matchId', '=', matchId).orderBy('seat').execute();
     },
+
+    /** 座位绑定的、仍启用的音色参数，供对局播放合成语音 */
+    seatVoice: (matchId: string, seat: number) =>
+      db.selectFrom('matchSeats').innerJoin('voices', 'voices.id', 'matchSeats.voiceId')
+        .select(VOICE_CHOICE_COLUMNS.map((column) => `voices.${column}` as const))
+        .where('matchSeats.matchId', '=', matchId).where('matchSeats.seat', '=', seat).where('voices.enabled', '=', true)
+        .executeTakeFirst(),
 
     /** 观众确认也算"有人在看"：updated_at 一并刷新，供进行中计数与回收器判断 */
     markAcked: (id: string, seq: number) =>
@@ -140,10 +158,7 @@ export function createMatchRepository(db: Db) {
           .where('status', 'in', ['created', 'running', 'waiting_ai']).where('updatedAt', '<', before)
           .returning('id').execute();
         const ids = rows.map((row) => row.id);
-        if (ids.length) {
-          await trx.updateTable('aiTasks').set({ status: 'cancelled', updatedAt: new Date() })
-            .where('matchId', 'in', ids).where('status', 'in', ['queued', 'running']).execute();
-        }
+        if (ids.length) await cancelOpenTasks(trx, ids);
         return ids;
       });
     },

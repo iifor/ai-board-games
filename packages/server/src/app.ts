@@ -2,13 +2,12 @@ import { createNodeWebSocket } from '@hono/node-ws';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { Services } from './container';
-import type { Db } from './db/database';
 import { requireAdmin } from './middlewares/auth';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { requestId } from './middlewares/requestId';
 import { authRoutes } from './modules/auth';
 import { adminGameRoutes, gameRoutes } from './modules/games';
-import { healthRoutes } from './modules/health/routes';
+import { healthRoutes } from './modules/health';
 import { adminMatchRoutes, publicMatchRoutes } from './modules/matches';
 import { modelRoutes } from './modules/models';
 import { playerRoutes, publicPlayerRoutes } from './modules/players';
@@ -28,8 +27,8 @@ const PUBLIC_BODY_LIMIT = 64 * 1024;
 /** 后台接口的请求体上限 */
 const ADMIN_BODY_LIMIT = 1024 * 1024;
 
-/** 路由装配：/api/toc 为 C 端公开接口，/api/admin 为需要管理员登录的后台接口 */
-export function createApp(db: Db, services: Services, options: AppOptions = { trustProxy: false }) {
+/** 路由装配：/api/toc 为 C 端公开接口，/api/admin 为需要管理员登录的后台接口；路由只拿到 service，不直接接触仓储或数据库 */
+export function createApp(services: Services, options: AppOptions = { trustProxy: false }) {
   const app = new Hono<AppEnv>();
   const { upgradeWebSocket, injectWebSocket } = createNodeWebSocket({ app });
   app.use('*', requestId);
@@ -40,17 +39,13 @@ export function createApp(db: Db, services: Services, options: AppOptions = { tr
 
   const guarded = (routes: Hono<AppEnv>) => new Hono<AppEnv>().use('*', requireAdmin(services.auth)).route('/', routes);
 
-  app.route('/api/health', healthRoutes(db));
+  app.route('/api/health', healthRoutes(services.health));
   app.route('/api/media', mediaRoutes(services.tts));
   app.route('/api/toc/games', gameRoutes(services.games));
   app.route('/api/toc/players', publicPlayerRoutes(services.players));
   app.route('/api/toc/matches', publicMatchRoutes(services.matches, { trustProxy: options.trustProxy }));
-  app.route('/api/toc/ws', realtimeRoutes(upgradeWebSocket, {
-    matches: services.repositories.matches,
-    bus: services.bus,
-    audio: services.audio,
-  }));
-  app.route('/api/admin/auth', authRoutes(services.auth));
+  app.route('/api/toc/ws', realtimeRoutes(upgradeWebSocket, services.realtime));
+  app.route('/api/admin/auth', authRoutes(services.auth, { trustProxy: options.trustProxy }));
   app.route('/api/admin/providers', guarded(providerRoutes(services.providers)));
   app.route('/api/admin/models', guarded(modelRoutes(services.models)));
   app.route('/api/admin/voices', guarded(voiceRoutes(services.voices)));
