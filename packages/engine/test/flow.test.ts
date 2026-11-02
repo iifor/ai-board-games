@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { advance, compileGame, createSnapshot, EngineInputError } from '../src';
+import { z } from 'zod';
+import { advance, compileGame, createSnapshot, defineGame, definePrompts, EngineInputError } from '../src';
 import { makePlayers, runToEnd } from '../src/testing';
 import { counterSpec } from './fixtures/minimal';
 import { secretGame } from './fixtures/secretGame';
@@ -38,6 +39,45 @@ describe('flow', () => {
   it('rejects snapshots from another spec version', () => {
     const snapshot = createSnapshot(compileGame(counterSpec(1)), { seed: 1, players: makePlayers(2) });
     expect(() => advance(compileGame(counterSpec(1, { version: 2 })), snapshot, { kind: 'start' })).toThrow(/不匹配/);
+  });
+
+  it('drops the stored result of a phase that enabled() skips', () => {
+    // mark 只在第 1 轮启用：第 2 轮被跳过后，probe 不能再读到第 1 轮留下的结果
+    const prompts = definePrompts({ rules: '测试规则', identity: '你是{{me.label}}', mark: '选择一名玩家' });
+    const game = compileGame(defineGame({
+      key: 'skip',
+      version: 1,
+      title: '跳过',
+      description: '引擎测试用',
+      players: { min: 2, max: 2 },
+      prompts,
+      rulesText: prompts.rules,
+      roles: { player: { name: '玩家', team: 'all', identity: prompts.identity } },
+      setup: { assign: { player: 2 }, init: () => ({ seen: [] as string[] }) },
+      state: { schema: z.object({ seen: z.array(z.string()) }), visibility: { seen: 'public' } },
+      start: 'mark',
+      phases: {
+        mark: {
+          kind: 'act',
+          action: '标记',
+          enabled: (ctx) => ctx.round === 1,
+          actors: (ctx) => ctx.seats.alive(),
+          targets: (ctx, seat) => ctx.seats.alive().except(seat),
+          prompt: prompts.mark,
+          next: 'probe',
+        },
+        probe: {
+          kind: 'compute',
+          run: (ctx) => ({ state: { seen: [...ctx.state.seen, ctx.results.mark ? 'present' : 'absent'] } }),
+          next: [{ when: (ctx) => ctx.round >= 2, goto: 'end' }, { goto: 'mark', round: 'increment' }],
+        },
+      },
+      end: (ctx) => ({ winner: null, winnerLabel: '无胜负', summary: ctx.state.seen.join(',') }),
+      presentation: { layout: 'circle' },
+    }));
+    const run = runToEnd(game, { seed: 1 });
+    expect(run.snapshot.result?.summary).toBe('present,absent');
+    expect(run.snapshot.results.mark).toBeUndefined();
   });
 });
 

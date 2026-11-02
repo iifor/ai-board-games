@@ -22,6 +22,8 @@ export interface VictoryHooks {
 export interface ExileHooks {
   /** 放逐投票的额外票（如乌鸦的诅咒） */
   bonus?(ctx: WerewolfContext): VoteBonus[];
+  /** 额外票的来源说明（如"乌鸦的诅咒"）：放逐结算播报得票构成时使用，缺省写"额外票" */
+  readonly bonusLabel?: string;
   /** 被放逐者免于出局的特殊结算（如最后一名狼人是魔狼时翻牌存活）；不干预时返回 null */
   hold?(ctx: WerewolfContext, target: Seat, state: WerewolfState): ComputeOutcome<WerewolfState> | null;
 }

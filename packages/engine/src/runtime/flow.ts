@@ -102,10 +102,16 @@ function popChain(env: ExecEnv, phaseId: string): ResumeTarget {
   return frame.resume;
 }
 
+/**
+ * 完成（或跳过）当前阶段并前往下一处。阶段结果按阶段 ID 保存，只反映最近一次访问：
+ * 被 enabled() 或调试 skip 跳过时没有结果，必须把上一次访问留下的旧结果删掉，
+ * 否则后续的 when / 模板 / findResult 会读到上一轮的数据。
+ */
 export function completePhase(env: ExecEnv, result: PhaseResult | null): void {
   const { s } = env;
   const phaseId = env.phaseId();
   if (result) s.results[phaseId] = deepFreeze(cloneJson(result));
+  else delete s.results[phaseId];
   const transition = resolveNext(env, env.phase().next, result);
   const target: ResumeTarget = transition.goto === RETURN_PHASE
     ? popChain(env, phaseId)

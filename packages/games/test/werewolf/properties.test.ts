@@ -1,4 +1,4 @@
-import { assertDeterministic, assertNoLeak, assertTerminates } from '@battle/engine/testing';
+import { assertDeterministic, assertNoLeak, assertTerminates, chaosAgent } from '@battle/engine/testing';
 import { describe, expect, it } from 'vitest';
 import { werewolfGame } from '../../src/werewolf';
 
@@ -30,5 +30,27 @@ describe('werewolf properties', () => {
 
   it('is deterministic', () => {
     expect(() => assertDeterministic(werewolfGame, { seed: 42 })).not.toThrow();
+  });
+});
+
+describe('werewolf properties: chaos mode', () => {
+  // 混沌脚本会弃票、放弃技能、在白天发言里自爆、给出不合法输出或模拟调用失败，覆盖默认脚本永远走不到的分支
+  const runs = assertTerminates(werewolfGame, Array.from({ length: 30 }, (_, index) => index + 1), { agent: chaosAgent(werewolfGame) });
+
+  it('terminates for 30 seeds and hits abstentions, self-destructs and fallbacks along the way', () => {
+    expect(runs).toHaveLength(30);
+    const log = runs.flatMap((run) => run.log);
+    expect(log.some((entry) => entry.kind === 'vote_tallied' && entry.abstained.length > 0)).toBe(true);
+    expect(log.some((entry) => entry.kind === 'seat_eliminated' && entry.reason === '自爆')).toBe(true);
+    expect(log.some((entry) => entry.kind === 'fallback')).toBe(true);
+    expect(runs.flatMap((run) => run.requests).some(({ request }) => request.attempt > 1)).toBe(true);
+  });
+
+  it('never leaks in chaos mode', () => {
+    for (const run of runs) assertNoLeak(werewolfGame, run);
+  });
+
+  it('is deterministic in chaos mode', () => {
+    expect(() => assertDeterministic(werewolfGame, { seed: 42, agent: chaosAgent(werewolfGame) })).not.toThrow();
   });
 });

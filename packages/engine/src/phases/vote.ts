@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ExecEnv } from '../runtime/env';
 import { toSeatNumbers } from '../runtime/seats';
 import type { VotePhase } from '../spec/phases';
+import { seatNumber } from './seatNumber';
 import { tallyBallots, type Tally } from './tally';
 import { done, issue, type AiPhaseExecutor, type StepOutcome } from './types';
 
@@ -144,7 +145,7 @@ export const voteExecutor: AiPhaseExecutor<Phase> = {
   },
 
   schema(_env, phase) {
-    const seat = z.number().int();
+    const seat = seatNumber();
     return z.object({
       target: phase.allowAbstain
         ? seat.nullable().describe('投票对象的座位号，必须是合法目标之一；null 表示弃票')

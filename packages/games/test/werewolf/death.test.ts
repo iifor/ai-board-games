@@ -1,4 +1,10 @@
+import { createSnapshot, SeatQuery } from '@battle/engine';
+import { makePlayers } from '@battle/engine/testing';
 import { describe, expect, it } from 'vitest';
+import { werewolfGame } from '../../src/werewolf';
+import type { WerewolfContext } from '../../src/werewolf/rules/context';
+import { settleShot } from '../../src/werewolf/rules/death';
+import type { WerewolfParams } from '../../src/werewolf/state';
 import { act, combine, eliminated, entries, everyoneVotes, first, play, requestsIn, roleSeats, stateOf, wolvesKill, type Override } from './helpers';
 
 const SEED = 11;
@@ -54,6 +60,30 @@ describe('hunter', () => {
     const run = play(SEED, combine(everyoneVotes('exile_vote', hunter, 1), act('hunter_shot', hunter, [])));
     expect(entries(run, 'action', 'hunter_shot')[0]?.text).toBe('猎人放弃开枪');
     expect(eliminated(run).filter((death) => death.round === 1).map((death) => death.seat)).toEqual([hunter]);
+  });
+
+  it('narrates a shot that no longer takes effect because the target is already out', () => {
+    // 开枪阶段只给存活目标，正常流程里结算时目标不会已出局；这是防御分支，直接调用结算函数覆盖：
+    // 目标在结算前被别的链（如殉情）带走时，不能静默吞掉这一枪
+    const snapshot = createSnapshot(werewolfGame, { seed: SEED, players: makePlayers(12) });
+    const seats = snapshot.seats.map((seat) => (seat.seat === villagerA ? { ...seat, alive: false } : seat));
+    const ctx: WerewolfContext = {
+      state: { ...stateOf(snapshot), pendingShot: villagerA },
+      params: snapshot.params as WerewolfParams,
+      seats: new SeatQuery(seats),
+      round: 1,
+      phaseId: 'hunter_resolve',
+      results: {},
+      result: null,
+      endReason: 'normal',
+      trigger: { kind: 'seat_eliminated', seat: hunter, cause: 'exile', reason: '被放逐' },
+      variant: null,
+      random: () => { throw new Error('结算开枪不应使用随机数'); },
+    };
+    const outcome = settleShot(ctx, '被猎人带走');
+    expect(outcome.eliminate ?? []).toEqual([]);
+    expect(outcome.state?.pendingShot).toBeNull();
+    expect(outcome.log).toEqual([{ kind: 'narration', text: `${hunter}号的枪没有生效（${villagerA}号已经出局）。` }]);
   });
 });
 

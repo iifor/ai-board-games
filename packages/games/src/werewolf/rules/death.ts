@@ -90,8 +90,13 @@ export function woundRogue(state: WerewolfState, seat: number, round: number, sh
 export function settleShot(ctx: WerewolfContext, reason: string): ComputeOutcome<WerewolfState> {
   const target = ctx.state.pendingShot;
   const state = { ...ctx.state, pendingShot: null };
-  // 排在开枪之前的触发器链（殉情）可能已经让目标出局；引擎保证开枪与结算之间不再插入别的链
-  if (target === null || !ctx.seats.get(target).alive) return { state };
+  if (target === null) return { state };
+  // 目标在结算前已出局（如排在开枪之前的殉情链带走了他）：这一枪不再生效，公开说明而不是静默吞掉
+  if (!ctx.seats.get(target).alive) {
+    const shooter = ctx.trigger?.seat;
+    const gun = shooter === undefined ? '这一枪' : `${shooter}号的枪`;
+    return { state, log: [{ kind: 'narration', text: `${gun}没有生效（${target}号已经出局）。` }] };
+  }
   // 猎人在夜里死亡（天亮出局）时开的枪算夜间开枪，其余（放逐、白天被带走等）算白天开枪
   const cause = ctx.trigger?.kind === 'seat_eliminated' && NIGHT_DEATH_CAUSES.has(ctx.trigger.cause) ? SHOT_BY_NIGHT : SHOT_BY_DAY;
   const traits = roleTraits(ctx.seats.get(target));

@@ -142,6 +142,43 @@ describe('vote', () => {
     const again = runToEnd(secretGame, { seed: 9, playerCount: 4, params: { rounds: 1 }, agent: tieAgent });
     expect(again.log).toEqual(run.log);
   });
+
+  it('accepts seat numbers written as digit strings for votes and acts', () => {
+    // 模型常把 3 写成 "3"：投票与动作的目标都应直接采用，不重问、不兜底，且模型看到的 schema 仍是 integer
+    const run = runToEnd(secretGame, {
+      seed: 9,
+      playerCount: 4,
+      params: { rounds: 1 },
+      agent: agentWith(secretGame, (request) => {
+        if (request.phaseId === 'vote') return { output: { target: String(request.legalTargets?.[0]) } };
+        if (request.phaseId === 'mark') return { output: { targets: [String(request.legalTargets?.[0])] } };
+        return undefined;
+      }),
+    });
+    expect(run.requests.filter(({ request }) => request.attempt > 1)).toHaveLength(0);
+    expect(run.log.filter((entry) => entry.kind === 'fallback')).toHaveLength(0);
+    const tally = run.log.find((entry): entry is Extract<LogEntry, { kind: 'vote_tallied' }> => entry.kind === 'vote_tallied');
+    expect(tally?.ballots.map((ballot) => ballot.target)).toEqual([2, 1, 1, 1]);
+    const marks = run.log.filter((entry): entry is Extract<LogEntry, { kind: 'action' }> => entry.kind === 'action');
+    expect(marks.every((mark) => mark.targets.every((target) => typeof target === 'number'))).toBe(true);
+    const voteRequest = run.requests.find(({ request }) => request.phaseId === 'vote')?.request;
+    expect(voteRequest?.outputSchema).toMatchObject({ properties: { target: { type: 'integer' } } });
+  });
+
+  it('still rejects non-numeric and non-integer strings as seat numbers', () => {
+    const run = runToEnd(secretGame, {
+      seed: 9,
+      playerCount: 4,
+      params: { rounds: 1 },
+      agent: agentWith(secretGame, (request) => (request.phaseId === 'vote' && request.seat === 1 && request.id.includes(':r0:')
+        ? { output: { target: request.attempt === 1 ? '3.5' : 'abc' } }
+        : undefined)),
+    });
+    const attempts = run.requests.filter(({ request }) => request.phaseId === 'vote' && request.seat === 1 && request.id.includes(':r0:'));
+    expect(attempts.map(({ request }) => request.attempt)).toEqual([1, 2]);
+    expect(attempts[1]?.request.prompt.output).toContain('上一次的输出不合法');
+    expect(run.log.some((entry) => entry.kind === 'fallback' && entry.seat === 1)).toBe(true);
+  });
 });
 
 describe('input validation', () => {

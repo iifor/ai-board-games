@@ -9,6 +9,8 @@ import type { SpecialDescriptor } from './types';
 
 // 乌鸦：每晚可以诅咒一名其他存活玩家（可不诅咒），不能连续两晚诅咒同一人。
 // 次日放逐投票前公布诅咒，被诅咒者在当天的放逐投票中额外获得 crowVotes 票（引擎的投票额外票 VotePhase.bonus）。
+// 口径：全员弃票时被诅咒者仍以诅咒票被放逐；放逐结算（rules/day.ts）会公开得票构成（"没有得到任何选票，但有额外票（乌鸦的诅咒 1 票）"），
+// 不会显示为零票当选。
 
 const crowPrompts = definePrompts({
   crow: [
@@ -74,5 +76,5 @@ export const crowSpecial: SpecialDescriptor = {
   prompts: crowPrompts,
   identities: { crow: crowPrompts.crow },
   phases: crowPhases,
-  exile: { bonus: crowBonus },
+  exile: { bonus: crowBonus, bonusLabel: '乌鸦的诅咒' },
 };

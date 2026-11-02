@@ -68,13 +68,13 @@ GameSpec 关键字段：
 | --- | --- | --- |
 | `announce` | 用**公开上下文**渲染模板，写入主持播报 | — |
 | `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆） | `output` schema（标准为 `speechOutput({ max })`：`max` 是提示词告诉模型的目标字数，schema 的硬上限是它的 `SPEECH_LENGTH_TOLERANCE`（2）倍，略超目标的发言照常采用，超过硬上限才重试、兜底）；有权声明的座位额外获得可选的 `declare` 字段 |
-| `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }` |
-| `vote` | 投票后计票，`weight` 设定票权，`bonus` 给出不属于任何投票者的额外票（如乌鸦诅咒，进入阶段时计算一次，每轮只计给该轮候选人；日志的 `tally` 含额外票、`ballots` 不含，AI 历史中显示为"额外票：5号+1"），`allowAbstain` 允许弃票（`fallbackMode: 'abstain'` 时兜底为弃票）；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者、`ballots` 给出最后一轮的有效选票（不含弃票，规则可据此知道谁投了谁）；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null |
+| `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }`，座位号接受 `3` 或 `"3"`（见"AI 管线"） |
+| `vote` | 投票后计票，`weight` 设定票权，`bonus` 给出不属于任何投票者的额外票（如乌鸦诅咒，进入阶段时计算一次，每轮只计给该轮候选人；日志的 `tally` 含额外票、`ballots` 不含，AI 历史中显示为"额外票：5号+1"），`allowAbstain` 允许弃票（`fallbackMode: 'abstain'` 时兜底为弃票）；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者、`ballots` 给出最后一轮的有效选票（不含弃票，规则可据此知道谁投了谁）；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null；座位号接受 `3` 或 `"3"` |
 | `judge` | 评委依次判定，`verdicts` 定义选项与含义；多数决，无评委或并列时取 `tieVerdict` | 自动生成 `{ verdict, comment }`，选项含义写入 schema 描述 |
 | `compute` | 纯函数结算：返回新状态、`reassign`（改变座位的角色或阵营；阵营改变时座位记录 `teamSince`，见"可见性"）、日志、淘汰列表，按此顺序生效（播报先于出局事件） | — |
 | `reveal` | 写入一条揭示日志；`revealRoles` 向所有玩家与观众公开全部身份，并在日志 `data.roles` 中给出身份表 | — |
 
-阶段可声明 `enabled(ctx)`：返回 false 时静默跳过（不记录、不计访问次数），直接按 `next` 跳转（此时 `ctx.result` 为 null），用于本局不存在的角色。
+阶段可声明 `enabled(ctx)`：返回 false 时静默跳过（不记录、不计访问次数），直接按 `next` 跳转（此时 `ctx.result` 为 null），用于本局不存在的角色。跳过的阶段**不保留上一次访问的结果**：`ctx.results[phaseId]` 会被删掉，后续的 `when`、模板与 `findResult` 不会读到上一轮的数据（调试指令 `skip` 同样如此）。
 
 跳转：`next` 为阶段 ID、`end`、`return`，或 `{ when?, goto, round? }` 列表（按顺序取第一个命中项，最后一项必须无条件）；`round: 'increment'` 使轮次加一。编译期检查跳转目标存在、所有阶段可达（从 `start`、触发器目标、`gameOver.goto` 出发），且只有触发器插入的阶段链可以 `return`。
 
@@ -112,16 +112,17 @@ GameSpec 关键字段：
 
 ## AI 管线
 
-请求 ID 为 `阶段#访问次数:槽位:a尝试次数`。收到回复后依次执行：schema 解析 → 合法目标与数量 → 内容校验。失败且未超过 `retries`（默认 1）时带错误原因重新发出；否则执行兜底（`speak` 必须提供 `fallback`，`act` / `vote` 随机合法目标，`judge` 可选 `fallback`，默认随机判定）。兜底输出同样经过校验，不合法视为 spec 错误。每次兜底在 host 频道留下 `fallback` 日志。`ai_failed` 直接兜底，不再重试。
+请求 ID 为 `阶段#访问次数:槽位:a尝试次数`。收到回复后依次执行：schema 解析 → 合法目标与数量 → 内容校验。`act` / `vote` 输出里的座位号用 `phases/seatNumber.ts` 的 schema：整数之外也接受只含数字的字符串（模型常把 `3` 写成 `"3"`，解析时转成数字），`"abc"`、`"3.5"`、`3.5`、`""` 仍被拒绝；模型看到的 JSON Schema 仍是 `integer`。失败且未超过 `retries`（默认 1）时带错误原因重新发出；否则执行兜底（`speak` 必须提供 `fallback`，`act` / `vote` 随机合法目标，`judge` 可选 `fallback`，默认随机判定）。兜底输出同样经过校验，不合法视为 spec 错误。每次兜底在 host 频道留下 `fallback` 日志。`ai_failed` 直接兜底，不再重试。
 
 ## 调试
 
-创建快照时传入 `debug`（可指定断点，默认取 `spec.debug.breakpoints`）即为调试局。断点在进入阶段前生效；指令：`continue`（到下一个断点）、`step`（执行当前阶段后停在下一个阶段前）、`run`（不再暂停）、`skip`（不执行当前阶段直接按 `next` 跳转，`ctx.result` 为 null）。
+创建快照时传入 `debug`（可指定断点，默认取 `spec.debug.breakpoints`）即为调试局。断点在进入阶段前生效；指令：`continue`（到下一个断点）、`step`（执行当前阶段后停在下一个阶段前）、`run`（不再暂停）、`skip`（不执行当前阶段直接按 `next` 跳转，`ctx.result` 为 null，该阶段上一次访问留下的结果也会被删掉）。
 
 ## 测试工具（@battle/engine/testing）
 
 - `runToEnd(game, { seed, playerCount | players, params, agent, debug, onPause })`：在内存中跑完一局，记录全部日志、舞台事件、AI 请求及发出时的快照。默认 agent 为脚本化输出。
 - `assertTerminates(game, seeds)`、`assertDeterministic(game, options)`、`assertNoLeak(game, run)`：每个游戏都应以 100 个种子运行三项性质检查。泄露检查以文本比对为准，少于 4 个字符的内容不参与比对。
+- 混沌模式 `chaosAgent(game)` / `chaosReply(game, snapshot, request)`（`testing/chaos.ts`）：默认脚本永远合法、从不弃票、从不声明，覆盖不到重试、兜底、弃票、放弃与自爆等分支。混沌脚本按固定概率（`CHAOS_RATES`：传输失败 3%、不合法输出 10%、允许弃票时弃票 30%、可放弃的动作放弃 50%、有权声明时附带声明 25%）做出这些行为，每个决定由对局种子与请求 ID 派生，同一种子可复现。每个游戏另以 30 个种子跑混沌模式，断言终局、不泄露，且至少出现过一次弃票、一次声明（狼人杀为自爆）与一次兜底。默认的 `scriptedOutput` 不受影响（服务端的脚本化对局依赖它的精确输出）。
 
 ## 尚未实现
 
