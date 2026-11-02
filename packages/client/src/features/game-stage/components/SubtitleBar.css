@@ -4,19 +4,24 @@
   bottom: 22px;
   left: 50%;
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-columns: 160px minmax(0, 1fr);
   gap: 16px;
   align-items: center;
-  width: min(900px, calc(100% - 320px));
-  min-height: 96px;
+  width: min(960px, calc(100% - 320px));
+  min-height: 92px;
   max-height: 30vh;
   padding: 14px 24px 14px 16px;
   border-color: var(--game-accent-soft);
   background:
-    radial-gradient(circle at 88% 40%, var(--game-accent-soft), transparent 36%),
-    linear-gradient(180deg, rgba(12, 25, 62, 0.86), rgba(5, 9, 28, 0.92));
+    radial-gradient(circle at 92% 40%, var(--game-accent-soft), transparent 36%),
+    linear-gradient(180deg, rgba(12, 25, 62, 0.88), rgba(5, 9, 28, 0.94));
   transform: translateX(-50%);
   animation: subtitle-in var(--ui-motion-slow) var(--ui-ease-out) both;
+}
+
+.stage-shell[data-feed-open='true'] .subtitle-bar {
+  left: calc(50% - 170px);
+  width: min(900px, calc(100% - 660px));
 }
 
 .subtitle-bar.is-idle {
@@ -40,8 +45,8 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   overflow: hidden;
   border: 2px solid var(--game-accent-strong);
   border-radius: 50%;
@@ -79,9 +84,15 @@
   text-overflow: ellipsis;
 }
 
+.subtitle-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
 .subtitle-bar p {
   min-width: 0;
-  max-height: calc(30vh - 28px);
+  max-height: calc(30vh - 48px);
   margin: 0;
   overflow-y: auto;
   color: #f4f7ff;
@@ -93,10 +104,37 @@
   animation: subtitle-text-in 0.6s var(--ui-ease-out) both;
 }
 
+.subtitle-progress {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.subtitle-progress b {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--game-accent-strong);
+  animation: subtitle-progress linear forwards;
+}
+
 .subtitle-bar[data-kind='narration'] .subtitle-avatar,
 .subtitle-bar[data-kind='game_over'] .subtitle-avatar {
   border-color: var(--ui-brand-strong);
   box-shadow: 0 0 22px var(--ui-brand-soft);
+}
+
+.subtitle-bar[data-kind='narration'] .subtitle-speaker small,
+.subtitle-bar[data-kind='narration'] .subtitle-progress b {
+  color: var(--ui-brand-strong);
+  background-color: var(--ui-brand-strong);
+}
+
+.subtitle-bar[data-kind='narration'] .subtitle-speaker small {
+  background: none;
 }
 
 .subtitle-bar[data-kind='seat_eliminated'] {
@@ -121,8 +159,15 @@
   }
 }
 
+@keyframes subtitle-progress {
+  to {
+    width: 100%;
+  }
+}
+
 @media (max-width: 860px) {
-  .subtitle-bar {
+  .subtitle-bar,
+  .stage-shell[data-feed-open='true'] .subtitle-bar {
     grid-template-columns: 1fr;
     width: auto;
   }

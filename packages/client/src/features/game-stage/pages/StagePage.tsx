@@ -4,29 +4,33 @@ import { StatusView } from '../../../components/StatusView';
 import { useAsync } from '../../../hooks/useAsync';
 import { fetchCatalog } from '../../../services/games';
 import { fetchMatch } from '../../../services/matches';
-import { EventFeed } from '../components/EventFeed';
+import { EventFeed, type FeedFilter } from '../components/EventFeed';
+import { NightSteps } from '../components/NightSteps';
 import { PhaseBanner } from '../components/PhaseBanner';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ResultPanel } from '../components/ResultPanel';
-import { SpeakerSpotlight } from '../components/SpeakerSpotlight';
 import { Stage } from '../components/Stage';
 import { StageBackdrop } from '../components/StageBackdrop';
 import { StageHud } from '../components/StageHud';
 import { SubtitleBar } from '../components/SubtitleBar';
+import { DRAWER_OPEN_MIN_WIDTH } from '../constants';
 import { useMatchStream } from '../hooks/useMatchStream';
 import { usePlayback } from '../hooks/usePlayback';
+import { describeEvent, displayDuration } from '../playback/describe';
 import type { PlaybackOptions } from '../types';
-import { periodOf } from '../utils';
+import { nightStepsOf, periodOf } from '../utils';
 import './StagePage.css';
 
-/** 对局舞台：实时观看与回放共用；全屏铺满，背景、座位、聚光立绘、字幕栏分层叠放 */
+/** 对局舞台：实时观看与回放共用；全屏铺满，背景、座位与中央立绘、字幕栏、记录侧栏分层叠放 */
 export function StagePage() {
   const matchId = useParams().matchId ?? '';
   const summary = useAsync(() => fetchMatch(matchId), [matchId]);
   const catalog = useAsync(fetchCatalog, []);
-  const stream = useMatchStream(matchId);
+  const [session, setSession] = useState(0);
+  const stream = useMatchStream(matchId, session);
   const [options, setOptions] = useState<PlaybackOptions>({ speed: 1, paused: false, muted: false });
-  const [feedOpen, setFeedOpen] = useState(false);
+  const [feedOpen, setFeedOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= DRAWER_OPEN_MIN_WIDTH);
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>('all');
   const playback = usePlayback(stream.items, stream.ack, options);
 
   if (summary.status === 'loading') return <StatusView kind="loading" />;
@@ -35,26 +39,33 @@ export function StagePage() {
   const layout = catalog.status === 'ready' ? (catalog.data.find((game) => game.key === gameKey)?.layout ?? 'circle') : 'circle';
   const finished = stream.ended && playback.pending === 0 && !playback.current;
   const period = periodOf(playback.view);
+  const durationMs = playback.current ? displayDuration(describeEvent(playback.current.event).text, options.speed) : null;
 
   return (
-    <div className="stage-shell" data-game={gameKey} data-period={period} data-finished={finished}>
+    <div className="stage-shell" data-game={gameKey} data-period={period} data-finished={finished} data-feed-open={feedOpen}>
       <StageBackdrop gameKey={gameKey} period={period} />
       <StageHud summary={summary.data} view={playback.view} connected={stream.connected} ended={stream.ended} />
       <PlaybackControls options={options} pending={playback.pending} finished={finished} feedOpen={feedOpen} onChange={setOptions} onToggleFeed={() => setFeedOpen((open) => !open)} />
+      <NightSteps steps={nightStepsOf(playback.played, playback.current, playback.view)} />
       {stream.error ? <div className="stage-error glass-panel"><StatusView kind="error" message={stream.error} /></div> : null}
-      <SpeakerSpotlight item={playback.current} view={playback.view} />
       <div className="stage-arena">
-        <Stage layout={layout} view={playback.view} current={playback.current} />
+        <Stage layout={layout} view={playback.view} current={playback.current} played={playback.played} />
       </div>
       <PhaseBanner item={playback.current} />
-      <SubtitleBar item={playback.current} view={playback.view} />
-      {finished && stream.result ? <ResultPanel result={stream.result} view={playback.view} /> : null}
+      <SubtitleBar item={playback.current} view={playback.view} durationMs={durationMs} />
+      {finished && stream.result ? (
+        <ResultPanel result={stream.result} view={playback.view} summary={summary.data} onReplay={() => setSession((value) => value + 1)} />
+      ) : null}
       <aside className={`stage-feed glass-panel ${feedOpen ? 'is-open' : ''}`} aria-label="对局记录" aria-hidden={!feedOpen}>
         <header>
           <h2>对局记录</h2>
-          <button type="button" className="button" onClick={() => setFeedOpen(false)}>收起</button>
+          <div className="stage-feed-filters" role="group" aria-label="筛选">
+            <button type="button" className={feedFilter === 'all' ? 'is-active' : ''} onClick={() => setFeedFilter('all')}>全部</button>
+            <button type="button" className={feedFilter === 'speech' ? 'is-active' : ''} onClick={() => setFeedFilter('speech')}>只看发言</button>
+          </div>
+          <button type="button" className="stage-feed-close" aria-label="收起记录" onClick={() => setFeedOpen(false)}>×</button>
         </header>
-        <EventFeed items={playback.played} />
+        <EventFeed items={playback.played} filter={feedFilter} />
       </aside>
       <Link className="stage-exit button" to="/">← 返回大厅</Link>
     </div>

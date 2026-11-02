@@ -1,0 +1,77 @@
+.night-steps {
+  position: absolute;
+  z-index: 40;
+  top: 92px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(720px, calc(100vw - 48px));
+  padding: 6px 14px 6px 6px;
+  border-radius: var(--ui-radius-pill);
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) both;
+}
+
+.night-steps-eye {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--game-accent-soft);
+  border-radius: 50%;
+  color: var(--game-accent-strong);
+  background: rgba(4, 16, 43, 0.7);
+  box-shadow: 0 0 20px var(--game-accent-soft);
+  animation: night-eye 2.4s ease-in-out infinite;
+}
+
+.night-steps ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.night-steps li {
+  position: relative;
+  white-space: nowrap;
+}
+
+.night-steps li + li::before {
+  content: '›';
+  position: absolute;
+  left: -9px;
+  color: rgba(209, 224, 255, 0.3);
+}
+
+.night-steps li.is-done {
+  color: var(--ui-text-dim);
+}
+
+.night-steps li.is-done::after {
+  content: ' ✓';
+  color: var(--game-accent-strong);
+}
+
+.night-steps li.is-current {
+  padding: 3px 10px;
+  border: 1px solid var(--game-accent-soft);
+  border-radius: var(--ui-radius-pill);
+  color: #fff;
+  background: var(--game-accent-soft);
+  text-shadow: 0 0 12px var(--game-accent-soft);
+}
+
+@keyframes night-eye {
+  50% {
+    box-shadow: 0 0 34px var(--game-accent-soft);
+    transform: scale(1.06);
+  }
+}

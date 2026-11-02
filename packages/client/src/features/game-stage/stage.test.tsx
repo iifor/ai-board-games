@@ -1,5 +1,6 @@
-import type { AudienceView, StageEvent } from '@battle/shared';
+import type { AudienceView, MatchSummaryDto, StageEvent } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { matchStreamUrl } from '../../services/matches';
 import { resolvePoster } from '../../utils/posters';
@@ -9,7 +10,8 @@ import { VoteBoard } from './components/VoteBoard';
 import { CircleLayout } from './layouts/CircleLayout';
 import { VersusLayout } from './layouts/VersusLayout';
 import { describeEvent, displayDuration, shouldSpeak } from './playback/describe';
-import { periodOf } from './utils';
+import type { StreamItem } from './types';
+import { judgeBadges, nightStepsOf, periodOf, rosterByTeam, speechOrderOf } from './utils';
 
 const seat = (no: number, team: string | null, position: number | null = null) => ({
   seat: no, name: `玩家${no}`, avatar: null, label: `${no}号 玩家${no}`, alive: no !== 3,
@@ -64,10 +66,46 @@ describe('layouts', () => {
     expect(html).toContain('身份未知');
   });
 
-  it('shows the result with the MVP', () => {
-    const html = renderToStaticMarkup(<ResultPanel result={{ winner: 'pro', winnerLabel: '正方胜出', summary: '正方胜出（评委 2:1）', mvp: 1, endReason: 'normal' }} view={view} />);
+  it('shows the result with the MVP, the roster and the rematch actions', () => {
+    const result = { winner: 'pro', winnerLabel: '正方胜出', summary: '正方胜出（评委 2:1）', mvp: 1, endReason: 'normal' as const };
+    const html = renderToStaticMarkup(<ResultPanel result={result} view={view} />);
     expect(html).toContain('正方胜出');
     expect(html).toContain('MVP：1号 玩家1');
+    expect(html).toContain('正方 · 获胜');
+    expect(html).toContain('评委');
+    expect(html).not.toContain('再来一局');
+    const summary: MatchSummaryDto = {
+      id: 'm_1', gameKey: 'debate', gameTitle: 'AI 辩论赛', variantKey: null, variantName: null, status: 'completed', debug: false, scripted: true,
+      seats: [{ seat: 1, playerId: 5, name: '玩家1' }, { seat: 2, playerId: null, name: '玩家2' }], result, createdAt: '2026-11-01T00:00:00Z', completedAt: null,
+    };
+    const withActions = renderToStaticMarkup(<MemoryRouter><ResultPanel result={result} view={view} summary={summary} onReplay={() => {}} /></MemoryRouter>);
+    expect(withActions).toContain('同样阵容再来一局');
+    expect(withActions).toContain('从头回放');
+    expect(withActions).toContain('href="/play/debate"');
+  });
+});
+
+describe('stage derivations', () => {
+  const item = (event: StageEvent): StreamItem => ({ event, audio: null });
+  const nightView: AudienceView = { ...view, gameKey: 'werewolf', phase: { id: 'wolf_kill', title: '狼人击杀' }, extra: { period: 'night' } };
+
+  it('lists the night phases of the current round, in order and without repeats', () => {
+    const played = [
+      item({ ...meta, kind: 'phase_started', title: '天黑请闭眼', view: nightView }),
+      item({ ...meta, seq: 2, kind: 'phase_started', title: '守卫守护', view: nightView }),
+      item({ ...meta, seq: 3, kind: 'phase_started', title: '守卫守护', view: nightView }),
+    ];
+    const current = item({ ...meta, seq: 4, kind: 'phase_started', title: '狼人击杀', view: nightView });
+    expect(nightStepsOf(played, current, nightView)).toEqual(['天黑请闭眼', '守卫守护', '狼人击杀']);
+    expect(nightStepsOf(played, current, { ...nightView, extra: { period: 'day' } })).toEqual([]);
+  });
+
+  it('tracks who has spoken in the current phase and what the judges decided', () => {
+    const speeches = [item({ ...meta, kind: 'speech', seat: 1, text: 'a' }), item({ ...meta, seq: 2, kind: 'speech', seat: 2, text: 'b' })];
+    expect(speechOrderOf(speeches, item({ ...meta, seq: 3, kind: 'speech', seat: 1, text: 'c' }), view)).toEqual([1, 2]);
+    expect(speechOrderOf(speeches, null, { ...view, phase: { id: 'other', title: 'x' } })).toEqual([]);
+    expect(judgeBadges([item({ ...meta, kind: 'judgement', seat: 3, verdict: 'pro', verdictLabel: '正方胜', comment: '' })])).toEqual({ 3: ['正方胜'] });
+    expect(rosterByTeam(view).map((group) => [group.label, group.seats.length])).toEqual([['正方', 1], ['反方', 1], ['评委', 1]]);
   });
 });
 

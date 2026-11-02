@@ -33,7 +33,7 @@ src/
 | 方法与路径 | 说明 | 鉴权 |
 | --- | --- | --- |
 | `GET /api/health` | 数据库可用返回 ok，否则 503 | 无 |
-| `GET /api/toc/games` | 游戏目录（来自注册表，含变体/板子） | 无 |
+| `GET /api/toc/games` | 游戏目录（来自注册表，含变体/板子及其角色构成） | 无 |
 | `GET /api/toc/players` | 启用的玩家公开信息（id、name、avatar、persona） | 无 |
 | `POST /api/admin/auth/login` | 登录，返回 JWT（12 小时）与是否需改密 | 无 |
 | `POST /api/admin/auth/password` | 修改密码（新密码至少 12 位） | 登录（允许未改密） |

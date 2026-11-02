@@ -1,0 +1,127 @@
+.board-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.board-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.board-picker-head h2 {
+  margin: 0;
+}
+
+.board-picker-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(149, 198, 255, 0.24);
+  border-radius: var(--ui-radius-pill);
+  background: rgba(7, 24, 55, 0.68);
+  color: var(--ui-text-muted);
+}
+
+.board-picker-search input {
+  width: 120px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 12px;
+  outline: none;
+}
+
+.board-picker-list {
+  display: grid;
+  gap: 8px;
+  max-height: calc(100vh - 340px);
+  min-height: 200px;
+  padding-right: 4px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.board-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(149, 198, 255, 0.22);
+  border-radius: 14px;
+  background: rgba(13, 23, 40, 0.72);
+  color: var(--ui-text);
+  text-align: left;
+  transition: border-color var(--ui-motion-fast) ease, background-color var(--ui-motion-fast) ease, transform var(--ui-motion-normal) var(--ui-ease-out), box-shadow var(--ui-motion-normal) ease;
+}
+
+.board-card:hover {
+  border-color: var(--ui-border-strong);
+  transform: translateX(3px);
+}
+
+.board-card.is-selected {
+  border-color: var(--game-accent-strong);
+  background: linear-gradient(180deg, var(--game-accent-soft), rgba(6, 13, 32, 0.86));
+  box-shadow: 0 0 24px var(--game-accent-soft);
+}
+
+.board-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.board-card-head strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.board-card-head span {
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.board-card.is-selected .board-card-head span {
+  color: var(--game-accent-strong);
+}
+
+.board-card-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.board-role {
+  padding: 1px 8px;
+  border-radius: var(--ui-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(221, 232, 255, 0.76);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.board-role.is-werewolf { background: rgba(192, 132, 252, 0.22); color: #e6d4ff; }
+.board-role.is-good { background: rgba(114, 240, 164, 0.16); color: #a8ffcc; }
+.board-role.is-pro { background: rgba(82, 215, 255, 0.16); color: #8be6ff; }
+.board-role.is-con { background: rgba(255, 107, 114, 0.16); color: #ffb3b7; }
+.board-role.is-judge { background: rgba(226, 194, 122, 0.16); color: #f0d48f; }
+
+.board-card-desc {
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.board-picker-empty {
+  margin: 0;
+  padding: 16px 0;
+  color: var(--ui-text-muted);
+  font-size: 13px;
+  text-align: center;
+}

@@ -9,8 +9,9 @@ const INITIAL: StreamState = { items: [], status: null, ended: false, result: nu
 /**
  * 订阅对局播放流：收到事件后由播放器播放，播放完调用 ack；
  * 断线后从最后确认的 seq 续播，重复收到的事件按 seq 去重。
+ * session 变化时从头重新订阅（"从头回放"）。
  */
-export function useMatchStream(matchId: string) {
+export function useMatchStream(matchId: string, session = 0) {
   const [state, setState] = useState<StreamState>(INITIAL);
   const socketRef = useRef<WebSocket | null>(null);
   const ackedRef = useRef(0);
@@ -62,7 +63,7 @@ export function useMatchStream(matchId: string) {
       if (timer) clearTimeout(timer);
       socketRef.current?.close();
     };
-  }, [matchId]);
+  }, [matchId, session]);
 
   const ack = useCallback((seq: number) => {
     ackedRef.current = Math.max(ackedRef.current, seq);

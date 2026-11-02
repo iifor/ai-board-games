@@ -35,7 +35,7 @@
 
 ## 游戏目录（catalog.ts）
 
-`GameCatalogItem`：`key`、`title`、`description`、`players`、`layout`（`versus` / `circle`）、`variants`（key、name、description、players）、`defaultVariant`。服务端从游戏注册表生成，前端不硬编码游戏列表。
+`GameCatalogItem`：`key`、`title`、`description`、`players`、`layout`（`versus` / `circle`）、`variants`（key、name、description、players，以及展示用的角色构成 `roles`：角色名、阵营、数量，`rest` 按人数上限折算）、`defaultVariant`。服务端从游戏注册表生成，前端不硬编码游戏列表。
 
 ## 测试约定
 

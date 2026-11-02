@@ -1,6 +1,15 @@
 import type { CompiledGame } from '@battle/engine';
-import type { GameCatalogItem, PhaseGraphDto } from '@battle/shared';
+import type { GameCatalogItem, PhaseGraphDto, VariantRoleItem } from '@battle/shared';
 import { notFound } from '../../utils/errors';
+
+/** 变体的角色构成（展示用）：按声明顺序，rest 按人数上限折算 */
+function variantRoles(game: CompiledGame, assign: Readonly<Record<string, number | 'rest'>>, maxPlayers: number): VariantRoleItem[] {
+  const fixed = Object.values(assign).reduce<number>((sum, count) => sum + (count === 'rest' ? 0 : count), 0);
+  return Object.entries(assign).map(([role, count]) => {
+    const spec = game.spec.roles[role];
+    return { name: spec?.name ?? role, team: spec?.team ?? '', count: count === 'rest' ? Math.max(0, maxPlayers - fixed) : count };
+  });
+}
 
 function toCatalogItem(game: CompiledGame): GameCatalogItem {
   const { spec } = game;
@@ -15,6 +24,7 @@ function toCatalogItem(game: CompiledGame): GameCatalogItem {
       name: variant.name,
       description: variant.description ?? '',
       players: variant.players ?? spec.players,
+      roles: variantRoles(game, variant.assign, (variant.players ?? spec.players).max),
     })),
     defaultVariant: spec.defaultVariant ?? null,
   };

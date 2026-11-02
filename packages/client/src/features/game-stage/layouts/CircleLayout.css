@@ -1,19 +1,19 @@
 .circle-layout {
-  width: 100%;
-  height: 100%;
   display: grid;
   place-items: center;
+  width: 100%;
+  height: 100%;
 }
 
 .circle-ring {
   position: relative;
-  width: min(100%, 1040px, calc((100vh - 300px) * 1.6));
-  aspect-ratio: 1.6;
+  width: min(100%, 1100px, calc((100vh - 290px) * 1.55));
+  aspect-ratio: 1.55;
 }
 
 .circle-table {
   position: absolute;
-  inset: 16% 22%;
+  inset: 15% 21%;
   border: 1px solid var(--game-accent-soft);
   border-radius: 50%;
   background: radial-gradient(ellipse at 50% 40%, var(--game-accent-soft), rgba(4, 12, 32, 0.4) 62%, transparent 72%);
@@ -26,24 +26,32 @@
   transform: translate(-50%, -50%);
 }
 
+/* 圆桌中央：上下两排座位之间的区域，立绘 / 票板放在这里 */
 .circle-center {
   position: absolute;
-  inset: 28% 28%;
+  inset: 19% 27% 18%;
   display: grid;
-  align-content: end;
-  justify-items: center;
-  gap: 8px;
-  pointer-events: none;
+  place-items: center;
+  min-height: 0;
+}
+
+.circle-center > * {
+  min-height: 0;
 }
 
 .circle-board {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
   padding: 2px 12px;
   border: 1px solid var(--game-accent-soft);
   border-radius: var(--ui-radius-pill);
   color: var(--game-accent-strong);
-  background: rgba(4, 12, 32, 0.7);
+  background: rgba(4, 12, 32, 0.8);
   font-size: 12px;
   font-weight: 800;
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 
 @keyframes circle-table-breathe {
@@ -55,7 +63,7 @@
 @media (max-width: 860px) {
   .circle-ring {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
     width: 100%;
     aspect-ratio: auto;
@@ -74,5 +82,11 @@
     position: static;
     grid-column: 1 / -1;
     grid-row: 1;
+    min-height: 200px;
+  }
+
+  .circle-board {
+    position: static;
+    transform: none;
   }
 }

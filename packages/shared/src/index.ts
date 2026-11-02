@@ -36,7 +36,7 @@ export type {
   PhaseNodeDto,
   ServerMessage,
 } from './api/matches';
-export type { GameCatalogItem, GameVariantItem, StageLayout } from './catalog';
+export type { GameCatalogItem, GameVariantItem, StageLayout, VariantRoleItem } from './catalog';
 export type {
   AudienceSeat,
   AudienceView,

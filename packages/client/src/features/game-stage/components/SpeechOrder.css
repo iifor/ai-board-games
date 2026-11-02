@@ -1,0 +1,40 @@
+.speech-order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--ui-radius-pill);
+  list-style: none;
+  font-size: 12px;
+  font-weight: 900;
+  animation: ui-fade-up var(--ui-motion-normal) var(--ui-ease-out) both;
+}
+
+.speech-order li {
+  position: relative;
+  padding: 3px 10px;
+  border-radius: var(--ui-radius-pill);
+  color: var(--ui-text-dim);
+  white-space: nowrap;
+}
+
+.speech-order li + li::before {
+  content: '›';
+  position: absolute;
+  left: -6px;
+  color: rgba(209, 224, 255, 0.3);
+}
+
+.speech-order li.is-current {
+  color: #fff;
+  background: var(--game-accent-soft);
+  box-shadow: 0 0 14px var(--game-accent-soft);
+}
+
+.speech-order-more {
+  padding: 3px 6px;
+}

@@ -1,16 +1,20 @@
 import type { AudienceView } from '@battle/shared';
+import { describeEvent } from '../playback/describe';
 import type { StreamItem } from '../types';
-import { roundLabel, seatOf } from '../utils';
+import { seatOf, speechOrderOf } from '../utils';
+import { SpeakerSpotlight } from './SpeakerSpotlight';
+import { SpeechOrder } from './SpeechOrder';
 import { VoteBoard } from './VoteBoard';
 import './StageCenter.css';
 
 interface StageCenterProps {
   readonly view: AudienceView;
   readonly current: StreamItem | null;
+  readonly played: readonly StreamItem[];
 }
 
-/** 舞台中央：计票时显示票板，出局时显示出局提示，其余时间显示天数与阶段 */
-export function StageCenter({ view, current }: StageCenterProps) {
+/** 舞台中央：计票时是票板，出局时是出局提示，其余时间站着说话人的立绘（上方是本阶段的发言顺序） */
+export function StageCenter({ view, current, played }: StageCenterProps) {
   const event = current?.event;
   if (event?.kind === 'vote_tallied') return <VoteBoard key={event.seq} event={event} view={view} />;
   if (event?.kind === 'seat_eliminated') {
@@ -22,10 +26,12 @@ export function StageCenter({ view, current }: StageCenterProps) {
       </div>
     );
   }
+  const order = speechOrderOf(played, current, view);
+  const speaking = event ? describeEvent(event).speaker : null;
   return (
     <div className="stage-center">
-      <strong>{roundLabel(view)}</strong>
-      <span>{view.phase?.title ?? (view.status === 'completed' ? '对局结束' : '准备中')}</span>
+      {order.length > 1 ? <SpeechOrder seats={order} current={speaking} view={view} /> : null}
+      <SpeakerSpotlight item={current} view={view} />
     </div>
   );
 }

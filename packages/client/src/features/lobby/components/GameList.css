@@ -1,8 +1,7 @@
 .game-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 420px));
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   gap: 24px;
-  justify-content: center;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -11,40 +10,23 @@
 .game-card {
   position: relative;
   display: grid;
-  gap: 10px;
-  justify-items: center;
-  min-height: 360px;
-  padding: 36px 28px 28px;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  padding: 26px 28px;
   overflow: hidden;
   border: 1px solid rgba(160, 210, 255, 0.3);
   border-radius: 22px;
   color: #edf7ff;
   background: linear-gradient(180deg, rgba(14, 30, 64, 0.84), rgba(6, 14, 36, 0.86));
   box-shadow: 0 26px 80px rgba(0, 0, 0, 0.38), inset 0 0 34px rgba(104, 171, 255, 0.1);
-  text-align: center;
   transition: transform var(--ui-motion-normal) var(--ui-ease-out), border-color var(--ui-motion-normal) ease, box-shadow var(--ui-motion-normal) ease;
 }
 
-.game-card::before {
-  content: '';
-  position: absolute;
-  inset: -40% -20% auto;
-  height: 70%;
-  background: radial-gradient(circle at 50% 100%, var(--game-accent-soft), transparent 60%);
-  opacity: 0.8;
-  transition: opacity var(--ui-motion-normal) ease, transform var(--ui-motion-slow) var(--ui-ease-out);
-  pointer-events: none;
-}
-
 .game-card:hover {
-  transform: translateY(-8px);
+  transform: translateY(-6px);
   border-color: rgba(224, 241, 255, 0.72);
   box-shadow: 0 34px 96px rgba(0, 0, 0, 0.48), 0 0 34px var(--game-accent-soft);
-}
-
-.game-card:hover::before {
-  opacity: 1;
-  transform: translateY(8%);
 }
 
 .game-card[data-game='werewolf'] {
@@ -60,7 +42,6 @@
   place-items: center;
   width: 86px;
   height: 86px;
-  margin-bottom: 6px;
   border: 1px solid rgba(231, 245, 255, 0.38);
   border-radius: 50%;
   color: #fff;
@@ -73,9 +54,15 @@
   transform: scale(1.08) rotate(-6deg);
 }
 
+.game-card-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
 .game-card h2 {
   margin: 0;
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 900;
   line-height: 1.1;
 }
@@ -83,17 +70,54 @@
 .game-card p {
   margin: 0;
   color: rgba(226, 239, 255, 0.76);
-  font-size: 15px;
+  font-size: 14px;
 }
 
-.game-card-meta {
-  color: rgba(224, 238, 255, 0.7);
-  font-size: 13px;
-  font-weight: 700;
+.game-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.game-card-chip {
+  padding: 3px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.game-card-chip.is-accent {
+  border-color: var(--game-accent-soft);
+  background: var(--game-accent-soft);
+  color: var(--game-accent-strong);
 }
 
 .game-card .button {
-  align-self: end;
-  min-width: 140px;
-  margin-top: 8px;
+  min-height: 44px;
+  padding: 0 26px;
+  font-size: 15px;
+}
+
+@media (max-width: 640px) {
+  .game-list {
+    grid-template-columns: 1fr;
+  }
+
+  .game-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: 20px;
+  }
+
+  .game-card-icon {
+    width: 64px;
+    height: 64px;
+  }
+
+  .game-card .button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }

@@ -20,6 +20,9 @@ describe('public endpoints', () => {
     expect(debate).toMatchObject({ layout: 'versus', variants: [], defaultVariant: null, players: { min: 9, max: 12 } });
     expect(werewolf?.defaultVariant).toBe('standard-12');
     expect(werewolf?.variants.map((variant) => variant.key)).toContain('white-wolf-king-guard-12');
+    const standard = werewolf?.variants.find((variant) => variant.key === 'standard-12');
+    expect(standard?.roles.find((role) => role.name === '狼人')).toMatchObject({ team: 'werewolf', count: 4 });
+    expect(standard?.roles.reduce((sum, role) => sum + role.count, 0)).toBe(12);
   });
 });
 

@@ -6,8 +6,8 @@
 
 | 路径 | 页面 | 说明 |
 | --- | --- | --- |
-| `/` | `LobbyPage` | 游戏目录（来自 `GET /api/toc/games`） |
-| `/play/:gameKey` | `SetupPage` | 选板子、按点击顺序选玩家（即座位顺序）、辩论赛可选自定义辩题，开局后跳转舞台 |
+| `/` | `LobbyPage` | 头图（入口按钮 + 最近一局）、游戏目录（`GET /api/toc/games`）、最近对局（`GET /api/toc/matches`，失败不影响大厅） |
+| `/play/:gameKey` | `SetupPage` | 左侧板子列表（可按名称/角色搜索，显示角色构成）或辩题，右侧按点击顺序选玩家（即座位顺序），底部固定操作条；终局"同样阵容再来一局"通过路由 state 带入板子与玩家 |
 | `/matches/:matchId` | `StagePage` | 对局舞台；实时观看与回放是同一页面、同一条播放流 |
 | `/history` | `HistoryPage` | 已完成的公开对局 |
 
@@ -19,7 +19,7 @@
 
 动效全部用 CSS（无动画库），`prefers-reduced-motion` 下全部关闭：
 - 大厅与开局：卡片错峰淡入上浮（`.ui-fade-up` + `--i` / `animationDelay`）、悬停上浮与强调色光晕、选中座位号弹出。
-- 舞台：狼人杀昼夜背景按 `view.extra.period` 圆形揭开切换（`StageBackdrop`）；进入新阶段时大标题横扫而过（`PhaseBanner`）；发言者座位亮起扩散光环、立绘推到舞台中央（`SpeakerSpotlight`，主持播报时主持人立在右侧）；字幕栏从下方滑入、文字从左向右揭开（`SubtitleBar`）；计票时票数条依次长出、当选者金色高亮（`VoteBoard`）；出局座位变灰并盖"出局"戳；终局结果卡弹性弹出并展示 MVP 立绘（`ResultPanel`）；对局记录是可收起的侧栏。
+- 舞台：狼人杀昼夜背景按 `view.extra.period` 圆形揭开切换（`StageBackdrop`）；进入新阶段时大标题横扫而过（`PhaseBanner`）；发言者座位亮起扩散光环、立绘站在圆桌中央（`SpeakerSpotlight`，主持人也站在这里）；字幕栏从下方滑入、文字从左向右揭开，并按预计时长走进度条（`SubtitleBar`）；计票时票数条依次长出、当选者金色高亮（`VoteBoard`）；出局座位变灰并盖"出局"戳；终局结果卡弹性弹出，展示 MVP 立绘、按阵营揭示的阵容与"同样阵容再来一局 / 从头回放"（`ResultPanel`、`ResultRoster`）。
 
 ## 目录
 
@@ -31,10 +31,12 @@ src/
   services/               http（统一解析 ApiResponse，业务错误转 ApiError）、games、matches
   utils/posters.ts        玩家名 → 内置海报
   features/
-    lobby/                LobbyHero、GameList（GameIcon）、SetupForm（PlayerPicker、TopicFields）、useMatchSetup、utils
-    game-stage/           useMatchStream、usePlayback、playback/*（纯逻辑与媒体播放）、layouts/*、utils（昼夜、座位查找）、
-                          components/*（StageBackdrop、StageHud、PlaybackControls、SeatCard、Stage、StageCenter、VoteBoard、
-                          SpeakerSpotlight、SubtitleBar、PhaseBanner、ResultPanel、EventFeed）
+    lobby/                LobbyHero、GameList（GameIcon）、RecentMatches、SetupForm（BoardPicker、PlayerPicker、TopicFields、SetupActionBar）、
+                          useMatchSetup（支持路由 state 带入的初值）、utils（选人、板子搜索、state 校验）
+    game-stage/           useMatchStream（session 变化时从头重订）、usePlayback、playback/*（纯逻辑与媒体播放）、layouts/*、
+                          constants（阵营标签、侧栏默认展开宽度）、utils（昼夜、座位、夜晚步骤、发言顺序、评委判定、终局阵容）、
+                          components/*（StageBackdrop、StageHud、PlaybackControls、NightSteps、SeatCard、Stage、StageCenter、SpeechOrder、
+                          VoteBoard、SpeakerSpotlight、SubtitleBar、PhaseBanner、ResultPanel、ResultRoster、EventFeed）
     history/              MatchList
   styles/global.css       设计令牌、基础样式、通用动效
 ```
@@ -48,14 +50,14 @@ src/
 
 ## 舞台分层
 
-`StagePage` 把各层绝对定位叠在全屏容器里：背景（0）→ 聚光立绘（2）→ 座位与舞台中央（4）→ 阶段横幅（35）→ 字幕栏（38）→ HUD、控制条、记录侧栏（40）→ 终局（60）。HUD 显示游戏与板子、LIVE / 已结束、当前天数与阶段；控制条含暂停、倍速、静音与记录开关。窄屏（≤860px）退化为自上而下的普通页面。
+`StagePage` 把各层绝对定位叠在全屏容器里：背景（0）→ 座位与舞台中央（4）→ 阶段横幅（35）→ 字幕栏（38）→ HUD、控制条、夜晚顺序、记录侧栏（40）→ 终局（60）。HUD 显示游戏与板子、LIVE / 已结束、当前天数与阶段；控制条含暂停、倍速、静音与记录开关；窗口 ≥1440px 时记录侧栏默认展开（舞台相应左移），可筛"只看发言"。所有附加信息只用已播放的公开事件算出（`utils.ts`）：夜晚行动顺序 = 本轮夜晚的 `phase_started` 标题；发言顺序 = 本阶段已发言的座位；评委判定徽章 = `judgement` 事件；终局阵容 = 终局视图里揭示的身份按阵营分组。窄屏（≤860px）退化为自上而下的普通页面：顶栏 → 舞台 → 字幕 → 控制 → 记录。
 
 ## 布局
 
-`layouts/registry.tsx` 把游戏声明的 `presentation.layout` 映射到组件，`center` 是舞台中央内容（`StageCenter`：天数与阶段 / 票板 / 出局提示）：
+`layouts/registry.tsx` 把游戏声明的 `presentation.layout` 映射到组件，`center` 是舞台中央内容（`StageCenter`：票板 / 出局提示 / 发言顺序条 + 说话人立绘），`badges` 是舞台算出的座位徽章：
 
-- `versus`（辩论赛）：左正方、右反方（按席位排序）、下方评委席，中间辩题（`view.extra.topic`）。
-- `circle`（狼人杀）：座位绕圆桌一圈（竖排卡片），桌面中央是板子名（`view.extra.board`）与舞台内容，警长标记来自 `view.extra.sheriff`，昼夜来自 `view.extra.period`（没有时按阶段标题推断）；窄屏退化为网格。
+- `versus`（辩论赛）：左正方、右反方（标题下带各自观点，按席位排序）、下方评委席（带判定徽章），中间辩题（`view.extra.topic`）与舞台内容。
+- `circle`（狼人杀）：座位绕圆桌一圈（1 号正上方、顺时针，竖排卡片），上下两排座位之间的区域留给舞台内容，桌下沿是板子名（`view.extra.board`），警长标记来自 `view.extra.sheriff`，昼夜来自 `view.extra.period`（没有时按阶段标题推断）；窄屏退化为四列网格。
 
 座位卡片只显示观众视图中可见的身份（不可见为"身份未知"），出局者置灰并盖戳，正在说话者亮起光环。新增布局时实现 `LayoutProps` 并在注册表登记。
 

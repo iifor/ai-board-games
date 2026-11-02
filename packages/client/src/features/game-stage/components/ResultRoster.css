@@ -1,0 +1,71 @@
+.result-roster {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.result-roster-team {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.result-roster-team h3 {
+  margin: 0;
+  color: rgba(221, 232, 255, 0.8);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.result-roster-team[data-team='werewolf'] { border-color: rgba(192, 132, 252, 0.4); background: rgba(192, 132, 252, 0.08); }
+.result-roster-team[data-team='werewolf'] h3 { color: #e6d4ff; }
+.result-roster-team[data-team='good'] { border-color: rgba(114, 240, 164, 0.32); background: rgba(114, 240, 164, 0.06); }
+.result-roster-team[data-team='good'] h3 { color: #a8ffcc; }
+.result-roster-team[data-team='pro'] { border-color: rgba(82, 215, 255, 0.4); }
+.result-roster-team[data-team='pro'] h3 { color: var(--team-pro); }
+.result-roster-team[data-team='con'] { border-color: rgba(255, 107, 114, 0.4); }
+.result-roster-team[data-team='con'] h3 { color: var(--team-con); }
+.result-roster-team[data-team='judge'] h3 { color: var(--team-judge); }
+
+.result-roster-team.is-winner {
+  box-shadow: 0 0 24px var(--ui-brand-soft);
+}
+
+.result-roster-team ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.result-roster-team li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.result-roster-team li span {
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+}
+
+.result-roster-team li.is-out {
+  opacity: 0.55;
+}
+
+.result-roster-team li.is-out span {
+  color: #ffd0d6;
+}
+
+@media (max-width: 760px) {
+  .result-roster {
+    grid-template-columns: 1fr !important;
+  }
+}

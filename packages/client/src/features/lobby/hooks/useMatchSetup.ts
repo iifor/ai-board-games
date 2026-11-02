@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { errorMessage } from '../../../services/http';
 import { createMatch } from '../../../services/matches';
 import { GAMES_WITH_TOPIC } from '../constants';
-import { playerRange, selectionHint, toggleSelection } from '../utils';
+import { playerRange, selectionHint, toggleSelection, type SetupInitial } from '../utils';
+
+export type { SetupInitial } from '../utils';
 
 export interface TopicDraft {
   readonly title: string;
@@ -11,10 +13,20 @@ export interface TopicDraft {
   readonly con: string;
 }
 
+function initialVariant(game: GameCatalogItem, initial: SetupInitial | undefined): string | null {
+  const wanted = initial?.variant;
+  return wanted && game.variants.some((variant) => variant.key === wanted) ? wanted : game.defaultVariant;
+}
+
+function initialSelection(players: readonly PublicPlayerDto[], initial: SetupInitial | undefined, max: number): number[] {
+  const known = new Set(players.map((player) => player.id));
+  return (initial?.playerIds ?? []).filter((id) => known.has(id)).slice(0, max);
+}
+
 /** 开局表单状态：板子、玩家（按选中顺序就座）、可选辩题；提交后返回对局 ID */
-export function useMatchSetup(game: GameCatalogItem, players: readonly PublicPlayerDto[]) {
-  const [variant, setVariant] = useState<string | null>(game.defaultVariant);
-  const [selected, setSelected] = useState<number[]>([]);
+export function useMatchSetup(game: GameCatalogItem, players: readonly PublicPlayerDto[], initial?: SetupInitial) {
+  const [variant, setVariant] = useState<string | null>(() => initialVariant(game, initial));
+  const [selected, setSelected] = useState<number[]>(() => initialSelection(players, initial, playerRange(game, initialVariant(game, initial)).max));
   const [topic, setTopic] = useState<TopicDraft>({ title: '', pro: '', con: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

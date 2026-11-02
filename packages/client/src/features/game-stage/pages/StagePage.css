@@ -7,14 +7,22 @@
   isolation: isolate;
 }
 
-/* 层级：背景 0 → 聚光立绘 2 → 座位与舞台中央 4 → 阶段横幅 35 → HUD / 控制条 / 记录 40 → 终局 60 */
+/* 层级：背景 0 → 座位与舞台中央 4 → 阶段横幅 35 → 字幕栏 38 → HUD / 控制条 / 夜晚顺序 / 记录 40 → 终局 60 */
+/* 行列都给定尺寸，布局组件的 height: 100% 才能按舞台高度解析，立绘才不会撑出舞台 */
 .stage-arena {
   position: absolute;
   z-index: 4;
-  inset: 96px 24px 170px;
+  inset: 96px 24px 150px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   place-items: center;
   min-width: 0;
+  transition: right var(--ui-motion-slow) var(--ui-ease-out);
+}
+
+.stage-shell[data-feed-open='true'] .stage-arena {
+  right: 368px;
 }
 
 .stage-waiting {
@@ -35,10 +43,10 @@
   z-index: 40;
   top: 96px;
   right: 24px;
-  bottom: 170px;
+  bottom: 24px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  width: min(380px, calc(100vw - 48px));
+  width: min(320px, calc(100vw - 48px));
   transform: translateX(calc(100% + 48px));
   transition: transform var(--ui-motion-slow) var(--ui-ease-out);
 }
@@ -50,14 +58,50 @@
 .stage-feed header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 10px 10px 10px 16px;
   border-bottom: 1px solid var(--ui-border);
 }
 
 .stage-feed h2 {
-  margin: 0;
-  font-size: 15px;
+  margin: 0 auto 0 0;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.stage-feed-filters {
+  display: flex;
+  gap: 4px;
+}
+
+.stage-feed-filters button,
+.stage-feed-close {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 14px;
+  color: rgba(230, 239, 255, 0.76);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  transition: color var(--ui-motion-fast) ease, background-color var(--ui-motion-fast) ease;
+}
+
+.stage-feed-filters button:hover,
+.stage-feed-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.stage-feed-filters button.is-active {
+  color: #fff;
+  background: var(--game-accent-soft);
+}
+
+.stage-feed-close {
+  width: 28px;
+  padding: 0;
+  font-size: 16px;
 }
 
 .stage-exit {
@@ -76,7 +120,7 @@
   transform: translateX(-50%);
 }
 
-/* 窄屏退化为自上而下的普通页面 */
+/* 窄屏退化为自上而下的普通页面：顶栏 → 舞台 → 字幕 → 控制 → 记录 */
 @media (max-width: 860px) {
   .stage-shell {
     position: static;
@@ -99,6 +143,16 @@
   .stage-backdrop {
     position: fixed;
   }
+
+  .stage-shell > .stage-hud { order: 1; }
+  .stage-shell > .night-steps { order: 2; }
+  .stage-shell > .stage-arena { order: 3; }
+  .stage-shell > .phase-banner { order: 4; }
+  .stage-shell > .subtitle-bar { order: 5; }
+  .stage-shell > .playback-rail { order: 6; }
+  .stage-shell > .result-panel { order: 7; }
+  .stage-shell > .stage-feed { order: 8; }
+  .stage-shell > .stage-exit { order: 9; }
 
   .stage-feed {
     max-height: 360px;

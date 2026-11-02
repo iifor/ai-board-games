@@ -4,70 +4,128 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at 50% 40%, rgba(18, 52, 111, 0.3), transparent 50%), rgba(1, 5, 17, 0.72);
+  padding: 24px;
+  overflow-y: auto;
+  background: radial-gradient(circle at 50% 40%, rgba(18, 52, 111, 0.3), transparent 50%), rgba(1, 5, 17, 0.74);
   backdrop-filter: blur(10px);
   animation: result-backdrop var(--ui-motion-slow) ease both;
 }
 
 .result-card {
   display: grid;
-  gap: 10px;
-  justify-items: center;
-  width: min(560px, calc(100% - 48px));
-  padding: 28px 32px 30px;
+  gap: 28px;
+  width: min(1000px, 100%);
+  padding: 30px 36px 28px;
   border-color: var(--ui-brand-soft);
-  text-align: center;
   animation: result-card 0.7s var(--ui-ease-elastic) both;
 }
 
-.result-card h2 {
-  margin: 0;
-  color: var(--ui-brand-strong);
-  font-size: clamp(28px, 3vw, 40px);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-shadow: 0 0 30px var(--ui-brand-soft);
-}
-
-.result-card > p {
-  margin: 0;
-  color: var(--ui-text-muted);
-  font-size: 15px;
+.result-card.has-mvp {
+  grid-template-columns: 260px minmax(0, 1fr);
 }
 
 .result-mvp-block {
   display: grid;
   justify-items: center;
+  align-content: start;
   gap: 8px;
-  margin-top: 8px;
-  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) 0.4s both;
+  padding-right: 28px;
+  border-right: 1px solid var(--ui-border);
+  text-align: center;
+}
+
+.result-mvp-block .hud-label {
+  color: var(--ui-brand-strong);
 }
 
 .result-mvp-avatar {
+  position: relative;
   display: grid;
-  place-items: center;
-  width: 110px;
-  height: 110px;
-  overflow: hidden;
-  border: 3px solid var(--ui-brand-strong);
-  border-radius: 50%;
-  background: rgba(5, 18, 45, 0.9);
-  box-shadow: 0 0 40px var(--ui-brand-soft);
-  font-size: 28px;
+  place-items: end center;
+  width: 200px;
+  height: 240px;
+  font-size: 40px;
   font-weight: 900;
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) 0.3s both;
+}
+
+.result-mvp-avatar::before {
+  content: '';
+  position: absolute;
+  inset: auto 10% 0;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, var(--ui-brand-soft), transparent 70%);
+  filter: blur(8px);
 }
 
 .result-mvp-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top;
+  position: relative;
+  width: auto;
+  height: 240px;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.5));
 }
 
 .result-mvp {
   margin: 0;
   color: #fff;
+  font-size: 18px;
   font-weight: 900;
+}
+
+.result-mvp-role {
+  padding: 3px 12px;
+  border: 1px solid var(--ui-brand-soft);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.result-body {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.result-body h2 {
+  margin: 0;
+  color: var(--ui-brand-strong);
+  font-size: clamp(28px, 3vw, 44px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 30px var(--ui-brand-soft);
+}
+
+.result-body > p {
+  margin: 0;
+  color: rgba(221, 232, 255, 0.8);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) 0.5s both;
+}
+
+.result-actions .button {
+  min-height: 46px;
+  padding: 0 24px;
+}
+
+.result-actions .button-primary {
+  border-color: var(--ui-brand-strong);
+  color: var(--ui-on-brand);
+  background: linear-gradient(180deg, var(--ui-brand-strong), var(--ui-brand));
+  box-shadow: 0 0 22px var(--ui-brand-soft);
 }
 
 @keyframes result-backdrop {
@@ -80,5 +138,21 @@
   from {
     opacity: 0;
     transform: translateY(30px) scale(0.9);
+  }
+}
+
+@media (max-width: 860px) {
+  .result-panel {
+    position: static;
+    padding: 0;
+  }
+
+  .result-card.has-mvp {
+    grid-template-columns: 1fr;
+  }
+
+  .result-mvp-block {
+    padding-right: 0;
+    border-right: 0;
   }
 }
