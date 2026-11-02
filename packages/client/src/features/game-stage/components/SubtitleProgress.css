@@ -1,0 +1,30 @@
+.subtitle-progress {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.subtitle-progress b {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--game-accent-strong);
+}
+
+.subtitle-progress.is-timed b {
+  animation: subtitle-progress linear forwards;
+}
+
+/* 音频进度每秒只报几次，用短过渡把台阶抹平 */
+.subtitle-progress.is-measured b {
+  transition: width 250ms linear;
+}
+
+@keyframes subtitle-progress {
+  to {
+    width: 100%;
+  }
+}

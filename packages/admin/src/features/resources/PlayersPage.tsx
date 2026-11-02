@@ -1,8 +1,9 @@
 import type { PlayerDto, PlayerInput } from '@battle/shared';
-import { Avatar, Form, Input, Select, Switch, Tag } from 'antd';
+import { Avatar, Form, Input, Select, Switch } from 'antd';
 import { useAsync } from '../../hooks/useAsync';
 import { modelsApi, playersApi, voicesApi } from '../../services/resources';
 import { ResourcePage } from './ResourcePage';
+import { StatusTag } from './StatusTag';
 
 interface Values {
   name: string;
@@ -31,7 +32,7 @@ export function PlayersPage() {
         { title: '人设', dataIndex: 'persona', ellipsis: true },
         { title: '模型', dataIndex: 'modelId', render: (id: number) => name(modelList, id) },
         { title: '音色', dataIndex: 'voiceId', render: (id: number | null) => name(voiceList, id) },
-        { title: '状态', dataIndex: 'enabled', render: (enabled: boolean) => (enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>) },
+        { title: '状态', dataIndex: 'enabled', render: (enabled: boolean) => <StatusTag enabled={enabled} /> },
       ]}
       defaults={{ persona: '', voiceId: null, avatar: null, enabled: true }}
       toValues={(dto) => dto}

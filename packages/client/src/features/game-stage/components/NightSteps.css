@@ -34,7 +34,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.06em;
 }
@@ -61,11 +61,11 @@
 }
 
 .night-steps li.is-current {
-  padding: 3px 10px;
-  border: 1px solid var(--game-accent-soft);
-  border-radius: var(--ui-radius-pill);
+  border-color: var(--game-accent-soft);
   color: #fff;
   background: var(--game-accent-soft);
+  font-weight: inherit;
+  letter-spacing: inherit;
   text-shadow: 0 0 12px var(--game-accent-soft);
 }
 

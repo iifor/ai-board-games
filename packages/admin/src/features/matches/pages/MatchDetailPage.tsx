@@ -1,5 +1,6 @@
 import { Alert, Card, Descriptions, Spin, Tabs, Tag, Typography } from 'antd';
 import { Link, useParams } from 'react-router';
+import { formatMatchTitle } from '../../../utils/format';
 import { DebugControls } from '../components/DebugControls';
 import { LogPanel } from '../components/LogPanel';
 import { PhaseGraph } from '../components/PhaseGraph';
@@ -17,7 +18,7 @@ export function MatchDetailPage() {
   return (
     <section className="match-detail">
       <Link to="/matches">← 返回列表</Link>
-      <Typography.Title level={3}>{detail.gameTitle}{detail.variantName ? ` · ${detail.variantName}` : ''}</Typography.Title>
+      <Typography.Title level={3}>{formatMatchTitle(detail)}</Typography.Title>
       {error ? <Alert type="warning" title={`刷新失败：${error}`} /> : null}
       {detail.error ? <Alert type="error" title={detail.error} /> : null}
       <Descriptions size="small" bordered column={{ xs: 1, md: 3 }}>

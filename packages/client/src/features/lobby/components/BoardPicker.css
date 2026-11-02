@@ -97,13 +97,8 @@
 }
 
 .board-role {
-  padding: 1px 8px;
-  border-radius: var(--ui-radius-pill);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(221, 232, 255, 0.76);
+  padding: 0 8px;
   font-size: 11px;
-  font-style: normal;
-  font-weight: 800;
 }
 
 .board-role.is-werewolf { background: rgba(192, 132, 252, 0.22); color: #e6d4ff; }

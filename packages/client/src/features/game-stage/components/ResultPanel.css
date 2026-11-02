@@ -6,12 +6,14 @@
   place-items: center;
   padding: 24px;
   overflow-y: auto;
+  outline: none;
   background: radial-gradient(circle at 50% 40%, rgba(18, 52, 111, 0.3), transparent 50%), rgba(1, 5, 17, 0.74);
   backdrop-filter: blur(10px);
   animation: result-backdrop var(--ui-motion-slow) ease both;
 }
 
 .result-card {
+  position: relative;
   display: grid;
   gap: 28px;
   width: min(1000px, 100%);
@@ -38,14 +40,31 @@
   color: var(--ui-brand-strong);
 }
 
+.result-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  color: var(--ui-text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 20px;
+  line-height: 1;
+  transition: color var(--ui-motion-fast) ease, border-color var(--ui-motion-fast) ease;
+}
+
+.result-close:hover {
+  border-color: var(--ui-border-strong);
+  color: #fff;
+}
+
+/* 立绘由 Avatar（figure）负责贴底居中，这里只定尺寸与底光 */
 .result-mvp-avatar {
-  position: relative;
-  display: grid;
-  place-items: end center;
   width: 200px;
   height: 240px;
   font-size: 40px;
-  font-weight: 900;
   animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) 0.3s both;
 }
 
@@ -60,12 +79,7 @@
 }
 
 .result-mvp-avatar img {
-  position: relative;
-  width: auto;
   height: 240px;
-  max-width: 100%;
-  object-fit: contain;
-  object-position: center bottom;
   filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.5));
 }
 
@@ -73,16 +87,6 @@
   margin: 0;
   color: #fff;
   font-size: 18px;
-  font-weight: 900;
-}
-
-.result-mvp-role {
-  padding: 3px 12px;
-  border: 1px solid var(--ui-brand-soft);
-  border-radius: var(--ui-radius-pill);
-  background: var(--ui-brand-soft);
-  color: var(--ui-brand-strong);
-  font-size: 12px;
   font-weight: 900;
 }
 

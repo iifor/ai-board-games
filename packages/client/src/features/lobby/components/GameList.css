@@ -80,21 +80,6 @@
   margin-top: 4px;
 }
 
-.game-card-chip {
-  padding: 3px 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-pill);
-  color: var(--ui-text-muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.game-card-chip.is-accent {
-  border-color: var(--game-accent-soft);
-  background: var(--game-accent-soft);
-  color: var(--game-accent-strong);
-}
-
 .game-card .button {
   min-height: 44px;
   padding: 0 26px;

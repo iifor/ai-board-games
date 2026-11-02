@@ -2,10 +2,11 @@ import { API_ERROR_CODES } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TracePanel } from './features/matches/components/TracePanel';
-import { channelColor, describeLog } from './features/matches/utils';
+import { channelColor, describeLog, progressChanged } from './features/matches/utils';
 import { applyFilters, enabledFilter, uniqueOptions, type ResourceFilter } from './features/resources/utils';
 import { AUTH_EVENTS, http } from './services/http';
 import { tokenStore } from './services/tokenStore';
+import { formatMatchTitle } from './utils/format';
 
 const meta = { seq: 1, round: 1, phaseId: 'vote', channel: 'host' as const };
 
@@ -19,6 +20,19 @@ describe('match utils', () => {
     expect(describeLog({ ...meta, kind: 'fallback', seat: 2, reason: '输出不合法' })).toBe('2号兜底：输出不合法');
     expect(channelColor('team:werewolf')).toBe('purple');
     expect(channelColor('private:3')).toBe('gold');
+  });
+
+  it('refetches the log and AI calls only when the event progress or the status moved', () => {
+    const marker = { lastSeq: 12, status: 'running' as const };
+    expect(progressChanged(null, marker)).toBe(true);
+    expect(progressChanged(marker, { ...marker })).toBe(false);
+    expect(progressChanged(marker, { ...marker, lastSeq: 13 })).toBe(true);
+    expect(progressChanged(marker, { ...marker, status: 'paused' })).toBe(true);
+  });
+
+  it('formats the match title with the board when there is one', () => {
+    expect(formatMatchTitle({ gameTitle: 'AI 狼人杀', variantName: '预女猎白' })).toBe('AI 狼人杀 · 预女猎白');
+    expect(formatMatchTitle({ gameTitle: 'AI 辩论赛', variantName: null })).toBe('AI 辩论赛');
   });
 });
 

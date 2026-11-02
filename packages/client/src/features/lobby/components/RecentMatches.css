@@ -56,13 +56,6 @@
 .recent-match-winner {
   grid-row: span 2;
   align-self: center;
-  padding: 3px 10px;
-  border-radius: var(--ui-radius-pill);
-  background: var(--game-accent-soft);
-  color: var(--game-accent-strong);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
 }
 
 .recent-match time {

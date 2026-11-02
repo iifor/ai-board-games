@@ -8,7 +8,8 @@
   --ui-border-strong: rgba(217, 230, 255, 0.56);
   --ui-text: #f5f8ff;
   --ui-text-muted: rgba(221, 232, 255, 0.68);
-  --ui-text-dim: rgba(180, 198, 230, 0.5);
+  /* 0.66：在舞台底色与玻璃面板上对比度 ≥ 5:1（11–12px 的小字也达标） */
+  --ui-text-dim: rgba(180, 198, 230, 0.66);
   --ui-brand: #e2c27a;
   --ui-brand-strong: #f0d48f;
   --ui-brand-soft: rgba(226, 194, 122, 0.22);
@@ -170,6 +171,42 @@ button {
   font-weight: 900;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+/* 胶囊标签：各处的小标签共用这一套尺寸与圆角；颜色由修饰类决定，使用处只覆盖颜色 */
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-pill);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.ui-pill-accent {
+  color: var(--game-accent-strong);
+  background: var(--game-accent-soft);
+}
+
+.ui-pill-brand {
+  border-color: var(--ui-brand-soft);
+  color: var(--ui-brand-strong);
+  background: var(--ui-brand-soft);
+}
+
+.ui-pill-outline {
+  border-color: var(--ui-border);
+  color: var(--ui-text-muted);
+}
+
+.ui-pill-soft {
+  color: rgba(221, 232, 255, 0.76);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* 通用进场动画：子项用 --i 控制错峰 */

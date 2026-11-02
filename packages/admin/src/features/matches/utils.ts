@@ -1,4 +1,4 @@
-import type { MatchStatus } from '@battle/shared';
+import type { MatchDetailDto, MatchStatus } from '@battle/shared';
 import type { LogEntryDto } from '../../services/matches';
 
 export const STATUS_LABELS: Readonly<Record<MatchStatus, { label: string; color: string }>> = {
@@ -47,4 +47,17 @@ export function describeLog(entry: LogEntryDto): string {
 
 export function isTerminal(status: MatchStatus): boolean {
   return status === 'completed' || status === 'failed';
+}
+
+/** 详情里标记"对局有没有往前走"的字段：事件进度与状态 */
+export interface ProgressMarker {
+  readonly lastSeq: number;
+  readonly status: MatchStatus;
+}
+
+export const progressMarkerOf = (detail: MatchDetailDto): ProgressMarker => ({ lastSeq: detail.lastSeq, status: detail.status });
+
+/** 事件进度或状态变了，才值得重新拉完整日志与 AI 调用（两者带着六层提示词与原始回复，体积大） */
+export function progressChanged(prev: ProgressMarker | null, next: ProgressMarker): boolean {
+  return prev === null || prev.lastSeq !== next.lastSeq || prev.status !== next.status;
 }

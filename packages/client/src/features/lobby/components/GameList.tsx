@@ -20,8 +20,8 @@ export function GameList({ games }: { readonly games: readonly GameCatalogItem[]
             <h2>{game.title}</h2>
             <p>{game.description}</p>
             <div className="game-card-chips">
-              <span className="game-card-chip is-accent">{playersLabel(game)}</span>
-              {GAMES_WITH_TOPIC.has(game.key) ? <span className="game-card-chip">可自定义辩题</span> : null}
+              <span className="ui-pill ui-pill-accent">{playersLabel(game)}</span>
+              {GAMES_WITH_TOPIC.has(game.key) ? <span className="ui-pill ui-pill-outline">可自定义辩题</span> : null}
             </div>
           </div>
           <Link className="button button-primary" to={`/play/${game.key}`}>开始</Link>

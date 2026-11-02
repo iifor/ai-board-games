@@ -16,12 +16,12 @@ function outcomeText(event: VoteEvent, view: AudienceView): string {
   return `${seat ? seat.name : `${event.outcome.seat}号`} 当选${event.outcome.byTieBreak ? '（平票随机）' : ''}`;
 }
 
-/** 票板：每个目标一根票数条，按得票比例依次长出；最后盖上结果 */
+/** 票板：每个目标一根票数条，按得票比例依次长出；最后盖上结果。计票结果由字幕栏播报，这里不做 live region */
 export function VoteBoard({ event, view }: VoteBoardProps) {
   const max = Math.max(1, ...event.tally.map((row) => row.votes));
   const selected = event.outcome?.kind === 'selected' ? event.outcome.seat : null;
   return (
-    <div className="vote-board glass-panel" role="status">
+    <div className="vote-board glass-panel" role="group" aria-label={event.title}>
       <span className="hud-label">{event.title}{event.runoff ? ` · 第 ${event.runoff + 1} 轮` : ''}</span>
       <ul>
         {event.tally.map((row, index) => (

@@ -55,14 +55,11 @@
   animation: ui-pop-in var(--ui-motion-slow) var(--ui-ease-elastic) both;
 }
 
+/* 头像的图片 / 首字由 Avatar 组件负责，这里只定尺寸与光环 */
 .player-option-portrait {
-  display: grid;
-  place-items: center;
   width: 84px;
   height: 84px;
-  overflow: hidden;
   border: 2px solid rgba(105, 159, 239, 0.5);
-  border-radius: 50%;
   background: rgba(3, 13, 35, 0.9);
   transition: border-color var(--ui-motion-fast) ease, box-shadow var(--ui-motion-normal) ease;
 }
@@ -70,13 +67,6 @@
 .player-option-selected .player-option-portrait {
   border-color: var(--game-accent-strong);
   box-shadow: 0 0 28px var(--game-accent-soft);
-}
-
-.player-option-portrait img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top;
 }
 
 .player-option-portrait b {

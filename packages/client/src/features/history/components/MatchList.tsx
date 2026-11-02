@@ -1,5 +1,6 @@
 import type { MatchSummaryDto } from '@battle/shared';
 import { Link } from 'react-router';
+import { formatDateTime, formatMatchTitle, formatWinner } from '../../../utils/format';
 import './MatchList.css';
 
 export function MatchList({ matches }: { readonly matches: readonly MatchSummaryDto[] }) {
@@ -8,9 +9,9 @@ export function MatchList({ matches }: { readonly matches: readonly MatchSummary
       {matches.map((match) => (
         <li key={match.id} className="card">
           <Link to={`/matches/${match.id}`}>
-            <strong>{match.gameTitle}{match.variantName ? ` · ${match.variantName}` : ''}</strong>
-            <span>{match.result?.winnerLabel ?? '未分胜负'}</span>
-            <time dateTime={match.createdAt}>{new Date(match.createdAt).toLocaleString('zh-CN')}</time>
+            <strong>{formatMatchTitle(match)}</strong>
+            <span className="ui-pill ui-pill-accent">{formatWinner(match)}</span>
+            <time dateTime={match.createdAt}>{formatDateTime(match.createdAt)}</time>
           </Link>
         </li>
       ))}

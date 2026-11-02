@@ -1,5 +1,6 @@
 import type { MatchSummaryDto } from '@battle/shared';
 import { Link } from 'react-router';
+import { formatDateTime, formatMatchTitle, formatWinner } from '../../../utils/format';
 import './RecentMatches.css';
 
 interface RecentMatchesProps {
@@ -19,9 +20,9 @@ export function RecentMatches({ matches, limit = 3 }: RecentMatchesProps) {
       <div className="recent-matches-grid">
         {matches.slice(0, limit).map((match, index) => (
           <Link key={match.id} className="recent-match ui-fade-up" data-game={match.gameKey} to={`/matches/${match.id}`} style={{ animationDelay: `${200 + index * 70}ms` }}>
-            <strong>{match.gameTitle}{match.variantName ? ` · ${match.variantName}` : ''}</strong>
-            <span className="recent-match-winner">{match.result?.winnerLabel ?? '未分胜负'}</span>
-            <time dateTime={match.createdAt}>{new Date(match.createdAt).toLocaleString('zh-CN', { hour12: false })} · 回放</time>
+            <strong>{formatMatchTitle(match)}</strong>
+            <span className="recent-match-winner ui-pill ui-pill-accent">{formatWinner(match)}</span>
+            <time dateTime={match.createdAt}>{formatDateTime(match.createdAt)} · 回放</time>
           </Link>
         ))}
       </div>

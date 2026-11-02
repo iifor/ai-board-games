@@ -3,15 +3,10 @@ import { useState } from 'react';
 import { errorMessage } from '../../../services/http';
 import { createMatch } from '../../../services/matches';
 import { GAMES_WITH_TOPIC } from '../constants';
-import { playerRange, selectionHint, toggleSelection, type SetupInitial } from '../utils';
+import type { SetupInitial, TopicDraft } from '../types';
+import { playerRange, selectionHint, toggleSelection } from '../utils';
 
-export type { SetupInitial } from '../utils';
-
-export interface TopicDraft {
-  readonly title: string;
-  readonly pro: string;
-  readonly con: string;
-}
+export type { SetupInitial, TopicDraft } from '../types';
 
 function initialVariant(game: GameCatalogItem, initial: SetupInitial | undefined): string | null {
   const wanted = initial?.variant;

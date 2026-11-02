@@ -3,10 +3,11 @@ import { Form, Input, InputNumber, Select, Space, Switch, Tag, Typography } from
 import { useSearchParams } from 'react-router';
 import { useAsync } from '../../hooks/useAsync';
 import { modelsApi, providersApi } from '../../services/resources';
+import { formatTime } from '../../utils/format';
 import { ModelActions } from './ModelActions';
 import { ResourcePage } from './ResourcePage';
 import { StatusTag } from './StatusTag';
-import { enabledFilter, formatTime, type ResourceFilter } from './utils';
+import { enabledFilter, type ResourceFilter } from './utils';
 
 interface Values {
   providerId: number;

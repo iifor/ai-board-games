@@ -1,5 +1,6 @@
 import type { GameCatalogItem, MatchSummaryDto } from '@battle/shared';
 import { Link } from 'react-router';
+import { formatMatchTitle, formatWinner } from '../../../utils/format';
 import './LobbyHero.css';
 
 interface LobbyHeroProps {
@@ -9,7 +10,7 @@ interface LobbyHeroProps {
 
 /** 大厅头图区：标题、文案、入口按钮，右侧是最近一局的入口 */
 export function LobbyHero({ primaryGame, latest }: LobbyHeroProps) {
-  const latestTitle = latest ? `${latest.gameTitle}${latest.variantName ? ` · ${latest.variantName}` : ''}` : null;
+  const latestTitle = latest ? formatMatchTitle(latest) : null;
   return (
     <>
       <div className="lobby-backdrop" aria-hidden="true" />
@@ -27,7 +28,7 @@ export function LobbyHero({ primaryGame, latest }: LobbyHeroProps) {
           <img src="/stage/werewolf-night.png" alt="" />
           <span className="lobby-hero-strip">
             <span><i aria-hidden="true" />{latestTitle ? `最近一局 · ${latestTitle}` : '还没有完成的对局'}</span>
-            <b>{latest ? `${latest.result?.winnerLabel ?? '未分胜负'} · 回放 →` : '去开一局 →'}</b>
+            <b>{latest ? `${formatWinner(latest)} · 回放 →` : '去开一局 →'}</b>
           </span>
         </Link>
       </section>

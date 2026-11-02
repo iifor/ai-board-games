@@ -39,7 +39,7 @@ export function BoardPicker({ variants, value, onChange }: BoardPickerProps) {
             {variant.roles.length ? (
               <span className="board-card-roles">
                 {variant.roles.map((role) => (
-                  <i key={role.name} className={`board-role is-${role.team || 'none'}`}>{role.name}{role.count > 1 ? ` ×${role.count}` : ''}</i>
+                  <i key={role.name} className={`ui-pill ui-pill-soft board-role is-${role.team || 'none'}`}>{role.name}{role.count > 1 ? ` ×${role.count}` : ''}</i>
                 ))}
               </span>
             ) : null}

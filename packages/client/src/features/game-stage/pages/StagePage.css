@@ -1,4 +1,8 @@
 .stage-shell {
+  /* 舞台各层共用的尺寸：边距、控制条最大宽度（HUD 据此让位）、字幕栏最大高度（舞台底部据此留白，字幕不盖住座位） */
+  --stage-gutter: 24px;
+  --stage-rail-width: 540px;
+  --stage-subtitle-max-height: clamp(104px, 22vh, 220px);
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -12,7 +16,7 @@
 .stage-arena {
   position: absolute;
   z-index: 4;
-  inset: 96px 24px 150px;
+  inset: 96px var(--stage-gutter) calc(var(--stage-subtitle-max-height) + 34px);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -104,11 +108,13 @@
   font-size: 16px;
 }
 
-.stage-exit {
+.stage-actions {
   position: absolute;
   z-index: 40;
   bottom: 22px;
-  left: 24px;
+  left: var(--stage-gutter);
+  display: flex;
+  gap: 8px;
 }
 
 .stage-error {
@@ -152,7 +158,7 @@
   .stage-shell > .playback-rail { order: 6; }
   .stage-shell > .result-panel { order: 7; }
   .stage-shell > .stage-feed { order: 8; }
-  .stage-shell > .stage-exit { order: 9; }
+  .stage-shell > .stage-actions { order: 9; }
 
   .stage-feed {
     max-height: 360px;

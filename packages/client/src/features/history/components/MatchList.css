@@ -26,15 +26,6 @@
   text-decoration: none;
 }
 
-.match-list span {
-  padding: 2px 12px;
-  border-radius: var(--ui-radius-pill);
-  background: var(--game-accent-soft);
-  color: var(--game-accent-strong);
-  font-size: 13px;
-  font-weight: 800;
-}
-
 .match-list time {
   color: var(--ui-text-muted);
   font-size: 13px;

@@ -5,15 +5,20 @@
   height: 100%;
 }
 
+/* 高度占满舞台，宽度按比例跟随；座位坐标与卡片缩放由 ringGeometry 按量到的尺寸算出并写进自定义属性 */
 .circle-ring {
+  --seat-scale: 1;
+  --ring-card-w: 118px;
+  --ring-card-h: 140px;
   position: relative;
-  width: min(100%, 1100px, calc((100vh - 290px) * 1.55));
-  aspect-ratio: 1.55;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 1.7;
 }
 
 .circle-table {
   position: absolute;
-  inset: 15% 21%;
+  inset: calc(var(--ring-card-h) * 0.45) calc(var(--ring-card-w) * 0.75);
   border: 1px solid var(--game-accent-soft);
   border-radius: 50%;
   background: radial-gradient(ellipse at 50% 40%, var(--game-accent-soft), rgba(4, 12, 32, 0.4) 62%, transparent 72%);
@@ -23,13 +28,13 @@
 
 .circle-seat {
   position: absolute;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(var(--seat-scale));
 }
 
 /* 圆桌中央：上下两排座位之间的区域，立绘 / 票板放在这里 */
 .circle-center {
   position: absolute;
-  inset: 19% 27% 18%;
+  inset: calc(var(--ring-card-h) + 8px) calc(var(--ring-card-w) + 16px);
   display: grid;
   place-items: center;
   min-height: 0;
@@ -43,14 +48,9 @@
   position: absolute;
   bottom: -8px;
   left: 50%;
-  padding: 2px 12px;
-  border: 1px solid var(--game-accent-soft);
-  border-radius: var(--ui-radius-pill);
+  border-color: var(--game-accent-soft);
   color: var(--game-accent-strong);
   background: rgba(4, 12, 32, 0.8);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
   transform: translateX(-50%);
 }
 
@@ -66,6 +66,8 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
     width: 100%;
+    height: auto;
+    max-width: none;
     aspect-ratio: auto;
   }
 

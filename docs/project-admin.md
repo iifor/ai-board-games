@@ -27,20 +27,21 @@ src/
   components/     ListFilterBar（关键字 + 下拉筛选栏）
   hooks/useAsync  数据加载三态与 reload
   services/       tokenStore（localStorage，不可用时退化为内存）、http（附带令牌；401 清除令牌并通知、40301 通知改密）、auth、resources（CRUD 与 modelActions / voiceActions）、matches
+  utils/format    formatTime（zh-CN、24 小时制）、formatMatchTitle（"游戏 · 板子"）
   features/
     auth/         AuthContext、LoginPage、ChangePasswordPage、RequireAuth
-    resources/    ResourcePage（通用列表 + 筛选 + 新建/编辑弹窗 + 删除 + 行操作/标题栏扩展）、utils（客户端筛选）、四个资源页面配置，
+    resources/    ResourcePage（通用列表 + 筛选 + 新建/编辑弹窗 + 删除 + 行操作/标题栏扩展）、utils（客户端筛选）、StatusTag（启用 / 停用，四个资源页共用）、四个资源页面配置，
                   ModelActions（测试 / 重新启用）、VoiceFormFields、VoiceActions（试听 / 导入默认音色）、playback（音频与浏览器朗读）
-    matches/      列表、详情、TracePanel、LogPanel、DebugControls、PhaseGraph、CreateDebugMatchModal、useMatchDetail
+    matches/      列表、详情、TracePanel、LogPanel、DebugControls、PhaseGraph、CreateDebugMatchModal、useMatchDetail、utils（状态标签、日志描述、进度标记）
 ```
 
 ## 约定
 
-- 登录态：令牌存在 `tokenStore`，账号信息（含是否需改密）以 `GET /api/admin/auth/me` 为准；接口返回 401 时清除令牌回到登录页，返回 40301 时进入改密页。
+- 登录态：令牌存在 `tokenStore`，账号信息（含是否需改密）以 `GET /api/admin/auth/me` 为准；接口返回 401 时清除令牌回到登录页，返回 40301 时进入改密页。受保护页面与改密页都先等 `auth.loading` 结束再决定跳转，刷新不会闪一下登录页。
 - 资源管理复用 `ResourcePage`：每个资源只提供列定义、表单字段、DTO 与表单值的转换，以及可选的搜索字段、下拉筛选（在客户端过滤，资源量级为数十到数百条）、行操作与标题栏操作。业务校验（引用存在、唯一名称、删除受限）以服务端为准，错误信息直接提示。供应商的 API Key 只写不读，编辑时留空表示不修改。
 - 模型："测试"真实调用一次模型（`POST /models/:id/test`），结果以提示展示（成功含耗时与是否为 JSON 输出，失败含原因）。被系统因额度耗尽停用的模型显示"额度已用完"与时间，"重新启用"先测试，通过后以 `enabled: true` 保存。
 - 音色：云端音色"试听"调用 `POST /voices/:id/preview` 得到 `/api/media/:id` 后播放；浏览器音色直接用 `speechSynthesis` 朗读。"导入默认音色"把内置目录（Azure 63、Mimo 12、浏览器 2）写入，已存在的跳过。
-- 对局详情未结束时每 2 秒刷新详情、完整日志与 AI 调用。
+- 对局详情未结束时每 2 秒只轮询详情；完整日志与 AI 调用（带六层提示词与原始回复，体积大）只在事件进度 `lastSeq` 或状态变化时重新拉取（`progressChanged`），调试指令执行后强制全量刷新。
 - 调试：调试局暂停时可单步、继续、跳过、连续运行；阶段图来自 `GET /api/admin/games/:key/phases`，高亮当前阶段。创建调试局可选种子、断点（含"全部阶段"）、推进节奏（连续生成 / 按观众确认）与脚本化。
 - Trace：每次模型调用按 L1–L6 展示提示词，以及原始响应、解析结果、错误与耗时，可只看失败调用。完整日志包含私密、阵营与 host 频道（兜底记录），可按频道筛选或只看兜底。
 - 名为"主持人"的音色用于 C 端主持播报的语音合成。

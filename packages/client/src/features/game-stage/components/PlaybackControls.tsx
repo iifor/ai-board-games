@@ -10,7 +10,10 @@ interface PlaybackControlsProps {
   readonly onToggleFeed: () => void;
 }
 
-/** 控制条：暂停 / 继续、倍速、静音、对局记录；暂停即停止确认，服务端随之暂停生成 */
+/**
+ * 控制条：暂停 / 继续、倍速、静音、对局记录；暂停即停止确认，服务端随之暂停生成。
+ * 状态文字只是展示，不做 live region（舞台上只有字幕栏会被读屏播报）
+ */
 export function PlaybackControls({ options, pending, finished, feedOpen, onChange, onToggleFeed }: PlaybackControlsProps) {
   const status = finished ? '播放完毕' : pending > 0 ? `已缓冲 ${pending} 段` : '等待 AI 生成…';
   return (
@@ -29,7 +32,7 @@ export function PlaybackControls({ options, pending, finished, feedOpen, onChang
         {options.muted ? '已静音' : '静音'}
       </button>
       <button type="button" className={feedOpen ? 'is-active' : ''} aria-pressed={feedOpen} onClick={onToggleFeed}>记录</button>
-      <span className="playback-status" aria-live="polite">{status}</span>
+      <span className="playback-status">{status}</span>
     </div>
   );
 }

@@ -1,10 +1,11 @@
-import type { GameCatalogItem } from '@battle/shared';
+import type { GameCatalogItem, MatchSummaryDto } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
+import { formatDateTime, formatMatchTitle, formatWinner } from '../../utils/format';
 import { GameList } from './components/GameList';
 import { PlayerPicker } from './components/PlayerPicker';
-import { filterVariants, isSetupInitial, playerRange, selectionHint, toggleSelection } from './utils';
+import { filterVariants, isSetupInitial, playerRange, rematchStateOf, selectionHint, toggleSelection } from './utils';
 
 const werewolf: GameCatalogItem = {
   key: 'werewolf', title: 'AI 狼人杀', description: '12 人', players: { min: 12, max: 12 }, layout: 'circle',
@@ -36,6 +37,22 @@ describe('lobby utils', () => {
     expect(isSetupInitial({ playerIds: ['a'] })).toBe(false);
     expect(isSetupInitial('standard-12')).toBe(false);
     expect(isSetupInitial({})).toBe(false);
+  });
+
+  it('builds the rematch state the setup page accepts, skipping seats without a player', () => {
+    const summary: MatchSummaryDto = {
+      id: 'm_1', gameKey: 'werewolf', gameTitle: 'AI 狼人杀', variantKey: 'standard-12', variantName: '预女猎白', layout: 'circle', status: 'completed',
+      debug: false, scripted: false, seats: [{ seat: 1, playerId: 5, name: 'a' }, { seat: 2, playerId: null, name: 'b' }, { seat: 3, playerId: 7, name: 'c' }],
+      result: null, createdAt: '2026-11-01T12:00:00Z', completedAt: null,
+    };
+    const state = rematchStateOf(summary);
+    expect(state).toEqual({ variant: 'standard-12', playerIds: [5, 7] });
+    expect(isSetupInitial(state)).toBe(true);
+    expect(formatMatchTitle(summary)).toBe('AI 狼人杀 · 预女猎白');
+    expect(formatMatchTitle({ ...summary, variantName: null })).toBe('AI 狼人杀');
+    expect(formatWinner(summary)).toBe('未分胜负');
+    expect(formatWinner({ result: { winner: 'good', winnerLabel: '好人胜利', summary: '', mvp: null, endReason: 'normal' } })).toBe('好人胜利');
+    expect(formatDateTime(summary.createdAt)).toMatch(/^2026\/11\/1 \d{2}:\d{2}:\d{2}$/);
   });
 });
 

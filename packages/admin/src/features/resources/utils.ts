@@ -42,7 +42,3 @@ export function enabledFilter<Dto extends { readonly enabled: boolean }>(): Reso
     matches: (dto, value) => String(dto.enabled) === value,
   };
 }
-
-export function formatTime(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString('zh-CN', { hour12: false }) : '';
-}

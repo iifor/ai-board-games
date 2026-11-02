@@ -14,9 +14,9 @@ export function SpeechOrder({ seats, current, view }: SpeechOrderProps) {
   const shown = seats.slice(-SPEECH_ORDER_LIMIT);
   return (
     <ol className="speech-order glass-panel" aria-label="发言顺序">
-      {shown.length < seats.length ? <li className="speech-order-more">…</li> : null}
+      {shown.length < seats.length ? <li className="ui-pill speech-order-more">…</li> : null}
       {shown.map((seat) => (
-        <li key={seat} className={seat === current ? 'is-current' : ''}>
+        <li key={seat} className={`ui-pill ${seat === current ? 'is-current' : ''}`}>
           {seatOf(view, seat)?.name ?? `${seat}号`}
         </li>
       ))}

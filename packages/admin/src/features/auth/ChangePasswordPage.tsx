@@ -1,4 +1,4 @@
-import { App, Button, Card, Form, Input } from 'antd';
+import { App, Button, Card, Form, Input, Spin } from 'antd';
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { changePassword } from '../../services/auth';
@@ -17,6 +17,8 @@ export function ChangePasswordPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const [submitting, setSubmitting] = useState(false);
+  // 与 RequireAuth 一样先等账号信息加载完，刷新 /password 时才不会闪一下跳登录页
+  if (auth.loading) return <Spin fullscreen />;
   if (!auth.profile) return <Navigate to="/login" replace />;
 
   const submit = async (values: PasswordValues) => {

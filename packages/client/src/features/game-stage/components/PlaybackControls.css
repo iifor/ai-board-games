@@ -1,12 +1,16 @@
+/* 宽度上限与 HUD 让出的空间同一个变量（StagePage.css 的 --stage-rail-width）；放不下时换行而不是溢出 */
 .playback-rail {
   position: absolute;
   z-index: 40;
   top: 16px;
-  right: 24px;
+  right: var(--stage-gutter, 24px);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
-  height: 50px;
+  max-width: var(--stage-rail-width, 540px);
+  min-height: 50px;
   padding: 5px;
   border-radius: 25px;
   animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) both;

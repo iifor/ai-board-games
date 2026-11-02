@@ -2,15 +2,21 @@ import type { AudienceView, MatchSummaryDto, StageEvent } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { nextFocusIndex } from '../../hooks/useDialogFocus';
 import { matchStreamUrl } from '../../services/matches';
 import { resolvePoster } from '../../utils/posters';
+import { NightSteps } from './components/NightSteps';
+import { PhaseBanner } from './components/PhaseBanner';
+import { PlaybackControls } from './components/PlaybackControls';
 import { ResultPanel } from './components/ResultPanel';
 import { SubtitleBar } from './components/SubtitleBar';
 import { VoteBoard } from './components/VoteBoard';
 import { CircleLayout } from './layouts/CircleLayout';
+import { ringGeometry } from './layouts/ringGeometry';
 import { VersusLayout } from './layouts/VersusLayout';
 import { describeEvent, displayDuration, shouldSpeak } from './playback/describe';
-import { playAudio, speak } from './playback/media';
+import { dwell, playAudio, speak } from './playback/media';
+import { SegmentControl, progressFraction } from './playback/segment';
 import type { StreamItem } from './types';
 import { judgeBadges, nightStepsOf, periodOf, rosterByTeam, speechOrderOf } from './utils';
 
@@ -46,6 +52,10 @@ describe('describeEvent', () => {
     expect(displayDuration('一'.repeat(20), 2)).toBe(displayDuration('一'.repeat(20), 1) / 2);
     expect(displayDuration(null, 1)).toBeLessThan(1000);
   });
+
+  it('does not cap the display time, so a long speech is shown in full when muted', () => {
+    expect(displayDuration('一'.repeat(300), 1)).toBe(48000);
+  });
 });
 
 describe('layouts', () => {
@@ -60,7 +70,7 @@ describe('layouts', () => {
   it('places every seat on the ring and marks the sheriff and the dead', () => {
     const wolfView: AudienceView = { ...view, gameKey: 'werewolf', seats: [seat(1, null), seat(2, null), seat(3, null)], extra: { sheriff: 2, board: '预女猎白' } };
     const html = renderToStaticMarkup(<CircleLayout view={wolfView} speaking={null} center={null} />);
-    expect(html.match(/circle-seat/g)).toHaveLength(3);
+    expect(html.match(/class="circle-seat"/g)).toHaveLength(3);
     expect(html).toContain('警长');
     expect(html).toContain('预女猎白');
     expect(html).toContain('seat-card-out');
@@ -76,7 +86,7 @@ describe('layouts', () => {
     expect(html).toContain('评委');
     expect(html).not.toContain('再来一局');
     const summary: MatchSummaryDto = {
-      id: 'm_1', gameKey: 'debate', gameTitle: 'AI 辩论赛', variantKey: null, variantName: null, status: 'completed', debug: false, scripted: true,
+      id: 'm_1', gameKey: 'debate', gameTitle: 'AI 辩论赛', variantKey: null, variantName: null, layout: 'versus', status: 'completed', debug: false, scripted: true,
       seats: [{ seat: 1, playerId: 5, name: '玩家1' }, { seat: 2, playerId: null, name: '玩家2' }], result, createdAt: '2026-11-01T00:00:00Z', completedAt: null,
     };
     const withActions = renderToStaticMarkup(<MemoryRouter><ResultPanel result={result} view={view} summary={summary} onReplay={() => {}} /></MemoryRouter>);
@@ -84,27 +94,98 @@ describe('layouts', () => {
     expect(withActions).toContain('从头回放');
     expect(withActions).toContain('href="/play/debate"');
   });
+
+  it('presents the result as a modal dialog with a close control only when it can be closed', () => {
+    const result = { winner: 'pro', winnerLabel: '正方胜出', summary: '', mvp: null, endReason: 'normal' as const };
+    const dialog = renderToStaticMarkup(<ResultPanel result={result} view={view} onClose={() => {}} />);
+    expect(dialog).toContain('role="dialog"');
+    expect(dialog).toContain('aria-modal="true"');
+    expect(dialog).toContain('aria-labelledby="result-winner"');
+    expect(dialog).toContain('aria-label="关闭结果"');
+    expect(renderToStaticMarkup(<ResultPanel result={result} view={view} />)).not.toContain('关闭结果');
+  });
+
+  it('cycles focus inside the dialog with Tab and Shift+Tab', () => {
+    expect(nextFocusIndex(3, -1, false)).toBe(0);
+    expect(nextFocusIndex(3, -1, true)).toBe(2);
+    expect(nextFocusIndex(3, 2, false)).toBe(0);
+    expect(nextFocusIndex(3, 0, true)).toBe(2);
+    expect(nextFocusIndex(0, -1, false)).toBe(-1);
+  });
 });
 
-describe('media playback failures', () => {
+describe('ring geometry', () => {
+  const card = { width: 118, height: 140 };
+  const adjacentOverlap = (geometry: ReturnType<typeof ringGeometry>) =>
+    geometry.seats.some((seat, index) => {
+      const next = geometry.seats[(index + 1) % geometry.seats.length];
+      return next !== undefined && Math.abs(seat.x - next.x) < geometry.card.width && Math.abs(seat.y - next.y) < geometry.card.height;
+    });
+
+  it('fits 12 seats around the ring at a 1280×720 stage by shrinking the cards instead of overlapping', () => {
+    const geometry = ringGeometry(12, { width: 734, height: 432 }, card);
+    expect(geometry.seats).toHaveLength(12);
+    expect(adjacentOverlap(geometry)).toBe(false);
+    expect(geometry.scale).toBeLessThan(1);
+    expect(geometry.scale).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it('keeps full-size cards when there is room and places seat 1 at the top, going clockwise', () => {
+    const geometry = ringGeometry(12, { width: 1200, height: 774 }, card);
+    expect(geometry.scale).toBe(1);
+    expect(adjacentOverlap(geometry)).toBe(false);
+    const [first, second] = geometry.seats;
+    expect(first?.x).toBeCloseTo(600, 5);
+    expect(first?.y).toBeCloseTo(card.height / 2, 5);
+    expect(second?.x ?? 0).toBeGreaterThan(first?.x ?? 0);
+    expect(ringGeometry(1, { width: 400, height: 300 }, card).seats).toHaveLength(1);
+  });
+});
+
+class FakeAudio {
+  static instances: FakeAudio[] = [];
+  playbackRate = 1;
+  currentTime = 0;
+  duration = Number.NaN;
+  paused = false;
+  readonly listeners = new Map<string, (() => void)[]>();
+  constructor(readonly url: string) {
+    FakeAudio.instances.push(this);
+  }
+  addEventListener(type: string, listener: () => void) {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+  }
+  emit(type: string) {
+    for (const listener of this.listeners.get(type) ?? []) listener();
+  }
+  pause() {
+    this.paused = true;
+  }
+  play() {
+    return Promise.resolve();
+  }
+}
+
+describe('media playback', () => {
+  const text = '一'.repeat(20);
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    FakeAudio.instances = [];
   });
 
-  it('dwells for the fallback time when the browser refuses to play, instead of finishing instantly', async () => {
+  it('dwells for the text time when the browser refuses to play, instead of finishing instantly', async () => {
     vi.useFakeTimers();
-    vi.stubGlobal('Audio', class {
-      playbackRate = 1;
-      addEventListener() {}
-      pause() {}
-      play() { return Promise.reject(new Error('NotAllowedError')); }
+    vi.stubGlobal('Audio', class extends FakeAudio {
+      override play() {
+        return Promise.reject(new Error('NotAllowedError'));
+      }
     });
     let finished = false;
-    void playAudio('/api/media/x', 1, new AbortController().signal, 1500).then(() => { finished = true; });
-    await vi.advanceTimersByTimeAsync(1000);
+    void playAudio('/api/media/x', new SegmentControl(1, false), text).then(() => { finished = true; });
+    await vi.advanceTimersByTimeAsync(displayDuration(text, 1) - 100);
     expect(finished).toBe(false);
-    await vi.advanceTimersByTimeAsync(600);
+    await vi.advanceTimersByTimeAsync(200);
     expect(finished).toBe(true);
   });
 
@@ -112,8 +193,68 @@ describe('media playback failures', () => {
     vi.useFakeTimers();
     vi.stubGlobal('window', {});
     let finished = false;
-    void speak('一'.repeat(20), 1, new AbortController().signal).then(() => { finished = true; });
-    await vi.advanceTimersByTimeAsync(displayDuration('一'.repeat(20), 1) - 100);
+    void speak(text, new SegmentControl(1, false)).then(() => { finished = true; });
+    await vi.advanceTimersByTimeAsync(displayDuration(text, 1) - 100);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(finished).toBe(true);
+  });
+
+  it('applies a speed change to the playing audio and reports progress from timeupdate', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('Audio', FakeAudio);
+    const control = new SegmentControl(1, false);
+    let finished = false;
+    void playAudio('/api/media/x', control, text).then(() => { finished = true; });
+    await vi.advanceTimersByTimeAsync(0);
+    const audio = FakeAudio.instances[0];
+    expect(audio?.playbackRate).toBe(1);
+    control.setRate(2);
+    expect(audio?.playbackRate).toBe(2);
+    if (audio) {
+      audio.duration = 12;
+      audio.currentTime = 3;
+      audio.emit('timeupdate');
+    }
+    expect(control.progress).toEqual({ kind: 'measured', fraction: 0.25 });
+    expect(finished).toBe(false);
+    audio?.emit('ended');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(finished).toBe(true);
+  });
+
+  it('stops the audio when muted and dwells for the remaining text time', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('Audio', FakeAudio);
+    const control = new SegmentControl(1, false);
+    let finished = false;
+    void playAudio('/api/media/x', control, text).then(() => { finished = true; });
+    await vi.advanceTimersByTimeAsync(0);
+    const audio = FakeAudio.instances[0];
+    if (audio) {
+      audio.duration = 10;
+      audio.currentTime = 5;
+    }
+    control.mute();
+    expect(audio?.paused).toBe(true);
+    expect(control.progress).toMatchObject({ kind: 'timed', fraction: 0.5, remainingMs: displayDuration(text, 1) / 2 });
+    await vi.advanceTimersByTimeAsync(displayDuration(text, 1) / 2 - 100);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(finished).toBe(true);
+  });
+
+  it('rescales the remaining dwell when the speed changes mid-way', async () => {
+    vi.useFakeTimers();
+    const control = new SegmentControl(1, false);
+    let finished = false;
+    void dwell(control, text).then(() => { finished = true; });
+    const total = displayDuration(text, 1);
+    await vi.advanceTimersByTimeAsync(total / 2);
+    control.setRate(2);
+    expect(control.progress).toMatchObject({ kind: 'timed', fraction: 0.5, remainingMs: total / 4 });
+    expect(progressFraction(control.progress, Date.now() + total / 8)).toBeCloseTo(0.75, 5);
+    await vi.advanceTimersByTimeAsync(total / 4 - 100);
     expect(finished).toBe(false);
     await vi.advanceTimersByTimeAsync(200);
     expect(finished).toBe(true);
@@ -177,6 +318,39 @@ describe('stage visuals', () => {
     expect(board).toContain('width:100%');
     expect(board).toContain('width:50%');
     expect(board).toContain('玩家1 当选');
+  });
+
+  it('drives the subtitle progress bar from the segment: audio progress as width, dwell as a timed animation', () => {
+    const speech: StageEvent = { ...meta, kind: 'speech', seat: 1, text: '我的观点是' };
+    const item = { event: speech, audio: null };
+    const measured = new SegmentControl(1, false);
+    measured.setProgress({ kind: 'measured', fraction: 0.25 });
+    expect(renderToStaticMarkup(<SubtitleBar item={item} view={view} control={measured} />)).toContain('width:25%');
+    const timed = new SegmentControl(1, false);
+    timed.setProgress({ kind: 'timed', fraction: 0.25, startedAt: 0, remainingMs: 3000 });
+    const html = renderToStaticMarkup(<SubtitleBar item={item} view={view} control={timed} />);
+    expect(html).toContain('animation-duration:4000ms');
+    expect(html).toContain('animation-delay:-1000ms');
+    expect(renderToStaticMarkup(<SubtitleBar item={item} view={view} />)).not.toContain('subtitle-progress');
+  });
+
+  it('keeps the subtitle bar as the only live region on the stage', () => {
+    const phase: StageEvent = { ...meta, kind: 'phase_started', title: '立论' };
+    const tally: StageEvent = {
+      ...meta, kind: 'vote_tallied', title: '评委投票', runoff: 0, ballots: [], abstained: [], tally: [], tied: [], outcome: { kind: 'none' },
+    };
+    const html = renderToStaticMarkup(
+      <>
+        <SubtitleBar item={{ event: phase, audio: null }} view={view} />
+        <PhaseBanner item={{ event: phase, audio: null }} />
+        <VoteBoard event={tally} view={view} />
+        <NightSteps steps={['天黑请闭眼', '狼人击杀']} />
+        <PlaybackControls options={{ speed: 1, paused: false, muted: false }} pending={2} finished={false} feedOpen={false} onChange={() => {}} onToggleFeed={() => {}} />
+      </>,
+    );
+    expect(html.match(/aria-live=/g)).toHaveLength(1);
+    expect(html).not.toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
   });
 });
 

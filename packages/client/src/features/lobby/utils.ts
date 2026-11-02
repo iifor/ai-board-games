@@ -1,4 +1,5 @@
-import type { GameCatalogItem, GameVariantItem } from '@battle/shared';
+import type { GameCatalogItem, GameVariantItem, MatchSummaryDto } from '@battle/shared';
+import type { SetupInitial } from './types';
 
 export function playerRange(game: GameCatalogItem, variantKey: string | null): { min: number; max: number } {
   return game.variants.find((variant) => variant.key === variantKey)?.players ?? game.players;
@@ -23,10 +24,9 @@ export function filterVariants(variants: readonly GameVariantItem[], query: stri
     [variant.name, variant.description, ...variant.roles.map((role) => role.name)].some((text) => text.toLowerCase().includes(needle)));
 }
 
-/** 从终局带过来的开局初值（路由 state），只认识这两个字段 */
-export interface SetupInitial {
-  readonly variant?: string | null;
-  readonly playerIds?: readonly number[];
+/** 终局"同样阵容再来一局"带给开局页的路由 state：同一板子 + 同样的玩家（按座位顺序，没有玩家 ID 的座位略过） */
+export function rematchStateOf(summary: MatchSummaryDto): SetupInitial {
+  return { variant: summary.variantKey, playerIds: summary.seats.flatMap((seat) => (seat.playerId === null ? [] : [seat.playerId])) };
 }
 
 export function isSetupInitial(value: unknown): value is SetupInitial {

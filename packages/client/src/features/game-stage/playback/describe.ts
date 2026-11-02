@@ -39,9 +39,9 @@ export function describeEvent(event: StageEvent): EventDisplay {
   }
 }
 
-/** 没有音频时的展示时长：按字数估算，倍速缩短 */
+/** 没有音频时的展示时长：按字数估算（不封顶，长发言静音时也要展示完），倍速缩短 */
 export function displayDuration(text: string | null, speed: number): number {
-  const base = text ? Math.min(8000, Math.max(900, text.length * 160)) : 400;
+  const base = text ? Math.max(900, text.length * 160) : 400;
   return Math.round(base / speed);
 }
 

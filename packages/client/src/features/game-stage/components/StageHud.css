@@ -2,13 +2,13 @@
   position: absolute;
   z-index: 40;
   top: 16px;
-  left: 24px;
+  left: var(--stage-gutter, 24px);
   display: grid;
   grid-template-columns: minmax(120px, 1fr) auto minmax(140px, 1.2fr);
   align-items: center;
   gap: 14px;
-  /* 右侧留给控制条 */
-  width: min(720px, calc(100vw - 440px));
+  /* 右侧留给控制条：与 .playback-rail 的 max-width 用同一个变量（StagePage.css），两者不会重叠 */
+  width: min(720px, calc(100vw - var(--stage-rail-width, 540px) - var(--stage-gutter, 24px) * 2 - 16px));
   min-width: 300px;
   min-height: 58px;
   padding: 8px 18px;
