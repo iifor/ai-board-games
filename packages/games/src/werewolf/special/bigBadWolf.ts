@@ -3,13 +3,12 @@ import type { WerewolfPhases } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import { isWolf, type WerewolfContext } from '../rules/context';
+import { isDreamed, swapTarget, withinMark } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import { addDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
-import { isDreamed } from './dreamer';
-import { markNotice, withinMark } from './fortuneTeller';
-import { swapTarget } from './magician';
+import { markNotice } from './fortuneTeller';
 
 // 大灰狼：离群的狼人（lone_wolf 阵营），与狼队互相认识（state.knownWolves），但不在狼队频道里，不夜聊、不参与狼队击杀。
 // 每晚狼队之后单独睁眼，全场可以发动一次单独击杀：先决定是否发动，发动后才得知占卜师的标记，并且必须落刀。

@@ -1,7 +1,7 @@
 import type { Seat } from '@battle/engine';
-import { swapTarget } from '../special/magician';
 import type { ThirdParty } from '../stateExtended';
 import type { WerewolfContext } from './context';
+import { swapTarget } from './nightEffects';
 import { addDeath } from './tally';
 import type { NightStep } from './types';
 

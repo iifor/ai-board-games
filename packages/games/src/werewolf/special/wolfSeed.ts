@@ -3,11 +3,11 @@ import type { WerewolfPhases } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
+import { swapTarget } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import { deathCause, noteTally, reassignTally, removeDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
-import { swapTarget } from './magician';
 
 // 种狼：狼队成员，全场一次，可以在狼队击杀后把当晚的被害者感染为狼人（决定写在狼队频道）。
 // 被害者当晚确实死于这一刀（没有被女巫救起、没有被守卫守住、没有同时被毒）时感染成功：他不会死亡，

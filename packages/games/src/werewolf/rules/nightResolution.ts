@@ -3,23 +3,23 @@ import { bigBadWolfKill } from '../special/bigBadWolf';
 import { bigTreeShield } from '../special/bigTree';
 import { merchantBackfire } from '../special/blackMerchant';
 import { demonHunt } from '../special/demonHunter';
-import { dreamDeaths, isDreamed } from '../special/dreamer';
+import { dreamDeaths } from '../special/dreamer';
 import { evilKnightReflect } from '../special/evilKnight';
 import { illusionSubstitution } from '../special/illusionist';
 import { loverNightLink } from '../special/lovers';
-import { swapTarget } from '../special/magician';
-import { woundRogue } from '../special/oldRogue';
 import { spiritShield } from '../special/spiritWolf';
-import { antidotedTonight } from '../special/spiritWolfSkills';
 import { stalkerAssassination } from '../special/stalker';
 import { wolfBeautyNightLink } from '../special/wolfBeauty';
 import { brotherKill } from '../special/wolfBrothers';
 import { wolfSeedInfection } from '../special/wolfSeed';
 import type { PendingDeath, WerewolfState } from '../state';
 import { roleTraits } from './board';
-import { thirdPartyKill } from './thirdParty';
 import type { WerewolfContext } from './context';
+import { woundRogue } from './death';
+import { isDreamed, swapTarget } from './nightEffects';
+import { antidotedTonight } from './spiritWolfSkills';
 import { addDeath, isDying } from './tally';
+import { thirdPartyKill } from './thirdParty';
 import type { NightStep, NightTally } from './types';
 
 /** 今晚毒药实际落在谁身上（魔术师换号后）：女巫的毒药（被灵狼的解毒剂解救的除外）与赠送 / 祈求得到的毒药 */

@@ -3,10 +3,10 @@ import type { WerewolfPhases } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
+import { swapTarget } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import { roleCatalog } from '../roles';
 import type { WerewolfState } from '../state';
-import { swapTarget } from './magician';
 
 // 天眼：神职，能验出具体身份的预言家——每晚必须查验一名其他存活玩家，私下得知他的角色名，查验记录保留在身份提示中。
 

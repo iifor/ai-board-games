@@ -1,11 +1,10 @@
 import { definePrompts, type ComputeOutcome, type TriggerEvent, type TriggerSpec } from '@battle/engine';
 import type { WerewolfPhases } from '../phases/types';
 import type { WerewolfContext } from '../rules/context';
+import { isDreamed, swapTarget } from '../rules/nightEffects';
 import { deathCause, noteTally, removeDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfParams, WerewolfState } from '../state';
-import { isDreamed } from './dreamer';
-import { swapTarget } from './magician';
 import { WHITE_WOLF_KING_BLAST } from './whiteWolfKing';
 
 // 大树（长老）：民牌，要被狼人刀中两次才会出局——第一次狼刀落下时只失去一条命（私下告知）；

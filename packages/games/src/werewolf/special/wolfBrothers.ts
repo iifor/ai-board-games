@@ -3,13 +3,11 @@ import type { WerewolfPhases } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
+import { isDreamed, swapTarget, withinMark } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import { addDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfParams, WerewolfState } from '../state';
-import { isDreamed } from './dreamer';
-import { withinMark } from './fortuneTeller';
-import { swapTarget } from './magician';
 
 // 狼兄弟：狼兄是狼队成员；狼弟是离群的狼（lone_wolf），只与狼兄互相认识（特性 pairedWith，写入 state.knownWolves），
 // 狼队其他人不认识他（狼刀可以选中他），狼兄出局前预言家查验他为好人（特性 appearsGoodWhile）。

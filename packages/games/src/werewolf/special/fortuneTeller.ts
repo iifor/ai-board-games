@@ -3,11 +3,12 @@ import type { WerewolfPhases } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
+import { markScope } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
 
 // 占卜师：每晚第一个睁眼，可以标记一个号码（全场一次，可不发动）。当晚所有狼人的击杀（狼队、大灰狼、继承击杀权的隐狼）
-// 只能落在被标记的号码及其左右相邻号码上（相邻号码不论死活，已出局者自然不能被击杀）。
+// 只能落在被标记的号码及其左右相邻号码上（相邻号码不论死活，已出局者自然不能被击杀；范围见 rules/nightEffects.ts）。
 // 标记后立即告知狼队；大灰狼要先决定是否发动单独击杀才会得知标记（见 bigBadWolf.ts）。
 
 export const fortuneTellerPrompts = definePrompts({
@@ -17,21 +18,6 @@ export const fortuneTellerPrompts = definePrompts({
   ].join(''),
   fortuneMark: '占卜师请睁眼。是否标记一个号码？选择一名玩家表示标记，输出空数组表示今晚不发动。',
 });
-
-/** 标记范围：被标记的号码与左右相邻号码（不论死活）；今晚没有标记时为 null */
-export function markScope(ctx: WerewolfContext): number[] | null {
-  const { marked } = ctx.state.night;
-  if (marked === null) return null;
-  const total = ctx.seats.count();
-  const wrap = (seat: number): number => ((seat - 1 + total) % total) + 1;
-  return [wrap(marked - 1), marked, wrap(marked + 1)];
-}
-
-/** 狼人今晚能否击杀该座位（只看标记范围） */
-export function withinMark(ctx: WerewolfContext, seat: number): boolean {
-  const scope = markScope(ctx);
-  return scope === null || scope.includes(seat);
-}
 
 /** 给狼人看的标记说明 */
 export function markNotice(ctx: WerewolfContext): string {

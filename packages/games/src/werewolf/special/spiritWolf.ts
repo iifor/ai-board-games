@@ -4,6 +4,7 @@ import { hasRole } from '../rules/board';
 import { nightActors, skillsLost } from '../rules/block';
 import { isWolf, type WerewolfContext } from '../rules/context';
 import { recordShot, settleShot, triggerSeat } from '../rules/death';
+import { swapTarget } from '../rules/nightEffects';
 import { addSeatNote } from '../rules/notes';
 import { nightAfter } from '../rules/order';
 import { deathCause, removeDeath } from '../rules/tally';
@@ -11,7 +12,6 @@ import type { NightStep } from '../rules/types';
 import type { WerewolfParams, WerewolfState } from '../state';
 import type { SpiritSkill } from '../stateFinal';
 import { godOrVillager } from './demon';
-import { swapTarget } from './magician';
 
 // 灵狼：狼队成员，与狼队一起击杀后，每晚在女巫之后、预言家之前单独睁眼（预言家因此改在 seer_check_late 查验）。
 // 首夜选择一名好人阵营玩家学习他的技能（state.spiritWolf.learned，写入法官私下告知的固定信息）：

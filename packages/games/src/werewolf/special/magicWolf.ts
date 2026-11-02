@@ -7,7 +7,7 @@ import type { WerewolfParams, WerewolfState } from '../state';
 // 魔狼：狼队成员。
 // - 自爆后（照常直接入夜）当晚所有神职的夜间技能被封印（state.godsSealedNight，见 rules/block.ts 的 canUseNightSkill），公开播报；
 // - 作为最后一名狼人被放逐时自动翻牌，不出局，存活到下一个天亮之后才出局（state.magicWolfDoom，公开）：
-//   这一晚他照常击杀；在此期间不能投票（rules/context.ts 的 canVote），达到天数上限时视为已出局（rules/victory.ts）。
+//   这一晚他照常击杀；在此期间不能投票、达到天数上限时视为已出局（rules/context.ts 的 bloodlineDoomed）。
 
 export const magicWolfPrompts = definePrompts({
   magicWolf: [
@@ -33,11 +33,6 @@ export function bloodlineHold(ctx: WerewolfContext, target: Seat, state: Werewol
       data: { seat: target.seat, role: MAGIC_WOLF },
     }],
   };
-}
-
-/** 翻牌存活、尚未出局的魔狼（不能投票；达到天数上限时视为已出局） */
-export function bloodlineDoomed(ctx: WerewolfContext, seat: Seat): boolean {
-  return seat.role === MAGIC_WOLF && ctx.state.magicWolfDoom !== null;
 }
 
 /** 自爆的魔狼：今晚（自爆当天的下一晚）神职的夜间技能被封印 */

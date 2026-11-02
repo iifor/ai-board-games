@@ -3,9 +3,9 @@ import type { WerewolfPhases } from '../phases/types';
 import { boardConfig, hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import { isPackWolf, type WerewolfContext } from '../rules/context';
+import { withinMark } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import type { WerewolfParams, WerewolfState } from '../state';
-import { withinMark } from './fortuneTeller';
 
 // 隐狼：离群的狼人（lone_wolf 阵营），狼队不认识他（狼刀可以选他），不在狼队频道里，不能自爆，查验时被视为好人。
 // 板子参数 hiddenWolf 决定口径：

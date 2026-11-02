@@ -1,7 +1,7 @@
 import type { Seat } from '@battle/engine';
-import { spiritAppearsGood } from '../special/spiritWolfSkills';
 import { roleTraits } from './board';
 import { isWolf, type WerewolfContext } from './context';
+import { spiritAppearsGood } from './spiritWolfSkills';
 
 /**
  * 查验（预言家、幸运儿、狐狸、熊的咆哮）时是否被视为好人：隐狼始终如此；狼弟在狼兄出局前、火力全开的隐狼在白狼王出局前如此；

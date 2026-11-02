@@ -3,11 +3,11 @@ import type { WerewolfPhases } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import { isWolf, type WerewolfContext } from '../rules/context';
+import { swapTarget } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import { addDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
-import { swapTarget } from './magician';
 
 // 猎魔人：神职，从第二夜起每晚可以狩猎一名其他存活玩家（可以不狩猎）。对方属于狼人阵营则对方当晚死亡，
 // 否则猎魔人自己当晚死亡（原因 hunt，守护、解药都挡不下，女巫不会被告知）。免疫女巫的毒药（角色特性 poisonImmune）。

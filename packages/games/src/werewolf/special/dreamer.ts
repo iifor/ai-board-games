@@ -8,8 +8,8 @@ import { addDeath, isDying } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
 
-// 摄梦人：每晚必须摄梦一名其他存活玩家（梦游者）。狼刀落在梦游者身上视为空刀，女巫对他用的毒药、解药都浪费；
-// 摄梦人当晚死亡或连续两晚摄梦同一人时，梦游者被摄梦而死（夜间死亡原因 dream）。
+// 摄梦人：每晚必须摄梦一名其他存活玩家（梦游者，rules/nightEffects.ts 的 isDreamed）。狼刀落在梦游者身上视为空刀，
+// 女巫对他用的毒药、解药都浪费；摄梦人当晚死亡或连续两晚摄梦同一人时，梦游者被摄梦而死（夜间死亡原因 dream）。
 
 export const dreamerPrompts = definePrompts({
   dreamer: [
@@ -19,11 +19,6 @@ export const dreamerPrompts = definePrompts({
   ].join(''),
   dreamerDream: '摄梦人请睁眼，选择今晚要摄梦的玩家。',
 });
-
-/** 今晚的梦游者 */
-export function isDreamed(ctx: WerewolfContext, seat: number): boolean {
-  return ctx.state.night.dreamed === seat;
-}
 
 /** 今晚没有摄梦（摄梦人已出局）时清空上一晚的记录 */
 function applyDream(ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState {

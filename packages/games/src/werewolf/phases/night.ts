@@ -17,7 +17,7 @@ import {
 } from '../rules/night';
 import { resolveNight } from '../rules/nightResolution';
 import { nightAfter } from '../rules/order';
-import { seerWakesLate } from '../special/spiritWolfSkills';
+import { seerWakesLate } from '../rules/spiritWolfSkills';
 import type { WerewolfParams, WerewolfState } from '../state';
 import type { WerewolfPhases } from './types';
 

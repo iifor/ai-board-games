@@ -7,20 +7,13 @@ import type { WerewolfParams, WerewolfState } from '../state';
 
 // 老流氓：算作村民，不受狼美人魅惑影响（角色特性 charmImmune）。被女巫毒、被猎人枪击时不会立即出局（特性 delayedDeath）：
 // 被毒进入中毒状态（不公布），被枪击进入负伤状态（公布），都在次日白天发言环节结束后出局；
-// 当天发言被自爆打断时，在自爆结算后出局。毒药与枪击分别在夜间结算与开枪结算中调用 woundRogue。
+// 当天发言被自爆打断时，在自爆结算后出局。毒药与枪击分别在夜间结算与开枪结算中调用 rules/death.ts 的 woundRogue。
 
 export const oldRoguePrompts = definePrompts({
   oldRogue: '你是{{me.label}}，身份是老流氓（算作村民）。你不受狼美人魅惑的影响；被女巫毒杀或被猎人枪击时不会立即出局，而是在次日白天发言环节结束后出局。',
 });
 
 export const ROGUE_DOOM = 'rogue_doom';
-
-/** 进入中毒或负伤状态：次日白天发言结束后出局；已有记录时保留更早的期限 */
-export function woundRogue(state: WerewolfState, seat: number, round: number, shot: boolean): WerewolfState {
-  const current = state.rogueWound;
-  if (current !== null) return { ...state, rogueWound: { ...current, shot: current.shot || shot } };
-  return { ...state, rogueWound: { seat, dueDay: round + 1, shot } };
-}
 
 /** 今天到期、仍然存活的老流氓 */
 function dueRogue(ctx: WerewolfContext): number | null {

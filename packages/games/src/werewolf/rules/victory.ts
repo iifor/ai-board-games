@@ -2,9 +2,8 @@ import type { EndResult, Seat } from '@battle/engine';
 import { cupidSide, cupidSummary } from '../special/cupid';
 import { hiddenWolfDoomed } from '../special/hiddenWolf';
 import { hybridSummary } from '../special/hybrid';
-import { bloodlineDoomed } from '../special/magicWolf';
 import { roleCategory } from './board';
-import { canVote, isWolf, type WerewolfContext } from './context';
+import { bloodlineDoomed, canVote, isWolf, type WerewolfContext } from './context';
 import { exileWeight } from './sheriff';
 import { contenders, inThirdParty, thirdPartyStanding, thirdPartyWinner, type ThirdPartyKind } from './thirdParty';
 

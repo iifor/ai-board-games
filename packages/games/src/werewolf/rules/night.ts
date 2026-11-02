@@ -1,12 +1,11 @@
 import type { ActDecision, ComputeOutcome, Seat, SeatQuery, VoteOutcome } from '@battle/engine';
-import { withinMark } from '../special/fortuneTeller';
-import { swapTarget } from '../special/magician';
-import { shieldedTonight } from '../special/spiritWolfSkills';
 import { emptyNight, type WerewolfState } from '../state';
 import { SEER_NO_RESULT, type SeerResult } from '../stateFinal';
 import { checksAsWolf } from './appearance';
 import { boardConfig, roleTraits } from './board';
 import { isWolf, seededRotation, type WerewolfContext } from './context';
+import { swapTarget, withinMark } from './nightEffects';
+import { shieldedTonight } from './spiritWolfSkills';
 
 export function resetNight(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return {
