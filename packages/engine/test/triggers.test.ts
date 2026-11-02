@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileGame, SpecError, type LogEntry } from '../src';
+import { compileGame, definePrompts, SpecError, type LogEntry } from '../src';
 import { assertDeterministic, assertNoLeak, assertTerminates, runToEnd, type Agent } from '../src/testing';
 import { agentWith } from './fixtures/agents';
 import { chainGame, chainSpec } from './fixtures/chainGame';
@@ -22,6 +22,32 @@ function scenario(votes: Record<number, Record<number, number>>, shot: number | 
     return undefined;
   });
 }
+
+describe('queued chains run one at a time', () => {
+  it('finishes the shot chain (shot → resolve) before the next queued trigger, which then sees the victim gone', () => {
+    const base = chainSpec();
+    const extra = definePrompts({ badge: '移交。' });
+    const game = compileGame(chainSpec({
+      prompts: { ...base.prompts, ...extra },
+      phases: { ...base.phases, badge: { kind: 'announce', title: '移交', text: extra.badge, next: 'return' } },
+      // 声明在猎手开枪之后：旧实现会把它插在开枪与结算之间
+      triggers: [...(base.triggers ?? []), { id: 'badge', on: 'seat_eliminated', when: (_ctx, event) => event.kind === 'seat_eliminated' && event.seat === 1, push: 'badge' }],
+    }));
+    const run = runToEnd(game, {
+      seed: 1,
+      playerCount: 5,
+      agent: agentWith(game, (request) => {
+        if (request.phaseId === 'vote') return { output: { target: request.seat === 1 ? 3 : 1 } };
+        if (request.phaseId === 'hunter_shot') return { output: { targets: [4] } };
+        return undefined;
+      }),
+    });
+    const order = run.log
+      .filter((entry) => entry.kind === 'phase_started' || entry.kind === 'seat_eliminated')
+      .map((entry) => (entry.kind === 'phase_started' ? entry.title : `出局${entry.seat}`));
+    expect(order.slice(0, 8)).toEqual(['发言', '放逐', '出局1', '遗言', '开枪', '出局4', '移交', '遗言']);
+  });
+});
 
 describe('push triggers', () => {
   const run = runToEnd(chainGame, {

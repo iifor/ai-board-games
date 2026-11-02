@@ -81,7 +81,7 @@ export function resolveShot(ctx: WerewolfContext): ComputeOutcome<WerewolfState>
 export function settleShot(ctx: WerewolfContext, reason: string): ComputeOutcome<WerewolfState> {
   const target = ctx.state.pendingShot;
   const state = { ...ctx.state, pendingShot: null };
-  // 开枪与结算之间会先插入排队的触发器（如情侣殉情），目标可能已经出局
+  // 排在开枪之前的触发器链（殉情）可能已经让目标出局；引擎保证开枪与结算之间不再插入别的链
   if (target === null || !ctx.seats.get(target).alive) return { state };
   // 猎人在夜里死亡（天亮出局）时开的枪算夜间开枪，其余（放逐、白天被带走等）算白天开枪
   const cause = ctx.trigger?.kind === 'seat_eliminated' && NIGHT_DEATH_CAUSES.has(ctx.trigger.cause) ? SHOT_BY_NIGHT : SHOT_BY_DAY;

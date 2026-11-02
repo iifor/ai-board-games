@@ -63,13 +63,19 @@ describe('cupid', () => {
     expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
   });
 
-  it('settles the day link before a shot aimed at the partner, who then cannot shoot back', () => {
-    const run = play(SEED, combine(link(king, hunter), everyoneVotes('exile_vote', king, 1), act('death_shot', king, [hunter])), BOARD);
+  it('settles the day link before the shot: the partner is already out, so the lover cannot shoot them and they cannot shoot back', () => {
+    const run = play(SEED, combine(link(king, hunter), everyoneVotes('exile_vote', king, 1), act('death_shot', king, [])), BOARD);
     expect(eliminated(run).slice(0, 2)).toEqual([
       { seat: king, round: 1, reason: '被放逐' },
       { seat: hunter, round: 1, reason: '殉情' },
     ]);
+    // 殉情链先完整执行，开枪时另一半已出局，只问过一次、不会因目标非法重问
     expect(requestsIn(run, 'death_shot').map((request) => request.seat)).toEqual([king]);
+    const log = run.snapshot.log;
+    const linkIndex = log.findIndex((entry) => entry.kind === 'seat_eliminated' && entry.seat === hunter);
+    const shotIndex = log.findIndex((entry) => entry.kind === 'phase_started' && entry.title === '开枪');
+    expect(linkIndex).toBeGreaterThan(-1);
+    expect(linkIndex).toBeLessThan(shotIndex);
   });
 
   it('takes the partner down by day when a lover is exiled; the lone cupid then plays on as an ordinary seat', () => {

@@ -1,7 +1,7 @@
 import type { AudienceView, MatchSummaryDto, StageEvent } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { matchStreamUrl } from '../../services/matches';
 import { resolvePoster } from '../../utils/posters';
 import { ResultPanel } from './components/ResultPanel';
@@ -10,6 +10,7 @@ import { VoteBoard } from './components/VoteBoard';
 import { CircleLayout } from './layouts/CircleLayout';
 import { VersusLayout } from './layouts/VersusLayout';
 import { describeEvent, displayDuration, shouldSpeak } from './playback/describe';
+import { playAudio, speak } from './playback/media';
 import type { StreamItem } from './types';
 import { judgeBadges, nightStepsOf, periodOf, rosterByTeam, speechOrderOf } from './utils';
 
@@ -82,6 +83,40 @@ describe('layouts', () => {
     expect(withActions).toContain('同样阵容再来一局');
     expect(withActions).toContain('从头回放');
     expect(withActions).toContain('href="/play/debate"');
+  });
+});
+
+describe('media playback failures', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('dwells for the fallback time when the browser refuses to play, instead of finishing instantly', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('Audio', class {
+      playbackRate = 1;
+      addEventListener() {}
+      pause() {}
+      play() { return Promise.reject(new Error('NotAllowedError')); }
+    });
+    let finished = false;
+    void playAudio('/api/media/x', 1, new AbortController().signal, 1500).then(() => { finished = true; });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(finished).toBe(true);
+  });
+
+  it('dwells by text length when speech synthesis is unavailable', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', {});
+    let finished = false;
+    void speak('一'.repeat(20), 1, new AbortController().signal).then(() => { finished = true; });
+    await vi.advanceTimersByTimeAsync(displayDuration('一'.repeat(20), 1) - 100);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(finished).toBe(true);
   });
 });
 

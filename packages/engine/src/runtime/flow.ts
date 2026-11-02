@@ -25,10 +25,14 @@ function budgetEnd(env: ExecEnv, message: string): void {
   finishGame(env, 'budget');
 }
 
-/** 前往目标阶段：若有排队的触发器，先插入触发器的阶段链，目标留到 return 时再去 */
+/**
+ * 前往目标阶段：若有排队的触发器，先插入触发器的阶段链，目标留到 return 时再去。
+ * 只在主流程上（阶段栈为空）取队列：一条链内部的转换（如开枪 → 结算）不会被别的触发器插队，
+ * 链 return 回到主流程时再按排队顺序逐条执行。
+ */
 function moveTo(env: ExecEnv, target: ResumeTarget): void {
   const { s } = env;
-  const queued = s.triggerQueue.shift();
+  const queued = s.stack.length === 0 ? s.triggerQueue.shift() : undefined;
   if (queued) {
     if (s.stack.length >= budgetLimits(env.game).maxStackDepth) {
       budgetEnd(env, `触发器嵌套超过上限，按预算终局`);

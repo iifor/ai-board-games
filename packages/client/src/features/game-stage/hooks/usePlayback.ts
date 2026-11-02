@@ -6,9 +6,10 @@ import type { PlaybackOptions, StreamItem } from '../types';
 
 async function present(item: StreamItem, options: PlaybackOptions, signal: AbortSignal): Promise<void> {
   const { text } = describeEvent(item.event);
-  if (!options.muted && item.audio) return playAudio(item.audio.url, options.speed, signal);
+  const dwell = displayDuration(text, options.speed);
+  if (!options.muted && item.audio) return playAudio(item.audio.url, options.speed, signal, dwell);
   if (!options.muted && text && shouldSpeak(item.event)) return speak(text, options.speed, signal);
-  return wait(displayDuration(text, options.speed), signal);
+  return wait(dwell, signal);
 }
 
 /**

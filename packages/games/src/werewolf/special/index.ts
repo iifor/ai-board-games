@@ -140,8 +140,17 @@ export const specialPhases: WerewolfPhases = {
 };
 
 /**
- * 出局后的特殊处理，排在遗言、猎人开枪之后、移交警徽之前（声明顺序即执行顺序）：
- * 中性开枪（狼王局）→ 额外的枪 → 灵狼翻牌带人 → 白狼王带人 → 魔狼封印 → 狼美人殉情 → 情侣殉情 → 炸弹人引爆 → 野孩子变狼 → 隐狼随狼队出局 → 九尾狐失去全部尾巴
+ * 殉情类触发器：排在遗言之后、所有开枪 / 带人之前。触发器链按声明顺序依次执行、互不插队，
+ * 所以同一次出局引发的殉情总是先于开枪与带人的结算（对自己的另一半开枪，这一枪不再生效）。
+ */
+export const specialLinkTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+  ...wolfBeautyTriggers,
+  ...loversTriggers,
+];
+
+/**
+ * 出局后的其他特殊处理，排在猎人开枪之后、移交警徽之前（声明顺序即执行顺序）：
+ * 中性开枪（狼王局）→ 额外的枪 → 灵狼翻牌带人 → 白狼王带人 → 魔狼封印 → 炸弹人引爆 → 野孩子变狼 → 隐狼随狼队出局 → 九尾狐失去全部尾巴
  * → 树苗全部出局时大树随之出局 → 老流氓到期出局 → 大树倒下 → 记录狼兄出局。
  */
 export const specialDeathTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
@@ -150,8 +159,6 @@ export const specialDeathTriggers: readonly TriggerSpec<WerewolfState, WerewolfP
   ...spiritWolfTriggers,
   ...whiteWolfKingTriggers,
   ...magicWolfTriggers,
-  ...wolfBeautyTriggers,
-  ...loversTriggers,
   ...bombmanTriggers,
   ...wildChildTriggers,
   ...hiddenWolfTriggers,
