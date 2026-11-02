@@ -2,8 +2,9 @@ import { applyDeclaration, speakSchema } from '../ai/declarations';
 import type { ExecEnv } from '../runtime/env';
 import { toSeatNumbers, type SeatSelection } from '../runtime/seats';
 import type { TemplateVars } from '../runtime/types';
+import { DEFAULT_SPEECH_MAX_CHARS, speechMaxOf } from '../spec/define';
 import type { SpeakPhase, SpeakTurn, SpeechOutput } from '../spec/phases';
-import { done, issue, templateByName, type AiPhaseExecutor, type RequestDraft } from './types';
+import { done, issue, templateByName, withMaxChars, type AiPhaseExecutor, type RequestDraft } from './types';
 
 interface TurnState {
   readonly seat: number;
@@ -24,15 +25,22 @@ function isSpeakTurn(item: unknown): item is SpeakTurn {
   return typeof item === 'object' && item !== null && 'seat' in item && !('profile' in item);
 }
 
+/** 提示词告诉模型的目标字数：speechOutput({ max }) 登记的值；自定义 output schema 用默认值 */
+function speechMaxChars(phase: Phase): number {
+  return speechMaxOf(phase.output) ?? DEFAULT_SPEECH_MAX_CHARS;
+}
+
 function normalizeTurns(phase: Phase, selection: SeatSelection | readonly SpeakTurn[]): TurnState[] {
+  const maxChars = speechMaxChars(phase);
   if (Array.isArray(selection) && selection.some(isSpeakTurn)) {
     return (selection as readonly SpeakTurn[]).map((turn) => ({
       seat: typeof turn.seat === 'number' ? turn.seat : turn.seat.seat,
-      vars: turn.vars ?? {},
+      vars: withMaxChars(turn.vars ?? {}, maxChars),
       template: (turn.prompt ?? phase.prompt).name,
     }));
   }
-  return toSeatNumbers(selection as SeatSelection).map((seat) => ({ seat, vars: {}, template: phase.prompt.name }));
+  const vars = withMaxChars({}, maxChars);
+  return toSeatNumbers(selection as SeatSelection).map((seat) => ({ seat, vars, template: phase.prompt.name }));
 }
 
 function draft(env: ExecEnv, turn: TurnState, index: number): RequestDraft {

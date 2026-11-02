@@ -18,7 +18,7 @@ const prompts = definePrompts({
   identity: '你是{{me.label}}。{{#if teammates}}队友：{{#each teammates}}{{this.label}} {{/each}}{{/if}}你的暗号是 {{state.codes}}。',
   intro: '游戏开始：{{state.banner}}',
   redChat: '和队友商量计划：{{state.redPlan}}',
-  talk: '第{{round}}轮公开发言。',
+  talk: '第{{round}}轮公开发言，不超过 {{turn.maxChars}} 字。',
   mark: '选择一名要标记的玩家。',
   vote: '投票淘汰一名玩家（复投轮次 {{turn.runoff}}）。',
 });

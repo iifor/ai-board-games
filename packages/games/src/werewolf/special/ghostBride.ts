@@ -23,7 +23,7 @@ const ghostBridePrompts = definePrompts({
   betrayerWolf: '你是{{me.label}}，原本是狼人，已经背叛狼队，与鬼魂新娘组成第三方阵营：需要让其他所有玩家出局才能获胜（见法官私下告诉你的信息）。',
   ghostBrideGroom: '鬼魂新娘请睁眼，选择一名玩家作为你的新郎。',
   ghostBrideWitness: '请选择一名玩家作为你们的证婚人（不能是你和新郎）。',
-  ghostBrideChat: '现在是第 {{round}} 夜，鬼魂新娘、新郎与证婚人请睁眼交流，不超过 80 字。',
+  ghostBrideChat: '现在是第 {{round}} 夜，鬼魂新娘、新郎与证婚人请睁眼交流，不超过 {{turn.maxChars}} 字。',
   ghostBrideKill: '场上不属于你们阵营的狼人已全部出局：今晚你们可以击杀一名不属于你们阵营的玩家，也可以输出空数组不杀人。',
 });
 

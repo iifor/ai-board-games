@@ -3,7 +3,7 @@ import type { ExecEnv } from '../runtime/env';
 import { toSeatNumbers } from '../runtime/seats';
 import type { Judgement } from '../spec/context';
 import type { JudgeFallback, JudgePhase } from '../spec/phases';
-import { done, issue, type AiPhaseExecutor, type StepOutcome } from './types';
+import { done, issue, withMaxChars, type AiPhaseExecutor, type StepOutcome } from './types';
 
 interface JudgeState {
   readonly judges: number[];
@@ -13,7 +13,13 @@ interface JudgeState {
 
 type Phase = JudgePhase<unknown, unknown>;
 
-const DEFAULT_COMMENT_MAX = 300;
+/** 阶段未设置 commentMax 时的点评字数上限 */
+export const DEFAULT_COMMENT_MAX = 300;
+
+/** 点评字数：既是 schema 的硬上限，也是提示词 {{turn.maxChars}} 告诉模型的数字 */
+function commentMax(phase: Phase): number {
+  return phase.commentMax ?? DEFAULT_COMMENT_MAX;
+}
 
 function verdictKeys(phase: Phase): [string, ...string[]] {
   const keys = Object.keys(phase.verdicts);
@@ -43,14 +49,15 @@ export const judgeExecutor: AiPhaseExecutor<Phase> = {
     const state = env.phaseState<JudgeState>();
     const seat = state.judges[state.next];
     if (seat === undefined) return aggregate(env, phase);
-    return issue([{ slot: `j${state.next}`, seat, action: 'judge', template: phase.prompt, vars: {}, legalTargets: null }]);
+    const vars = withMaxChars({}, commentMax(phase));
+    return issue([{ slot: `j${state.next}`, seat, action: 'judge', template: phase.prompt, vars, legalTargets: null }]);
   },
 
   schema(_env, phase) {
     const meaning = Object.entries(phase.verdicts).map(([key, label]) => `${key}=${label}`).join('；');
     return z.object({
       verdict: z.enum(verdictKeys(phase)).describe(`判定：${meaning}`),
-      comment: z.string().trim().min(1).max(phase.commentMax ?? DEFAULT_COMMENT_MAX).describe('点评内容'),
+      comment: z.string().trim().min(1).max(commentMax(phase)).describe('点评内容'),
     });
   },
 

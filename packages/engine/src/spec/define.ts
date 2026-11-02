@@ -22,10 +22,27 @@ export function definePrompts<const T extends Readonly<Record<string, string>>>(
  */
 export const SPEECH_LENGTH_TOLERANCE = 2;
 
-/** 发言阶段的标准输出：{ speech }；max 是提示词告诉模型的目标字数，硬上限为其 SPEECH_LENGTH_TOLERANCE 倍 */
+/** 发言阶段没有用 speechOutput 登记目标字数（自定义 output schema）时，{{turn.maxChars}} 渲染的默认值 */
+export const DEFAULT_SPEECH_MAX_CHARS = 150;
+
+/** speechOutput 登记的目标字数（schema → max）：字数只在 speechOutput({ max }) 写一次，提示词通过 {{turn.maxChars}} 读取 */
+const speechLimits = new WeakMap<ZodType, number>();
+
+/**
+ * 发言阶段的标准输出：{ speech }。
+ * max 是提示词告诉模型的目标字数（引擎注入为轮次变量，模板以 {{turn.maxChars}} 引用），schema 的硬上限为其 SPEECH_LENGTH_TOLERANCE 倍。
+ */
 export function speechOutput(options: { readonly max: number; readonly min?: number }): ZodType<SpeechOutput> {
+  if (!Number.isInteger(options.max) || options.max < 1) throw new Error(`speechOutput 的 max 必须是正整数，收到 ${options.max}`);
   const hardMax = options.max * SPEECH_LENGTH_TOLERANCE;
-  return z.object({
+  const schema = z.object({
     speech: z.string().trim().min(options.min ?? 1).max(hardMax).describe(`发言内容，目标不超过 ${options.max} 字`),
   });
+  speechLimits.set(schema, options.max);
+  return schema;
+}
+
+/** 读取 speechOutput 登记的目标字数；不是由 speechOutput 构造的 schema 返回 null */
+export function speechMaxOf(schema: ZodType): number | null {
+  return speechLimits.get(schema) ?? null;
 }

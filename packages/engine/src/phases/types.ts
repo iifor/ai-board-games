@@ -49,3 +49,12 @@ export function templateByName(env: ExecEnv, name: string): PromptTemplate {
   if (!template) throw new Error(`模板 "${name}" 未登记在 spec.prompts 中`);
   return template;
 }
+
+/** 引擎注入的轮次变量：发言与点评的目标字数，模板以 {{turn.maxChars}} 引用 */
+export const MAX_CHARS_VAR = 'maxChars';
+
+/** 把引擎按输出 schema 决定的字数并入轮次变量；游戏在 SpeakTurn.vars 中自行设置同名变量视为写错（会与 schema 脱节） */
+export function withMaxChars(vars: TemplateVars, maxChars: number): TemplateVars {
+  if (MAX_CHARS_VAR in vars) throw new Error(`轮次变量 ${MAX_CHARS_VAR} 由引擎按输出 schema 注入，不能在 vars 中自行设置`);
+  return { ...vars, [MAX_CHARS_VAR]: maxChars };
+}

@@ -67,10 +67,10 @@ GameSpec 关键字段：
 | kind | 行为 | AI 输出 |
 | --- | --- | --- |
 | `announce` | 用**公开上下文**渲染模板，写入主持播报 | — |
-| `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆） | `output` schema（标准为 `speechOutput({ max })`：`max` 是提示词告诉模型的目标字数，schema 的硬上限是它的 `SPEECH_LENGTH_TOLERANCE`（2）倍，略超目标的发言照常采用，超过硬上限才重试、兜底）；有权声明的座位额外获得可选的 `declare` 字段 |
+| `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆） | `output` schema（标准为 `speechOutput({ max })`：`max` 是提示词告诉模型的目标字数，引擎把它注入为轮次变量 `turn.maxChars`，模板写"不超过 {{turn.maxChars}} 字"而不手写数字；schema 的硬上限是它的 `SPEECH_LENGTH_TOLERANCE`（2）倍，略超目标的发言照常采用，超过硬上限才重试、兜底；自定义 `output` schema 没有登记字数时 `turn.maxChars` 取 `DEFAULT_SPEECH_MAX_CHARS`（150））；有权声明的座位额外获得可选的 `declare` 字段 |
 | `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }`，座位号接受 `3` 或 `"3"`（见"AI 管线"） |
 | `vote` | 投票后计票，`weight` 设定票权，`bonus` 给出不属于任何投票者的额外票（如乌鸦诅咒，进入阶段时计算一次，每轮只计给该轮候选人；日志的 `tally` 含额外票、`ballots` 不含，AI 历史中显示为"额外票：5号+1"），`allowAbstain` 允许弃票（`fallbackMode: 'abstain'` 时兜底为弃票）；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者、`ballots` 给出最后一轮的有效选票（不含弃票，规则可据此知道谁投了谁）；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null；座位号接受 `3` 或 `"3"` |
-| `judge` | 评委依次判定，`verdicts` 定义选项与含义；多数决，无评委或并列时取 `tieVerdict` | 自动生成 `{ verdict, comment }`，选项含义写入 schema 描述 |
+| `judge` | 评委依次判定，`verdicts` 定义选项与含义；多数决，无评委或并列时取 `tieVerdict`；`commentMax`（默认 300）是点评字数上限 | 自动生成 `{ verdict, comment }`，选项含义写入 schema 描述；`commentMax` 同样注入为 `turn.maxChars`，模板用它说明点评字数 |
 | `compute` | 纯函数结算：返回新状态、`reassign`（改变座位的角色或阵营；阵营改变时座位记录 `teamSince`，见"可见性"）、日志、淘汰列表，按此顺序生效（播报先于出局事件） | — |
 | `reveal` | 写入一条揭示日志；`revealRoles` 向所有玩家与观众公开全部身份，并在日志 `data.roles` 中给出身份表 | — |
 
@@ -100,7 +100,7 @@ GameSpec 关键字段：
 
 模板语法只有 `{{path}}`、`{{#each path}}…{{/each}}`（块内用 `this.x`）、`{{#if path}}…{{else}}…{{/if}}`；变量缺失或输出非标量会报错，`null` 输出为空。
 
-模板上下文（按当前玩家可见范围生成）：`me`（含 `persona`）、`title`、`round`、`phase`、`seats`、`aliveSeats`（不可见的身份为 null）、`teammates`、`params`、`state`（按 `visibility` 投影）、`turn`、`legalTargets`。`announce` 模板只能使用公开上下文（无 `me`、`teammates`、`turn`、`legalTargets`，`state` 只含 public 字段）。编译期静态检查变量根与状态字段可见性。
+模板上下文（按当前玩家可见范围生成）：`me`（含 `persona`）、`title`、`round`、`phase`、`seats`、`aliveSeats`（不可见的身份为 null）、`teammates`、`params`、`state`（按 `visibility` 投影）、`turn`（发言轮次的 `SpeakTurn.vars`，引擎另注入 `maxChars`：发言取 `speechOutput({ max })` 的 `max`，点评取 `commentMax`，字数只在阶段配置写一次，模板不手写；`vars` 中自行设置 `maxChars` 会抛错）、`legalTargets`。`announce` 模板只能使用公开上下文（无 `me`、`teammates`、`turn`、`legalTargets`，`state` 只含 public 字段）。编译期静态检查变量根与状态字段可见性。
 
 ## 可见性
 
@@ -122,7 +122,7 @@ GameSpec 关键字段：
 
 - `runToEnd(game, { seed, playerCount | players, params, agent, debug, onPause })`：在内存中跑完一局，记录全部日志、舞台事件、AI 请求及发出时的快照。默认 agent 为脚本化输出。
 - `assertTerminates(game, seeds)`、`assertDeterministic(game, options)`、`assertNoLeak(game, run)`：每个游戏都应以 100 个种子运行三项性质检查。泄露检查以文本比对为准，少于 4 个字符的内容不参与比对。
-- 混沌模式 `chaosAgent(game)` / `chaosReply(game, snapshot, request)`（`testing/chaos.ts`）：默认脚本永远合法、从不弃票、从不声明，覆盖不到重试、兜底、弃票、放弃与自爆等分支。混沌脚本按固定概率（`CHAOS_RATES`：传输失败 3%、不合法输出 10%、允许弃票时弃票 30%、可放弃的动作放弃 50%、有权声明时附带声明 25%）做出这些行为，每个决定由对局种子与请求 ID 派生，同一种子可复现。每个游戏另以 30 个种子跑混沌模式，断言终局、不泄露，且至少出现过一次弃票、一次声明（狼人杀为自爆）与一次兜底。默认的 `scriptedOutput` 不受影响（服务端的脚本化对局依赖它的精确输出）。
+- 混沌模式 `chaosReply(game, snapshot, request)`（`debug/chaosAgent.ts`，由 `@battle/engine` 导出，服务端的混沌调试局也用它）与测试代理 `chaosAgent(game)`（`testing/chaos.ts`）：默认脚本永远合法、从不弃票、从不声明，覆盖不到重试、兜底、弃票、放弃与自爆等分支。混沌脚本按固定概率（`CHAOS_RATES`：传输失败 3%、不合法输出 10%、允许弃票时弃票 30%、可放弃的动作放弃 50%、有权声明时附带声明 25%）做出这些行为，每个决定由对局种子与请求 ID 派生，同一种子可复现。每个游戏另以 30 个种子跑混沌模式，断言终局、不泄露，且至少出现过一次弃票、一次声明（狼人杀为自爆）与一次兜底。默认的 `scriptedOutput` 不受影响（服务端的脚本化对局依赖它的精确输出）。
 
 ## 尚未实现
 

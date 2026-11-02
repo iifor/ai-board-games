@@ -7,8 +7,8 @@ const prompts = definePrompts({
   rules: '评审游戏：两名发言人轮流发言，评委判定胜方。',
   speaker: '你是{{me.label}}，{{me.roleName}}{{me.position}}号位。',
   judge: '你是{{me.label}}，担任评委。',
-  pitch: '请发言。',
-  review: '请判定哪位发言人表现更好。',
+  pitch: '请发言，不超过 {{turn.maxChars}} 字。',
+  review: '请判定哪位发言人表现更好，点评不超过 {{turn.maxChars}} 字。',
 });
 
 export const panelSpec = defineGame({
