@@ -11,7 +11,8 @@ export interface MatchRow {
   /** 脚本化调试局是否使用混沌脚本 */
   readonly chaos: boolean;
   readonly pacing: MatchPacing;
-  readonly snapshot: EngineSnapshot;
+  /** 当前阶段；列表、概要与播放流只读这一列，不读整份快照 */
+  readonly phaseId: string | null;
   readonly version: number;
   readonly lastSeq: number;
   readonly ackedSeq: number;
@@ -19,6 +20,11 @@ export interface MatchRow {
   readonly error: string | null;
   readonly createdAt: Date;
   readonly completedAt: Date | null;
+}
+
+/** 推进时锁定读出的对局：带完整快照 */
+export interface LockedMatchRow extends MatchRow {
+  readonly snapshot: EngineSnapshot;
 }
 
 export interface SeatRow {

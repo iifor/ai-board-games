@@ -124,7 +124,7 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 | `models` | 模型参数、备用模型（自引用，删除时置空）、系统停用原因与时间（`disabled_reason` / `disabled_at`，迁移 003） |
 | `voices` | 音色：来源、音色名、语言、性别、风格、语速、音调、试听文本、说明（迁移 003） |
 | `players` | AI 玩家（模型删除受限，音色删除时置空） |
-| `matches` | 对局：游戏、变体、spec 版本与 hash、种子、状态、debug / scripted / pacing、`chaos`（脚本化调试局是否用混沌脚本，迁移 005）、引擎快照、版本号、`last_seq` / `acked_seq`、结果 |
+| `matches` | 对局：游戏、变体、spec 版本与 hash、种子、状态、debug / scripted / pacing、`chaos`（脚本化调试局是否用混沌脚本，迁移 005）、引擎快照、当前阶段 `phase_id`（快照游标的冗余列，随快照一起写入，迁移 007）、版本号、`last_seq` / `acked_seq`、结果 |
 | `match_seats` | 座位 → 玩家、模型、音色（开局时固化，玩家删除后保留名字） |
 | `ai_tasks` | AI 请求队列（queued / running / succeeded / failed / cancelled，领取过期时间，领取次数 `attempts`，迁移 004） |
 | `match_stage_events` | 按 seq 的舞台事件，实时推送与回放共用 |
@@ -139,6 +139,8 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 ## 测试
 
 `packages/server/test/`：集成测试连接真实 PostgreSQL（`TEST_DATABASE_URL`，默认本机开发库 `127.0.0.1:5433`），每个测试文件创建独立 schema 并在结束时删除，文件之间串行执行；HTTP 用 `app.request()`，WebSocket 测试用 `support/stream.ts` 在随机端口监听并逐个确认事件。模型、语音与跨实例通知传输层通过 `createServices` 的 `ExternalDeps` 注入假实现（默认用真实的 LISTEN/NOTIFY，每个测试实例一条监听连接）。CI 中由 PostgreSQL service 提供数据库。
+
+对局仓储的普通读取（`find`、`list`，供概要、详情、列表、播放流、worker 判断是否脚本化）只取元数据列，不含快照：快照带全部日志，随对局变长，回放时每推送一个事件都会读一次对局行。只有推进（`lock`，`SELECT … FOR UPDATE`）、脚本化输出（`snapshot`）与后台完整日志（`log`，只取 `snapshot -> 'log'`）才读快照。
 
 Kysely 的 `CamelCasePlugin` 必须开启 `maintainNestedObjectKeys`：快照等 jsonb 中以阶段 ID 为键的对象（如 `visits.guard_protect`）不能被改名。
 

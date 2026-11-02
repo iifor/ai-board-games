@@ -137,7 +137,9 @@ export function createMatchService(deps: MatchServiceDeps) {
 
     /** 后台查看完整日志（包含私密频道与兜底记录） */
     async log(id: string): Promise<readonly LogEntry[]> {
-      return (await load(id)).row.snapshot.log;
+      const log = await repository.log(id);
+      if (!log) throw notFound('对局');
+      return log;
     },
 
     async aiCalls(id: string): Promise<AiCallDto[]> {

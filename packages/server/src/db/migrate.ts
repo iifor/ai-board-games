@@ -7,6 +7,7 @@ import * as resources from './migrations/003_resources';
 import * as aiTaskAttempts from './migrations/004_ai_task_attempts';
 import * as matchChaos from './migrations/005_match_chaos';
 import * as requestWindows from './migrations/006_request_windows';
+import * as matchPhaseId from './migrations/007_match_phase_id';
 
 /** 迁移按 key 排序执行；新增迁移在此登记 */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {
@@ -16,6 +17,7 @@ const MIGRATIONS: Readonly<Record<string, Migration>> = {
   '004_ai_task_attempts': aiTaskAttempts,
   '005_match_chaos': matchChaos,
   '006_request_windows': requestWindows,
+  '007_match_phase_id': matchPhaseId,
 };
 
 const provider: MigrationProvider = { getMigrations: async () => MIGRATIONS };

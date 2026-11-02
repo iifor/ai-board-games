@@ -38,6 +38,10 @@ describe('scripted debug matches', () => {
     await runUntilSettled(t, created.id);
     const paused = dataOf(await t.call<MatchDetailDto>('GET', `/api/admin/matches/${created.id}`, { token }));
     expect(paused).toMatchObject({ status: 'paused', phaseId: 'dawn', variantName: '白狼王&守卫', layout: 'circle' });
+    // 概要、详情与播放流只读元数据列：整份快照（含全部日志）只在推进时读出
+    const row = await t.services.repositories.matches.find(created.id);
+    expect(row).toMatchObject({ phaseId: 'dawn' });
+    expect(row).not.toHaveProperty('snapshot');
     const resumed = dataOf(await t.call<MatchDetailDto>('POST', `/api/admin/matches/${created.id}/debug`, { token, body: { command: 'run' } }));
     expect(resumed.status).not.toBe('paused');
     await runUntilSettled(t, created.id);
@@ -69,7 +73,7 @@ describe('model-backed matches', () => {
       const calls = dataOf(await t.call<{ modelName: string; prompt: Record<string, string>; error: string | null }[]>('GET', `/api/admin/matches/${created.id}/ai-calls`, { token }));
       expect(calls.length).toBe(llm.calls.length);
       expect(calls.every((call) => call.error === null && call.prompt.instruction)).toBe(true);
-      expect(match?.snapshot.log.filter((entry) => entry.kind === 'fallback')).toEqual([]);
+      expect((await t.services.repositories.matches.log(created.id))?.filter((entry) => entry.kind === 'fallback')).toEqual([]);
     } finally {
       await t.cleanup();
     }
@@ -86,7 +90,7 @@ describe('model-backed matches', () => {
       await runUntilSettled(t, created.id);
       const match = await t.services.repositories.matches.find(created.id);
       expect(match?.status).toBe('completed');
-      expect(match?.snapshot.log.filter((entry) => entry.kind === 'fallback')).toEqual([]);
+      expect((await t.services.repositories.matches.log(created.id))?.filter((entry) => entry.kind === 'fallback')).toEqual([]);
       const models = dataOf(await t.call<ModelDto[]>('GET', '/api/admin/models', { token }));
       expect(models.find((model) => model.model === 'main-model')).toMatchObject({ enabled: false, disabledReason: 'quota_exhausted' });
       expect(models.find((model) => model.model === 'backup-model')).toMatchObject({ enabled: true, disabledReason: null });
@@ -121,7 +125,7 @@ describe('model-backed matches', () => {
         await runUntilSettled(t2, match.id);
         const row = await t2.services.repositories.matches.find(match.id);
         expect(row?.status).toBe('completed');
-        expect(row?.snapshot.log.filter((entry) => entry.kind === 'fallback').length).toBeGreaterThan(0);
+        expect((await t2.services.repositories.matches.log(match.id))?.filter((entry) => entry.kind === 'fallback').length).toBeGreaterThan(0);
       } finally {
         await t2.cleanup();
       }

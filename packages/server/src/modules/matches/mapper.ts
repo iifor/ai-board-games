@@ -32,7 +32,7 @@ export function toDetail(row: MatchRow, seats: readonly SeatRow[], game: Compile
     lastSeq: row.lastSeq,
     ackedSeq: row.ackedSeq,
     error: row.error,
-    phaseId: row.snapshot.cursor.phaseId,
+    phaseId: row.phaseId,
   };
 }
 

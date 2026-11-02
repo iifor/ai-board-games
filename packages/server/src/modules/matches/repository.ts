@@ -1,11 +1,11 @@
-import type { AiRequest, EngineSnapshot } from '@battle/engine';
+import type { AiRequest, EngineSnapshot, LogEntry } from '@battle/engine';
 import type { GameResult, MatchPacing, MatchStatus, StageEvent } from '@battle/shared';
 import { sql, type Transaction } from 'kysely';
 import type { Db } from '../../db/database';
 import { JOB_LOCKS, PUBLIC_CREATION_LOCK, tryJobLock } from '../../db/locks';
 import type { Database } from '../../db/schema';
 import { VOICE_CHOICE_COLUMNS } from '../voices/repository';
-import type { MatchRow, SeatRow, TaskCompletion } from './types';
+import type { LockedMatchRow, MatchRow, SeatRow, TaskCompletion } from './types';
 
 type Executor = Db | Transaction<Database>;
 
@@ -29,13 +29,14 @@ export interface NewMatch {
 
 const SEAT_COLUMNS = ['seat', 'playerId', 'playerName', 'modelId', 'voiceId'] as const;
 
+/** 对局元数据列：不含快照（快照带全部日志，只有推进、脚本化输出与后台日志需要） */
 const MATCH_COLUMNS = [
-  'id', 'gameKey', 'variantKey', 'status', 'debug', 'scripted', 'chaos', 'pacing', 'snapshot', 'version',
+  'id', 'gameKey', 'variantKey', 'status', 'debug', 'scripted', 'chaos', 'pacing', 'phaseId', 'version',
   'lastSeq', 'ackedSeq', 'result', 'error', 'createdAt', 'completedAt',
 ] as const;
 
-function toRow(row: Record<string, unknown>): MatchRow {
-  return row as unknown as MatchRow;
+function toRow<T extends MatchRow = MatchRow>(row: Record<string, unknown>): T {
+  return row as unknown as T;
 }
 
 export function createMatchRepository(db: Db) {
@@ -52,14 +53,27 @@ export function createMatchRepository(db: Db) {
         ...match,
         params: JSON.stringify(match.params),
         snapshot: JSON.stringify(match.snapshot),
+        phaseId: match.snapshot.cursor.phaseId,
         status: match.snapshot.status,
       }).execute();
       await trx.insertInto('matchSeats').values(seats.map((seat) => ({ ...seat, matchId: match.id }))).execute();
     },
 
-    async lock(trx: Executor, id: string): Promise<MatchRow | undefined> {
-      const row = await trx.selectFrom('matches').select(MATCH_COLUMNS).where('id', '=', id).forUpdate().executeTakeFirst();
-      return row ? toRow(row) : undefined;
+    async lock(trx: Executor, id: string): Promise<LockedMatchRow | undefined> {
+      const row = await trx.selectFrom('matches').select([...MATCH_COLUMNS, 'snapshot']).where('id', '=', id).forUpdate().executeTakeFirst();
+      return row ? toRow<LockedMatchRow>(row) : undefined;
+    },
+
+    /** 不加锁读出快照（脚本化输出用）；对局不存在时为 undefined */
+    async snapshot(id: string): Promise<EngineSnapshot | undefined> {
+      const row = await db.selectFrom('matches').select('snapshot').where('id', '=', id).executeTakeFirst();
+      return row?.snapshot as EngineSnapshot | undefined;
+    },
+
+    /** 完整日志（含私密与 host 频道）：只取快照里的 log，不把整份快照传回来 */
+    async log(id: string): Promise<LogEntry[] | undefined> {
+      const row = await db.selectFrom('matches').select(sql<LogEntry[]>`snapshot -> 'log'`.as('log')).where('id', '=', id).executeTakeFirst();
+      return row?.log;
     },
 
     async find(id: string): Promise<MatchRow | undefined> {
@@ -82,6 +96,7 @@ export function createMatchRepository(db: Db) {
     }): Promise<void> {
       await trx.updateTable('matches').set({
         snapshot: JSON.stringify(update.snapshot),
+        phaseId: update.snapshot.cursor.phaseId,
         status: update.status,
         version: sql`version + 1`,
         lastSeq: update.lastSeq,

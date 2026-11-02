@@ -88,6 +88,8 @@ export interface MatchesTable {
   chaos: boolean;
   pacing: string;
   snapshot: Json<unknown>;
+  /** 当前阶段（快照游标的冗余列，随快照一起写入；迁移 007） */
+  phaseId: string | null;
   version: Generated<number>;
   lastSeq: Generated<number>;
   ackedSeq: Generated<number>;

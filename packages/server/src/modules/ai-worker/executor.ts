@@ -85,10 +85,12 @@ export function createTaskExecutor(deps: ExecutorDeps) {
       if (!match) return failed(task, '对局不存在');
       if (match.scripted) {
         const game = deps.findGame(match.gameKey);
-        if (!match.chaos) return succeeded(task, scriptedOutput(game, match.snapshot, task.request));
+        const snapshot = await deps.matches.snapshot(task.matchId);
+        if (!snapshot) return failed(task, '对局不存在');
+        if (!match.chaos) return succeeded(task, scriptedOutput(game, snapshot, task.request));
         // 模拟的调用失败是一次"已完成但失败"的任务：以 ai_failed 交回引擎走兜底，对局继续；
         // 它不是执行异常，不会计入 worker 的领取次数上限
-        const reply = chaosReply(game, match.snapshot, task.request);
+        const reply = chaosReply(game, snapshot, task.request);
         return 'failed' in reply ? failed(task, reply.failed) : succeeded(task, reply.output);
       }
 

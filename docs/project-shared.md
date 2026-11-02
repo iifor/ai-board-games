@@ -45,4 +45,4 @@
 ## 测试约定
 
 - 所有包统一使用 vitest，测试文件命名 `*.test.ts(x)`。engine 的测试放在 `packages/engine/test/`（含合成游戏 fixture 与跨包纯度测试），其余包的测试与源码同目录。
-- 根目录 `vitest.config.ts` 以 `packages/*` 为项目列表；shared 目前只有类型，配置了 `passWithNoTests`。
+- 根目录 `vitest.config.ts` 以 `packages/*` 为项目列表。shared 的 `speech.test.ts` 用以事件类型为键的表覆盖每种舞台事件的朗读口径：新增事件类型时这张表编译不过，必须先决定它读不读、由谁读；同文件还测试 `formatMatchTitle`。
