@@ -3,7 +3,7 @@ import { createAzureTts } from './azure';
 import { createMimoTts } from './mimo';
 import type { TtsProviders } from './types';
 
-export { createMediaRepository } from './repository';
+export { createMediaRepository, type LockedAsset, type MediaRepository, type NewMediaAsset } from './repository';
 export { mediaRoutes } from './routes';
 export { assetId, createTtsService, type TtsService, type VoiceChoice } from './service';
 export type { TtsProvider, TtsProviders, VoiceSpec } from './types';

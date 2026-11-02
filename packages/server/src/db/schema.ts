@@ -154,6 +154,12 @@ export interface MediaAssetsTable {
   createdAt: CreatedAt;
 }
 
+/** 限流与登录锁定的滑动窗口记录（迁移 006）：key 由用途与来源组成，at 为发生时间 */
+export interface RequestWindowsTable {
+  key: string;
+  at: Date;
+}
+
 export interface Database {
   adminUsers: AdminUsersTable;
   modelProviders: ModelProvidersTable;
@@ -166,4 +172,5 @@ export interface Database {
   matchStageEvents: MatchStageEventsTable;
   aiCalls: AiCallsTable;
   mediaAssets: MediaAssetsTable;
+  requestWindows: RequestWindowsTable;
 }

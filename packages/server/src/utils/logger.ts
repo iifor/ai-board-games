@@ -12,3 +12,6 @@ export const logger = {
   warn: (message: string, fields?: Readonly<Record<string, unknown>>) => write('warn', message, fields),
   error: (message: string, fields?: Readonly<Record<string, unknown>>) => write('error', message, fields),
 };
+
+/** 可注入的日志接口（测试里替换为静默或收集实现） */
+export type Logger = typeof logger;

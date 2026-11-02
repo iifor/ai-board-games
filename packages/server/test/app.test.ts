@@ -10,7 +10,9 @@ afterAll(async () => t.cleanup());
 
 describe('public endpoints', () => {
   it('reports health when the database is reachable', async () => {
-    expect(dataOf(await t.call<{ status: string }>('GET', '/api/health'))).toEqual({ status: 'ok' });
+    const health = dataOf(await t.call<{ status: string; instance: string }>('GET', '/api/health'));
+    expect(health).toEqual({ status: 'ok', instance: t.services.instanceId });
+    expect(health.instance).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it('lists the game catalog with variants', async () => {

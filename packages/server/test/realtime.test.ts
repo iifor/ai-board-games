@@ -1,63 +1,26 @@
-import type { AddressInfo } from 'node:net';
-import { serve, type ServerType } from '@hono/node-server';
 import { gameRegistry } from '@battle/games';
-import type { MatchSummaryDto, ServerMessage, StageEvent } from '@battle/shared';
+import type { MatchSummaryDto } from '@battle/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MAX_CLIENT_FRAME_BYTES, MESSAGE_TOO_BIG_CODE } from '../src/modules/realtime';
 import { fakeTts, scriptedLlm, seedPlayers } from './support/fixtures';
+import { listen, watch as watchOn } from './support/stream';
 import { createTestApp, dataOf, type TestApp } from './support/testApp';
 
 let t: TestApp;
-let server: ServerType;
-let port = 0;
+let server: Awaited<ReturnType<typeof listen>>;
 const tts = fakeTts();
 
 beforeAll(async () => {
   t = await createTestApp({}, { llm: scriptedLlm(), ttsProviders: { azure: tts } });
-  server = serve({ fetch: t.app.fetch, port: 0 });
-  t.injectWebSocket(server);
-  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
-  port = (server.address() as AddressInfo).port;
+  server = await listen(t);
   t.services.worker.start();
 });
 afterAll(async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await server.close();
   await t.cleanup();
 });
 
-interface Watched {
-  readonly events: StageEvent[];
-  readonly audio: (string | null)[];
-  readonly end: ServerMessage | null;
-}
-
-/** 连接对局流并逐个确认，直到收到 end 或达到 limit 个事件 */
-function watch(matchId: string, afterSeq: number, limit = Number.POSITIVE_INFINITY): Promise<Watched> {
-  return new Promise((resolve, reject) => {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/toc/ws/matches/${matchId}`);
-    const events: StageEvent[] = [];
-    const audio: (string | null)[] = [];
-    const timer = setTimeout(() => reject(new Error('观看超时')), 60_000);
-    const finish = (end: ServerMessage | null) => {
-      clearTimeout(timer);
-      socket.close();
-      resolve({ events, audio, end });
-    };
-    socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'hello', afterSeq })));
-    socket.addEventListener('error', () => reject(new Error('WebSocket 出错')));
-    socket.addEventListener('message', (message) => {
-      const data = JSON.parse(String(message.data)) as ServerMessage;
-      if (data.type === 'event') {
-        events.push(data.event);
-        audio.push(data.audio?.url ?? null);
-        if (events.length >= limit) return finish(null);
-        socket.send(JSON.stringify({ type: 'ack', seq: data.event.seq }));
-      } else if (data.type === 'end' || data.type === 'error' || (data.type === 'status' && data.status === 'failed')) {
-        finish(data);
-      }
-    });
-  });
-}
+const watch = (matchId: string, afterSeq: number, limit?: number) => watchOn(server.port, matchId, afterSeq, limit);
 
 describe('realtime playback', () => {
   it('streams a live match one acknowledged event at a time, with audio', async () => {
@@ -122,7 +85,7 @@ describe('realtime playback', () => {
     const [finished] = dataOf(await t.call<MatchSummaryDto[]>('GET', '/api/toc/matches'));
     if (!finished) throw new Error('没有已完成的对局');
     const closed = await new Promise<{ code: number; events: number }>((resolve, reject) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}/api/toc/ws/matches/${finished.id}`);
+      const socket = new WebSocket(`ws://127.0.0.1:${server.port}/api/toc/ws/matches/${finished.id}`);
       const timer = setTimeout(() => reject(new Error('没有被关闭')), 10_000);
       let events = 0;
       socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'hello', afterSeq: 0, padding: 'x'.repeat(MAX_CLIENT_FRAME_BYTES) })));

@@ -5,48 +5,57 @@ import type { AdminIdentity } from '../../types';
 import { hashPassword, verifyPassword } from '../../utils/crypto';
 import { badRequest, tooManyRequests, unauthorized } from '../../utils/errors';
 import { logger } from '../../utils/logger';
-import { createWindowCounter } from '../../utils/windowCounter';
+import { windowKey, type WindowStore } from '../../utils/windowStore';
 import { FAILED_LOGIN_WINDOW_MS, MAX_FAILED_LOGINS, MAX_FAILED_LOGINS_PER_SOURCE, TOKEN_TTL_SECONDS } from './constants';
 import type { AuthRepository } from './repository';
 
-export function createAuthService(repository: AuthRepository, config: Pick<AppConfig, 'jwtSecret' | 'bootstrapAdmin'>) {
-  /** 进程内计数：来源 + 用户名 的失败次数，以及来源的累计失败次数；过期条目会被清理 */
-  const accountFailures = createWindowCounter(FAILED_LOGIN_WINDOW_MS);
-  const sourceFailures = createWindowCounter(FAILED_LOGIN_WINDOW_MS);
-  const accountKey = (source: string, username: string) => `${source}\u0000${username}`;
+export function createAuthService(repository: AuthRepository, config: Pick<AppConfig, 'jwtSecret' | 'bootstrapAdmin'>, failures: WindowStore) {
+  /** 失败计数放在 WindowStore（数据库）里，多实例共享：来源 + 用户名 一份，来源累计一份 */
+  const accountKey = (source: string, username: string) => windowKey('login', source, username);
+  const sourceKey = (source: string) => windowKey('login-source', source);
 
-  function assertNotLocked(source: string, username: string, now: number): void {
-    const locked = accountFailures.count(accountKey(source, username), now) >= MAX_FAILED_LOGINS
-      || sourceFailures.count(source, now) >= MAX_FAILED_LOGINS_PER_SOURCE;
-    if (locked) throw tooManyRequests('登录失败次数过多，请稍后再试');
+  async function assertNotLocked(source: string, username: string, now: number): Promise<void> {
+    const since = new Date(now - FAILED_LOGIN_WINDOW_MS);
+    const [account, bySource] = await Promise.all([failures.count(accountKey(source, username), since), failures.count(sourceKey(source), since)]);
+    if (account >= MAX_FAILED_LOGINS || bySource >= MAX_FAILED_LOGINS_PER_SOURCE) throw tooManyRequests('登录失败次数过多，请稍后再试');
   }
 
-  function recordFailure(source: string, username: string, now: number): void {
-    accountFailures.record(accountKey(source, username), now);
-    sourceFailures.record(source, now);
+  async function recordFailure(source: string, username: string, now: number): Promise<void> {
+    const at = new Date(now);
+    await Promise.all([failures.add(accountKey(source, username), at), failures.add(sourceKey(source), at)]);
   }
 
   return {
-    /** 管理员表为空时用配置创建首个账号（首次登录必须改密）；已有账号时不做任何事 */
+    /**
+     * 管理员表为空时用配置创建首个账号（首次登录必须改密）；已有账号时不做任何事。
+     * 多实例同时启动：持锁后再查一次，只有一个实例会插入，其余看到已有账号直接返回。
+     */
     async bootstrap(): Promise<void> {
       if ((await repository.count()) > 0) return;
       if (!config.bootstrapAdmin) {
         logger.warn('没有管理员账号，且未配置 ADMIN_USERNAME / ADMIN_PASSWORD，后台暂时无法登录');
         return;
       }
-      await repository.create(config.bootstrapAdmin.username, await hashPassword(config.bootstrapAdmin.password));
-      logger.info('已创建初始管理员账号', { username: config.bootstrapAdmin.username });
+      const { username, password } = config.bootstrapAdmin;
+      const passwordHash = await hashPassword(password);
+      const created = await repository.transaction(async (trx) => {
+        await repository.lockBootstrap(trx);
+        if ((await repository.count(trx)) > 0) return false;
+        await repository.create(username, passwordHash, trx);
+        return true;
+      });
+      if (created) logger.info('已创建初始管理员账号', { username });
     },
 
     /** source 是请求来源（连接地址或可信代理给出的地址），锁定按来源 + 用户名计 */
     async login(username: string, password: string, source: string, now = Date.now()): Promise<AdminLoginResponse> {
-      assertNotLocked(source, username, now);
+      await assertNotLocked(source, username, now);
       const user = await repository.findByUsername(username);
       if (!user || !(await verifyPassword(password, user.passwordHash))) {
-        recordFailure(source, username, now);
+        await recordFailure(source, username, now);
         throw unauthorized('用户名或密码错误');
       }
-      accountFailures.clear(accountKey(source, username));
+      await failures.clear(accountKey(source, username));
       const exp = Math.floor(now / 1000) + TOKEN_TTL_SECONDS;
       const token = await sign({ sub: user.id, exp }, config.jwtSecret, 'HS256');
       return { token, expiresAt: new Date(exp * 1000).toISOString(), mustChangePassword: user.mustChangePassword };

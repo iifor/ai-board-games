@@ -6,6 +6,7 @@ import * as matches from './migrations/002_matches';
 import * as resources from './migrations/003_resources';
 import * as aiTaskAttempts from './migrations/004_ai_task_attempts';
 import * as matchChaos from './migrations/005_match_chaos';
+import * as requestWindows from './migrations/006_request_windows';
 
 /** 迁移按 key 排序执行；新增迁移在此登记 */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {
@@ -14,6 +15,7 @@ const MIGRATIONS: Readonly<Record<string, Migration>> = {
   '003_resources': resources,
   '004_ai_task_attempts': aiTaskAttempts,
   '005_match_chaos': matchChaos,
+  '006_request_windows': requestWindows,
 };
 
 const provider: MigrationProvider = { getMigrations: async () => MIGRATIONS };

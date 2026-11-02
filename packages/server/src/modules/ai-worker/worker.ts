@@ -25,7 +25,7 @@ export interface WorkerDeps {
 export const AI_GIVE_UP_ERROR = 'AI 处理多次失败，对局已终止';
 const DEFAULT_STOP_TIMEOUT_MS = 10_000;
 
-/** AI worker：事件驱动 + 定时兜底轮询（处理重试与过期领取） */
+/** AI worker：事件驱动（总线跨实例唤醒）+ 定时兜底轮询（处理重试、过期领取与丢失的通知） */
 export function createAiWorker(deps: WorkerDeps, options: WorkerOptions) {
   /** 进行中的任务：以执行 promise 为键，便于关闭超时时报告还没结束的是哪些 */
   const running = new Map<Promise<void>, ClaimedTask>();

@@ -24,7 +24,7 @@ export interface StreamDeps {
 }
 
 export interface StreamOptions {
-  /** 等待新事件期间的兜底重查间隔：总线只在本进程内，其他实例的 worker 产生的事件靠它发现 */
+  /** 等待新事件期间的兜底重查间隔：其他实例的事件经总线（LISTEN/NOTIFY）送达，这是通知丢失（监听连接重连期间）时的安全网 */
   readonly pollMs: number;
 }
 

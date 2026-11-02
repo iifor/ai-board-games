@@ -1,4 +1,4 @@
-export { createCreationLimiter } from './limits';
+export { createCreationLimiter, CREATION_WINDOW_MS, type CreationLimiter } from './limits';
 export { createMatchReaper, IDLE_MATCH_ERROR, type MatchReaper } from './reaper';
 export { createMatchRepository, type MatchRepository } from './repository';
 export { adminMatchRoutes, publicMatchRoutes } from './routes';

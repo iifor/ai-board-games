@@ -3,7 +3,7 @@ import type { AudioRef, VoiceProvider } from '@battle/shared';
 import { badRequest, upstream } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import type { MediaRepository } from './repository';
-import type { TtsProvider, TtsProviders, VoiceSpec } from './types';
+import type { SynthesizedAudio, TtsProvider, TtsProviders, VoiceSpec } from './types';
 
 export interface VoiceChoice extends VoiceSpec {
   readonly provider: VoiceProvider;
@@ -16,6 +16,17 @@ export function assetId(provider: Pick<TtsProvider, 'signature'>, voice: VoiceCh
 }
 
 export function createTtsService(providers: TtsProviders, repository: MediaRepository) {
+  /** 本进程内同一音频只合成一次（快路径）；跨实例靠仓储的 advisory lock */
+  const inflight = new Map<string, Promise<AudioRef>>();
+
+  async function callProvider(provider: TtsProvider, text: string, voice: VoiceChoice): Promise<SynthesizedAudio> {
+    try {
+      return await provider.synthesize(text, voice);
+    } catch (error) {
+      throw upstream(error instanceof Error ? error.message : '语音合成失败');
+    }
+  }
+
   /** 合成并缓存；失败抛出可展示给管理员的错误（试听用） */
   async function synthesize(text: string, voice: VoiceChoice): Promise<AudioRef> {
     if (voice.provider === 'browser') throw badRequest('浏览器朗读的音色由前端直接试听');
@@ -24,14 +35,17 @@ export function createTtsService(providers: TtsProviders, repository: MediaRepos
     const id = assetId(provider, voice, text);
     const url = `/api/media/${id}`;
     if (await repository.exists(id)) return { url, mime: 'audio/mpeg' };
-    let audio;
-    try {
-      audio = await provider.synthesize(text, voice);
-    } catch (error) {
-      throw upstream(error instanceof Error ? error.message : '语音合成失败');
-    }
-    await repository.insert({ id, provider: voice.provider, voiceName: voice.voiceName, mime: audio.mime, data: audio.data });
-    return { url, mime: audio.mime };
+    const existing = inflight.get(id);
+    if (existing) return existing;
+    const job = repository.locked(id, async (asset): Promise<AudioRef> => {
+      // 等锁期间另一实例可能已经合成并提交
+      if (await asset.exists()) return { url, mime: 'audio/mpeg' };
+      const audio = await callProvider(provider, text, voice);
+      await asset.insert({ provider: voice.provider, voiceName: voice.voiceName, mime: audio.mime, data: audio.data });
+      return { url, mime: audio.mime };
+    }).finally(() => inflight.delete(id));
+    inflight.set(id, job);
+    return job;
   }
 
   return {

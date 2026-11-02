@@ -21,3 +21,6 @@ export const conflict = (message: string) => new AppError(409, API_ERROR_CODES.c
 export const tooManyRequests = (message: string) => new AppError(429, API_ERROR_CODES.tooManyRequests, message);
 /** 上游服务（模型、语音）不可用或返回错误 */
 export const upstream = (message: string) => new AppError(502, API_ERROR_CODES.upstream, message);
+
+/** 日志字段用：任何抛出的值都给出一段可读信息 */
+export const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));

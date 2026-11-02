@@ -103,7 +103,7 @@ export function createMatchService(deps: MatchServiceDeps) {
   return {
     /** C 端开局：按来源限流 + 同时进行的公开对局数上限（上限判断与插入在同一事务里串行化，并发请求不会一起越过） */
     async createPublic(request: CreateMatchRequest, source: string): Promise<MatchSummaryDto> {
-      deps.limiter.check(source);
+      await deps.limiter.check(source);
       return create(request, null, async (trx) => {
         await repository.lockPublicCreation(trx);
         if ((await repository.countActivePublic(new Date(Date.now() - deps.idleMs), trx)) >= deps.maxActive) {

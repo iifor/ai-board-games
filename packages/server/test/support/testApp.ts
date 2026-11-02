@@ -11,9 +11,14 @@ import { migrateToLatest } from '../../src/db/migrate';
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://battle@127.0.0.1:5433/battle';
 export const ADMIN = { username: 'admin', password: 'initial-password-123' } as const;
 
-/** 每个测试文件一个独立 schema，结束后删除 */
-export async function createTestApp(overrides: Partial<AppConfig> = {}, external: ExternalDeps = {}) {
-  const schema = `test_${randomBytes(6).toString('hex')}`;
+export interface TestAppOptions {
+  /** 复用另一个实例的 schema（多实例测试）：schema 由创建它的实例负责删除 */
+  readonly schema?: string;
+}
+
+/** 每个测试文件一个独立 schema，结束后删除；每个实例有自己的连接池、实例 ID 与跨实例通知的监听连接 */
+export async function createTestApp(overrides: Partial<AppConfig> = {}, external: ExternalDeps = {}, options: TestAppOptions = {}) {
+  const schema = options.schema ?? `test_${randomBytes(6).toString('hex')}`;
   const config: AppConfig = {
     env: 'test',
     port: 0,
@@ -33,6 +38,7 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, external
   await migrateToLatest(db, schema);
   const services = createServices(db, config, gameRegistry, { sleep: async () => {}, ...external });
   await services.auth.bootstrap();
+  await services.bus.start();
   const { app, injectWebSocket } = createApp(services, { trustProxy: config.http.trustProxy });
 
   async function call<T>(method: string, path: string, options: { body?: unknown; token?: string; headers?: Record<string, string> } = {}) {
@@ -55,11 +61,12 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, external
 
   async function cleanup(): Promise<void> {
     await services.worker.stop();
-    await sql`drop schema if exists ${sql.id(schema)} cascade`.execute(db);
+    await services.bus.stop();
+    if (!options.schema) await sql`drop schema if exists ${sql.id(schema)} cascade`.execute(db);
     await db.destroy();
   }
 
-  return { app, injectWebSocket, db, services, config, call, adminToken, cleanup };
+  return { app, injectWebSocket, db, services, config, schema, call, adminToken, cleanup };
 }
 
 export type TestApp = Awaited<ReturnType<typeof createTestApp>>;

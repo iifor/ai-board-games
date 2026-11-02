@@ -2,14 +2,13 @@ import type { AiRequest, EngineSnapshot } from '@battle/engine';
 import type { GameResult, MatchPacing, MatchStatus, StageEvent } from '@battle/shared';
 import { sql, type Transaction } from 'kysely';
 import type { Db } from '../../db/database';
+import { JOB_LOCKS, PUBLIC_CREATION_LOCK, tryJobLock } from '../../db/locks';
 import type { Database } from '../../db/schema';
 import { VOICE_CHOICE_COLUMNS } from '../voices/repository';
 import type { MatchRow, SeatRow, TaskCompletion } from './types';
 
 type Executor = Db | Transaction<Database>;
 
-/** 公开开局用的事务级 advisory lock 键（任意固定整数，只需全库唯一） */
-const PUBLIC_CREATION_LOCK = 7201;
 /** 还没有结果的任务状态 */
 const OPEN_TASK_STATUSES = ['queued', 'running'] as const;
 
@@ -168,9 +167,13 @@ export function createMatchRepository(db: Db) {
     /** 公开开局的事务级串行锁：让"计数 + 插入"不会被并发请求一起越过上限 */
     lockPublicCreation: (trx: Executor) => sql`select pg_advisory_xact_lock(${PUBLIC_CREATION_LOCK})`.execute(trx),
 
-    /** 长时间无人确认的公开对局标为失败，并取消其排队中的 AI 任务；返回被结束的对局 ID */
-    async failIdle(before: Date, error: string): Promise<string[]> {
+    /**
+     * 长时间无人确认的公开对局标为失败，并取消其排队中的 AI 任务；返回被结束的对局 ID。
+     * 先拿回收器的 try-lock：另一实例正在清扫时返回 null，不重复扫。
+     */
+    async failIdle(before: Date, error: string): Promise<string[] | null> {
       return db.transaction().execute(async (trx) => {
+        if (!(await tryJobLock(trx, JOB_LOCKS.reaper))) return null;
         const rows = await trx.updateTable('matches')
           .set({ status: 'failed', error, updatedAt: new Date(), completedAt: new Date() })
           .where('debug', '=', false).where('pacing', '=', 'ack')

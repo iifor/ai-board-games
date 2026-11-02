@@ -1,17 +1,18 @@
 import { tooManyRequests } from '../../utils/errors';
-import { createWindowCounter } from '../../utils/windowCounter';
+import { windowKey, type WindowStore } from '../../utils/windowStore';
 
-const WINDOW_MS = 60 * 60 * 1000;
+export const CREATION_WINDOW_MS = 60 * 60 * 1000;
 const MAX_PER_WINDOW = 10;
 
-/** C 端开局限流：每个来源每小时最多 10 局（进程内滑动窗口计数，过期来源会被清理） */
-export function createCreationLimiter(now: () => number = Date.now) {
-  const counter = createWindowCounter(WINDOW_MS);
+/** C 端开局限流：每个来源每小时最多 10 局；计数放在 WindowStore 里，多实例共享 */
+export function createCreationLimiter(store: WindowStore, now: () => number = Date.now) {
   return {
-    check(source: string): void {
+    /** 超限抛 429，否则记一次。计数与记录不是同一条语句，并发请求可能略微越过上限：限流只求近似，不做串行化 */
+    async check(source: string): Promise<void> {
       const current = now();
-      if (counter.count(source, current) >= MAX_PER_WINDOW) throw tooManyRequests('开局过于频繁，请稍后再试');
-      counter.record(source, current);
+      const key = windowKey('creation', source);
+      if (await store.count(key, new Date(current - CREATION_WINDOW_MS)) >= MAX_PER_WINDOW) throw tooManyRequests('开局过于频繁，请稍后再试');
+      await store.add(key, new Date(current));
     },
   };
 }

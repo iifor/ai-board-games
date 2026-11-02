@@ -19,7 +19,7 @@ const envSchema = z.object({
   AI_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
   /** 一个 AI 任务最多领取几次：执行或推进反复失败时终止对局，不再无限重试、重复付费调用模型 */
   AI_TASK_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(3),
-  /** 播放流等待新事件时的兜底重查间隔（毫秒）：事件总线只在进程内，其他实例产生的事件靠它发现 */
+  /** 播放流等待新事件时的兜底重查间隔（毫秒）：跨实例通知经 LISTEN/NOTIFY 即时送达，这是监听连接重连期间丢失通知时的安全网 */
   STREAM_POLL_MS: z.coerce.number().int().min(100).max(60_000).default(2000),
   /** C 端同时进行中的公开对局上限 */
   MAX_ACTIVE_MATCHES: z.coerce.number().int().min(1).max(1000).default(5),

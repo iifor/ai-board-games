@@ -169,10 +169,12 @@ describe('tts cache key', () => {
         return row ? { ...row, createdAt: new Date() } : undefined;
       },
       exists: async (id) => stored.has(id),
-      insert: async (values) => {
-        stored.set(values.id, values);
-        return [];
-      },
+      locked: (id, work) => work({
+        exists: async () => stored.has(id),
+        insert: async (values) => {
+          stored.set(id, { id, ...values });
+        },
+      }),
     };
     const first = fakeTts('mimo:model-a:mp3');
     const second = fakeTts('mimo:model-b:mp3');
