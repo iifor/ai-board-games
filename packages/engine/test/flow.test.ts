@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { advance, compileGame, createSnapshot, defineGame, definePrompts, EngineInputError } from '../src';
+import { advance, compileGame, createSnapshot, defineGame, definePrompts, EngineInputError, SpecMismatchError } from '../src';
 import { makePlayers, runToEnd } from '../src/testing';
 import { counterSpec } from './fixtures/minimal';
 import { secretGame } from './fixtures/secretGame';
@@ -38,7 +38,10 @@ describe('flow', () => {
 
   it('rejects snapshots from another spec version', () => {
     const snapshot = createSnapshot(compileGame(counterSpec(1)), { seed: 1, players: makePlayers(2) });
-    expect(() => advance(compileGame(counterSpec(1, { version: 2 })), snapshot, { kind: 'start' })).toThrow(/不匹配/);
+    const run = () => advance(compileGame(counterSpec(1, { version: 2 })), snapshot, { kind: 'start' });
+    expect(run).toThrow(SpecMismatchError);
+    // 不是可以忽略的过期输入：服务端据此终止对局，而不是把它当成迟到的 AI 结果
+    expect(run).not.toThrow(EngineInputError);
   });
 
   it('drops the stored result of a phase that enabled() skips', () => {

@@ -1,7 +1,7 @@
 import { issueDrafts } from '../ai/requests';
 import type { CompiledGame } from '../compiler/compile';
 import { shouldPauseBeforeEnter } from '../debug/breakpoints';
-import { EngineInputError } from '../errors';
+import { SpecMismatchError } from '../errors';
 import { executorFor } from '../phases/registry';
 import { cloneJson, deepFreeze } from '../utils/json';
 import { ExecEnv, type Emitted } from './env';
@@ -78,7 +78,7 @@ function runUntilBlocked(env: ExecEnv): void {
 /** 引擎唯一的推进入口：纯函数，不修改传入的快照 */
 export function advance(game: CompiledGame, snapshot: EngineSnapshot, input: EngineInput): AdvanceResult {
   if (snapshot.gameKey !== game.spec.key || snapshot.specHash !== game.hash) {
-    throw new EngineInputError(`快照属于 ${snapshot.gameKey}@${snapshot.specHash}，与当前游戏定义不匹配`);
+    throw new SpecMismatchError(`快照属于 ${snapshot.gameKey}@${snapshot.specHash}，与当前游戏定义不匹配`);
   }
   const out: Emitted = { log: [], stageEvents: [], aiRequests: [] };
   const env = new ExecEnv(game, workingCopy(snapshot), out);

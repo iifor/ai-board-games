@@ -27,7 +27,7 @@ r = advance(game, r.snapshot, { kind: 'debug', command: 'step' });         // �
 - 状态：`created → running → waiting_ai ⇄ running → completed`；调试局还会进入 `paused`。
 - 非法输入（重复开局、未知或过期的请求、非调试局的调试指令）抛 `EngineInputError`，调用方保留原快照。
 - spec 写错抛 `SpecError`（编译期汇总全部问题），或在运行到出错位置时抛出普通 `Error`。
-- 快照记录 `specHash`；用不匹配的游戏定义推进会被拒绝。**hash 只覆盖结构、模板与函数源码，不覆盖闭包捕获的常量**，改变行为时必须同时提升 `version`。
+- 快照记录 `specHash`；用不匹配的游戏定义推进抛 `SpecMismatchError`（不继承 `EngineInputError`：这一局用当前代码永远无法推进，调用方必须单独处理，不能当成过期输入忽略）。hash 覆盖结构、模板与函数源码，所以改动任何规则、模板都会让进行中的旧对局无法继续。**hash 不覆盖闭包捕获的常量**，改变行为时必须同时提升 `version`。
 - `AiRequest.prompt` 是 L1–L6 分层结果，`toChatMessages()` 给出推荐的消息排布（L1–L3 为 system，L4–L6 为 user）。
 - 调试局用 `scriptedOutput(game, snapshot, request)` 生成确定性合法输出，代替真实模型。
 

@@ -73,7 +73,7 @@ src/
 
 ## 对局运行时
 
-- **推进**（`modules/matches/runtime.ts`）：一个事务内 `SELECT … FOR UPDATE` 锁定对局行 → 调用引擎 `advance` → 写回快照、新的 AI 任务、舞台事件，以及（来自 worker 时）完成的任务；提交后通过事件总线通知 worker 与实时网关（总线跨实例，见"多实例"）。引擎计算放在 try 内：`EngineInputError` 对 AI 结果视为过期（任务记为 cancelled），对其他输入返回 409；引擎其他异常把对局标为 failed。数据库错误不吞掉，整个事务回滚并向上抛出。完结任务只作用于仍为 queued / running 的任务：迟到的重复结果不会把已 succeeded 的任务改写成 cancelled。
+- **推进**（`modules/matches/runtime.ts`）：一个事务内 `SELECT … FOR UPDATE` 锁定对局行 → 调用引擎 `advance` → 写回快照、新的 AI 任务、舞台事件，以及（来自 worker 时）完成的任务；提交后通过事件总线通知 worker 与实时网关（总线跨实例，见"多实例"）。引擎计算放在 try 内：`EngineInputError` 对 AI 结果视为过期（任务记为 cancelled），对其他输入返回 409；`SpecMismatchError`（快照来自旧版本的游戏定义，见下文"部署与游戏版本"）立即把对局标为 failed（错误"游戏规则已更新，这局无法继续，已终止"，触发的任务记为 cancelled）；引擎其他异常把对局标为 failed。后两种情况都会取消该局其余未完成的任务，与 `failMatch` 共用同一段终止逻辑。数据库错误不吞掉，整个事务回滚并向上抛出。完结任务只作用于仍为 queued / running 的任务：迟到的重复结果不会把已 succeeded 的任务改写成 cancelled。
 - **AI worker**（`modules/ai-worker`）：事件驱动（总线跨实例唤醒）+ 每秒兜底轮询（处理重试、过期领取与丢失的通知）。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型），每次领取 `attempts` 加一。执行或推进抛错（如数据库故障）时只记日志等待重新领取；领取次数达到 `AI_TASK_MAX_ATTEMPTS`（默认 3）仍失败则由 `runtime.failMatch` 把对局标为 failed（错误"AI 处理多次失败，对局已终止"）、任务记为 failed、其余任务取消，并通过总线通知在线观众，不再无限重试、重复付费调用模型。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；开启混沌脚本（`chaos`）的脚本化对局改用引擎的 `chaosReply`：按对局种子与请求 ID 以固定概率弃票、放弃可放弃的动作、附带自爆等声明、给出非法输出（引擎重问后再兜底）或模拟一次调用失败——模拟失败是一次"已完成但失败"的任务（任务记为 failed、以 `ai_failed` 交回引擎走兜底，对局继续），不是执行异常，不计入下面的领取次数上限。否则依次尝试座位玩家的主模型与备用模型中仍启用的部分（主模型被停用时直接用备用模型），每个模型最多 2 次传输层尝试（429 / 5xx / 超时可重试），全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`（脚本化与混沌对局不写）。
 - **优雅关闭**（`src/index.ts`）：收到 SIGINT / SIGTERM 后先停回收器，再 `worker.stop()`：不再领取新任务，等待进行中的任务最多 `SHUTDOWN_TIMEOUT_MS`（默认 10 秒），超时则记录还没结束的任务（matchId、requestId）并继续关闭——它们的领取在 10 分钟后过期，由下一个实例重新领取。随后关闭跨实例通知的监听连接、HTTP 监听与连接池；整个关闭流程超过 2 倍 `SHUTDOWN_TIMEOUT_MS` 仍没结束（例如被卡住的任务占着连接）就直接退出。
 - **无人观看回收**（`modules/matches/reaper.ts`）：每分钟把 `MATCH_IDLE_MINUTES` 内没有动静（既没推进也没有观众确认，`updated_at` 在确认时也会刷新）的 ack 节奏公开对局标为 failed 并取消其排队任务，通过总线通知在线观众；调试局不回收。进行中计数也只算这个窗口内有动静的对局。每次清扫先在事务里拿 `pg_try_advisory_xact_lock`，拿不到（另一实例正在扫）就跳过，`sweep()` 返回 null。
@@ -106,6 +106,12 @@ src/
 - **本来就安全的部分**：AI 任务领取 `FOR UPDATE SKIP LOCKED`；公开开局上限在事务里持 advisory lock（单键 7201）串行化。所有 advisory lock 键登记在 `db/locks.ts`。
 
 运维要点：每个实例比连接池多占一条数据库连接（LISTEN）；NOTIFY 是 PostgreSQL 内置功能，不需要扩展；advisory lock 与 NOTIFY 都是数据库范围而非 schema 范围，共用一个库、不同 schema 的部署会互相等待锁（只影响效率，不影响正确性），通道名已按 schema 区分。测试里 `createTestApp` 可传 `{ schema }` 复用另一个实例的 schema，用来搭两个实例（`test/multiInstance.test.ts`）。
+
+### 部署与游戏版本
+
+对局快照固化了创建时游戏定义的 `specHash`，它覆盖规则函数源码与模板（见 `project-engine.md`）。部署了改动规则或模板的新代码后，进行中的旧对局无法再推进：下一次推进（worker 交回 AI 结果、后台调试指令）会把它标为 failed，不会停在 `waiting_ai` / `paused` 上；暂停中的调试局要等下一条调试指令才会被终止。已经领取的任务仍会先调用一次模型，结果随后作废。
+
+因此改动规则的版本不能与旧版本混跑（滚动部署）：新旧实例会把对方创建的对局都判为版本不匹配而终止。这类版本应停掉全部旧实例后再启动新实例；只改服务端、前端等不影响 `specHash` 的版本可以滚动部署。
 
 ## 数据库
 

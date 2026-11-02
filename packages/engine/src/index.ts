@@ -6,7 +6,7 @@ export { compileGame, END_PHASE, RETURN_PHASE, type CompiledGame } from './compi
 export { scriptedOutput } from './debug/scriptedAgent';
 export { CHAOS_FAILURE_REASON, CHAOS_RATES, chaosReply } from './debug/chaosAgent';
 export type { ScriptedReply } from './debug/chaosAgent';
-export { EngineInputError, SpecError, TemplateError } from './errors';
+export { EngineInputError, SpecError, SpecMismatchError, TemplateError } from './errors';
 export { toChatMessages, type ChatMessage } from './prompt/assemble';
 export type { PromptTemplate } from './prompt/template';
 export { advance } from './runtime/advance';

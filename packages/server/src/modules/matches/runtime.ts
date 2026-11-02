@@ -1,5 +1,7 @@
-import { advance, EngineInputError, type CompiledGame, type EngineInput } from '@battle/engine';
+import { advance, EngineInputError, SpecMismatchError, type CompiledGame, type EngineInput } from '@battle/engine';
 import type { MatchStatus } from '@battle/shared';
+import type { Transaction } from 'kysely';
+import type { Database } from '../../db/schema';
 import type { EventBus } from '../../utils/eventBus';
 import { conflict, notFound } from '../../utils/errors';
 import { logger } from '../../utils/logger';
@@ -8,11 +10,23 @@ import { TERMINAL_STATUSES, type AdvanceOutcome, type TaskCompletion } from './t
 
 const NOTHING: Omit<AdvanceOutcome, 'status'> = { events: [], tasks: [], stale: false };
 
+/** 对局由旧版本的游戏定义创建，部署新代码后无法继续时展示给观众的原因 */
+export const SPEC_MISMATCH_ERROR = '游戏规则已更新，这局无法继续，已终止';
+/** 引擎内部出错（spec 写错等）时展示给观众的原因；详情只写服务端日志 */
+const ENGINE_FAILURE_ERROR = '对局运行出错，已终止';
+
 /**
  * 对局推进：在一个事务里锁定对局行 → 调用引擎 advance → 写回快照、AI 任务、舞台事件（以及完成的任务）。
  * 提交后通过事件总线通知 AI worker 与实时网关。
  */
 export function createMatchRuntime(repository: MatchRepository, findGame: (key: string) => CompiledGame, bus: EventBus) {
+  /** 在已锁定对局行的事务里终止对局：标为失败、记下触发的任务（如有）、取消其余未完成任务 */
+  async function terminate(trx: Transaction<Database>, matchId: string, error: string, completion?: TaskCompletion): Promise<void> {
+    await repository.markFailed(trx, matchId, error);
+    if (completion) await repository.completeTask(trx, matchId, completion);
+    await repository.cancelOpenTasks(trx, [matchId]);
+  }
+
   async function advanceMatch(matchId: string, input: EngineInput, completion?: TaskCompletion): Promise<AdvanceOutcome> {
     const outcome = await repository.transaction(async (trx): Promise<AdvanceOutcome> => {
       const row = await repository.lock(trx, matchId);
@@ -34,9 +48,15 @@ export function createMatchRuntime(repository: MatchRepository, findGame: (key: 
           await repository.completeTask(trx, matchId, { ...completion, status: 'cancelled', error: error.message });
           return { ...NOTHING, status: row.status, stale: true };
         }
-        logger.error('对局推进失败', { matchId, error: error instanceof Error ? error.message : String(error) });
-        await repository.markFailed(trx, matchId, '对局运行出错，已终止');
-        if (completion) await repository.completeTask(trx, matchId, { ...completion, status: 'failed' });
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof SpecMismatchError) {
+          // 快照来自旧版本的游戏定义：当前代码永远推进不了它，立即终止，不能当成过期结果留在 waiting_ai
+          logger.warn('对局的游戏定义已更新，终止对局', { matchId, error: message });
+          await terminate(trx, matchId, SPEC_MISMATCH_ERROR, completion && { ...completion, status: 'cancelled', error: message });
+          return { ...NOTHING, status: 'failed' };
+        }
+        logger.error('对局推进失败', { matchId, error: message });
+        await terminate(trx, matchId, ENGINE_FAILURE_ERROR, completion && { ...completion, status: 'failed' });
         return { ...NOTHING, status: 'failed' };
       }
       const lastSeq = result.stageEvents.reduce((max, event) => Math.max(max, event.seq), row.lastSeq);
@@ -64,9 +84,7 @@ export function createMatchRuntime(repository: MatchRepository, findGame: (key: 
     const failed = await repository.transaction(async (trx) => {
       const row = await repository.lock(trx, matchId);
       if (!row || TERMINAL_STATUSES.has(row.status)) return false;
-      await repository.markFailed(trx, matchId, error);
-      await repository.completeTask(trx, matchId, completion);
-      await repository.cancelOpenTasks(trx, [matchId]);
+      await terminate(trx, matchId, error, completion);
       return true;
     });
     if (failed) bus.emit('match:status', { matchId, status: 'failed' });

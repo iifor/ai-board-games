@@ -17,6 +17,17 @@ export class EngineInputError extends Error {
   }
 }
 
+/**
+ * 快照由另一版本的游戏定义创建（部署后规则或模板变了）：这一局用当前代码永远无法推进。
+ * 不继承 EngineInputError：调用方必须单独处理，不能把它当成可以忽略的过期输入。
+ */
+export class SpecMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SpecMismatchError';
+  }
+}
+
 /** 提示词模板语法错误或渲染时变量缺失 */
 export class TemplateError extends Error {
   constructor(templateName: string, message: string) {
