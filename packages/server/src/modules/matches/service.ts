@@ -9,7 +9,6 @@ import type { MatchRepository } from './repository';
 import type { MatchRuntime } from './runtime';
 import type { SeatRow } from './types';
 
-const ACTIVE_WINDOW_MS = 30 * 60 * 1000;
 
 export interface MatchServiceDeps {
   readonly repository: MatchRepository;
@@ -19,6 +18,8 @@ export interface MatchServiceDeps {
   readonly tryGame: (key: string) => CompiledGame | null;
   readonly limiter: CreationLimiter;
   readonly maxActive: number;
+  /** 多久没有动静（推进或观众确认）就不再算进行中 */
+  readonly idleMs: number;
 }
 
 export function createMatchService(deps: MatchServiceDeps) {
@@ -37,7 +38,10 @@ export function createMatchService(deps: MatchServiceDeps) {
     };
   }
 
-  async function create(request: CreateMatchRequest, debug: CreateDebugMatchRequest | null): Promise<MatchSummaryDto> {
+  /** 开局事务里插入之前执行的检查（公开开局的上限判断） */
+  type CreationGuard = Parameters<MatchRepository['transaction']>[0];
+
+  async function create(request: CreateMatchRequest, debug: CreateDebugMatchRequest | null, guard: CreationGuard | null): Promise<MatchSummaryDto> {
     const game = deps.findGame(request.gameKey);
     const { profiles, seats } = await seatsFor(request.playerIds);
     const seed = debug?.seed ?? randomInt(0, 2 ** 32);
@@ -55,19 +59,22 @@ export function createMatchService(deps: MatchServiceDeps) {
       throw error;
     }
     const id = `m_${randomUUID()}`;
-    await repository.transaction((trx) => repository.insert(trx, {
-      id,
-      gameKey: game.spec.key,
-      variantKey: snapshot.variantKey,
-      specVersion: game.spec.version,
-      specHash: game.hash,
-      seed,
-      params: snapshot.params,
-      debug: debug !== null,
-      scripted: debug?.scripted ?? false,
-      pacing: debug?.pacing ?? 'ack',
-      snapshot,
-    }, seats));
+    await repository.transaction(async (trx) => {
+      if (guard) await guard(trx);
+      await repository.insert(trx, {
+        id,
+        gameKey: game.spec.key,
+        variantKey: snapshot.variantKey,
+        specVersion: game.spec.version,
+        specHash: game.hash,
+        seed,
+        params: snapshot.params,
+        debug: debug !== null,
+        scripted: debug?.scripted ?? false,
+        pacing: debug?.pacing ?? 'ack',
+        snapshot,
+      }, seats);
+    });
     await deps.runtime.advanceMatch(id, { kind: 'start' });
     return summary(id);
   }
@@ -84,16 +91,18 @@ export function createMatchService(deps: MatchServiceDeps) {
   }
 
   return {
-    /** C 端开局：限流 + 同时进行的公开对局数上限 */
+    /** C 端开局：按来源限流 + 同时进行的公开对局数上限（上限判断与插入在同一事务里串行化，并发请求不会一起越过） */
     async createPublic(request: CreateMatchRequest, source: string): Promise<MatchSummaryDto> {
       deps.limiter.check(source);
-      if ((await repository.countActivePublic(new Date(Date.now() - ACTIVE_WINDOW_MS))) >= deps.maxActive) {
-        throw tooManyRequests('当前进行中的对局较多，请稍后再试');
-      }
-      return create(request, null);
+      return create(request, null, async (trx) => {
+        await repository.lockPublicCreation(trx);
+        if ((await repository.countActivePublic(new Date(Date.now() - deps.idleMs), trx)) >= deps.maxActive) {
+          throw tooManyRequests('当前进行中的对局较多，请稍后再试');
+        }
+      });
     },
 
-    createDebug: (request: CreateDebugMatchRequest) => create(request, request),
+    createDebug: (request: CreateDebugMatchRequest) => create(request, request, null),
     summary,
 
     async detail(id: string): Promise<MatchDetailDto> {

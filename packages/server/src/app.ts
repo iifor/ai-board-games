@@ -1,5 +1,6 @@
 import { createNodeWebSocket } from '@hono/node-ws';
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import type { Services } from './container';
 import type { Db } from './db/database';
 import { requireAdmin } from './middlewares/auth';
@@ -17,11 +18,23 @@ import { mediaRoutes } from './modules/tts';
 import { voiceRoutes } from './modules/voices';
 import type { AppEnv } from './types';
 
+export interface AppOptions {
+  /** 部署在可信反向代理之后时为 true：限流来源取 X-Forwarded-For */
+  readonly trustProxy: boolean;
+}
+
+/** 公开接口的请求体上限：开局请求只有几个 ID 和一个小参数对象 */
+const PUBLIC_BODY_LIMIT = 64 * 1024;
+/** 后台接口的请求体上限 */
+const ADMIN_BODY_LIMIT = 1024 * 1024;
+
 /** 路由装配：/api/toc 为 C 端公开接口，/api/admin 为需要管理员登录的后台接口 */
-export function createApp(db: Db, services: Services) {
+export function createApp(db: Db, services: Services, options: AppOptions = { trustProxy: false }) {
   const app = new Hono<AppEnv>();
   const { upgradeWebSocket, injectWebSocket } = createNodeWebSocket({ app });
   app.use('*', requestId);
+  app.use('/api/toc/*', bodyLimit({ maxSize: PUBLIC_BODY_LIMIT }));
+  app.use('/api/admin/*', bodyLimit({ maxSize: ADMIN_BODY_LIMIT }));
   app.onError(errorHandler);
   app.notFound(notFoundHandler);
 
@@ -31,7 +44,7 @@ export function createApp(db: Db, services: Services) {
   app.route('/api/media', mediaRoutes(services.tts));
   app.route('/api/toc/games', gameRoutes(services.games));
   app.route('/api/toc/players', publicPlayerRoutes(services.players));
-  app.route('/api/toc/matches', publicMatchRoutes(services.matches));
+  app.route('/api/toc/matches', publicMatchRoutes(services.matches, { trustProxy: options.trustProxy }));
   app.route('/api/toc/ws', realtimeRoutes(upgradeWebSocket, {
     matches: services.repositories.matches,
     bus: services.bus,

@@ -7,6 +7,9 @@ import type { MatchRow, SeatRow, TaskCompletion } from './types';
 
 type Executor = Db | Transaction<Database>;
 
+/** 公开开局用的事务级 advisory lock 键（任意固定整数，只需全库唯一） */
+const PUBLIC_CREATION_LOCK = 7201;
+
 export interface NewMatch {
   readonly id: string;
   readonly gameKey: string;
@@ -113,14 +116,36 @@ export function createMatchRepository(db: Db) {
         .where('matchId', '=', matchId).orderBy('seat').execute();
     },
 
+    /** 观众确认也算"有人在看"：updated_at 一并刷新，供进行中计数与回收器判断 */
     markAcked: (id: string, seq: number) =>
-      db.updateTable('matches').set({ ackedSeq: sql`greatest(acked_seq, ${seq})` }).where('id', '=', id).execute(),
+      db.updateTable('matches').set({ ackedSeq: sql`greatest(acked_seq, ${seq})`, updatedAt: new Date() }).where('id', '=', id).execute(),
 
-    async countActivePublic(since: Date): Promise<number> {
-      const row = await db.selectFrom('matches').select((eb) => eb.fn.countAll<string>().as('count'))
+    /** 近期有动静的进行中公开对局数；传入事务时与 lockPublicCreation 在同一事务内判断 */
+    async countActivePublic(since: Date, executor: Executor = db): Promise<number> {
+      const row = await executor.selectFrom('matches').select((eb) => eb.fn.countAll<string>().as('count'))
         .where('debug', '=', false).where('status', 'not in', ['completed', 'failed']).where('updatedAt', '>', since)
         .executeTakeFirstOrThrow();
       return Number(row.count);
+    },
+
+    /** 公开开局的事务级串行锁：让"计数 + 插入"不会被并发请求一起越过上限 */
+    lockPublicCreation: (trx: Executor) => sql`select pg_advisory_xact_lock(${PUBLIC_CREATION_LOCK})`.execute(trx),
+
+    /** 长时间无人确认的公开对局标为失败，并取消其排队中的 AI 任务；返回被结束的对局 ID */
+    async failIdle(before: Date, error: string): Promise<string[]> {
+      return db.transaction().execute(async (trx) => {
+        const rows = await trx.updateTable('matches')
+          .set({ status: 'failed', error, updatedAt: new Date(), completedAt: new Date() })
+          .where('debug', '=', false).where('pacing', '=', 'ack')
+          .where('status', 'in', ['created', 'running', 'waiting_ai']).where('updatedAt', '<', before)
+          .returning('id').execute();
+        const ids = rows.map((row) => row.id);
+        if (ids.length) {
+          await trx.updateTable('aiTasks').set({ status: 'cancelled', updatedAt: new Date() })
+            .where('matchId', 'in', ids).where('status', 'in', ['queued', 'running']).execute();
+        }
+        return ids;
+      });
     },
 
     remove: (id: string) => db.deleteFrom('matches').where('id', '=', id).executeTakeFirst(),

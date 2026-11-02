@@ -45,7 +45,7 @@ src/
 | `POST /api/admin/voices/:id/preview` | 试听：按音色参数合成一段文本，返回与对局播放共用的 `/api/media/:id` 地址；浏览器音色返回 400，由前端自己朗读 | 管理员 |
 | `POST /api/admin/voices/import-defaults` | 导入内置音色目录（`modules/voices/catalog.ts`，沿用旧版默认语音包），按（来源、音色名、风格）与名称去重，可重复执行 | 管理员 |
 | 同上 `/api/admin/players` | AI 玩家（模型、音色引用检查） | 管理员 |
-| `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`）；每来源每小时 10 局，进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制 | 无 |
+| `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`）；每来源每小时 10 局（来源默认是连接地址，`TRUST_PROXY=true` 时才取 `X-Forwarded-For`），进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制（上限判断与插入在同一事务内用 advisory lock 串行化，并发请求不会一起越过）；公开接口请求体上限 64 KB | 无 |
 | `GET /api/toc/matches`、`GET /api/toc/matches/:id` | 已完成的公开对局历史、对局概要 | 无 |
 | `GET /api/media/:id` | 合成音频（按音色与文本哈希寻址，长期缓存） | 无 |
 | `WS /api/toc/ws/matches/:id` | 播放流，见下文"实时推送" | 无 |
@@ -69,6 +69,7 @@ src/
 
 - **推进**（`modules/matches/runtime.ts`）：一个事务内 `SELECT … FOR UPDATE` 锁定对局行 → 调用引擎 `advance` → 写回快照、新的 AI 任务、舞台事件，以及（来自 worker 时）完成的任务；提交后通过进程内事件总线通知 worker 与实时网关。引擎计算放在 try 内：`EngineInputError` 对 AI 结果视为过期（任务记为 cancelled），对其他输入返回 409；引擎其他异常把对局标为 failed。数据库错误不吞掉，整个事务回滚并向上抛出。
 - **AI worker**（`modules/ai-worker`）：事件驱动 + 每秒兜底轮询。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型）。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；否则依次尝试座位玩家的主模型与备用模型中仍启用的部分（主模型被停用时直接用备用模型），每个模型最多 2 次传输层尝试（429 / 5xx / 超时可重试），全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`。
+- **无人观看回收**（`modules/matches/reaper.ts`）：每分钟把 `MATCH_IDLE_MINUTES` 内没有动静（既没推进也没有观众确认，`updated_at` 在确认时也会刷新）的 ack 节奏公开对局标为 failed 并取消其排队任务，通过总线通知在线观众；调试局不回收。进行中计数也只算这个窗口内有动静的对局。
 - **额度耗尽自动停用**：供应商返回 4xx 且错误码在 `modules/llm/quota.ts` 的列表中（百炼 `Arrearage` / `AllocationQuota.FreeTierOnly`、火山 `*BillOverdue`、OpenAI `insufficient_quota` 等）时，LLM 客户端抛出 `quotaExhausted` 的 `LlmError`；worker 不重试，把该模型标为 `enabled = false`、`disabled_reason = 'quota_exhausted'` 并切换备用模型。管理员补充额度后在后台"测试"通过再"重新启用"（`PUT` 时 `enabled: true` 清除原因）。普通限流（429 但没有这些错误码）仍只是重试。
 - **LLM**（`modules/llm`）：OpenAI 兼容 Chat Completions，要求 JSON 对象输出，`toChatMessages` 排布分层 prompt；从回复中提取 JSON（兼容代码块），取不出时把原文交给引擎校验并重问。
 - **TTS**（`modules/tts`）：Azure（REST，不依赖 SDK；SSML 带语言、`mstts:express-as` 风格、prosody 语速与音调）与 Mimo（OpenAI 兼容；风格作为前置的 user 指令）；`browser` 音色与脚本化对局不合成。音频存入 `media_assets`，按（来源、音色名、语言、风格、语速、音调、文本）哈希去重；对局播放中合成失败只记日志，前端退回浏览器朗读或字幕；后台试听走同一条 `synthesize`，失败则以 50201 把原因返回给管理员。主持播报使用名为"主持人"的音色（没有则不合成）。
@@ -79,7 +80,7 @@ src/
 
 1. 客户端连接后发送 `{ type: 'hello', afterSeq }`（10 秒内未发送则从头开始）。
 2. 服务端逐个推送 `{ type: 'event', event, audio }`，客户端播放完毕发送 `{ type: 'ack', seq }` 后才推送下一个；推送时预先为之后的 3 个事件准备语音。
-3. 暂时没有新事件时推送 `status`；对局结束且事件推完后推送 `{ type: 'end', result }` 并关闭；失败推送 `status: failed`。
+3. 暂时没有新事件时推送 `status`；对局结束且事件推完后推送 `{ type: 'end', result }` 并关闭；失败推送 `status: failed`。推送进行中收到的总线通知会记为"待重查"，本轮结束后再查一次，不会丢掉唤醒。
 4. 断线重连用最后确认的 seq 作为 `afterSeq` 续播；已结束的对局从 0 开始即为回放，与实时走同一条路径。
 5. 多个观众时，`matches.acked_seq` 取最大确认值。
 
@@ -103,7 +104,7 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 
 ## 配置
 
-见 `.env.example`：`PORT`（默认 3100）、`DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_POOL_MAX`、`JWT_SECRET`（≥32 字符）、`SECRET_KEY`、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（≥12 字符）、`AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`、`MIMO_API_KEY` / `MIMO_BASE_URL` / `MIMO_TTS_MODEL`、`AI_CONCURRENCY`（默认 4）、`MAX_ACTIVE_MATCHES`（默认 5）。`pnpm --filter @battle/server dev` 读取根目录 `.env`。
+见 `.env.example`：`PORT`（默认 3100）、`DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_POOL_MAX`、`JWT_SECRET`（≥32 字符）、`SECRET_KEY`、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（≥12 字符）、`AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`、`MIMO_API_KEY` / `MIMO_BASE_URL` / `MIMO_TTS_MODEL`、`AI_CONCURRENCY`（默认 4）、`MAX_ACTIVE_MATCHES`（默认 5）、`MATCH_IDLE_MINUTES`（默认 30）、`TRUST_PROXY`（默认 false）。`pnpm --filter @battle/server dev` 读取根目录 `.env`。
 
 ## 测试
 

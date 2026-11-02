@@ -1,15 +1,26 @@
-import type { StageEvent } from '@battle/shared';
+import type { GameResult, MatchStatus, StageEvent } from '@battle/shared';
 import type { EventBus } from '../../utils/eventBus';
 import { logger } from '../../utils/logger';
-import type { MatchRepository } from '../matches/repository';
 import { PREFETCH_EVENTS, TERMINAL_STATUSES } from '../matches/types';
 import type { AudioResolver } from './audio';
 import { encode, type StreamSocket } from './protocol';
 
+/** 播放流只需要对局的这几个字段 */
+export interface StreamMatch {
+  readonly status: MatchStatus;
+  readonly scripted: boolean;
+  readonly result: GameResult | null;
+  readonly error: string | null;
+}
+
 export interface StreamDeps {
-  readonly matches: MatchRepository;
+  readonly matches: {
+    find(id: string): Promise<StreamMatch | undefined>;
+    nextEvent(id: string, afterSeq: number): Promise<StageEvent | undefined>;
+    markAcked(id: string, seq: number): Promise<unknown>;
+  };
   readonly bus: EventBus;
-  readonly audio: AudioResolver;
+  readonly audio: Pick<AudioResolver, 'audioFor'>;
 }
 
 /**
@@ -22,6 +33,8 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
   let started = false;
   let closed = false;
   let pumping = false;
+  /** 推送进行中又收到了通知：这一轮结束后必须再查一次，否则这次唤醒就丢了 */
+  let dirty = false;
   const unsubscribes = [
     deps.bus.on('match:events', (payload) => payload.matchId === matchId && void pump()),
     deps.bus.on('match:status', (payload) => payload.matchId === matchId && void pump()),
@@ -45,27 +58,40 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
     void prefetchAudio(event.seq, scripted);
   }
 
+  /** 推送一步：有下一个事件就推，没有就按对局状态发 status / end */
+  async function step(): Promise<void> {
+    const match = await deps.matches.find(matchId);
+    if (!match) {
+      socket.send(encode({ type: 'error', message: '对局不存在' }));
+      close();
+      return;
+    }
+    const next = await deps.matches.nextEvent(matchId, cursor);
+    if (next) {
+      await send(next, match.scripted);
+    } else if (TERMINAL_STATUSES.has(match.status)) {
+      socket.send(encode(match.status === 'failed'
+        ? { type: 'status', status: 'failed', error: match.error }
+        : { type: 'end', result: match.result }));
+      close();
+    } else {
+      socket.send(encode({ type: 'status', status: match.status, error: null }));
+    }
+  }
+
   async function pump(): Promise<void> {
-    if (!started || closed || awaiting !== null || pumping) return;
+    if (!started || closed) return;
+    if (pumping) {
+      dirty = true;
+      return;
+    }
     pumping = true;
     try {
-      const match = await deps.matches.find(matchId);
-      if (!match) {
-        socket.send(encode({ type: 'error', message: '对局不存在' }));
-        close();
-        return;
-      }
-      const next = await deps.matches.nextEvent(matchId, cursor);
-      if (next) {
-        await send(next, match.scripted);
-      } else if (TERMINAL_STATUSES.has(match.status)) {
-        socket.send(encode(match.status === 'failed'
-          ? { type: 'status', status: 'failed', error: match.error }
-          : { type: 'end', result: match.result }));
-        close();
-      } else {
-        socket.send(encode({ type: 'status', status: match.status, error: null }));
-      }
+      do {
+        dirty = false;
+        if (awaiting !== null) return;
+        await step();
+      } while (dirty && !closed && awaiting === null);
     } catch (error) {
       logger.error('推送对局事件失败', { matchId, error: (error as Error).message });
     } finally {

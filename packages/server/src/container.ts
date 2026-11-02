@@ -5,7 +5,7 @@ import { createAiTaskRepository, createAiWorker, createTaskExecutor } from './mo
 import { createAuthRepository, createAuthService } from './modules/auth';
 import { createGameService } from './modules/games';
 import { createOpenAiCompatibleClient, type LlmClient } from './modules/llm';
-import { createCreationLimiter, createMatchRepository, createMatchRuntime, createMatchService } from './modules/matches';
+import { createCreationLimiter, createMatchReaper, createMatchRepository, createMatchRuntime, createMatchService } from './modules/matches';
 import { createModelRepository, createModelService } from './modules/models';
 import { createPlayerRepository, createPlayerService } from './modules/players';
 import { createProviderRepository, createProviderService } from './modules/providers';
@@ -68,7 +68,9 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
       tryGame: (key) => registry.get(key) ?? null,
       limiter: createCreationLimiter(),
       maxActive: config.matches.maxActive,
+      idleMs: config.matches.idleMs,
     }),
+    reaper: createMatchReaper({ repository: repositories.matches, bus }, { idleMs: config.matches.idleMs }),
     audio: createAudioResolver(db, tts),
     worker: createAiWorker({ tasks: repositories.aiTasks, executor, runtime, bus }, { concurrency: config.ai.concurrency }),
   };

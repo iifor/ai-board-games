@@ -19,6 +19,10 @@ const envSchema = z.object({
   AI_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
   /** C 端同时进行中的公开对局上限 */
   MAX_ACTIVE_MATCHES: z.coerce.number().int().min(1).max(1000).default(5),
+  /** 公开对局多少分钟无人确认视为无人观看：不再计入进行中数量，并由回收器结束 */
+  MATCH_IDLE_MINUTES: z.coerce.number().int().min(1).max(1440).default(30),
+  /** 只有部署在可信反向代理之后才读取 X-Forwarded-For 作为限流来源 */
+  TRUST_PROXY: z.enum(['true', 'false']).default('false'),
 });
 
 export interface AppConfig {
@@ -34,7 +38,8 @@ export interface AppConfig {
     readonly mimo: { readonly apiKey: string; readonly baseUrl: string; readonly model: string } | null;
   };
   readonly ai: { readonly concurrency: number };
-  readonly matches: { readonly maxActive: number };
+  readonly matches: { readonly maxActive: number; readonly idleMs: number };
+  readonly http: { readonly trustProxy: boolean };
 }
 
 export class ConfigError extends Error {
@@ -66,6 +71,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>> = p
       mimo: value.MIMO_API_KEY ? { apiKey: value.MIMO_API_KEY, baseUrl: value.MIMO_BASE_URL, model: value.MIMO_TTS_MODEL } : null,
     },
     ai: { concurrency: value.AI_CONCURRENCY },
-    matches: { maxActive: value.MAX_ACTIVE_MATCHES },
+    matches: { maxActive: value.MAX_ACTIVE_MATCHES, idleMs: value.MATCH_IDLE_MINUTES * 60_000 },
+    http: { trustProxy: value.TRUST_PROXY === 'true' },
   };
 }

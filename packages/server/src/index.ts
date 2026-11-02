@@ -15,13 +15,15 @@ async function main(): Promise<void> {
   const services = createServices(db, config, gameRegistry);
   await services.auth.bootstrap();
 
-  const { app, injectWebSocket } = createApp(db, services);
+  const { app, injectWebSocket } = createApp(db, services, { trustProxy: config.http.trustProxy });
   const server = serve({ fetch: app.fetch, port: config.port }, ({ port }) => logger.info('服务已启动', { port }));
   injectWebSocket(server);
   services.worker.start();
+  services.reaper.start();
 
   const shutdown = (signal: string) => {
     logger.info('正在关闭服务', { signal });
+    services.reaper.stop();
     void services.worker.stop().then(() => {
       server.close(() => {
         void db.destroy().finally(() => process.exit(0));

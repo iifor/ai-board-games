@@ -6,9 +6,14 @@ import { parseJson, parseQuery } from '../../utils/validate';
 import type { MatchService } from './service';
 import { createDebugMatchSchema, createMatchSchema, debugCommandSchema, listQuerySchema } from './validator';
 
-/** 限流用的来源标识：优先取反向代理传入的客户端地址 */
-function sourceOf(c: Context<AppEnv>): string {
-  const forwarded = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
+export interface MatchControllerOptions {
+  /** 只有部署在可信反向代理之后才相信 X-Forwarded-For，否则任何人换个请求头就能绕过限流 */
+  readonly trustProxy: boolean;
+}
+
+/** 限流用的来源标识 */
+function sourceOf(c: Context<AppEnv>, trustProxy: boolean): string {
+  const forwarded = trustProxy ? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() : undefined;
   if (forwarded) return forwarded;
   try {
     return getConnInfo(c).remote.address ?? 'unknown';
@@ -19,9 +24,10 @@ function sourceOf(c: Context<AppEnv>): string {
 
 const matchId = (c: Context<AppEnv>) => c.req.param('id') ?? '';
 
-export function createMatchController(service: MatchService) {
+export function createMatchController(service: MatchService, options: MatchControllerOptions = { trustProxy: false }) {
   return {
-    createPublic: async (c: Context<AppEnv>) => ok(c, await service.createPublic(await parseJson(c, createMatchSchema), sourceOf(c)), 201),
+    createPublic: async (c: Context<AppEnv>) =>
+      ok(c, await service.createPublic(await parseJson(c, createMatchSchema), sourceOf(c, options.trustProxy)), 201),
     history: async (c: Context<AppEnv>) => {
       const { limit } = parseQuery(c, listQuerySchema);
       return ok(c, await service.list({ debug: false, status: 'completed', limit }));

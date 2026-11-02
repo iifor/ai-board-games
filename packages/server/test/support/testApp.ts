@@ -23,17 +23,18 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, external
     bootstrapAdmin: ADMIN,
     tts: { azure: null, mimo: null },
     ai: { concurrency: 4 },
-    matches: { maxActive: 5 },
+    matches: { maxActive: 5, idleMs: 30 * 60_000 },
+    http: { trustProxy: false },
     ...overrides,
   };
   const db = createDatabase(config.database);
   await migrateToLatest(db, schema);
   const services = createServices(db, config, gameRegistry, { sleep: async () => {}, ...external });
   await services.auth.bootstrap();
-  const { app, injectWebSocket } = createApp(db, services);
+  const { app, injectWebSocket } = createApp(db, services, { trustProxy: config.http.trustProxy });
 
-  async function call<T>(method: string, path: string, options: { body?: unknown; token?: string } = {}) {
-    const headers: Record<string, string> = {};
+  async function call<T>(method: string, path: string, options: { body?: unknown; token?: string; headers?: Record<string, string> } = {}) {
+    const headers: Record<string, string> = { ...options.headers };
     if (options.body !== undefined) headers['Content-Type'] = 'application/json';
     if (options.token) headers.Authorization = `Bearer ${options.token}`;
     const init: RequestInit = { method, headers };
