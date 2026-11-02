@@ -8,6 +8,7 @@ import { nightAfter } from '../rules/order';
 import { addDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 猎魔人：神职，从第二夜起每晚可以狩猎一名其他存活玩家（可以不狩猎）。对方属于狼人阵营则对方当晚死亡，
 // 否则猎魔人自己当晚死亡（原因 hunt，守护、解药都挡不下，女巫不会被告知）。免疫女巫的毒药（角色特性 poisonImmune）。
@@ -29,7 +30,7 @@ function applyHunt(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
 }
 
 /** 狩猎结算：狼人阵营的猎物死亡，否则猎魔人死亡；猎魔人当晚另有死因时狩猎照常生效。魔术师换号后按实际落点 */
-export const demonHunt: NightStep = (ctx, tally) => {
+const demonHunt: NightStep = (ctx, tally) => {
   const { hunted } = ctx.state.night;
   const hunter = ctx.seats.alive().withRole(DEMON_HUNTER).ids()[0];
   if (hunted === null || hunter === undefined) return tally;
@@ -37,7 +38,7 @@ export const demonHunt: NightStep = (ctx, tally) => {
   return addDeath(tally, isWolf(ctx.seats.get(prey)) ? prey : hunter, 'hunt');
 };
 
-export const demonHunterPhases = {
+const demonHunterPhases = {
   demon_hunter_hunt: {
     kind: 'act',
     title: '猎魔人狩猎',
@@ -52,3 +53,11 @@ export const demonHunterPhases = {
     next: nightAfter('demon_hunter_hunt'),
   },
 } satisfies WerewolfPhases;
+
+export const demonHunterSpecial: SpecialDescriptor = {
+  key: 'demonHunter',
+  prompts: demonHunterPrompts,
+  identities: { demon_hunter: demonHunterPrompts.demonHunter },
+  phases: demonHunterPhases,
+  nightStep: demonHunt,
+};

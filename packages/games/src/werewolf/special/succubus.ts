@@ -6,6 +6,7 @@ import { isWolf, type WerewolfContext } from '../rules/context';
 import { addSeatNote } from '../rules/notes';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 魅魔：狼队成员（与狼队一起夜聊、击杀，查验为狼人，可以自爆）。首夜在盗贼之后第一个睁眼，必须选择一名好人（非狼人阵营的存活玩家）
 // 与自己结为情侣（lovers.ts），两人组成第三方阵营（state.thirdParty），屠城获胜。被选中者私下得知；狼队不知道她选了谁。
@@ -37,7 +38,7 @@ function bond(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const succubusPhases = {
+const succubusPhases = {
   succubus_link: {
     kind: 'act',
     title: '魅魔',
@@ -51,3 +52,10 @@ export const succubusPhases = {
   },
   succubus_bond: { kind: 'compute', enabled: (ctx) => ctx.round === 1 && hasRole(ctx, SUCCUBUS), run: bond, next: nightAfter('succubus_bond') },
 } satisfies WerewolfPhases;
+
+export const succubusSpecial: SpecialDescriptor = {
+  key: 'succubus',
+  prompts: succubusPrompts,
+  identities: { succubus: succubusPrompts.succubus },
+  phases: succubusPhases,
+};

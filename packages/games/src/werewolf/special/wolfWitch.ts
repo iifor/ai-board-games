@@ -5,6 +5,7 @@ import { nightActors } from '../rules/block';
 import { isWolf, type WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 狼巫：狼队成员，每晚第一个单独睁眼，可以诅咒一名好人阵营的存活玩家（可以不诅咒），诅咒过的下一晚冷却；诅咒写在狼队频道。
 // 被诅咒者立即被私下告知，直到下一个夜晚到来之前不能发动任何技能（state.night.hexed，见 rules/block.ts 的 skillsLost：
@@ -40,7 +41,7 @@ function notifyHexed(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return { log: [{ kind: 'narration', text: '你被狼巫诅咒了：直到下一个夜晚到来之前，你都不能发动任何技能。', channel: `private:${hexed}` }] };
 }
 
-export const wolfWitchPhases = {
+const wolfWitchPhases = {
   wolf_witch_curse: {
     kind: 'act',
     title: '狼巫诅咒',
@@ -62,3 +63,10 @@ export const wolfWitchPhases = {
     next: nightAfter('wolf_witch_notice'),
   },
 } satisfies WerewolfPhases;
+
+export const wolfWitchSpecial: SpecialDescriptor = {
+  key: 'wolfWitch',
+  prompts: wolfWitchPrompts,
+  identities: { wolf_witch: wolfWitchPrompts.wolfWitch },
+  phases: wolfWitchPhases,
+};

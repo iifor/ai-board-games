@@ -7,6 +7,7 @@ import { nightAfter } from '../rules/order';
 import { addDeath, deathCause, removeDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 幻术师：神职，每晚可以选择一名其他存活玩家作为幻象（可以不发动），发动过的下一晚冷却。
 // 幻术师当晚被狼刀或毒杀时（任何狼刀、任何毒药，在守护、解药等结算之后仍要死亡），幻象代替他死亡，死因不变；
@@ -34,7 +35,7 @@ function applyIllusion(ctx: WerewolfContext, decisions: readonly ActDecision[]):
 }
 
 /** 幻象替死：排在各种击杀与庇护之后、连带死亡（殉情等）之前，替死者的死亡同样会引发连带死亡 */
-export const illusionSubstitution: NightStep = (ctx, tally) => {
+const illusionSubstitution: NightStep = (ctx, tally) => {
   const { phantom } = ctx.state.night;
   const illusionist = ctx.seats.alive().withRole(ILLUSIONIST).ids()[0];
   if (phantom === null || illusionist === undefined || !ctx.seats.get(phantom).alive) return tally;
@@ -43,7 +44,7 @@ export const illusionSubstitution: NightStep = (ctx, tally) => {
   return addDeath(removeDeath(tally, illusionist), phantom, cause);
 };
 
-export const illusionistPhases = {
+const illusionistPhases = {
   illusionist_illusion: {
     kind: 'act',
     title: '幻术师',
@@ -58,3 +59,11 @@ export const illusionistPhases = {
     next: nightAfter('illusionist_illusion'),
   },
 } satisfies WerewolfPhases;
+
+export const illusionistSpecial: SpecialDescriptor = {
+  key: 'illusionist',
+  prompts: illusionistPrompts,
+  identities: { illusionist: illusionistPrompts.illusionist },
+  phases: illusionistPhases,
+  nightStep: illusionSubstitution,
+};

@@ -5,6 +5,7 @@ import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 梦魇：狼人阵营，每晚第一个睁眼恐惧一名其他存活玩家（可不恐惧，不能连续两晚恐惧同一人），之后与狼队一起击杀。
 // 被恐惧者当晚夜间技能失效、猎人当晚被狼刀不能开枪、恐惧到狼人则狼队当晚不能击杀；封锁由 rules/block.ts 统一处理。
@@ -28,7 +29,7 @@ function applyFear(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
   return { ...ctx.state, night: { ...ctx.state.night, feared }, nightmareLastTarget: feared };
 }
 
-export const nightmarePhases = {
+const nightmarePhases = {
   nightmare_fear: {
     kind: 'act',
     title: '梦魇恐惧',
@@ -43,3 +44,10 @@ export const nightmarePhases = {
     next: nightAfter('nightmare_fear'),
   },
 } satisfies WerewolfPhases;
+
+export const nightmareSpecial: SpecialDescriptor = {
+  key: 'nightmare',
+  prompts: nightmarePrompts,
+  identities: { nightmare: nightmarePrompts.nightmare },
+  phases: nightmarePhases,
+};

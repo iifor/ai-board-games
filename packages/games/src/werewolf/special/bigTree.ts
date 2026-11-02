@@ -1,11 +1,12 @@
-import { definePrompts, type ComputeOutcome, type TriggerEvent, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ComputeOutcome, type TriggerEvent } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import type { WerewolfContext } from '../rules/context';
 import { isDreamed, swapTarget } from '../rules/nightEffects';
 import { deathCause, noteTally, removeDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
 import { WHITE_WOLF_KING_BLAST } from './whiteWolfKing';
+import type { SpecialDescriptor } from './types';
 
 // 大树（长老）：民牌，要被狼人刀中两次才会出局——第一次狼刀落下时只失去一条命（私下告知）；
 // 女巫对还有两条命的大树用解药，解药作废，大树照样失去一条命；守卫守住则没有被刀中。
@@ -28,7 +29,7 @@ function antidoteSpent(ctx: WerewolfContext, tree: number): boolean {
 }
 
 /** 狼刀落在还有两条命的大树身上：不死，失去一条命 */
-export const bigTreeShield: NightStep = (ctx, tally) => {
+const bigTreeShield: NightStep = (ctx, tally) => {
   const tree = ctx.seats.alive().withRole(TREE).ids()[0];
   if (tree === undefined || tally.state.bigTreeHits > 0) return tally;
   const struck = deathCause(tally, tree) === 'wolf';
@@ -53,10 +54,19 @@ function disableGods(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const bigTreePhases = {
+const bigTreePhases = {
   big_tree_fall: { kind: 'compute', title: '大树倒下', run: disableGods, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const bigTreeTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const bigTreeTriggers: WerewolfTriggers = [
   { id: 'big-tree-fall', on: 'seat_eliminated', when: fallsBadly, push: 'big_tree_fall' },
 ];
+
+export const bigTreeSpecial: SpecialDescriptor = {
+  key: 'bigTree',
+  prompts: bigTreePrompts,
+  identities: { big_tree: bigTreePrompts.bigTree },
+  phases: bigTreePhases,
+  deathTriggers: bigTreeTriggers,
+  nightStep: bigTreeShield,
+};

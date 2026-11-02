@@ -1,5 +1,5 @@
-import { definePrompts, type ActDecision, type ComputeOutcome, type Seat, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ActDecision, type ComputeOutcome, type Seat } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
@@ -7,7 +7,8 @@ import { isDreamed, swapTarget, withinMark } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import { addDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 狼兄弟：狼兄是狼队成员；狼弟是离群的狼（lone_wolf），只与狼兄互相认识（特性 pairedWith，写入 state.knownWolves），
 // 狼队其他人不认识他（狼刀可以选中他），狼兄出局前预言家查验他为好人（特性 appearsGoodWhile）。
@@ -56,7 +57,7 @@ function applyKill(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
 }
 
 /** 狼弟的单独击杀：守护、解药都挡不下；受魔术师换号、梦游影响 */
-export const brotherKill: NightStep = (ctx, tally) => {
+const brotherKill: NightStep = (ctx, tally) => {
   const { brotherTarget } = ctx.state.night;
   if (brotherTarget === null) return tally;
   const victim = swapTarget(ctx, brotherTarget);
@@ -77,7 +78,7 @@ function join(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const wolfBrothersPhases = {
+const wolfBrothersPhases = {
   wolf_brother_mourn: { kind: 'compute', run: recordFall, next: 'return' },
   younger_brother_join: {
     kind: 'compute',
@@ -99,7 +100,7 @@ export const wolfBrothersPhases = {
   },
 } satisfies WerewolfPhases;
 
-export const wolfBrothersTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const wolfBrothersTriggers: WerewolfTriggers = [
   {
     id: 'wolf-elder-fall',
     on: 'seat_eliminated',
@@ -107,3 +108,12 @@ export const wolfBrothersTriggers: readonly TriggerSpec<WerewolfState, WerewolfP
     push: 'wolf_brother_mourn',
   },
 ];
+
+export const wolfBrothersSpecial: SpecialDescriptor = {
+  key: 'wolfBrothers',
+  prompts: wolfBrothersPrompts,
+  identities: { wolf_elder_brother: wolfBrothersPrompts.wolfElderBrother, wolf_younger_brother: wolfBrothersPrompts.wolfYoungerBrother, wolf_younger_brother_pack: wolfBrothersPrompts.wolfYoungerBrotherPack },
+  phases: wolfBrothersPhases,
+  deathTriggers: wolfBrothersTriggers,
+  nightStep: brotherKill,
+};

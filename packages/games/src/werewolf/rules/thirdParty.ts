@@ -1,13 +1,11 @@
 import type { Seat } from '@battle/engine';
 import type { ThirdParty } from '../stateExtended';
 import type { WerewolfContext } from './context';
-import { swapTarget } from './nightEffects';
-import { addDeath } from './tally';
-import type { NightStep } from './types';
 
 // 第三方阵营（state.thirdParty）：人狼恋的丘比特与情侣、魅魔与情侣、鬼魂新娘与新郎和证婚人（lovers），成为第三方的祈求者（requester）。
 // 第三方仍在争胜（还有存活的核心成员）时：第三方成员不计入好人与狼人之间的胜负（屠边、票数），好人与狼人都不能获胜；
 // 存活玩家全部属于第三方时第三方获胜（屠城）。第三方成员的座位阵营（team）不一定改变：魅魔、人狼恋中的狼仍在狼队里。
+// 第三方的夜间击杀在 special/thirdPartyKill.ts。
 
 export type ThirdPartyKind = ThirdParty['kind'];
 
@@ -38,9 +36,3 @@ export function thirdPartyWinner(ctx: WerewolfContext): ThirdPartyKind | null {
 export function thirdPartyStanding(ctx: WerewolfContext): boolean {
   return standingAmong(ctx, ctx.seats.alive().list());
 }
-
-/** 第三方的夜间击杀（祈求者、鬼魂新娘一方）：守护、解药都挡不下，女巫不会被告知；魔术师换号后按实际落点 */
-export const thirdPartyKill: NightStep = (ctx, tally) => {
-  const { thirdKill } = ctx.state.night;
-  return thirdKill === null ? tally : addDeath(tally, swapTarget(ctx, thirdKill), 'third_kill');
-};

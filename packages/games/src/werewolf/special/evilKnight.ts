@@ -2,6 +2,7 @@ import { definePrompts } from '@battle/engine';
 import type { WerewolfContext } from '../rules/context';
 import { addDeath, isDying } from '../rules/tally';
 import type { NightStep } from '../rules/types';
+import type { SpecialDescriptor } from './types';
 
 // 恶灵骑士：狼人阵营，与狼队一起击杀，不能自爆；永远不会在夜晚死亡（免疫毒药与夜间开枪，由角色特性处理）。
 // 反伤（全场一次）：女巫毒他则女巫当晚死亡；预言家查验他则预言家当晚死亡，但同验同毒时只有女巫死亡。
@@ -31,9 +32,16 @@ function reflectTarget(ctx: WerewolfContext): number | null {
   return checkingSeer(ctx);
 }
 
-export const evilKnightReflect: NightStep = (ctx, tally) => {
+const evilKnightReflect: NightStep = (ctx, tally) => {
   if (tally.state.evilKnightReflected) return tally;
   const target = reflectTarget(ctx);
   if (target === null || isDying(tally, target)) return tally;
   return { ...addDeath(tally, target, 'reflect'), state: { ...tally.state, evilKnightReflected: true } };
+};
+
+export const evilKnightSpecial: SpecialDescriptor = {
+  key: 'evilKnight',
+  prompts: evilKnightPrompts,
+  identities: { evil_knight: evilKnightPrompts.evilKnight },
+  nightStep: evilKnightReflect,
 };

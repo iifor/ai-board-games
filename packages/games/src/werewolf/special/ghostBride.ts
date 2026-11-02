@@ -8,6 +8,7 @@ import { nightAfter } from '../rules/order';
 import { inThirdParty } from '../rules/thirdParty';
 import { roleCatalog } from '../roles';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 鬼魂新娘：第三方（阵营 ghost_bride）。首夜选择新郎，再选择证婚人；新郎与证婚人背叛原有阵营，阵营改为 ghost_bride
 // （狼队成员改为"叛变的狼人"，离开狼队），三人组成第三方（state.thirdParty），屠城获胜。新娘与新郎是情侣（lovers.ts）。
@@ -84,7 +85,7 @@ function applyKill(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
   return { ...ctx.state, night: { ...ctx.state.night, thirdKill } };
 }
 
-export const ghostBridePhases = {
+const ghostBridePhases = {
   ghost_bride_link: {
     kind: 'act',
     title: '鬼魂新娘',
@@ -132,3 +133,10 @@ export const ghostBridePhases = {
     next: nightAfter('ghost_bride_kill'),
   },
 } satisfies WerewolfPhases;
+
+export const ghostBrideSpecial: SpecialDescriptor = {
+  key: 'ghostBride',
+  prompts: ghostBridePrompts,
+  identities: { ghost_bride: ghostBridePrompts.ghostBride, betrayer_wolf: ghostBridePrompts.betrayerWolf },
+  phases: ghostBridePhases,
+};

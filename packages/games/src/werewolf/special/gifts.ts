@@ -1,13 +1,14 @@
-import { definePrompts, type ActDecision, type TriggerEvent, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ActDecision, type TriggerEvent } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { canUseNightSkill, skillsLost } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
 import { recordShot, settleShot, shotAllowed, triggerSeat } from '../rules/death';
 import { seerVerdict } from '../rules/night';
 import { nightAfter } from '../rules/order';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
 import { NO_GIFTS, type GiftSkill } from '../stateExtended';
+import type { SpecialDescriptor } from './types';
 
 // 额外技能（黑商的幸运儿、祈求者）：预言家的验、女巫的毒各用一次，可以当晚使用也可以留到之后的夜晚；
 // 猎人的枪在出局时直接开枪，不翻牌（公开记录只写"开枪带走 X号"，被带走者的出局原因为"被枪杀"）。
@@ -21,7 +22,7 @@ export const giftPrompts = definePrompts({
 
 export const GIFT_LABELS: Readonly<Record<GiftSkill, string>> = { check: '预言家的验', gun: '猎人的枪', poison: '女巫的毒' };
 
-export function hasGift(ctx: WerewolfContext, seat: number, skill: GiftSkill): boolean {
+function hasGift(ctx: WerewolfContext, seat: number, skill: GiftSkill): boolean {
   return (ctx.state.gifts[String(seat)] ?? NO_GIFTS)[skill];
 }
 
@@ -77,7 +78,7 @@ function applyShot(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
   return shooter === undefined ? state : spendGift(state, shooter, 'gun');
 }
 
-export const giftPhases = {
+const giftPhases = {
   gift_check: {
     kind: 'act',
     action: '查验',
@@ -118,6 +119,13 @@ export const giftPhases = {
   gift_shot_resolve: { kind: 'compute', run: (ctx) => settleShot(ctx, '被枪杀'), next: 'return' },
 } satisfies WerewolfPhases;
 
-export const giftTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const giftTriggers: WerewolfTriggers = [
   { id: 'gift-shot', on: 'seat_eliminated', when: canGiftShoot, push: 'gift_shot' },
 ];
+
+export const giftsSpecial: SpecialDescriptor = {
+  key: 'gifts',
+  prompts: giftPrompts,
+  phases: giftPhases,
+  deathTriggers: giftTriggers,
+};

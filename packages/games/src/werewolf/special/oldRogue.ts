@@ -1,9 +1,10 @@
-import { definePrompts, type ComputeOutcome, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ComputeOutcome } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { hasRole } from '../rules/board';
 import type { WerewolfContext } from '../rules/context';
 import { dayAfter } from '../rules/order';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 老流氓：算作村民，不受狼美人魅惑影响（角色特性 charmImmune）。被女巫毒、被猎人枪击时不会立即出局（特性 delayedDeath）：
 // 被毒进入中毒状态（不公布），被枪击进入负伤状态（公布），都在次日白天发言环节结束后出局；
@@ -32,7 +33,7 @@ function resolveDoom(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const oldRoguePhases = {
+const oldRoguePhases = {
   old_rogue_doom: {
     kind: 'compute',
     enabled: (ctx) => hasRole(ctx, 'old_rogue'),
@@ -43,7 +44,7 @@ export const oldRoguePhases = {
 } satisfies WerewolfPhases;
 
 /** 白天发言被自爆打断：到期的老流氓在自爆结算后出局 */
-export const oldRogueTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const oldRogueTriggers: WerewolfTriggers = [
   {
     id: 'old-rogue-doom-cut',
     on: 'seat_eliminated',
@@ -51,3 +52,11 @@ export const oldRogueTriggers: readonly TriggerSpec<WerewolfState, WerewolfParam
     push: 'old_rogue_doom_cut',
   },
 ];
+
+export const oldRogueSpecial: SpecialDescriptor = {
+  key: 'oldRogue',
+  prompts: oldRoguePrompts,
+  identities: { old_rogue: oldRoguePrompts.oldRogue },
+  phases: oldRoguePhases,
+  deathTriggers: oldRogueTriggers,
+};

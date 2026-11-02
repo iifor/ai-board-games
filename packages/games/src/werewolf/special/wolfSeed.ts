@@ -8,6 +8,7 @@ import { nightAfter } from '../rules/order';
 import { deathCause, noteTally, reassignTally, removeDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 种狼：狼队成员，全场一次，可以在狼队击杀后把当晚的被害者感染为狼人（决定写在狼队频道）。
 // 被害者当晚确实死于这一刀（没有被女巫救起、没有被守卫守住、没有同时被毒）时感染成功：他不会死亡，
@@ -37,7 +38,7 @@ function applyInfect(ctx: WerewolfContext, decisions: readonly ActDecision[]): W
 }
 
 /** 被害者确实死于狼刀时感染成功：移出死亡名单并加入狼队 */
-export const wolfSeedInfection: NightStep = (ctx, tally) => {
+const wolfSeedInfection: NightStep = (ctx, tally) => {
   const { infecting, wolfTarget } = ctx.state.night;
   if (!infecting || wolfTarget === null) return tally;
   const victim = swapTarget(ctx, wolfTarget);
@@ -49,7 +50,7 @@ export const wolfSeedInfection: NightStep = (ctx, tally) => {
   );
 };
 
-export const wolfSeedPhases = {
+const wolfSeedPhases = {
   wolf_seed_infect: {
     kind: 'act',
     title: '种狼',
@@ -65,3 +66,11 @@ export const wolfSeedPhases = {
     next: nightAfter('wolf_seed_infect'),
   },
 } satisfies WerewolfPhases;
+
+export const wolfSeedSpecial: SpecialDescriptor = {
+  key: 'wolfSeed',
+  prompts: wolfSeedPrompts,
+  identities: { wolf_seed: wolfSeedPrompts.wolfSeed, infected_wolf: wolfSeedPrompts.infectedWolf },
+  phases: wolfSeedPhases,
+  nightStep: wolfSeedInfection,
+};

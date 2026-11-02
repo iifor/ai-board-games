@@ -1,16 +1,17 @@
-import type { ComputeOutcome, TriggerEvent, TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import type { ComputeOutcome, TriggerEvent } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import type { WerewolfContext } from '../rules/context';
 import { LOVER_BY_DAY } from '../rules/death';
 import { addDeath, isDying } from '../rules/tally';
 import type { NightStep } from '../rules/types';
-import { NIGHT_DEATH_CAUSES, type WerewolfParams, type WerewolfState } from '../state';
+import { NIGHT_DEATH_CAUSES, type WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 情侣（丘比特连的两人、魅魔与她连的人、鬼魂新娘与新郎，state.lovers）：一方出局时另一方殉情。
 // 夜里殉情并入当晚死讯（原因 lover，与其他夜间死亡不作区分，首夜有遗言）；白天殉情由触发器立即结算（原因 lover_day，没有遗言）。
 // 殉情者不能发动出局技能（猎人、狼王不能开枪，见 rules/death.ts 的 NO_SHOT_CAUSES）。
 
-export function partnerOf(ctx: WerewolfContext, seat: number): number | null {
+function partnerOf(ctx: WerewolfContext, seat: number): number | null {
   const [first, second] = ctx.state.lovers;
   if (first === undefined || second === undefined) return null;
   if (seat === first) return second;
@@ -18,7 +19,7 @@ export function partnerOf(ctx: WerewolfContext, seat: number): number | null {
 }
 
 /** 夜里一方死亡：另一方一起列入死讯 */
-export const loverNightLink: NightStep = (ctx, tally) => {
+const loverNightLink: NightStep = (ctx, tally) => {
   const [first, second] = ctx.state.lovers;
   if (first === undefined || second === undefined) return tally;
   const firstDies = isDying(tally, first);
@@ -43,10 +44,17 @@ function resolveDayLink(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const loversPhases = {
+const loversPhases = {
   lover_link: { kind: 'compute', title: '殉情', run: resolveDayLink, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const loversTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const loversTriggers: WerewolfTriggers = [
   { id: 'lover-link', on: 'seat_eliminated', when: diesByDay, push: 'lover_link' },
 ];
+
+export const loversSpecial: SpecialDescriptor = {
+  key: 'lovers',
+  phases: loversPhases,
+  linkTriggers: loversTriggers,
+  nightStep: loverNightLink,
+};

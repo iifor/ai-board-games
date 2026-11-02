@@ -5,6 +5,7 @@ import {
   daySpeakers,
   describeDirection,
   directionTargets,
+  exileBonus,
   exileCandidates,
   exileVoters,
   recordExile,
@@ -14,7 +15,6 @@ import { canSelfDestruct } from '../rules/death';
 import { announceDawn } from '../rules/dawn';
 import { dayAfter } from '../rules/order';
 import { exileWeight } from '../rules/sheriff';
-import { crowBonus } from '../special/crow';
 import type { WerewolfPhases } from './types';
 
 export const dayPhases = {
@@ -48,7 +48,7 @@ export const dayPhases = {
     voters: exileVoters,
     candidates: exileCandidates,
     weight: exileWeight,
-    bonus: crowBonus,
+    bonus: exileBonus,
     prompt: prompts.exileVote,
     allowAbstain: true,
     tie: { runoff: 0, then: 'none' },

@@ -7,6 +7,7 @@ import { addDeath } from '../rules/tally';
 import { dayAfter, nightAfter } from '../rules/order';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 潜行者：放逐投票中投给的玩家若没有被放逐出局，当晚可以暗杀他（全场一次，可不发动）。
 // 暗杀在夜间结算，守护与解药都挡不下；被花蝴蝶等封锁的当晚不能暗杀，机会随之失效。
@@ -46,12 +47,12 @@ function applyAssassination(ctx: WerewolfContext, decisions: readonly ActDecisio
   return stalked === null ? state : { ...state, night: { ...state.night, stalked }, stalkerUsed: true };
 }
 
-export const stalkerAssassination: NightStep = (ctx, tally) => {
+const stalkerAssassination: NightStep = (ctx, tally) => {
   const { stalked } = ctx.state.night;
   return stalked === null ? tally : addDeath(tally, stalked, 'stalker');
 };
 
-export const stalkerPhases = {
+const stalkerPhases = {
   stalker_mark: {
     kind: 'compute',
     enabled: (ctx) => hasRole(ctx, 'stalker'),
@@ -71,3 +72,11 @@ export const stalkerPhases = {
     next: nightAfter('stalker_assassinate'),
   },
 } satisfies WerewolfPhases;
+
+export const stalkerSpecial: SpecialDescriptor = {
+  key: 'stalker',
+  prompts: stalkerPrompts,
+  identities: { stalker: stalkerPrompts.stalker },
+  phases: stalkerPhases,
+  nightStep: stalkerAssassination,
+};

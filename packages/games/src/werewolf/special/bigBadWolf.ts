@@ -9,6 +9,7 @@ import { addDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
 import { markNotice } from './fortuneTeller';
+import type { SpecialDescriptor } from './types';
 
 // 大灰狼：离群的狼人（lone_wolf 阵营），与狼队互相认识（state.knownWolves），但不在狼队频道里，不夜聊、不参与狼队击杀。
 // 每晚狼队之后单独睁眼，全场可以发动一次单独击杀：先决定是否发动，发动后才得知占卜师的标记，并且必须落刀。
@@ -48,14 +49,14 @@ function applyKill(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
 }
 
 /** 单独击杀：守护、解药都挡不下；与其他狼刀一样受魔术师换号、梦游影响 */
-export const bigBadWolfKill: NightStep = (ctx, tally) => {
+const bigBadWolfKill: NightStep = (ctx, tally) => {
   const { bigBadWolfTarget } = ctx.state.night;
   if (bigBadWolfTarget === null) return tally;
   const victim = swapTarget(ctx, bigBadWolfTarget);
   return isDreamed(ctx, victim) ? tally : addDeath(tally, victim, 'wolf');
 };
 
-export const bigBadWolfPhases = {
+const bigBadWolfPhases = {
   big_bad_wolf_decide: {
     kind: 'act',
     title: '大灰狼',
@@ -87,3 +88,11 @@ export const bigBadWolfPhases = {
     next: nightAfter('big_bad_wolf_kill'),
   },
 } satisfies WerewolfPhases;
+
+export const bigBadWolfSpecial: SpecialDescriptor = {
+  key: 'bigBadWolf',
+  prompts: bigBadWolfPrompts,
+  identities: { big_bad_wolf: bigBadWolfPrompts.bigBadWolf },
+  phases: bigBadWolfPhases,
+  nightStep: bigBadWolfKill,
+};

@@ -1,8 +1,9 @@
-import { definePrompts, type ActDecision, type ComputeOutcome, type TriggerSpec } from '@battle/engine';
+import { definePrompts, type ActDecision, type ComputeOutcome } from '@battle/engine';
 import type { WerewolfContext } from '../rules/context';
 import { triggerSeat } from '../rules/death';
-import type { WerewolfParams, WerewolfState } from '../state';
-import type { WerewolfPhases } from '../phases/types';
+import type { WerewolfState } from '../state';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
+import type { SpecialDescriptor } from './types';
 
 // 白狼王：狼人阵营，自爆时可以带走一名玩家（被带走者没有遗言）。
 
@@ -25,7 +26,7 @@ function resolveBlast(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return { state, eliminate: [{ seat: target, reason: '被白狼王带走', cause: WHITE_WOLF_KING_BLAST }] };
 }
 
-export const whiteWolfKingPhases = {
+const whiteWolfKingPhases = {
   white_wolf_king_blast: {
     kind: 'act',
     title: '白狼王带人',
@@ -42,7 +43,7 @@ export const whiteWolfKingPhases = {
   white_wolf_king_resolve: { kind: 'compute', run: resolveBlast, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const whiteWolfKingTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const whiteWolfKingTriggers: WerewolfTriggers = [
   {
     id: 'white-wolf-king-blast',
     on: 'seat_eliminated',
@@ -51,3 +52,11 @@ export const whiteWolfKingTriggers: readonly TriggerSpec<WerewolfState, Werewolf
     push: 'white_wolf_king_blast',
   },
 ];
+
+export const whiteWolfKingSpecial: SpecialDescriptor = {
+  key: 'whiteWolfKing',
+  prompts: whiteWolfKingPrompts,
+  identities: { white_wolf_king: whiteWolfKingPrompts.whiteWolfKing },
+  phases: whiteWolfKingPhases,
+  deathTriggers: whiteWolfKingTriggers,
+};

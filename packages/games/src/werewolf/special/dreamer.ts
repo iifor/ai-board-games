@@ -7,6 +7,7 @@ import { nightAfter } from '../rules/order';
 import { addDeath, isDying } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 摄梦人：每晚必须摄梦一名其他存活玩家（梦游者，rules/nightEffects.ts 的 isDreamed）。狼刀落在梦游者身上视为空刀，
 // 女巫对他用的毒药、解药都浪费；摄梦人当晚死亡或连续两晚摄梦同一人时，梦游者被摄梦而死（夜间死亡原因 dream）。
@@ -28,14 +29,14 @@ function applyDream(ctx: WerewolfContext, decisions: readonly ActDecision[]): We
 }
 
 /** 连续两晚摄梦同一人，或摄梦人当晚死亡：梦游者被摄梦而死 */
-export const dreamDeaths: NightStep = (ctx, tally) => {
+const dreamDeaths: NightStep = (ctx, tally) => {
   const { dreamed, dreamRepeat } = ctx.state.night;
   if (dreamed === null || !ctx.seats.get(dreamed).alive) return tally;
   const dreamerDies = ctx.seats.withRole('dreamer').ids().some((seat) => isDying(tally, seat));
   return dreamRepeat || dreamerDies ? addDeath(tally, dreamed, 'dream') : tally;
 };
 
-export const dreamerPhases = {
+const dreamerPhases = {
   dreamer_dream: {
     kind: 'act',
     title: '摄梦人',
@@ -49,3 +50,11 @@ export const dreamerPhases = {
     next: nightAfter('dreamer_dream'),
   },
 } satisfies WerewolfPhases;
+
+export const dreamerSpecial: SpecialDescriptor = {
+  key: 'dreamer',
+  prompts: dreamerPrompts,
+  identities: { dreamer: dreamerPrompts.dreamer },
+  phases: dreamerPhases,
+  nightStep: dreamDeaths,
+};

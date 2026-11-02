@@ -1,9 +1,10 @@
-import { definePrompts, type ActDecision, type ComputeOutcome, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ActDecision, type ComputeOutcome } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { hasRole } from '../rules/board';
 import type { WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 野孩子：好人阵营，既不算神职也不算村民（类别 third）。首夜第一个睁眼选择一名榜样（必须选择，双方都不知道对方身份）。
 // 榜样出局时野孩子变为狼人：角色改为 wild_child_wolf（狼人阵营、认识狼队），从此与狼队一起夜聊、击杀；
@@ -40,7 +41,7 @@ function becomesWolf(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const wildChildPhases = {
+const wildChildPhases = {
   wild_child_choose: {
     kind: 'act',
     title: '野孩子',
@@ -56,7 +57,7 @@ export const wildChildPhases = {
   wild_child_convert: { kind: 'compute', run: becomesWolf, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const wildChildTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const wildChildTriggers: WerewolfTriggers = [
   {
     id: 'wild-child-convert',
     on: 'seat_eliminated',
@@ -65,3 +66,11 @@ export const wildChildTriggers: readonly TriggerSpec<WerewolfState, WerewolfPara
     push: 'wild_child_convert',
   },
 ];
+
+export const wildChildSpecial: SpecialDescriptor = {
+  key: 'wildChild',
+  prompts: wildChildPrompts,
+  identities: { wild_child: wildChildPrompts.wildChild, wild_child_wolf: wildChildPrompts.wildChildWolf },
+  phases: wildChildPhases,
+  deathTriggers: wildChildTriggers,
+};

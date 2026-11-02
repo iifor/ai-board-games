@@ -1,10 +1,11 @@
-import { definePrompts, type ComputeOutcome, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ComputeOutcome } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { hasRole, roleCategory } from '../rules/board';
 import type { WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import { FOX_TAILS } from '../stateExtras';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 九尾狐：神职，有九条尾巴。每有一名神职出局失去两条、每有一名村民出局失去一条（按本局屠边类别，其他身份不计）；
 // 失去全部尾巴时立即出局。每晚最后一个睁眼查看剩余尾巴数（私下告知，身份提示中保留最近一次查看的数量）。
@@ -19,7 +20,7 @@ export const nineTailedFoxPrompts = definePrompts({
 export const FOX_TAILS_LOST = 'fox_tails';
 
 /** 当前剩余的尾巴：由已出局玩家的类别算出 */
-export function foxTails(ctx: WerewolfContext): number {
+function foxTails(ctx: WerewolfContext): number {
   const lost = ctx.seats.dead().list().reduce((sum, seat) => {
     if (seat.role === 'nine_tailed_fox') return sum;
     const category = roleCategory(ctx, seat);
@@ -48,7 +49,7 @@ function loseAllTails(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return { eliminate: [{ seat: fox, reason: '失去全部尾巴', cause: FOX_TAILS_LOST }] };
 }
 
-export const nineTailedFoxPhases = {
+const nineTailedFoxPhases = {
   fox_check: {
     kind: 'compute',
     enabled: (ctx) => hasRole(ctx, 'nine_tailed_fox'),
@@ -58,7 +59,7 @@ export const nineTailedFoxPhases = {
   fox_fall: { kind: 'compute', run: loseAllTails, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const nineTailedFoxTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const nineTailedFoxTriggers: WerewolfTriggers = [
   {
     id: 'fox-tails',
     on: 'seat_eliminated',
@@ -67,3 +68,11 @@ export const nineTailedFoxTriggers: readonly TriggerSpec<WerewolfState, Werewolf
     push: 'fox_fall',
   },
 ];
+
+export const nineTailedFoxSpecial: SpecialDescriptor = {
+  key: 'nineTailedFox',
+  prompts: nineTailedFoxPrompts,
+  identities: { nine_tailed_fox: nineTailedFoxPrompts.nineTailedFox },
+  phases: nineTailedFoxPhases,
+  deathTriggers: nineTailedFoxTriggers,
+};

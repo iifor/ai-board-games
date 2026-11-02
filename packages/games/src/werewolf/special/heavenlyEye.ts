@@ -7,6 +7,7 @@ import { swapTarget } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import { roleCatalog } from '../roles';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 天眼：神职，能验出具体身份的预言家——每晚必须查验一名其他存活玩家，私下得知他的角色名，查验记录保留在身份提示中。
 
@@ -31,7 +32,7 @@ function applyCheck(ctx: WerewolfContext, decisions: readonly ActDecision[]): We
   return { ...ctx.state, heavenlyEyeChecks: [...ctx.state.heavenlyEyeChecks, check] };
 }
 
-export const heavenlyEyePhases = {
+const heavenlyEyePhases = {
   heavenly_eye_check: {
     kind: 'act',
     title: '天眼查验',
@@ -45,3 +46,10 @@ export const heavenlyEyePhases = {
     next: nightAfter('heavenly_eye_check'),
   },
 } satisfies WerewolfPhases;
+
+export const heavenlyEyeSpecial: SpecialDescriptor = {
+  key: 'heavenlyEye',
+  prompts: heavenlyEyePrompts,
+  identities: { heavenly_eye: heavenlyEyePrompts.heavenlyEye },
+  phases: heavenlyEyePhases,
+};

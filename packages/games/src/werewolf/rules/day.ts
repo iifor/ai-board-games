@@ -1,8 +1,10 @@
-import type { ActDecision, ComputeOutcome, Seat, VoteOutcome } from '@battle/engine';
-import { bloodlineHold } from '../special/magicWolf';
+import type { ActDecision, ComputeOutcome, Seat, VoteBonus, VoteOutcome } from '@battle/engine';
+import { specialExileHooks } from '../special';
 import type { WerewolfState } from '../state';
 import { skillsLost } from './block';
 import { canVote, ring, type WerewolfContext } from './context';
+
+// 白天流程：放逐环节消费 special/index.ts 登记表中的放逐钩子（额外票、免于出局）；特殊角色模块不得引用本文件。
 
 /** 警长左右两侧最近的存活玩家，警长从中选择发言起点 */
 export function directionTargets(ctx: WerewolfContext, sheriff: Seat): number[] {
@@ -52,11 +54,25 @@ export function exileCandidates(ctx: WerewolfContext, voter: Seat): number[] {
   return ctx.seats.alive().except(voter).where((seat) => !(seat.role === 'idiot' && ctx.state.idiotRevealed)).ids();
 }
 
+/** 放逐投票的额外票（乌鸦的诅咒） */
+export function exileBonus(ctx: WerewolfContext): VoteBonus[] {
+  return specialExileHooks.flatMap((hooks) => hooks.bonus?.(ctx) ?? []);
+}
+
 export function recordExile(ctx: WerewolfContext, outcome: VoteOutcome): WerewolfState {
   return { ...ctx.state, exileTarget: outcome.kind === 'selected' ? outcome.seat : null };
 }
 
-/** 白痴首次被放逐时翻牌免死；最后一名狼人是魔狼时翻牌存活到次日天亮；其他人出局；平票或全部弃票则无人出局 */
+/** 特殊角色让被放逐者免于出局的结算（最后一名狼人是魔狼时翻牌存活）；没有干预时为 null */
+function heldByExile(ctx: WerewolfContext, target: Seat, state: WerewolfState): ComputeOutcome<WerewolfState> | null {
+  for (const hooks of specialExileHooks) {
+    const outcome = hooks.hold?.(ctx, target, state);
+    if (outcome) return outcome;
+  }
+  return null;
+}
+
+/** 白痴首次被放逐时翻牌免死；特殊角色的免死结算（魔狼翻牌）；其他人出局；平票或全部弃票则无人出局 */
 export function resolveExile(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const target = ctx.state.exileTarget;
   const state = { ...ctx.state, exileTarget: null };
@@ -68,5 +84,5 @@ export function resolveExile(ctx: WerewolfContext): ComputeOutcome<WerewolfState
       log: [{ kind: 'revealed', text: `${target}号翻牌，身份是白痴，免于出局，但此后失去投票权。`, data: { seat: target, role: 'idiot' } }],
     };
   }
-  return bloodlineHold(ctx, seat, state) ?? { state, eliminate: [{ seat: target, reason: '被放逐', cause: 'exile' }] };
+  return heldByExile(ctx, seat, state) ?? { state, eliminate: [{ seat: target, reason: '被放逐', cause: 'exile' }] };
 }

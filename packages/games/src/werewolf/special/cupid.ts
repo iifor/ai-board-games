@@ -6,6 +6,7 @@ import { isPackWolf, isWolf, type WerewolfContext } from '../rules/context';
 import { addSeatNote } from '../rules/notes';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 丘比特：不属于狼、神、民任何一边（屠边类别 third）。首夜在盗贼之后睁眼，选择两名存活玩家（可以包括自己）成为情侣（lovers.ts），
 // 情侣私下得知对方的号码（不知道身份）。两人都是好人 → 丘比特属于好人阵营；都是狼人 → 属于狼人阵营；
@@ -54,13 +55,13 @@ function veto(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
 }
 
 /** 丘比特所在的阵营（情侣都是好人 / 都是狼人时）；人狼恋时属于第三方，返回 null */
-export function cupidSide(ctx: WerewolfContext, seat: Seat): 'good' | 'werewolf' | null {
+function cupidSide(ctx: WerewolfContext, seat: Seat): 'good' | 'werewolf' | null {
   if (seat.role !== CUPID || ctx.state.lovers.length !== 2 || ctx.state.thirdParty?.seats.includes(seat.seat)) return null;
   return ctx.state.lovers.every((lover) => isWolf(ctx.seats.get(lover))) ? 'werewolf' : 'good';
 }
 
 /** 终局说明中的丘比特结果；本局没有连成情侣时为 null */
-export function cupidSummary(ctx: WerewolfContext, winner: string): string | null {
+function cupidSummary(ctx: WerewolfContext, winner: string): string | null {
   const cupid = ctx.seats.withRole(CUPID).list()[0];
   if (!cupid || ctx.state.lovers.length !== 2) return null;
   const side = cupidSide(ctx, cupid);
@@ -68,7 +69,7 @@ export function cupidSummary(ctx: WerewolfContext, winner: string): string | nul
   return `丘比特 ${cupid.seat}号属于${side === 'werewolf' ? '狼人阵营' : '好人阵营'}，${side === winner ? '随之胜利' : '随之落败'}`;
 }
 
-export const cupidPhases = {
+const cupidPhases = {
   cupid_link: {
     kind: 'act',
     title: '丘比特',
@@ -84,3 +85,11 @@ export const cupidPhases = {
   cupid_bond: { kind: 'compute', enabled: (ctx) => ctx.round === 1 && hasRole(ctx, CUPID), run: bond, next: nightAfter('cupid_bond') },
   lover_veto: { kind: 'compute', enabled: (ctx) => hasRole(ctx, CUPID), run: veto, next: nightAfter('lover_veto') },
 } satisfies WerewolfPhases;
+
+export const cupidSpecial: SpecialDescriptor = {
+  key: 'cupid',
+  prompts: cupidPrompts,
+  identities: { cupid: cupidPrompts.cupid },
+  phases: cupidPhases,
+  victory: { side: cupidSide, note: cupidSummary },
+};

@@ -1,5 +1,5 @@
-import { definePrompts, type ActDecision, type ComputeOutcome, type Seat, type SeatQuery, type TriggerEvent, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ActDecision, type ComputeOutcome, type Seat, type SeatQuery, type TriggerEvent } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { nightActors, skillsLost } from '../rules/block';
 import { isWolf, type WerewolfContext } from '../rules/context';
@@ -9,9 +9,10 @@ import { addSeatNote } from '../rules/notes';
 import { nightAfter } from '../rules/order';
 import { deathCause, removeDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
 import type { SpiritSkill } from '../stateFinal';
 import { godOrVillager } from './demon';
+import type { SpecialDescriptor } from './types';
 
 // 灵狼：狼队成员，与狼队一起击杀后，每晚在女巫之后、预言家之前单独睁眼（预言家因此改在 seer_check_late 查验）。
 // 首夜选择一名好人阵营玩家学习他的技能（state.spiritWolf.learned，写入法官私下告知的固定信息）：
@@ -110,7 +111,7 @@ function applyShield(ctx: WerewolfContext, decisions: readonly ActDecision[]): W
 }
 
 /** 庇护：被庇护者当晚不会死于狼刀与毒药（排在各种击杀之后，挡下所有狼刀；守护与解药的结果不影响庇护） */
-export const spiritShield: NightStep = (ctx, tally) => {
+const spiritShield: NightStep = (ctx, tally) => {
   const { spiritShield: shield } = ctx.state.night;
   if (shield === null) return tally;
   const seat = swapTarget(ctx, shield);
@@ -135,7 +136,7 @@ function resolveShot(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return { ...settled, log: [reveal, ...(settled.log ?? [])] };
 }
 
-export const spiritWolfPhases = {
+const spiritWolfPhases = {
   spirit_wolf_learn: {
     kind: 'act',
     title: '灵狼',
@@ -197,6 +198,15 @@ export const spiritWolfPhases = {
   spirit_wolf_shot_resolve: { kind: 'compute', run: resolveShot, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const spiritWolfTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const spiritWolfTriggers: WerewolfTriggers = [
   { id: 'spirit-wolf-shot', on: 'seat_eliminated', when: canSpiritShoot, push: 'spirit_wolf_shot' },
 ];
+
+export const spiritWolfSpecial: SpecialDescriptor = {
+  key: 'spiritWolf',
+  prompts: spiritWolfPrompts,
+  identities: { spirit_wolf: spiritWolfPrompts.spiritWolf },
+  phases: spiritWolfPhases,
+  deathTriggers: spiritWolfTriggers,
+  nightStep: spiritShield,
+};

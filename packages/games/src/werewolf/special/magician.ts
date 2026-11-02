@@ -5,6 +5,7 @@ import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 魔术师：每晚第一个行动，可以交换两名存活玩家的号码（可不交换），每个号码全场只能被交换一次。
 // 当晚作用在这两个号码上的技能结果互换（狼刀、守护、毒药、预言家查验等都经 rules/nightEffects.ts 的 swapTarget 换算），
@@ -33,7 +34,7 @@ function applySwap(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
   };
 }
 
-export const magicianPhases = {
+const magicianPhases = {
   magician_swap: {
     kind: 'act',
     title: '魔术师',
@@ -49,3 +50,10 @@ export const magicianPhases = {
     next: nightAfter('magician_swap'),
   },
 } satisfies WerewolfPhases;
+
+export const magicianSpecial: SpecialDescriptor = {
+  key: 'magician',
+  prompts: magicianPrompts,
+  identities: { magician: magicianPrompts.magician },
+  phases: magicianPhases,
+};

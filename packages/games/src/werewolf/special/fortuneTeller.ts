@@ -6,6 +6,7 @@ import type { WerewolfContext } from '../rules/context';
 import { markScope } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 占卜师：每晚第一个睁眼，可以标记一个号码（全场一次，可不发动）。当晚所有狼人的击杀（狼队、大灰狼、继承击杀权的隐狼）
 // 只能落在被标记的号码及其左右相邻号码上（相邻号码不论死活，已出局者自然不能被击杀；范围见 rules/nightEffects.ts）。
@@ -37,7 +38,7 @@ function notifyPack(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return { log: [{ kind: 'narration', text: markNotice(ctx), channel: 'team:werewolf' }] };
 }
 
-export const fortuneTellerPhases = {
+const fortuneTellerPhases = {
   fortune_mark: {
     kind: 'act',
     title: '占卜师',
@@ -58,3 +59,10 @@ export const fortuneTellerPhases = {
     next: nightAfter('fortune_notice'),
   },
 } satisfies WerewolfPhases;
+
+export const fortuneTellerSpecial: SpecialDescriptor = {
+  key: 'fortuneTeller',
+  prompts: fortuneTellerPrompts,
+  identities: { fortune_teller: fortuneTellerPrompts.fortuneTeller },
+  phases: fortuneTellerPhases,
+};

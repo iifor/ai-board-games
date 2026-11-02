@@ -1,11 +1,12 @@
-import { definePrompts, type ActDecision, type ComputeOutcome, type Seat, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ActDecision, type ComputeOutcome, type Seat } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { boardConfig, hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import { isPackWolf, type WerewolfContext } from '../rules/context';
 import { withinMark } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 隐狼：离群的狼人（lone_wolf 阵营），狼队不认识他（狼刀可以选他），不在狼队频道里，不能自爆，查验时被视为好人。
 // 板子参数 hiddenWolf 决定口径：
@@ -51,7 +52,7 @@ function applyKill(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
  * linked 口径下狼队已全部出局、隐狼还活着：他马上会随之出局（hidden_wolf_link），
  * 胜负判定在此期间暂缓，避免按隐狼单独的票数误判狼人胜利。
  */
-export function hiddenWolfDoomed(ctx: WerewolfContext): boolean {
+function hiddenWolfDoomed(ctx: WerewolfContext): boolean {
   return boardConfig(ctx).hiddenWolf === 'linked' && !packAlive(ctx) && ctx.seats.alive().withRole('hidden_wolf').count() > 0;
 }
 
@@ -62,7 +63,7 @@ function resolveLink(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const hiddenWolfPhases = {
+const hiddenWolfPhases = {
   hidden_wolf_kill: {
     kind: 'act',
     title: '隐狼',
@@ -79,7 +80,7 @@ export const hiddenWolfPhases = {
   hidden_wolf_link: { kind: 'compute', run: resolveLink, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const hiddenWolfTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const hiddenWolfTriggers: WerewolfTriggers = [
   {
     id: 'hidden-wolf-link',
     on: 'seat_eliminated',
@@ -87,3 +88,12 @@ export const hiddenWolfTriggers: readonly TriggerSpec<WerewolfState, WerewolfPar
     push: 'hidden_wolf_link',
   },
 ];
+
+export const hiddenWolfSpecial: SpecialDescriptor = {
+  key: 'hiddenWolf',
+  prompts: hiddenWolfPrompts,
+  identities: { hidden_wolf: hiddenWolfPrompts.hiddenWolf, hidden_wolf_pack: hiddenWolfPrompts.hiddenWolfPack },
+  phases: hiddenWolfPhases,
+  deathTriggers: hiddenWolfTriggers,
+  victory: { defer: hiddenWolfDoomed },
+};

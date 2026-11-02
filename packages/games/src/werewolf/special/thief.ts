@@ -7,6 +7,7 @@ import { addSeatNote } from '../rules/notes';
 import { nightAfter } from '../rules/order';
 import { roleCatalog } from '../roles';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 盗贼：有底牌的板子开局抽出两张底牌（rules/deal.ts，结果在 state.thief，只有盗贼本人可见）。
 // 盗贼首夜第一个睁眼，从两张底牌中拿一张作为自己的身份（compute 改派角色与阵营）：其中有狼人阵营的牌时必须拿它（不再询问），
@@ -51,7 +52,7 @@ function take(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
 
 const firstNight = (ctx: WerewolfContext): boolean => ctx.round === 1 && hasRole(ctx, THIEF);
 
-export const thiefPhases = {
+const thiefPhases = {
   thief_choose: {
     kind: 'act',
     title: '盗贼',
@@ -66,3 +67,10 @@ export const thiefPhases = {
   },
   thief_take: { kind: 'compute', enabled: firstNight, run: take, next: nightAfter('thief_take') },
 } satisfies WerewolfPhases;
+
+export const thiefSpecial: SpecialDescriptor = {
+  key: 'thief',
+  prompts: thiefPrompts,
+  identities: { thief: thiefPrompts.thief },
+  phases: thiefPhases,
+};

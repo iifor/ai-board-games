@@ -1,8 +1,9 @@
-import { definePrompts, type ComputeOutcome, type Seat, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ComputeOutcome, type Seat } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { isWolf, type WerewolfContext } from '../rules/context';
 import { dayAfter } from '../rules/order';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 魔狼：狼队成员。
 // - 自爆后（照常直接入夜）当晚所有神职的夜间技能被封印（state.godsSealedNight，见 rules/block.ts 的 canUseNightSkill），公开播报；
@@ -22,7 +23,7 @@ const MAGIC_WOLF = 'magic_wolf';
 export const BLOODLINE = 'bloodline';
 
 /** 魔狼作为最后一名狼人被放逐：翻牌，不出局，存活到下一个天亮之后（返回 null 表示照常出局） */
-export function bloodlineHold(ctx: WerewolfContext, target: Seat, state: WerewolfState): ComputeOutcome<WerewolfState> | null {
+function bloodlineHold(ctx: WerewolfContext, target: Seat, state: WerewolfState): ComputeOutcome<WerewolfState> | null {
   if (target.role !== MAGIC_WOLF || state.magicWolfDoom !== null) return null;
   if (ctx.seats.alive().except(target).where(isWolf).count() > 0) return null;
   return {
@@ -51,7 +52,7 @@ function fade(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return { eliminate: [{ seat, reason: '血脉之力耗尽', cause: BLOODLINE }] };
 }
 
-export const magicWolfPhases = {
+const magicWolfPhases = {
   magic_wolf_seal: { kind: 'compute', run: seal, next: 'return' },
   magic_wolf_fade: {
     kind: 'compute',
@@ -61,7 +62,7 @@ export const magicWolfPhases = {
   },
 } satisfies WerewolfPhases;
 
-export const magicWolfTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const magicWolfTriggers: WerewolfTriggers = [
   {
     id: 'magic-wolf-seal',
     on: 'seat_eliminated',
@@ -69,3 +70,12 @@ export const magicWolfTriggers: readonly TriggerSpec<WerewolfState, WerewolfPara
     push: 'magic_wolf_seal',
   },
 ];
+
+export const magicWolfSpecial: SpecialDescriptor = {
+  key: 'magicWolf',
+  prompts: magicWolfPrompts,
+  identities: { magic_wolf: magicWolfPrompts.magicWolf },
+  phases: magicWolfPhases,
+  deathTriggers: magicWolfTriggers,
+  exile: { hold: bloodlineHold },
+};

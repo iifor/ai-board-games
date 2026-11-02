@@ -4,6 +4,7 @@ import { hasRole } from '../rules/board';
 import { isWolf, type WerewolfContext } from '../rules/context';
 import { dayAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 骑士：白天发言结束、放逐投票前可以决斗一名存活玩家（全场一次，可不发动）。
 // 对方是狼人：该狼人出局，当天放逐取消，直接入夜；对方是好人：骑士出局，白天照常进行。决斗出局者没有遗言。
@@ -51,7 +52,7 @@ function resolveDuel(ctx: WerewolfContext, hit: boolean): ComputeOutcome<Werewol
   };
 }
 
-export const knightPhases = {
+const knightPhases = {
   knight_duel: {
     kind: 'act',
     title: '骑士决斗',
@@ -71,3 +72,10 @@ export const knightPhases = {
   knight_hit: { kind: 'compute', run: (ctx) => resolveDuel(ctx, true), next: [{ goto: 'night_start', round: 'increment' }] },
   knight_miss: { kind: 'compute', run: (ctx) => resolveDuel(ctx, false), next: dayAfter('knight_duel') },
 } satisfies WerewolfPhases;
+
+export const knightSpecial: SpecialDescriptor = {
+  key: 'knight',
+  prompts: knightPrompts,
+  identities: { knight: knightPrompts.knight },
+  phases: knightPhases,
+};

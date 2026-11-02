@@ -8,6 +8,7 @@ import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
 import type { GiftSkill } from '../stateExtended';
 import { grantGift } from './gifts';
+import type { SpecialDescriptor } from './types';
 
 // 祈求者：神职，首夜第一个睁眼祈求一名其他存活玩家（必须祈求），按对方身份得到：
 // 平民 → 白天放逐投票计为两票（rules/sheriff.ts 的 exileWeight）；猎人 → 猎人的枪；女巫 → 女巫的毒；天眼（或其他神职）→ 一次查验（gifts.ts）；
@@ -69,7 +70,7 @@ function applyKill(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
   return { ...ctx.state, night: { ...ctx.state.night, thirdKill } };
 }
 
-export const requesterPhases = {
+const requesterPhases = {
   requester_pray: {
     kind: 'act',
     title: '祈求者',
@@ -100,3 +101,10 @@ export const requesterPhases = {
     next: nightAfter('requester_kill'),
   },
 } satisfies WerewolfPhases;
+
+export const requesterSpecial: SpecialDescriptor = {
+  key: 'requester',
+  prompts: requesterPrompts,
+  identities: { requester: requesterPrompts.requester },
+  phases: requesterPhases,
+};

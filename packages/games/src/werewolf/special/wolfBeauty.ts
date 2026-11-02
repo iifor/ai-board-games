@@ -1,5 +1,5 @@
-import { definePrompts, type ActDecision, type ComputeOutcome, type TriggerEvent, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ActDecision, type ComputeOutcome, type TriggerEvent } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { boardConfig, hasRole, roleTraits } from '../rules/board';
 import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
@@ -7,7 +7,8 @@ import { CHARM_BY_DAY } from '../rules/death';
 import { nightAfter } from '../rules/order';
 import { addDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
-import { NIGHT_DEATH_CAUSES, type WerewolfParams, type WerewolfState } from '../state';
+import { NIGHT_DEATH_CAUSES, type WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 狼美人：狼人阵营，狼人击杀后单独魅惑一名其他存活玩家（可不魅惑）。狼美人在当晚或天亮后的白天出局时，
 // 当晚被魅惑者随之殉情：夜里死亡时并入当晚死讯，白天出局时由触发器立即结算。殉情的猎人不能开枪。不能自爆。
@@ -34,7 +35,7 @@ function linkedLover(ctx: WerewolfContext): number | null {
 }
 
 /** 狼美人当晚死亡：被魅惑者一起列入死讯（削弱版狼美人被毒杀时不带人） */
-export const wolfBeautyNightLink: NightStep = (ctx, tally) => {
+const wolfBeautyNightLink: NightStep = (ctx, tally) => {
   const lover = linkedLover(ctx);
   if (lover === null) return tally;
   const poisonLinks = boardConfig(ctx).wolfBeautyPoisonLink;
@@ -58,7 +59,7 @@ function resolveDayLink(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const wolfBeautyPhases = {
+const wolfBeautyPhases = {
   wolf_beauty_charm: {
     kind: 'act',
     title: '狼美人魅惑',
@@ -75,6 +76,15 @@ export const wolfBeautyPhases = {
   wolf_beauty_link: { kind: 'compute', title: '殉情', run: resolveDayLink, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const wolfBeautyTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const wolfBeautyTriggers: WerewolfTriggers = [
   { id: 'wolf-beauty-link', on: 'seat_eliminated', when: diesByDay, push: 'wolf_beauty_link' },
 ];
+
+export const wolfBeautySpecial: SpecialDescriptor = {
+  key: 'wolfBeauty',
+  prompts: wolfBeautyPrompts,
+  identities: { wolf_beauty: wolfBeautyPrompts.wolfBeauty },
+  phases: wolfBeautyPhases,
+  linkTriggers: wolfBeautyTriggers,
+  nightStep: wolfBeautyNightLink,
+};
