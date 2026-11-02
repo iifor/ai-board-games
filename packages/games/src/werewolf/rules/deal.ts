@@ -1,7 +1,7 @@
 import type { DealContext, SeatQuery } from '@battle/engine';
 import type { BoardDefinition } from '../boardDefinition';
 import { DEFAULT_BOARD, findBoard } from '../boards';
-import { roleCatalog } from '../roles';
+import { ROLE_CATALOG, roleName } from '../roles';
 import type { WerewolfParams, WerewolfState } from '../state';
 
 // 有底牌的板子（盗贼）：牌堆 = roles + extraCards，开局按种子抽出与 extraCards 同样数量的底牌，其余发给座位。
@@ -18,7 +18,7 @@ function deckOf(board: BoardDefinition, seats: number): string[] {
 
 /** 狼人阵营的牌（盗贼抽到时必须拿走） */
 export function isWolfCard(role: string): boolean {
-  const team = roleCatalog()[role]?.spec.team;
+  const team = ROLE_CATALOG[role]?.team;
   return team === 'werewolf' || team === 'lone_wolf';
 }
 
@@ -67,6 +67,6 @@ export function initialThief(board: BoardDefinition, seats: SeatQuery): Werewolf
     if ((remaining[role] ?? 0) > 0) remaining[role] = (remaining[role] ?? 0) - 1;
     else cards.push(role);
   }
-  const label = (role: string | undefined): string => (role === undefined ? '' : `「${roleCatalog()[role]?.spec.name ?? role}」`);
+  const label = (role: string | undefined): string => (role === undefined ? '' : `「${roleName(role)}」`);
   return { seat: seats.withRole('thief').ids()[0] ?? null, cards, first: label(cards[0]), second: label(cards[1]) };
 }

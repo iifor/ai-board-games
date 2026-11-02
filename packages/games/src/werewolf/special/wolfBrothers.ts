@@ -15,7 +15,7 @@ import type { SpecialDescriptor } from './types';
 // 狼兄出局后的下一晚，狼弟在狼队击杀之后单独击杀一名玩家（可以不杀；守护、解药挡不下）；
 // 再之后一晚的狼人行动前，狼弟改为狼队成员（wolf_younger_brother_pack），与狼队互相认识、一起夜聊与击杀。
 
-export const wolfBrothersPrompts = definePrompts({
+const wolfBrothersPrompts = definePrompts({
   wolfElderBrother: [
     '你是{{me.label}}，身份是狼兄（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '{{#if state.knownWolves}}你的弟弟狼弟是 {{#each state.knownWolves}}{{this}}号 {{/each}}：他不和狼队一起夜聊、击杀，狼队其他人不认识他，你出局前预言家查验他为好人。{{/if}}',

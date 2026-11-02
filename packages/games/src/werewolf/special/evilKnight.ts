@@ -8,7 +8,7 @@ import type { SpecialDescriptor } from './types';
 // 反伤（全场一次）：女巫毒他则女巫当晚死亡；预言家查验他则预言家当晚死亡，但同验同毒时只有女巫死亡。
 // 反伤对象当晚本就会死亡时不消耗反伤。
 
-export const evilKnightPrompts = definePrompts({
+const evilKnightPrompts = definePrompts({
   evilKnight: [
     '你是{{me.label}}，身份是恶灵骑士（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '你永远不会在夜晚死亡（免疫女巫的毒药和夜间出局的猎人开的枪）。女巫毒你时女巫当晚死亡，预言家查验你时预言家当晚死亡（同一晚既被查验又被毒时只有女巫死亡），这一反伤全场只会发生一次。你不能自爆。',

@@ -10,7 +10,7 @@ import type { SpecialDescriptor } from './types';
 // - 作为最后一名狼人被放逐时自动翻牌，不出局，存活到下一个天亮之后才出局（state.magicWolfDoom，公开）：
 //   这一晚他照常击杀；在此期间不能投票、达到天数上限时视为已出局（rules/context.ts 的 bloodlineDoomed）。
 
-export const magicWolfPrompts = definePrompts({
+const magicWolfPrompts = definePrompts({
   magicWolf: [
     '你是{{me.label}}，身份是魔狼（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '白天发言时你可以在发言后宣布自爆：自爆后直接进入黑夜，当晚所有神职的技能都会被你封印。',

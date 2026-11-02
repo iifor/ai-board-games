@@ -8,7 +8,7 @@ import type { SpecialDescriptor } from './types';
 
 // 混血儿：好人阵营、算作村民；首夜第一个睁眼选择一名主人（双方都不知道对方身份），胜负跟随主人的阵营。
 
-export const hybridPrompts = definePrompts({
+const hybridPrompts = definePrompts({
   hybrid: [
     '你是{{me.label}}，身份是混血儿（算作村民）。',
     '{{#if state.hybridMaster}}你的主人是 {{state.hybridMaster}}号，你不知道他的身份。{{else}}首夜你要选择一名主人。{{/if}}',

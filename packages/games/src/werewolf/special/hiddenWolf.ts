@@ -13,7 +13,7 @@ import type { SpecialDescriptor } from './types';
 // - inherit（隐狼&乌鸦）：开局由法官私下告知狼同伴（state.knownWolves）；狼同伴全部出局后继承击杀权，每晚单独击杀（即当晚的狼刀）。
 // - linked（驯熊师&隐狼）：与狼人互不相认、不能击杀；狼队最后一名狼人出局时隐狼随之出局。
 
-export const hiddenWolfPrompts = definePrompts({
+const hiddenWolfPrompts = definePrompts({
   hiddenWolf: [
     '你是{{me.label}}，身份是隐狼（离群的狼人，狼人阵营），不能自爆，查验时被视为好人。',
     '{{#if state.knownWolves}}法官告诉你，你的狼同伴是 {{#each state.knownWolves}}{{this}}号 {{/each}}；他们不知道你是谁，你也不和他们一起夜聊、击杀。',

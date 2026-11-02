@@ -12,7 +12,7 @@ import type { SpecialDescriptor } from './types';
 // 女巫对还有两条命的大树用解药，解药作废，大树照样失去一条命；守卫守住则没有被刀中。
 // 大树因狼刀或白狼王自爆带人以外的原因出局时，法官公开宣布其余神职全部失去技能（state.godsDisabled，见 rules/block.ts 的 skillsLost）。
 
-export const bigTreePrompts = definePrompts({
+const bigTreePrompts = definePrompts({
   bigTree: [
     '你是{{me.label}}，身份是大树（长老，算作村民）。你要被狼人刀中两次才会出局{{#if state.bigTreeHits}}，你已经被刀中过一次，再被刀中就会出局{{/if}}。',
     '女巫对还有两条命的你使用解药时，解药作废，你只剩一条命。你若因狼刀或白狼王自爆以外的原因出局，其余神职将全部失去技能。',

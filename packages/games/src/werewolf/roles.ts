@@ -1,48 +1,8 @@
-import type { PromptTemplate, RoleSpec } from '@battle/engine';
 import type { RoleCategory } from './boardDefinition';
-import { werewolfPrompts as prompts } from './prompts';
-import { bearPrompts } from './special/bear';
-import { bearTamerPrompts } from './special/bearTamer';
-import { bigBadWolfPrompts } from './special/bigBadWolf';
-import { bigTreePrompts } from './special/bigTree';
-import { blackMerchantPrompts } from './special/blackMerchant';
-import { bombmanPrompts } from './special/bombman';
-import { butterflyPrompts } from './special/butterfly';
-import { crowPrompts } from './special/crow';
-import { cupidPrompts } from './special/cupid';
-import { demonPrompts } from './special/demon';
-import { dreamerPrompts } from './special/dreamer';
-import { evilKnightPrompts } from './special/evilKnight';
-import { fortuneTellerPrompts } from './special/fortuneTeller';
-import { ghostBridePrompts } from './special/ghostBride';
-import { foxPrompts } from './special/fox';
-import { guardPrompts } from './special/guard';
-import { heavenlyEyePrompts } from './special/heavenlyEye';
-import { hiddenWolfPrompts } from './special/hiddenWolf';
-import { hybridPrompts } from './special/hybrid';
-import { illusionistPrompts } from './special/illusionist';
-import { knightPrompts } from './special/knight';
-import { demonHunterPrompts } from './special/demonHunter';
-import { magicianPrompts } from './special/magician';
-import { magicWolfPrompts } from './special/magicWolf';
-import { nightmarePrompts } from './special/nightmare';
-import { nineTailedFoxPrompts } from './special/nineTailedFox';
-import { oldRoguePrompts } from './special/oldRogue';
-import { penguinPrompts } from './special/penguin';
-import { requesterPrompts } from './special/requester';
-import { saplingPrompts } from './special/sapling';
-import { silenceElderPrompts } from './special/silenceElder';
-import { spiritWolfPrompts } from './special/spiritWolf';
-import { stalkerPrompts } from './special/stalker';
-import { succubusPrompts } from './special/succubus';
-import { thiefPrompts } from './special/thief';
-import { whiteWolfKingPrompts } from './special/whiteWolfKing';
-import { wildChildPrompts } from './special/wildChild';
-import { wolfBeautyPrompts } from './special/wolfBeauty';
-import { wolfBrothersPrompts } from './special/wolfBrothers';
-import { wolfKingPrompts } from './special/wolfKing';
-import { wolfSeedPrompts } from './special/wolfSeed';
-import { wolfWitchPrompts } from './special/wolfWitch';
+
+// 角色目录（叶子数据模块）：每个角色的展示名、阵营、屠边类别与特性，基础规则与特殊角色模块都可以引用。
+// 身份模板不在这里：基础角色的在 prompts.ts，特殊角色的在各自模块的描述符中登记，由 roleSpecs.ts 装配成引擎的 RoleSpec。
+// 本模块不得引用 special/*，否则会重新形成 规则 → 角色目录 → 特殊角色 → 规则 的循环。
 
 /** 角色的静态特性，规则通过 roleTraits(seat) 读取 */
 export interface RoleTraits {
@@ -66,21 +26,22 @@ export interface RoleTraits {
   readonly delayedDeath?: boolean;
 }
 
+/**
+ * werewolf：狼队（互相认识、共享狼队频道）；lone_wolf：离群的狼（狼人阵营，但不在狼队频道里）；good：好人阵营；
+ * ghost_bride：鬼魂新娘的第三方阵营（共享第三方频道，见 special/ghostBride.ts）
+ */
+export type RoleTeam = 'werewolf' | 'lone_wolf' | 'good' | 'ghost_bride';
+
 export interface RoleEntry {
-  readonly spec: RoleSpec;
+  readonly name: string;
+  readonly team: RoleTeam;
   /** 屠边判定用的类别；板子可在 config.categories 中覆盖 */
   readonly category: RoleCategory;
   readonly traits: RoleTraits;
 }
 
-/**
- * werewolf：狼队（互相认识、共享狼队频道）；lone_wolf：离群的狼（狼人阵营，但不在狼队频道里）；good：好人阵营；
- * ghost_bride：鬼魂新娘的第三方阵营（共享第三方频道，见 special/ghostBride.ts）
- */
-type RoleTeam = 'werewolf' | 'lone_wolf' | 'good' | 'ghost_bride';
-
-function role(name: string, team: RoleTeam, identity: PromptTemplate, category: RoleCategory, traits: RoleTraits = {}): RoleEntry {
-  return { spec: { name, team, identity, ...(team === 'werewolf' ? { knowsTeammates: true } : {}) }, category, traits };
+function role(name: string, team: RoleTeam, category: RoleCategory, traits: RoleTraits = {}): RoleEntry {
+  return { name, team, category, traits };
 }
 
 /** 恶魔、恶灵骑士：免疫毒药与夜间出局的猎人的枪，不能自爆 */
@@ -92,79 +53,66 @@ const PACK_HIDDEN_WOLF: RoleTraits = { noSelfDestruct: true, appearsGoodWhile: '
 /** 狼弟：只与狼兄相认，狼队不认识他；狼兄出局前查验为好人 */
 const YOUNGER_BROTHER: RoleTraits = { hiddenFromPack: true, appearsGoodWhile: 'wolf_elder_brother', pairedWith: 'wolf_elder_brother' };
 
-/** 全部板子用到的角色；新增特殊角色时在此登记 */
-function buildCatalog(): Readonly<Record<string, RoleEntry>> {
-  return {
-    werewolf: role('狼人', 'werewolf', prompts.werewolf, 'wolf'),
-    white_wolf_king: role('白狼王', 'werewolf', whiteWolfKingPrompts.whiteWolfKing, 'wolf'),
-    wolf_beauty: role('狼美人', 'werewolf', wolfBeautyPrompts.wolfBeauty, 'wolf', { noSelfDestruct: true }),
-    demon: role('恶魔', 'werewolf', demonPrompts.demon, 'wolf', NIGHT_IMMUNE),
-    evil_knight: role('恶灵骑士', 'werewolf', evilKnightPrompts.evilKnight, 'wolf', NIGHT_IMMUNE),
-    nightmare: role('梦魇', 'werewolf', nightmarePrompts.nightmare, 'wolf'),
-    wolf_king: role('狼王', 'werewolf', wolfKingPrompts.wolfKing, 'wolf'),
-    wild_child_wolf: role('野孩子', 'werewolf', wildChildPrompts.wildChildWolf, 'wolf'),
-    big_bad_wolf: role('大灰狼', 'lone_wolf', bigBadWolfPrompts.bigBadWolf, 'wolf', { noSelfDestruct: true }),
-    hidden_wolf: role('隐狼', 'lone_wolf', hiddenWolfPrompts.hiddenWolf, 'wolf', { noSelfDestruct: true, hiddenFromPack: true, appearsGood: true }),
-    hidden_wolf_pack: role('隐狼', 'werewolf', hiddenWolfPrompts.hiddenWolfPack, 'wolf', PACK_HIDDEN_WOLF),
-    wolf_elder_brother: role('狼兄', 'werewolf', wolfBrothersPrompts.wolfElderBrother, 'wolf'),
-    wolf_younger_brother: role('狼弟', 'lone_wolf', wolfBrothersPrompts.wolfYoungerBrother, 'wolf', YOUNGER_BROTHER),
-    wolf_younger_brother_pack: role('狼弟', 'werewolf', wolfBrothersPrompts.wolfYoungerBrotherPack, 'wolf'),
-    wolf_seed: role('种狼', 'werewolf', wolfSeedPrompts.wolfSeed, 'wolf'),
-    infected_wolf: role('感染狼', 'werewolf', wolfSeedPrompts.infectedWolf, 'wolf'),
-    succubus: role('魅魔', 'werewolf', succubusPrompts.succubus, 'wolf'),
-    magic_wolf: role('魔狼', 'werewolf', magicWolfPrompts.magicWolf, 'wolf'),
-    spirit_wolf: role('灵狼', 'werewolf', spiritWolfPrompts.spiritWolf, 'wolf'),
-    wolf_witch: role('狼巫', 'werewolf', wolfWitchPrompts.wolfWitch, 'wolf'),
-    seer: role('预言家', 'good', prompts.seer, 'god'),
-    witch: role('女巫', 'good', prompts.witch, 'god'),
-    hunter: role('猎人', 'good', prompts.hunter, 'god'),
-    idiot: role('白痴', 'good', prompts.idiot, 'god'),
-    guard: role('守卫', 'good', guardPrompts.guard, 'god'),
-    silence_elder: role('禁言长老', 'good', silenceElderPrompts.silenceElder, 'god'),
-    knight: role('骑士', 'good', knightPrompts.knight, 'god'),
-    stalker: role('潜行者', 'good', stalkerPrompts.stalker, 'god'),
-    butterfly: role('花蝴蝶', 'good', butterflyPrompts.butterfly, 'god'),
-    dreamer: role('摄梦人', 'good', dreamerPrompts.dreamer, 'god'),
-    magician: role('魔术师', 'good', magicianPrompts.magician, 'god'),
-    fortune_teller: role('占卜师', 'good', fortuneTellerPrompts.fortuneTeller, 'god'),
-    crow: role('乌鸦', 'good', crowPrompts.crow, 'god'),
-    bear_tamer: role('驯熊师', 'good', bearTamerPrompts.bearTamer, 'god'),
-    bombman: role('炸弹人', 'good', bombmanPrompts.bombman, 'god'),
-    nine_tailed_fox: role('九尾狐', 'good', nineTailedFoxPrompts.nineTailedFox, 'god'),
-    black_merchant: role('黑商', 'good', blackMerchantPrompts.blackMerchant, 'god'),
-    bear: role('熊', 'good', bearPrompts.bear, 'god'),
-    penguin: role('企鹅', 'good', penguinPrompts.penguin, 'god'),
-    fox: role('狐狸', 'good', foxPrompts.fox, 'god'),
-    heavenly_eye: role('天眼', 'good', heavenlyEyePrompts.heavenlyEye, 'god'),
-    requester: role('祈求者', 'good', requesterPrompts.requester, 'god'),
-    demon_hunter: role('猎魔人', 'good', demonHunterPrompts.demonHunter, 'god', { poisonImmune: true }),
-    illusionist: role('幻术师', 'good', illusionistPrompts.illusionist, 'god'),
-    thief: role('盗贼', 'good', thiefPrompts.thief, 'villager'),
-    cupid: role('丘比特', 'good', cupidPrompts.cupid, 'third'),
-    ghost_bride: role('鬼魂新娘', 'ghost_bride', ghostBridePrompts.ghostBride, 'third'),
-    betrayer_wolf: role('叛变的狼人', 'ghost_bride', ghostBridePrompts.betrayerWolf, 'third'),
-    hybrid: role('混血儿', 'good', hybridPrompts.hybrid, 'villager'),
-    old_rogue: role('老流氓', 'good', oldRoguePrompts.oldRogue, 'villager', { charmImmune: true, delayedDeath: true }),
-    wild_child: role('野孩子', 'good', wildChildPrompts.wildChild, 'third'),
-    big_tree: role('大树', 'good', bigTreePrompts.bigTree, 'villager'),
-    villager: role('村民', 'good', prompts.villager, 'villager'),
-    rabbit: role('兔兔', 'good', prompts.rabbit, 'villager'),
-    sapling: role('树苗', 'good', saplingPrompts.sapling, 'villager'),
-  };
-}
+/** 全部板子用到的角色；新增特殊角色时在此登记，身份模板在该角色模块的描述符中登记 */
+export const ROLE_CATALOG: Readonly<Record<string, RoleEntry>> = {
+  werewolf: role('狼人', 'werewolf', 'wolf'),
+  white_wolf_king: role('白狼王', 'werewolf', 'wolf'),
+  wolf_beauty: role('狼美人', 'werewolf', 'wolf', { noSelfDestruct: true }),
+  demon: role('恶魔', 'werewolf', 'wolf', NIGHT_IMMUNE),
+  evil_knight: role('恶灵骑士', 'werewolf', 'wolf', NIGHT_IMMUNE),
+  nightmare: role('梦魇', 'werewolf', 'wolf'),
+  wolf_king: role('狼王', 'werewolf', 'wolf'),
+  wild_child_wolf: role('野孩子', 'werewolf', 'wolf'),
+  big_bad_wolf: role('大灰狼', 'lone_wolf', 'wolf', { noSelfDestruct: true }),
+  hidden_wolf: role('隐狼', 'lone_wolf', 'wolf', { noSelfDestruct: true, hiddenFromPack: true, appearsGood: true }),
+  hidden_wolf_pack: role('隐狼', 'werewolf', 'wolf', PACK_HIDDEN_WOLF),
+  wolf_elder_brother: role('狼兄', 'werewolf', 'wolf'),
+  wolf_younger_brother: role('狼弟', 'lone_wolf', 'wolf', YOUNGER_BROTHER),
+  wolf_younger_brother_pack: role('狼弟', 'werewolf', 'wolf'),
+  wolf_seed: role('种狼', 'werewolf', 'wolf'),
+  infected_wolf: role('感染狼', 'werewolf', 'wolf'),
+  succubus: role('魅魔', 'werewolf', 'wolf'),
+  magic_wolf: role('魔狼', 'werewolf', 'wolf'),
+  spirit_wolf: role('灵狼', 'werewolf', 'wolf'),
+  wolf_witch: role('狼巫', 'werewolf', 'wolf'),
+  seer: role('预言家', 'good', 'god'),
+  witch: role('女巫', 'good', 'god'),
+  hunter: role('猎人', 'good', 'god'),
+  idiot: role('白痴', 'good', 'god'),
+  guard: role('守卫', 'good', 'god'),
+  silence_elder: role('禁言长老', 'good', 'god'),
+  knight: role('骑士', 'good', 'god'),
+  stalker: role('潜行者', 'good', 'god'),
+  butterfly: role('花蝴蝶', 'good', 'god'),
+  dreamer: role('摄梦人', 'good', 'god'),
+  magician: role('魔术师', 'good', 'god'),
+  fortune_teller: role('占卜师', 'good', 'god'),
+  crow: role('乌鸦', 'good', 'god'),
+  bear_tamer: role('驯熊师', 'good', 'god'),
+  bombman: role('炸弹人', 'good', 'god'),
+  nine_tailed_fox: role('九尾狐', 'good', 'god'),
+  black_merchant: role('黑商', 'good', 'god'),
+  bear: role('熊', 'good', 'god'),
+  penguin: role('企鹅', 'good', 'god'),
+  fox: role('狐狸', 'good', 'god'),
+  heavenly_eye: role('天眼', 'good', 'god'),
+  requester: role('祈求者', 'good', 'god'),
+  demon_hunter: role('猎魔人', 'good', 'god', { poisonImmune: true }),
+  illusionist: role('幻术师', 'good', 'god'),
+  thief: role('盗贼', 'good', 'villager'),
+  cupid: role('丘比特', 'good', 'third'),
+  ghost_bride: role('鬼魂新娘', 'ghost_bride', 'third'),
+  betrayer_wolf: role('叛变的狼人', 'ghost_bride', 'third'),
+  hybrid: role('混血儿', 'good', 'villager'),
+  old_rogue: role('老流氓', 'good', 'villager', { charmImmune: true, delayedDeath: true }),
+  wild_child: role('野孩子', 'good', 'third'),
+  big_tree: role('大树', 'good', 'villager'),
+  villager: role('村民', 'good', 'villager'),
+  rabbit: role('兔兔', 'good', 'villager'),
+  sapling: role('树苗', 'good', 'villager'),
+};
 
-let catalog: Readonly<Record<string, RoleEntry>> | null = null;
-
-/**
- * 惰性构建：特殊角色模块会间接引用本模块（规则 → 角色类别），
- * 延迟到首次使用时再读取各模块的身份模板，模块加载顺序就不会影响结果。
- * 只从各角色模块直接引用模板，不要引用 special/index（它在加载时就会展开各模块的阶段）。
- */
-export function roleCatalog(): Readonly<Record<string, RoleEntry>> {
-  catalog ??= buildCatalog();
-  return catalog;
-}
-
-export function roleSpecs(): Record<string, RoleSpec> {
-  return Object.fromEntries(Object.entries(roleCatalog()).map(([key, entry]) => [key, entry.spec]));
+/** 角色的展示名；未登记的角色原样返回 key */
+export function roleName(role: string): string {
+  return ROLE_CATALOG[role]?.name ?? role;
 }

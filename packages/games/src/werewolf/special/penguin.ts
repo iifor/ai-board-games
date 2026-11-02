@@ -11,7 +11,7 @@ import type { SpecialDescriptor } from './types';
 // 被冰冻者当晚的夜间技能失效（见 rules/block.ts 的夜间技能封锁）：狐狸不能查验、乌鸦不能诅咒、熊次日天亮不咆哮；
 // 冰冻到狼人则整个狼队当晚不能击杀。
 
-export const penguinPrompts = definePrompts({
+const penguinPrompts = definePrompts({
   penguin: [
     '你是{{me.label}}，身份是企鹅（神职）。每晚你可以冰冻一名其他玩家，被冰冻者当晚的夜间技能失效（冰冻熊则熊次日不咆哮；冰冻到狼人则整个狼队当晚不能击杀），不能连续两晚冰冻同一人。',
     '{{#if state.penguinLastTarget}}你上一晚冰冻的是 {{state.penguinLastTarget}}号，今晚不能再冰冻他。{{/if}}',

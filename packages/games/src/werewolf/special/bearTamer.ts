@@ -11,7 +11,7 @@ import type { SpecialDescriptor } from './types';
 // 驯熊师：每晚入夜前判定一次熊的咆哮状态——驯熊师左右相邻的两名存活玩家中有狼人（查验视为好人的隐狼除外）则咆哮；
 // 次日天亮与死讯一起公布。驯熊师已出局（包括当晚死亡）时熊不咆哮。
 
-export const bearTamerPrompts = definePrompts({
+const bearTamerPrompts = definePrompts({
   bearTamer: '你是{{me.label}}，身份是驯熊师。每天天亮公布死讯时，法官会同时公布熊是否咆哮：入夜前你左右相邻的两名存活玩家中有狼人时，次日天亮熊会咆哮（你出局后熊不再咆哮）。',
 });
 

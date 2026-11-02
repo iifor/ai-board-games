@@ -11,7 +11,7 @@ import type { SpecialDescriptor } from './types';
 // 若这次引爆同时炸死了场上所有狼人和所有村民（或所有狼人和所有神职），炸弹人单独获胜（state.bombmanWin）。
 // 是否引爆只记在炸弹人私密频道；引爆时才公开翻牌。
 
-export const bombmanPrompts = definePrompts({
+const bombmanPrompts = definePrompts({
   bombman: '你是{{me.label}}，身份是炸弹人（神职）。被放逐出局时你可以翻牌引爆，炸死所有投票放逐你的玩家；若同时炸死了场上所有狼人和所有村民（或所有狼人和所有神职），你单独获胜。',
   bombmanBlast: '你被放逐出局。是否翻牌引爆，炸死所有投票放逐你的玩家（见上方放逐投票记录）？选择你自己表示引爆，输出空数组表示不引爆。',
 });

@@ -11,7 +11,7 @@ import type { SpecialDescriptor } from './types';
 // 魅魔：狼队成员（与狼队一起夜聊、击杀，查验为狼人，可以自爆）。首夜在盗贼之后第一个睁眼，必须选择一名好人（非狼人阵营的存活玩家）
 // 与自己结为情侣（lovers.ts），两人组成第三方阵营（state.thirdParty），屠城获胜。被选中者私下得知；狼队不知道她选了谁。
 
-export const succubusPrompts = definePrompts({
+const succubusPrompts = definePrompts({
   succubus: [
     '你是{{me.label}}，身份是魅魔（混在狼队中的第三方）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '首夜你第一个睁眼，选择一名好人与你结为情侣：你们组成第三方阵营（一方出局时另一方殉情），需要让其他所有玩家出局才能获胜；你仍与狼队一起夜聊、击杀。白天发言时你可以在发言后宣布自爆。',

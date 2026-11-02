@@ -10,7 +10,7 @@ import type { SpecialDescriptor } from './types';
 // 恶魔：狼人阵营，狼人行动后单独查验一名好人阵营的存活玩家是神职还是平民（必须查验）。
 // 免疫毒药与夜间出局的猎人的枪、不能自爆，这些由角色目录中的特性统一处理。
 
-export const demonPrompts = definePrompts({
+const demonPrompts = definePrompts({
   demon: [
     '你是{{me.label}}，身份是恶魔（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '每晚狼人行动后，你可以单独查验一名好人阵营玩家是神职还是平民。你免疫女巫的毒药和夜间出局的猎人开的枪，不能自爆。',

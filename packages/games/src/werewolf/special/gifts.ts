@@ -14,7 +14,7 @@ import type { SpecialDescriptor } from './types';
 // 猎人的枪在出局时直接开枪，不翻牌（公开记录只写"开枪带走 X号"，被带走者的出局原因为"被枪杀"）。
 // 额外技能不覆盖原有技能；神职持有者在大树倒下后同样失去额外技能。
 
-export const giftPrompts = definePrompts({
+const giftPrompts = definePrompts({
   giftCheck: '你持有额外的一次查验：选择一名玩家查验他是好人还是狼人，也可以输出空数组留到之后的夜晚再用。',
   giftPoison: '你持有额外的一瓶毒药：选择一名玩家毒杀，也可以输出空数组留到之后的夜晚再用。',
   giftShot: '你已出局，可以用额外获得的枪带走一名存活玩家（不会翻牌），也可以输出空数组放弃开枪。',

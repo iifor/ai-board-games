@@ -10,7 +10,7 @@ import type { SpecialDescriptor } from './types';
 // 榜样出局时野孩子变为狼人：角色改为 wild_child_wolf（狼人阵营、认识狼队），从此与狼队一起夜聊、击杀；
 // 只能看到加入之后的狼队频道记录（引擎 Seat.teamSince）。野孩子先于榜样出局则始终是好人。
 
-export const wildChildPrompts = definePrompts({
+const wildChildPrompts = definePrompts({
   wildChild: [
     '你是{{me.label}}，身份是野孩子（好人阵营，既不算神职也不算村民）。',
     '{{#if state.wildChildModel}}你的榜样是 {{state.wildChildModel}}号，你不知道他的身份。{{else}}首夜你要选择一名榜样。{{/if}}',

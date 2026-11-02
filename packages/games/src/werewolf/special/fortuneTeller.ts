@@ -12,7 +12,7 @@ import type { SpecialDescriptor } from './types';
 // 只能落在被标记的号码及其左右相邻号码上（相邻号码不论死活，已出局者自然不能被击杀；范围见 rules/nightEffects.ts）。
 // 标记后立即告知狼队；大灰狼要先决定是否发动单独击杀才会得知标记（见 bigBadWolf.ts）。
 
-export const fortuneTellerPrompts = definePrompts({
+const fortuneTellerPrompts = definePrompts({
   fortuneTeller: [
     '你是{{me.label}}，身份是占卜师。每晚你第一个睁眼，可以标记一个号码：当晚狼人（包括大灰狼）只能击杀该号码及其左右相邻号码中的玩家（相邻号码不论死活）。全场只能标记一次。',
     '{{#if state.fortuneMarkUsed}}你已经用过标记。{{/if}}',

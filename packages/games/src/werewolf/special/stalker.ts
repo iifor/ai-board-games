@@ -12,7 +12,7 @@ import type { SpecialDescriptor } from './types';
 // 潜行者：放逐投票中投给的玩家若没有被放逐出局，当晚可以暗杀他（全场一次，可不发动）。
 // 暗杀在夜间结算，守护与解药都挡不下；被花蝴蝶等封锁的当晚不能暗杀，机会随之失效。
 
-export const stalkerPrompts = definePrompts({
+const stalkerPrompts = definePrompts({
   stalker: [
     '你是{{me.label}}，身份是潜行者。',
     '{{#if state.stalkerUsed}}你已经用过暗杀。{{else}}如果你在放逐投票中投给的玩家没有被放逐出局，你可以在当晚暗杀他，全场只能暗杀一次。{{/if}}',

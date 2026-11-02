@@ -12,7 +12,7 @@ import type { SpecialDescriptor } from './types';
 // 情侣私下得知对方的号码（不知道身份）。两人都是好人 → 丘比特属于好人阵营；都是狼人 → 属于狼人阵营；
 // 一好一狼 → 丘比特与情侣组成第三方（state.thirdParty），此时情侣中的狼人与其他狼人刀法不一致时当晚视为空刀（lover_veto）。
 
-export const cupidPrompts = definePrompts({
+const cupidPrompts = definePrompts({
   cupid: [
     '你是{{me.label}}，身份是丘比特（不属于狼、神、民任何一边）。首夜你选择两名玩家（可以包括你自己）成为情侣：一方出局时另一方殉情。',
     '两人都是好人则你属于好人阵营；都是狼人则你属于狼人阵营；一好一狼则你与情侣组成第三方阵营，需要让其他所有玩家出局才能获胜。你只知道情侣是谁，不知道他们的身份。',

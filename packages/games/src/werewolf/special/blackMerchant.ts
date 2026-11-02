@@ -16,7 +16,7 @@ import type { SpecialDescriptor } from './types';
 // 板子参数 blackMerchant：first_night 首夜第一个睁眼且必须交易；any_night 任意一晚（女巫之后）可以交易，
 // 此时黑商若当晚被狼刀且没有被救，会先私下得知自己将要出局。
 
-export const blackMerchantPrompts = definePrompts({
+const blackMerchantPrompts = definePrompts({
   blackMerchant: [
     '你是{{me.label}}，身份是黑商（神职）。',
     '{{#if state.merchant.used}}你已经完成了交易。{{else}}全场一次，你可以选择一名玩家进行黑暗交易，把预言家的验、猎人的枪、女巫的毒之一交给他；',

@@ -14,7 +14,7 @@ import type { SpecialDescriptor } from './types';
 // 被害者当晚确实死于这一刀（没有被女巫救起、没有被守卫守住、没有同时被毒）时感染成功：他不会死亡，
 // 改为"感染狼"（狼队成员，失去原有技能），私下得知并在狼队频道告知狼队；否则感染无效，次数照常消耗。
 
-export const wolfSeedPrompts = definePrompts({
+const wolfSeedPrompts = definePrompts({
   wolfSeed: [
     '你是{{me.label}}，身份是种狼（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '{{#if state.wolfSeedUsed}}你已经用过感染。{{else}}全场一次，你可以在狼队击杀后把当晚的被害者感染为狼人：若他当晚确实被击杀（没有被女巫救起、没有被守卫守住），他不会死亡，而是失去原有技能加入狼队。{{/if}}',

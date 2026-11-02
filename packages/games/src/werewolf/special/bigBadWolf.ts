@@ -15,7 +15,7 @@ import type { SpecialDescriptor } from './types';
 // 每晚狼队之后单独睁眼，全场可以发动一次单独击杀：先决定是否发动，发动后才得知占卜师的标记，并且必须落刀。
 // 单独击杀与狼刀同时结算，不经过女巫（女巫只被告知狼队刀口），解药挡不下。不能自爆。
 
-export const bigBadWolfPrompts = definePrompts({
+const bigBadWolfPrompts = definePrompts({
   bigBadWolf: [
     '你是{{me.label}}，身份是大灰狼（离群的狼人，狼人阵营）。',
     '你的狼同伴：{{#each state.knownWolves}}{{this}}号 {{/each}}。你们互相认识，但夜里你不和狼队一起夜聊、击杀，也看不见彼此的刀法。',

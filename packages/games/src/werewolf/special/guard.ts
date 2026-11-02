@@ -9,7 +9,7 @@ import type { SpecialDescriptor } from './types';
 
 // 守卫：每晚守护一人（可自守、可空守），不能连续两晚守同一人；同守同救则被守护者死亡。
 
-export const guardPrompts = definePrompts({
+const guardPrompts = definePrompts({
   guard: '你是{{me.label}}，身份是守卫。{{#if state.guardLastTarget}}你上一晚守护的是 {{state.guardLastTarget}}号，今晚不能再守他。{{/if}}',
   guardProtect: '守卫请睁眼，选择今晚要守护的玩家，也可以输出空数组空守。',
 });

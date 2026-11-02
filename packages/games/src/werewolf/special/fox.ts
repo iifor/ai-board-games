@@ -12,7 +12,7 @@ import type { SpecialDescriptor } from './types';
 // 狐狸：神职，每晚选择一名存活玩家，查验他与左右相邻号码（三个相连号码，按座位号环绕）中的存活玩家里有没有狼人
 // （查验视为好人的狼除外）。有狼人则下一晚可以继续查验；三人都是好人则永远失去查验能力。查验记录只记在狐狸私密频道。
 
-export const foxPrompts = definePrompts({
+const foxPrompts = definePrompts({
   fox: [
     '你是{{me.label}}，身份是狐狸（神职）。每晚你可以选择一名玩家，查验他与左右相邻号码（三个相连号码中的存活玩家）里有没有狼人；',
     '有狼人时你下一晚可以继续查验，都是好人时你永远失去查验能力。',

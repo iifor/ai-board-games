@@ -10,7 +10,7 @@ import type { SpecialDescriptor } from './types';
 // 九尾狐：神职，有九条尾巴。每有一名神职出局失去两条、每有一名村民出局失去一条（按本局屠边类别，其他身份不计）；
 // 失去全部尾巴时立即出局。每晚最后一个睁眼查看剩余尾巴数（私下告知，身份提示中保留最近一次查看的数量）。
 
-export const nineTailedFoxPrompts = definePrompts({
+const nineTailedFoxPrompts = definePrompts({
   nineTailedFox: [
     '你是{{me.label}}，身份是九尾狐（神职）。你有九条尾巴：每有一名神职出局你失去两条，每有一名村民出局你失去一条；失去全部尾巴时你会出局。',
     '每晚你最后一个睁眼查看尾巴数量，最近一次查看时你还有 {{state.foxTailsSeen}} 条尾巴。',

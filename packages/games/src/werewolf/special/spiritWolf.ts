@@ -22,7 +22,7 @@ import type { SpecialDescriptor } from './types';
 // - 守卫：第二夜起每晚可以庇护一名玩家（不能连续两晚同一人），效果见 spiritWolfSkills.ts 与下面的 spiritShield；
 // - 其他身份算平民：查验时被视为好人（rules/appearance.ts）。
 
-export const spiritWolfPrompts = definePrompts({
+const spiritWolfPrompts = definePrompts({
   spiritWolf: [
     '你是{{me.label}}，身份是灵狼（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '每晚与狼队一起击杀后，你在女巫之后、预言家之前单独睁眼；首夜你选择一名好人阵营玩家学习他的技能（学到什么见法官私下告诉你的信息）。',

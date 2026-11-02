@@ -11,7 +11,7 @@ import type { SpecialDescriptor } from './types';
 // 当晚作用在这两个号码上的技能结果互换（狼刀、守护、毒药、预言家查验等都经 rules/nightEffects.ts 的 swapTarget 换算），
 // 天亮后恢复；各角色看到的仍是自己选择的号码（女巫看到的刀口不变）。
 
-export const magicianPrompts = definePrompts({
+const magicianPrompts = definePrompts({
   magician: [
     '你是{{me.label}}，身份是魔术师。每晚你第一个行动，可以交换两名玩家的号码：当晚作用在这两个号码上的技能结果互换',
     '（如狼人击杀 1 号而你交换了 1、2 号，则实际死亡的是 2 号；预言家查验 1 号得到的是 2 号的身份），天亮后恢复。每个号码全场只能被交换一次。',

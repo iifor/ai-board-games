@@ -16,7 +16,7 @@ import type { SpecialDescriptor } from './types';
 // 被毒杀、摄梦而死、自爆、殉情、被炸死时不能开枪。有狼王的板子里猎人与狼王开枪都不翻牌：
 // 两者共用标题中性的"开枪"阶段（death_shot），播报与出局原因都不说明开枪者身份。
 
-export const wolfKingPrompts = definePrompts({
+const wolfKingPrompts = definePrompts({
   wolfKing: [
     '你是{{me.label}}，身份是狼王（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '你被放逐、被猎人枪杀或被狼人误刀出局时可以开枪带走一名玩家；被女巫毒杀、因摄梦死亡或自爆时不能开枪。开枪时不翻牌，其他人分不清开枪的是猎人还是狼王。',

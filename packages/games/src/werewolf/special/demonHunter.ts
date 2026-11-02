@@ -14,7 +14,7 @@ import type { SpecialDescriptor } from './types';
 // 否则猎魔人自己当晚死亡（原因 hunt，守护、解药都挡不下，女巫不会被告知）。免疫女巫的毒药（角色特性 poisonImmune）。
 // 判断用的是真实阵营而不是查验结果：狩猎不是查验。
 
-export const demonHunterPrompts = definePrompts({
+const demonHunterPrompts = definePrompts({
   demonHunter: [
     '你是{{me.label}}，身份是猎魔人（神职）。从第二夜起，你每晚可以狩猎一名玩家：他是狼人则他出局，他是好人则你自己出局。',
     '你免疫女巫的毒药。',

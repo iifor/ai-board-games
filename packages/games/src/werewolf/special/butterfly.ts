@@ -12,7 +12,7 @@ import type { SpecialDescriptor } from './types';
 
 export const BUTTERFLY_MAX_HUGS = 2;
 
-export const butterflyPrompts = definePrompts({
+const butterflyPrompts = definePrompts({
   butterfly: [
     '你是{{me.label}}，身份是花蝴蝶。你已经抱过 {{state.butterflyHugs}} 次，全场最多 2 次。',
     '被你抱住的玩家当晚夜间技能失效（猎人的开枪不受影响）；抱到狼人则整个狼队当晚不能击杀。',

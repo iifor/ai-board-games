@@ -7,7 +7,7 @@ import type { SpecialDescriptor } from './types';
 // 树苗（火力全开）：平民，没有技能。所有树苗都出局时，大树（长老）随之出局——
 // 这是大树因狼刀与白狼王自爆以外的原因出局，因此其余神职随即失去技能（见 bigTree.ts）。
 
-export const saplingPrompts = definePrompts({
+const saplingPrompts = definePrompts({
   sapling: '你是{{me.label}}，身份是树苗（平民）。你没有特殊技能，需要通过发言和投票找出狼人；所有树苗都出局时，大树也会随之倒下。',
 });
 

@@ -15,7 +15,7 @@ import type { SpecialDescriptor } from './types';
 // 狼人阵营 → 成为第三方（state.thirdParty，kind requester），每晚可以单独击杀一名玩家（守护、解药挡不下），需要屠城才能获胜。
 // 祈求结果私下告知并写入 seatNotes；被祈求者不会得知。
 
-export const requesterPrompts = definePrompts({
+const requesterPrompts = definePrompts({
   requester: [
     '你是{{me.label}}，身份是祈求者（神职）。首夜你第一个睁眼祈求一名玩家：他是平民则你在白天放逐投票中计为两票；他是猎人则你获得猎人的枪；',
     '他是女巫则你获得女巫的毒；他是天眼则你获得一次验人能力；他是狼人或恶魔则你成为第三方，每晚可以单独击杀一名玩家，需要让其他所有玩家出局才能获胜。',

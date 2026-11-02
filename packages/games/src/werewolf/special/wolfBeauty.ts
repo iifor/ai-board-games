@@ -14,7 +14,7 @@ import type { SpecialDescriptor } from './types';
 // 当晚被魅惑者随之殉情：夜里死亡时并入当晚死讯，白天出局时由触发器立即结算。殉情的猎人不能开枪。不能自爆。
 // 不受魅惑影响的角色（老流氓，特性 charmImmune）不会殉情；板子参数 wolfBeautyPoisonLink 为 false 时，狼美人被毒杀不带人。
 
-export const wolfBeautyPrompts = definePrompts({
+const wolfBeautyPrompts = definePrompts({
   wolfBeauty: [
     '你是{{me.label}}，身份是狼美人（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '每晚狼人击杀后，你可以单独魅惑一名玩家；你在当晚或天亮后的白天出局时，被魅惑的玩家会随你殉情。你不能自爆。',

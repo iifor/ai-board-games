@@ -5,7 +5,7 @@ import type { WerewolfContext } from '../rules/context';
 import { isWolfCard } from '../rules/deal';
 import { addSeatNote } from '../rules/notes';
 import { nightAfter } from '../rules/order';
-import { roleCatalog } from '../roles';
+import { ROLE_CATALOG, roleName } from '../roles';
 import type { WerewolfState } from '../state';
 import type { SpecialDescriptor } from './types';
 
@@ -13,7 +13,7 @@ import type { SpecialDescriptor } from './types';
 // 盗贼首夜第一个睁眼，从两张底牌中拿一张作为自己的身份（compute 改派角色与阵营）：其中有狼人阵营的牌时必须拿它（不再询问），
 // 否则自己选择。盗贼牌被抽作底牌时本局没有盗贼，阶段照常出现（标题只依据牌堆），没有人行动。
 
-export const thiefPrompts = definePrompts({
+const thiefPrompts = definePrompts({
   thief: '你是{{me.label}}，身份是盗贼。首夜你第一个睁眼，从法官手中的两张底牌（{{state.thief.first}}、{{state.thief.second}}）中拿一张作为自己的身份；其中有狼人阵营的牌时必须拿它。',
   thiefChoose: '盗贼请睁眼。法官手中的两张底牌是 {{state.thief.first}} 和 {{state.thief.second}}。选择你自己表示拿走{{state.thief.first}}，输出空数组表示拿走{{state.thief.second}}。',
 });
@@ -42,11 +42,10 @@ function take(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const seat = thiefSeat(ctx);
   const role = chosenCard(ctx);
   if (seat === undefined || role === undefined) return {};
-  const entry = roleCatalog()[role];
-  const name = entry?.spec.name ?? role;
+  const name = roleName(role);
   const text = forcedCard(ctx) === undefined ? `你拿走了${name}，从现在起你的身份是${name}。` : `底牌中有狼人阵营的牌，你必须拿走${name}，从现在起你的身份是${name}。`;
   const log: LogDraft[] = [{ kind: 'narration', text, channel: `private:${seat}` }];
-  if (entry?.spec.team === 'werewolf') log.push({ kind: 'narration', text: `盗贼 ${seat}号 拿到了${name}，成为你们的狼队友。`, channel: 'team:werewolf' });
+  if (ROLE_CATALOG[role]?.team === 'werewolf') log.push({ kind: 'narration', text: `盗贼 ${seat}号 拿到了${name}，成为你们的狼队友。`, channel: 'team:werewolf' });
   return { state: addSeatNote(ctx.state, seat, `你原本是盗贼，首夜拿走了${name}。`), reassign: [{ seat, role }], log };
 }
 

@@ -11,7 +11,7 @@ import type { SpecialDescriptor } from './types';
 // 被诅咒者立即被私下告知，直到下一个夜晚到来之前不能发动任何技能（state.night.hexed，见 rules/block.ts 的 skillsLost：
 // 当晚的夜间技能、当晚或次日白天出局时的开枪、白痴翻牌等）；下一晚入夜时随 night 一起清空。
 
-export const wolfWitchPrompts = definePrompts({
+const wolfWitchPrompts = definePrompts({
   wolfWitch: [
     '你是{{me.label}}，身份是狼巫（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '每晚你第一个单独睁眼，可以诅咒一名好人阵营玩家，使他直到下一个夜晚到来之前不能发动任何技能；诅咒过的下一晚不能再诅咒。',
