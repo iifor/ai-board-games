@@ -5,11 +5,12 @@ import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
 import { dayAfter, nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 乌鸦：每晚可以诅咒一名其他存活玩家（可不诅咒），不能连续两晚诅咒同一人。
 // 次日放逐投票前公布诅咒，被诅咒者在当天的放逐投票中额外获得 crowVotes 票（引擎的投票额外票 VotePhase.bonus）。
 
-export const crowPrompts = definePrompts({
+const crowPrompts = definePrompts({
   crow: [
     '你是{{me.label}}，身份是乌鸦。每晚你可以诅咒一名其他玩家，他在次日的放逐投票中会额外被投票（放逐投票前法官会公布诅咒）。',
     '{{#if state.crowLastTarget}}你上一晚诅咒的是 {{state.crowLastTarget}}号，今晚不能再诅咒他。{{/if}}',
@@ -33,7 +34,7 @@ function cursedToday(ctx: WerewolfContext): number | null {
 }
 
 /** 放逐投票的额外票 */
-export function crowBonus(ctx: WerewolfContext): VoteBonus[] {
+function crowBonus(ctx: WerewolfContext): VoteBonus[] {
   const cursed = cursedToday(ctx);
   return cursed === null ? [] : [{ target: cursed, votes: boardConfig(ctx).crowVotes }];
 }
@@ -46,7 +47,7 @@ function announceCurse(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return { log: [{ kind: 'narration', text }] };
 }
 
-export const crowPhases = {
+const crowPhases = {
   crow_curse: {
     kind: 'act',
     title: '乌鸦',
@@ -67,3 +68,11 @@ export const crowPhases = {
     next: dayAfter('crow_announce'),
   },
 } satisfies WerewolfPhases;
+
+export const crowSpecial: SpecialDescriptor = {
+  key: 'crow',
+  prompts: crowPrompts,
+  identities: { crow: crowPrompts.crow },
+  phases: crowPhases,
+  exile: { bonus: crowBonus },
+};

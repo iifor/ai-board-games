@@ -1,15 +1,16 @@
-import { definePrompts, type ComputeOutcome, type Seat, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ComputeOutcome, type Seat } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { isWolf, type WerewolfContext } from '../rules/context';
 import { dayAfter } from '../rules/order';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 魔狼：狼队成员。
 // - 自爆后（照常直接入夜）当晚所有神职的夜间技能被封印（state.godsSealedNight，见 rules/block.ts 的 canUseNightSkill），公开播报；
 // - 作为最后一名狼人被放逐时自动翻牌，不出局，存活到下一个天亮之后才出局（state.magicWolfDoom，公开）：
-//   这一晚他照常击杀；在此期间不能投票（rules/context.ts 的 canVote），达到天数上限时视为已出局（rules/victory.ts）。
+//   这一晚他照常击杀；在此期间不能投票、达到天数上限时视为已出局（rules/context.ts 的 bloodlineDoomed）。
 
-export const magicWolfPrompts = definePrompts({
+const magicWolfPrompts = definePrompts({
   magicWolf: [
     '你是{{me.label}}，身份是魔狼（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '白天发言时你可以在发言后宣布自爆：自爆后直接进入黑夜，当晚所有神职的技能都会被你封印。',
@@ -22,7 +23,7 @@ const MAGIC_WOLF = 'magic_wolf';
 export const BLOODLINE = 'bloodline';
 
 /** 魔狼作为最后一名狼人被放逐：翻牌，不出局，存活到下一个天亮之后（返回 null 表示照常出局） */
-export function bloodlineHold(ctx: WerewolfContext, target: Seat, state: WerewolfState): ComputeOutcome<WerewolfState> | null {
+function bloodlineHold(ctx: WerewolfContext, target: Seat, state: WerewolfState): ComputeOutcome<WerewolfState> | null {
   if (target.role !== MAGIC_WOLF || state.magicWolfDoom !== null) return null;
   if (ctx.seats.alive().except(target).where(isWolf).count() > 0) return null;
   return {
@@ -33,11 +34,6 @@ export function bloodlineHold(ctx: WerewolfContext, target: Seat, state: Werewol
       data: { seat: target.seat, role: MAGIC_WOLF },
     }],
   };
-}
-
-/** 翻牌存活、尚未出局的魔狼（不能投票；达到天数上限时视为已出局） */
-export function bloodlineDoomed(ctx: WerewolfContext, seat: Seat): boolean {
-  return seat.role === MAGIC_WOLF && ctx.state.magicWolfDoom !== null;
 }
 
 /** 自爆的魔狼：今晚（自爆当天的下一晚）神职的夜间技能被封印 */
@@ -56,7 +52,7 @@ function fade(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return { eliminate: [{ seat, reason: '血脉之力耗尽', cause: BLOODLINE }] };
 }
 
-export const magicWolfPhases = {
+const magicWolfPhases = {
   magic_wolf_seal: { kind: 'compute', run: seal, next: 'return' },
   magic_wolf_fade: {
     kind: 'compute',
@@ -66,7 +62,7 @@ export const magicWolfPhases = {
   },
 } satisfies WerewolfPhases;
 
-export const magicWolfTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const magicWolfTriggers: WerewolfTriggers = [
   {
     id: 'magic-wolf-seal',
     on: 'seat_eliminated',
@@ -74,3 +70,12 @@ export const magicWolfTriggers: readonly TriggerSpec<WerewolfState, WerewolfPara
     push: 'magic_wolf_seal',
   },
 ];
+
+export const magicWolfSpecial: SpecialDescriptor = {
+  key: 'magicWolf',
+  prompts: magicWolfPrompts,
+  identities: { magic_wolf: magicWolfPrompts.magicWolf },
+  phases: magicWolfPhases,
+  deathTriggers: magicWolfTriggers,
+  exile: { hold: bloodlineHold },
+};

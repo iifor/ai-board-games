@@ -1,10 +1,9 @@
 import type { ActDecision, ComputeOutcome, Seat, TriggerEvent } from '@battle/engine';
-import { woundRogue } from '../special/oldRogue';
-import { shieldedTonight } from '../special/spiritWolfSkills';
 import { NIGHT_DEATH_CAUSES, type WerewolfState } from '../state';
 import { hasRole, roleTraits } from './board';
 import { shotBlockedTonight, skillsLost } from './block';
 import { isWolf, type WerewolfContext } from './context';
+import { shieldedTonight } from './spiritWolfSkills';
 
 /** 猎人枪杀的 cause 记录开枪时机：白天被放逐后开枪 / 夜里死亡后开枪 */
 export const SHOT_BY_DAY = 'shot_by_day';
@@ -75,6 +74,16 @@ export function describeShot(ctx: WerewolfContext, _seat: unknown, targets: read
 
 export function resolveShot(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   return settleShot(ctx, anonymousShots(ctx) ? '被枪杀' : '被猎人带走');
+}
+
+/**
+ * 延迟出局的角色（老流氓，特性 delayedDeath）被毒或被枪击：进入中毒或负伤状态，次日白天发言结束后出局；
+ * 已有记录时保留更早的期限。到期出局在 special/oldRogue.ts。
+ */
+export function woundRogue(state: WerewolfState, seat: number, round: number, shot: boolean): WerewolfState {
+  const current = state.rogueWound;
+  if (current !== null) return { ...state, rogueWound: { ...current, shot: current.shot || shot } };
+  return { ...state, rogueWound: { seat, dueDay: round + 1, shot } };
 }
 
 /** 结算 pendingShot：reason 是被带走者的出局说明（不翻牌的枪统一写"被枪杀"） */

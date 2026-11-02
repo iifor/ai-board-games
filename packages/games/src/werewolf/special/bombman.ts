@@ -1,16 +1,17 @@
-import { definePrompts, findResult, type ComputeOutcome, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, findResult, type ComputeOutcome } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { roleCategory } from '../rules/board';
 import { isWolf, type WerewolfContext } from '../rules/context';
 import { BOMBED, triggerSeat } from '../rules/death';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 炸弹人：神职。被放逐出局时可以翻牌引爆，炸死所有投票放逐他的玩家（以放逐投票的最后一轮选票为准），
 // 被炸死者不能发动技能（猎人不能开枪，见 NO_SHOT_CAUSES）、没有遗言。
 // 若这次引爆同时炸死了场上所有狼人和所有村民（或所有狼人和所有神职），炸弹人单独获胜（state.bombmanWin）。
 // 是否引爆只记在炸弹人私密频道；引爆时才公开翻牌。
 
-export const bombmanPrompts = definePrompts({
+const bombmanPrompts = definePrompts({
   bombman: '你是{{me.label}}，身份是炸弹人（神职）。被放逐出局时你可以翻牌引爆，炸死所有投票放逐你的玩家；若同时炸死了场上所有狼人和所有村民（或所有狼人和所有神职），你单独获胜。',
   bombmanBlast: '你被放逐出局。是否翻牌引爆，炸死所有投票放逐你的玩家（见上方放逐投票记录）？选择你自己表示引爆，输出空数组表示不引爆。',
 });
@@ -43,7 +44,7 @@ function resolveBlast(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const bombmanPhases = {
+const bombmanPhases = {
   bombman_blast: {
     kind: 'act',
     action: '引爆',
@@ -57,7 +58,7 @@ export const bombmanPhases = {
   bombman_resolve: { kind: 'compute', run: resolveBlast, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const bombmanTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const bombmanTriggers: WerewolfTriggers = [
   {
     id: 'bombman-blast',
     on: 'seat_eliminated',
@@ -66,3 +67,11 @@ export const bombmanTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams
     push: 'bombman_blast',
   },
 ];
+
+export const bombmanSpecial: SpecialDescriptor = {
+  key: 'bombman',
+  prompts: bombmanPrompts,
+  identities: { bombman: bombmanPrompts.bombman },
+  phases: bombmanPhases,
+  deathTriggers: bombmanTriggers,
+};

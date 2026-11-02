@@ -5,11 +5,12 @@ import { nightActors } from '../rules/block';
 import { isWolf, type WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 恶魔：狼人阵营，狼人行动后单独查验一名好人阵营的存活玩家是神职还是平民（必须查验）。
 // 免疫毒药与夜间出局的猎人的枪、不能自爆，这些由角色目录中的特性统一处理。
 
-export const demonPrompts = definePrompts({
+const demonPrompts = definePrompts({
   demon: [
     '你是{{me.label}}，身份是恶魔（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '每晚狼人行动后，你可以单独查验一名好人阵营玩家是神职还是平民。你免疫女巫的毒药和夜间出局的猎人开的枪，不能自爆。',
@@ -34,7 +35,7 @@ function applyDemonCheck(ctx: WerewolfContext, decisions: readonly ActDecision[]
   return { ...ctx.state, demonChecks: [...ctx.state.demonChecks, check] };
 }
 
-export const demonPhases = {
+const demonPhases = {
   demon_check: {
     kind: 'act',
     title: '恶魔查验',
@@ -48,3 +49,10 @@ export const demonPhases = {
     next: nightAfter('demon_check'),
   },
 } satisfies WerewolfPhases;
+
+export const demonSpecial: SpecialDescriptor = {
+  key: 'demon',
+  prompts: demonPrompts,
+  identities: { demon: demonPrompts.demon },
+  phases: demonPhases,
+};

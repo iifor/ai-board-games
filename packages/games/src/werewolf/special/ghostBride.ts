@@ -6,15 +6,16 @@ import { isPackWolf, isWolf, type WerewolfContext } from '../rules/context';
 import { addSeatNote } from '../rules/notes';
 import { nightAfter } from '../rules/order';
 import { inThirdParty } from '../rules/thirdParty';
-import { roleCatalog } from '../roles';
+import { roleName } from '../roles';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 鬼魂新娘：第三方（阵营 ghost_bride）。首夜选择新郎，再选择证婚人；新郎与证婚人背叛原有阵营，阵营改为 ghost_bride
 // （狼队成员改为"叛变的狼人"，离开狼队），三人组成第三方（state.thirdParty），屠城获胜。新娘与新郎是情侣（lovers.ts）。
 // 证婚人私下得知新娘与新郎的身份。之后每晚三人在第三方频道交流；场上的单身狼（第三方以外的狼人）全部出局后，
 // 新娘（她出局后新郎，两人都出局后证婚人）每晚可以击杀一名第三方以外的玩家（守护、解药挡不下）。
 
-export const ghostBridePrompts = definePrompts({
+const ghostBridePrompts = definePrompts({
   ghostBride: [
     '你是{{me.label}}，身份是鬼魂新娘（第三方）。首夜你选择一名玩家作为新郎，再选择一名证婚人：新郎与证婚人背叛原有阵营，与你组成第三方阵营，需要让其他所有玩家出局才能获胜；你与新郎一方出局时另一方殉情。',
     '每晚你们三人可以交流；场上不属于你们的狼人全部出局后，你们每晚可以击杀一名玩家（你和新郎都出局后由证婚人击杀）。',
@@ -36,11 +37,6 @@ function recordGroom(ctx: WerewolfContext, decisions: readonly ActDecision[]): W
   return addSeatNote({ ...ctx.state, lovers: [decision.seat, groom] }, decision.seat, `你选择了 ${groom}号 作为新郎。`);
 }
 
-function roleName(ctx: WerewolfContext, seat: number): string {
-  const { role } = ctx.seats.get(seat);
-  return roleCatalog()[role]?.spec.name ?? role;
-}
-
 /** 背叛原有阵营：狼队成员改为叛变的狼人（离开狼队），其他人只改阵营 */
 function betray(ctx: WerewolfContext, seat: number): SeatReassignment {
   return isPackWolf(ctx.seats.get(seat)) ? { seat, role: 'betrayer_wolf' } : { seat, team: BRIDE };
@@ -51,7 +47,7 @@ function bond(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const witness = findResult(ctx.results, 'ghost_bride_witness', 'act')?.decisions.flatMap((item) => item.targets)[0];
   if (bride === undefined || groom === undefined || witness === undefined) return {};
   const groomText = `鬼魂新娘 ${bride}号 选你作为新郎：你背叛原有阵营，与她和证婚人 ${witness}号 组成第三方阵营，需要让其他所有玩家出局才能获胜；你与新娘一方出局时另一方随之殉情。`;
-  const witnessText = `鬼魂新娘 ${bride}号 与新郎 ${groom}号（身份是${roleName(ctx, groom)}）结为情侣，你被选为证婚人：你背叛原有阵营，与他们组成第三方阵营，需要让其他所有玩家出局才能获胜；情侣都出局后由你行使击杀。`;
+  const witnessText = `鬼魂新娘 ${bride}号 与新郎 ${groom}号（身份是${roleName(ctx.seats.get(groom).role)}）结为情侣，你被选为证婚人：你背叛原有阵营，与他们组成第三方阵营，需要让其他所有玩家出局才能获胜；情侣都出局后由你行使击杀。`;
   const members = [bride, groom, witness].sort((a, b) => a - b);
   let state: WerewolfState = { ...ctx.state, thirdParty: { kind: 'lovers', seats: members, core: members } };
   state = addSeatNote(addSeatNote(addSeatNote(state, bride, `证婚人是 ${witness}号。`), groom, groomText), witness, witnessText);
@@ -84,7 +80,7 @@ function applyKill(ctx: WerewolfContext, decisions: readonly ActDecision[]): Wer
   return { ...ctx.state, night: { ...ctx.state.night, thirdKill } };
 }
 
-export const ghostBridePhases = {
+const ghostBridePhases = {
   ghost_bride_link: {
     kind: 'act',
     title: '鬼魂新娘',
@@ -132,3 +128,10 @@ export const ghostBridePhases = {
     next: nightAfter('ghost_bride_kill'),
   },
 } satisfies WerewolfPhases;
+
+export const ghostBrideSpecial: SpecialDescriptor = {
+  key: 'ghostBride',
+  prompts: ghostBridePrompts,
+  identities: { ghost_bride: ghostBridePrompts.ghostBride, betrayer_wolf: ghostBridePrompts.betrayerWolf },
+  phases: ghostBridePhases,
+};

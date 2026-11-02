@@ -1,12 +1,11 @@
 import type { EndResult, Seat } from '@battle/engine';
-import { cupidSide, cupidSummary } from '../special/cupid';
-import { hiddenWolfDoomed } from '../special/hiddenWolf';
-import { hybridSummary } from '../special/hybrid';
-import { bloodlineDoomed } from '../special/magicWolf';
+import { specialVictoryHooks } from '../special';
 import { roleCategory } from './board';
-import { canVote, isWolf, type WerewolfContext } from './context';
+import { bloodlineDoomed, canVote, isWolf, type WerewolfContext } from './context';
 import { exileWeight } from './sheriff';
 import { contenders, inThirdParty, thirdPartyStanding, thirdPartyWinner, type ThirdPartyKind } from './thirdParty';
+
+// 胜负判定：消费 special/index.ts 登记表中的胜负钩子（所属一方、暂缓判定、终局附注）；特殊角色模块不得引用本文件。
 
 /**
  * bombman：炸弹人引爆时同时炸死所有狼人和一整边好人，作为第三方单独获胜；
@@ -52,7 +51,7 @@ function sidesWinner(ctx: WerewolfContext, alive: readonly Seat[]): 'good' | 'we
 }
 
 /**
- * 胜负判定（依次）：炸弹人炸光 → 炸弹人胜；狼刀锁定 → 狼人胜；存活者全是第三方 → 第三方胜；随狼队出局的隐狼尚未结算 → 暂缓；
+ * 胜负判定（依次）：炸弹人炸光 → 炸弹人胜；狼刀锁定 → 狼人胜；存活者全是第三方 → 第三方胜；特殊角色要求暂缓（随狼队出局的隐狼尚未结算）→ 暂缓；
  * 之后在第三方以外的座位中判断：狼人阵营全灭（且第三方也已全灭）→ 好人胜；神职或村民全灭 → 狼人胜；
  * 狼人有效票数严格多于好人 → 狼人胜（好人已无法靠投票翻盘）。第三方还有人存活时好人与狼人都不能获胜。
  */
@@ -61,8 +60,17 @@ export function decideWinner(ctx: WerewolfContext): WerewolfWinner | null {
   if (ctx.state.winnerLock === 'werewolf') return 'werewolf';
   const third = thirdPartyWinner(ctx);
   if (third !== null) return third;
-  if (hiddenWolfDoomed(ctx)) return null;
+  if (specialVictoryHooks.some((hooks) => hooks.defer?.(ctx) ?? false)) return null;
   return sidesWinner(ctx, ctx.seats.alive().list());
+}
+
+/** 特殊角色指定的所属一方（丘比特跟随情侣）；没有干预时为 null */
+function specialSide(ctx: WerewolfContext, seat: Seat): 'good' | 'werewolf' | null {
+  for (const hooks of specialVictoryHooks) {
+    const side = hooks.side?.(ctx, seat);
+    if (side !== null && side !== undefined) return side;
+  }
+  return null;
 }
 
 /** 该座位是否属于胜利一方（MVP 平票时优先） */
@@ -71,7 +79,7 @@ export function onWinningSide(ctx: WerewolfContext, seat: number, winner: Werewo
   if (winner === 'bombman') return target.role === 'bombman';
   if (winner === 'lovers' || winner === 'requester') return inThirdParty(ctx, seat);
   if (inThirdParty(ctx, seat)) return false;
-  const side = cupidSide(ctx, target);
+  const side = specialSide(ctx, target);
   if (side !== null) return side === winner;
   return isWolf(target) === (winner === 'werewolf');
 }
@@ -87,7 +95,10 @@ function winReason(ctx: WerewolfContext, winner: WerewolfWinner): string {
 
 /** 胜负说明后附加特殊角色的个人结果（混血儿跟随主人、丘比特跟随情侣） */
 function withNotes(ctx: WerewolfContext, winner: WerewolfWinner, summary: string): string {
-  const notes = [hybridSummary(ctx, winner), cupidSummary(ctx, winner)].filter((note): note is string => note !== null);
+  const notes = specialVictoryHooks.flatMap((hooks) => {
+    const note = hooks.note?.(ctx, winner);
+    return note === null || note === undefined ? [] : [note];
+  });
   return [summary, ...notes].join('；');
 }
 

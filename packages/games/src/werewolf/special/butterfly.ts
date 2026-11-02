@@ -5,13 +5,14 @@ import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 花蝴蝶：每晚可以抱一名其他存活玩家（全场最多两次，可不抱）。被抱者当晚夜间技能失效，
 // 抱到狼人则整个狼队当晚不能击杀；封锁本身由 rules/block.ts 统一处理。
 
 export const BUTTERFLY_MAX_HUGS = 2;
 
-export const butterflyPrompts = definePrompts({
+const butterflyPrompts = definePrompts({
   butterfly: [
     '你是{{me.label}}，身份是花蝴蝶。你已经抱过 {{state.butterflyHugs}} 次，全场最多 2 次。',
     '被你抱住的玩家当晚夜间技能失效（猎人的开枪不受影响）；抱到狼人则整个狼队当晚不能击杀。',
@@ -25,7 +26,7 @@ function applyHug(ctx: WerewolfContext, decisions: readonly ActDecision[]): Were
   return { ...ctx.state, night: { ...ctx.state.night, hugged }, butterflyHugs: ctx.state.butterflyHugs + 1 };
 }
 
-export const butterflyPhases = {
+const butterflyPhases = {
   butterfly_hug: {
     kind: 'act',
     title: '花蝴蝶',
@@ -40,3 +41,10 @@ export const butterflyPhases = {
     next: nightAfter('butterfly_hug'),
   },
 } satisfies WerewolfPhases;
+
+export const butterflySpecial: SpecialDescriptor = {
+  key: 'butterfly',
+  prompts: butterflyPrompts,
+  identities: { butterfly: butterflyPrompts.butterfly },
+  phases: butterflyPhases,
+};

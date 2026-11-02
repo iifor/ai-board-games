@@ -6,11 +6,12 @@ import type { WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { DawnStep } from '../rules/types';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 禁言长老：每晚必须禁言一名存活玩家（可以禁言自己），不能连续两晚禁言同一人；
 // 天亮时与死讯一起公布，被禁言者当天的白天发言环节不能发言（仍可投票、发表遗言）。
 
-export const silenceElderPrompts = definePrompts({
+const silenceElderPrompts = definePrompts({
   silenceElder: [
     '你是{{me.label}}，身份是禁言长老。每晚你必须禁言一名玩家，被禁言者次日白天发言环节不能发言。',
     '{{#if state.elderLastTarget}}你上一晚禁言的是 {{state.elderLastTarget}}号，今晚不能再禁言他。{{/if}}',
@@ -28,7 +29,7 @@ function applySilence(ctx: WerewolfContext, decisions: readonly ActDecision[]): 
 }
 
 /** 天亮时公布禁言；被禁言者当晚已死亡则不公布 */
-export const publishSilence: DawnStep = (ctx, draft) => {
+const publishSilence: DawnStep = (ctx, draft) => {
   const target = ctx.state.night.silenced;
   if (target === null || !ctx.seats.get(target).alive || draft.deaths.some((death) => death.seat === target)) return draft;
   return {
@@ -38,7 +39,7 @@ export const publishSilence: DawnStep = (ctx, draft) => {
   };
 };
 
-export const silenceElderPhases = {
+const silenceElderPhases = {
   elder_silence: {
     kind: 'act',
     title: '禁言长老禁言',
@@ -51,3 +52,11 @@ export const silenceElderPhases = {
     next: nightAfter('elder_silence'),
   },
 } satisfies WerewolfPhases;
+
+export const silenceElderSpecial: SpecialDescriptor = {
+  key: 'silenceElder',
+  prompts: silenceElderPrompts,
+  identities: { silence_elder: silenceElderPrompts.silenceElder },
+  phases: silenceElderPhases,
+  dawnStep: publishSilence,
+};

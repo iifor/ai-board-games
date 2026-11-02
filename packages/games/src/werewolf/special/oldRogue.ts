@@ -1,26 +1,20 @@
-import { definePrompts, type ComputeOutcome, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ComputeOutcome } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import { hasRole } from '../rules/board';
 import type { WerewolfContext } from '../rules/context';
 import { dayAfter } from '../rules/order';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 老流氓：算作村民，不受狼美人魅惑影响（角色特性 charmImmune）。被女巫毒、被猎人枪击时不会立即出局（特性 delayedDeath）：
 // 被毒进入中毒状态（不公布），被枪击进入负伤状态（公布），都在次日白天发言环节结束后出局；
-// 当天发言被自爆打断时，在自爆结算后出局。毒药与枪击分别在夜间结算与开枪结算中调用 woundRogue。
+// 当天发言被自爆打断时，在自爆结算后出局。毒药与枪击分别在夜间结算与开枪结算中调用 rules/death.ts 的 woundRogue。
 
-export const oldRoguePrompts = definePrompts({
+const oldRoguePrompts = definePrompts({
   oldRogue: '你是{{me.label}}，身份是老流氓（算作村民）。你不受狼美人魅惑的影响；被女巫毒杀或被猎人枪击时不会立即出局，而是在次日白天发言环节结束后出局。',
 });
 
 export const ROGUE_DOOM = 'rogue_doom';
-
-/** 进入中毒或负伤状态：次日白天发言结束后出局；已有记录时保留更早的期限 */
-export function woundRogue(state: WerewolfState, seat: number, round: number, shot: boolean): WerewolfState {
-  const current = state.rogueWound;
-  if (current !== null) return { ...state, rogueWound: { ...current, shot: current.shot || shot } };
-  return { ...state, rogueWound: { seat, dueDay: round + 1, shot } };
-}
 
 /** 今天到期、仍然存活的老流氓 */
 function dueRogue(ctx: WerewolfContext): number | null {
@@ -39,7 +33,7 @@ function resolveDoom(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const oldRoguePhases = {
+const oldRoguePhases = {
   old_rogue_doom: {
     kind: 'compute',
     enabled: (ctx) => hasRole(ctx, 'old_rogue'),
@@ -50,7 +44,7 @@ export const oldRoguePhases = {
 } satisfies WerewolfPhases;
 
 /** 白天发言被自爆打断：到期的老流氓在自爆结算后出局 */
-export const oldRogueTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const oldRogueTriggers: WerewolfTriggers = [
   {
     id: 'old-rogue-doom-cut',
     on: 'seat_eliminated',
@@ -58,3 +52,11 @@ export const oldRogueTriggers: readonly TriggerSpec<WerewolfState, WerewolfParam
     push: 'old_rogue_doom_cut',
   },
 ];
+
+export const oldRogueSpecial: SpecialDescriptor = {
+  key: 'oldRogue',
+  prompts: oldRoguePrompts,
+  identities: { old_rogue: oldRoguePrompts.oldRogue },
+  phases: oldRoguePhases,
+  deathTriggers: oldRogueTriggers,
+};

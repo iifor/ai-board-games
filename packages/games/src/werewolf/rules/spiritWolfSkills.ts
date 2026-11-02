@@ -1,10 +1,10 @@
 import type { Seat } from '@battle/engine';
-import { hasRole } from '../rules/board';
-import type { WerewolfContext } from '../rules/context';
-import { swapTarget } from './magician';
+import { hasRole } from './board';
+import type { WerewolfContext } from './context';
+import { swapTarget } from './nightEffects';
 
 // 灵狼学到的技能对其他规则的影响（查验结果、毒药、夜间开枪、查验视为好人、预言家的睁眼顺序）。
-// 规则模块只从这里读取，不引用灵狼的阶段模块（spiritWolf.ts）。
+// 写入这些状态的阶段在 special/spiritWolf.ts。
 
 const SPIRIT_WOLF = 'spirit_wolf';
 

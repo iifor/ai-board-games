@@ -3,14 +3,15 @@ import type { WerewolfPhases } from '../phases/types';
 import { hasRole } from '../rules/board';
 import { nightActors } from '../rules/block';
 import type { WerewolfContext } from '../rules/context';
+import { swapTarget } from '../rules/nightEffects';
 import { nightAfter } from '../rules/order';
-import { roleCatalog } from '../roles';
+import { roleName } from '../roles';
 import type { WerewolfState } from '../state';
-import { swapTarget } from './magician';
+import type { SpecialDescriptor } from './types';
 
 // 天眼：神职，能验出具体身份的预言家——每晚必须查验一名其他存活玩家，私下得知他的角色名，查验记录保留在身份提示中。
 
-export const heavenlyEyePrompts = definePrompts({
+const heavenlyEyePrompts = definePrompts({
   heavenlyEye: [
     '你是{{me.label}}，身份是天眼（能验出具体身份的预言家）。',
     '{{#if state.heavenlyEyeChecks}}你的查验记录：{{#each state.heavenlyEyeChecks}}第{{this.night}}夜查验 {{this.target}}号，身份是{{this.role}}；{{/each}}{{else}}你还没有查验过任何人。{{/if}}',
@@ -20,8 +21,7 @@ export const heavenlyEyePrompts = definePrompts({
 
 /** 查验得到的角色名：魔术师换号后为换过去那名玩家的身份 */
 function roleSeen(ctx: WerewolfContext, target: number): string {
-  const seat = ctx.seats.get(swapTarget(ctx, target));
-  return roleCatalog()[seat.role]?.spec.name ?? seat.role;
+  return roleName(ctx.seats.get(swapTarget(ctx, target)).role);
 }
 
 function applyCheck(ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState {
@@ -31,7 +31,7 @@ function applyCheck(ctx: WerewolfContext, decisions: readonly ActDecision[]): We
   return { ...ctx.state, heavenlyEyeChecks: [...ctx.state.heavenlyEyeChecks, check] };
 }
 
-export const heavenlyEyePhases = {
+const heavenlyEyePhases = {
   heavenly_eye_check: {
     kind: 'act',
     title: '天眼查验',
@@ -45,3 +45,10 @@ export const heavenlyEyePhases = {
     next: nightAfter('heavenly_eye_check'),
   },
 } satisfies WerewolfPhases;
+
+export const heavenlyEyeSpecial: SpecialDescriptor = {
+  key: 'heavenlyEye',
+  prompts: heavenlyEyePrompts,
+  identities: { heavenly_eye: heavenlyEyePrompts.heavenlyEye },
+  phases: heavenlyEyePhases,
+};

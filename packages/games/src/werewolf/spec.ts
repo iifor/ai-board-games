@@ -6,7 +6,7 @@ import { nightPhases } from './phases/night';
 import { postgamePhases } from './phases/postgame';
 import { sheriffPhases } from './phases/sheriff';
 import { werewolfPrompts } from './prompts';
-import { roleSpecs } from './roles';
+import { roleSpecs } from './roleSpecs';
 import { dealBoard } from './rules/deal';
 import { isNightPhase } from './rules/order';
 import { decideWinner, werewolfResult } from './rules/victory';

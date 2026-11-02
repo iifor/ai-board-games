@@ -6,11 +6,12 @@ import { ring, type WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { DawnStep } from '../rules/types';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 驯熊师：每晚入夜前判定一次熊的咆哮状态——驯熊师左右相邻的两名存活玩家中有狼人（查验视为好人的隐狼除外）则咆哮；
 // 次日天亮与死讯一起公布。驯熊师已出局（包括当晚死亡）时熊不咆哮。
 
-export const bearTamerPrompts = definePrompts({
+const bearTamerPrompts = definePrompts({
   bearTamer: '你是{{me.label}}，身份是驯熊师。每天天亮公布死讯时，法官会同时公布熊是否咆哮：入夜前你左右相邻的两名存活玩家中有狼人时，次日天亮熊会咆哮（你出局后熊不再咆哮）。',
 });
 
@@ -31,14 +32,14 @@ function watch(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
 }
 
 /** 天亮时与死讯一起公布熊的咆哮状态 */
-export const bearRoarNote: DawnStep = (ctx, draft) => {
+const bearRoarNote: DawnStep = (ctx, draft) => {
   const tamer = ctx.seats.withRole('bear_tamer').list()[0];
   if (!tamer) return draft;
   const tamerAlive = tamer.alive && !draft.deaths.some((death) => death.seat === tamer.seat);
   return { ...draft, notes: [...draft.notes, tamerAlive && ctx.state.bearRoars ? '熊咆哮了。' : '熊没有咆哮。'] };
 };
 
-export const bearTamerPhases = {
+const bearTamerPhases = {
   bear_watch: {
     kind: 'compute',
     enabled: (ctx) => hasRole(ctx, 'bear_tamer'),
@@ -46,3 +47,11 @@ export const bearTamerPhases = {
     next: nightAfter('bear_watch'),
   },
 } satisfies WerewolfPhases;
+
+export const bearTamerSpecial: SpecialDescriptor = {
+  key: 'bearTamer',
+  prompts: bearTamerPrompts,
+  identities: { bear_tamer: bearTamerPrompts.bearTamer },
+  phases: bearTamerPhases,
+  dawnStep: bearRoarNote,
+};

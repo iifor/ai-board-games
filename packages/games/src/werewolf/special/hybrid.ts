@@ -4,10 +4,11 @@ import { hasRole } from '../rules/board';
 import { isWolf, type WerewolfContext } from '../rules/context';
 import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 混血儿：好人阵营、算作村民；首夜第一个睁眼选择一名主人（双方都不知道对方身份），胜负跟随主人的阵营。
 
-export const hybridPrompts = definePrompts({
+const hybridPrompts = definePrompts({
   hybrid: [
     '你是{{me.label}}，身份是混血儿（算作村民）。',
     '{{#if state.hybridMaster}}你的主人是 {{state.hybridMaster}}号，你不知道他的身份。{{else}}首夜你要选择一名主人。{{/if}}',
@@ -21,7 +22,7 @@ function applyMaster(ctx: WerewolfContext, decisions: readonly ActDecision[]): W
   return master === undefined ? ctx.state : { ...ctx.state, hybridMaster: master };
 }
 
-export const hybridPhases = {
+const hybridPhases = {
   hybrid_choose: {
     kind: 'act',
     title: '混血儿选主人',
@@ -37,13 +38,13 @@ export const hybridPhases = {
 } satisfies WerewolfPhases;
 
 /** 混血儿最终所属的阵营：跟随主人（离群的狼也算狼人阵营）；没有主人时算好人 */
-export function hybridSide(ctx: WerewolfContext, seat: Seat): string {
+function hybridSide(ctx: WerewolfContext, seat: Seat): string {
   const master = ctx.state.hybridMaster;
   return isWolf(master === null ? seat : ctx.seats.get(master)) ? 'werewolf' : 'good';
 }
 
 /** 终局说明中的混血儿结果；本局没有混血儿时为 null */
-export function hybridSummary(ctx: WerewolfContext, winner: string): string | null {
+function hybridSummary(ctx: WerewolfContext, winner: string): string | null {
   const hybrid = ctx.seats.withRole('hybrid').list()[0];
   if (!hybrid) return null;
   const master = ctx.state.hybridMaster;
@@ -52,3 +53,11 @@ export function hybridSummary(ctx: WerewolfContext, winner: string): string | nu
   const owner = master === null ? '没有主人' : `主人是 ${master}号（${side === 'werewolf' ? '狼人阵营' : '好人阵营'}）`;
   return `混血儿 ${hybrid.seat}号${owner}，${result}`;
 }
+
+export const hybridSpecial: SpecialDescriptor = {
+  key: 'hybrid',
+  prompts: hybridPrompts,
+  identities: { hybrid: hybridPrompts.hybrid },
+  phases: hybridPhases,
+  victory: { note: hybridSummary },
+};

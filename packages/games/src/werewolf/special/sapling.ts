@@ -1,12 +1,13 @@
-import { definePrompts, type ComputeOutcome, type TriggerEvent, type TriggerSpec } from '@battle/engine';
-import type { WerewolfPhases } from '../phases/types';
+import { definePrompts, type ComputeOutcome, type TriggerEvent } from '@battle/engine';
+import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import type { WerewolfContext } from '../rules/context';
-import type { WerewolfParams, WerewolfState } from '../state';
+import type { WerewolfState } from '../state';
+import type { SpecialDescriptor } from './types';
 
 // 树苗（火力全开）：平民，没有技能。所有树苗都出局时，大树（长老）随之出局——
 // 这是大树因狼刀与白狼王自爆以外的原因出局，因此其余神职随即失去技能（见 bigTree.ts）。
 
-export const saplingPrompts = definePrompts({
+const saplingPrompts = definePrompts({
   sapling: '你是{{me.label}}，身份是树苗（平民）。你没有特殊技能，需要通过发言和投票找出狼人；所有树苗都出局时，大树也会随之倒下。',
 });
 
@@ -29,10 +30,18 @@ function treeFalls(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   };
 }
 
-export const saplingPhases = {
+const saplingPhases = {
   sapling_tree_fall: { kind: 'compute', run: treeFalls, next: 'return' },
 } satisfies WerewolfPhases;
 
-export const saplingTriggers: readonly TriggerSpec<WerewolfState, WerewolfParams>[] = [
+const saplingTriggers: WerewolfTriggers = [
   { id: 'sapling-tree-fall', on: 'seat_eliminated', when: lastSaplingFell, push: 'sapling_tree_fall' },
 ];
+
+export const saplingSpecial: SpecialDescriptor = {
+  key: 'sapling',
+  prompts: saplingPrompts,
+  identities: { sapling: saplingPrompts.sapling },
+  phases: saplingPhases,
+  deathTriggers: saplingTriggers,
+};

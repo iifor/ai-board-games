@@ -18,9 +18,14 @@ export function isPackWolf(seat: Seat): boolean {
   return seat.team === PACK_TEAM;
 }
 
-/** 翻牌的白痴失去投票权；翻牌存活、等待出局的魔狼（state.magicWolfDoom）也不能投票 */
+/** 翻牌存活、等待出局的魔狼（state.magicWolfDoom）：不能投票；达到天数上限时视为已出局 */
+export function bloodlineDoomed(ctx: WerewolfContext, seat: Seat): boolean {
+  return seat.role === 'magic_wolf' && ctx.state.magicWolfDoom !== null;
+}
+
+/** 翻牌的白痴失去投票权；翻牌存活、等待出局的魔狼也不能投票 */
 export function canVote(ctx: WerewolfContext, seat: Seat): boolean {
-  if (seat.role === 'magic_wolf' && ctx.state.magicWolfDoom !== null) return false;
+  if (bloodlineDoomed(ctx, seat)) return false;
   return seat.alive && !(seat.role === 'idiot' && ctx.state.idiotRevealed);
 }
 
