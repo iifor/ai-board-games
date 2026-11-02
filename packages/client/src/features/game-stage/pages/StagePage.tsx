@@ -10,6 +10,7 @@ import { PlaybackControls } from '../components/PlaybackControls';
 import { ResultPanel } from '../components/ResultPanel';
 import { Stage } from '../components/Stage';
 import { StageBackdrop } from '../components/StageBackdrop';
+import { StageError } from '../components/StageError';
 import { StageHud } from '../components/StageHud';
 import { SubtitleBar } from '../components/SubtitleBar';
 import { DRAWER_OPEN_MIN_WIDTH } from '../constants';
@@ -46,10 +47,10 @@ export function StagePage() {
   return (
     <div className="stage-shell" data-game={gameKey} data-period={period} data-finished={finished} data-feed-open={feedOpen}>
       <StageBackdrop gameKey={gameKey} period={period} />
-      <StageHud summary={summary.data} view={playback.view} connected={stream.connected} ended={stream.ended} />
+      <StageHud summary={summary.data} view={playback.view} connection={stream.connection} ended={stream.ended} />
       <PlaybackControls options={options} pending={playback.pending} finished={finished} feedOpen={feedOpen} onChange={setOptions} onToggleFeed={() => setFeedOpen((open) => !open)} />
       <NightSteps steps={nightStepsOf(playback.played, playback.current, playback.view)} />
-      {stream.error ? <div className="stage-error glass-panel"><StatusView kind="error" message={stream.error} /></div> : null}
+      {stream.error ? <StageError message={stream.error} onRetry={stream.connection === 'lost' ? stream.retry : null} /> : null}
       <div className="stage-arena">
         <Stage layout={layout} view={playback.view} current={playback.current} played={playback.played} />
       </div>

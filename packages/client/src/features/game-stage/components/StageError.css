@@ -1,0 +1,12 @@
+.stage-error {
+  position: absolute;
+  z-index: 50;
+  top: 96px;
+  left: 50%;
+  padding: 0 16px;
+  transform: translateX(-50%);
+}
+
+.stage-error .status-view {
+  padding: 24px 16px;
+}

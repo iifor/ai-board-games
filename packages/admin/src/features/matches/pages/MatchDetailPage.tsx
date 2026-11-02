@@ -1,6 +1,6 @@
+import { formatMatchTitle } from '@battle/shared';
 import { Alert, Card, Descriptions, Spin, Tabs, Tag, Typography } from 'antd';
 import { Link, useParams } from 'react-router';
-import { formatMatchTitle } from '../../../utils/format';
 import { DebugControls } from '../components/DebugControls';
 import { LogPanel } from '../components/LogPanel';
 import { PhaseGraph } from '../components/PhaseGraph';

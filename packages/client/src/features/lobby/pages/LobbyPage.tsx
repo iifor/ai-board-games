@@ -6,21 +6,18 @@ import { GameList } from '../components/GameList';
 import { LobbyHero } from '../components/LobbyHero';
 import { RecentMatches } from '../components/RecentMatches';
 
-/** 大厅：游戏目录 + 最近对局；历史加载失败不影响大厅本身 */
+/** 大厅：游戏目录 + 最近对局；目录与历史分别加载，历史失败只影响最近对局区（显示错误与重试），大厅其余部分照常 */
 export function LobbyPage() {
-  const data = useAsync(async () => {
-    const [games, history] = await Promise.all([fetchCatalog(), fetchHistory().catch(() => [])]);
-    return { games, history };
-  }, []);
-  if (data.status === 'loading') return <StatusView kind="loading" />;
-  if (data.status === 'error') return <StatusView kind="error" message={data.message} onRetry={data.reload} />;
-  if (!data.data.games.length) return <StatusView kind="empty" message="还没有可玩的游戏" />;
-  const { games, history } = data.data;
+  const games = useAsync(fetchCatalog, []);
+  const history = useAsync(fetchHistory, []);
+  if (games.status === 'loading') return <StatusView kind="loading" />;
+  if (games.status === 'error') return <StatusView kind="error" message={games.message} onRetry={games.reload} />;
+  if (!games.data.length) return <StatusView kind="empty" message="还没有可玩的游戏" />;
   return (
     <section>
-      <LobbyHero primaryGame={games.find((game) => game.key === 'werewolf') ?? games[0] ?? null} latest={history[0] ?? null} />
-      <GameList games={games} />
-      <RecentMatches matches={history} />
+      <LobbyHero primaryGame={games.data.find((game) => game.key === 'werewolf') ?? games.data[0] ?? null} history={history} />
+      <GameList games={games.data} />
+      <RecentMatches history={history} onRetry={history.reload} />
     </section>
   );
 }

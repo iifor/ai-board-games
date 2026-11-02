@@ -22,6 +22,13 @@
   text-decoration: none;
 }
 
+/* 加载中 / 加载失败就放在列表的位置上，比整页状态矮一些 */
+.recent-matches .status-view {
+  padding: 24px 16px;
+  border: 1px dashed var(--ui-border);
+  border-radius: 16px;
+}
+
 .recent-matches-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

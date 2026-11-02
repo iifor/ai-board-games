@@ -1,9 +1,9 @@
-import type { StageEvent } from '@battle/shared';
+import { speechOf, type StageEvent } from '@battle/shared';
 
 export interface EventDisplay {
   /** 说话的座位；主持播报为 null */
   readonly speaker: number | null;
-  /** 字幕与朗读的文本；纯状态事件为 null */
+  /** 字幕文本；纯状态事件为 null */
   readonly text: string | null;
 }
 
@@ -14,38 +14,44 @@ function voteSummary(event: Extract<StageEvent, { kind: 'vote_tallied' }>): stri
   return `${event.title}：${rows}，${event.outcome.seat}号当选${event.outcome.byTieBreak ? '（平票随机）' : ''}`;
 }
 
-/** 舞台事件 → 字幕内容；与服务端的语音合成选择同样的文本 */
-export function describeEvent(event: StageEvent): EventDisplay {
+/** 字幕上的说话人：发言、点评、行动都显示当事座位（行动虽由主持人声音读出，字幕仍归到行动者） */
+function speakerOf(event: StageEvent): number | null {
   switch (event.kind) {
     case 'speech':
-      return { speaker: event.seat, text: event.text };
     case 'judgement':
-      return { speaker: event.seat, text: `${event.verdictLabel}。${event.comment}` };
-    case 'narration':
-    case 'revealed':
-      return { speaker: null, text: event.text };
     case 'action':
-      return { speaker: event.seat, text: event.text };
-    case 'vote_tallied':
-      return { speaker: null, text: voteSummary(event) };
-    case 'seat_eliminated':
-      return { speaker: null, text: `${event.seat}号出局（${event.reason}）` };
-    case 'phase_started':
-      return { speaker: null, text: event.title };
-    case 'game_over':
-      return { speaker: null, text: event.result.summary };
-    case 'fallback':
-      return { speaker: null, text: null };
+      return event.seat;
+    default:
+      return null;
   }
+}
+
+/** 不朗读的事件的字幕：计票摘要、出局提示、阶段标题；兜底记录不上字幕 */
+function silentText(event: StageEvent): string | null {
+  switch (event.kind) {
+    case 'vote_tallied':
+      return voteSummary(event);
+    case 'seat_eliminated':
+      return `${event.seat}号出局（${event.reason}）`;
+    case 'phase_started':
+      return event.title;
+    default:
+      return null;
+  }
+}
+
+/**
+ * 舞台事件 → 字幕内容。要朗读的事件（由 @battle/shared 的 speechOf 决定，服务端合成语音用的是同一处）
+ * 字幕就是朗读文本；其余事件只上字幕不朗读
+ */
+export function describeEvent(event: StageEvent): EventDisplay {
+  const speech = speechOf(event);
+  if (speech) return { speaker: speakerOf(event), text: speech.text };
+  return { speaker: null, text: silentText(event) };
 }
 
 /** 没有音频时的展示时长：按字数估算（不封顶，长发言静音时也要展示完），倍速缩短 */
 export function displayDuration(text: string | null, speed: number): number {
   const base = text ? Math.max(900, text.length * 160) : 400;
   return Math.round(base / speed);
-}
-
-/** 需要朗读的事件（阶段标题、计票等只展示不朗读） */
-export function shouldSpeak(event: StageEvent): boolean {
-  return ['speech', 'judgement', 'narration', 'revealed', 'game_over'].includes(event.kind);
 }

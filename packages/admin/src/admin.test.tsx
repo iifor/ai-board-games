@@ -1,4 +1,4 @@
-import { API_ERROR_CODES } from '@battle/shared';
+import { API_ERROR_CODES, formatMatchTitle } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TracePanel } from './features/matches/components/TracePanel';
@@ -6,7 +6,6 @@ import { channelColor, describeLog, progressChanged } from './features/matches/u
 import { applyFilters, enabledFilter, uniqueOptions, type ResourceFilter } from './features/resources/utils';
 import { AUTH_EVENTS, http } from './services/http';
 import { tokenStore } from './services/tokenStore';
-import { formatMatchTitle } from './utils/format';
 
 const meta = { seq: 1, round: 1, phaseId: 'vote', channel: 'host' as const };
 
@@ -30,7 +29,7 @@ describe('match utils', () => {
     expect(progressChanged(marker, { ...marker, status: 'paused' })).toBe(true);
   });
 
-  it('formats the match title with the board when there is one', () => {
+  it('formats the match title with the shared helper, with the board when there is one', () => {
     expect(formatMatchTitle({ gameTitle: 'AI 狼人杀', variantName: '预女猎白' })).toBe('AI 狼人杀 · 预女猎白');
     expect(formatMatchTitle({ gameTitle: 'AI 辩论赛', variantName: null })).toBe('AI 辩论赛');
   });

@@ -1,11 +1,15 @@
-import type { GameCatalogItem, MatchSummaryDto } from '@battle/shared';
+import { formatMatchTitle, type GameCatalogItem, type MatchSummaryDto } from '@battle/shared';
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
-import { formatDateTime, formatMatchTitle, formatWinner } from '../../utils/format';
+import { formatDateTime, formatWinner } from '../../utils/format';
 import { GameList } from './components/GameList';
+import { LobbyHero } from './components/LobbyHero';
 import { PlayerPicker } from './components/PlayerPicker';
-import { filterVariants, isSetupInitial, playerRange, rematchStateOf, selectionHint, toggleSelection } from './utils';
+import { RecentMatches } from './components/RecentMatches';
+import { SetupActionBar } from './components/SetupActionBar';
+import { filterVariants, isSetupInitial, playerRange, readyLabel, rematchStateOf, selectionHint, toggleSelection } from './utils';
 
 const werewolf: GameCatalogItem = {
   key: 'werewolf', title: 'AI 狼人杀', description: '12 人', players: { min: 12, max: 12 }, layout: 'circle',
@@ -27,6 +31,13 @@ describe('lobby utils', () => {
     expect(selectionHint(7, { min: 9, max: 12 })).toBe('还需选择 2 名玩家');
     expect(selectionHint(13, { min: 9, max: 12 })).toBe('最多 12 名玩家，请取消 1 名');
     expect(playerRange(werewolf, 'standard-12')).toEqual({ min: 12, max: 12 });
+  });
+
+  it('only says the table is full at the maximum, otherwise how many more can join', () => {
+    expect(readyLabel(9, { min: 9, max: 12 })).toBe('可开局，还可再加 3 人');
+    expect(readyLabel(11, { min: 9, max: 12 })).toBe('可开局，还可再加 1 人');
+    expect(readyLabel(12, { min: 9, max: 12 })).toBe('人数已满，可以开始');
+    expect(readyLabel(12, { min: 12, max: 12 })).toBe('人数已满，可以开始');
   });
 
   it('searches boards by name or role and recognises rematch state', () => {
@@ -61,6 +72,36 @@ describe('lobby components', () => {
     const html = renderToStaticMarkup(<MemoryRouter><GameList games={[werewolf]} /></MemoryRouter>);
     expect(html).toContain('12 人 · 1 个板子');
     expect(html).toContain('href="/play/werewolf"');
+  });
+
+  it('puts the seating status on the action bar from the catalog range', () => {
+    const bar = (count: number, range: { min: number; max: number }) =>
+      renderToStaticMarkup(<SetupActionBar boardName="预女猎白" count={count} range={range} hint={selectionHint(count, range)} topicPartial={false} submitting={false} />);
+    expect(bar(9, { min: 9, max: 12 })).toContain('可开局，还可再加 3 人');
+    expect(bar(12, { min: 9, max: 12 })).toContain('人数已满，可以开始');
+    expect(bar(7, { min: 9, max: 12 })).toContain('还需选择 2 名玩家');
+    expect(bar(7, { min: 9, max: 12 })).toContain('disabled=""');
+  });
+
+  it('tells a failed history apart from an empty one and keeps the lobby around it', () => {
+    const summary: MatchSummaryDto = {
+      id: 'm_1', gameKey: 'werewolf', gameTitle: 'AI 狼人杀', variantKey: 'standard-12', variantName: '预女猎白', layout: 'circle', status: 'completed',
+      debug: false, scripted: false, seats: [], result: null, createdAt: '2026-11-01T12:00:00Z', completedAt: null,
+    };
+    const render = (node: ReactNode) => renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>);
+    const failed = render(<RecentMatches history={{ status: 'error', message: '网络连接失败' }} onRetry={() => {}} />);
+    expect(failed).toContain('最近对局加载失败：网络连接失败');
+    expect(failed).toContain('重试');
+    expect(failed).toContain('href="/history"');
+    expect(failed).not.toContain('还没有完成的对局');
+    expect(render(<RecentMatches history={{ status: 'ready', data: [] }} onRetry={() => {}} />)).toBe('');
+    expect(render(<RecentMatches history={{ status: 'loading' }} onRetry={() => {}} />)).toContain('加载中');
+    expect(render(<RecentMatches history={{ status: 'ready', data: [summary] }} onRetry={() => {}} />)).toContain('AI 狼人杀 · 预女猎白');
+    const hero = render(<LobbyHero primaryGame={werewolf} history={{ status: 'error', message: 'x' }} />);
+    expect(hero).toContain('最近对局暂时拉不到');
+    expect(hero).not.toContain('还没有完成的对局');
+    expect(render(<LobbyHero primaryGame={werewolf} history={{ status: 'ready', data: [] }} />)).toContain('还没有完成的对局');
+    expect(render(<LobbyHero primaryGame={werewolf} history={{ status: 'ready', data: [summary] }} />)).toContain('最近一局 · AI 狼人杀 · 预女猎白');
   });
 
   it('numbers selected players by seat', () => {

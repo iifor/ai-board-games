@@ -24,9 +24,9 @@
   font-weight: 800;
 }
 
-.event-feed-phase_started {
+.event-feed li.event-feed-phase_started {
   margin-top: 4px;
-  background: transparent !important;
+  background: transparent;
   color: var(--ui-text-muted);
   font-weight: 900;
   letter-spacing: 0.1em;

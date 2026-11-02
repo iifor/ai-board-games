@@ -1,6 +1,9 @@
 import type { AudienceView, GameResult } from '@battle/shared';
+import type { CSSProperties } from 'react';
 import { rosterByTeam } from '../utils';
 import './ResultRoster.css';
+
+type RosterStyle = CSSProperties & Record<'--roster-columns', number>;
 
 interface ResultRosterProps {
   readonly view: AudienceView;
@@ -11,8 +14,9 @@ interface ResultRosterProps {
 export function ResultRoster({ view, result }: ResultRosterProps) {
   const groups = rosterByTeam(view);
   if (!groups.length) return null;
+  const style: RosterStyle = { '--roster-columns': Math.min(groups.length, 4) };
   return (
-    <div className="result-roster" style={{ gridTemplateColumns: `repeat(${Math.min(groups.length, 4)}, minmax(0, 1fr))` }}>
+    <div className="result-roster" style={style}>
       {groups.map((group) => (
         <section key={group.team ?? 'unknown'} className={`result-roster-team ${group.team === result.winner ? 'is-winner' : ''}`} data-team={group.team ?? ''}>
           <h3>{group.label}{group.team === result.winner ? ' · 获胜' : ''}</h3>

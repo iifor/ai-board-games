@@ -1,4 +1,6 @@
-import { displayDuration } from './describe';
+import { speechOf } from '@battle/shared';
+import type { StreamItem } from '../types';
+import { describeEvent, displayDuration } from './describe';
 import type { SegmentControl } from './segment';
 
 const now = () => Date.now();
@@ -131,4 +133,16 @@ export function speak(text: string, control: SegmentControl): Promise<void> {
     control.setProgress({ kind: 'timed', fraction: 0, startedAt, remainingMs: displayDuration(text, rate) });
     window.speechSynthesis.speak(utterance);
   });
+}
+
+/**
+ * 一段内容怎么播：有服务端音频播音频；否则要朗读的事件（speechOf 决定，行动由主持人声音读）用浏览器朗读；
+ * 其余按字数停留。静音时全部按字数停留。
+ */
+export function present(item: StreamItem, control: SegmentControl): Promise<void> {
+  const { text } = describeEvent(item.event);
+  if (!control.muted && item.audio) return playAudio(item.audio.url, control, text);
+  const speech = control.muted ? null : speechOf(item.event);
+  if (speech) return speak(speech.text, control);
+  return dwell(control, text);
 }

@@ -1,6 +1,6 @@
-import type { MatchSummaryDto } from '@battle/shared';
+import { formatMatchTitle, type MatchSummaryDto } from '@battle/shared';
 import { Link } from 'react-router';
-import { formatDateTime, formatMatchTitle, formatWinner } from '../../../utils/format';
+import { formatDateTime, formatWinner } from '../../../utils/format';
 import './MatchList.css';
 
 export function MatchList({ matches }: { readonly matches: readonly MatchSummaryDto[] }) {

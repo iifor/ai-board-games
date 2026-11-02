@@ -117,15 +117,6 @@
   gap: 8px;
 }
 
-.stage-error {
-  position: absolute;
-  z-index: 50;
-  top: 96px;
-  left: 50%;
-  padding: 0 16px;
-  transform: translateX(-50%);
-}
-
 /* 窄屏退化为自上而下的普通页面：顶栏 → 舞台 → 字幕 → 控制 → 记录 */
 @media (max-width: 860px) {
   .stage-shell {

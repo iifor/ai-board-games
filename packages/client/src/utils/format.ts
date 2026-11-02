@@ -1,9 +1,6 @@
 import type { MatchSummaryDto } from '@battle/shared';
 
-/** "游戏 · 板子"；没有板子时只有游戏名 */
-export function formatMatchTitle(match: Pick<MatchSummaryDto, 'gameTitle' | 'variantName'>): string {
-  return match.variantName ? `${match.gameTitle} · ${match.variantName}` : match.gameTitle;
-}
+// 对局标题（"游戏 · 板子"）用 @battle/shared 的 formatMatchTitle，C 端与 B 端共用
 
 /** 胜方；没有结果（未结束或失败）时为"未分胜负" */
 export function formatWinner(match: Pick<MatchSummaryDto, 'result'>): string {

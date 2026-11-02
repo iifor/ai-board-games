@@ -27,7 +27,7 @@ src/
   components/     ListFilterBar（关键字 + 下拉筛选栏）
   hooks/useAsync  数据加载三态与 reload
   services/       tokenStore（localStorage，不可用时退化为内存）、http（附带令牌；401 清除令牌并通知、40301 通知改密）、auth、resources（CRUD 与 modelActions / voiceActions）、matches
-  utils/format    formatTime（zh-CN、24 小时制）、formatMatchTitle（"游戏 · 板子"）
+  utils/format    formatTime（zh-CN、24 小时制）；对局标题（"游戏 · 板子"）用 @battle/shared 的 formatMatchTitle，与 C 端共用
   features/
     auth/         AuthContext、LoginPage、ChangePasswordPage、RequireAuth
     resources/    ResourcePage（通用列表 + 筛选 + 新建/编辑弹窗 + 删除 + 行操作/标题栏扩展）、utils（客户端筛选）、StatusTag（启用 / 停用，四个资源页共用）、四个资源页面配置，

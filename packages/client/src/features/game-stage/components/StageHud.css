@@ -65,6 +65,15 @@
   color: var(--ui-text-muted);
 }
 
+.stage-hud-live.is-lost {
+  border-color: rgba(255, 93, 108, 0.5);
+  color: #ffd9dd;
+}
+
+.stage-hud-live.is-lost i {
+  background: var(--ui-danger);
+}
+
 .stage-hud-status {
   min-width: 0;
   margin: 0;

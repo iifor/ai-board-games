@@ -1,7 +1,6 @@
 import type { AudienceView } from '@battle/shared';
 import { useEffect, useRef, useState } from 'react';
-import { describeEvent, shouldSpeak } from '../playback/describe';
-import { dwell, playAudio, speak } from '../playback/media';
+import { present } from '../playback/media';
 import { SegmentControl } from '../playback/segment';
 import type { PlaybackOptions, StreamItem } from '../types';
 
@@ -10,16 +9,8 @@ interface Segment {
   readonly control: SegmentControl;
 }
 
-/** 一段内容怎么播：有音频播音频，否则浏览器朗读或按字数停留；静音时全部按字数停留 */
-function present(item: StreamItem, control: SegmentControl): Promise<void> {
-  const { text } = describeEvent(item.event);
-  if (!control.muted && item.audio) return playAudio(item.audio.url, control, text);
-  if (!control.muted && text && shouldSpeak(item.event)) return speak(text, control);
-  return dwell(control, text);
-}
-
 /**
- * 依次播放收到的事件：有音频播音频，否则浏览器朗读或按字数停留；
+ * 依次播放收到的事件（每段怎么播见 playback/media 的 present）；
  * 每个事件播放完才 ack，服务端据此推进下一个。暂停时不再开始新的事件。
  * 倍速与静音通过 SegmentControl 实时作用于正在播放的这段。
  */

@@ -1,9 +1,11 @@
+import type { PlayerRange } from '../types';
+import { readyLabel } from '../utils';
 import './SetupActionBar.css';
 
 interface SetupActionBarProps {
   readonly boardName: string;
   readonly count: number;
-  readonly range: { readonly min: number; readonly max: number };
+  readonly range: PlayerRange;
   readonly hint: string | null;
   readonly topicPartial: boolean;
   readonly submitting: boolean;
@@ -12,7 +14,7 @@ interface SetupActionBarProps {
 /** 固定在底部的操作条：就座进度 + 开始按钮（表单的 submit） */
 export function SetupActionBar({ boardName, count, range, hint, topicPartial, submitting }: SetupActionBarProps) {
   const ready = !hint && !topicPartial;
-  const status = topicPartial ? '辩题请填完整或全部留空' : (hint ?? '人数已满，可以开始');
+  const status = topicPartial ? '辩题请填完整或全部留空' : (hint ?? readyLabel(count, range));
   return (
     <div className="setup-action-bar">
       <div className="setup-action-status glass-panel">

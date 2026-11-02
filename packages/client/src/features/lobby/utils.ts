@@ -1,14 +1,21 @@
 import type { GameCatalogItem, GameVariantItem, MatchSummaryDto } from '@battle/shared';
-import type { SetupInitial } from './types';
+import type { PlayerRange, SetupInitial } from './types';
 
-export function playerRange(game: GameCatalogItem, variantKey: string | null): { min: number; max: number } {
+export function playerRange(game: GameCatalogItem, variantKey: string | null): PlayerRange {
   return game.variants.find((variant) => variant.key === variantKey)?.players ?? game.players;
 }
 
-export function selectionHint(count: number, range: { min: number; max: number }): string | null {
+/** 人数不满足时的提示；满足时为 null */
+export function selectionHint(count: number, range: PlayerRange): string | null {
   if (count < range.min) return `还需选择 ${range.min - count} 名玩家`;
   if (count > range.max) return `最多 ${range.max} 名玩家，请取消 ${count - range.max} 名`;
   return null;
+}
+
+/** 人数已满足时的提示：只有到了上限才说"人数已满"，否则说明还能再加几人 */
+export function readyLabel(count: number, range: PlayerRange): string {
+  if (count >= range.max) return '人数已满，可以开始';
+  return `可开局，还可再加 ${range.max - count} 人`;
 }
 
 /** 按顺序切换选中；选中顺序即座位顺序 */

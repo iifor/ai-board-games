@@ -1,11 +1,11 @@
-import type { MatchStatus, MatchSummaryDto } from '@battle/shared';
+import { formatMatchTitle, type MatchStatus, type MatchSummaryDto } from '@battle/shared';
 import { Alert, App, Button, Popconfirm, Select, Space, Table, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useAsync } from '../../../hooks/useAsync';
 import { errorMessage } from '../../../services/http';
 import { deleteMatch, listMatches } from '../../../services/matches';
-import { formatMatchTitle, formatTime } from '../../../utils/format';
+import { formatTime } from '../../../utils/format';
 import { CreateDebugMatchModal } from '../components/CreateDebugMatchModal';
 import { STATUS_LABELS } from '../utils';
 
