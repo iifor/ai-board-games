@@ -87,7 +87,7 @@
 
 板子即引擎的玩法变体（`variant`），在 `boards.ts` 的 `BOARDS` 中登记（定义格式与板子参数在 `boardDefinition.ts`，第三批板子清单在 `boardsExtended.ts`，第四批在 `boardsFinal.ts`）：角色表、人数（`players`，默认 12 人）、底牌（`extraCards`，见"盗贼与底牌"）、板子参数，以及给 AI 的规则说明（由 `roleRules.ts` 按本局角色与板子参数自动拼出：通用规则 + 每个角色的完整规则 + 板子的特殊约定 `notes`；规则层开头的"这是一局 N 人狼人杀"按本局人数）。板子参数（`boardConfigSchema`）：女巫自救口径、是否竞选警长、屠边类别覆盖、狼美人被毒是否带人（`wolfBeautyPoisonLink`）、隐狼口径（`hiddenWolf`）、乌鸦额外票数（`crowVotes`）、黑商口径（`blackMerchant`）。特殊角色各自一个模块（`special/<role>.ts`，导出一个描述符，见下文"模块分层"），在 `roles.ts` 的角色目录中登记阵营、屠边类别与特性（不能自爆、免疫毒药、查验视为好人、不受魅惑、延迟出局等）；本局没有该角色时相关阶段静默跳过。所有板子都有首日警长竞选、自爆与上文的标准规则。
 
-**模块分层**（`packages/games/src/werewolf/`；运行时 import 只能沿此方向，不允许循环——以前 `roles.ts`、`rules/*`、`special/*` 曾形成一个 49 文件的循环，只靠"在函数内读取常量"的约定维持）：
+**模块分层**（`packages/games/src/werewolf/`；运行时 import 只能沿此方向，不允许循环——以前 `roles.ts`、`rules/*`、`special/*` 曾形成一个 49 文件的循环，只靠"在函数内读取常量"的约定维持。`test/werewolf/layering.test.ts` 扫描运行时 import（`import type` 不算）守住两条：没有环；登记表只被第 5、6 条列出的消费方引用）：
 
 1. 数据层：`state*.ts`、`boardDefinition.ts`、`roleRules.ts`、`boards*.ts`、`prompts.ts`、`roles.ts`。`roles.ts` 是角色目录（展示名、阵营、屠边类别、特性 `RoleTraits`），不含身份模板，不引用 `special/*`。
 2. 基础规则层 `rules/*`（除第 5 条的四个结算管线）：纯函数，只引用数据层；跨模块共用的"状态解读"都在这里——魔术师换号 `swapTarget`、占卜师标记 `withinMark`、梦游者 `isDreamed`（`rules/nightEffects.ts`），灵狼技能的效果（`rules/spiritWolfSkills.ts`），老流氓延迟出局 `woundRogue`（`rules/death.ts`），魔狼血脉 `bloodlineDoomed`（`rules/context.ts`）。基础规则需要某个角色的静态特性时加到 `RoleTraits`，不引用该角色模块。
