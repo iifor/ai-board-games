@@ -5,13 +5,17 @@ import { decryptSecret, encryptSecret, maskSecret } from '../../utils/crypto';
 import { badRequest, notFound } from '../../utils/errors';
 import type { ProviderRepository } from './repository';
 
-function toDto(row: Selectable<ModelProvidersTable>): ProviderDto {
+/** 各供应商的模型数，来自模型 repository 的分组统计 */
+export type ModelCounter = () => Promise<readonly { readonly providerId: number; readonly count: string | number }[]>;
+
+function toDto(row: Selectable<ModelProvidersTable>, modelCount: number): ProviderDto {
   return {
     id: row.id,
     name: row.name,
     baseUrl: row.baseUrl,
     apiKeyMasked: row.apiKeyHint,
     enabled: row.enabled,
+    modelCount,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -24,32 +28,44 @@ export interface ProviderCredentials {
   readonly apiKey: string;
 }
 
-export function createProviderService(repository: ProviderRepository, secretKey: Buffer) {
+export function createProviderService(repository: ProviderRepository, secretKey: Buffer, countModels: ModelCounter) {
+  async function counts(): Promise<Map<number, number>> {
+    return new Map((await countModels()).map((row) => [row.providerId, Number(row.count)]));
+  }
+
+  async function withCount(row: Selectable<ModelProvidersTable>): Promise<ProviderDto> {
+    return toDto(row, (await counts()).get(row.id) ?? 0);
+  }
+
   return {
-    list: async (): Promise<ProviderDto[]> => (await repository.list()).map(toDto),
+    async list(): Promise<ProviderDto[]> {
+      const [rows, countMap] = await Promise.all([repository.list(), counts()]);
+      return rows.map((row) => toDto(row, countMap.get(row.id) ?? 0));
+    },
 
     async get(id: number): Promise<ProviderDto> {
       const row = await repository.find(id);
       if (!row) throw notFound('模型供应商');
-      return toDto(row);
+      return withCount(row);
     },
 
     async create(input: ProviderInput): Promise<ProviderDto> {
       if (!input.apiKey) throw badRequest('创建供应商时必须提供 API Key');
-      return toDto(await repository.create({
+      const row = await repository.create({
         name: input.name,
         baseUrl: input.baseUrl,
         apiKeyEncrypted: encryptSecret(input.apiKey, secretKey),
         apiKeyHint: maskSecret(input.apiKey),
         enabled: input.enabled ?? true,
-      }));
+      });
+      return toDto(row, 0);
     },
 
     async update(id: number, input: ProviderInput): Promise<ProviderDto> {
       const key = input.apiKey ? { apiKeyEncrypted: encryptSecret(input.apiKey, secretKey), apiKeyHint: maskSecret(input.apiKey) } : {};
       const row = await repository.update(id, { name: input.name, baseUrl: input.baseUrl, enabled: input.enabled ?? true, ...key });
       if (!row) throw notFound('模型供应商');
-      return toDto(row);
+      return withCount(row);
     },
 
     async remove(id: number): Promise<void> {

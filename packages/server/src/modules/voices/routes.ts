@@ -1,7 +1,10 @@
-import { crudController, crudRoutes } from '../../utils/crud';
+import { crudRoutes } from '../../utils/crud';
+import { voiceController } from './controller';
 import type { VoiceService } from './service';
-import { voiceSchema } from './validator';
 
 export function voiceRoutes(service: VoiceService) {
-  return crudRoutes(crudController(service, { create: voiceSchema, update: voiceSchema }));
+  const controller = voiceController(service);
+  return crudRoutes(controller)
+    .post('/import-defaults', controller.importDefaults)
+    .post('/:id/preview', controller.preview);
 }

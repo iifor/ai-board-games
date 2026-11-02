@@ -1,7 +1,9 @@
 import { scriptedOutput, toChatMessages, type CompiledGame, type EngineInput } from '@battle/engine';
+import { logger } from '../../utils/logger';
 import { extractJson, LlmError, type LlmClient } from '../llm';
 import type { MatchRepository } from '../matches/repository';
 import type { TaskCompletion } from '../matches/types';
+import type { ModelService } from '../models/service';
 import type { ProviderService } from '../providers/service';
 import type { AiTaskRepository, ClaimedTask, SeatModel } from './repository';
 
@@ -18,6 +20,7 @@ export interface ExecutorDeps {
   readonly tasks: AiTaskRepository;
   readonly matches: MatchRepository;
   readonly providers: ProviderService;
+  readonly models: Pick<ModelService, 'markQuotaExhausted'>;
   readonly llm: LlmClient;
   readonly findGame: (key: string) => CompiledGame;
   readonly sleep: (ms: number) => Promise<void>;
@@ -58,15 +61,21 @@ export function createTaskExecutor(deps: ExecutorDeps) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await deps.tasks.recordCall({ ...base, rawResponse: null, output: undefined, error: message, latencyMs: Date.now() - started, usage: null });
-      return { error: message, retryable: error instanceof LlmError ? error.retryable : false };
+      const quotaExhausted = error instanceof LlmError && error.quotaExhausted;
+      if (quotaExhausted) {
+        await deps.models.markQuotaExhausted(model.modelId);
+        logger.warn('模型额度耗尽，已自动停用', { modelId: model.modelId, modelName: model.name, error: message });
+      }
+      return { error: message, retryable: !quotaExhausted && error instanceof LlmError && error.retryable };
     }
   }
 
+  /** 主模型与备用模型中仍启用的部分；主模型被停用（如额度耗尽）时直接用备用模型 */
   async function modelChain(task: ClaimedTask): Promise<SeatModel[]> {
     const primary = await deps.tasks.seatModel(task.matchId, task.seat);
     if (!primary) return [];
     const fallback = primary.fallbackModelId ? await deps.tasks.modelById(primary.fallbackModelId) : undefined;
-    return fallback ? [primary, fallback] : [primary];
+    return [primary, ...(fallback ? [fallback] : [])].filter((model) => model.enabled);
   }
 
   return {

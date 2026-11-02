@@ -1,28 +1,46 @@
 import { createHash } from 'node:crypto';
 import type { AudioRef, VoiceProvider } from '@battle/shared';
+import { badRequest, upstream } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import type { MediaRepository } from './repository';
-import type { TtsProviders } from './types';
+import type { TtsProviders, VoiceSpec } from './types';
 
-export interface VoiceChoice {
+export interface VoiceChoice extends VoiceSpec {
   readonly provider: VoiceProvider;
-  readonly voiceName: string;
 }
 
-/** 语音合成 + 按（音色、文本）缓存；失败只记录日志并返回 null，前端会退回字幕或浏览器朗读 */
+/** 音频按（来源、音色及其参数、文本）哈希寻址，参数不同不会复用缓存 */
+function assetId(voice: VoiceChoice, text: string): string {
+  const key = [voice.provider, voice.voiceName, voice.language, voice.style, voice.rate, voice.pitch, text].join('\u0000');
+  return createHash('sha256').update(key).digest('hex').slice(0, 40);
+}
+
 export function createTtsService(providers: TtsProviders, repository: MediaRepository) {
+  /** 合成并缓存；失败抛出可展示给管理员的错误（试听用） */
+  async function synthesize(text: string, voice: VoiceChoice): Promise<AudioRef> {
+    if (voice.provider === 'browser') throw badRequest('浏览器朗读的音色由前端直接试听');
+    const provider = providers[voice.provider];
+    if (!provider) throw upstream(`${voice.provider} 语音服务未配置，请检查服务端环境变量`);
+    const id = assetId(voice, text);
+    const url = `/api/media/${id}`;
+    if (await repository.exists(id)) return { url, mime: 'audio/mpeg' };
+    let audio;
+    try {
+      audio = await provider.synthesize(text, voice);
+    } catch (error) {
+      throw upstream(error instanceof Error ? error.message : '语音合成失败');
+    }
+    await repository.insert({ id, provider: voice.provider, voiceName: voice.voiceName, mime: audio.mime, data: audio.data });
+    return { url, mime: audio.mime };
+  }
+
   return {
+    synthesize,
+    /** 对局播放用：失败只记录日志并返回 null，前端会退回字幕或浏览器朗读 */
     async audioFor(text: string, voice: VoiceChoice | null): Promise<AudioRef | null> {
-      if (!voice || voice.provider === 'browser' || !text.trim()) return null;
-      const provider = providers[voice.provider];
-      if (!provider) return null;
-      const id = createHash('sha256').update(`${voice.provider}|${voice.voiceName}|${text}`).digest('hex').slice(0, 40);
-      const url = `/api/media/${id}`;
-      if (await repository.exists(id)) return { url, mime: 'audio/mpeg' };
+      if (!voice || voice.provider === 'browser' || !text.trim() || !providers[voice.provider]) return null;
       try {
-        const audio = await provider.synthesize(text, voice.voiceName);
-        await repository.insert({ id, provider: voice.provider, voiceName: voice.voiceName, mime: audio.mime, data: audio.data });
-        return { url, mime: audio.mime };
+        return await synthesize(text, voice);
       } catch (error) {
         logger.warn('语音合成失败', { provider: voice.provider, error: (error as Error).message });
         return null;

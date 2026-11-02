@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TracePanel } from './features/matches/components/TracePanel';
 import { channelColor, describeLog } from './features/matches/utils';
+import { applyFilters, enabledFilter, uniqueOptions, type ResourceFilter } from './features/resources/utils';
 import { AUTH_EVENTS, http } from './services/http';
 import { tokenStore } from './services/tokenStore';
 
@@ -18,6 +19,25 @@ describe('match utils', () => {
     expect(describeLog({ ...meta, kind: 'fallback', seat: 2, reason: '输出不合法' })).toBe('2号兜底：输出不合法');
     expect(channelColor('team:werewolf')).toBe('purple');
     expect(channelColor('private:3')).toBe('gold');
+  });
+});
+
+describe('resource filters', () => {
+  interface Row { readonly id: number; readonly name: string; readonly provider: string; readonly enabled: boolean }
+  const rows: Row[] = [
+    { id: 1, name: 'Azure 女声', provider: 'azure', enabled: true },
+    { id: 2, name: 'Mimo 男声', provider: 'mimo', enabled: false },
+  ];
+  const providerFilter: ResourceFilter<Row> = { key: 'provider', placeholder: '来源', options: () => [], matches: (dto, value) => dto.provider === value };
+  const filters = [providerFilter, enabledFilter<Row>()];
+  const search = (dto: Row) => [dto.name];
+
+  it('combines select filters with a case-insensitive keyword search', () => {
+    expect(applyFilters(rows, filters, { provider: 'azure' }, search).map((row) => row.id)).toEqual([1]);
+    expect(applyFilters(rows, filters, { enabled: 'false', q: 'MIMO' }, search).map((row) => row.id)).toEqual([2]);
+    expect(applyFilters(rows, filters, { q: '不存在' }, search)).toEqual([]);
+    expect(applyFilters(rows, filters, { q: '', provider: undefined }, search)).toHaveLength(2);
+    expect(uniqueOptions(['b', 'a', null, 'a'])).toEqual([{ value: 'a', label: 'a' }, { value: 'b', label: 'b' }]);
   });
 });
 

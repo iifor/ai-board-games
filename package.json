@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "db:up": "docker compose -f docker-compose.dev.yml up -d --wait",
     "db:down": "docker compose -f docker-compose.dev.yml down",
-    "dev:seed": "node scripts/dev/seed-demo.mjs"
+    "dev:seed": "node scripts/dev/seed-demo.mjs",
+    "dev:import-legacy": "node scripts/dev/import-legacy.mjs"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -3,11 +3,13 @@ import { Migrator, type Migration, type MigrationProvider } from 'kysely/migrati
 import type { Db } from './database';
 import * as init from './migrations/001_init';
 import * as matches from './migrations/002_matches';
+import * as resources from './migrations/003_resources';
 
 /** 迁移按 key 排序执行；新增迁移在此登记 */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {
   '001_init': init,
   '002_matches': matches,
+  '003_resources': resources,
 };
 
 const provider: MigrationProvider = { getMigrations: async () => MIGRATIONS };

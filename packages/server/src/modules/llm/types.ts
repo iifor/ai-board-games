@@ -20,9 +20,12 @@ export interface LlmResponse {
   readonly usage: LlmUsage | null;
 }
 
-/** 传输层失败：retryable 表示超时、限流、5xx 等可以重试的错误 */
+/**
+ * 传输层失败：retryable 表示超时、限流、5xx 等可以重试的错误；
+ * quotaExhausted 表示供应商明确返回额度耗尽 / 欠费，模型应被停用并切换备用模型。
+ */
 export class LlmError extends Error {
-  constructor(message: string, readonly retryable: boolean) {
+  constructor(message: string, readonly retryable: boolean, readonly quotaExhausted = false) {
     super(message);
     this.name = 'LlmError';
   }

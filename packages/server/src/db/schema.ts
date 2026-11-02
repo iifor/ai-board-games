@@ -34,6 +34,9 @@ export interface ModelsTable {
   maxTokens: number;
   fallbackModelId: number | null;
   enabled: boolean;
+  /** 系统自动停用的原因（如额度耗尽）；管理员手动停用为 null */
+  disabledReason: string | null;
+  disabledAt: Date | null;
   createdAt: CreatedAt;
   updatedAt: UpdatedAt;
 }
@@ -43,6 +46,13 @@ export interface VoicesTable {
   name: string;
   provider: string;
   voiceName: string;
+  language: string;
+  gender: string | null;
+  style: string;
+  rate: string;
+  pitch: string;
+  sampleText: string;
+  description: string;
   enabled: boolean;
   createdAt: CreatedAt;
   updatedAt: UpdatedAt;

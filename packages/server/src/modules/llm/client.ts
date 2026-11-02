@@ -1,3 +1,4 @@
+import { isQuotaExhausted } from './quota';
 import { LlmError, type LlmClient, type LlmRequest, type LlmResponse } from './types';
 
 interface ChatCompletionPayload {
@@ -34,8 +35,9 @@ export function createOpenAiCompatibleClient(): LlmClient {
       }
       const payload = (await response.json().catch(() => null)) as ChatCompletionPayload | null;
       if (!response.ok) {
-        const retryable = response.status === 429 || response.status >= 500;
-        throw new LlmError(`模型返回 ${response.status}：${payload?.error?.message ?? response.statusText}`, retryable);
+        const message = `模型返回 ${response.status}：${payload?.error?.message ?? response.statusText}`;
+        if (isQuotaExhausted(response.status, payload)) throw new LlmError(message, false, true);
+        throw new LlmError(message, response.status === 429 || response.status >= 500);
       }
       const content = payload?.choices?.[0]?.message?.content;
       if (typeof content !== 'string' || !content.trim()) throw new LlmError('模型返回了空内容', true);

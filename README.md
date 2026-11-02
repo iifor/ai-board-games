@@ -21,6 +21,14 @@ ADMIN_USERNAME=admin ADMIN_PASSWORD=<修改后的密码> pnpm dev:seed -- --matc
 
 演示数据使用占位模型供应商，只能运行"脚本化"的调试局（不调用模型）；要让 AI 真正对战，请在后台把供应商替换为可用的 OpenAI 兼容接口。
 
+旧版（`legacy-final`）的配置可以这样迁移：内置音色目录（Azure 63 个、Mimo 12 个、浏览器 2 个）和旧 SQLite 里的 12 名 AI 玩家人设（`scripts/dev/legacy/players.json`）：
+
+```bash
+ADMIN_USERNAME=admin ADMIN_PASSWORD=<修改后的密码> pnpm dev:import-legacy
+```
+
+音色目录也可以在后台"音色"页点"导入默认音色"。旧版数据库里的供应商、模型与 API Key 不在本仓库中，需要在后台重新配置。
+
 ## 检查与测试
 
 ```bash

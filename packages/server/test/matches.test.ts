@@ -1,6 +1,6 @@
-import { API_ERROR_CODES, type MatchDetailDto, type MatchSummaryDto } from '@battle/shared';
+import { API_ERROR_CODES, type MatchDetailDto, type MatchSummaryDto, type ModelDto } from '@battle/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { failingLlm, runUntilSettled, scriptedLlm, seedPlayers } from './support/fixtures';
+import { failingLlm, quotaExhaustedLlm, runUntilSettled, scriptedLlm, seedPlayers } from './support/fixtures';
 import { createTestApp, dataOf, type TestApp } from './support/testApp';
 
 describe('scripted debug matches', () => {
@@ -69,6 +69,29 @@ describe('model-backed matches', () => {
       expect(calls.length).toBe(llm.calls.length);
       expect(calls.every((call) => call.error === null && call.prompt.instruction)).toBe(true);
       expect(match?.snapshot.log.filter((entry) => entry.kind === 'fallback')).toEqual([]);
+    } finally {
+      await t.cleanup();
+    }
+  });
+
+  it('disables a model whose quota is exhausted and keeps playing on the fallback model', async () => {
+    const llm = quotaExhaustedLlm(['main-model']);
+    const t = await createTestApp({}, { llm });
+    try {
+      const token = await t.adminToken();
+      t.services.worker.start();
+      const playerIds = await seedPlayers(t, 9);
+      const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/admin/matches', { token, body: { gameKey: 'debate', playerIds, pacing: 'free' } }));
+      await runUntilSettled(t, created.id);
+      const match = await t.services.repositories.matches.find(created.id);
+      expect(match?.status).toBe('completed');
+      expect(match?.snapshot.log.filter((entry) => entry.kind === 'fallback')).toEqual([]);
+      const models = dataOf(await t.call<ModelDto[]>('GET', '/api/admin/models', { token }));
+      expect(models.find((model) => model.model === 'main-model')).toMatchObject({ enabled: false, disabledReason: 'quota_exhausted' });
+      expect(models.find((model) => model.model === 'backup-model')).toMatchObject({ enabled: true, disabledReason: null });
+      // 停用后不再调用主模型，也不重试：主模型的调用次数不超过并发数
+      expect(llm.calls.filter((call) => call.model === 'main-model').length).toBeLessThanOrEqual(t.config.ai.concurrency);
+      expect(llm.calls.some((call) => call.model === 'backup-model')).toBe(true);
     } finally {
       await t.cleanup();
     }

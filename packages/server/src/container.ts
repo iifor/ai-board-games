@@ -35,14 +35,17 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
     aiTasks: createAiTaskRepository(db),
     media: createMediaRepository(db),
   };
-  const providers = createProviderService(repositories.providers, config.secretKey);
+  const llm = external.llm ?? createOpenAiCompatibleClient();
+  const providers = createProviderService(repositories.providers, config.secretKey, repositories.models.countByProvider);
+  const models = createModelService({ repository: repositories.models, providers: repositories.providers, credentials: providers.credentials, llm });
   const runtime = createMatchRuntime(repositories.matches, games.find, bus);
   const tts = createTtsService(external.ttsProviders ?? ttsProvidersFromConfig(config.tts), repositories.media);
   const executor = createTaskExecutor({
     tasks: repositories.aiTasks,
     matches: repositories.matches,
     providers,
-    llm: external.llm ?? createOpenAiCompatibleClient(),
+    models,
+    llm,
     findGame: games.find,
     sleep: external.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
   });
@@ -54,8 +57,8 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
     tts,
     auth: createAuthService(repositories.auth, config),
     providers,
-    models: createModelService(repositories.models, repositories.providers),
-    voices: createVoiceService(repositories.voices),
+    models,
+    voices: createVoiceService(repositories.voices, tts),
     players: createPlayerService(repositories.players, repositories.models, repositories.voices),
     matches: createMatchService({
       repository: repositories.matches,

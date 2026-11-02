@@ -29,12 +29,13 @@ export function createAudioResolver(db: Db, tts: TtsService) {
 
   async function voiceFor(matchId: string, seat: number | null): Promise<VoiceChoice | null> {
     const query = seat === null
-      ? db.selectFrom('voices').select(['provider', 'voiceName']).where('name', '=', HOST_VOICE_NAME).where('enabled', '=', true)
+      ? db.selectFrom('voices').select(['provider', 'voiceName', 'language', 'style', 'rate', 'pitch'])
+        .where('name', '=', HOST_VOICE_NAME).where('enabled', '=', true)
       : db.selectFrom('matchSeats').innerJoin('voices', 'voices.id', 'matchSeats.voiceId')
-        .select(['voices.provider', 'voices.voiceName'])
+        .select(['voices.provider', 'voices.voiceName', 'voices.language', 'voices.style', 'voices.rate', 'voices.pitch'])
         .where('matchSeats.matchId', '=', matchId).where('matchSeats.seat', '=', seat).where('voices.enabled', '=', true);
     const row = await query.executeTakeFirst();
-    return row ? { provider: row.provider as VoiceChoice['provider'], voiceName: row.voiceName } : null;
+    return row ? { ...row, provider: row.provider as VoiceChoice['provider'] } : null;
   }
 
   return {

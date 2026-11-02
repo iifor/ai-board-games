@@ -19,3 +19,5 @@ export const forbidden = (message = '没有权限') => new AppError(403, API_ERR
 export const notFound = (what: string) => new AppError(404, API_ERROR_CODES.notFound, `${what}不存在`);
 export const conflict = (message: string) => new AppError(409, API_ERROR_CODES.conflict, message);
 export const tooManyRequests = (message: string) => new AppError(429, API_ERROR_CODES.tooManyRequests, message);
+/** 上游服务（模型、语音）不可用或返回错误 */
+export const upstream = (message: string) => new AppError(502, API_ERROR_CODES.upstream, message);

@@ -1,17 +1,23 @@
 export type { AdminLoginRequest, AdminLoginResponse, AdminProfile, ChangePasswordRequest } from './api/auth';
 export { API_ERROR_CODES, isApiSuccess } from './api/common';
 export type { ApiErrorCode, ApiFailure, ApiResponse, ApiSuccess } from './api/common';
-export { VOICE_PROVIDERS } from './api/resources';
+export { MODEL_DISABLED_REASONS, VOICE_GENDERS, VOICE_PROVIDERS } from './api/resources';
 export type {
+  ModelDisabledReason,
   ModelDto,
   ModelInput,
+  ModelTestResult,
   PlayerDto,
   PlayerInput,
   ProviderDto,
   ProviderInput,
   PublicPlayerDto,
   VoiceDto,
+  VoiceGender,
+  VoiceImportResult,
   VoiceInput,
+  VoicePreviewRequest,
+  VoicePreviewResult,
   VoiceProvider,
 } from './api/resources';
 export type {

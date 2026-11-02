@@ -22,6 +22,7 @@ export const API_ERROR_CODES = {
   conflict: 40901,
   tooManyRequests: 42901,
   internal: 50000,
+  upstream: 50201,
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];

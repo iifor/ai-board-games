@@ -1,7 +1,10 @@
 import type { ProviderDto, ProviderInput } from '@battle/shared';
-import { Form, Input, Switch, Tag } from 'antd';
+import { Button, Form, Input, Switch } from 'antd';
+import { useNavigate } from 'react-router';
 import { providersApi } from '../../services/resources';
 import { ResourcePage } from './ResourcePage';
+import { StatusTag } from './StatusTag';
+import { enabledFilter } from './utils';
 
 interface Values {
   name: string;
@@ -11,15 +14,21 @@ interface Values {
 }
 
 export function ProvidersPage() {
+  const navigate = useNavigate();
   return (
     <ResourcePage<ProviderDto, ProviderInput, Values>
       title="模型供应商"
       api={providersApi}
+      searchPlaceholder="搜索名称或 Base URL"
+      search={(dto) => [dto.name, dto.baseUrl]}
+      filters={[enabledFilter<ProviderDto>()]}
+      rowActions={(dto) => <Button size="small" onClick={() => navigate(`/models?providerId=${dto.id}`)}>模型列表</Button>}
       columns={[
         { title: '名称', dataIndex: 'name' },
-        { title: 'Base URL', dataIndex: 'baseUrl' },
-        { title: 'API Key', dataIndex: 'apiKeyMasked' },
-        { title: '状态', dataIndex: 'enabled', render: (enabled: boolean) => (enabled ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>) },
+        { title: 'Base URL', dataIndex: 'baseUrl', ellipsis: true },
+        { title: 'API Key', dataIndex: 'apiKeyMasked', width: 110 },
+        { title: '模型数', dataIndex: 'modelCount', width: 80 },
+        { title: '状态', dataIndex: 'enabled', width: 80, render: (enabled: boolean) => <StatusTag enabled={enabled} /> },
       ]}
       defaults={{ enabled: true }}
       toValues={(dto) => ({ name: dto.name, baseUrl: dto.baseUrl, enabled: dto.enabled })}

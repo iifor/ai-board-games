@@ -28,7 +28,7 @@ src/
 
 ## 接口
 
-统一响应：成功 `{ code: 0, message: 'ok', data }`；失败 `{ code, message }`，错误码见 `@battle/shared` 的 `API_ERROR_CODES`（40001 参数、40101 未登录、40301 需先改密、40401 不存在、40901 冲突、42901 过于频繁、50000 内部错误）。未知错误只返回通用信息，详情写服务端日志（含 requestId，响应头 `X-Request-Id`）。数据库唯一约束与外键错误转换为 409，不暴露约束名。
+统一响应：成功 `{ code: 0, message: 'ok', data }`；失败 `{ code, message }`，错误码见 `@battle/shared` 的 `API_ERROR_CODES`（40001 参数、40101 未登录、40301 需先改密、40401 不存在、40901 冲突、42901 过于频繁、50000 内部错误、50201 上游服务（模型、语音）不可用）。未知错误只返回通用信息，详情写服务端日志（含 requestId，响应头 `X-Request-Id`）。数据库唯一约束与外键错误转换为 409，不暴露约束名。
 
 | 方法与路径 | 说明 | 鉴权 |
 | --- | --- | --- |
@@ -38,9 +38,12 @@ src/
 | `POST /api/admin/auth/login` | 登录，返回 JWT（12 小时）与是否需改密 | 无 |
 | `POST /api/admin/auth/password` | 修改密码（新密码至少 12 位） | 登录（允许未改密） |
 | `GET /api/admin/auth/me` | 当前管理员 | 登录（允许未改密） |
-| `GET/POST /api/admin/providers`，`GET/PUT/DELETE /api/admin/providers/:id` | 模型供应商 | 管理员 |
-| 同上 `/api/admin/models` | 模型（供应商、备用模型引用检查） | 管理员 |
-| 同上 `/api/admin/voices` | 音色（azure / mimo / browser） | 管理员 |
+| `GET/POST /api/admin/providers`，`GET/PUT/DELETE /api/admin/providers/:id` | 模型供应商（含模型数） | 管理员 |
+| 同上 `/api/admin/models` | 模型（供应商、备用模型引用检查；`enabled: true` 会清除系统停用原因） | 管理员 |
+| `POST /api/admin/models/:id/test` | 连接测试：真实调用一次模型并要求 JSON 回复；失败不报错，结果里给出原因与耗时 | 管理员 |
+| 同上 `/api/admin/voices` | 音色（azure / mimo / browser；语言、性别、风格、语速、音调、试听文本、说明） | 管理员 |
+| `POST /api/admin/voices/:id/preview` | 试听：按音色参数合成一段文本，返回与对局播放共用的 `/api/media/:id` 地址；浏览器音色返回 400，由前端自己朗读 | 管理员 |
+| `POST /api/admin/voices/import-defaults` | 导入内置音色目录（`modules/voices/catalog.ts`，沿用旧版默认语音包），按（来源、音色名、风格）与名称去重，可重复执行 | 管理员 |
 | 同上 `/api/admin/players` | AI 玩家（模型、音色引用检查） | 管理员 |
 | `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`）；每来源每小时 10 局，进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制 | 无 |
 | `GET /api/toc/matches`、`GET /api/toc/matches/:id` | 已完成的公开对局历史、对局概要 | 无 |
@@ -65,9 +68,10 @@ src/
 ## 对局运行时
 
 - **推进**（`modules/matches/runtime.ts`）：一个事务内 `SELECT … FOR UPDATE` 锁定对局行 → 调用引擎 `advance` → 写回快照、新的 AI 任务、舞台事件，以及（来自 worker 时）完成的任务；提交后通过进程内事件总线通知 worker 与实时网关。引擎计算放在 try 内：`EngineInputError` 对 AI 结果视为过期（任务记为 cancelled），对其他输入返回 409；引擎其他异常把对局标为 failed。数据库错误不吞掉，整个事务回滚并向上抛出。
-- **AI worker**（`modules/ai-worker`）：事件驱动 + 每秒兜底轮询。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型）。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；否则依次尝试座位玩家的主模型与备用模型，每个模型最多 2 次传输层尝试（429 / 5xx / 超时可重试），全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`。
+- **AI worker**（`modules/ai-worker`）：事件驱动 + 每秒兜底轮询。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型）。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；否则依次尝试座位玩家的主模型与备用模型中仍启用的部分（主模型被停用时直接用备用模型），每个模型最多 2 次传输层尝试（429 / 5xx / 超时可重试），全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`。
+- **额度耗尽自动停用**：供应商返回 4xx 且错误码在 `modules/llm/quota.ts` 的列表中（百炼 `Arrearage` / `AllocationQuota.FreeTierOnly`、火山 `*BillOverdue`、OpenAI `insufficient_quota` 等）时，LLM 客户端抛出 `quotaExhausted` 的 `LlmError`；worker 不重试，把该模型标为 `enabled = false`、`disabled_reason = 'quota_exhausted'` 并切换备用模型。管理员补充额度后在后台"测试"通过再"重新启用"（`PUT` 时 `enabled: true` 清除原因）。普通限流（429 但没有这些错误码）仍只是重试。
 - **LLM**（`modules/llm`）：OpenAI 兼容 Chat Completions，要求 JSON 对象输出，`toChatMessages` 排布分层 prompt；从回复中提取 JSON（兼容代码块），取不出时把原文交给引擎校验并重问。
-- **TTS**（`modules/tts`）：Azure（REST，不依赖 SDK）与 Mimo（OpenAI 兼容）；`browser` 音色与脚本化对局不合成。音频存入 `media_assets`，按（音色、文本）哈希去重；合成失败只记日志，前端退回浏览器朗读或字幕。主持播报使用名为"主持人"的音色（没有则不合成）。
+- **TTS**（`modules/tts`）：Azure（REST，不依赖 SDK；SSML 带语言、`mstts:express-as` 风格、prosody 语速与音调）与 Mimo（OpenAI 兼容；风格作为前置的 user 指令）；`browser` 音色与脚本化对局不合成。音频存入 `media_assets`，按（来源、音色名、语言、风格、语速、音调、文本）哈希去重；对局播放中合成失败只记日志，前端退回浏览器朗读或字幕；后台试听走同一条 `synthesize`，失败则以 50201 把原因返回给管理员。主持播报使用名为"主持人"的音色（没有则不合成）。
 
 ## 实时推送
 
@@ -87,8 +91,8 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 | --- | --- |
 | `admin_users` | 管理员 |
 | `model_providers` | 供应商（加密的 API Key + 掩码） |
-| `models` | 模型参数、备用模型（自引用，删除时置空） |
-| `voices` | 音色 |
+| `models` | 模型参数、备用模型（自引用，删除时置空）、系统停用原因与时间（`disabled_reason` / `disabled_at`，迁移 003） |
+| `voices` | 音色：来源、音色名、语言、性别、风格、语速、音调、试听文本、说明（迁移 003） |
 | `players` | AI 玩家（模型删除受限，音色删除时置空） |
 | `matches` | 对局：游戏、变体、spec 版本与 hash、种子、状态、debug / scripted / pacing、引擎快照、版本号、`last_seq` / `acked_seq`、结果 |
 | `match_seats` | 座位 → 玩家、模型、音色（开局时固化，玩家删除后保留名字） |

@@ -6,7 +6,7 @@ import type { TtsProviders } from './types';
 export { createMediaRepository } from './repository';
 export { mediaRoutes } from './routes';
 export { createTtsService, type TtsService, type VoiceChoice } from './service';
-export type { TtsProvider, TtsProviders } from './types';
+export type { TtsProvider, TtsProviders, VoiceSpec } from './types';
 
 export function ttsProvidersFromConfig(config: AppConfig['tts']): TtsProviders {
   return {

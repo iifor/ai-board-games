@@ -34,6 +34,19 @@ export function failingLlm(failingModels: readonly string[]): LlmClient & { call
   };
 }
 
+/** 指定模型名返回"额度耗尽"（不可重试，且应停用模型），其余模型正常回答 */
+export function quotaExhaustedLlm(exhaustedModels: readonly string[]): LlmClient & { calls: LlmRequest[] } {
+  const calls: LlmRequest[] = [];
+  return {
+    calls,
+    complete: async (request) => {
+      calls.push(request);
+      if (exhaustedModels.includes(request.model)) throw new LlmError('模型返回 429：Arrearage', false, true);
+      return { content: answerFor(request), usage: null };
+    },
+  };
+}
+
 export function fakeTts(): TtsProvider & { texts: string[] } {
   const texts: string[] = [];
   return {
