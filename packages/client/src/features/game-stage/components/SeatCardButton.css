@@ -1,0 +1,29 @@
+/* 座位卡片是按钮（点开座位资料弹层）：这里只抹掉浏览器的按钮样式，外观仍由 SeatCard.css 决定。
+   :where() 让这些规则没有具体度，SeatCard.css 的任何规则（如 .seat-card-stack 的定宽与居中）都能盖过它 */
+:where(.seat-card-trigger) {
+  appearance: none;
+  /* 按钮的 width: auto 按内容收缩、不像 div 那样撑满父元素：对垒布局的正反方座位靠它占满列宽 */
+  width: 100%;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 评委席是横向排列的 flex 行，卡片按内容宽度 */
+:where(.versus-bench-seats > .seat-card-trigger) {
+  width: auto;
+}
+
+/* 悬停只提亮描边，不改 transform（发言光环的上浮与缩放由 SeatCard.css 负责） */
+.seat-card-trigger:hover {
+  border-color: rgba(190, 207, 232, 0.55);
+}
+
+/* 弹层已打开的座位：游戏强调色描边，用 outline 不与发言光环的 box-shadow 冲突 */
+.seat-card-trigger.is-selected {
+  outline: 2px solid var(--game-accent-strong);
+  outline-offset: 3px;
+}

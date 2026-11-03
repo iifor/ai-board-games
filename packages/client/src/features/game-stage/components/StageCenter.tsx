@@ -11,12 +11,14 @@ interface StageCenterProps {
   readonly view: AudienceView;
   readonly current: StreamItem | null;
   readonly played: readonly StreamItem[];
+  /** 票板的票数条等选票飞完再长出（布局不飞票时为 0） */
+  readonly voteDelayMs?: number | undefined;
 }
 
 /** 舞台中央：计票时是票板，出局时是出局提示，其余时间站着说话人的立绘（上方是本阶段的发言顺序） */
-export function StageCenter({ view, current, played }: StageCenterProps) {
+export function StageCenter({ view, current, played, voteDelayMs = 0 }: StageCenterProps) {
   const event = current?.event;
-  if (event?.kind === 'vote_tallied') return <VoteBoard key={event.seq} event={event} view={view} />;
+  if (event?.kind === 'vote_tallied') return <VoteBoard key={event.seq} event={event} view={view} delayMs={voteDelayMs} />;
   if (event?.kind === 'seat_eliminated') {
     const seat = seatOf(view, event.seat);
     return (

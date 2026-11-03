@@ -1,0 +1,29 @@
+/* 飞行层盖在座位之上、不挡点击；令牌默认不可见，由 WAAPI 关键帧控制位置与透明度（不支持时就一直不可见） */
+.ballot-flight {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ballot-token {
+  --ballot-size: calc(14px + 4px * (var(--ballot-weight, 1) - 1));
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--ballot-size);
+  height: var(--ballot-size);
+  margin: calc(var(--ballot-size) / -2) 0 0 calc(var(--ballot-size) / -2);
+  border-radius: 50%;
+  opacity: 0;
+  background: radial-gradient(circle at 35% 35%, #fff 0, var(--game-accent-strong) 28%, var(--game-accent) 70%);
+  box-shadow: 0 0 10px var(--game-accent-strong), 0 0 22px var(--game-accent-soft);
+  will-change: transform, opacity;
+}
+
+/* 弃票：灰一点的令牌，停在投票者座位上闪烁 */
+.ballot-token.is-abstain {
+  background: radial-gradient(circle at 35% 35%, #fff 0, rgba(210, 220, 240, 0.9) 30%, rgba(120, 135, 170, 0.8) 70%);
+  box-shadow: 0 0 10px rgba(210, 220, 240, 0.6);
+}

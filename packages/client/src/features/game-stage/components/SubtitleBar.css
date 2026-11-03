@@ -36,7 +36,8 @@
   grid-template-columns: 160px minmax(0, 1fr);
   gap: 16px;
   align-items: center;
-  animation: subtitle-in var(--ui-motion-slow) var(--ui-ease-out) both;
+  /* 每段字幕都重新进场：用 normal 时长，主持人不到一秒的短句也不会大半时间空着 */
+  animation: subtitle-in var(--ui-motion-normal) var(--ui-ease-out) both;
 }
 
 .subtitle-speaker {
@@ -95,7 +96,7 @@
   line-height: 1.55;
   white-space: pre-wrap;
   text-wrap: pretty;
-  animation: subtitle-text-in 0.6s var(--ui-ease-out) both;
+  animation: subtitle-text-in 0.4s var(--ui-ease-out) both;
 }
 
 .subtitle-bar[data-kind='narration'] .subtitle-avatar,
@@ -119,7 +120,7 @@
 @keyframes subtitle-in {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(10px);
   }
 }
 

@@ -3,8 +3,10 @@ import { useRef } from 'react';
 import { Link } from 'react-router';
 import { Avatar } from '../../../components/Avatar';
 import { useDialogFocus } from '../../../hooks/useDialogFocus';
+import { resolvePoster } from '../../../utils/posters';
 import { rematchStateOf } from '../../lobby';
 import { ResultRoster } from './ResultRoster';
+import { SpeakerAvatar } from './SpeakerCard';
 import './ResultPanel.css';
 
 interface ResultPanelProps {
@@ -17,11 +19,15 @@ interface ResultPanelProps {
   readonly onClose?: (() => void) | undefined;
 }
 
-/** 终局：覆盖整个舞台的结果对话框——MVP 立绘、胜方与摘要、阵容揭示、下一步操作；打开时焦点移入，关闭时焦点还回 */
+/**
+ * 终局：铺满视口的结果对话框——MVP 立绘（没有立绘时是发言者大卡式的大头像）、胜方与摘要、逐行揭示的阵容、下一步操作；
+ * 打开时焦点移入，关闭时焦点还回。对话框是唯一的网格项，卡片永远不会比视口宽
+ */
 export function ResultPanel({ result, view, summary, onReplay, onClose }: ResultPanelProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
   useDialogFocus(dialogRef, onClose);
   const mvp = result.mvp === null ? null : view?.seats.find((seat) => seat.seat === result.mvp);
+  const poster = mvp ? resolvePoster(mvp.name, mvp.avatar, 'cutout') : null;
   return (
     <section ref={dialogRef} className="result-panel" role="dialog" aria-modal="true" aria-labelledby="result-winner" tabIndex={-1}>
       <div className={`result-card glass-panel ${mvp ? 'has-mvp' : ''}`}>
@@ -29,7 +35,7 @@ export function ResultPanel({ result, view, summary, onReplay, onClose }: Result
         {mvp ? (
           <div className="result-mvp-block">
             <span className="hud-label">MVP</span>
-            <Avatar className="result-mvp-avatar" shape="figure" name={mvp.name} avatar={mvp.avatar} />
+            {poster ? <Avatar className="result-mvp-avatar" shape="figure" name={mvp.name} avatar={mvp.avatar} /> : <SpeakerAvatar className="result-mvp-card" seat={mvp} />}
             <p className="result-mvp">MVP：{mvp.label}</p>
             {mvp.roleName ? <span className="ui-pill ui-pill-brand">{mvp.roleName}</span> : null}
           </div>

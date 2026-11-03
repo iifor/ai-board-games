@@ -1,10 +1,16 @@
+/* 铺满视口的遮罩（fixed：不随舞台让位，侧栏展开时也居中于整个视口），在 .stage-shell 的层叠上下文里压过侧栏等 40 层。
+   列轨道给定为 minmax(0, 1fr)：隐式 auto 轨道会被卡片的最大内容宽度（长摘要）撑到比视口宽，再居中就把卡片推出左边缘；
+   safe center：卡片比视口高时从顶部开始滚动而不是上下都切掉 */
 .result-panel {
-  position: absolute;
+  position: fixed;
   z-index: 60;
   inset: 0;
   display: grid;
-  place-items: center;
-  padding: 24px;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: safe center;
+  align-items: start;
+  justify-items: center;
+  padding: var(--stage-gutter, 24px);
   overflow-y: auto;
   outline: none;
   background: radial-gradient(circle at 50% 40%, rgba(18, 52, 111, 0.3), transparent 50%), rgba(1, 5, 17, 0.74);
@@ -17,6 +23,8 @@
   display: grid;
   gap: 28px;
   width: min(1000px, 100%);
+  max-width: 100%;
+  min-width: 0;
   padding: 30px 36px 28px;
   border-color: var(--ui-brand-soft);
   animation: result-card 0.7s var(--ui-ease-elastic) both;
@@ -81,6 +89,18 @@
 .result-mvp-avatar img {
   height: 240px;
   filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.5));
+}
+
+/* 没有立绘的 MVP：发言者大卡式的大头像（SpeakerCard.css），金色光环代替阵营色 */
+.result-mvp-card {
+  --team-color: var(--ui-brand-strong);
+  margin: 24px 0 12px;
+}
+
+.result-mvp-card .speaker-avatar-image {
+  width: 160px;
+  height: 160px;
+  box-shadow: 0 0 46px var(--ui-brand-soft), inset 0 0 24px rgba(0, 0, 0, 0.4);
 }
 
 .result-mvp {

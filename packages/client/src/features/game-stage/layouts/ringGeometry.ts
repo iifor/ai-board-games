@@ -26,11 +26,23 @@ export interface RingOptions {
   readonly minScale?: number | undefined;
 }
 
+/** 圆桌的目标宽高比：舞台够宽时按这个比例摆成椭圆 */
+export const RING_RATIO = 1.7;
+
 const SAMPLES = 720;
 const SCALE_STEP = 0.05;
 const TOP = -Math.PI / 2;
 
 const point = (angle: number, radiusX: number, radiusY: number): RingPoint => ({ x: radiusX * Math.cos(angle), y: radiusY * Math.sin(angle) });
+
+/**
+ * 圆桌在舞台里占的盒子：高度占满，宽度按 RING_RATIO 跟随，但永远不超过舞台宽度——
+ * 记录侧栏展开后舞台变窄，圆桌随之变圆，座位不会被挤到侧栏底下
+ */
+export function fitRingBox(arena: RingSize, ratio: number = RING_RATIO): RingSize {
+  const width = Math.max(0, Math.min(arena.width, Math.round(arena.height * ratio)));
+  return { width, height: Math.max(0, arena.height) };
+}
 
 /** 椭圆上按弧长等分的角度（从正上方开始顺时针）：等角度会把两侧挤在一起，等弧长不会 */
 export function equalArcAngles(count: number, radiusX: number, radiusY: number): number[] {
@@ -90,4 +102,14 @@ export function ringGeometry(count: number, box: RingSize, card: RingSize, optio
     if (fits(candidate, gap)) return candidate;
   }
   return candidate;
+}
+
+/** 座位号 → 卡片中心（容器 px）：几何按座位在视图里的顺序排，这里按座位号索引，供选票飞行等动效取坐标 */
+export function seatAnchors(seats: readonly number[], geometry: RingGeometry): ReadonlyMap<number, RingPoint> {
+  const anchors = new Map<number, RingPoint>();
+  seats.forEach((seat, index) => {
+    const position = geometry.seats[index];
+    if (position) anchors.set(seat, position);
+  });
+  return anchors;
 }

@@ -1,0 +1,172 @@
+/* 座位资料弹层：挂在 .stage-arena 里（它是 position: absolute，作定位基准，舞台层级 4 之内盖在座位与中央立绘上）。
+   位置由 utils 的 popoverPlacement 算出，写进自定义属性而不是内联 left / top，窄屏规则才能把它改成底部固定面板 */
+.seat-popover {
+  --popover-left: 0px;
+  --popover-top: 0px;
+  position: absolute;
+  z-index: 10;
+  top: var(--popover-top);
+  left: var(--popover-left);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(320px, 100%);
+  max-height: min(460px, 100%);
+  padding: 16px 16px 12px;
+  border-color: var(--game-accent-soft);
+  color: var(--ui-text);
+  transform-origin: left top;
+  animation: ui-pop-in var(--ui-motion-normal) var(--ui-ease-out) both;
+}
+
+.seat-popover[data-side='left'] {
+  transform-origin: right top;
+}
+
+/* 容器聚焦只为读屏播报标题，不画焦点环；里面的关闭按钮仍有全局焦点环 */
+.seat-popover:focus {
+  outline: none;
+}
+
+.seat-popover-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  color: rgba(230, 239, 255, 0.76);
+  background: transparent;
+  font-size: 16px;
+  font-weight: 800;
+  transition: color var(--ui-motion-fast) ease, background-color var(--ui-motion-fast) ease;
+}
+
+.seat-popover-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.seat-popover-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding-right: 24px;
+}
+
+/* 大头像：光环取阵营色（global.css 按 data-team 给出 --team-color），没有阵营时取游戏强调色 */
+.seat-popover-avatar {
+  width: 84px;
+  height: 84px;
+  border: 3px solid var(--team-color, var(--game-accent-strong));
+  background: rgba(3, 13, 35, 0.9);
+  box-shadow: 0 0 28px var(--game-accent-soft);
+  font-size: 28px;
+}
+
+.seat-popover-no {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 13px;
+  color: #061024;
+  background: #dfe9ff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.seat-popover-identity {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.seat-popover-identity strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-popover-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.seat-popover-team {
+  border-color: var(--team-color, var(--ui-border));
+  color: var(--team-color, var(--ui-text-muted));
+}
+
+.seat-popover-out {
+  border-color: rgba(255, 93, 108, 0.6);
+  color: #ffd0d6;
+  background: var(--ui-danger-soft);
+}
+
+/* 发言列表：只有它滚动，头部固定 */
+.seat-popover-speeches {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  margin: 12px 0 0;
+  padding: 12px 2px 0 0;
+  border-top: 1px solid var(--ui-border);
+  overflow-y: auto;
+  list-style: none;
+  font-size: 13px;
+  scrollbar-width: thin;
+}
+
+.seat-popover-speeches li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--ui-radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  line-height: 1.5;
+}
+
+.seat-popover-judgement {
+  border-left: 3px solid var(--ui-brand);
+}
+
+.seat-popover-speeches small {
+  color: var(--ui-text-dim);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.seat-popover-speeches p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.seat-popover-empty {
+  color: var(--ui-text-muted);
+  text-align: center;
+}
+
+/* 窄屏：舞台区域变成普通文档流（StagePage.css 把它改为 static），弹层改为底部固定面板 */
+@media (max-width: 860px) {
+  .seat-popover {
+    position: fixed;
+    z-index: 50;
+    inset: auto 12px 12px;
+    width: auto;
+    max-height: 60vh;
+    transform-origin: center bottom;
+  }
+}

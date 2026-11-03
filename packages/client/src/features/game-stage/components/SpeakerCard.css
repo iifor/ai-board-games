@@ -1,0 +1,107 @@
+/* 发言者大卡：立在舞台中央的玻璃卡，强调色随游戏，光环随阵营（global.css 的 --team-color），进场与立绘同一套 spotlight-in */
+.speaker-card {
+  --speaker-ring: var(--team-color, var(--game-accent-strong));
+  position: relative;
+  display: grid;
+  /* 头像行随舞台中央的高度伸缩：中央区域变矮（侧栏打开、小窗）时先缩头像，不压到上方的发言顺序条 */
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: min(100%, 320px);
+  max-height: 100%;
+  min-height: 0;
+  padding: 18px 26px 16px;
+  border: 1px solid var(--game-accent-soft);
+  border-radius: var(--ui-radius-lg);
+  background: linear-gradient(180deg, rgba(14, 26, 60, 0.82), rgba(5, 10, 28, 0.9));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 48px var(--game-accent-soft), inset 0 0 30px rgba(120, 175, 255, 0.08);
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.speaker-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 12% auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--game-accent-strong), transparent);
+}
+
+.speaker-avatar {
+  --speaker-ring: var(--team-color, var(--game-accent-strong));
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 0;
+  animation: ui-pop-in var(--ui-motion-slow) var(--ui-ease-elastic) both;
+}
+
+.speaker-avatar-image {
+  width: auto;
+  height: min(100%, clamp(72px, 16vh, 150px));
+  aspect-ratio: 1 / 1;
+  border: 3px solid var(--speaker-ring);
+  background: rgba(3, 13, 35, 0.9);
+  box-shadow: 0 0 40px var(--game-accent-soft), inset 0 0 24px rgba(0, 0, 0, 0.4);
+  font-size: clamp(32px, 5vh, 48px);
+}
+
+/* 与座位卡的发言光环同一套扩散动画 */
+.speaker-avatar::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 2px solid var(--speaker-ring);
+  border-radius: 50%;
+  animation: seat-speaker-ring 1.4s ease-out infinite;
+}
+
+.speaker-avatar-no {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 15px;
+  color: #061024;
+  background: #dfe9ff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.speaker-card-name {
+  color: #fff;
+  font-size: clamp(18px, 2.2vw, 26px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 18px var(--game-accent-soft);
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) 0.12s both;
+}
+
+.speaker-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) 0.22s both;
+}
+
+.speaker-card-team {
+  border-color: var(--speaker-ring);
+  color: var(--speaker-ring);
+}
+
+@media (max-width: 860px) {
+  .speaker-avatar-image {
+    width: 84px;
+    height: 84px;
+    font-size: 30px;
+  }
+}

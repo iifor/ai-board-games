@@ -22,3 +22,17 @@ export const RECONNECT_MAX_MS = 15_000;
 /** 连续失败这么多次（含首次连接）后不再自动重连，改为报错并提供手动重试；五次重连约 30 秒 */
 export const MAX_CONNECT_FAILURES = 6;
 export const CONNECTION_LOST_MESSAGE = '连接中断，请刷新重试';
+
+/** 控制条按钮上的快捷键提示：title 给鼠标悬停，aria-keyshortcuts 给辅助技术 */
+export const SHORTCUT_HINTS = {
+  pause: { title: '暂停 / 继续（空格）', keys: 'Space' },
+  speed: { title: '倍速（← 减慢 / → 加快）', keys: 'ArrowLeft ArrowRight' },
+  mute: { title: '静音（M）', keys: 'M' },
+  feed: { title: '对局记录（L）', keys: 'L' },
+  result: { title: '查看结果（R）', keys: 'R' },
+} as const;
+
+/** 座位卡片按钮上的标记（SeatCard 写在按钮上）：座位弹层据此识别"点在座位卡片上"的事件——由卡片自己处理切换 / 关闭，不算点在弹层外 */
+export const SEAT_TRIGGER_SELECTOR = '[data-seat-trigger]';
+/** 座位弹层与卡片之间的间距（px） */
+export const POPOVER_GAP = 12;

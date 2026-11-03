@@ -1,6 +1,6 @@
-import type { AudienceSeat, AudienceView, StageEvent } from '@battle/shared';
-import { TEAM_LABELS } from './constants';
-import type { StreamItem } from './types';
+import { speechOf, type AudienceSeat, type AudienceView, type StageEvent } from '@battle/shared';
+import { POPOVER_GAP, TEAM_LABELS } from './constants';
+import { SPEEDS, type PlaybackOptions, type SeatSpeech, type ShortcutKeyLike, type StageShortcut, type StreamItem } from './types';
 
 export type StagePeriod = 'day' | 'night';
 
@@ -14,6 +14,11 @@ export function periodOf(view: AudienceView | null): StagePeriod {
 
 export function seatOf(view: AudienceView | null, seat: number | null): AudienceSeat | null {
   return seat === null ? null : (view?.seats.find((candidate) => candidate.seat === seat) ?? null);
+}
+
+/** 夜晚闭眼：存活且没有在行动的座位；出局者保持出局样式，正在行动的座位亮着 */
+export function isAsleep(seat: AudienceSeat, speaking: number | null, period: StagePeriod): boolean {
+  return period === 'night' && seat.alive && seat.seat !== speaking;
 }
 
 export function roundLabel(view: AudienceView): string {
@@ -90,4 +95,107 @@ export function rosterByTeam(view: AudienceView): readonly TeamRoster[] {
     groups.set(seat.team, list);
   }
   return [...groups.entries()].map(([team, seats]) => ({ team, label: teamLabel(team), seats }));
+}
+
+/** 某个座位在本局的公开发言与评委判定（已播放的，旧的在前），每条带轮次与阶段标题；判定文本与字幕同口径（"判定。点评"） */
+export function speechesOfSeat(played: readonly StreamItem[], seat: number): readonly SeatSpeech[] {
+  const speeches: SeatSpeech[] = [];
+  for (const { event } of played) {
+    if ((event.kind !== 'speech' && event.kind !== 'judgement') || event.seat !== seat) continue;
+    const text = speechOf(event)?.text;
+    if (text === undefined) continue;
+    const phase = event.view.phase?.title;
+    speeches.push({ seq: event.seq, kind: event.kind, title: phase ? `${roundLabel(event.view)} · ${phase}` : roundLabel(event.view), text });
+  }
+  return speeches;
+}
+
+/** 焦点在这些表单控件里时不响应快捷键 */
+const EDITABLE_TAGS: ReadonlySet<string> = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
+
+/**
+ * 键盘事件 → 舞台快捷键动作；不匹配为 null。
+ * 按住 Ctrl / Meta / Alt、焦点在输入框 / 文本域 / 下拉框 / 可编辑区域时一律不响应；
+ * 焦点在按钮上时空格交给按钮自己（原生激活，如座位卡片打开弹层），避免同一下既激活按钮又切换暂停。
+ * Escape 不在这里：终局对话框与座位弹层各自处理
+ */
+export function shortcutActionOf(event: ShortcutKeyLike): StageShortcut | null {
+  if (event.ctrlKey || event.metaKey || event.altKey) return null;
+  const tag = event.target?.tagName.toUpperCase() ?? '';
+  if (EDITABLE_TAGS.has(tag) || event.target?.isContentEditable) return null;
+  switch (event.key) {
+    case ' ':
+      return tag === 'BUTTON' ? null : 'toggle-pause';
+    case 'ArrowLeft':
+      return 'speed-down';
+    case 'ArrowRight':
+      return 'speed-up';
+    case 'm':
+    case 'M':
+      return 'toggle-mute';
+    case 'l':
+    case 'L':
+      return 'toggle-feed';
+    case 'r':
+    case 'R':
+      return 'toggle-result';
+    default:
+      return null;
+  }
+}
+
+/** 相邻的倍速档（控制条提供的 1 / 1.5 / 2 / 3）；到头了保持不变，不在档位上的值取下一个更快 / 更慢的档 */
+export function stepSpeed(speed: number, direction: -1 | 1): number {
+  const steps = direction > 0 ? SPEEDS.filter((value) => value > speed) : [...SPEEDS].reverse().filter((value) => value < speed);
+  return steps[0] ?? speed;
+}
+
+/** 快捷键作用于播放选项后的新选项；记录侧栏与终局结果不是播放选项，返回 null 由调用方处理 */
+export function applyShortcut(action: StageShortcut, options: PlaybackOptions): PlaybackOptions | null {
+  switch (action) {
+    case 'toggle-pause':
+      return { ...options, paused: !options.paused };
+    case 'toggle-mute':
+      return { ...options, muted: !options.muted };
+    case 'speed-down':
+      return { ...options, speed: stepSpeed(options.speed, -1) };
+    case 'speed-up':
+      return { ...options, speed: stepSpeed(options.speed, 1) };
+    default:
+      return null;
+  }
+}
+
+export interface Box {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface PopoverPlacement {
+  /** 相对舞台区域左上角 */
+  readonly left: number;
+  readonly top: number;
+  /** 弹层在卡片的哪一侧（决定弹出动画的原点） */
+  readonly side: 'right' | 'left';
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+/**
+ * 座位弹层的位置：默认贴在卡片右侧、顶部对齐；右侧放不下翻到左侧；两侧都放不下时贴右侧并夹回舞台内。
+ * 上下出界时夹回舞台内。包围盒都是视口坐标（getBoundingClientRect），结果相对舞台区域
+ */
+export function popoverPlacement(anchor: Box, arena: Box, size: { readonly width: number; readonly height: number }, gap = POPOVER_GAP): PopoverPlacement {
+  const anchorLeft = anchor.left - arena.left;
+  const anchorTop = anchor.top - arena.top;
+  const maxLeft = Math.max(0, arena.width - size.width);
+  const maxTop = Math.max(0, arena.height - size.height);
+  const right = anchorLeft + anchor.width + gap;
+  const left = anchorLeft - gap - size.width;
+  const top = clamp(anchorTop, 0, maxTop);
+  if (right <= maxLeft) return { left: right, top, side: 'right' };
+  if (left >= 0) return { left, top, side: 'left' };
+  return { left: clamp(right, 0, maxLeft), top, side: 'right' };
 }

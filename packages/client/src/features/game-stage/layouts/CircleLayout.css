@@ -1,17 +1,26 @@
+/* 轨道给定为 minmax(0, 1fr)：隐式 auto 轨道会被圆桌的固有宽度（高度 × 比例）撑大并溢出舞台，
+   圆桌的 max-width: 100% 再按撑大后的轨道解析，于是侧栏展开时右侧座位被压在侧栏底下 */
 .circle-layout {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   place-items: center;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
-/* 高度占满舞台，宽度按比例跟随；座位坐标与卡片缩放由 ringGeometry 按量到的尺寸算出并写进自定义属性 */
+/* 量到舞台尺寸后宽高由 fitRingBox 算出写进 --ring-w / --ring-h（高度占满、宽度不超过舞台）；
+   量到之前高度占满、宽度按比例兜底。只写自定义属性不写内联宽高，窄屏规则才能把它改回网格。
+   座位坐标与卡片缩放由 ringGeometry 算出并写进自定义属性 */
 .circle-ring {
   --seat-scale: 1;
   --ring-card-w: 118px;
   --ring-card-h: 140px;
   position: relative;
-  height: 100%;
+  width: var(--ring-w, auto);
+  height: var(--ring-h, 100%);
   max-width: 100%;
   aspect-ratio: 1.7;
 }
@@ -19,6 +28,7 @@
 .circle-table {
   position: absolute;
   inset: calc(var(--ring-card-h) * 0.45) calc(var(--ring-card-w) * 0.75);
+  transition: inset var(--ui-motion-normal) var(--ui-ease-out);
   border: 1px solid var(--game-accent-soft);
   border-radius: 50%;
   background: radial-gradient(ellipse at 50% 40%, var(--game-accent-soft), rgba(4, 12, 32, 0.4) 62%, transparent 72%);
@@ -26,9 +36,11 @@
   animation: circle-table-breathe 6s ease-in-out infinite;
 }
 
+/* 舞台变宽变窄（侧栏开合）时座位滑到新位置、卡片平滑缩放，而不是跳过去 */
 .circle-seat {
   position: absolute;
   transform: translate(-50%, -50%) scale(var(--seat-scale));
+  transition: left var(--ui-motion-normal) var(--ui-ease-out), top var(--ui-motion-normal) var(--ui-ease-out), transform var(--ui-motion-normal) var(--ui-ease-out);
 }
 
 /* 圆桌中央：上下两排座位之间的区域，立绘 / 票板放在这里 */
@@ -38,6 +50,7 @@
   display: grid;
   place-items: center;
   min-height: 0;
+  transition: inset var(--ui-motion-normal) var(--ui-ease-out);
 }
 
 .circle-center > * {
@@ -78,6 +91,10 @@
   .circle-seat {
     position: static;
     transform: none;
+  }
+
+  .ballot-flight {
+    display: none;
   }
 
   .circle-center {

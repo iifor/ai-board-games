@@ -1,5 +1,9 @@
-/* 列数由组件按阵营数写进 --roster-columns（不用内联 grid-template-columns，窄屏规则才能把它改成单列） */
+/* 列数由组件按阵营数写进 --roster-columns（不用内联 grid-template-columns，窄屏规则才能把它改成单列）；
+   行数写进 --roster-rows，获胜阵营的扫光等最后一行揭示完再开始 */
 .result-roster {
+  --roster-reveal-start: 0.35s;
+  --roster-reveal-step: 70ms;
+  --roster-sweep-at: calc(var(--roster-reveal-start) + var(--roster-rows, 0) * var(--roster-reveal-step));
   display: grid;
   grid-template-columns: repeat(var(--roster-columns, 1), minmax(0, 1fr));
   gap: 12px;
@@ -34,8 +38,21 @@
 .result-roster-team[data-team='con'] h3 { color: var(--team-con); }
 .result-roster-team[data-team='judge'] h3 { color: var(--team-judge); }
 
+/* 获胜阵营：阵容揭示完后一道光从左扫到右，随后留下金色光晕 */
 .result-roster-team.is-winner {
-  box-shadow: 0 0 24px var(--ui-brand-soft);
+  position: relative;
+  overflow: hidden;
+  animation: result-winner-glow 0.9s ease-out var(--roster-sweep-at) both;
+}
+
+.result-roster-team.is-winner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 28%, rgba(255, 236, 180, 0.38) 50%, transparent 72%);
+  transform: translateX(-120%);
+  pointer-events: none;
+  animation: result-sweep 1.1s var(--ui-ease-out) var(--roster-sweep-at) both;
 }
 
 .result-roster-team ul {
@@ -47,10 +64,13 @@
   font-size: 13px;
 }
 
+/* 整张表逐行揭示：--i 是全表行号（跨阵营连续），从卡片进场之后开始 */
 .result-roster-team li {
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) both;
+  animation-delay: calc(var(--roster-reveal-start) + var(--i, 0) * var(--roster-reveal-step));
 }
 
 .result-roster-team li span {
@@ -64,6 +84,24 @@
 
 .result-roster-team li.is-out span {
   color: #ffd0d6;
+}
+
+@keyframes result-sweep {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes result-winner-glow {
+  from {
+    box-shadow: 0 0 0 transparent;
+  }
+  40% {
+    box-shadow: 0 0 36px var(--ui-brand-soft), inset 0 0 24px var(--ui-brand-soft);
+  }
+  to {
+    box-shadow: 0 0 24px var(--ui-brand-soft);
+  }
 }
 
 @media (max-width: 760px) {

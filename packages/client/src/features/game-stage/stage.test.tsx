@@ -7,11 +7,12 @@ import { NightSteps } from './components/NightSteps';
 import { PhaseBanner } from './components/PhaseBanner';
 import { PlaybackControls } from './components/PlaybackControls';
 import { StageError } from './components/StageError';
+import { SpeakerSpotlight } from './components/SpeakerSpotlight';
 import { StageHud } from './components/StageHud';
 import { SubtitleBar } from './components/SubtitleBar';
 import { VoteBoard } from './components/VoteBoard';
 import { SegmentControl } from './playback/segment';
-import { meta, summary, view } from './stage.fixtures';
+import { meta, seat, summary, view } from './stage.fixtures';
 import type { StreamItem } from './types';
 import { hasSpotlight, judgeBadges, nightStepsOf, periodOf, rosterByTeam, speechOrderOf } from './utils';
 
@@ -79,6 +80,44 @@ describe('stage visuals', () => {
     expect(board).toContain('width:100%');
     expect(board).toContain('width:50%');
     expect(board).toContain('玩家1 当选');
+  });
+
+  it('stands a speaker card in the spotlight when the speaker has no poster, and keeps the host and poster figures', () => {
+    const speech: StageEvent = { ...meta, kind: 'speech', seat: 1, text: '我的观点是' };
+    const card = renderToStaticMarkup(<SpeakerSpotlight item={{ event: speech, audio: null }} view={view} />);
+    expect(card).toContain('speaker-spotlight is-card');
+    expect(card).toContain('speaker-card');
+    expect(card).toContain('data-team="pro"');
+    expect(card).toContain('玩家1');
+    expect(card).toContain('1 号 · 1号位');
+    expect(card).toContain('角色pro');
+    expect(card).toContain('正方');
+    expect(card).not.toContain('<img');
+    const unknown = renderToStaticMarkup(<SpeakerSpotlight item={{ event: speech, audio: null }} view={{ ...view, seats: [seat(1, null)] }} />);
+    expect(unknown).toContain('身份未知');
+    expect(unknown).not.toContain('data-team');
+    const narration: StageEvent = { ...meta, kind: 'narration', text: '天黑请闭眼' };
+    const host = renderToStaticMarkup(<SpeakerSpotlight item={{ event: narration, audio: null }} view={view} />);
+    expect(host).toContain('is-host');
+    expect(host).toContain('/player-poster-cutouts/host.webp');
+    expect(host).not.toContain('speaker-card');
+    const posterView = { ...view, seats: [{ ...seat(1, 'pro', 1), name: '豆包' }] };
+    const poster = renderToStaticMarkup(<SpeakerSpotlight item={{ event: speech, audio: null }} view={posterView} />);
+    expect(poster).toContain('/player-poster-cutouts/doubao.webp');
+    expect(poster).not.toContain('speaker-card');
+  });
+
+  it('delays the vote board bars until the ballots have landed', () => {
+    const tally: StageEvent = {
+      ...meta, kind: 'vote_tallied', title: '放逐投票', runoff: 0, ballots: [], abstained: [],
+      tally: [{ target: 1, votes: 2 }, { target: 2, votes: 1 }], tied: [], outcome: { kind: 'selected', seat: 1, byTieBreak: false },
+    };
+    const html = renderToStaticMarkup(<VoteBoard event={tally} view={view} delayMs={1000} />);
+    expect(html).toContain('animation-delay:1000ms');
+    expect(html).toContain('animation-delay:1120ms');
+    expect(html).toContain('animation-delay:1090ms');
+    expect(html).toContain('animation-delay:1580ms');
+    expect(renderToStaticMarkup(<VoteBoard event={tally} view={view} />)).toContain('animation-delay:0ms');
   });
 
   it('shows the acting seat as the subtitle speaker for an action, even though the host voice reads it', () => {

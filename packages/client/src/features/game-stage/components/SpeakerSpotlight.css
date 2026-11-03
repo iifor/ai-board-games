@@ -33,6 +33,22 @@
   background: radial-gradient(ellipse at 50% 80%, var(--ui-brand-soft), transparent 64%);
 }
 
+/* 发言者大卡：居中而不是贴底，底光收窄到卡片下方 */
+.speaker-spotlight.is-card {
+  align-items: center;
+  height: 100%;
+  min-height: 0;
+  padding-bottom: 4%;
+}
+
+.speaker-spotlight.is-card::before {
+  inset: 55% 20% 0;
+}
+
+.speaker-spotlight.is-card > .speaker-card {
+  position: relative;
+}
+
 @keyframes spotlight-in {
   from {
     opacity: 0;

@@ -70,6 +70,13 @@
   --game-accent-secondary: #ff766f;
 }
 
+/* 阵营色：带 data-team 的元素用 --team-color 取自己阵营的颜色（座位卡光环、发言者大卡）；没登记的阵营取不到，使用处自带兜底 */
+[data-team='pro'] { --team-color: var(--team-pro); }
+[data-team='con'] { --team-color: var(--team-con); }
+[data-team='judge'] { --team-color: var(--team-judge); }
+[data-team='werewolf'] { --team-color: var(--team-werewolf); }
+[data-team='good'] { --team-color: var(--team-good); }
+
 *,
 *::before,
 *::after {

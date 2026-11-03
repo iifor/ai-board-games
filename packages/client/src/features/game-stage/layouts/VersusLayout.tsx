@@ -1,5 +1,6 @@
 import type { AudienceSeat } from '@battle/shared';
 import { SeatCard } from '../components/SeatCard';
+import { isAsleep } from '../utils';
 import type { LayoutProps } from './types';
 import './VersusLayout.css';
 
@@ -15,16 +16,19 @@ function isTopic(value: unknown): value is Topic {
 
 const byPosition = (a: AudienceSeat, b: AudienceSeat) => (a.position ?? 99) - (b.position ?? 99);
 
-/** 对垒布局：左正方、右反方（标题下带各自观点），中间辩题与舞台内容，下方评委席（带判定徽章） */
-export function VersusLayout({ view, speaking, center, badges }: LayoutProps) {
+/** 对垒布局：左正方、右反方（标题下带各自观点），中间辩题与舞台内容，下方评委席（带判定徽章）；没有座位坐标，不播选票飞行 */
+export function VersusLayout({ view, speaking, center, badges, period = 'day', onSeatSelect, selectedSeat = null }: LayoutProps) {
   const side = (team: string) => view.seats.filter((seat) => seat.team === team).sort(byPosition);
   const topic = isTopic(view.extra.topic) ? view.extra.topic : null;
+  const card = (seat: AudienceSeat) => (
+    <SeatCard key={seat.seat} seat={seat} speaking={seat.seat === speaking} asleep={isAsleep(seat, speaking, period)} badges={badges?.[seat.seat] ?? []} onSelect={onSeatSelect} selected={seat.seat === selectedSeat} />
+  );
   const column = (team: 'pro' | 'con', label: string) => (
     <section className={`versus-side versus-side-${team}`} aria-label={label}>
       <h3>{label}{topic ? <span>{topic[team]}</span> : null}</h3>
       {side(team).map((seat, index) => (
         <div key={seat.seat} className="ui-fade-up" style={{ animationDelay: `${index * 70}ms` }}>
-          <SeatCard seat={seat} speaking={seat.seat === speaking} badges={badges?.[seat.seat] ?? []} />
+          {card(seat)}
         </div>
       ))}
     </section>
@@ -46,7 +50,7 @@ export function VersusLayout({ view, speaking, center, badges }: LayoutProps) {
       <section className="versus-bench" aria-label="评委席">
         <h3>评委席</h3>
         <div className="versus-bench-seats">
-          {side('judge').map((seat) => <SeatCard key={seat.seat} seat={seat} speaking={seat.seat === speaking} badges={badges?.[seat.seat] ?? []} />)}
+          {side('judge').map(card)}
         </div>
       </section>
     </div>
