@@ -23,10 +23,39 @@
   transition: transform var(--ui-motion-normal) var(--ui-ease-out), border-color var(--ui-motion-normal) ease, box-shadow var(--ui-motion-normal) ease;
 }
 
-.game-card:hover {
+/* 悬停与键盘聚焦（焦点落在"开始"上）是同一套状态：上浮 + 扫光一次 + 图标亮起；说明与标签不动 */
+.game-card:hover,
+.game-card:focus-within {
   transform: translateY(-6px);
   border-color: rgba(224, 241, 255, 0.72);
   box-shadow: 0 34px 96px rgba(0, 0, 0, 0.48), 0 0 34px var(--game-accent-soft);
+}
+
+.game-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.12) 50%, transparent 65%);
+  opacity: 0;
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.game-card:hover::after,
+.game-card:focus-within::after {
+  animation: game-card-sweep 900ms var(--ui-ease-out) 1 forwards;
+}
+
+@keyframes game-card-sweep {
+  from {
+    opacity: 1;
+    transform: translateX(-120%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(120%);
+  }
 }
 
 .game-card[data-game='werewolf'] {
@@ -47,11 +76,15 @@
   color: #fff;
   background: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.08), 0 0 28px var(--game-accent-soft);
-  transition: transform var(--ui-motion-slow) var(--ui-ease-elastic);
+  transition: transform var(--ui-motion-slow) var(--ui-ease-elastic), box-shadow var(--ui-motion-slow) ease, border-color var(--ui-motion-normal) ease, background-color var(--ui-motion-normal) ease;
 }
 
-.game-card:hover .game-card-icon {
+.game-card:hover .game-card-icon,
+.game-card:focus-within .game-card-icon {
   transform: scale(1.08) rotate(-6deg);
+  border-color: var(--game-accent-strong);
+  background: var(--game-accent-soft);
+  box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.12), 0 0 0 6px var(--game-accent-soft), 0 0 44px var(--game-accent);
 }
 
 .game-card-body {
@@ -104,5 +137,11 @@
   .game-card .button {
     grid-column: 1 / -1;
     justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-card {
+    animation-delay: 0ms;
   }
 }

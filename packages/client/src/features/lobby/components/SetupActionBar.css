@@ -38,12 +38,17 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* 进度条：宽度随就座人数过渡；凑够人后整条亮起 */
 .setup-action-progress b {
   display: block;
   height: 100%;
   border-radius: 3px;
   background: linear-gradient(90deg, var(--game-accent), var(--game-accent-strong));
-  transition: width var(--ui-motion-slow) var(--ui-ease-out);
+  transition: width var(--ui-motion-slow) var(--ui-ease-out), box-shadow var(--ui-motion-slow) ease;
+}
+
+.setup-action-progress.is-ready b {
+  box-shadow: 0 0 12px var(--game-accent-strong);
 }
 
 .setup-action-hint {
@@ -62,6 +67,27 @@
   min-height: 52px;
   padding: 0 36px;
   font-size: 17px;
+}
+
+/* 人数刚凑够：按钮脉冲一次（光环扩散 + 轻微放大），播完由组件摘掉类名 */
+.setup-action-submit.is-pulsing {
+  animation: setup-submit-pulse 760ms var(--ui-ease-out) 1;
+}
+
+@keyframes setup-submit-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--game-accent-strong), 0 0 20px var(--game-accent-soft);
+  }
+
+  40% {
+    transform: scale(1.05);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 18px transparent, 0 0 20px var(--game-accent-soft);
+  }
 }
 
 @media (max-width: 760px) {

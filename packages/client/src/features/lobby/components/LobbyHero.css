@@ -52,6 +52,7 @@
   font-size: 15px;
 }
 
+/* 最近一局卡片：悬停上浮；背景图缓慢放大，并随指针做轻微视差（--px / --py 由 useParallax 写入） */
 .lobby-hero-visual {
   position: relative;
   display: block;
@@ -64,7 +65,8 @@
   transition: transform var(--ui-motion-normal) var(--ui-ease-out), box-shadow var(--ui-motion-normal) ease;
 }
 
-.lobby-hero-visual:hover {
+.lobby-hero-visual:hover,
+.lobby-hero-visual:focus-visible {
   transform: translateY(-4px);
   box-shadow: 0 34px 96px rgba(0, 0, 0, 0.5), 0 0 34px var(--game-accent-soft);
 }
@@ -73,11 +75,13 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 1.2s var(--ui-ease-out);
+  transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.02);
+  transition: transform 1.6s var(--ui-ease-out);
 }
 
-.lobby-hero-visual:hover img {
-  transform: scale(1.04);
+.lobby-hero-visual:hover img,
+.lobby-hero-visual:focus-visible img {
+  transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.1);
 }
 
 .lobby-hero-strip {
@@ -94,7 +98,13 @@
   font-weight: 900;
 }
 
-.lobby-hero-strip > span {
+.lobby-hero-strip-text {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lobby-hero-strip-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -104,7 +114,8 @@
   text-overflow: ellipsis;
 }
 
-.lobby-hero-strip i {
+.lobby-hero-strip-title i {
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -112,9 +123,37 @@
   box-shadow: 0 0 12px rgba(114, 240, 164, 0.8);
 }
 
-.lobby-hero-strip b {
+.lobby-hero-strip-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ui-text-muted);
+  font-weight: 700;
+}
+
+.lobby-hero-strip-meta .ui-pill {
+  font-size: 11px;
+}
+
+/* 去开一局 / 回放：做成胶囊按钮，悬停时箭头向右探一下 */
+.lobby-hero-strip-cta {
+  flex: none;
+  padding: 7px 14px;
+  border: 1px solid var(--game-accent-soft);
+  border-radius: var(--ui-radius-pill);
   color: var(--game-accent-strong);
+  background: rgba(5, 12, 30, 0.6);
   white-space: nowrap;
+  transition: background-color var(--ui-motion-fast) ease, border-color var(--ui-motion-fast) ease, color var(--ui-motion-fast) ease, transform var(--ui-motion-normal) var(--ui-ease-out), box-shadow var(--ui-motion-normal) ease;
+}
+
+.lobby-hero-visual:hover .lobby-hero-strip-cta,
+.lobby-hero-visual:focus-visible .lobby-hero-strip-cta {
+  border-color: var(--game-accent-strong);
+  color: #061024;
+  background: var(--game-accent-strong);
+  box-shadow: 0 0 20px var(--game-accent-soft);
+  transform: translateX(4px);
 }
 
 @media (max-width: 860px) {
@@ -124,5 +163,11 @@
 
   .lobby-hero-visual {
     height: 180px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-hero .ui-fade-up {
+    animation-delay: 0ms;
   }
 }

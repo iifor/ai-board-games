@@ -14,6 +14,7 @@
   margin: 0;
 }
 
+/* 搜索框：聚焦时整个胶囊亮起强调色光晕（input 自身不画 outline） */
 .board-picker-search {
   display: inline-flex;
   align-items: center;
@@ -24,6 +25,13 @@
   border-radius: var(--ui-radius-pill);
   background: rgba(7, 24, 55, 0.68);
   color: var(--ui-text-muted);
+  transition: border-color var(--ui-motion-fast) ease, box-shadow var(--ui-motion-normal) ease, color var(--ui-motion-fast) ease;
+}
+
+.board-picker-search:focus-within {
+  border-color: var(--game-accent-strong);
+  color: var(--game-accent-strong);
+  box-shadow: 0 0 0 3px var(--game-accent-soft), 0 0 18px var(--game-accent-soft);
 }
 
 .board-picker-search input {
@@ -46,6 +54,8 @@
 }
 
 .board-card {
+  /* 不设 overflow: hidden——它会把网格项的自动最小尺寸归零，定高的列表会把每张卡压扁 */
+  position: relative;
   display: grid;
   gap: 6px;
   padding: 12px 14px;
@@ -62,10 +72,41 @@
   transform: translateX(3px);
 }
 
+/* 选中：左侧一道强调色边，从中间向上下长出 */
+.board-card::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  bottom: 50%;
+  left: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--game-accent-strong);
+  box-shadow: 0 0 10px var(--game-accent-strong);
+  transition: top var(--ui-motion-normal) var(--ui-ease-out), bottom var(--ui-motion-normal) var(--ui-ease-out);
+}
+
 .board-card.is-selected {
   border-color: var(--game-accent-strong);
   background: linear-gradient(180deg, var(--game-accent-soft), rgba(6, 13, 32, 0.86));
   box-shadow: 0 0 24px var(--game-accent-soft);
+}
+
+.board-card.is-selected::before {
+  top: 0;
+  bottom: 0;
+}
+
+/* 选中板子的角色标签依次弹出：换板子时重新选中，动画自然重放 */
+.board-card.is-selected .board-role {
+  animation: ui-pop-in 360ms var(--ui-ease-elastic) both;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-card.is-selected .board-role {
+    animation-delay: 0ms;
+  }
 }
 
 .board-card-head {

@@ -1,3 +1,4 @@
+import { usePulseOnce } from '../hooks/usePulseOnce';
 import type { PlayerRange } from '../types';
 import { readyLabel } from '../utils';
 import './SetupActionBar.css';
@@ -11,10 +12,11 @@ interface SetupActionBarProps {
   readonly submitting: boolean;
 }
 
-/** 固定在底部的操作条：就座进度 + 开始按钮（表单的 submit） */
+/** 固定在底部的操作条：就座进度 + 开始按钮（表单的 submit）；人数刚凑够时按钮脉冲一次 */
 export function SetupActionBar({ boardName, count, range, hint, topicPartial, submitting }: SetupActionBarProps) {
   const ready = !hint && !topicPartial;
   const status = topicPartial ? '辩题请填完整或全部留空' : (hint ?? readyLabel(count, range));
+  const pulse = usePulseOnce(ready);
   return (
     <div className="setup-action-bar">
       <div className="setup-action-status glass-panel">
@@ -22,10 +24,15 @@ export function SetupActionBar({ boardName, count, range, hint, topicPartial, su
           <span className="hud-label">本局</span>
           <strong>{boardName} · {count} / {range.max} 人已就座</strong>
         </div>
-        <i className="setup-action-progress" aria-hidden="true"><b style={{ width: `${Math.min(100, (count / range.max) * 100)}%` }} /></i>
+        <i className={`setup-action-progress ${ready ? 'is-ready' : ''}`} aria-hidden="true"><b style={{ width: `${Math.min(100, (count / range.max) * 100)}%` }} /></i>
         <span className={`setup-action-hint ${ready ? 'is-ready' : ''}`}>{status}</span>
       </div>
-      <button type="submit" className="button button-primary setup-action-submit" disabled={!ready || submitting}>
+      <button
+        type="submit"
+        className={`button button-primary setup-action-submit ${pulse.pulsing ? 'is-pulsing' : ''}`}
+        disabled={!ready || submitting}
+        onAnimationEnd={pulse.settle}
+      >
         {submitting ? '正在开局…' : '开始对局'}
       </button>
     </div>

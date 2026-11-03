@@ -30,10 +30,13 @@ export function useMatchSetup(game: GameCatalogItem, players: readonly PublicPla
   const topicComplete = topic.title.trim() && topic.pro.trim() && topic.con.trim();
   const topicPartial = !topicComplete && (topic.title.trim() || topic.pro.trim() || topic.con.trim());
 
-  const fillRandom = () => {
+  /** 随机补满到上限；返回这次新坐下的玩家（按座位顺序），给动效用 */
+  const fillRandom = (): number[] => {
     const pool = players.map((player) => player.id).filter((id) => !selected.includes(id));
     const shuffled = [...pool].sort(() => Math.random() - 0.5);
-    setSelected([...selected, ...shuffled].slice(0, range.max));
+    const next = [...selected, ...shuffled].slice(0, range.max);
+    setSelected(next);
+    return next.filter((id) => !selected.includes(id));
   };
 
   const submit = async (): Promise<string | null> => {

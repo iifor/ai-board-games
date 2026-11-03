@@ -55,6 +55,11 @@
   animation: ui-pop-in var(--ui-motion-slow) var(--ui-ease-elastic) both;
 }
 
+/* 头像外再包一层：飞入座位时克隆的就是它（Avatar 本身不暴露 ref） */
+.player-option-figure {
+  display: grid;
+}
+
 /* 头像的图片 / 首字由 Avatar 组件负责，这里只定尺寸与光环 */
 .player-option-portrait {
   width: 84px;

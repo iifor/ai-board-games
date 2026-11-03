@@ -1,7 +1,11 @@
 import type { GameVariantItem } from '@battle/shared';
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { filterVariants } from '../utils';
 import './BoardPicker.css';
+
+type RoleStyle = CSSProperties & Record<'--i', number>;
+
+const roleStyle = (index: number): RoleStyle => ({ '--i': index });
 
 interface BoardPickerProps {
   readonly variants: readonly GameVariantItem[];
@@ -9,7 +13,7 @@ interface BoardPickerProps {
   readonly onChange: (key: string) => void;
 }
 
-/** 板子列表：可按名称或角色搜索，每张卡片显示角色构成 */
+/** 板子列表：可按名称或角色搜索，每张卡片显示角色构成；选中的卡片角色标签按 --i 依次弹出 */
 export function BoardPicker({ variants, value, onChange }: BoardPickerProps) {
   const [query, setQuery] = useState('');
   const visible = filterVariants(variants, query);
@@ -38,8 +42,10 @@ export function BoardPicker({ variants, value, onChange }: BoardPickerProps) {
             </span>
             {variant.roles.length ? (
               <span className="board-card-roles">
-                {variant.roles.map((role) => (
-                  <i key={role.name} className={`ui-pill ui-pill-soft board-role is-${role.team || 'none'}`}>{role.name}{role.count > 1 ? ` ×${role.count}` : ''}</i>
+                {variant.roles.map((role, index) => (
+                  <i key={role.name} className={`ui-pill ui-pill-soft board-role is-${role.team || 'none'}`} style={roleStyle(index)}>
+                    {role.name}{role.count > 1 ? ` ×${role.count}` : ''}
+                  </i>
                 ))}
               </span>
             ) : null}

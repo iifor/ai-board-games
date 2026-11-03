@@ -6,19 +6,21 @@
   list-style: none;
 }
 
-.match-list li {
-  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) both;
-  transition: transform var(--ui-motion-normal) var(--ui-ease-out), border-color var(--ui-motion-fast) ease;
+/* 行：进场由 .ui-fade-up + --i 错峰；悬停 / 聚焦上浮、边框亮起 */
+.match-row {
+  transition: transform var(--ui-motion-normal) var(--ui-ease-out), border-color var(--ui-motion-fast) ease, box-shadow var(--ui-motion-normal) ease;
 }
 
-.match-list li:hover {
-  transform: translateX(6px);
+.match-row:hover,
+.match-row:focus-within {
+  transform: translateY(-3px);
   border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-shadow-elevated), 0 0 28px var(--game-accent-soft);
 }
 
 .match-list a {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   gap: 16px;
   align-items: center;
   padding: 14px 20px;
@@ -29,4 +31,37 @@
 .match-list time {
   color: var(--ui-text-muted);
   font-size: 13px;
+}
+
+/* 回放：平时压暗，悬停 / 聚焦时点亮并向右探一下 */
+.match-row-replay {
+  color: var(--ui-text-dim);
+  font-size: 13px;
+  white-space: nowrap;
+  opacity: 0.7;
+  transform: translateX(-6px);
+  transition: color var(--ui-motion-fast) ease, opacity var(--ui-motion-fast) ease, transform var(--ui-motion-normal) var(--ui-ease-out);
+}
+
+.match-row:hover .match-row-replay,
+.match-row:focus-within .match-row-replay {
+  color: var(--game-accent-strong);
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@media (max-width: 640px) {
+  .match-list a {
+    grid-template-columns: 1fr auto;
+  }
+
+  .match-row-replay {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-row {
+    animation-delay: 0ms;
+  }
 }

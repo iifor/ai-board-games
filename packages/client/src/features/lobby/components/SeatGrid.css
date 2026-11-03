@@ -1,0 +1,146 @@
+.seat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(149, 198, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(3, 10, 26, 0.5);
+  list-style: none;
+}
+
+.seat-slot {
+  display: grid;
+  justify-items: center;
+  min-height: 84px;
+}
+
+.seat-slot-empty {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-top: 2px;
+  border: 1px dashed rgba(149, 198, 255, 0.3);
+  border-radius: 50%;
+  color: var(--ui-text-dim);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.seat-slot.is-over .seat-slot-empty,
+.seat-slot.is-over .seat-chip-no {
+  border-color: rgba(255, 93, 108, 0.6);
+  color: #ffd9dd;
+  background: var(--ui-danger-soft);
+}
+
+/* 坐了人的座位：落地后弹出（--seat-delay 由飞行时长决定），悬停上浮并露出"×" */
+.seat-chip {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  width: 100%;
+  padding: 2px 0 0;
+  border: 0;
+  color: var(--ui-text);
+  background: transparent;
+  animation: ui-pop-in var(--ui-motion-slow) var(--ui-ease-elastic) both;
+  animation-delay: var(--seat-delay, 0ms);
+  transition: transform var(--ui-motion-normal) var(--ui-ease-out);
+}
+
+.seat-chip:hover,
+.seat-chip:focus-visible {
+  transform: translateY(-3px);
+}
+
+.seat-chip-avatar {
+  width: 52px;
+  height: 52px;
+  border: 2px solid var(--game-accent-strong);
+  background: rgba(3, 13, 35, 0.9);
+  box-shadow: 0 0 18px var(--game-accent-soft);
+  transition: box-shadow var(--ui-motion-normal) ease, border-color var(--ui-motion-fast) ease;
+}
+
+.seat-chip:hover .seat-chip-avatar,
+.seat-chip:focus-visible .seat-chip-avatar {
+  border-color: #ffb3b7;
+  box-shadow: 0 0 22px rgba(255, 93, 108, 0.35);
+}
+
+.seat-chip-avatar b {
+  font-size: 15px;
+}
+
+.seat-chip-no {
+  position: absolute;
+  top: 38px;
+  left: calc(50% + 12px);
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  color: #061024;
+  background: var(--game-accent-strong);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.seat-chip-remove {
+  position: absolute;
+  top: -2px;
+  left: calc(50% + 14px);
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--ui-danger);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity var(--ui-motion-fast) ease, transform var(--ui-motion-fast) var(--ui-ease-out);
+}
+
+.seat-chip:hover .seat-chip-remove,
+.seat-chip:focus-visible .seat-chip-remove {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.seat-chip-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 飞行中的克隆体（animations.ts 挂在 body 上）：加一圈强调色光晕，和落点的座位头像衔接 */
+.ui-ghost .player-option-portrait {
+  border-color: var(--game-accent-strong);
+  box-shadow: 0 0 28px var(--game-accent-soft), 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* 离席时淡出的克隆体：不要再跑一遍弹出动画 */
+.ui-ghost.seat-chip {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat-chip {
+    animation-delay: 0ms;
+  }
+}
