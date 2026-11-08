@@ -23,11 +23,22 @@ const DIRECTORY: Readonly<Record<PosterVariant, string>> = { poster: 'player-pos
 
 export const HOST_POSTER = '/player-poster-cutouts/host.webp';
 
+// 模拟玩家没有资源 ID；按生成时的编号配图，旧回放也能显示同一张脸。
+const SIMULATED_PORTRAITS = ['doubao', 'grok', 'wenxin', 'gemini', 'kimi', 'deepseek', 'qwen', 'yuanbao', 'xinghuo', 'zhipu', 'chatgpt', 'claude-code', 'meta'] as const;
+
+export function seatPortrait(name: string, variant: PosterVariant = 'poster'): string | null {
+  const simulated = /^(\d+) 号模拟玩家$/.exec(name.trim());
+  if (!simulated) return resolvePoster(name, null, variant);
+  const slug = SIMULATED_PORTRAITS[Number(simulated[1]) - 1];
+  return slug ? `/${DIRECTORY[variant]}/${slug}.webp` : null;
+}
+
 function normalizeAlias(name: string): string {
   return name.normalize('NFKC').trim().toLowerCase().replace(/[\s._\-·]/g, '');
 }
 
 export function resolvePoster(name: string, avatar: string | null, variant: PosterVariant = 'cutout'): string | null {
+  if (name.trim() === '主持人' && !avatar) return HOST_POSTER;
   const slug = SLUG_BY_ALIAS[normalizeAlias(name)];
   return slug ? `/${DIRECTORY[variant]}/${slug}.webp` : avatar;
 }

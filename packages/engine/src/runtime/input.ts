@@ -15,7 +15,9 @@ export function applyInput(env: ExecEnv, input: EngineInput): void {
     case 'ai_failed':
       if (s.status !== 'waiting_ai') throw new EngineInputError(`当前状态 ${s.status} 不接受 AI 结果`);
       s.status = 'running';
+      env.activeRequestId = input.requestId;
       receiveAiReply(env, input.requestId, input.kind === 'ai_result' ? { output: input.output } : { failed: input.reason });
+      env.activeRequestId = null;
       return;
     case 'debug':
       applyDebugCommand(env, input.command);

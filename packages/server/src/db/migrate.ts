@@ -8,6 +8,9 @@ import * as aiTaskAttempts from './migrations/004_ai_task_attempts';
 import * as matchChaos from './migrations/005_match_chaos';
 import * as requestWindows from './migrations/006_request_windows';
 import * as matchPhaseId from './migrations/007_match_phase_id';
+import * as matchTraceNodes from './migrations/008_match_trace_nodes';
+import * as aiCallTraceSettings from './migrations/009_ai_call_trace_settings';
+import * as traceDeletion from './migrations/010_trace_deletion';
 
 /** 迁移按 key 排序执行；新增迁移在此登记 */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {
@@ -18,6 +21,9 @@ const MIGRATIONS: Readonly<Record<string, Migration>> = {
   '005_match_chaos': matchChaos,
   '006_request_windows': requestWindows,
   '007_match_phase_id': matchPhaseId,
+  '008_match_trace_nodes': matchTraceNodes,
+  '009_ai_call_trace_settings': aiCallTraceSettings,
+  '010_trace_deletion': traceDeletion,
 };
 
 const provider: MigrationProvider = { getMigrations: async () => MIGRATIONS };

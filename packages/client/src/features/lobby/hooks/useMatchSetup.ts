@@ -1,10 +1,10 @@
 import type { GameCatalogItem, PublicPlayerDto } from '@battle/shared';
 import { useState } from 'react';
 import { errorMessage } from '../../../services/http';
-import { createMatch } from '../../../services/matches';
+import { createLocalDebugMatch, createMatch } from '../../../services/matches';
 import { GAMES_WITH_TOPIC } from '../constants';
 import type { SetupInitial, TopicDraft } from '../types';
-import { playerRange, selectionHint, toggleSelection } from '../utils';
+import { fillOpenSeats, playerRange, selectionHint, toggleSelection } from '../utils';
 
 export type { SetupInitial, TopicDraft } from '../types';
 
@@ -30,22 +30,23 @@ export function useMatchSetup(game: GameCatalogItem, players: readonly PublicPla
   const topicComplete = topic.title.trim() && topic.pro.trim() && topic.con.trim();
   const topicPartial = !topicComplete && (topic.title.trim() || topic.pro.trim() || topic.con.trim());
 
-  /** 随机补满到上限；返回这次新坐下的玩家（按座位顺序），给动效用 */
-  const fillRandom = (): number[] => {
-    const pool = players.map((player) => player.id).filter((id) => !selected.includes(id));
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
-    const next = [...selected, ...shuffled].slice(0, range.max);
-    setSelected(next);
-    return next.filter((id) => !selected.includes(id));
+  const randomFill = Boolean(game.seatGroups?.length);
+  const fill = (): number[] => {
+    const added = fillOpenSeats(players.map((player) => player.id), selected, range.max, randomFill);
+    setSelected([...selected, ...added]);
+    return added;
   };
 
-  const submit = async (): Promise<string | null> => {
-    if (hint || topicPartial) return null;
+  const submit = async (mode: 'players' | 'generated'): Promise<string | null> => {
+    if (submitting || topicPartial || (mode === 'players' && hint)) return null;
     setSubmitting(true);
     setError(null);
     try {
       const params = GAMES_WITH_TOPIC.has(game.key) && topicComplete ? { topic: { title: topic.title.trim(), pro: topic.pro.trim(), con: topic.con.trim() } } : undefined;
-      const match = await createMatch({ gameKey: game.key, variant: variant ?? undefined, playerIds: selected, params });
+      const request = { gameKey: game.key, variant: variant ?? undefined, params };
+      const match = mode === 'generated'
+        ? await createLocalDebugMatch(request)
+        : await createMatch({ ...request, playerIds: selected });
       return match.id;
     } catch (cause) {
       setError(errorMessage(cause));
@@ -60,7 +61,8 @@ export function useMatchSetup(game: GameCatalogItem, players: readonly PublicPla
     setVariant,
     selected,
     toggle: (id: number) => setSelected((prev) => toggleSelection(prev, id)),
-    fillRandom,
+    fill,
+    randomFill,
     clear: () => setSelected([]),
     topic,
     setTopic,

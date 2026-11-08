@@ -12,7 +12,13 @@ export interface CreateMatchRequest {
   readonly playerIds: readonly number[];
 }
 
-export interface CreateDebugMatchRequest extends CreateMatchRequest {
+/** 游戏、板子与可选参数。模拟阵容由服务端按该玩法的人数生成。 */
+export type GeneratedMatchRequest = Omit<CreateMatchRequest, 'playerIds'>;
+
+export type CreateDebugMatchRequest = (
+  | (CreateMatchRequest & { readonly generatePlayers?: false | undefined })
+  | (GeneratedMatchRequest & { readonly generatePlayers: true; readonly scripted: true; readonly playerIds?: undefined })
+) & {
   readonly seed?: number | undefined;
   /** 'all' 或阶段 ID 列表；不传则不暂停 */
   readonly breakpoints?: 'all' | readonly string[] | undefined;
@@ -21,7 +27,7 @@ export interface CreateDebugMatchRequest extends CreateMatchRequest {
   readonly scripted?: boolean | undefined;
   /** true：脚本化输出改用混沌脚本（弃票 / 放弃 / 自爆等声明 / 非法输出 / 模拟调用失败）；只在 scripted 为 true 时有意义 */
   readonly chaos?: boolean | undefined;
-}
+};
 
 export interface MatchSeatDto {
   readonly seat: number;
@@ -49,6 +55,7 @@ export interface MatchSummaryDto {
 }
 
 export interface MatchDetailDto extends MatchSummaryDto {
+  readonly traceDeleted: boolean;
   readonly pacing: MatchPacing;
   readonly lastSeq: number;
   readonly ackedSeq: number;

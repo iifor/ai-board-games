@@ -21,6 +21,12 @@ describe('public endpoints', () => {
     const werewolf = catalog.find((game) => game.key === 'werewolf');
     expect(debate).toMatchObject({ layout: 'versus', variants: [], defaultVariant: null, players: { min: 9, max: 12 } });
     expect(werewolf?.defaultVariant).toBe('standard-12');
+    expect(debate?.seatGroups).toEqual([
+      { team: 'pro', name: '正方', count: 4 }, { team: 'con', name: '反方', count: 4 }, { team: 'judge', name: '评委', minCount: 1, count: 4 },
+    ]);
+    expect(werewolf?.seatGroups).toBeUndefined();
+    const zoo = werewolf?.variants.find((variant) => variant.key === 'animal-zoo-12');
+    expect(zoo?.roles.find((role) => role.name === '兔兔')).toMatchObject({ minCount: 3, count: 4 });
     expect(werewolf?.variants.map((variant) => variant.key)).toContain('white-wolf-king-guard-12');
     const standard = werewolf?.variants.find((variant) => variant.key === 'standard-12');
     expect(standard?.roles.find((role) => role.name === '狼人')).toMatchObject({ team: 'werewolf', count: 4 });

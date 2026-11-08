@@ -1,146 +1,86 @@
 .seat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
-  gap: 8px;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid rgba(149, 198, 255, 0.16);
-  border-radius: 16px;
-  background: rgba(3, 10, 26, 0.5);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px 3px;
+  margin: 14px 0 0;
+  padding: 0;
   list-style: none;
 }
 
-.seat-slot {
-  display: grid;
-  justify-items: center;
-  min-height: 84px;
+.seat-slot { display: grid; align-content: start; justify-items: center; min-width: 0; min-height: 58px; }
+.seat-slot-empty, .seat-chip-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
 }
 
 .seat-slot-empty {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
-  margin-top: 2px;
-  border: 1px dashed rgba(149, 198, 255, 0.3);
-  border-radius: 50%;
-  color: var(--ui-text-dim);
-  font-size: 13px;
-  font-weight: 900;
+  border: 1px dashed var(--ui-border);
+  background: rgba(255, 255, 255, .025);
+  color: var(--ui-text-muted);
+  font: 600 12px/1 monospace;
 }
 
-.seat-slot.is-over .seat-slot-empty,
-.seat-slot.is-over .seat-chip-no {
-  border-color: rgba(255, 93, 108, 0.6);
-  color: #ffd9dd;
-  background: var(--ui-danger-soft);
-}
-
-/* 坐了人的座位：落地后弹出（--seat-delay 由飞行时长决定），悬停上浮并露出"×" */
 .seat-chip {
   position: relative;
   display: grid;
-  gap: 4px;
+  align-content: start;
   justify-items: center;
+  gap: 4px;
   width: 100%;
-  padding: 2px 0 0;
+  min-height: 54px;
+  padding: 0;
   border: 0;
+  border-radius: 8px;
   color: var(--ui-text);
   background: transparent;
   animation: ui-pop-in var(--ui-motion-slow) var(--ui-ease-elastic) both;
   animation-delay: var(--seat-delay, 0ms);
-  transition: transform var(--ui-motion-normal) var(--ui-ease-out);
 }
 
-.seat-chip:hover,
-.seat-chip:focus-visible {
-  transform: translateY(-3px);
-}
-
-.seat-chip-avatar {
-  width: 52px;
-  height: 52px;
-  border: 2px solid var(--game-accent-strong);
-  background: rgba(3, 13, 35, 0.9);
-  box-shadow: 0 0 18px var(--game-accent-soft);
-  transition: box-shadow var(--ui-motion-normal) ease, border-color var(--ui-motion-fast) ease;
-}
-
-.seat-chip:hover .seat-chip-avatar,
-.seat-chip:focus-visible .seat-chip-avatar {
-  border-color: #ffb3b7;
-  box-shadow: 0 0 22px rgba(255, 93, 108, 0.35);
-}
-
-.seat-chip-avatar b {
-  font-size: 15px;
-}
-
-.seat-chip-no {
+.seat-chip-avatar { overflow: hidden; border: 1px solid var(--game-accent-strong); background: var(--ui-bg-surface-strong); font-size: 13px; }
+.seat-chip-avatar img { position: absolute; inset: 0; object-position: 50% 16%; }
+.seat-chip-no, .seat-chip-remove {
   position: absolute;
-  top: 38px;
-  left: calc(50% + 12px);
+  top: 24px;
+  left: calc(50% + 5px);
   display: grid;
   place-items: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 10px;
-  color: #061024;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 5px;
+  color: #071525;
   background: var(--game-accent-strong);
-  font-size: 11px;
-  font-weight: 900;
+  font: 800 10px/1 system-ui, sans-serif;
 }
 
-.seat-chip-remove {
-  position: absolute;
-  top: -2px;
-  left: calc(50% + 14px);
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  color: #fff;
-  background: var(--ui-danger);
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 900;
-  line-height: 1;
-  opacity: 0;
-  transform: scale(0.6);
-  transition: opacity var(--ui-motion-fast) ease, transform var(--ui-motion-fast) var(--ui-ease-out);
-}
+.seat-chip-remove { opacity: 0; color: white; background: #963840; }
+.seat-chip:hover .seat-chip-remove, .seat-chip:focus-visible .seat-chip-remove { opacity: 1; }
+.seat-slot.is-over .seat-chip-no { color: white; background: #963840; }
+.seat-chip-name { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 650; }
+.ui-ghost.seat-chip { animation: none; }
 
-.seat-chip:hover .seat-chip-remove,
-.seat-chip:focus-visible .seat-chip-remove {
-  opacity: 1;
-  transform: scale(1);
-}
+.seat-groups { display: grid; gap: 8px; margin-top: 14px; }
+.seat-group { padding: 10px 8px 6px; border-radius: 10px; border: 1px solid var(--ui-border); }
+.seat-group[data-team='pro'] { --seat-accent: #8cdeef; background: rgba(76, 180, 211, .07); }
+.seat-group[data-team='con'] { --seat-accent: #ffb1a5; background: rgba(226, 125, 106, .07); }
+.seat-group[data-team='judge'] { --seat-accent: #e5c688; background: rgba(202, 166, 94, .07); }
+.seat-group h3 { display: flex; justify-content: space-between; align-items: baseline; margin: 0 3px; font-size: 14px; color: var(--seat-accent, var(--ui-text)); }
+.seat-group h3 small { color: var(--ui-text-muted); font-size: 11px; font-weight: 500; }
+.seat-group .seat-grid { margin-top: 9px; }
+.seat-group .seat-slot { min-height: 41px; }
+.seat-group .seat-chip-avatar { border-color: var(--seat-accent); }
+.seat-group .seat-chip-no { left: auto; right: 0; background: var(--seat-accent); }
 
-.seat-chip-name {
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* 飞行中的克隆体（animations.ts 挂在 body 上）：加一圈强调色光晕，和落点的座位头像衔接 */
-.ui-ghost .player-option-portrait {
-  border-color: var(--game-accent-strong);
-  box-shadow: 0 0 28px var(--game-accent-soft), 0 12px 30px rgba(0, 0, 0, 0.4);
-}
-
-/* 离席时淡出的克隆体：不要再跑一遍弹出动画 */
-.ui-ghost.seat-chip {
-  animation: none;
+@media (max-width: 780px) {
+  .seat-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .seat-group .seat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .seat-group .seat-chip-no { right: auto; left: calc(50% + 4px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .seat-chip {
-    animation-delay: 0ms;
-  }
+  .seat-chip { animation-delay: 0ms; }
 }

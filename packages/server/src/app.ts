@@ -9,12 +9,14 @@ import { authRoutes } from './modules/auth';
 import { adminGameRoutes, gameRoutes } from './modules/games';
 import { healthRoutes } from './modules/health';
 import { adminMatchRoutes, publicMatchRoutes } from './modules/matches';
+import { localDebugRoutes } from './modules/matches/localDebugRoutes';
 import { modelRoutes } from './modules/models';
 import { playerRoutes, publicPlayerRoutes } from './modules/players';
 import { providerRoutes } from './modules/providers';
 import { MAX_CLIENT_FRAME_BYTES, realtimeRoutes } from './modules/realtime';
 import { mediaRoutes } from './modules/tts';
 import { voiceRoutes } from './modules/voices';
+import { traceRoutes } from './modules/traces/routes';
 import type { AppEnv } from './types';
 
 export interface AppOptions {
@@ -45,6 +47,7 @@ export function createApp(services: Services, options: AppOptions = { trustProxy
   app.route('/api/media', mediaRoutes(services.tts));
   app.route('/api/toc/games', gameRoutes(services.games));
   app.route('/api/toc/players', publicPlayerRoutes(services.players));
+  if (services.localDebugEnabled) app.route('/api/toc/matches/local-debug', localDebugRoutes(services.matches));
   app.route('/api/toc/matches', publicMatchRoutes(services.matches, { trustProxy: options.trustProxy }));
   app.route('/api/toc/ws', realtimeRoutes(upgradeWebSocket, services.realtime));
   app.route('/api/admin/auth', authRoutes(services.auth, { trustProxy: options.trustProxy }));
@@ -53,6 +56,7 @@ export function createApp(services: Services, options: AppOptions = { trustProxy
   app.route('/api/admin/voices', guarded(voiceRoutes(services.voices)));
   app.route('/api/admin/players', guarded(playerRoutes(services.players)));
   app.route('/api/admin/matches', guarded(adminMatchRoutes(services.matches)));
+  app.route('/api/admin/traces', guarded(traceRoutes(services.traces)));
   app.route('/api/admin/games', guarded(adminGameRoutes(services.games)));
   return { app, injectWebSocket };
 }

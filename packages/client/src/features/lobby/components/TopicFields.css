@@ -3,16 +3,8 @@
   gap: 10px;
   margin: 0;
   padding: 16px 18px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-bg-surface-soft);
-}
-
-.topic-fields legend {
-  padding: 0 6px;
-  color: var(--ui-text-muted);
-  font-size: 13px;
-  font-weight: 800;
+  border: 0;
+  min-inline-size: 0;
 }
 
 .topic-fields label {
@@ -23,6 +15,7 @@
 }
 
 .topic-fields input {
+  min-width: 0;
   padding: 8px 12px;
   border: 1px solid rgba(149, 198, 255, 0.28);
   border-radius: var(--ui-radius-sm);

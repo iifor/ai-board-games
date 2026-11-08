@@ -9,6 +9,8 @@ export interface EventDisplay {
 
 function voteSummary(event: Extract<StageEvent, { kind: 'vote_tallied' }>): string {
   const rows = event.tally.map((row) => `${row.target}号 ${row.votes} 票`).join('，') || '无人投票';
+  if (event.phaseId === 'wolf_kill' && event.outcome) return event.outcome.kind === 'selected'
+    ? `狼刀锁定 ${event.outcome.seat}号（${rows}）` : '狼队今晚没有锁定目标';
   if (event.outcome === null) return `${event.title}：${rows}，平票，进入复投`;
   if (event.outcome.kind === 'none') return `${event.title}：${rows}，无人当选`;
   return `${event.title}：${rows}，${event.outcome.seat}号当选${event.outcome.byTieBreak ? '（平票随机）' : ''}`;

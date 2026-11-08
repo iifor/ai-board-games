@@ -6,7 +6,8 @@ import type { WerewolfContext } from './context';
 import { woundRogue } from './death';
 import { isDreamed, swapTarget } from './nightEffects';
 import { antidotedTonight } from './spiritWolfSkills';
-import { addDeath, isDying } from './tally';
+import { addDeath, isDying, noteTally } from './tally';
+import { nightDeathEffect, spectatorEffect } from './spectatorEffects';
 import type { NightStep, NightTally } from './types';
 
 // 夜间结算管线：消费 special/index.ts 登记表中的结算步骤；特殊角色模块不得引用本文件。
@@ -34,7 +35,14 @@ const wolfKill: NightStep = (ctx, tally) => {
   const victim = swapTarget(ctx, wolfTarget);
   const guardedSeat = guarded === null ? null : swapTarget(ctx, guarded);
   const blocked = (guardedSeat === victim) !== saved;
-  if (blocked || isDreamed(ctx, victim) || poisonKills(ctx, victim)) return tally;
+  if (isDreamed(ctx, victim)) return noteTally(tally, spectatorEffect('dream', victim, '梦游避开狼刀'));
+  if (blocked) {
+    if (guardedSeat === victim) return noteTally(tally, spectatorEffect('shield', victim, '守护成功 · 挡下狼刀'));
+    // 大树的第一条命仍会在后续结算中消耗。
+    if (ctx.seats.get(victim).role === 'big_tree' && ctx.state.bigTreeHits === 0) return tally;
+    return noteTally(tally, spectatorEffect('heal', victim, '解药生效 · 挡下狼刀'));
+  }
+  if (poisonKills(ctx, victim)) return tally;
   return addDeath(tally, victim, 'wolf');
 };
 
@@ -43,9 +51,9 @@ const poison: NightStep = (ctx, tally) => poisonedSeats(ctx).reduce<NightTally>(
   if (isDying(current, seat)) return current;
   if (poisonKills(ctx, seat)) return addDeath(current, seat, 'poison');
   if (roleTraits(ctx.seats.get(seat)).delayedDeath && !isDreamed(ctx, seat)) {
-    return { ...current, state: woundRogue(current.state, seat, ctx.round, false) };
+    return noteTally({ ...current, state: woundRogue(current.state, seat, ctx.round, false) }, spectatorEffect('poison', seat, '中毒 · 延迟结算'));
   }
-  return current;
+  return noteTally(current, spectatorEffect('shield', seat, '毒药未生效'));
 }, tally);
 
 /** 结算顺序：狼刀 → 毒药 → 特殊角色的结算步骤（顺序与理由见 special/index.ts 的 specialNightSteps） */
@@ -55,5 +63,6 @@ const NIGHT_STEPS: readonly NightStep[] = [wolfKill, poison, ...specialNightStep
 export function resolveNight(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const tally = NIGHT_STEPS.reduce<NightTally>((current, step) => step(ctx, current), { state: ctx.state, deaths: [] });
   const pendingDeaths: PendingDeath[] = [...tally.deaths].sort((a, b) => a.seat - b.seat);
-  return { state: { ...tally.state, pendingDeaths }, reassign: tally.reassign ?? [], log: tally.log ?? [] };
+  const log = [...(tally.log ?? []), ...pendingDeaths.map(({ seat, cause }) => nightDeathEffect(seat, cause))];
+  return { state: { ...tally.state, pendingDeaths }, reassign: tally.reassign ?? [], log };
 }

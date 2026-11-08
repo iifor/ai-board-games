@@ -114,16 +114,17 @@ describe('seat popover', () => {
     expect(popoverPlacement({ left: 200, top: 100, width: 118, height: 140 }, arena, size, 0).left).toBe(218);
   });
 
-  it('renders the seat profile with its speeches, state and a close control', () => {
+  it('renders a hover region with the seat state and keyboard-scrollable speeches', () => {
     const speeches: readonly SeatSpeech[] = [
       { seq: 1, kind: 'speech', title: '第 1 轮 · 立论', text: '我方认为' },
       { seq: 3, kind: 'judgement', title: '第 1 轮 · 评审', text: '正方胜。论证完整' },
     ];
     const html = renderToStaticMarkup(<SeatPopover seat={seat(1, 'pro', 1)} speeches={speeches} anchor={null} arenaRef={createRef<HTMLDivElement>()} onClose={() => {}} />);
-    expect(html).toContain('role="dialog"');
+    expect(html).toContain('role="region"');
     expect(html).toContain('aria-labelledby="seat-popover-name"');
     expect(html).toContain('data-team="pro"');
-    expect(html).toContain('aria-label="关闭座位资料"');
+    expect(html).toContain('aria-label="本局发言" tabindex="0"');
+    expect(html).not.toContain('<button');
     expect(html).toContain('玩家1');
     expect(html).toContain('1 号 · 1号位');
     expect(html).toContain('角色pro');
@@ -143,19 +144,17 @@ describe('seat popover', () => {
     expect(out).not.toContain('data-team');
   });
 
-  it('turns the seat card into a button that reports which seat was picked', () => {
-    // 座位卡片从 div 改成 button：键盘可聚焦、回车 / 空格打开座位弹层；外观类名不变
+  it('allows focus to preview a seat and links it to the visible profile', () => {
     const html = renderToStaticMarkup(<SeatCard seat={seat(1, 'pro', 1)} speaking={false} onSelect={() => {}} selected />);
-    expect(html.startsWith('<button type="button"')).toBe(true);
+    expect(html.startsWith('<span role="group" tabindex="0"')).toBe(true);
     expect(html).toContain('seat-card seat-card-row seat-card-trigger');
     expect(html).toContain('data-seat-trigger="1"');
-    expect(html).toContain('aria-haspopup="dialog"');
-    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('aria-details="seat-profile"');
     expect(html).toContain('is-selected');
     expect(html).toContain('<span class="seat-card-body">');
     const plain = renderToStaticMarkup(<SeatCard seat={seat(1, 'pro', 1)} speaking={false} />);
-    expect(plain.startsWith('<button type="button"')).toBe(true);
-    expect(plain).not.toContain('aria-expanded');
+    expect(plain).not.toContain('tabindex');
+    expect(plain).not.toContain('aria-details');
     expect(plain).not.toContain('is-selected');
   });
 });

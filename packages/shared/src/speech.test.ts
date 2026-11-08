@@ -42,6 +42,19 @@ describe('speechOf', () => {
   it.each(Object.entries(CASES))('%s', (_kind, { payload, expected }) => {
     expect(speechOf(event(payload))).toEqual(expected);
   });
+  it.each([
+    { phaseId: 'sheriff_signup', targets: [2] }, { phaseId: 'sheriff_signup', targets: [] },
+    { phaseId: 'sheriff_withdraw', targets: [2] }, { phaseId: 'sheriff_withdraw', targets: [] },
+  ])('keeps sheriff choices silent: $phaseId $targets', ({ phaseId, targets }) => {
+    const choice: StageEvent = { ...event({ kind: 'action', seat: 2, action: '竞选选择', targets, text: '2号的竞选选择' }), phaseId };
+    expect(speechOf(choice)).toBeNull();
+    expect(speechOf({ ...choice, phaseId: 'sheriff_withdraw' })).toBeNull();
+    expect(speechOf({ ...choice, phaseId: 'sheriff_badge_transfer' })).not.toBeNull();
+    expect(speechOf({ ...choice, view: { ...view, gameKey: 'debate' } })).not.toBeNull();
+    expect(speechOf({ ...choice, kind: 'narration', text: '开始警长竞选' })).not.toBeNull();
+    expect(speechOf({ ...choice, kind: 'narration', phaseId: 'sheriff_resolve', text: '2号当选警长。' })).not.toBeNull();
+    expect(speechOf({ ...choice, kind: 'speech', seat: 2, phaseId: 'sheriff_speech', text: '竞选发言' })).not.toBeNull();
+  });
 });
 
 describe('formatMatchTitle', () => {

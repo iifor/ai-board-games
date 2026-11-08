@@ -21,9 +21,11 @@ export async function listen(t: TestApp): Promise<{ port: number; close(): Promi
 }
 
 /** 连接对局流并逐个确认，直到收到 end 或达到 limit 个事件 */
-export function watch(port: number, matchId: string, afterSeq: number, limit = Number.POSITIVE_INFINITY, timeoutMs = 60_000): Promise<Watched> {
+export function watch(port: number, matchId: string, afterSeq: number, limit = Number.POSITIVE_INFINITY, timeoutMs = 60_000, seat?: number): Promise<Watched> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/toc/ws/matches/${matchId}`);
+    const url = new URL(`ws://127.0.0.1:${port}/api/toc/ws/matches/${matchId}`);
+    if (seat !== undefined) url.searchParams.set('seat', String(seat));
+    const socket = new WebSocket(url);
     const events: StageEvent[] = [];
     const audio: (string | null)[] = [];
     const timer = setTimeout(() => {

@@ -18,4 +18,13 @@
 
 .admin-content {
   padding: 0 20px 32px;
+  min-width: 0;
+}
+
+.admin-header .admin-menu-toggle { display: none; }
+@media (max-width: 767px) {
+  .admin-layout .ant-layout-sider { display: none; }
+  .admin-header .admin-menu-toggle { display: inline-flex; margin-right: auto; }
+  .admin-header { padding-inline: 12px; gap: 8px; }
+  .admin-content { padding: 12px 12px 24px; }
 }

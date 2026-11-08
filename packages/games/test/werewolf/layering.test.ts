@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -56,7 +56,7 @@ function runtimeImports(file: string): string[] {
 }
 
 function buildGraph(): Map<string, string[]> {
-  const id = (file: string): string => relative(ROOT, file);
+  const id = (file: string): string => relative(ROOT, file).split(sep).join('/');
   return new Map(listFiles(ROOT).map((file) => [id(file), runtimeImports(file).map(id)]));
 }
 

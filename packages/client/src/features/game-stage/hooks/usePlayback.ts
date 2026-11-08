@@ -53,6 +53,6 @@ export function usePlayback(items: readonly StreamItem[], ack: (seq: number) => 
 
   const played = items.slice(0, index);
   const shown = playing?.item ?? played[played.length - 1] ?? null;
-  const view: AudienceView | null = shown?.event.view ?? null;
+  const view: AudienceView | null = shown?.event.view ?? (options.paused ? items[index]?.event.view ?? null : null);
   return { current: playing?.item ?? null, control: playing?.control ?? null, played, view, pending: items.length - index };
 }

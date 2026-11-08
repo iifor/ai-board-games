@@ -11,7 +11,10 @@ export function LobbyPage() {
   const games = useAsync(fetchCatalog, []);
   const history = useAsync(fetchHistory, []);
   if (games.status === 'loading') return <StatusView kind="loading" />;
-  if (games.status === 'error') return <StatusView kind="error" message={games.message} onRetry={games.reload} />;
+  if (games.status === 'error') return <StatusView kind="error" message={games.message} onRetry={() => {
+    games.reload();
+    if (history.status === 'error') history.reload();
+  }} />;
   if (!games.data.length) return <StatusView kind="empty" message="还没有可玩的游戏" />;
   return (
     <section>

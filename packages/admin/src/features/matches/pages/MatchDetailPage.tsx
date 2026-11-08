@@ -19,6 +19,7 @@ export function MatchDetailPage() {
     <section className="match-detail">
       <Link to="/matches">← 返回列表</Link>
       <Typography.Title level={3}>{formatMatchTitle(detail)}</Typography.Title>
+      {detail.traceDeleted ? <Typography.Text type="secondary">本局调用链已删除</Typography.Text> : <Link to={'/traces/' + detail.id}>查看整局调用链</Link>}
       {error ? <Alert type="warning" title={`刷新失败：${error}`} /> : null}
       {detail.error ? <Alert type="error" title={detail.error} /> : null}
       <Descriptions size="small" bordered column={{ xs: 1, md: 3 }}>
@@ -44,8 +45,8 @@ export function MatchDetailPage() {
               </div>
             ),
           },
-          { key: 'trace', label: `Trace（${calls.length}）`, children: <TracePanel calls={calls} /> },
-          { key: 'log', label: `完整日志（${log.length}）`, children: <LogPanel log={log} /> },
+          { key: 'trace', label: `模型调用（${calls.length}）`, children: <TracePanel calls={calls} /> },
+          { key: 'log', label: `完整日志（${log.length}）`, children: <LogPanel log={log} matchId={detail.traceDeleted ? null : matchId} /> },
         ]}
       />
     </section>

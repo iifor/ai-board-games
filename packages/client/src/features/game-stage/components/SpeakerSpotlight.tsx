@@ -1,5 +1,5 @@
 import type { AudienceView } from '@battle/shared';
-import { HOST_POSTER, resolvePoster } from '../../../utils/posters';
+import { HOST_POSTER, seatPortrait } from '../../../utils/posters';
 import { describeEvent } from '../playback/describe';
 import type { StreamItem } from '../types';
 import { hasSpotlight, seatOf } from '../utils';
@@ -16,7 +16,7 @@ export function SpeakerSpotlight({ item, view }: SpeakerSpotlightProps) {
   const event = item?.event;
   if (!event || !view || !hasSpotlight(event.kind)) return null;
   const seat = seatOf(view, describeEvent(event).speaker);
-  const src = seat ? resolvePoster(seat.name, seat.avatar, 'cutout') : HOST_POSTER;
+  const src = seat ? seatPortrait(seat.name, 'cutout') ?? seat.avatar : HOST_POSTER;
   const classes = ['speaker-spotlight', seat ? '' : 'is-host', src ? '' : 'is-card'].filter(Boolean).join(' ');
   return (
     <figure key={`${event.seq}-${src ?? 'card'}`} className={classes} aria-hidden="true">

@@ -1,5 +1,7 @@
 # 服务端（packages/server）
 
+狼人杀 WebSocket 默认推送上帝视角。连接 `/api/toc/ws/matches/:id?seat=N` 时，服务端校验座位，只推送公开频道和该座位的身份，保留已公开翻牌。跳过的私密事件由服务端推进确认；字幕、语音与记录共用投影后的事件。进行中与回放使用相同规则。
+
 > 状态：P3 完成服务端基础；P4 完成对局运行时、AI worker、LLM 与 TTS 调用、按确认节奏的实时推送与回放。
 
 ## 技术选型
@@ -35,7 +37,7 @@ src/
 | 方法与路径 | 说明 | 鉴权 |
 | --- | --- | --- |
 | `GET /api/health` | 数据库可用返回 `{ status: 'ok', instance }`（`instance` 是应答实例启动时生成的随机 ID），否则 503 | 无 |
-| `GET /api/toc/games` | 游戏目录（来自注册表，含变体/板子及其角色构成） | 无 |
+| `GET /api/toc/games` | 游戏目录（来自注册表，含变体及角色构成；固定公开席位的游戏另含有序的 `seatGroups`） | 无 |
 | `GET /api/toc/players` | 启用的玩家公开信息（id、name、avatar、persona） | 无 |
 | `POST /api/admin/auth/login` | 登录，返回 JWT（12 小时）与是否需改密 | 无 |
 | `POST /api/admin/auth/password` | 修改密码（新密码至少 12 位） | 登录（允许未改密） |
@@ -57,6 +59,8 @@ src/
 | `GET /api/admin/games/:key/phases` | 游戏阶段图（阶段、类型、标题、跳转目标），供调试台使用 | 管理员 |
 
 ### 调试局对外可见性
+
+开发环境另提供 `POST /api/toc/matches/local-debug`，接收 `gameKey`、可选 `variant` 与 `params`。仅接受来自本机回环地址的 JSON 请求，校验请求主机与浏览器 Origin，沿用开局频率限制。服务端固定使用自动阵容、脚本化与连续生成，生产环境不注册此入口。管理后台可在原调试开局接口提交 `generatePlayers: true` 和 `scripted: true`，此时必须省略 `playerIds`。生成座位仅保存在本局快照与座位表中，玩家、模型、音色外键均为空。
 
 调试局（`debug = true`）从不出现在公开历史列表里；按 ID 的公开概要与播放流是否能看到它由 `MatchService` 的 `debugVisibleToPublic` 决定（组合根按 `NODE_ENV` 注入，不是全局变量）：生产环境视为不存在（概要 404，播放流回 `error: 对局不存在`），开发与测试环境可见，因为验收脚本化调试局时要用 C 端舞台观看。后台接口不受影响。播放流的 `find` 走 `MatchService.findPublic`，与概要接口共用同一判断。
 
@@ -114,6 +118,10 @@ src/
 因此改动规则的版本不能与旧版本混跑（滚动部署）：新旧实例会把对方创建的对局都判为版本不匹配而终止。这类版本应停掉全部旧实例后再启动新实例；只改服务端、前端等不影响 `specHash` 的版本可以滚动部署。
 
 ## 数据库
+
+管理端 `GET /api/admin/traces` 可按游戏 / 状态分页列出对局；`GET /api/admin/traces/:id` 返回节点索引、每次模型尝试的摘要和分模型用量；`GET /api/admin/traces/:id/nodes/:node` 按需读取关联决策、提示词、模型参数 / 输出及对应舞台快照。三个接口及删除共用管理员鉴权。节点随对局推进在同一事务写入 `match_trace_nodes`，以对局内的阶段访问、请求 ID 和事件 seq 建立关联。脚本局采集决策和规则节点，模型传输次数为零。
+
+`DELETE /api/admin/traces/:id` 锁定对局行，设置 `matches.trace_deleted`，删除本局节点、`ai_calls` 和已完结任务缓存的请求 / 输出 / 错误，同一事务提交。进行中的任务仅在执行期间保留必要输入，完成或取消后清空。模型传输在事务外执行，写入明细前在共享行锁内复核删除标记。重复删除幂等；之后新推进不会重新采集。对局状态、游戏日志、舞台事件、回放与音频继续保留。私密调用链接口及模型调用明细响应使用 `private, no-store`。
 
 PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 public）。启动时自动执行迁移，失败则拒绝启动。
 

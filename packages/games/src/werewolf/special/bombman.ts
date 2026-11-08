@@ -39,7 +39,7 @@ function resolveBlast(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const list = victims.map((seat) => `${seat}号`).join('、');
   return {
     state: { ...ctx.state, bombmanWin: wipesOut(ctx, victims) },
-    log: [{ kind: 'revealed', text: `${bombman}号翻牌为炸弹人并引爆，炸死了投票放逐他的 ${list}。`, data: { seat: bombman, role: 'bombman' } }],
+    log: [{ kind: 'revealed', text: `${bombman}号翻牌为炸弹人并引爆，炸死了投票放逐他的 ${list}。`, data: { seat: bombman, role: 'bombman', targets: victims } }],
     eliminate: victims.map((seat) => ({ seat, reason: '被炸弹人炸死', cause: BOMBED })),
   };
 }

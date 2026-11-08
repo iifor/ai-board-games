@@ -72,3 +72,18 @@
   font-weight: 700;
   white-space: nowrap;
 }
+.audience-setting select, .playback-speed {
+  min-height: 36px;
+  padding-inline: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 20px;
+  background: #121d32;
+  color: #e9edf7;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+@media (min-width: 861px) {
+  .playback-rail:has(.audience-setting) button { min-width: 29px; padding-inline: 7px; }
+  .playback-rail:has(.audience-setting) .playback-status { padding-inline: 3px; }
+}

@@ -1,4 +1,5 @@
-import { assertDeterministic, assertNoLeak, assertTerminates } from '@battle/engine/testing';
+import { createSnapshot } from '@battle/engine';
+import { assertDeterministic, assertNoLeak, assertTerminates, makePlayers } from '@battle/engine/testing';
 import { describe, expect, it } from 'vitest';
 import { boardPlayers, BOARDS } from '../../src/werewolf/boards';
 import { werewolfGame } from '../../src/werewolf';
@@ -15,6 +16,15 @@ const [villager = 0, villagerB = 0] = roleSeats(SEED, 'villager', BOARD);
 const guardOn = (target: number | null, night: number): Override => act('guard_protect', guard, target === null ? [] : [target], night);
 
 describe('board registry', () => {
+  it('keeps numbered players in place while dealing different identities by seed', () => {
+    const players = makePlayers(12).reverse();
+    const deals = [1, 2, 3].map((seed) => createSnapshot(werewolfGame, { seed, players, variant: 'standard-12' }).seats);
+    for (const seats of deals) {
+      expect(seats.map((seat) => [seat.seat, seat.profile.playerId])).toEqual(players.map((player, i) => [i + 1, player.playerId]));
+    }
+    expect(new Set(deals.map((seats) => seats.map((seat) => seat.role).join(','))).size).toBeGreaterThan(1);
+  });
+
   it('registers every board as a variant with its player range', () => {
     for (const board of BOARDS) {
       const variant = werewolfGame.spec.variants?.[board.key];

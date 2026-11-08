@@ -11,11 +11,13 @@ const HELLO_TIMEOUT_MS = 10_000;
 export function realtimeRoutes(upgradeWebSocket: UpgradeWebSocket, realtime: RealtimeService) {
   return new Hono<AppEnv>().get('/matches/:id', upgradeWebSocket((c) => {
     const matchId = c.req.param('id') ?? '';
+    const seat = c.req.query('seat');
     let stream: MatchStream | null = null;
     let helloTimer: NodeJS.Timeout | null = null;
     return {
       onOpen(_event, ws) {
-        stream = realtime.open(matchId, { send: (data) => ws.send(data), close: (code, reason) => ws.close(code, reason) });
+        if (seat !== undefined && !/^[1-9]\d?$/.test(seat)) { ws.close(POLICY_VIOLATION_CODE, '座位无效'); return; }
+        stream = realtime.open(matchId, { send: (data) => ws.send(data), close: (code, reason) => ws.close(code, reason) }, seat === undefined ? undefined : Number(seat));
         // 没发 hello 的客户端从头开始推送
         helloTimer = setTimeout(() => stream?.hello(0), HELLO_TIMEOUT_MS);
       },

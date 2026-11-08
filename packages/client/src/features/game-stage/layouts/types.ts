@@ -3,8 +3,12 @@ import type { ReactNode } from 'react';
 import type { VoteFlight } from '../animation/ballotFlight';
 import type { SeatSelectHandler } from '../types';
 import type { StagePeriod } from '../utils';
+import type { SignupChoice } from '../animation/sheriffSignup';
 
 export interface LayoutProps {
+  readonly signup?: SignupChoice | null;
+  readonly cue?: import('../animation/skillCue').SkillCue | null;
+  readonly cueSeq?: number | undefined;
   readonly view: AudienceView;
   /** 正在说话的座位 */
   readonly speaking: number | null;

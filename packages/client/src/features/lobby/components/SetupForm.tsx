@@ -16,13 +16,13 @@ interface SetupFormProps {
   readonly initial?: SetupInitial | undefined;
 }
 
-/** 开局：左侧选板子（或辩题），右侧座位带 + 选玩家，底部操作条；选人 / 离席的动效在状态更新前触发（此时还能量到起点与落点） */
+/** 开局共享同一份选人状态；在更新座位前量取飞行动效的起点与落点。 */
 export function SetupForm({ game, players, initial }: SetupFormProps) {
   const setup = useMatchSetup(game, players, initial);
   const flights = useSeatFlights();
   const navigate = useNavigate();
-  const start = async () => {
-    const id = await setup.submit();
+  const start = async (mode: 'players' | 'generated') => {
+    const id = await setup.submit(mode);
     if (id) navigate(`/matches/${id}`);
   };
   const board = game.variants.find((variant) => variant.key === setup.variant) ?? null;
@@ -34,9 +34,9 @@ export function SetupForm({ game, players, initial }: SetupFormProps) {
     else flights.arrive([id], setup.selected.length);
     setup.toggle(id);
   };
-  const fillRandom = () => {
+  const fillSeats = () => {
     const startIndex = setup.selected.length;
-    flights.arrive(setup.fillRandom(), startIndex);
+    flights.arrive(setup.fill(), startIndex);
   };
   const clear = () => {
     flights.leave(setup.selected.map((playerId, seatIndex) => ({ playerId, seatIndex })));
@@ -44,33 +44,62 @@ export function SetupForm({ game, players, initial }: SetupFormProps) {
   };
 
   return (
-    <form className="setup-form" data-game={game.key} onSubmit={(event) => { event.preventDefault(); void start(); }}>
-      <div className="setup-columns">
-        <aside className="setup-side">
-          <Link to="/" className="setup-back">← 返回大厅</Link>
+    <form className="setup-form" data-game={game.key} onSubmit={(event) => { event.preventDefault(); void start('players'); }}>
+      <header className="setup-header">
+        <Link to="/" className="setup-back">← 返回大厅</Link>
+        <div className="setup-title">
           <h1>{game.title}</h1>
-          {game.variants.length ? <BoardPicker variants={game.variants} value={setup.variant} onChange={setup.setVariant} /> : null}
-          {GAMES_WITH_TOPIC.has(game.key) ? <TopicFields topic={setup.topic} onChange={setup.setTopic} incomplete={setup.topicPartial} /> : null}
+          <span>{setup.range.min === setup.range.max ? setup.range.min : `${setup.range.min}–${setup.range.max}`} 人</span>
+        </div>
+      </header>
+      {game.variants.length > 0 && <BoardPicker variants={game.variants} value={setup.variant} onChange={setup.setVariant} />}
+      <div className={players.length ? 'setup-columns' : 'setup-columns setup-empty'}>
+        <aside className="setup-side">
+          {GAMES_WITH_TOPIC.has(game.key) && (
+            <details className="setup-settings">
+              <summary>自定义辩题 <small>{setup.topicPartial ? '待补全' : '可选'}</small></summary>
+              <TopicFields topic={setup.topic} onChange={setup.setTopic} incomplete={setup.topicPartial} />
+            </details>
+          )}
+          {players.length > 0 && (
+            <section className="setup-lineup" aria-label="本局阵容">
+              <div className="setup-lineup-head"><h2>{game.seatGroups?.length ? '阵营座次' : '座位顺序'}</h2><span>{seated.length} / {setup.range.max}</span></div>
+              <SeatGrid seated={seated} groups={game.seatGroups} max={setup.range.max} onUnseat={toggle} registerSlot={flights.registerSlot} arrivalDelay={flights.arrivalDelay} />
+            </section>
+          )}
+          {import.meta.env.DEV && (
+            <details className="setup-settings setup-debug-settings" open={players.length === 0 || undefined}>
+              <summary>模拟开局 <small>本地调试</small></summary>
+              <div className="setup-debug">
+                <p>{board ? `${board.name} · ` : ''}{players.length ? '使用当局临时玩家，由脚本执行行动。' : '玩家库为空，可以用临时玩家体验这局游戏。'}</p>
+                <button type="button" className={players.length ? 'button' : 'button button-primary'} disabled={setup.submitting || setup.topicPartial}
+                  onClick={() => void start('generated')}>{setup.submitting ? '正在创建对局…' : `生成 ${setup.range.min} 名模拟玩家并开局`}</button>
+              </div>
+            </details>
+          )}
         </aside>
-        <section className="setup-players glass-panel">
-          <div className="setup-players-head">
-            <h2>选择玩家 <span>点击顺序即座位顺序 · {setup.selected.length} / {setup.range.max}</span></h2>
-            <button type="button" className="button" onClick={fillRandom}>随机补满</button>
-            <button type="button" className="button" onClick={clear}>清空</button>
-          </div>
-          <SeatGrid seated={seated} max={setup.range.max} onUnseat={toggle} registerSlot={flights.registerSlot} arrivalDelay={flights.arrivalDelay} />
-          <PlayerPicker players={players} selected={setup.selected} onToggle={toggle} registerSource={flights.registerSource} />
-        </section>
+        {players.length > 0 && (
+          <section className="setup-players" aria-labelledby="setup-picker-title">
+            <div className="setup-players-head">
+              <div><h2 id="setup-picker-title">选择玩家</h2><p>{setup.randomFill ? '依次入座正方、反方和评委席' : '按点击顺序，从 1 号起依次入座'}</p></div>
+              <div className="setup-tools">
+                <button type="button" className="button" disabled={seated.length >= Math.min(players.length, setup.range.max)} onClick={fillSeats}>{setup.randomFill ? '随机补满' : '按序补满'}</button>
+                <button type="button" className="button" disabled={!seated.length} onClick={clear}>清空</button>
+              </div>
+            </div>
+            <PlayerPicker players={players} selected={setup.selected} groups={game.seatGroups} onToggle={toggle} registerSource={flights.registerSource} />
+          </section>
+        )}
       </div>
       {setup.error ? <p className="setup-error" role="alert">{setup.error}</p> : null}
-      <SetupActionBar
+      {players.length > 0 && <SetupActionBar
         boardName={board?.name ?? game.title}
         count={setup.selected.length}
         range={setup.range}
         hint={setup.hint}
         topicPartial={setup.topicPartial}
         submitting={setup.submitting}
-      />
+      />}
     </form>
   );
 }

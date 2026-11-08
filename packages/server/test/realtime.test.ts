@@ -72,7 +72,19 @@ describe('realtime playback', () => {
       const watched = await watch(match.id, 0);
       expect(watched.end).toMatchObject({ type: 'end', result: { winner: expect.anything() } });
       expect(watched.events[watched.events.length - 1]?.kind).toBe('game_over');
-      expect(watched.events.every((event) => event.channel === 'public')).toBe(true);
+      expect(watched.events.every((event) => event.channel !== 'host')).toBe(true);
+      if (game.spec.key === 'werewolf') {
+        expect(watched.events.some((event) => event.channel.startsWith('private:'))).toBe(true);
+        expect(watched.events[0]?.view.seats.every((seat) => seat.role !== null)).toBe(true);
+        if (variant === game.spec.defaultVariant) {
+          const player = await watchOn(server.port, match.id, 0, undefined, undefined, 2);
+          expect(player.events.map(e => e.seq)).toEqual(watched.events.filter(e => e.channel === 'public').map(e => e.seq));
+          expect(player.events[0]?.view.seats.filter(seat => seat.role !== null).map(s => s.seat)).toEqual([2]);
+          expect(player.events.at(-1)?.view.seats.every(seat => seat.role !== null)).toBe(true);
+        }
+      } else {
+        expect(watched.events.every((event) => event.channel === 'public')).toBe(true);
+      }
     },
   );
 

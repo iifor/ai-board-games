@@ -10,6 +10,16 @@ export function audienceMode(game: CompiledGame): AudienceMode {
   return game.spec.presentation.audienceView ?? 'public';
 }
 
+function shownRoles(game: CompiledGame, s: EngineSnapshot): NonNullable<AudienceView['shownRoles']> {
+  const roles: Record<number, { role: string; roleName: string }> = {};
+  for (const entry of s.log) {
+    if (entry.kind !== 'revealed' || entry.channel !== 'public') continue;
+    const { seat, role } = entry.data;
+    if (typeof seat === 'number' && typeof role === 'string' && game.spec.roles[role]) roles[seat] = { role, roleName: game.spec.roles[role].name };
+  }
+  return roles;
+}
+
 /** 观众在某一时刻看到的局面：角色按观众视角与终局揭示规则决定是否可见 */
 export function buildAudienceView(
   game: CompiledGame,
@@ -35,6 +45,7 @@ export function buildAudienceView(
   });
   const phaseId = s.cursor.phaseId;
   return {
+    ...(omniscient ? { publicRoles: s.seats.filter((seat) => revealRoles || roleVisibleTo(game, s, seat, null)).map((seat) => seat.seat), shownRoles: shownRoles(game, s) } : {}),
     gameKey: game.spec.key,
     title: game.spec.title,
     round: s.round,

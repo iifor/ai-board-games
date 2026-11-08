@@ -185,6 +185,28 @@ describe('present', () => {
     FakeAudio.instances = [];
   });
 
+  it.each([
+    { phaseId: 'sheriff_signup', targets: [2] }, { phaseId: 'sheriff_signup', targets: [] },
+    { phaseId: 'sheriff_withdraw', targets: [2] }, { phaseId: 'sheriff_withdraw', targets: [] },
+  ])('shows sheriff choice without cached audio or browser speech: $phaseId $targets', async ({ phaseId, targets }) => {
+    vi.useFakeTimers();
+    vi.stubGlobal('Audio', FakeAudio);
+    const speakFn = stubSpeechSynthesis();
+    const signup: StageEvent = { ...action, phaseId, targets, view: { ...meta.view, gameKey: 'werewolf' } };
+    expect(describeEvent(signup).text).toBeNull();
+    for (const muted of [false, true]) {
+      let finished = false;
+      void present({ event: signup, audio: { url: '/cached-signup.mp3', mime: 'audio/mpeg' } }, new SegmentControl(2, muted))
+        .then(() => { finished = true; });
+      await vi.advanceTimersByTimeAsync(199);
+      expect(finished).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(finished).toBe(true);
+      expect(FakeAudio.instances).toHaveLength(0);
+      expect(speakFn).not.toHaveBeenCalled();
+    }
+  });
+
   it('plays the server audio when there is one, reads other spoken events with the browser voice and only dwells on the rest', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('Audio', FakeAudio);

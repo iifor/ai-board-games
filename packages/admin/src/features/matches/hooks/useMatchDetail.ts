@@ -1,6 +1,7 @@
 import type { AiCallDto, MatchDetailDto } from '@battle/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { errorMessage } from '../../../services/http';
+import { onAdminViewResumed, onTraceRemoved } from '../../../services/traceInvalidation';
 import { fetchAiCalls, fetchMatchDetail, fetchMatchLog, type LogEntryDto } from '../../../services/matches';
 import { isTerminal, progressChanged, progressMarkerOf, type ProgressMarker } from '../utils';
 
@@ -22,13 +23,17 @@ const EMPTY: MatchDetailState = { detail: null, log: [], calls: [], error: null 
 export function useMatchDetail(matchId: string) {
   const [state, setState] = useState<MatchDetailState>(EMPTY);
   const markerRef = useRef<ProgressMarker | null>(null);
+  const generation = useRef(0);
 
   const load = useCallback(async (force = false) => {
+    const version = generation.current;
     try {
       const detail = await fetchMatchDetail(matchId);
+      if (version !== generation.current) return null;
       const marker = progressMarkerOf(detail);
       if (force || progressChanged(markerRef.current, marker)) {
         const [log, calls] = await Promise.all([fetchMatchLog(matchId), fetchAiCalls(matchId)]);
+        if (version !== generation.current) return null;
         markerRef.current = marker;
         setState({ detail, log, calls, error: null });
       } else {
@@ -36,12 +41,24 @@ export function useMatchDetail(matchId: string) {
       }
       return detail;
     } catch (error) {
-      setState((prev) => ({ ...prev, error: errorMessage(error) }));
+      if (version === generation.current) setState((prev) => ({ ...prev, error: errorMessage(error) }));
       return null;
     }
   }, [matchId]);
 
   const reload = useCallback(() => load(true), [load]);
+  useEffect(() => onAdminViewResumed(() => {
+    generation.current++;
+    setState((prev) => ({ ...prev, calls: [] }));
+    void reload();
+  }), [reload]);
+  useEffect(() => onTraceRemoved((id) => {
+    if (id !== matchId) return;
+    generation.current++;
+    markerRef.current = null;
+    setState((prev) => ({ ...prev, calls: [], detail: prev.detail && { ...prev.detail, traceDeleted: true } }));
+    void reload();
+  }), [matchId, reload]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -55,6 +72,7 @@ export function useMatchDetail(matchId: string) {
     void tick();
     return () => {
       stopped = true;
+      generation.current++;
       if (timer) clearTimeout(timer);
     };
   }, [load]);

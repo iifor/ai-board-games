@@ -4,6 +4,7 @@ import { logger } from '../../utils/logger';
 import { PREFETCH_EVENTS, TERMINAL_STATUSES } from '../matches/types';
 import type { AudioResolver } from './audio';
 import { encode, type StreamSocket } from './protocol';
+import { forPlayerSeat } from './perspective';
 
 /** 播放流只需要对局的这几个字段 */
 export interface StreamMatch {
@@ -32,7 +33,7 @@ export interface StreamOptions {
  * 一个连接上的播放流：按 seq 逐个推送舞台事件，客户端播放完 ack 后才推送下一个；
  * 没有新事件时等待总线通知，并按 pollMs 兜底重查；对局结束且事件推送完毕后发送 end。实时与回放走同一条路径。
  */
-export function createMatchStream(matchId: string, socket: StreamSocket, deps: StreamDeps, options: StreamOptions) {
+export function createMatchStream(matchId: string, socket: StreamSocket, deps: StreamDeps, options: StreamOptions, seat?: number) {
   let cursor = 0;
   let awaiting: number | null = null;
   let started = false;
@@ -70,7 +71,7 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
     for (let i = 0; i < PREFETCH_EVENTS; i += 1) {
       const next = await deps.matches.nextEvent(matchId, seq);
       if (!next) return;
-      void deps.audio.audioFor(matchId, next, scripted);
+      if (seat === undefined || next.channel === 'public') void deps.audio.audioFor(matchId, next, scripted);
       seq = next.seq;
     }
   }
@@ -115,7 +116,18 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
     await settlePendingAck();
     const next = await deps.matches.nextEvent(matchId, cursor);
     if (next) {
-      await send(next, match.scripted);
+      if (seat !== undefined && !next.view.seats.some((item) => item.seat === seat)) {
+        socket.send(encode({ type: 'error', message: '本局没有这个座位' }));
+        close();
+        return;
+      }
+      const visible = seat === undefined ? next : forPlayerSeat(next, seat);
+      if (visible) await send(visible, match.scripted);
+      else {
+        cursor = next.seq;
+        await markAcked(cursor);
+        dirty = true;
+      }
     } else if (TERMINAL_STATUSES.has(match.status)) {
       socket.send(encode(match.status === 'failed'
         ? { type: 'status', status: 'failed', error: match.error }

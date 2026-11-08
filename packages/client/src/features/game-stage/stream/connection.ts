@@ -39,7 +39,8 @@ export class MatchStreamConnection {
   readonly #createSocket: SocketFactory;
   readonly #listeners = new Set<() => void>();
 
-  constructor(url: string, createSocket: SocketFactory = openSocket) {
+  constructor(url: string, createSocket: SocketFactory = openSocket, afterSeq = 0) {
+    this.#playedSeq = afterSeq;
     this.#url = url;
     this.#createSocket = createSocket;
     this.#connect();

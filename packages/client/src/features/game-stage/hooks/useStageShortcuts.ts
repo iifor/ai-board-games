@@ -4,6 +4,7 @@ import { applyShortcut, shortcutActionOf } from '../utils';
 
 interface StageShortcutsOptions {
   readonly options: PlaybackOptions;
+  readonly finished: boolean;
   readonly onChange: (next: PlaybackOptions) => void;
   /** L：开合记录侧栏 */
   readonly onToggleFeed: () => void;
@@ -17,9 +18,9 @@ interface StageShortcutsOptions {
  * 命中的键 preventDefault（空格不滚动页面）；别处已 preventDefault 的事件（如座位弹层处理过的）不再响应；
  * 长按的重复事件只拦下默认行为、不重复切换
  */
-export function useStageShortcuts({ options, onChange, onToggleFeed, onToggleResult }: StageShortcutsOptions): void {
-  const latest = useRef({ options, onChange, onToggleFeed, onToggleResult });
-  latest.current = { options, onChange, onToggleFeed, onToggleResult };
+export function useStageShortcuts(controls: StageShortcutsOptions): void {
+  const latest = useRef(controls);
+  latest.current = controls;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -33,6 +34,7 @@ export function useStageShortcuts({ options, onChange, onToggleFeed, onToggleRes
       });
       if (!action) return;
       const current = latest.current;
+      if (action === 'toggle-pause' && current.finished) return;
       if (action === 'toggle-result' && !current.onToggleResult) return;
       event.preventDefault();
       if (event.repeat) return;

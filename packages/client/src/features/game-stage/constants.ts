@@ -5,13 +5,12 @@ export const TEAM_LABELS: Readonly<Record<string, string>> = {
   lone_wolf: '独狼',
   third: '第三方',
   lovers: '情侣',
+  ghost_bride: '鬼魂新娘',
+  requester: '祈求者',
   pro: '正方',
   con: '反方',
   judge: '评委',
 };
-
-/** 窗口至少这么宽时，对局记录侧栏默认展开 */
-export const DRAWER_OPEN_MIN_WIDTH = 1440;
 
 /** 发言顺序条最多显示的座位数，更早的折叠成省略号 */
 export const SPEECH_ORDER_LIMIT = 6;
@@ -32,7 +31,5 @@ export const SHORTCUT_HINTS = {
   result: { title: '查看结果（R）', keys: 'R' },
 } as const;
 
-/** 座位卡片按钮上的标记（SeatCard 写在按钮上）：座位弹层据此识别"点在座位卡片上"的事件——由卡片自己处理切换 / 关闭，不算点在弹层外 */
-export const SEAT_TRIGGER_SELECTOR = '[data-seat-trigger]';
 /** 座位弹层与卡片之间的间距（px） */
 export const POPOVER_GAP = 12;

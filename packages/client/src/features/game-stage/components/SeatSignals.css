@@ -1,0 +1,39 @@
+
+/* 灯沿固定在卡片内，发言、遗言和评委点评不改变任何座位的占位。 */
+.circle-seat-card.ui-fade-up, .versus-side > .ui-fade-up {
+  animation: seat-arrive 160ms ease-out both;
+}
+@keyframes seat-arrive { from { opacity: .65; } }
+.seat-card.seat-card-speaking {
+  --mic-light: var(--team-color, #ffe598);
+  transform: none;
+  opacity: 1;
+  filter: none;
+  border-color: var(--mic-light);
+  background: radial-gradient(ellipse at 38% 0%, color-mix(in srgb, var(--mic-light) 38%, transparent), transparent 78%),
+    linear-gradient(160deg,#223453,#081023);
+  box-shadow: inset 0 3px 0 var(--mic-light), 0 0 0 1px var(--mic-light), 0 0 20px color-mix(in srgb,var(--mic-light) 38%,transparent);
+}
+.seat-card-speaking .seat-card-avatar { border-color: var(--mic-light); }
+.seat-mic {
+  position: absolute; right: 5px; bottom: 5px; display: flex; align-items: center;
+  gap: 2px; height: 16px; padding: 2px 4px; border-radius: 6px; background: #0b1528; color: var(--mic-light);
+}
+.seat-mic i { width: 2px; height: 9px; background: currentColor; border-radius: 2px; animation: mic-level .72s ease-in-out infinite alternate; }
+.seat-mic i:nth-child(2) { height: 12px; animation-delay: -.42s; }
+.seat-mic i:nth-child(3) { height: 6px; animation-delay: -.18s; }
+@keyframes mic-level { from { transform: scaleY(.4); } to { transform: scaleY(1); } }
+.seat-card[data-acting=true] { border-color: #ffe4ad; box-shadow: inset 0 2px #ffe4ad; }
+.seat-card[data-effect-target] { border-color: var(--fx-color); box-shadow: inset 0 0 16px color-mix(in srgb,var(--fx-color) 30%,transparent), 0 0 14px color-mix(in srgb,var(--fx-color) 48%,transparent); }
+.seat-impact { position:absolute; inset:0; border:2px solid var(--fx-color); border-radius:inherit; overflow:hidden; pointer-events:none; animation: impact-ring .64s ease-out both; }
+.seat-impact::after { content:''; position:absolute; inset:0; opacity:0; background:radial-gradient(ellipse at 50% 75%,var(--fx-color),transparent 65%); animation: impact-glow .65s ease-out both; }
+.seat-impact:is([data-effect=blade],[data-effect=duel],[data-effect=shot])::after { background:linear-gradient(126deg,transparent 40%,var(--fx-color) 48%,white 50%,transparent 53%); animation: impact-cut .58s ease-out both; }
+.seat-impact:is([data-effect=poison],[data-effect=heal])::after { background:radial-gradient(circle at 28% 70%,var(--fx-color) 2%,transparent 5%),radial-gradient(circle at 75% 55%,var(--fx-color) 3%,transparent 6%),linear-gradient(0deg,var(--fx-color),transparent 70%); animation: impact-vapor .72s ease-out both; }
+@keyframes impact-glow { 0% { opacity:0; } 30% { opacity:.64; } 100% { opacity:0; } }
+@keyframes impact-ring { from { opacity:.3; } 48% {opacity:1;} to {opacity:.65;} }
+@keyframes impact-cut { from {transform:translateX(60%);opacity:0;} 30% {opacity:.9;} to {transform:translateX(-60%);opacity:0;} }
+@keyframes impact-vapor { from {transform:translateY(35%);opacity:0;} 40% {opacity:.55;} to {transform:translateY(-12%);opacity:0;} }
+@media (prefers-reduced-motion: reduce) {
+  .circle-seat-card.ui-fade-up, .versus-side > .ui-fade-up { animation: none; }
+  .seat-mic i,.seat-card-speaking .seat-card-avatar,.seat-card-speaking .seat-card-avatar::before,.seat-impact,.seat-impact::after { animation:none; }
+}

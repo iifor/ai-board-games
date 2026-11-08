@@ -44,7 +44,7 @@ export function LobbyHero({ primaryGame, history }: LobbyHeroProps) {
         <Link
           className="lobby-hero-visual ui-fade-up"
           style={step(2)}
-          to={latest ? `/matches/${latest.id}` : '/history'}
+          to={latest ? `/matches/${latest.id}` : primaryGame ? `/play/${primaryGame.key}` : '/history'}
           data-game={latest?.gameKey}
           onPointerMove={parallax.onPointerMove}
           onPointerLeave={parallax.onPointerLeave}
@@ -60,7 +60,7 @@ export function LobbyHero({ primaryGame, history }: LobbyHeroProps) {
                 </span>
               ) : null}
             </span>
-            <b className="lobby-hero-strip-cta">{strip.action}</b>
+            <b className="lobby-hero-strip-cta">{latest || primaryGame ? strip.action : '查看历史 →'}</b>
           </span>
         </Link>
       </section>

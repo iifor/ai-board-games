@@ -1,4 +1,4 @@
-import type { GameCatalogItem, GameVariantItem, MatchSummaryDto } from '@battle/shared';
+import type { GameCatalogItem, GameVariantItem, MatchSummaryDto, VariantRoleItem } from '@battle/shared';
 import type { PlayerRange, SetupInitial } from './types';
 
 export function playerRange(game: GameCatalogItem, variantKey: string | null): PlayerRange {
@@ -21,6 +21,23 @@ export function readyLabel(count: number, range: PlayerRange): string {
 /** 按顺序切换选中；选中顺序即座位顺序 */
 export function toggleSelection(selected: readonly number[], id: number): number[] {
   return selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id];
+}
+
+export function debatePosition(group: VariantRoleItem | undefined, offset: number): string {
+  if (group?.team !== 'pro' && group?.team !== 'con') return '';
+  return `${['一', '二', '三', '四'][offset] ?? offset + 1}辩`;
+}
+
+/** 从候选列表中选出空位所需的玩家；已有座位不参与重排。 */
+export function fillOpenSeats(candidates: readonly number[], selected: readonly number[], max: number, randomize: boolean): number[] {
+  const pool = candidates.filter((id) => !selected.includes(id));
+  if (randomize) {
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+    }
+  }
+  return pool.slice(0, Math.max(0, max - selected.length));
 }
 
 /** 板子搜索：匹配名称、说明或任一角色名 */

@@ -48,18 +48,6 @@ export function hasSpotlight(kind: StageEvent['kind']): boolean {
   return kind === 'speech' || kind === 'judgement' || kind === 'narration' || kind === 'revealed' || kind === 'game_over' || kind === 'action';
 }
 
-/** 本轮夜晚已经走过的阶段标题（含当前），只用公开的 phase_started 事件 */
-export function nightStepsOf(played: readonly StreamItem[], current: StreamItem | null, view: AudienceView | null): readonly string[] {
-  if (!view || periodOf(view) !== 'night') return [];
-  const items = current ? [...played, current] : played;
-  const steps: string[] = [];
-  for (const { event } of items) {
-    if (event.kind !== 'phase_started' || event.round !== view.round || periodOf(event.view) !== 'night') continue;
-    if (steps[steps.length - 1] !== event.title) steps.push(event.title);
-  }
-  return steps;
-}
-
 /** 当前阶段里已经发言（或点评）的座位，含正在发言的 */
 export function speechOrderOf(played: readonly StreamItem[], current: StreamItem | null, view: AudienceView | null): readonly number[] {
   if (!view?.phase) return [];

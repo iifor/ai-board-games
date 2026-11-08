@@ -1,4 +1,5 @@
 import type { ColumnType, Generated } from 'kysely';
+import type { TraceKind, TraceModelSettings } from '@battle/shared';
 
 // 列名在 TS 中为 camelCase，由 CamelCasePlugin 映射为数据库中的 snake_case。
 
@@ -74,6 +75,7 @@ export interface PlayersTable {
 type Json<T> = ColumnType<T, string, string>;
 
 export interface MatchesTable {
+  traceDeleted: Generated<boolean>;
   id: string;
   gameKey: string;
   variantKey: string | null;
@@ -132,6 +134,7 @@ export interface MatchStageEventsTable {
 }
 
 export interface AiCallsTable {
+  traceSettings: Json<TraceModelSettings> | null;
   id: Generated<number>;
   matchId: string;
   requestId: string;
@@ -163,6 +166,11 @@ export interface RequestWindowsTable {
 }
 
 export interface Database {
+  matchTraceNodes: {
+    id: Generated<number>; matchId: string; round: number; phaseId: string | null; visit: number;
+    kind: TraceKind; label: string; seat: number | null; seq: number | null;
+    requestIds: Json<readonly string[]>; inputRequestId: string | null; data: Json<unknown> | null; createdAt: CreatedAt;
+  };
   adminUsers: AdminUsersTable;
   modelProviders: ModelProvidersTable;
   models: ModelsTable;

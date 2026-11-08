@@ -1,0 +1,63 @@
+.stage-record {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: min(100%, 58vh);
+  min-height: 0;
+  overflow: hidden;
+}
+.stage-record .event-feed { align-content: start; }
+.stage-record .event-feed li { font-size: clamp(14px, 1.1vw, 22px); overflow-wrap: anywhere; }
+
+.stage-record header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.stage-record h2 {
+  margin: 0 auto 0 0;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.stage-feed-filters {
+  display: flex;
+  gap: 4px;
+}
+
+.stage-feed-filters button,
+.stage-feed-close {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 14px;
+  color: rgba(230, 239, 255, 0.76);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  transition: color var(--ui-motion-fast) ease, background-color var(--ui-motion-fast) ease;
+}
+
+.stage-feed-filters button:hover,
+.stage-feed-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.stage-feed-filters button.is-active {
+  color: #fff;
+  background: var(--game-accent-soft);
+}
+
+.stage-feed-close {
+  width: 28px;
+  padding: 0;
+  font-size: 16px;
+}
+
+@media (max-width: 860px) {
+  .stage-record { height: min(400px, 48vh); }
+}

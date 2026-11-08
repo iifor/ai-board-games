@@ -1,10 +1,11 @@
 import { Select, Space, Switch, Table, Tag } from 'antd';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import type { LogEntryDto } from '../../../services/matches';
 import { channelColor, describeLog } from '../utils';
 
 /** 完整日志（含私密、阵营与 host 频道），可按频道筛选、只看兜底 */
-export function LogPanel({ log }: { readonly log: readonly LogEntryDto[] }) {
+export function LogPanel({ log, matchId }: { readonly log: readonly LogEntryDto[]; readonly matchId: string | null }) {
   const [channel, setChannel] = useState<string | null>(null);
   const [fallbackOnly, setFallbackOnly] = useState(false);
   const channels = useMemo(() => [...new Set(log.map((entry) => entry.channel))].sort(), [log]);
@@ -23,6 +24,7 @@ export function LogPanel({ log }: { readonly log: readonly LogEntryDto[] }) {
         dataSource={[...shown]}
         pagination={{ pageSize: 50, hideOnSinglePage: true }}
         columns={[
+          { title: '溯源', key: 'trace', render: (_, row) => matchId ? <Link to={`/traces/${matchId}?seq=${row.seq}`}>调用链</Link> : '—' },
           { title: '#', dataIndex: 'seq', width: 60 },
           { title: '天', dataIndex: 'round', width: 50 },
           { title: '阶段', dataIndex: 'phaseId', width: 150 },

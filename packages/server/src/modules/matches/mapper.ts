@@ -28,6 +28,7 @@ export function toSummary(row: MatchRow, seats: readonly SeatRow[], game: Compil
 export function toDetail(row: MatchRow, seats: readonly SeatRow[], game: CompiledGame | null): MatchDetailDto {
   return {
     ...toSummary(row, seats, game),
+    traceDeleted: row.traceDeleted,
     pacing: row.pacing,
     lastSeq: row.lastSeq,
     ackedSeq: row.ackedSeq,

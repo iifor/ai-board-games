@@ -16,10 +16,13 @@
     linear-gradient(180deg, rgba(12, 25, 62, 0.88), rgba(5, 9, 28, 0.94));
 }
 
-/* 记录侧栏展开时整体左移，与舞台让位一致 */
-.stage-shell[data-feed-open='true'] .subtitle-bar {
-  right: 340px;
-  width: min(900px, calc(100% - 660px));
+.subtitle-live-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .subtitle-bar.is-idle {
@@ -29,6 +32,11 @@
   color: var(--ui-text-muted);
   font-size: 14px;
   letter-spacing: 0.08em;
+}
+.subtitle-bar:is([data-kind='speech'],[data-kind='judgement']) .subtitle-speaker {
+  border-inline-start: 3px solid var(--game-accent-strong);
+  padding-inline-start: 9px;
+  background: linear-gradient(90deg, var(--game-accent-soft), transparent 84%);
 }
 
 .subtitle-inner {
@@ -56,6 +64,7 @@
   background: rgba(5, 18, 45, 0.9);
   box-shadow: 0 0 22px var(--game-accent-soft);
 }
+.subtitle-avatar img { position: absolute; inset: 0; }
 
 .subtitle-speaker > span {
   display: grid;
@@ -136,10 +145,10 @@
 }
 
 @media (max-width: 860px) {
-  .subtitle-bar,
-  .stage-shell[data-feed-open='true'] .subtitle-bar {
+  .subtitle-bar {
     width: auto;
     max-height: none;
+    margin-inline: 0;
   }
 
   .subtitle-inner {

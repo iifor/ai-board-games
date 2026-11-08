@@ -8,8 +8,9 @@ import { playersApi } from '../../../services/resources';
 
 interface Values {
   gameKey: string;
-  variant?: string;
+  variant?: string | undefined;
   playerIds: number[];
+  generatePlayers: boolean;
   seed?: number;
   breakpoints: string[];
   pacing: 'ack' | 'free';
@@ -26,10 +27,13 @@ export function CreateDebugMatchModal({ open, onClose, onCreated }: { readonly o
   const [saving, setSaving] = useState(false);
   const gameKey = Form.useWatch('gameKey', form);
   const scripted = Form.useWatch('scripted', form);
+  const generatePlayers = Form.useWatch('generatePlayers', form);
+  const variantKey = Form.useWatch('variant', form);
   const catalog = useAsync(fetchCatalog, []);
   const players = useAsync(playersApi.list, []);
   const graph = useAsync(() => (gameKey ? fetchPhaseGraph(gameKey) : Promise.resolve(null)), [gameKey]);
   const game = catalog.status === 'ready' ? catalog.data.find((item) => item.key === gameKey) : undefined;
+  const range = game?.variants.find((variant) => variant.key === variantKey)?.players ?? game?.players;
 
   const submit = async () => {
     const values = await form.validateFields();
@@ -38,11 +42,12 @@ export function CreateDebugMatchModal({ open, onClose, onCreated }: { readonly o
       const request: CreateDebugMatchRequest = {
         gameKey: values.gameKey,
         variant: values.variant,
-        playerIds: values.playerIds,
+        ...(values.generatePlayers
+          ? { generatePlayers: true, scripted: true }
+          : { playerIds: values.playerIds, scripted: values.scripted }),
         seed: values.seed,
         breakpoints: values.breakpoints.includes('*all') ? 'all' : values.breakpoints,
         pacing: values.pacing,
-        scripted: values.scripted,
         // 混沌脚本只在脚本化时有意义；关掉脚本化后不把它带给服务端
         chaos: values.scripted && values.chaos,
       };
@@ -57,18 +62,28 @@ export function CreateDebugMatchModal({ open, onClose, onCreated }: { readonly o
 
   return (
     <Modal title="创建调试局" open={open} onOk={submit} confirmLoading={saving} onCancel={onClose} destroyOnHidden width={640}>
-      <Form form={form} layout="vertical" initialValues={{ breakpoints: [], pacing: 'free', scripted: true, chaos: false, playerIds: [] }}>
+      <Form form={form} layout="vertical" initialValues={{ breakpoints: [], pacing: 'free', scripted: true, generatePlayers: true, chaos: false, playerIds: [] }}>
         <Form.Item name="gameKey" label="游戏" rules={[{ required: true }]}>
-          <Select options={catalog.status === 'ready' ? catalog.data.map((item) => ({ value: item.key, label: item.title })) : []} />
+          <Select onChange={(key: string) => {
+            const next = catalog.status === 'ready' ? catalog.data.find((item) => item.key === key) : undefined;
+            form.setFieldsValue({ variant: next?.defaultVariant ?? undefined, breakpoints: [] });
+          }} options={catalog.status === 'ready' ? catalog.data.map((item) => ({ value: item.key, label: item.title })) : []} />
         </Form.Item>
         {game?.variants.length ? (
-          <Form.Item name="variant" label="板子" initialValue={game.defaultVariant ?? undefined}>
+          <Form.Item name="variant" label="板子">
             <Select options={game.variants.map((variant) => ({ value: variant.key, label: variant.name }))} />
           </Form.Item>
         ) : null}
-        <Form.Item name="playerIds" label={`玩家（按选择顺序就座${game ? `，${game.players.min}–${game.players.max} 人` : ''}）`} rules={[{ required: true, type: 'array', min: 1 }]}>
-          <Select mode="multiple" options={players.status === 'ready' ? players.data.filter((item) => item.enabled).map((item) => ({ value: item.id, label: item.name })) : []} />
+        <Form.Item name="generatePlayers" label="自动生成模拟玩家" valuePropName="checked"
+          extra={generatePlayers && range ? `本局生成 ${range.min} 名临时玩家，由脚本代替模型行动。` : undefined}>
+          <Switch disabled={!scripted} />
         </Form.Item>
+        {!generatePlayers && (
+          <Form.Item name="playerIds" label={`玩家（按选择顺序就座${range ? `，${range.min}–${range.max} 人` : ''}）`}
+            rules={[{ required: true, type: 'array', min: range?.min ?? 1, max: range?.max ?? 32 }]}>
+            <Select mode="multiple" options={players.status === 'ready' ? players.data.filter((item) => item.enabled).map((item) => ({ value: item.id, label: item.name })) : []} />
+          </Form.Item>
+        )}
         <Form.Item name="seed" label="种子（留空随机）"><InputNumber min={0} max={4294967295} style={{ width: '100%' }} /></Form.Item>
         <Form.Item name="breakpoints" label="断点（在进入这些阶段前暂停）">
           <Select mode="multiple" options={[{ value: '*all', label: '全部阶段' }, ...(graph.status === 'ready' && graph.data ? graph.data.phases.map((phase) => ({ value: phase.id, label: phase.title ? `${phase.id}（${phase.title}）` : phase.id })) : [])]} />
@@ -77,7 +92,7 @@ export function CreateDebugMatchModal({ open, onClose, onCreated }: { readonly o
           <Select options={[{ value: 'free', label: '不等待观众（连续生成）' }, { value: 'ack', label: '按观众播放确认推进' }]} />
         </Form.Item>
         <Form.Item name="scripted" label="脚本化（不调用模型与云端语音）" valuePropName="checked">
-          <Switch onChange={(checked) => { if (!checked) form.setFieldValue('chaos', false); }} />
+          <Switch onChange={(checked) => { if (!checked) form.setFieldsValue({ chaos: false, generatePlayers: false }); }} />
         </Form.Item>
         <Form.Item name="chaos" label="混沌脚本" valuePropName="checked" extra={CHAOS_HELP}>
           <Switch disabled={!scripted} />

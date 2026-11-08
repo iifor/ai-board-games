@@ -26,6 +26,21 @@ export interface RingOptions {
   readonly minScale?: number | undefined;
 }
 
+/** 与所有座位按钮留出间距的居中矩形，宽度和高度同时按舞台比例缩放。 */
+export function speechBox(box: RingSize, geometry: RingGeometry): RingSize {
+  const aspect = 2.3;
+  const gap = 6;
+  let halfHeight = Math.min(box.height / 2, box.width / (2 * aspect));
+  for (const seat of geometry.seats) {
+    const clearX = Math.abs(seat.x - box.width / 2) - geometry.card.width / 2 - gap;
+    const clearY = Math.abs(seat.y - box.height / 2) - geometry.card.height / 2 - gap;
+    // 满足横向或纵向分离之一，两个矩形便不会相交。
+    halfHeight = Math.min(halfHeight, Math.max(clearX / aspect, clearY));
+  }
+  const height = Math.max(0, Math.floor(halfHeight * 2));
+  return { width: Math.floor(height * aspect), height };
+}
+
 /** 圆桌的目标宽高比：舞台够宽时按这个比例摆成椭圆 */
 export const RING_RATIO = 1.7;
 

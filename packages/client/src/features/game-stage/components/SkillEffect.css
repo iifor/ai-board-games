@@ -1,0 +1,46 @@
+.skill-effect {
+  --fx-time: 590ms;
+  position: relative;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 3px;
+  max-width: 100%;
+  min-height: 0;
+  padding: 8px 14px;
+  text-align: center;
+  color: var(--fx-color);
+  pointer-events: none;
+  isolation: isolate;
+}
+.skill-effect::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -10% -14%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #0a1126ed 15%, #0a1328b8 47%, transparent 72%);
+}
+.skill-emblem {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(44px, 6vh, 68px);
+  aspect-ratio: 1;
+}
+.skill-emblem svg { width: 78%; overflow: visible; filter: drop-shadow(0 0 6px currentColor); animation: fx-appear var(--fx-time) ease-out both; }
+.skill-wave { position: absolute; inset: 0; border: 1px solid currentColor; border-radius: 50%; opacity: .28; animation: fx-wave var(--fx-time) ease-out both; }
+.skill-effect strong { font-size: clamp(14px, 2.2vh, 22px); line-height: 1.25; color: #fff; text-shadow: 0 1px 5px #000; }
+.skill-seats { font-size: 12px; font-weight: 750; letter-spacing: .05em; }
+.skill-effect:is([data-effect=blade],[data-effect=duel],[data-effect=shot]) svg { animation-name: fx-slash; }
+.skill-effect:is([data-effect=heal],[data-effect=poison],[data-effect=frost]) svg { animation-name: fx-rise; }
+.skill-effect:is([data-effect=shield],[data-effect=blast]) .skill-wave { box-shadow: 0 0 12px currentColor, inset 0 0 6px currentColor; }
+.skill-effect:is([data-effect=inspect],[data-effect=dream],[data-effect=seal]) .skill-wave { border-style: dashed; animation-name: fx-orbit; }
+@keyframes fx-appear { from { transform: scale(.7); opacity: .2; } 70% { transform: scale(1.07); } }
+@keyframes fx-wave { from { transform: scale(.45); opacity: .85; } to { transform: scale(1.2); opacity: .23; } }
+@keyframes fx-slash { from { transform: translate(18%, -22%) rotate(-28deg); opacity: .12; } 68% { transform: translate(-4%,5%) rotate(4deg); } }
+@keyframes fx-rise { from { transform: translateY(25%); opacity: .2; } }
+@keyframes fx-orbit { from { transform: rotate(-75deg) scale(.72); } to { transform: rotate(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .skill-effect .skill-emblem svg, .skill-effect .skill-wave { animation: none; }
+}

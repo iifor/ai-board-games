@@ -31,6 +31,7 @@ function applyFallback(env: ExecEnv, pending: PendingRequest, reason: string): v
     throw new SpecError(env.game.spec.key, [`阶段 ${pending.phaseId} 的兜底输出不合法：${invalid}`]);
   }
   env.log({ kind: 'fallback', seat: pending.seat, reason, channel: 'host' });
+  env.record('decision', '兜底', { reason, applied: parsed.data }, { seat: pending.seat });
   executor.store(env, phase, pending, parsed.data);
 }
 
@@ -47,6 +48,7 @@ export function receiveAiReply(env: ExecEnv, requestId: string, reply: AiReply):
   const parsed = executor.schema(env, phase, pending).safeParse(reply.output);
   const error = parsed.success ? executor.check(env, phase, pending, parsed.data) : formatZodIssues(parsed.error);
   if (parsed.success && !error) {
+    env.record('decision', '采纳', { applied: parsed.data }, { seat: pending.seat });
     executor.store(env, phase, pending, parsed.data);
     return;
   }
@@ -54,6 +56,7 @@ export function receiveAiReply(env: ExecEnv, requestId: string, reply: AiReply):
   const reason = error ?? '输出不合法';
   const retries = 'retries' in phase ? phase.retries ?? DEFAULT_RETRIES : DEFAULT_RETRIES;
   if (pending.attempt <= retries) {
+    env.record('decision', '校验拒绝', { reason }, { seat: pending.seat });
     if (!issueRequest(env, draftFromPending(env, pending), pending.attempt + 1, reason)) finishGame(env, 'budget');
     return;
   }

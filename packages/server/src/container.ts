@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { CompiledGame } from '@battle/engine';
 import type { AppConfig } from './config/env';
 import type { Db } from './db/database';
+import { createTraceRepository } from './modules/traces/repository';
+import { createTraceService } from './modules/traces/service';
 import { createPgNotifier, type BusTransport } from './db/notifier';
 import { createAiTaskRepository, createAiWorker, createTaskExecutor } from './modules/ai-worker';
 import { createAuthRepository, createAuthService, FAILED_LOGIN_WINDOW_MS } from './modules/auth';
@@ -80,6 +82,8 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
   });
   return {
     instanceId,
+    localDebugEnabled: config.env === 'development',
+    traces: createTraceService(createTraceRepository(db)),
     bus,
     repositories,
     games,

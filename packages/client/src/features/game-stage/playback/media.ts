@@ -1,4 +1,4 @@
-import { speechOf } from '@battle/shared';
+import { isSheriffChoice, speechOf } from '@battle/shared';
 import type { StreamItem } from '../types';
 import { describeEvent, displayDuration } from './describe';
 import type { SegmentControl } from './segment';
@@ -140,6 +140,8 @@ export function speak(text: string, control: SegmentControl): Promise<void> {
  * 其余按字数停留。静音时全部按字数停留。
  */
 export function present(item: StreamItem, control: SegmentControl): Promise<void> {
+  // 旧回放可能已缓存这段语音，仍以当前展示规则为准，短暂停留供座位动效播放。
+  if (isSheriffChoice(item.event)) return dwell(control, null);
   const { text } = describeEvent(item.event);
   if (!control.muted && item.audio) return playAudio(item.audio.url, control, text);
   const speech = control.muted ? null : speechOf(item.event);

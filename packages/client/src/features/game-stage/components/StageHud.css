@@ -103,3 +103,20 @@
     display: none;
   }
 }
+
+@media (max-width: 860px) {
+  .stage-hud { min-width: 0; }
+  .stage-hud-status { display: block; grid-column: 1 / -1; text-align: left; }
+  .stage-hud { row-gap: 2px; }
+}
+
+@media (min-width: 861px) {
+  .stage-shell[data-layout='circle'] .stage-hud {
+    width: fit-content;
+    min-width: 0;
+    max-width: calc(100% - var(--stage-rail-width) - 2 * var(--stage-gutter) - 16px);
+    grid-template-columns: minmax(0, auto) auto minmax(0, auto);
+  }
+  .stage-shell[data-layout='circle'] .stage-hud-status { display: block; }
+}
+.stage-shell[data-layout='circle'] .stage-hud-live { min-width: 0; padding: 2px 0; border: 0; background: transparent; }

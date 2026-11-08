@@ -1,9 +1,9 @@
-import type { AudienceView, StageEvent } from '@battle/shared';
+import type { StageEvent } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { matchStreamUrl } from '../../services/matches';
 import { resolvePoster } from '../../utils/posters';
-import { NightSteps } from './components/NightSteps';
+import { EventFeed } from './components/EventFeed';
 import { PhaseBanner } from './components/PhaseBanner';
 import { PlaybackControls } from './components/PlaybackControls';
 import { StageError } from './components/StageError';
@@ -14,7 +14,7 @@ import { VoteBoard } from './components/VoteBoard';
 import { SegmentControl } from './playback/segment';
 import { meta, seat, summary, view } from './stage.fixtures';
 import type { StreamItem } from './types';
-import { hasSpotlight, judgeBadges, nightStepsOf, periodOf, rosterByTeam, speechOrderOf } from './utils';
+import { hasSpotlight, judgeBadges, periodOf, rosterByTeam, speechOrderOf } from './utils';
 
 describe('stage derivations', () => {
   it('puts the acting seat in the spotlight for actions but not for tallies or phase titles', () => {
@@ -25,17 +25,17 @@ describe('stage derivations', () => {
   });
 
   const item = (event: StageEvent): StreamItem => ({ event, audio: null });
-  const nightView: AudienceView = { ...view, gameKey: 'werewolf', phase: { id: 'wolf_kill', title: '狼人击杀' }, extra: { period: 'night' } };
 
-  it('lists the night phases of the current round, in order and without repeats', () => {
-    const played = [
-      item({ ...meta, kind: 'phase_started', title: '天黑请闭眼', view: nightView }),
-      item({ ...meta, seq: 2, kind: 'phase_started', title: '守卫守护', view: nightView }),
-      item({ ...meta, seq: 3, kind: 'phase_started', title: '守卫守护', view: nightView }),
-    ];
-    const current = item({ ...meta, seq: 4, kind: 'phase_started', title: '狼人击杀', view: nightView });
-    expect(nightStepsOf(played, current, nightView)).toEqual(['天黑请闭眼', '守卫守护', '狼人击杀']);
-    expect(nightStepsOf(played, current, { ...nightView, extra: { period: 'day' } })).toEqual([]);
+  it('keeps night phases in the record and the live region without drawing a duplicate subtitle', () => {
+    const phase = item({ ...meta, kind: 'phase_started', title: '狼人夜聊' });
+    expect(renderToStaticMarkup(<EventFeed items={[phase]} />)).toContain('狼人夜聊');
+    const active = renderToStaticMarkup(<SubtitleBar quietIdle item={phase} view={view} />);
+    expect(active).toContain('aria-live="polite"');
+    expect(active).toContain('狼人夜聊');
+    expect(active).not.toContain('glass-panel');
+    const idle = renderToStaticMarkup(<SubtitleBar quietIdle item={null} view={view} />);
+    expect(idle).not.toContain('等待下一段');
+    expect(idle).not.toContain('glass-panel');
   });
 
   it('tracks who has spoken in the current phase and what the judges decided', () => {
@@ -51,6 +51,8 @@ describe('stage visuals', () => {
   it('maps player names to the built-in posters and falls back to the avatar', () => {
     expect(resolvePoster('豆包', null)).toBe('/player-poster-cutouts/doubao.webp');
     expect(resolvePoster('Claude', null, 'poster')).toBe('/player-posters/claude-code.webp');
+    expect(resolvePoster('主持人', null, 'poster')).toBe('/player-poster-cutouts/host.webp');
+    expect(resolvePoster('主持人', '/custom-host.png')).toBe('/custom-host.png');
     expect(resolvePoster('通义 千问', null)).toBe('/player-poster-cutouts/qwen.webp');
     expect(resolvePoster('阿明', 'https://x/a.png')).toBe('https://x/a.png');
     expect(resolvePoster('阿明', null)).toBeNull();
@@ -152,7 +154,6 @@ describe('stage visuals', () => {
         <SubtitleBar item={{ event: phase, audio: null }} view={view} />
         <PhaseBanner item={{ event: phase, audio: null }} />
         <VoteBoard event={tally} view={view} />
-        <NightSteps steps={['天黑请闭眼', '狼人击杀']} />
         <PlaybackControls options={{ speed: 1, paused: false, muted: false }} pending={2} finished={false} feedOpen={false} onChange={() => {}} onToggleFeed={() => {}} />
       </>,
     );
@@ -163,8 +164,9 @@ describe('stage visuals', () => {
 
   it('shows the connection state on the HUD and offers a retry only when the connection was lost', () => {
     const hud = (connection: 'connecting' | 'open' | 'lost' | 'closed', ended = false) =>
-      renderToStaticMarkup(<StageHud summary={summary} view={null} connection={connection} ended={ended} />);
+      renderToStaticMarkup(<StageHud summary={{ ...summary, status: 'waiting_ai' }} view={null} connection={connection} ended={ended} />);
     expect(hud('open')).toContain('LIVE');
+    expect(renderToStaticMarkup(<StageHud summary={{ ...summary, status: 'completed' }} view={null} connection="open" ended={false} />)).toContain('回放');
     expect(hud('connecting')).toContain('连接中');
     expect(hud('lost')).toContain('连接中断');
     expect(hud('lost')).toContain('is-lost');

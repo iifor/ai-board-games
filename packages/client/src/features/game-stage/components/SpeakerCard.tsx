@@ -8,7 +8,7 @@ interface SpeakerAvatarProps {
   readonly className?: string | undefined;
 }
 
-/** 大头像：带阵营色光环与座位号角标（内置海报 → 玩家头像 → 首字），发言者大卡与终局 MVP 共用 */
+/** 发言者大卡的头像，带阵营色光环与座位号角标。 */
 export function SpeakerAvatar({ seat, className }: SpeakerAvatarProps) {
   return (
     <span className={['speaker-avatar', className].filter(Boolean).join(' ')} data-team={seat.team ?? undefined}>
@@ -35,7 +35,7 @@ export function SpeakerCard({ seat }: SpeakerCardProps) {
       <span className="speaker-card-meta">
         <em className="ui-pill ui-pill-soft">{seat.seat} 号{seat.position === null ? '' : ` · ${seat.position}号位`}</em>
         <em className="ui-pill ui-pill-accent">{seat.roleName ?? '身份未知'}</em>
-        {seat.team ? <em className="ui-pill speaker-card-team">{teamLabel(seat.team)}</em> : null}
+        {seat.team && teamLabel(seat.team) !== seat.roleName ? <em className="ui-pill speaker-card-team">{teamLabel(seat.team)}</em> : null}
       </span>
     </div>
   );

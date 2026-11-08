@@ -15,14 +15,6 @@
   transition: transform var(--ui-motion-normal) var(--ui-ease-out), opacity var(--ui-motion-slow) ease, filter var(--ui-motion-slow) ease, box-shadow var(--ui-motion-normal) ease;
 }
 
-.seat-card-stack {
-  flex-direction: column;
-  gap: 6px;
-  width: 118px;
-  padding: 10px 8px 8px;
-  text-align: center;
-}
-
 /* 头像的图片 / 首字由 Avatar 组件负责，这里只定尺寸与光环 */
 .seat-card-avatar {
   width: 56px;
@@ -31,11 +23,6 @@
   background: rgba(3, 13, 35, 0.9);
   box-shadow: 0 0 18px rgba(39, 104, 219, 0.16);
   transition: border-color var(--ui-motion-fast) ease, box-shadow var(--ui-motion-normal) ease, transform var(--ui-motion-normal) ease;
-}
-
-.seat-card-stack .seat-card-avatar {
-  width: 72px;
-  height: 72px;
 }
 
 .seat-card-no {
@@ -158,20 +145,6 @@
 .seat-card-asleep .seat-card-avatar {
   border-color: rgba(130, 150, 210, 0.5);
   box-shadow: 0 0 14px rgba(120, 150, 230, 0.12);
-}
-
-.seat-card-eyes {
-  position: absolute;
-  top: 6px;
-  left: 8px;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 16px;
-  border-radius: 8px;
-  color: rgba(196, 210, 248, 0.78);
-  background: rgba(6, 12, 34, 0.7);
-  animation: ui-pop-in var(--ui-motion-normal) var(--ui-ease-out) both;
 }
 
 /* 环形布局里卡片按 ringGeometry 算出的 --seat-scale 整体缩放，不再靠媒体查询改尺寸 */

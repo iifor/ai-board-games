@@ -8,24 +8,28 @@ interface StageHudProps {
   readonly view: AudienceView | null;
   readonly connection: StreamConnection;
   readonly ended: boolean;
+  readonly replay?: boolean;
 }
 
 /** LIVE 标记的文字与修饰类：已结束 > 连上 > 自动重连已放弃 > 连接中 */
-function liveBadge(connection: StreamConnection, ended: boolean): { readonly label: string; readonly className: string } {
+function liveBadge(connection: StreamConnection, ended: boolean, replay: boolean): { readonly label: string; readonly className: string } {
   if (ended) return { label: '已结束', className: 'is-ended' };
-  if (connection === 'open') return { label: 'LIVE', className: 'is-live' };
+  if (connection === 'open' || (connection === 'closed' && replay)) return replay ? { label: '回放', className: 'is-replay' } : { label: 'LIVE', className: 'is-live' };
   if (connection === 'lost') return { label: '连接中断', className: 'is-lost' };
   return { label: '连接中', className: '' };
 }
 
 /** 顶部直播条：游戏与板子、LIVE 状态、当前阶段 */
-export function StageHud({ summary, view, connection, ended }: StageHudProps) {
-  const live = liveBadge(connection, ended);
-  const status = view?.phase ? `${roundLabel(view)} · ${view.phase.title}` : view?.status === 'completed' ? '对局已结束' : '准备中';
+export function StageHud({ summary, view, connection, ended, replay = summary.status === 'completed' }: StageHudProps) {
+  const live = liveBadge(connection, ended, replay);
+  const phase = view?.phase;
+  const mode = summary.variantName ?? (typeof view?.extra.board === 'string' ? view.extra.board : null);
+  const title = phase?.title === phase?.id && /^[a-z_]+$/.test(phase?.id ?? '') ? '技能结算' : phase?.title;
+  const status = view && title ? `${roundLabel(view)} · ${title}` : view?.status === 'completed' ? '对局已结束' : '准备中';
   return (
     <header className="stage-hud glass-panel" aria-label="对局状态">
       <div className="stage-hud-identity">
-        <span className="hud-label">{summary.variantName ?? '对局'}</span>
+        {mode && <span className="hud-label">{mode}</span>}
         <strong>{summary.gameTitle}</strong>
       </div>
       <div className={`stage-hud-live ${live.className}`}>

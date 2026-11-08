@@ -38,9 +38,13 @@ const speechLog = (log: readonly LogEntry[]) =>
 describe('debate setup', () => {
   it('accepts 9-12 players and rejects fewer', () => {
     expect(() => createSnapshot(debateGame, { seed: 1, players: makePlayers(8) })).toThrow(/9-12/);
-    for (const count of [9, 12]) {
-      const snapshot = createSnapshot(debateGame, { seed: 1, players: makePlayers(count) });
-      expect(snapshot.seats.filter((seat) => seat.role === 'judge')).toHaveLength(count - 8);
+    for (const count of [9, 10, 11, 12]) {
+      const players = makePlayers(count).reverse();
+      for (const seed of [1, 27]) {
+        const { seats } = createSnapshot(debateGame, { seed, players });
+        expect(seats.map((seat) => seat.profile.playerId)).toEqual(players.map((player) => player.playerId));
+        expect(seats.map((seat) => seat.role)).toEqual([...Array(4).fill('pro'), ...Array(4).fill('con'), ...Array(count - 8).fill('judge')]);
+      }
     }
   });
 

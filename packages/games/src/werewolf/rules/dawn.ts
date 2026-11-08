@@ -23,13 +23,13 @@ export function announceDawn(ctx: WerewolfContext): ComputeOutcome<WerewolfState
     deaths,
     notes: [],
   };
-  const { state, notes } = specialDawnSteps.reduce<DawnDraft>((draft, step) => step(ctx, draft), initial);
+  const { state, notes, effects = [] } = specialDawnSteps.reduce<DawnDraft>((draft, step) => step(ctx, draft), initial);
   const news = deaths.length
     ? `天亮了，昨晚死亡的是：${deaths.map((death) => `${death.seat}号`).join('、')}。`
     : '天亮了，昨晚是平安夜。';
   return {
     state,
-    log: [{ kind: 'narration', text: [news, ...notes].join('') }],
+    log: [{ kind: 'narration', text: [news, ...notes].join('') }, ...effects],
     eliminate: deaths.map((death) => ({ seat: death.seat, reason: '昨晚死亡', cause: death.cause })),
   };
 }

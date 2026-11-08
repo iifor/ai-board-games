@@ -14,6 +14,7 @@ interface VoteState {
   candidates: Record<string, number[]>;
   /** 座位 → 目标；null 为弃票 */
   ballots: Record<string, number | null>;
+  ballotRequests?: Record<string, string>;
   /** 额外票：座位 → 票数（进入阶段时确定；旧快照中可能没有） */
   readonly bonus?: Record<string, number>;
   issued: boolean;
@@ -47,6 +48,7 @@ function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, tied: readon
   const state = env.phaseState<VoteState>();
   const title = phase.title ?? env.phaseId();
   const ballots = ballotsOf(state);
+  const requestIds = Object.values(state.ballotRequests ?? {});
   env.log({
     kind: 'vote_tallied',
     title,
@@ -57,9 +59,9 @@ function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, tied: readon
     tied: [...tied],
     outcome,
     channel: phase.channel ?? 'public',
-  });
+  }, requestIds);
   if (phase.onResult === 'eliminate' && outcome.kind === 'selected') {
-    env.eliminate(outcome.seat, phase.eliminateReason ?? `${title}出局`, phase.eliminateCause ?? env.phaseId());
+    env.eliminate(outcome.seat, phase.eliminateReason ?? `${title}出局`, phase.eliminateCause ?? env.phaseId(), requestIds);
   }
   const result = { kind: 'vote', outcome, rounds: state.stage + 1, tied: [...tied], ballots } as const;
   if (phase.apply) env.setState(phase.apply(env.ctx(result), outcome));
@@ -79,8 +81,9 @@ function startRunoff(env: ExecEnv, phase: Phase, tied: readonly number[]): StepO
     tied: [...tied],
     outcome: null,
     channel: phase.channel ?? 'public',
-  });
+  }, Object.values(state.ballotRequests ?? {}));
   state.stage += 1;
+  state.ballotRequests = {};
   state.candidates = Object.fromEntries(
     state.voters.map((voter) => [String(voter), (state.candidates[String(voter)] ?? []).filter((seat) => tied.includes(seat))]),
   );
@@ -169,6 +172,8 @@ export const voteExecutor: AiPhaseExecutor<Phase> = {
   },
 
   store(env, _phase, pending, value) {
-    env.phaseState<VoteState>().ballots[String(pending.seat)] = (value as VoteOutput).target;
+    const state = env.phaseState<VoteState>();
+    state.ballots[String(pending.seat)] = (value as VoteOutput).target;
+    if (env.collectTrace) (state.ballotRequests ??= {})[String(pending.seat)] = pending.id;
   },
 };

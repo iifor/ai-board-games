@@ -39,6 +39,7 @@ export function issueRequest(env: ExecEnv, draft: RequestDraft, attempt = 1, pre
   });
 
   s.pending.push(deepFreeze(cloneJson(pending)));
+  env.record('request', pending.action, { template: pending.templateName, previousError, previousRequestId: env.activeRequestId }, { seat: pending.seat, requestIds: [pending.id] });
   s.budgetUsed.aiRequests += 1;
   env.out.aiRequests.push({
     id: pending.id,

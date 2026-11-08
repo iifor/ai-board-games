@@ -16,8 +16,7 @@ export function TopicFields({ topic, onChange, incomplete }: TopicFieldsProps) {
     </label>
   );
   return (
-    <fieldset className="topic-fields">
-      <legend>自定义辩题（可选）</legend>
+    <fieldset className="topic-fields" aria-label="自定义辩题">
       {field('title', '辩题', 100)}
       {field('pro', '正方观点', 200)}
       {field('con', '反方观点', 200)}

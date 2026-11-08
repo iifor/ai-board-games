@@ -12,40 +12,24 @@
   width: min(320px, 100%);
   max-height: min(460px, 100%);
   padding: 16px 16px 12px;
-  border-color: var(--game-accent-soft);
   color: var(--ui-text);
   transform-origin: left top;
   animation: ui-pop-in var(--ui-motion-normal) var(--ui-ease-out) both;
 }
+.seat-popover.glass-panel { border: 0; }
 
 .seat-popover[data-side='left'] {
   transform-origin: right top;
 }
+/* 透明过渡区连接座位和卡片，缓慢移动指针也能进入发言记录。 */
+@media (min-width: 861px) {
+  .seat-popover::before { content: ''; position: absolute; inset: 0 100% 0 auto; width: var(--popover-gap); }
+  .seat-popover[data-side='left']::before { inset-inline: 100% auto; }
+}
 
-/* 容器聚焦只为读屏播报标题，不画焦点环；里面的关闭按钮仍有全局焦点环 */
-.seat-popover:focus {
+.seat-popover-speeches:focus-visible {
   outline: none;
-}
-
-.seat-popover-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 14px;
-  color: rgba(230, 239, 255, 0.76);
-  background: transparent;
-  font-size: 16px;
-  font-weight: 800;
-  transition: color var(--ui-motion-fast) ease, background-color var(--ui-motion-fast) ease;
-}
-
-.seat-popover-close:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+  background: #23324a;
 }
 
 .seat-popover-head {
@@ -53,7 +37,6 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: 12px;
   align-items: center;
-  padding-right: 24px;
 }
 
 /* 大头像：光环取阵营色（global.css 按 data-team 给出 --team-color），没有阵营时取游戏强调色 */
@@ -65,6 +48,7 @@
   box-shadow: 0 0 28px var(--game-accent-soft);
   font-size: 28px;
 }
+.seat-popover-avatar img { position: absolute; inset: 0; }
 
 .seat-popover-no {
   position: absolute;
@@ -126,7 +110,6 @@
   overflow-y: auto;
   list-style: none;
   font-size: 13px;
-  scrollbar-width: thin;
 }
 
 .seat-popover-speeches li {

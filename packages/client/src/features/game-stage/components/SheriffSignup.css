@@ -1,0 +1,45 @@
+.ring-seat-head .signup-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding-inline: 4px;
+  color: #ffdf85;
+  background: #322818e8;
+  font-size: 10px;
+  line-height: 18px;
+}
+.signup-badge svg { width: 15px; height: 15px; flex: none; fill: #e1aa40; }
+.signup-badge svg path + path { fill: #fff0b6; }
+.signup-effect { position: absolute; inset: 0; pointer-events: none; }
+.signup-flash {
+  position: absolute;
+  inset: 18px 20px 22px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #ffe2a055, #f5c76124 40%, transparent 72%);
+  animation: signup-rise var(--signup-duration) ease-out both;
+}
+.circle-seat-card:has(.signup-effect[data-joined='true']) .seat-figure-art {
+  animation: signup-figure var(--signup-duration, 400ms) ease-out;
+}
+.signup-effect[data-joined='false'] .signup-flash {
+  background: radial-gradient(ellipse, #b9c7df3b, transparent 70%);
+  animation-name: signup-pass;
+}
+.signup-effect[data-choice='退水'] .signup-flash { animation-name: signup-withdraw; }
+.circle-seat-card:has(.signup-effect[data-choice='退水']) .seat-figure-art {
+  animation: signup-figure-withdraw var(--signup-duration, 400ms) ease-out;
+}
+@keyframes signup-rise {
+  from { opacity: 0; transform: translateY(10px) scale(.7); }
+  35% { opacity: 1; }
+  to { opacity: 0; transform: translateY(-12px) scale(1.15); }
+}
+@keyframes signup-pass { from { opacity: .85; } to { opacity: 0; transform: scale(.75); } }
+@keyframes signup-withdraw { from { opacity: .85; } to { opacity: 0; transform: translateY(14px) scale(.65); } }
+@keyframes signup-figure { 45% { filter: drop-shadow(0 0 9px #ffdf85) brightness(1.15); } }
+@keyframes signup-figure-withdraw { 45% { filter: saturate(.45) brightness(.8); } }
+@media (prefers-reduced-motion: reduce) {
+  .signup-flash, .circle-seat-card:has(.signup-effect[data-choice]) .seat-figure-art { animation: none; }
+  .signup-flash { opacity: .5; }
+}

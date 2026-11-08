@@ -25,6 +25,7 @@ export type {
   AudioRef,
   ClientMessage,
   CreateDebugMatchRequest,
+  GeneratedMatchRequest,
   CreateMatchRequest,
   DebugCommandRequest,
   MatchDetailDto,
@@ -38,7 +39,7 @@ export type {
 } from './api/matches';
 export type { GameCatalogItem, GameVariantItem, StageLayout, VariantRoleItem } from './catalog';
 export { formatMatchTitle } from './format';
-export { speechOf } from './speech';
+export { isSheriffChoice, isSheriffSignup, speechOf } from './speech';
 export type { SpeechContent } from './speech';
 export type {
   AudienceSeat,
@@ -54,3 +55,4 @@ export type {
   VoteOutcome,
   VoteTallyRow,
 } from './stage';
+export type { TraceKind, TraceMark, TraceNodeDto, TraceNodeDetailDto, TraceMatchDto, MatchTraceDto, TraceRequestDto, TraceModelSettings, ModelUsageDto } from './api/traces';

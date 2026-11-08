@@ -30,7 +30,10 @@ export function createMatchController(service: MatchService, options: MatchContr
     adminCreate: async (c: Context<AppEnv>) => ok(c, await service.createDebug(await parseJson(c, createDebugMatchSchema)), 201),
     detail: async (c: Context<AppEnv>) => ok(c, await service.detail(matchId(c))),
     log: async (c: Context<AppEnv>) => ok(c, await service.log(matchId(c))),
-    aiCalls: async (c: Context<AppEnv>) => ok(c, await service.aiCalls(matchId(c))),
+    aiCalls: async (c: Context<AppEnv>) => {
+      c.header('Cache-Control', 'private, no-store');
+      return ok(c, await service.aiCalls(matchId(c)));
+    },
     debug: async (c: Context<AppEnv>) => {
       const { command } = await parseJson(c, debugCommandSchema);
       return ok(c, await service.debugCommand(matchId(c), command));

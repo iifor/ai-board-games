@@ -1,4 +1,5 @@
 import type { AiRequest } from '@battle/engine';
+import type { TraceModelSettings } from '@battle/shared';
 import { sql } from 'kysely';
 import type { Db } from '../../db/database';
 
@@ -72,18 +73,23 @@ export function createAiTaskRepository(db: Db) {
       seat: number;
       modelId: number | null;
       modelName: string;
+      traceSettings: TraceModelSettings;
       prompt: unknown;
       rawResponse: string | null;
       output: unknown;
       error: string | null;
       latencyMs: number;
       usage: unknown;
-    }) => db.insertInto('aiCalls').values({
-      ...values,
-      prompt: JSON.stringify(values.prompt),
-      output: values.output === undefined ? null : JSON.stringify(values.output),
-      usage: values.usage === null ? null : JSON.stringify(values.usage),
-    }).execute(),
+    }) => db.transaction().execute(async (trx) => {
+      // 模型在事务外执行。共享行锁与删链互斥，即使晚到的调用也不会重新留下明细。
+      const match = await trx.selectFrom('matches').select('traceDeleted').where('id', '=', values.matchId).forShare().executeTakeFirst();
+      if (!match || match.traceDeleted) return;
+      await trx.insertInto('aiCalls').values({
+        ...values, traceSettings: JSON.stringify(values.traceSettings), prompt: JSON.stringify(values.prompt),
+        output: values.output === undefined ? null : JSON.stringify(values.output),
+        usage: values.usage === null ? null : JSON.stringify(values.usage),
+      }).execute();
+    }),
   };
 }
 

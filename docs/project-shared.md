@@ -9,6 +9,8 @@
 
 `StageEvent = StagePayload & StageEventMeta & { view: AudienceView }`。
 
+观战专用频道 `spectator` 用于已经结算的视觉提示，不进入任何 AI 的可见历史。技能结算复用 `revealed`，其 `data` 可携带 `effect`、`title` 和实际受影响的 `target`。上帝视图记录全员身份，以及此刻可以公开的 `publicRoles` 和已经翻牌的 `shownRoles`。服务端使用这两项生成单座位视图。
+
 | kind | 字段 | 说明 |
 | --- | --- | --- |
 | `phase_started` | `title` | 进入有标题的阶段 |
@@ -28,6 +30,10 @@
 
 ## REST 契约（api/*）
 
+`api/traces.ts` 定义管理员可见的调用链契约：轻量节点索引包含阶段访问、直接请求 ID、此次推进输入和事件序号；节点详情含规则快照、关联决策、模型尝试或舞台视图。调用链独立删除后管理端对局详情通过 `traceDeleted` 表示停止采集。观众协议不包含这些诊断字段。
+
+`GeneratedMatchRequest` 仅含游戏键、可选板子与参数，供本地调试开局使用。`CreateDebugMatchRequest` 支持按 `playerIds` 选择已有玩家，或用 `generatePlayers: true`、`scripted: true` 生成阵容，二者互斥。生成座位的 `MatchSeatDto.playerId` 为 `null`，可通过本局座位号区分。
+
 - `common.ts`：`ApiResponse` 统一响应、`API_ERROR_CODES`、`isApiSuccess` 类型守卫。
 - `auth.ts`：登录、改密、当前管理员。
 - `resources.ts`：供应商（只有 `apiKeyMasked`，含 `modelCount`）、模型（含 `disabledReason` / `disabledAt`，以及连接测试结果 `ModelTestResult`）、音色（`language`、`gender`、`style`、`rate`、`pitch`、`sampleText`、`description`，以及试听请求/结果与导入结果）、玩家及公开玩家信息；`*Input` 中的可选字段允许 `undefined`（与 zod optional 一致）。四种资源的 `enabled` 都是：创建时省略默认 true，更新时省略保留原值。
@@ -35,12 +41,15 @@
 
 ## 游戏目录（catalog.ts）
 
+可选的 `GameCatalogItem.seatGroups` 按座号列出可预览的公开分组，复用 `VariantRoleItem`。其 `count` 按人数上限计算，数量可变时另有 `minCount`。狼人杀只返回模式的角色构成，辩论赛返回正方、反方和评委席。
+
 `GameCatalogItem`：`key`、`title`、`description`、`players`、`layout`（`versus` / `circle`）、`variants`（key、name、description、players，以及展示用的角色构成 `roles`：角色名、阵营、数量，`rest` 按人数上限折算）、`defaultVariant`。服务端从游戏注册表生成，前端不硬编码游戏列表。
 
 ## 两端共用的口径（speech.ts、format.ts）
 
 - `speechOf(event)`：哪些舞台事件要朗读、读什么——返回 `{ text, seat }`（`seat` 为 null 表示主持人声音）或 null（阶段标题、计票、出局提示、兜底记录只展示不朗读）。服务端据此合成语音，客户端据此决定是否朗读与朗读文本，两边只认这一处：评委点评连同判定一起读（`判定。点评`），行动（开枪、自爆……）、播报、揭示、终局总结由主持人读。
 - `formatMatchTitle(match)`："游戏 · 板子"，没有板子时只有游戏名；C 端与 B 端共用。
+- `isSheriffChoice(event)`：识别狼人杀 `sheriff_signup`、`sheriff_withdraw` 的行动事件；`speechOf` 对上警／不上警、退水／继续竞选选择返回 null，服务端不合成逐人语音，客户端使用座位动效展示。`isSheriffSignup(event)` 只识别其中的上警选择，供候选状态计算使用。竞选发言及当选播报正常朗读。
 
 ## 测试约定
 

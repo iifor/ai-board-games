@@ -1,78 +1,81 @@
-.setup-form {
-  display: grid;
-  gap: 16px;
+.app-main:has(> .setup-form) {
+  max-width: 1560px;
+  padding-inline: clamp(16px, 3vw, 44px);
 }
+
+.setup-form { display: grid; gap: 20px; }
+
+.setup-header {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 8px;
+  min-height: 120px;
+  padding: 18px clamp(18px, 3vw, 36px);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background-color: #101c32;
+  background-image: linear-gradient(95deg, #101c32 20%, rgba(16, 28, 50, .95) 46%, rgba(16, 28, 50, .15) 82%), var(--setup-scene, none);
+  background-position: center, right 69%;
+  background-size: cover, max(56%, 360px) auto;
+  background-repeat: no-repeat;
+}
+
+[data-game='debate'] .setup-header { --setup-scene: url('/stage/debate.png'); }
+[data-game='werewolf'] .setup-header { --setup-scene: url('/stage/werewolf-night.png'); }
+.setup-back { color: var(--ui-text-muted); font-size: 13px; text-decoration: none; }
+.setup-back:hover { color: var(--ui-text); text-decoration: underline; }
+
+.setup-title, .setup-players-head, .setup-tools, .setup-lineup-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setup-title { flex-wrap: wrap; gap: 16px; }
+.setup-title h1 { margin: 0; font-size: clamp(26px, 2.3vw, 38px); line-height: 1.15; }
+.setup-title > span { padding-left: 16px; border-left: 1px solid var(--ui-border-strong); color: var(--game-accent-strong); }
 
 .setup-columns {
   display: grid;
-  grid-template-columns: 380px minmax(0, 1fr);
-  gap: 28px;
+  grid-template-columns: clamp(260px, 24%, 340px) minmax(0, 1fr);
   align-items: start;
+  gap: clamp(16px, 2vw, 30px);
 }
 
-.setup-side {
-  position: sticky;
-  top: 76px;
-  display: grid;
-  gap: 14px;
+.setup-side, .setup-players { display: grid; align-content: start; gap: 12px; min-width: 0; }
+
+.setup-settings, .setup-lineup {
+  min-width: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-bg-surface-soft);
 }
 
-.setup-back {
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-}
+.setup-lineup { padding: 16px; }
+.setup-settings summary { padding: 14px 16px; cursor: pointer; font-weight: 750; }
+.setup-settings summary::marker { color: var(--game-accent-strong); }
+.setup-settings summary small { margin-left: 6px; color: var(--ui-text-muted); font-weight: 500; }
+.setup-settings[open] summary { border-bottom: 1px solid var(--ui-border); }
+.setup-debug { display: grid; gap: 10px; padding: 14px 16px; justify-items: start; }
+.setup-debug p, .setup-players-head p { margin: 0; color: var(--ui-text-muted); font-size: 13px; }
+.setup-empty { grid-template-columns: minmax(0, 640px); }
 
-.setup-side h1 {
-  margin: 0;
-  font-size: 30px;
-  font-weight: 900;
-}
+.setup-lineup-head, .setup-players-head { justify-content: space-between; }
+.setup-players-head { flex-wrap: wrap; row-gap: 8px; }
+.setup-players-head h2, .setup-lineup-head h2 { margin: 0; line-height: 1.4; }
+.setup-players-head h2 { font-size: 22px; }
+.setup-lineup-head h2 { font-size: 16px; }
+.setup-lineup-head > span { color: var(--game-accent-strong); font-size: 13px; font-variant-numeric: tabular-nums; }
+.setup-tools { gap: 6px; }
+.setup-tools .button { border-radius: var(--ui-radius-sm); }
+.setup-error { margin: 0; padding: 10px 14px; border-radius: var(--ui-radius-sm); color: #ffd9dd; background: var(--ui-danger-soft); }
 
-.setup-players {
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-}
-
-.setup-players-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.setup-players-head h2 {
-  margin: 0 auto 0 0;
-  font-size: 18px;
-  font-weight: 900;
-}
-
-.setup-players-head h2 span {
-  margin-left: 8px;
-  color: var(--ui-text-muted);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.setup-error {
-  margin: 0;
-  padding: 10px 14px;
-  border: 1px solid rgba(255, 105, 119, 0.4);
-  border-radius: var(--ui-radius-sm);
-  color: #ffd9dd;
-  background: rgba(91, 19, 35, 0.4);
-}
-
-@media (max-width: 960px) {
-  .setup-columns {
-    grid-template-columns: 1fr;
-  }
-
-  .setup-side {
-    position: static;
-  }
-
-  .board-picker-list {
-    max-height: 320px;
-  }
+@media (max-width: 780px) {
+  .setup-form, .setup-columns { gap: 12px; }
+  .setup-columns { grid-template-columns: minmax(0, 1fr); }
+  .setup-side { display: contents; }
+  .setup-players { order: 1; }
+  .setup-debug-settings { order: 2; }
+  .setup-header { min-height: 94px; }
 }

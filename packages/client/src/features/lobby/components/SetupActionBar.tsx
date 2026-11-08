@@ -19,7 +19,7 @@ export function SetupActionBar({ boardName, count, range, hint, topicPartial, su
   const pulse = usePulseOnce(ready);
   return (
     <div className="setup-action-bar">
-      <div className="setup-action-status glass-panel">
+      <div className="setup-action-status" role="status">
         <div className="setup-action-board">
           <span className="hud-label">本局</span>
           <strong>{boardName} · {count} / {range.max} 人已就座</strong>

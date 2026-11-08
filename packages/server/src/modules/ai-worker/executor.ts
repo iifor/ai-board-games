@@ -43,10 +43,14 @@ function failed(task: ClaimedTask, reason: string): TaskResult {
 export function createTaskExecutor(deps: ExecutorDeps) {
   async function callModel(task: ClaimedTask, model: SeatModel): Promise<{ output: unknown } | { error: string; retryable: boolean }> {
     const started = Date.now();
-    const base = { matchId: task.matchId, requestId: task.requestId, seat: task.seat, modelId: model.modelId, modelName: model.name, prompt: task.request.prompt };
+    const base = {
+      matchId: task.matchId, requestId: task.requestId, seat: task.seat, modelId: model.modelId, modelName: model.name, prompt: task.request.prompt,
+      traceSettings: { model: model.model, providerId: model.providerId, temperature: model.temperature, maxTokens: model.maxTokens },
+    };
+    let response: Awaited<ReturnType<LlmClient['complete']>>;
     try {
       const credentials = await deps.providers.credentials(model.providerId);
-      const response = await deps.llm.complete({
+      response = await deps.llm.complete({
         baseUrl: credentials.baseUrl,
         apiKey: credentials.apiKey,
         model: model.model,
@@ -55,9 +59,6 @@ export function createTaskExecutor(deps: ExecutorDeps) {
         maxTokens: model.maxTokens,
         timeoutMs: LLM_TIMEOUT_MS,
       });
-      const output = extractJson(response.content);
-      await deps.tasks.recordCall({ ...base, rawResponse: response.content, output, error: null, latencyMs: Date.now() - started, usage: response.usage });
-      return { output };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await deps.tasks.recordCall({ ...base, rawResponse: null, output: undefined, error: message, latencyMs: Date.now() - started, usage: null });
@@ -68,6 +69,9 @@ export function createTaskExecutor(deps: ExecutorDeps) {
       }
       return { error: message, retryable: !quotaExhausted && error instanceof LlmError && error.retryable };
     }
+    const output = extractJson(response.content);
+    await deps.tasks.recordCall({ ...base, rawResponse: response.content, output, error: null, latencyMs: Date.now() - started, usage: response.usage });
+    return { output };
   }
 
   /** 主模型与备用模型中仍启用的部分；主模型被停用（如额度耗尽）时直接用备用模型 */

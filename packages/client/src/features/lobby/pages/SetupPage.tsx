@@ -18,6 +18,6 @@ export function SetupPage() {
   if (data.status === 'loading') return <StatusView kind="loading" />;
   if (data.status === 'error') return <StatusView kind="error" message={data.message} onRetry={data.reload} />;
   if (!data.data.game) return <StatusView kind="empty" message="游戏不存在" />;
-  if (!data.data.players.length) return <StatusView kind="empty" message="还没有可用的 AI 玩家，请先在后台创建" />;
+  if (!data.data.players.length && !import.meta.env.DEV) return <StatusView kind="empty" message="还没有可用的 AI 玩家，请先在后台创建" />;
   return <SetupForm game={data.data.game} players={data.data.players} initial={initial} />;
 }

@@ -7,7 +7,6 @@
   overflow-y: auto;
   list-style: none;
   font-size: 13px;
-  scrollbar-width: thin;
 }
 
 .event-feed li {

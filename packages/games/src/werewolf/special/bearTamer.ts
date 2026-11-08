@@ -1,4 +1,5 @@
 import { definePrompts, type ComputeOutcome } from '@battle/engine';
+import { spectatorEffect } from '../rules/spectatorEffects';
 import type { WerewolfPhases } from '../phases/types';
 import { checksAsWolf } from '../rules/appearance';
 import { hasRole } from '../rules/board';
@@ -36,7 +37,8 @@ const bearRoarNote: DawnStep = (ctx, draft) => {
   const tamer = ctx.seats.withRole('bear_tamer').list()[0];
   if (!tamer) return draft;
   const tamerAlive = tamer.alive && !draft.deaths.some((death) => death.seat === tamer.seat);
-  return { ...draft, notes: [...draft.notes, tamerAlive && ctx.state.bearRoars ? '熊咆哮了。' : '熊没有咆哮。'] };
+  const text = tamerAlive && ctx.state.bearRoars ? '熊咆哮了' : '熊没有咆哮';
+  return { ...draft, notes: [...draft.notes, text + '。'], effects: [...(draft.effects ?? []), spectatorEffect('inspect', tamer.seat, text)] };
 };
 
 const bearTamerPhases = {

@@ -45,7 +45,7 @@ function resolveDuel(ctx: WerewolfContext, hit: boolean): ComputeOutcome<Werewol
     ? `${target}号是狼人，出局；今天的放逐投票取消，直接进入黑夜。`
     : `${target}号是好人，骑士以死谢罪，白天继续进行。`;
   return {
-    log: [{ kind: 'revealed', text: `${knight}号翻牌为骑士，决斗 ${target}号：${verdict}`, data: { seat: knight, role: 'knight' } }],
+    log: [{ kind: 'revealed', text: `${knight}号翻牌为骑士，决斗 ${target}号：${verdict}`, data: { seat: knight, role: 'knight', target } }],
     eliminate: hit
       ? [{ seat: target, reason: '被骑士决斗', cause: KNIGHT_DUEL }]
       : [{ seat: knight, reason: '决斗失败', cause: KNIGHT_FAILED }],

@@ -8,12 +8,14 @@ import type { StreamState } from '../types';
  * 收到事件后由播放器播放，播放完调用 ack；自动重连放弃后可 retry。
  * session 变化时从头重新订阅（"从头回放"）。
  */
-export function useMatchStream(matchId: string, session = 0) {
+export function useMatchStream(matchId: string, session = 0, seat: number | null = null, afterSeq = 0) {
   const [state, setState] = useState<StreamState>(INITIAL_STREAM_STATE);
   const connectionRef = useRef<MatchStreamConnection | null>(null);
 
   useEffect(() => {
-    const connection = new MatchStreamConnection(matchStreamUrl(matchId));
+    const url = new URL(matchStreamUrl(matchId));
+    if (seat !== null) url.searchParams.set('seat', String(seat));
+    const connection = new MatchStreamConnection(url.href, undefined, afterSeq);
     connectionRef.current = connection;
     setState(connection.state);
     const unsubscribe = connection.subscribe(() => setState(connection.state));
@@ -22,7 +24,7 @@ export function useMatchStream(matchId: string, session = 0) {
       connection.dispose();
       if (connectionRef.current === connection) connectionRef.current = null;
     };
-  }, [matchId, session]);
+  }, [matchId, session, seat, afterSeq]);
 
   const ack = useCallback((seq: number) => connectionRef.current?.ack(seq), []);
   const retry = useCallback(() => connectionRef.current?.retry(), []);

@@ -89,6 +89,7 @@ export function enterPhase(env: ExecEnv): boolean {
   }
   s.visits[phaseId] = visit;
   s.cursor = { phaseId, entered: true, visit, phaseState: null };
+  env.record('phase', phase.title ?? phaseId, { action: phase.kind, trigger: s.activeTrigger });
   if (phase.title) env.log({ kind: 'phase_started', title: phase.title });
   executorFor(phase).enter(env, phase);
   return true;
@@ -113,6 +114,10 @@ export function completePhase(env: ExecEnv, result: PhaseResult | null): void {
   if (result) s.results[phaseId] = deepFreeze(cloneJson(result));
   else delete s.results[phaseId];
   const transition = resolveNext(env, env.phase().next, result);
+  if (s.cursor.entered && env.collectTrace) env.record('settlement', '规则结算', {
+    result, configuredNext: transition.goto, trigger: s.activeTrigger, state: s.state,
+    seats: s.seats.map(({ seat, role, team, alive }) => ({ seat, role, team, alive })),
+  });
   const target: ResumeTarget = transition.goto === RETURN_PHASE
     ? popChain(env, phaseId)
     : { goto: transition.goto, round: transition.round === 'increment' };

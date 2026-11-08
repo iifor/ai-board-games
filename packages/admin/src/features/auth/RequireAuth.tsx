@@ -8,7 +8,7 @@ export function RequireAuth({ children }: { readonly children: ReactNode }) {
   const { profile, loading } = useAuth();
   const location = useLocation();
   if (loading) return <Spin fullscreen />;
-  if (!profile) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!profile) return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
   if (profile.mustChangePassword) return <Navigate to="/password" replace />;
   return <>{children}</>;
 }

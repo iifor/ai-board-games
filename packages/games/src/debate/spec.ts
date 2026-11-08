@@ -7,7 +7,7 @@ const holdPosition = () => ({ speech: '我方坚持己方立场，请评委关�
 
 export const debateSpec = defineGame({
   key: 'debate',
-  version: 1,
+  version: 2,
   title: 'AI 辩论赛',
   description: '正反双方各四名辩手，经立论、攻辩、总结后由评委判定胜负并评选最佳辩手。',
   players: { min: 9, max: 12 },
@@ -20,7 +20,7 @@ export const debateSpec = defineGame({
     judge: { name: '评委', team: 'judge', identity: prompts.judge, publicRole: true },
   },
   seatLabel: debateSeatLabel,
-  setup: { assign: { pro: 4, con: 4, judge: 'rest' }, init: pickTopic },
+  setup: { assign: { pro: 4, con: 4, judge: 'rest' }, shuffle: false, init: pickTopic },
   state: { schema: debateStateSchema, visibility: { topic: 'public' } },
   start: 'topic_reveal',
   phases: {

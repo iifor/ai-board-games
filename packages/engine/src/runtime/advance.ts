@@ -76,13 +76,13 @@ function runUntilBlocked(env: ExecEnv): void {
 }
 
 /** 引擎唯一的推进入口：纯函数，不修改传入的快照 */
-export function advance(game: CompiledGame, snapshot: EngineSnapshot, input: EngineInput): AdvanceResult {
+export function advance(game: CompiledGame, snapshot: EngineSnapshot, input: EngineInput, collectTrace = true): AdvanceResult {
   if (snapshot.gameKey !== game.spec.key || snapshot.specHash !== game.hash) {
     throw new SpecMismatchError(`快照属于 ${snapshot.gameKey}@${snapshot.specHash}，与当前游戏定义不匹配`);
   }
   const out: Emitted = { log: [], stageEvents: [], aiRequests: [] };
-  const env = new ExecEnv(game, workingCopy(snapshot), out);
+  const env = new ExecEnv(game, workingCopy(snapshot), out, collectTrace);
   applyInput(env, input);
   runUntilBlocked(env);
-  return { snapshot: env.s, log: out.log, stageEvents: out.stageEvents, aiRequests: out.aiRequests, status: env.s.status };
+  return { snapshot: env.s, log: out.log, stageEvents: out.stageEvents, aiRequests: out.aiRequests, status: env.s.status, trace: env.trace };
 }

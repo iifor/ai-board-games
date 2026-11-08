@@ -6,7 +6,8 @@ import type { EventBus } from '../../utils/eventBus';
 import { conflict, notFound } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import type { MatchRepository } from './repository';
-import { TERMINAL_STATUSES, type AdvanceOutcome, type TaskCompletion } from './types';
+import { boundary, recordTrace } from '../traces/record';
+import { TERMINAL_STATUSES, type AdvanceOutcome, type LockedMatchRow, type TaskCompletion } from './types';
 
 const NOTHING: Omit<AdvanceOutcome, 'status'> = { events: [], tasks: [], stale: false };
 
@@ -21,42 +22,46 @@ const ENGINE_FAILURE_ERROR = '对局运行出错，已终止';
  */
 export function createMatchRuntime(repository: MatchRepository, findGame: (key: string) => CompiledGame, bus: EventBus) {
   /** 在已锁定对局行的事务里终止对局：标为失败、记下触发的任务（如有）、取消其余未完成任务 */
-  async function terminate(trx: Transaction<Database>, matchId: string, error: string, completion?: TaskCompletion): Promise<void> {
-    await repository.markFailed(trx, matchId, error);
-    if (completion) await repository.completeTask(trx, matchId, completion);
-    await repository.cancelOpenTasks(trx, [matchId]);
+  async function terminate(trx: Transaction<Database>, row: LockedMatchRow, error: string, completion?: TaskCompletion): Promise<void> {
+    await repository.markFailed(trx, row.id, error);
+    if (completion) await repository.completeTask(trx, row.id, completion, row.traceDeleted);
+    await repository.cancelOpenTasks(trx, [row.id]);
   }
 
   async function advanceMatch(matchId: string, input: EngineInput, completion?: TaskCompletion): Promise<AdvanceOutcome> {
     const outcome = await repository.transaction(async (trx): Promise<AdvanceOutcome> => {
       const row = await repository.lock(trx, matchId);
       if (!row) throw notFound('对局');
+      const source = 'requestId' in input ? input.requestId : null;
       if (TERMINAL_STATUSES.has(row.status)) {
         // 已结束的对局：迟到的 AI 结果直接作废，其他输入（如调试指令）视为冲突
         if (!completion) throw conflict('对局已结束');
-        await repository.completeTask(trx, matchId, { ...completion, status: 'cancelled' });
+        await repository.completeTask(trx, matchId, { ...completion, status: 'cancelled' }, row.traceDeleted);
         return { ...NOTHING, status: row.status, stale: true };
       }
       // 先做纯计算：引擎错误在这里处理；数据库写入在 try 之外，出错时整个事务回滚并向上抛出
       let result: ReturnType<typeof advance>;
       try {
-        result = advance(findGame(row.gameKey), row.snapshot, input);
+        result = advance(findGame(row.gameKey), row.snapshot, input, !row.traceDeleted);
       } catch (error) {
         if (error instanceof EngineInputError) {
           // AI 结果过期（阶段已被跳转等）不算错误；其他非法输入交给调用方
           if (!completion) throw conflict(error.message);
-          await repository.completeTask(trx, matchId, { ...completion, status: 'cancelled', error: error.message });
+          const [update] = await repository.completeTask(trx, matchId, { ...completion, status: 'cancelled', error: error.message }, row.traceDeleted);
+          if (update?.numUpdatedRows) await recordTrace(trx, row, source, [boundary('control', '丢弃过期回复', { reason: error.message }, row.snapshot)]);
           return { ...NOTHING, status: row.status, stale: true };
         }
         const message = error instanceof Error ? error.message : String(error);
         if (error instanceof SpecMismatchError) {
           // 快照来自旧版本的游戏定义：当前代码永远推进不了它，立即终止，不能当成过期结果留在 waiting_ai
           logger.warn('对局的游戏定义已更新，终止对局', { matchId, error: message });
-          await terminate(trx, matchId, SPEC_MISMATCH_ERROR, completion && { ...completion, status: 'cancelled', error: message });
+          await terminate(trx, row, SPEC_MISMATCH_ERROR, completion && { ...completion, status: 'cancelled', error: message });
+          await recordTrace(trx, row, source, [boundary('failure', SPEC_MISMATCH_ERROR, { reason: message }, row.snapshot)]);
           return { ...NOTHING, status: 'failed' };
         }
         logger.error('对局推进失败', { matchId, error: message });
-        await terminate(trx, matchId, ENGINE_FAILURE_ERROR, completion && { ...completion, status: 'failed' });
+        await terminate(trx, row, ENGINE_FAILURE_ERROR, completion && { ...completion, status: 'failed' });
+        await recordTrace(trx, row, source, [boundary('failure', ENGINE_FAILURE_ERROR, { reason: message }, row.snapshot)]);
         return { ...NOTHING, status: 'failed' };
       }
       const lastSeq = result.stageEvents.reduce((max, event) => Math.max(max, event.seq), row.lastSeq);
@@ -64,7 +69,15 @@ export function createMatchRuntime(repository: MatchRepository, findGame: (key: 
       await repository.saveAdvance(trx, matchId, { snapshot: result.snapshot, status, lastSeq, result: result.snapshot.result });
       await repository.insertTasks(trx, matchId, result.aiRequests);
       await repository.insertEvents(trx, matchId, result.stageEvents);
-      if (completion) await repository.completeTask(trx, matchId, completion);
+      if (completion) await repository.completeTask(trx, matchId, completion, row.traceDeleted);
+      const marks = [...result.trace];
+      if (input.kind === 'start') {
+        const { seed, specVersion, specHash, variantKey, params, seats, state } = row.snapshot;
+        marks.unshift(boundary('control', '开局', { seed, specVersion, specHash, variantKey, params, seats, state }, row.snapshot));
+      } else if (input.kind === 'debug') {
+        marks.unshift(boundary('control', input.command, input, row.snapshot));
+      }
+      await recordTrace(trx, row, source, marks);
       return { status, events: result.stageEvents, tasks: result.aiRequests, stale: false };
     });
 
@@ -84,7 +97,8 @@ export function createMatchRuntime(repository: MatchRepository, findGame: (key: 
     const failed = await repository.transaction(async (trx) => {
       const row = await repository.lock(trx, matchId);
       if (!row || TERMINAL_STATUSES.has(row.status)) return false;
-      await terminate(trx, matchId, error, completion);
+      await terminate(trx, row, error, completion);
+      await recordTrace(trx, row, completion.requestId, [boundary('failure', error, { reason: completion.error }, row.snapshot)]);
       return true;
     });
     if (failed) bus.emit('match:status', { matchId, status: 'failed' });

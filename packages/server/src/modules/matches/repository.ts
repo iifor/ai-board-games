@@ -5,6 +5,7 @@ import type { Db } from '../../db/database';
 import { JOB_LOCKS, PUBLIC_CREATION_LOCK, tryJobLock } from '../../db/locks';
 import type { Database } from '../../db/schema';
 import { VOICE_CHOICE_COLUMNS } from '../voices/repository';
+import { recordTrace, boundary } from '../traces/record';
 import type { LockedMatchRow, MatchRow, SeatRow, TaskCompletion } from './types';
 
 type Executor = Db | Transaction<Database>;
@@ -32,7 +33,7 @@ const SEAT_COLUMNS = ['seat', 'playerId', 'playerName', 'modelId', 'voiceId'] as
 /** 对局元数据列：不含快照（快照带全部日志，只有推进、脚本化输出与后台日志需要） */
 const MATCH_COLUMNS = [
   'id', 'gameKey', 'variantKey', 'status', 'debug', 'scripted', 'chaos', 'pacing', 'phaseId', 'version',
-  'lastSeq', 'ackedSeq', 'result', 'error', 'createdAt', 'completedAt',
+  'lastSeq', 'ackedSeq', 'result', 'error', 'createdAt', 'completedAt', 'traceDeleted',
 ] as const;
 
 function toRow<T extends MatchRow = MatchRow>(row: Record<string, unknown>): T {
@@ -42,7 +43,9 @@ function toRow<T extends MatchRow = MatchRow>(row: Record<string, unknown>): T {
 export function createMatchRepository(db: Db) {
   /** 取消这些对局里还没完成的任务（对局失败或被回收时） */
   const cancelOpenTasks = (trx: Executor, matchIds: readonly string[]) =>
-    trx.updateTable('aiTasks').set({ status: 'cancelled', updatedAt: new Date() })
+    trx.updateTable('aiTasks').set({ status: 'cancelled', updatedAt: new Date(),
+      request: sql`case when (select m.trace_deleted from matches m where m.id = ai_tasks.match_id) then '{}'::jsonb else request end`,
+    })
       .where('matchId', 'in', matchIds).where('status', 'in', OPEN_TASK_STATUSES).execute();
 
   return {
@@ -117,11 +120,12 @@ export function createMatchRepository(db: Db) {
     },
 
     /** 只有还在排队或执行中的任务才能被完结：迟到的结果不能把已 succeeded 的任务改成 cancelled */
-    completeTask: (trx: Executor, matchId: string, task: TaskCompletion) =>
+    completeTask: (trx: Executor, matchId: string, task: TaskCompletion, traceDeleted = false) =>
       trx.updateTable('aiTasks').set({
         status: task.status,
         output: task.output === undefined ? null : JSON.stringify(task.output),
         error: task.error,
+        ...(traceDeleted ? { request: '{}', output: null, error: null } : {}),
         claimedUntil: null,
         updatedAt: new Date(),
       }).where('matchId', '=', matchId).where('requestId', '=', task.requestId).where('status', 'in', OPEN_TASK_STATUSES).execute(),
@@ -193,9 +197,14 @@ export function createMatchRepository(db: Db) {
           .set({ status: 'failed', error, updatedAt: new Date(), completedAt: new Date() })
           .where('debug', '=', false).where('pacing', '=', 'ack')
           .where('status', 'in', ['created', 'running', 'waiting_ai']).where('updatedAt', '<', before)
-          .returning('id').execute();
+          .returning(['id', 'phaseId', 'traceDeleted', sql<number>`(snapshot->>'round')::int`.as('round'),
+            sql<number>`(snapshot->'cursor'->>'visit')::int`.as('visit')]).execute();
         const ids = rows.map((row) => row.id);
         if (ids.length) await cancelOpenTasks(trx, ids);
+        for (const row of rows) {
+          const context = { round: row.round, cursor: { phaseId: row.phaseId, visit: row.visit } };
+          await recordTrace(trx, row, null, [boundary('failure', error, { reason: 'idle' }, context)]);
+        }
         return ids;
       });
     },

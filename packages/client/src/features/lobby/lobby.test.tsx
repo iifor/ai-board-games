@@ -12,7 +12,7 @@ import { PlayerPicker } from './components/PlayerPicker';
 import { RecentMatches } from './components/RecentMatches';
 import { SeatGrid } from './components/SeatGrid';
 import { SetupActionBar } from './components/SetupActionBar';
-import { filterVariants, isSetupInitial, playerRange, readyLabel, rematchStateOf, selectionHint, toggleSelection } from './utils';
+import { fillOpenSeats, filterVariants, isSetupInitial, playerRange, readyLabel, rematchStateOf, selectionHint, toggleSelection } from './utils';
 
 const werewolf: GameCatalogItem = {
   key: 'werewolf', title: 'AI 狼人杀', description: '12 人', players: { min: 12, max: 12 }, layout: 'circle',
@@ -24,6 +24,14 @@ const werewolf: GameCatalogItem = {
 };
 
 describe('lobby utils', () => {
+  it('fills open seats in list order or samples without replacement, preserving prior picks', () => {
+    expect(fillOpenSeats([2, 5, 7, 9], [7], 3, false)).toEqual([2, 5]);
+    expect(fillOpenSeats([2, 5, 7], [5, 7], 1, false)).toEqual([]);
+    const random = fillOpenSeats([2, 5, 7, 9], [7], 3, true);
+    expect(new Set(random).size).toBe(2);
+    expect(random.every((id) => [2, 5, 9].includes(id))).toBe(true);
+  });
+
   it('keeps selection order as seat order', () => {
     expect(toggleSelection([3, 1], 2)).toEqual([3, 1, 2]);
     expect(toggleSelection([3, 1, 2], 1)).toEqual([3, 2]);
@@ -110,7 +118,11 @@ describe('lobby components', () => {
     expect(withLatest).toContain(`dateTime="${summary.createdAt}"`);
     expect(withLatest).toContain('回放 →');
     expect(withLatest).toContain('href="/matches/m_1"');
-    expect(render(<LobbyHero primaryGame={werewolf} history={{ status: 'ready', data: [] }} />)).toContain('去开一局 →');
+    for (const history of [{ status: 'ready', data: [] }, { status: 'loading' }, { status: 'error', message: 'offline' }] as const) {
+      const emptyHero = render(<LobbyHero primaryGame={werewolf} history={history} />);
+      expect(emptyHero).toMatch(/<a[^>]+class="lobby-hero-visual[^"]*"[^>]+href="\/play\/werewolf"/);
+      expect(emptyHero).toContain('去开一局 →');
+    }
   });
 
   it('staggers the hero and the game cards on first paint', () => {
@@ -152,6 +164,16 @@ describe('lobby components', () => {
     );
     expect(html.indexOf('>2<')).toBeLessThan(html.indexOf('阿明'));
     expect(html).toContain('冷静');
+  });
+
+  it('names the debate groups and uses the absolute seat for each side', () => {
+    const groups = [{ name: '正方', team: 'pro', count: 4 }, { name: '反方', team: 'con', count: 4 }, { name: '评委', team: 'judge', count: 4 }];
+    const seated = Array.from({ length: 9 }, (_, i) => ({ id: i + 1, name: `玩家${i + 1}`, avatar: null, persona: '' }));
+    const html = renderToStaticMarkup(<SeatGrid seated={seated} max={12} groups={groups} onUnseat={() => {}} />);
+    expect(html).toContain('1 号 正方一辩 玩家1');
+    expect(html).toContain('5 号 反方一辩 玩家5');
+    expect(html).toContain('9 号 评委 玩家9');
+    expect(html).toContain('12 号 评委，空位');
   });
 });
 

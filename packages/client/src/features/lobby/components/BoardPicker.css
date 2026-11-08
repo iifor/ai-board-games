@@ -1,163 +1,79 @@
 .board-picker {
   display: grid;
-  gap: 10px;
+  grid-template-columns: clamp(240px, 26%, 360px) minmax(0, 1fr);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  overflow: hidden;
+  background: var(--ui-bg-surface-soft);
 }
 
-.board-picker-head {
+.board-current, .board-options { min-width: 0; padding: clamp(14px, 1.5vw, 22px); }
+.board-current {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
   gap: 10px;
+  border-right: 1px solid var(--ui-border);
+  background: linear-gradient(130deg, var(--game-accent-soft), transparent 88%), var(--ui-bg-surface-strong);
 }
 
-.board-picker-head h2 {
-  margin: 0;
+.board-current-label { font-size: 12px; font-weight: 700; color: var(--game-accent-strong); }
+.board-current h3 { margin: 0; font-size: clamp(21px, 2vw, 29px); line-height: 1.2; }
+.board-current h3 small, .board-picker-head small { color: var(--ui-text-muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.board-current p { margin: 0; color: var(--ui-text-muted); font-size: 13px; line-height: 1.55; }
+.board-card-roles { display: flex; flex-wrap: wrap; gap: 5px; }
+.board-role { padding: 0 8px; font-size: 12px; }
+.board-role.is-werewolf { background: rgba(192, 132, 252, .2); color: #e6d4ff; }
+.board-role.is-good { background: rgba(114, 240, 164, .14); color: #b6f3cf; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .board-role { animation: ui-pop-in 280ms var(--ui-ease-out) both; animation-delay: calc(var(--i, 0) * 22ms); }
 }
 
-/* 搜索框：聚焦时整个胶囊亮起强调色光晕（input 自身不画 outline） */
-.board-picker-search {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid rgba(149, 198, 255, 0.24);
-  border-radius: var(--ui-radius-pill);
-  background: rgba(7, 24, 55, 0.68);
-  color: var(--ui-text-muted);
-  transition: border-color var(--ui-motion-fast) ease, box-shadow var(--ui-motion-normal) ease, color var(--ui-motion-fast) ease;
-}
-
-.board-picker-search:focus-within {
-  border-color: var(--game-accent-strong);
-  color: var(--game-accent-strong);
-  box-shadow: 0 0 0 3px var(--game-accent-soft), 0 0 18px var(--game-accent-soft);
-}
-
-.board-picker-search input {
-  width: 120px;
-  border: 0;
-  background: transparent;
-  color: var(--ui-text);
-  font-size: 12px;
-  outline: none;
-}
+.board-options { display: grid; align-content: start; gap: 12px; }
+.board-picker-head, .board-picker-search, .board-card { display: flex; align-items: center; }
+.board-picker-head { justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.board-picker-head h2 { margin: 0; font-size: 21px; }
+.board-picker-head small { margin-left: 4px; }
+.board-picker-search { gap: 6px; padding: 7px 10px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-text-muted); }
+.board-picker-search:focus-within { border-color: var(--game-accent-strong); }
+.board-picker-search input { width: 9em; min-width: 0; border: 0; background: transparent; color: var(--ui-text); font: inherit; font-size: 13px; outline: none; }
 
 .board-picker-list {
   display: grid;
-  gap: 8px;
-  max-height: calc(100vh - 340px);
-  min-height: 200px;
-  padding-right: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 166px), 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 6px;
+  max-height: 156px;
   overflow-y: auto;
-  scrollbar-width: thin;
+  padding: 3px;
 }
 
 .board-card {
-  /* 不设 overflow: hidden——它会把网格项的自动最小尺寸归零，定高的列表会把每张卡压扁 */
-  position: relative;
-  display: grid;
-  gap: 6px;
-  padding: 12px 14px;
-  border: 1px solid rgba(149, 198, 255, 0.22);
-  border-radius: 14px;
-  background: rgba(13, 23, 40, 0.72);
+  justify-content: space-between;
+  gap: 7px;
+  min-height: 46px;
+  padding: 8px 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: rgba(8, 17, 33, .65);
   color: var(--ui-text);
   text-align: left;
-  transition: border-color var(--ui-motion-fast) ease, background-color var(--ui-motion-fast) ease, transform var(--ui-motion-normal) var(--ui-ease-out), box-shadow var(--ui-motion-normal) ease;
 }
+.board-card strong { font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.board-card small { font-size: 11px; white-space: nowrap; color: var(--ui-text-muted); }
+.board-card:hover { border-color: var(--ui-border-strong); }
+.board-card:focus-visible { outline: 2px solid var(--game-accent-strong); outline-offset: 1px; }
+.board-card.is-selected { background: var(--game-accent-soft); border-color: var(--game-accent-strong); box-shadow: inset 3px 0 var(--game-accent-strong); }
+.board-card.is-selected strong { color: var(--game-accent-strong); }
+.board-picker-empty { grid-column: 1 / -1; margin: 0; padding: 14px 0; color: var(--ui-text-muted); font-size: 13px; }
 
-.board-card:hover {
-  border-color: var(--ui-border-strong);
-  transform: translateX(3px);
-}
-
-/* 选中：左侧一道强调色边，从中间向上下长出 */
-.board-card::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  bottom: 50%;
-  left: 0;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--game-accent-strong);
-  box-shadow: 0 0 10px var(--game-accent-strong);
-  transition: top var(--ui-motion-normal) var(--ui-ease-out), bottom var(--ui-motion-normal) var(--ui-ease-out);
-}
-
-.board-card.is-selected {
-  border-color: var(--game-accent-strong);
-  background: linear-gradient(180deg, var(--game-accent-soft), rgba(6, 13, 32, 0.86));
-  box-shadow: 0 0 24px var(--game-accent-soft);
-}
-
-.board-card.is-selected::before {
-  top: 0;
-  bottom: 0;
-}
-
-/* 选中板子的角色标签依次弹出：换板子时重新选中，动画自然重放 */
-.board-card.is-selected .board-role {
-  animation: ui-pop-in 360ms var(--ui-ease-elastic) both;
-  animation-delay: calc(var(--i, 0) * 28ms);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .board-card.is-selected .board-role {
-    animation-delay: 0ms;
-  }
-}
-
-.board-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.board-card-head strong {
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.board-card-head span {
-  color: var(--ui-text-muted);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.board-card.is-selected .board-card-head span {
-  color: var(--game-accent-strong);
-}
-
-.board-card-roles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.board-role {
-  padding: 0 8px;
-  font-size: 11px;
-}
-
-.board-role.is-werewolf { background: rgba(192, 132, 252, 0.22); color: #e6d4ff; }
-.board-role.is-good { background: rgba(114, 240, 164, 0.16); color: #a8ffcc; }
-.board-role.is-pro { background: rgba(82, 215, 255, 0.16); color: #8be6ff; }
-.board-role.is-con { background: rgba(255, 107, 114, 0.16); color: #ffb3b7; }
-.board-role.is-judge { background: rgba(226, 194, 122, 0.16); color: #f0d48f; }
-
-.board-card-desc {
-  color: var(--ui-text-muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.board-picker-empty {
-  margin: 0;
-  padding: 16px 0;
-  color: var(--ui-text-muted);
-  font-size: 13px;
-  text-align: center;
+@media (max-width: 780px) {
+  .board-picker { grid-template-columns: minmax(0, 1fr); }
+  .board-current { gap: 7px; border: 0; border-bottom: 1px solid var(--ui-border); }
+  .board-picker-head h2 { font-size: 18px; }
+  .board-picker-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 158px; }
+  .board-card { padding-inline: 8px; }
 }

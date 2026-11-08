@@ -1,5 +1,4 @@
-/* 轨道给定为 minmax(0, 1fr)：隐式 auto 轨道会被圆桌的固有宽度（高度 × 比例）撑大并溢出舞台，
-   圆桌的 max-width: 100% 再按撑大后的轨道解析，于是侧栏展开时右侧座位被压在侧栏底下 */
+/* 允许轨道缩小，圆桌的固有宽度不会撑出舞台。 */
 .circle-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -16,27 +15,25 @@
    座位坐标与卡片缩放由 ringGeometry 算出并写进自定义属性 */
 .circle-ring {
   --seat-scale: 1;
-  --ring-card-w: 118px;
-  --ring-card-h: 140px;
+  --ring-card-w: 144px;
+  --ring-card-h: 184px;
   position: relative;
   width: var(--ring-w, auto);
   height: var(--ring-h, 100%);
   max-width: 100%;
-  aspect-ratio: 1.7;
+  aspect-ratio: 2.2;
 }
 
 .circle-table {
   position: absolute;
   inset: calc(var(--ring-card-h) * 0.45) calc(var(--ring-card-w) * 0.75);
   transition: inset var(--ui-motion-normal) var(--ui-ease-out);
-  border: 1px solid var(--game-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--game-accent-strong) 18%, transparent);
   border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 40%, var(--game-accent-soft), rgba(4, 12, 32, 0.4) 62%, transparent 72%);
-  box-shadow: inset 0 0 60px var(--game-accent-soft), 0 0 80px rgba(0, 0, 0, 0.35);
-  animation: circle-table-breathe 6s ease-in-out infinite;
+  pointer-events: none;
 }
 
-/* 舞台变宽变窄（侧栏开合）时座位滑到新位置、卡片平滑缩放，而不是跳过去 */
+/* 调整窗口时，座位随椭圆轨道平滑移动。 */
 .circle-seat {
   position: absolute;
   transform: translate(-50%, -50%) scale(var(--seat-scale));
@@ -56,27 +53,121 @@
 .circle-center > * {
   min-height: 0;
 }
+.circle-center:has(.stage-record) {
+  z-index: 3;
+  inset: 12% 18%;
+}
+.circle-center .stage-record { width: min(100%, 720px); height: 100%; }
+.circle-center:has(> .speech-carousel) {
+  inset: 0;
+  margin: auto;
+  width: var(--speech-w);
+  height: var(--speech-h);
+  transition: none;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}
 
-.circle-board {
+/* 座位沿用圆桌几何。为头顶身份和脚下座号预留固定行，未知身份也不会改变脚底位置。 */
+.circle-seat .seat-card-stack {
+  --platform-color: var(--team-color, #c1cbd8);
+  display: grid;
+  grid-template-rows: 19px minmax(0, 1fr) 18px 16px;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 0;
+  width: 144px;
+  height: 184px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.ring-seat-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  max-width: 100%;
+  color: var(--platform-color);
+  font-size: 12px;
+  font-weight: 750;
+}
+.ring-seat-head > * {
+  overflow: hidden;
+  padding-inline: 6px;
+  border-radius: 5px;
+  background: rgb(7 15 28 / 88%);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ring-seat-head em { color: var(--ui-brand-strong); font-style: normal; }
+.seat-figure {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: end center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.seat-figure-art { width: 100%; height: 100%; min-height: 0; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 3px 4px #020818); }
+.seat-figure-art[data-art='portrait'] { width: 78%; border-radius: 32% 32% 8px 8px; object-fit: cover; object-position: center 16%; }
+.seat-figure:not(:has(img)) {
+  background: radial-gradient(ellipse 15% 19% at 50% 33%, #97adc5 96%, transparent 100%),
+    radial-gradient(ellipse 35% 40% at 50% 86%, #455c77 95%, transparent 100%);
+}
+.ring-seat-platform {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  width: min(76%, 88px);
+  color: var(--platform-color);
+  font-size: 14px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px #06101b;
+}
+.ring-seat-platform::before {
+  content: '';
   position: absolute;
-  bottom: -8px;
-  left: 50%;
-  border-color: var(--game-accent-soft);
-  color: var(--game-accent-strong);
-  background: rgba(4, 12, 32, 0.8);
-  transform: translateX(-50%);
+  z-index: -1;
+  inset: -6px 0 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 24%, color-mix(in srgb, var(--platform-color) 40%, #142031), #132030 65%, #09121e 85%);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--platform-color) 70%, #101c2a), 0 5px 8px #07112080;
 }
-
-@keyframes circle-table-breathe {
-  50% {
-    box-shadow: inset 0 0 90px var(--game-accent-soft), 0 0 100px rgba(0, 0, 0, 0.35);
-  }
+.ring-seat-name {
+  align-self: end;
+  max-width: 96%;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #0a1424cf;
+  color: #f4f6fc;
+  font-size: 12px;
+  line-height: 1.15;
+  font-weight: 650;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
+.circle-seat .seat-card-asleep { opacity: 1; filter: none; }
+.circle-seat .seat-card-asleep .seat-figure-art { filter: saturate(.68) brightness(.82) drop-shadow(0 2px 4px #020818); }
+.circle-seat .seat-card-out { opacity: .8; filter: none; }
+.circle-seat .seat-card-out .seat-figure { filter: grayscale(1); }
+.circle-seat .seat-card-speaking .seat-figure-art,
+.circle-seat .seat-card[data-acting] .seat-figure-art { filter: drop-shadow(0 0 6px var(--mic-light, #ffe4ad)); }
+.circle-seat .seat-card-speaking .ring-seat-platform::before,
+.circle-seat .seat-card[data-acting] .ring-seat-platform::before { filter: drop-shadow(0 0 5px var(--mic-light, #ffe4ad)); }
+.circle-seat .seat-card[data-effect-target] .ring-seat-platform::before { filter: drop-shadow(0 0 6px var(--fx-color)); }
+.circle-seat .seat-card-stamp { top: 24px; right: auto; left: 2px; z-index: 2; }
 
 @media (max-width: 860px) {
   .circle-ring {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 96px), 1fr));
     gap: 8px;
     width: 100%;
     height: auto;
@@ -91,6 +182,16 @@
   .circle-seat {
     position: static;
     transform: none;
+    min-width: 0;
+  }
+
+  .circle-seat .seat-card-stack {
+    width: 100%;
+    height: clamp(146px, 29vw, 180px);
+  }
+
+  .circle-layout {
+    height: auto;
   }
 
   .ballot-flight {
@@ -101,11 +202,12 @@
     position: static;
     grid-column: 1 / -1;
     grid-row: 1;
-    min-height: 200px;
+    min-height: 0;
+    gap: 6px;
   }
 
-  .circle-board {
-    position: static;
-    transform: none;
-  }
+  .circle-center .stage-record { height: min(390px, 46vh); }
+  .circle-center:has(> .speech-carousel) { width: 100%; height: var(--mobile-speech-height); }
+
+  .circle-center .speaker-spotlight { height: clamp(100px, 20vh, 160px); }
 }

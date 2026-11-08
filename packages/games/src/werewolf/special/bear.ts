@@ -1,4 +1,5 @@
 import { definePrompts } from '@battle/engine';
+import { spectatorEffect } from '../rules/spectatorEffects';
 import { checksAsWolf } from '../rules/appearance';
 import { hasRole } from '../rules/board';
 import { isBlocked } from '../rules/block';
@@ -19,7 +20,10 @@ const bearDawnRoar: DawnStep = (ctx, draft) => {
   const bear = ctx.seats.withRole('bear').ids()[0];
   const roars = bear !== undefined && survives(bear) && !isBlocked(ctx, bear)
     && nearestNeighbors(ctx, bear, survives).some((seat) => checksAsWolf(ctx, ctx.seats.get(seat)));
-  return { ...draft, notes: [...draft.notes, roars ? '熊咆哮了。' : '熊没有咆哮。'] };
+  const text = roars ? '熊咆哮了' : '熊没有咆哮';
+  const effects = [...(draft.effects ?? [])];
+  if (bear !== undefined) effects.push(spectatorEffect('inspect', bear, text));
+  return { ...draft, notes: [...draft.notes, text + '。'], effects };
 };
 
 export const bearSpecial: SpecialDescriptor = {

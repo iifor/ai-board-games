@@ -20,7 +20,10 @@ async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown):
     throw new ApiError(0, '网络连接失败，请检查服务是否启动');
   }
   const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
-  if (!payload) throw new ApiError(response.status, `服务返回了无法识别的响应（${response.status}）`);
+  if (!payload) {
+    const unavailable = [502, 503, 504].includes(response.status);
+    throw new ApiError(response.status, unavailable ? '暂时连不上游戏服务，请稍后重试。' : `加载失败（HTTP ${response.status}），请重试。`);
+  }
   if (!isApiSuccess(payload)) throw new ApiError(payload.code, payload.message);
   return payload.data;
 }

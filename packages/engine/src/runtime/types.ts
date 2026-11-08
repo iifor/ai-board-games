@@ -1,4 +1,4 @@
-import type { Channel, GameResult, StageEvent, StageEventMeta, StagePayload } from '@battle/shared';
+import type { Channel, GameResult, StageEvent, StageEventMeta, StagePayload, TraceMark } from '@battle/shared';
 import type { PhaseResult, TriggerEvent } from '../spec/context';
 
 export interface SeatProfile {
@@ -152,6 +152,7 @@ export type EngineInput =
   | { readonly kind: 'debug'; readonly command: DebugCommand };
 
 export interface AdvanceResult {
+  readonly trace: readonly TraceMark[];
   readonly snapshot: EngineSnapshot;
   readonly log: readonly LogEntry[];
   readonly stageEvents: readonly StageEvent[];

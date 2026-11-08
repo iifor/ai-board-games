@@ -56,7 +56,7 @@ export interface SeatSpeech {
   readonly text: string;
 }
 
-/** 点击 / 回车座位卡片：座位号与卡片元素（弹层按它的包围盒定位，关闭后焦点还回它） */
+/** 悬浮或键盘聚焦的座位号与元素，资料卡按它的包围盒定位。 */
 export type SeatSelectHandler = (seat: number, element: HTMLElement) => void;
 
 /** 已打开弹层的座位 */

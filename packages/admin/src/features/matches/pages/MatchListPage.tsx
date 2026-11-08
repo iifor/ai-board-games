@@ -32,9 +32,9 @@ export function MatchListPage() {
       <Space style={{ width: '100%', justifyContent: 'space-between', margin: '16px 0' }} wrap>
         <Typography.Title level={3} style={{ margin: 0 }}>对局与调试</Typography.Title>
         <Space wrap>
-          <Select allowClear placeholder="全部状态" style={{ width: 130 }} value={status} onChange={setStatus}
+          <Select allowClear aria-label="按对局状态筛选" placeholder="全部状态" style={{ width: 130 }} value={status} onChange={setStatus}
             options={Object.entries(STATUS_LABELS).map(([value, { label }]) => ({ value, label }))} />
-          <Select allowClear placeholder="全部类型" style={{ width: 130 }} value={debug} onChange={setDebug}
+          <Select allowClear aria-label="按对局类型筛选" placeholder="全部类型" style={{ width: 130 }} value={debug} onChange={setDebug}
             options={[{ value: true, label: '调试局' }, { value: false, label: '公开对局' }]} />
           <Button onClick={matches.reload}>刷新</Button>
           <Button type="primary" onClick={() => setCreating(true)}>创建调试局</Button>
@@ -49,9 +49,9 @@ export function MatchListPage() {
         columns={[
           { title: '对局', key: 'title', render: (_, match) => <Link to={`/matches/${match.id}`}>{formatMatchTitle(match)}</Link> },
           { title: '状态', dataIndex: 'status', render: (value: MatchStatus) => <Tag color={STATUS_LABELS[value].color}>{STATUS_LABELS[value].label}</Tag> },
-          { title: '类型', key: 'type', render: (_, match) => (match.debug ? <Tag color="orange">{matchTypeLabel(match)}</Tag> : <Tag>{matchTypeLabel(match)}</Tag>) },
-          { title: '结果', key: 'result', render: (_, match) => match.result?.winnerLabel ?? '—' },
-          { title: '创建时间', dataIndex: 'createdAt', render: (value: string) => formatTime(value) },
+          { title: '类型', key: 'type', responsive: ['md'], render: (_, match) => (match.debug ? <Tag color="orange">{matchTypeLabel(match)}</Tag> : <Tag>{matchTypeLabel(match)}</Tag>) },
+          { title: '结果', key: 'result', responsive: ['sm'], render: (_, match) => match.result?.winnerLabel ?? '—' },
+          { title: '创建时间', dataIndex: 'createdAt', responsive: ['md'], render: (value: string) => formatTime(value) },
           {
             title: '操作', key: 'actions', render: (_, match) => (
               <Popconfirm title="删除对局及其全部记录？" onConfirm={() => remove(match.id)}><Button size="small" danger>删除</Button></Popconfirm>

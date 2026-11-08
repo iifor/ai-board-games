@@ -1,0 +1,60 @@
+.debate-broadcast {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-height: 100%;
+  min-height: 0;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+/* 字幕嵌在正反方中间的舞台背景上，文字、音频、进度条共用同一个事件。 */
+.debate-broadcast .subtitle-bar {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  flex: none;
+  width: 100%;
+  max-height: none;
+  margin: 0;
+  padding: clamp(18px, 2.3vw, 44px);
+  border: 0;
+  border-block: 1px solid rgba(180, 199, 226, .25);
+  border-radius: 2px;
+  background: linear-gradient(100deg, rgba(9, 18, 34, .77), rgba(9, 17, 31, .63) 75%, rgba(9, 17, 31, .36));
+  box-shadow: none;
+}
+.debate-broadcast .subtitle-inner { grid-template-columns: minmax(0, 1fr); gap: clamp(14px, 2vh, 30px); }
+.debate-broadcast .subtitle-bar .subtitle-speaker {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: none;
+  gap: 12px;
+}
+.debate-broadcast .subtitle-bar[data-team] .subtitle-speaker {
+  padding-inline-start: 10px;
+  border-inline-start: 3px solid var(--team-color);
+}
+.debate-broadcast .subtitle-speaker small { color: var(--team-color, var(--ui-brand-strong)); font-size: clamp(12px, .9vw, 18px); }
+.debate-broadcast .subtitle-speaker strong { font-size: clamp(17px, 1.4vw, 30px); }
+.debate-broadcast .subtitle-avatar { width: clamp(44px, 3.7vw, 70px); height: clamp(44px, 3.7vw, 70px); border-color: var(--team-color, var(--ui-brand-strong)); }
+.debate-broadcast .subtitle-body { gap: clamp(14px, 2.5vh, 28px); }
+.debate-broadcast .subtitle-body p {
+  max-height: clamp(120px, 35vh, 600px);
+  overflow-wrap: anywhere;
+  font-size: clamp(19px, 1.65vw, 38px);
+  font-weight: 450;
+  line-height: 1.65;
+}
+.debate-broadcast .subtitle-progress b { background: var(--team-color, var(--ui-brand-strong)); }
+.debate-broadcast .speech-order { flex: none; }
+.debate-broadcast .vote-board { flex: none; }
+
+@media (max-width: 860px) {
+  .debate-broadcast { overflow: visible; }
+  .debate-broadcast .subtitle-bar { padding: 14px; }
+  .debate-broadcast .subtitle-inner { gap: 10px; }
+  .debate-broadcast .subtitle-body p { max-height: 38vh; font-size: 17px; }
+}

@@ -39,7 +39,7 @@
   --team-pro: #52d7ff;
   --team-con: #ff6b72;
   --team-judge: var(--ui-brand);
-  --team-werewolf: #c084fc;
+  --team-werewolf: #ff797e;
   --team-good: #72f0a4;
 
   /* 组件沿用的语义别名 */
@@ -76,12 +76,21 @@
 [data-team='judge'] { --team-color: var(--team-judge); }
 [data-team='werewolf'] { --team-color: var(--team-werewolf); }
 [data-team='good'] { --team-color: var(--team-good); }
+[data-team='lone_wolf'] { --team-color: #ffb76b; }
+[data-team='ghost_bride'] { --team-color: #c6a1ff; }
+[data-team='lovers'] { --team-color: #ffa4d6; }
+[data-team='requester'] { --team-color: #8cdaff; }
+[data-team='third'] { --team-color: #f0d48f; }
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
+
+/* 隐藏滚动条本身，保留滚轮、触屏及键盘滚动。 */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
 
 html,
 body {

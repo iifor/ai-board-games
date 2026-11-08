@@ -1,9 +1,10 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { createSnapshot, EngineInputError, type CompiledGame, type LogEntry, type SeatProfile } from '@battle/engine';
-import type { AiCallDto, CreateDebugMatchRequest, CreateMatchRequest, MatchDetailDto, MatchStatus, MatchSummaryDto } from '@battle/shared';
+import type { AiCallDto, CreateDebugMatchRequest, CreateMatchRequest, GeneratedMatchRequest, MatchDetailDto, MatchStatus, MatchSummaryDto } from '@battle/shared';
 import { badRequest, notFound, tooManyRequests } from '../../utils/errors';
 import type { PlayerRepository } from '../players/repository';
 import type { CreationLimiter } from './limits';
+import { generateSeats } from './generatedSeats';
 import { toAiCall, toDetail, toSummary } from './mapper';
 import type { MatchRepository } from './repository';
 import type { MatchRuntime } from './runtime';
@@ -42,9 +43,11 @@ export function createMatchService(deps: MatchServiceDeps) {
   /** 开局事务里插入之前执行的检查（公开开局的上限判断） */
   type CreationGuard = Parameters<MatchRepository['transaction']>[0];
 
-  async function create(request: CreateMatchRequest, debug: CreateDebugMatchRequest | null, guard: CreationGuard | null): Promise<MatchSummaryDto> {
+  async function create(request: CreateDebugMatchRequest, debug: CreateDebugMatchRequest | null, guard: CreationGuard | null): Promise<MatchSummaryDto> {
     const game = deps.findGame(request.gameKey);
-    const { profiles, seats } = await seatsFor(request.playerIds);
+    const { profiles, seats } = request.generatePlayers
+      ? generateSeats(game, request.variant)
+      : await seatsFor(request.playerIds);
     const seed = debug?.seed ?? randomInt(0, 2 ** 32);
     let snapshot;
     try {
@@ -113,6 +116,11 @@ export function createMatchService(deps: MatchServiceDeps) {
     },
 
     createDebug: (request: CreateDebugMatchRequest) => create(request, request, null),
+    async createLocalDebug(setup: GeneratedMatchRequest, source: string) {
+      await deps.limiter.check(source);
+      const request: CreateDebugMatchRequest = { ...setup, generatePlayers: true, scripted: true, pacing: 'free' };
+      return create(request, request, null);
+    },
     summary,
     findPublic,
 

@@ -1,6 +1,6 @@
 // 对局播放协议：引擎日志与前端 StageEvent 共用同一套事件词表。
 
-export type Channel = 'public' | 'host' | `team:${string}` | `private:${number}`;
+export type Channel = 'public' | 'spectator' | 'host' | `team:${string}` | `private:${number}`;
 
 export type VoteOutcome =
   | { readonly kind: 'selected'; readonly seat: number; readonly byTieBreak: boolean }
@@ -85,6 +85,10 @@ export interface AudienceSeat {
 }
 
 export interface AudienceView {
+  /** 此刻已向全场公开身份的座位，供服务端生成单座位观战流。 */
+  readonly publicRoles?: readonly number[];
+  /** 单人公开翻牌时公布的身份，后来私下转职也不会改变这条公开事实。 */
+  readonly shownRoles?: Readonly<Record<number, { readonly role: string; readonly roleName: string }>>;
   readonly gameKey: string;
   readonly title: string;
   readonly round: number;
