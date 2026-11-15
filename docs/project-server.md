@@ -104,6 +104,8 @@ src/
 
 ## 密钥
 
+配置跨环境迁移使用根目录的 `config:export` / `config:import` 命令。模块按配置白名单读取，在同一快照导出，并加密整份文件。导入在事务中保留 ID、恢复备用模型及玩家绑定、校正自增与发布序列；目标配置表和对局表须为空。供应商密钥可通过 `CONFIG_SOURCE_SECRET_KEY` 解包后用目标 `SECRET_KEY` 重加密。配置文件不包含历史对局、玩家记忆或管理员账号，详见 [配置迁移](operations/config-transfer.md)。
+
 模型供应商的 API Key 用 AES-256-GCM 与 `SECRET_KEY`（32 字节 base64）加密存储，另存末 4 位掩码用于展示；接口永不返回明文，只有服务端内部的 `providers.credentials()` 会解密（供 P4 调用模型）。
 
 ## 对局运行时

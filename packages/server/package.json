@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "config:export": "tsx --env-file-if-exists=../../.env src/commands/config-transfer.ts export",
+    "config:import": "tsx --env-file-if-exists=../../.env src/commands/config-transfer.ts import",
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
     "start": "tsx --env-file-if-exists=../../.env src/index.ts",
     "check": "tsc -p tsconfig.json"

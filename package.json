@@ -8,6 +8,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "config:export": "pnpm --filter @battle/server config:export",
+    "config:import": "pnpm --filter @battle/server config:import",
     "dev": "pnpm -r --parallel --if-present run dev",
     "build": "pnpm -r --if-present run build",
     "check": "pnpm -r run check",
