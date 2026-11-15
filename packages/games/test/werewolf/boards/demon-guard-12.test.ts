@@ -32,7 +32,7 @@ describe('demon', () => {
 
   it('survives the witch’s poison, which is still used up', () => {
     const run = play(SEED, act('witch_poison', witch, [demon], 1), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
     expect(stateOf(run.snapshot).potions.poison).toBe(false);
   });
 

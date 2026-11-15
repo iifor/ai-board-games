@@ -13,10 +13,10 @@ interface JudgeState {
 
 type Phase = JudgePhase<unknown, unknown>;
 
-/** 阶段未设置 commentMax 时的点评字数上限 */
+/** 缺少玩家和阶段篇幅设置时的点评建议字数 */
 export const DEFAULT_COMMENT_MAX = 300;
 
-/** 点评字数：既是 schema 的硬上限，也是提示词 {{turn.maxChars}} 告诉模型的数字 */
+/** 阶段提供的默认篇幅建议 */
 function commentMax(phase: Phase): number {
   return phase.commentMax ?? DEFAULT_COMMENT_MAX;
 }
@@ -57,7 +57,7 @@ export const judgeExecutor: AiPhaseExecutor<Phase> = {
     const meaning = Object.entries(phase.verdicts).map(([key, label]) => `${key}=${label}`).join('；');
     return z.object({
       verdict: z.enum(verdictKeys(phase)).describe(`判定：${meaning}`),
-      comment: z.string().trim().min(1).max(commentMax(phase)).describe('点评内容'),
+      comment: z.string().trim().min(1).describe('点评内容'),
     });
   },
 
@@ -65,12 +65,10 @@ export const judgeExecutor: AiPhaseExecutor<Phase> = {
     return null;
   },
 
-  fallback(env, phase, pending): JudgeFallback {
-    const ctx = env.ctx();
-    return phase.fallback?.(ctx, env.seat(pending.seat)) ?? {
-      verdict: ctx.random(`fallback:${pending.id}`).pick(verdictKeys(phase)),
-      comment: '（该评委未能给出有效点评）',
-    };
+  skipFailed(env, phase, pending) {
+    env.log({ kind: 'speech', seat: pending.seat, text: '过~', channel: phase.channel ?? 'public' });
+    env.phaseState<JudgeState>().next += 1;
+    return { verdict: null, comment: '过~' };
   },
 
   store(env, phase, pending, value) {

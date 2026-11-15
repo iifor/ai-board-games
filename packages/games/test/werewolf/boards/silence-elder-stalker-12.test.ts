@@ -28,7 +28,7 @@ describe('stalker', () => {
       { seat: villagerB, round: 1, reason: '被放逐' },
       { seat: villager, round: 2, reason: '昨晚死亡' },
     ]);
-    expect(entries(run, 'narration', 'dawn').find((entry) => entry.round === 2)?.text).toContain(`昨晚死亡的是：${villager}号`);
+    expect(entries(run, 'narration', 'dawn').find((entry) => entry.round === 2)?.text).toContain(`昨晚${villager}号出局`);
   });
 
   it('gets no chance when his target was exiled or when he abstained', () => {

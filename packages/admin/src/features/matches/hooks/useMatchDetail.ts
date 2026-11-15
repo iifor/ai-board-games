@@ -64,7 +64,6 @@ export function useMatchDetail(matchId: string) {
     let timer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
     markerRef.current = null;
-    setState(EMPTY);
     const tick = async () => {
       const detail = await load();
       if (!stopped && (!detail || !isTerminal(detail.status))) timer = setTimeout(() => void tick(), POLL_MS);

@@ -77,9 +77,13 @@ describe('realtime playback', () => {
         expect(watched.events.some((event) => event.channel.startsWith('private:'))).toBe(true);
         expect(watched.events[0]?.view.seats.every((seat) => seat.role !== null)).toBe(true);
         if (variant === game.spec.defaultVariant) {
-          const player = await watchOn(server.port, match.id, 0, undefined, undefined, 2);
-          expect(player.events.map(e => e.seq)).toEqual(watched.events.filter(e => e.channel === 'public').map(e => e.seq));
-          expect(player.events[0]?.view.seats.filter(seat => seat.role !== null).map(s => s.seat)).toEqual([2]);
+          const witch = watched.events[0]!.view.seats.find(s => s.role === 'witch')!.seat;
+          const player = await watchOn(server.port, match.id, 0, undefined, undefined, witch);
+          const expected = watched.events.filter(e => e.channel === 'public' || e.channel === `private:${witch}` &&
+            (e.kind === 'narration' || e.kind === 'action' && e.seat === witch));
+          expect(expected.some(e => e.kind === 'narration' && e.purpose === 'decision')).toBe(true);
+          expect(player.events.map(e => e.seq)).toEqual(expected.map(e => e.seq));
+          expect(player.events[0]?.view.seats.filter(seat => seat.role !== null).map(s => s.seat)).toEqual([witch]);
           expect(player.events.at(-1)?.view.seats.every(seat => seat.role !== null)).toBe(true);
         }
       } else {

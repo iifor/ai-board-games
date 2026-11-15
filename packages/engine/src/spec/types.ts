@@ -66,6 +66,8 @@ export interface EndResult {
 
 export interface PresentationSpec<S, P> {
   readonly layout: StageLayout;
+  /** 进入阶段时随标题朗读；内容及是否播报都必须是公开信息。 */
+  phaseAnnouncement?(ctx: RuleContext<S, P>): string | null;
   readonly audienceView?: 'public' | 'omniscient';
   /** 布局区域 → 阵营，如 versus 的 left/right/bench */
   readonly areas?: Readonly<Record<string, string>>;
@@ -105,8 +107,8 @@ export interface GameOverSpec<S, P> {
 
 export interface DebugSpec<S, P> {
   readonly breakpoints?: BreakpointSetting;
-  /** 调试局的发言内容；不提供时使用通用调试文案 */
-  speak?(ctx: RuleContext<S, P>, seat: Seat, vars: TemplateVars): SpeechOutput;
+  /** 调试局的发言内容；未指定或返回 undefined 时使用通用调试文案 */
+  speak?(ctx: RuleContext<S, P>, seat: Seat, vars: TemplateVars): SpeechOutput | undefined;
 }
 
 export type PromptSet = Readonly<Record<string, PromptTemplate>>;

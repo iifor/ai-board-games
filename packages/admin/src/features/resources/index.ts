@@ -1,4 +1,3 @@
-export { ModelsPage } from './ModelsPage';
+export { ModelManagementPage } from './ModelManagementPage';
 export { PlayersPage } from './PlayersPage';
-export { ProvidersPage } from './ProvidersPage';
 export { VoicesPage } from './VoicesPage';

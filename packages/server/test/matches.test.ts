@@ -1,5 +1,6 @@
 import { API_ERROR_CODES, type MatchDetailDto, type MatchSummaryDto, type ModelDto } from '@battle/shared';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { LlmError } from '../src/modules/llm';
 import { failingLlm, quotaExhaustedLlm, runUntilSettled, scriptedLlm, seedPlayers } from './support/fixtures';
 import { createTestApp, dataOf, type TestApp } from './support/testApp';
 
@@ -15,6 +16,12 @@ describe('scripted debug matches', () => {
 
   it('runs a debate to the end without calling a model', async () => {
     const playerIds = await seedPlayers(t, 9);
+    const firstId = playerIds[0]!;
+    const profile = await t.services.players.get(firstId);
+    await t.services.players.update(firstId, { ...profile, modelId: null });
+    const live = await t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } });
+    expect(live.status).toBe(400);
+    expect(live.body.message).toContain('尚未绑定模型');
     const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/admin/matches', {
       token,
       body: { gameKey: 'debate', playerIds, scripted: true, pacing: 'free' },
@@ -59,6 +66,35 @@ describe('scripted debug matches', () => {
 });
 
 describe('model-backed matches', () => {
+  it('recovers on the second retry of the same request before using a fallback', async () => {
+    const llm = scriptedLlm();
+    vi.spyOn(llm, 'complete')
+      .mockRejectedValueOnce(new LlmError('fetch failed', true))
+      .mockRejectedValueOnce(new LlmError('模型返回 503', true));
+    const t = await createTestApp({}, { llm });
+    try {
+      const token = await t.adminToken();
+      const playerIds = await seedPlayers(t, 9);
+      t.services.worker.start();
+      const match = dataOf(await t.call<MatchSummaryDto>('POST', '/api/admin/matches', {
+        token, body: { gameKey: 'debate', playerIds, pacing: 'free' },
+      }));
+      await runUntilSettled(t, match.id);
+      const calls = dataOf(await t.call<{ requestId: string; modelId: number; error: string | null }[]>(
+        'GET', `/api/admin/matches/${match.id}/ai-calls`, { token },
+      ));
+      const first = calls.find(call => call.error === 'fetch failed');
+      expect(first).toBeDefined();
+      const attempts = calls.filter(call => call.requestId === first?.requestId);
+      expect(attempts).toHaveLength(3);
+      expect(attempts.every(call => call.modelId === first?.modelId)).toBe(true);
+      expect(attempts.map(call => call.error)).toEqual(expect.arrayContaining(['fetch failed', '模型返回 503', null]));
+      expect((await t.services.repositories.matches.log(match.id))?.filter(entry => entry.kind === 'fallback')).toEqual([]);
+    } finally {
+      await t.cleanup();
+    }
+  });
+
   it('runs a debate through the model and records every call', async () => {
     const llm = scriptedLlm();
     const t = await createTestApp({}, { llm });
@@ -107,13 +143,30 @@ describe('model-backed matches', () => {
     const t = await createTestApp({}, { llm });
     try {
       const token = await t.adminToken();
-      t.services.worker.start();
       const playerIds = await seedPlayers(t, 9);
+      const quiet = await t.services.players.get(playerIds[0]!);
+      const talkative = await t.services.players.get(playerIds[4]!);
+      await t.services.players.update(quiet.id, { ...quiet, persona: '高冷寡言', temperature: 0 });
+      await t.services.players.update(talkative.id, { ...talkative, persona: '健谈的话痨' });
+      const primary = await t.services.models.get(quiet.modelId!);
+      const backup = await t.services.models.get(primary.fallbackModelId!);
+      await t.services.models.update(backup.id, { ...backup, maxTokens: 2048 });
       const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/admin/matches', { token, body: { gameKey: 'debate', playerIds, pacing: 'free' } }));
+      await t.services.players.update(quiet.id, { ...quiet, persona: '活泼健谈' });
+      t.services.worker.start();
       await runUntilSettled(t, created.id);
       expect((await t.services.repositories.matches.find(created.id))?.status).toBe('completed');
       const models = new Set(llm.calls.map((call) => call.model));
       expect(models).toEqual(new Set(['main-model', 'backup-model']));
+      for (const [persona, temperature, budget, suggestedChars] of [['高冷寡言', 0, 3072, 80], ['健谈的话痨', 0.95, 8192, 500]] as const) {
+        const calls = llm.calls.filter(call => call.messages[0]?.content.includes(persona)
+          && call.messages[1]?.content.includes(`建议 ${suggestedChars} 字以内`));
+        expect(new Set(calls.map(call => call.model))).toEqual(models);
+        for (const call of calls) {
+          expect(call.temperature).toBe(temperature);
+          expect(call.maxTokens).toBe(call.model === 'backup-model' ? Math.min(budget, 2048) : budget);
+        }
+      }
 
       const broken = failingLlm(['broken-main', 'broken-backup']);
       const t2 = await createTestApp({}, { llm: broken });
@@ -125,7 +178,15 @@ describe('model-backed matches', () => {
         await runUntilSettled(t2, match.id);
         const row = await t2.services.repositories.matches.find(match.id);
         expect(row?.status).toBe('completed');
-        expect((await t2.services.repositories.matches.log(match.id))?.filter((entry) => entry.kind === 'fallback').length).toBeGreaterThan(0);
+        const log = await t2.services.repositories.matches.log(match.id) ?? [];
+        expect(log.some(entry => entry.kind === 'fallback')).toBe(true);
+        const speeches = log.filter(entry => entry.kind === 'speech');
+        expect(speeches.length).toBeGreaterThan(0);
+        expect(speeches.every(entry => entry.text === '过~')).toBe(true);
+        expect(log.some(entry => entry.kind === 'judgement')).toBe(false);
+        expect(log.find(entry => entry.kind === 'vote_tallied')).toMatchObject({
+          ballots: [], outcome: { kind: 'none' }, abstained: expect.any(Array),
+        });
       } finally {
         await t2.cleanup();
       }
@@ -192,6 +253,9 @@ describe('match listing and viewer progress', () => {
   it('lists seats for every match in a bounded number of queries', async () => {
     const listed = dataOf(await t.call<MatchSummaryDto[]>('GET', '/api/admin/matches', { token }));
     expect(listed.map((match) => match.id).sort()).toEqual(created.map((match) => match.id).sort());
+    const next = dataOf(await t.call<MatchSummaryDto[]>('GET', '/api/admin/matches?limit=1&offset=1', { token }));
+    expect(next).toEqual(listed.slice(1, 2));
+    expect((await t.call('GET', '/api/admin/matches?offset=-1', { token })).status).toBe(400);
     // 列表里每局的座位与单独查该局时一致，且按座位号排序
     for (const match of listed) {
       expect(match.seats).toEqual(dataOf(await t.call<MatchSummaryDto>('GET', `/api/admin/matches/${match.id}`, { token })).seats);

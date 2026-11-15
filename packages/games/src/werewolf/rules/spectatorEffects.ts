@@ -1,8 +1,9 @@
 import type { LogDraft } from '@battle/engine';
 import type { NightDeathCause } from '../state';
 
-export function spectatorEffect(effect: string, target: number, title: string): LogDraft {
-  return { kind: 'revealed', channel: 'spectator', text: `${target}号 · ${title}`, data: { effect, target, title } };
+export function spectatorEffect(effect: string, target: number, title: string, announcement?: 'dawn'): LogDraft {
+  return { kind: 'revealed', channel: 'spectator', text: `${target}号 · ${title}`,
+    data: { effect, target, title, ...(announcement ? { announcement } : {}) } };
 }
 
 const DEATH_EFFECT: Record<NightDeathCause, readonly [string, string]> = {
@@ -13,5 +14,5 @@ const DEATH_EFFECT: Record<NightDeathCause, readonly [string, string]> = {
 
 export function nightDeathEffect(target: number, cause: NightDeathCause): LogDraft {
   const [effect, title] = DEATH_EFFECT[cause];
-  return spectatorEffect(effect, target, title);
+  return spectatorEffect(effect, target, title, 'dawn');
 }

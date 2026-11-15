@@ -1,4 +1,4 @@
-import { EngineInputError, SpecError } from '../errors';
+import { EngineInputError } from '../errors';
 import { aiExecutorFor } from '../phases/registry';
 import type { ExecEnv } from '../runtime/env';
 import { finishGame } from '../runtime/flow';
@@ -24,15 +24,9 @@ function takePending(env: ExecEnv, requestId: string): PendingRequest {
 function applyFallback(env: ExecEnv, pending: PendingRequest, reason: string): void {
   const phase = env.phase();
   const executor = aiExecutorFor(phase);
-  const value = executor.fallback(env, phase, pending);
-  const parsed = executor.schema(env, phase, pending).safeParse(value);
-  const invalid = parsed.success ? executor.check(env, phase, pending, parsed.data) : formatZodIssues(parsed.error);
-  if (!parsed.success || invalid) {
-    throw new SpecError(env.game.spec.key, [`阶段 ${pending.phaseId} 的兜底输出不合法：${invalid}`]);
-  }
-  env.log({ kind: 'fallback', seat: pending.seat, reason, channel: 'host' });
-  env.record('decision', '兜底', { reason, applied: parsed.data }, { seat: pending.seat });
-  executor.store(env, phase, pending, parsed.data);
+  env.log({ kind: 'fallback', seat: pending.seat, reason, channel: 'host', action: pending.action });
+  const applied = executor.skipFailed(env, phase, pending);
+  env.record('decision', '兜底', { reason, applied }, { seat: pending.seat });
 }
 
 /** 接收一条 AI 回复：解析 → 合法性 → 内容校验；失败时带原因重问，次数用尽后走兜底 */
@@ -45,9 +39,16 @@ export function receiveAiReply(env: ExecEnv, requestId: string, reply: AiReply):
 
   const phase = env.phase();
   const executor = aiExecutorFor(phase);
-  const parsed = executor.schema(env, phase, pending).safeParse(reply.output);
+  let gameOutput = reply.output;
+  if (pending.memoryContext && gameOutput && typeof gameOutput === 'object' && !Array.isArray(gameOutput)) {
+    const { memoryNote: _note, ...fields } = gameOutput as Record<string, unknown>;
+    gameOutput = fields;
+  }
+  const parsed = executor.schema(env, phase, pending).safeParse(gameOutput);
   const error = parsed.success ? executor.check(env, phase, pending, parsed.data) : formatZodIssues(parsed.error);
   if (parsed.success && !error) {
+    env.acceptedRequestId = requestId;
+    env.acceptedOutput = parsed.data;
     env.record('decision', '采纳', { applied: parsed.data }, { seat: pending.seat });
     executor.store(env, phase, pending, parsed.data);
     return;

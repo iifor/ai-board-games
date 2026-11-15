@@ -20,13 +20,20 @@ function allowedDeclarations(env: ExecEnv, phase: Phase, seat: Seat): [string, D
 export function speakSchema(env: ExecEnv, phase: Phase, seat: Seat): ZodType {
   const allowed = allowedDeclarations(env, phase, seat);
   const [first, ...rest] = allowed.map(([key]) => key);
-  if (first === undefined) return phase.output;
+  if (first === undefined && !phase.allowSkip) return phase.output;
   if (!(phase.output instanceof z.ZodObject)) {
-    throw new SpecError(env.game.spec.key, [`阶段 ${env.phaseId()} 声明了附加动作，output 必须是 z.object`]);
+    throw new SpecError(env.game.spec.key, [`阶段 ${env.phaseId()} 允许跳过或附加动作，output 必须是 z.object`]);
   }
+  const output = phase.allowSkip
+    ? phase.output.extend({ speech: phase.output.shape.speech.nullable().describe('发言正文，主动跳过时填 null') })
+    : phase.output;
+  if (first === undefined) return output;
   const meaning = allowed.map(([key, declaration]) => `${key}=${declaration.label}`).join('；');
-  return phase.output.extend({
-    declare: z.enum([first, ...rest]).optional().describe(`可选的附加动作，不需要时不要填写：${meaning}`),
+  return output.extend({
+    declare: z.preprocess(
+      value => value === null || (typeof value === 'string' && value.trim() === '') ? undefined : value,
+      z.enum([first, ...rest]).optional(),
+    ).optional().describe(`可选的附加动作，不需要时不要填写：${meaning}`),
   });
 }
 
@@ -36,6 +43,7 @@ export function applyDeclaration(env: ExecEnv, phase: Phase, seat: Seat, value: 
   if (action === undefined) return;
   const declaration = phase.declarations?.[action];
   if (!declaration) throw new Error(`阶段 ${env.phaseId()} 没有附加动作 ${action}`);
-  env.log({ kind: 'action', seat: seat.seat, action: declaration.label, targets: [], text: `宣布${declaration.label}` });
+  const text = declaration.describe?.(env.ctx(), seat) ?? `宣布${declaration.label}`;
+  env.log({ kind: 'action', seat: seat.seat, action: declaration.label, targets: [], text });
   fireEvent(env, { kind: 'action_declared', seat: seat.seat, action });
 }

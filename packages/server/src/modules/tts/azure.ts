@@ -1,27 +1,29 @@
 import { buildAzureSsml } from './azureSsml';
-import { TTS_TIMEOUT_MS, type SynthesizedAudio, type TtsProvider, type VoiceSpec } from './types';
+import { prepareAzureSpeech } from './azureSpeech';
+import { createAzureVoiceCatalog } from '../voices/azureCatalog';
+import { azureControlSupport } from './azureControlCapabilities';
+import { createAzureSynthesis, type AzureSynthesizer } from './azureTransport';
+import { azureCaptionCues } from './azureCaptions';
+import type { AzureVoiceCatalogEntry } from '@battle/shared';
+import type { SynthesizedAudio, TtsProvider, VoiceSpec } from './types';
 
 /** 请求的输出格式；决定音频内容，因此参与缓存键 */
 const AZURE_OUTPUT_FORMAT = 'audio-24khz-48kbitrate-mono-mp3';
 
-/** Azure 语音 REST 接口（不依赖 SDK） */
-export function createAzureTts(config: { readonly key: string; readonly region: string }): TtsProvider {
+/** 官方 SDK 同时生成音频及其字幕时间轴。 */
+export function createAzureTts(
+  config: { readonly key: string; readonly region: string },
+  catalog: () => Promise<AzureVoiceCatalogEntry[]> = createAzureVoiceCatalog(config),
+  synthesize: AzureSynthesizer = createAzureSynthesis(config),
+): TtsProvider {
   return {
-    signature: `azure:${AZURE_OUTPUT_FORMAT}`,
+    signature: `azure-sdk:${AZURE_OUTPUT_FORMAT}:captions-v1`,
+    prepare: (text, voice) => prepareAzureSpeech(text, voice, catalog, azureControlSupport(voice.voiceName, config.region)),
     async synthesize(text: string, voice: VoiceSpec): Promise<SynthesizedAudio> {
-      const response = await fetch(`https://${config.region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
-        method: 'POST',
-        headers: {
-          'Ocp-Apim-Subscription-Key': config.key,
-          'Content-Type': 'application/ssml+xml',
-          'X-Microsoft-OutputFormat': AZURE_OUTPUT_FORMAT,
-          'User-Agent': 'ai-board-games',
-        },
-        body: buildAzureSsml(voice, text),
-        signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
-      });
-      if (!response.ok) throw new Error(`Azure 语音合成失败：${response.status}`);
-      return { data: Buffer.from(await response.arrayBuffer()), mime: 'audio/mpeg' };
+      const speech = voice.controls ? { text, voice } : await prepareAzureSpeech(text, voice, catalog, azureControlSupport(voice.voiceName, config.region));
+      const result = await synthesize(buildAzureSsml(speech.voice, speech.text));
+      const captions = azureCaptionCues(speech.text, result.words);
+      return { data: result.data, mime: result.mime, ...(captions ? { captions } : {}) };
     },
   };
 }

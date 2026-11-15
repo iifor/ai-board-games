@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { AudioRef, VoiceProvider } from '@battle/shared';
+import type { AudioCaptionCue, AudioRef, VoiceProvider } from '@battle/shared';
 import { badRequest, upstream } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import type { MediaRepository } from './repository';
@@ -11,13 +11,20 @@ export interface VoiceChoice extends VoiceSpec {
 
 /** 音频按（来源、合成器签名、音色及其参数、文本）哈希寻址：换模型、改参数都不会复用旧缓存 */
 export function assetId(provider: Pick<TtsProvider, 'signature'>, voice: VoiceChoice, text: string): string {
-  const key = [voice.provider, provider.signature, voice.voiceName, voice.language, voice.style, voice.rate, voice.pitch, text].join('\u0000');
+  const key = [voice.provider, provider.signature, voice.voiceName, voice.language, voice.style, voice.rate, voice.pitch, text,
+    ...(voice.segments ? [JSON.stringify(voice.segments)] : []),
+    ...(voice.controls ? [JSON.stringify(voice.controls)] : []),
+  ].join('\u0000');
   return createHash('sha256').update(key).digest('hex').slice(0, 40);
 }
 
 export function createTtsService(providers: TtsProviders, repository: MediaRepository) {
   /** 本进程内同一音频只合成一次（快路径）；跨实例靠仓储的 advisory lock */
   const inflight = new Map<string, Promise<AudioRef>>();
+
+  const reference = (id: string, asset: { readonly mime: string; readonly captions?: readonly AudioCaptionCue[] | null }): AudioRef => ({
+    url: `/api/media/${id}`, mime: asset.mime, ...(asset.captions?.length ? { captions: asset.captions } : {}),
+  });
 
   async function callProvider(provider: TtsProvider, text: string, voice: VoiceChoice): Promise<SynthesizedAudio> {
     try {
@@ -32,17 +39,24 @@ export function createTtsService(providers: TtsProviders, repository: MediaRepos
     if (voice.provider === 'browser') throw badRequest('浏览器朗读的音色由前端直接试听');
     const provider = providers[voice.provider];
     if (!provider) throw upstream(`${voice.provider} 语音服务未配置，请检查服务端环境变量`);
+    if (provider.prepare) {
+      const speech = await provider.prepare(text, voice);
+      text = speech.text;
+      voice = { ...speech.voice, provider: voice.provider };
+    }
+    if (!text.trim()) throw badRequest('朗读内容不能为空');
     const id = assetId(provider, voice, text);
-    const url = `/api/media/${id}`;
-    if (await repository.exists(id)) return { url, mime: 'audio/mpeg' };
+    const cached = await repository.reference(id);
+    if (cached) return reference(id, cached);
     const existing = inflight.get(id);
     if (existing) return existing;
     const job = repository.locked(id, async (asset): Promise<AudioRef> => {
       // 等锁期间另一实例可能已经合成并提交
-      if (await asset.exists()) return { url, mime: 'audio/mpeg' };
+      const cached = await asset.reference();
+      if (cached) return reference(id, cached);
       const audio = await callProvider(provider, text, voice);
-      await asset.insert({ provider: voice.provider, voiceName: voice.voiceName, mime: audio.mime, data: audio.data });
-      return { url, mime: audio.mime };
+      await asset.insert({ provider: voice.provider, voiceName: voice.voiceName, ...audio });
+      return reference(id, audio);
     }).finally(() => inflight.delete(id));
     inflight.set(id, job);
     return job;

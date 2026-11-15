@@ -26,7 +26,7 @@ export interface PlaybackOptions {
   readonly muted: boolean;
 }
 
-export const SPEEDS = [1, 1.5, 2, 3] as const;
+export const SPEEDS = [1, 1.25, 1.5, 2, 3] as const;
 
 /** 舞台快捷键对应的动作：空格 暂停 / 继续，← / → 倍速，M 静音，L 记录侧栏，R 终局结果（只在有结果时） */
 export type StageShortcut = 'toggle-pause' | 'speed-down' | 'speed-up' | 'toggle-mute' | 'toggle-feed' | 'toggle-result';

@@ -1,4 +1,4 @@
-import { speechOf, type AudienceSeat, type AudienceView, type StageEvent } from '@battle/shared';
+import { isPlayerSpeech, speechOf, type AudienceSeat, type AudienceView, type StageEvent } from '@battle/shared';
 import { POPOVER_GAP, TEAM_LABELS } from './constants';
 import { SPEEDS, type PlaybackOptions, type SeatSpeech, type ShortcutKeyLike, type StageShortcut, type StreamItem } from './types';
 
@@ -10,6 +10,10 @@ export function periodOf(view: AudienceView | null): StagePeriod {
   if (view.extra.period === 'day' || view.extra.period === 'night') return view.extra.period;
   if (view.gameKey !== 'werewolf') return 'day';
   return /夜|天黑/.test(view.phase?.title ?? '') ? 'night' : 'day';
+}
+
+export function speakerLabel(seat: number, name?: string): string {
+  return name && name.replace(/\s/g, '') !== seat + '号' ? `${seat} 号 · ${name}` : `${seat} 号`;
 }
 
 export function seatOf(view: AudienceView | null, seat: number | null): AudienceSeat | null {
@@ -54,7 +58,7 @@ export function speechOrderOf(played: readonly StreamItem[], current: StreamItem
   const items = current ? [...played, current] : played;
   const seats: number[] = [];
   for (const { event } of items) {
-    if (event.kind !== 'speech' && event.kind !== 'judgement') continue;
+    if (!isPlayerSpeech(event)) continue;
     if (event.round !== view.round || event.phaseId !== view.phase.id || seats.includes(event.seat)) continue;
     seats.push(event.seat);
   }
@@ -64,7 +68,9 @@ export function speechOrderOf(played: readonly StreamItem[], current: StreamItem
 /** 评委已经给出的判定：座位 → 判定文字 */
 export function judgeBadges(played: readonly StreamItem[]): Readonly<Record<number, readonly string[]>> {
   const badges: Record<number, string[]> = {};
-  for (const { event } of played) if (event.kind === 'judgement') badges[event.seat] = [event.verdictLabel];
+  for (const { event } of played) if (event.kind === 'judgement') {
+    badges[event.seat] = [event.source ? `${event.verdictLabel}（系统代选）` : event.verdictLabel];
+  }
   return badges;
 }
 
@@ -89,7 +95,7 @@ export function rosterByTeam(view: AudienceView): readonly TeamRoster[] {
 export function speechesOfSeat(played: readonly StreamItem[], seat: number): readonly SeatSpeech[] {
   const speeches: SeatSpeech[] = [];
   for (const { event } of played) {
-    if ((event.kind !== 'speech' && event.kind !== 'judgement') || event.seat !== seat) continue;
+    if (!isPlayerSpeech(event) || event.seat !== seat) continue;
     const text = speechOf(event)?.text;
     if (text === undefined) continue;
     const phase = event.view.phase?.title;
@@ -132,7 +138,7 @@ export function shortcutActionOf(event: ShortcutKeyLike): StageShortcut | null {
   }
 }
 
-/** 相邻的倍速档（控制条提供的 1 / 1.5 / 2 / 3）；到头了保持不变，不在档位上的值取下一个更快 / 更慢的档 */
+/** 沿控制条的档位调速，到头保持不变；当前值不在档位上时取对应方向的最近档。 */
 export function stepSpeed(speed: number, direction: -1 | 1): number {
   const steps = direction > 0 ? SPEEDS.filter((value) => value > speed) : [...SPEEDS].reverse().filter((value) => value < speed);
   return steps[0] ?? speed;

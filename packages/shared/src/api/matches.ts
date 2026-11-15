@@ -36,6 +36,7 @@ export interface MatchSeatDto {
 }
 
 export interface MatchSummaryDto {
+  readonly importTitle?: string;
   readonly id: string;
   readonly gameKey: string;
   readonly gameTitle: string;
@@ -79,9 +80,17 @@ export interface AiCallDto {
 
 export type DebugCommandRequest = { readonly command: 'continue' | 'step' | 'run' | 'skip' };
 
+/** 来自语音合成服务的音频时间，单位为毫秒，文本已移除朗读控制标签。 */
+export interface AudioCaptionCue {
+  readonly text: string;
+  readonly startMs: number;
+  readonly endMs: number;
+}
+
 export interface AudioRef {
   readonly url: string;
   readonly mime: string;
+  readonly captions?: readonly AudioCaptionCue[];
 }
 
 /** WebSocket：服务端 → 客户端 */

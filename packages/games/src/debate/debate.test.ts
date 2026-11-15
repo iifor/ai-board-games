@@ -125,7 +125,7 @@ describe('debate judging', () => {
       agent: agentWith((request) => (request.action === 'judge' ? { output: { verdict: '都很好', comment: '' } } : undefined)),
     });
     expect(run.requests.filter(({ request }) => request.action === 'judge').map(({ request }) => request.attempt)).toEqual([1, 2]);
-    expect(['pro', 'con']).toContain(run.snapshot.result?.winner);
+    expect(run.snapshot.result?.winner).toBe('draw');
     expect(run.log.filter((entry) => entry.kind === 'fallback')).toHaveLength(1);
   });
 

@@ -4,12 +4,14 @@ import { extractJson, LlmError, type LlmClient } from '../llm';
 import type { MatchRepository } from '../matches/repository';
 import type { TaskCompletion } from '../matches/types';
 import type { ModelService } from '../models/service';
+import { playerSpeechSettings, type PlayerSpeechSettings } from '@battle/shared';
 import type { ProviderService } from '../providers/service';
 import type { AiTaskRepository, ClaimedTask, SeatModel } from './repository';
+import type { SpeechDelivery } from './speechDelivery';
 
 export const LLM_TIMEOUT_MS = 60_000;
 /** 每个模型的传输层尝试次数；主模型用尽后切换备用模型 */
-export const ATTEMPTS_PER_MODEL = 2;
+export const ATTEMPTS_PER_MODEL = 3;
 
 export interface TaskResult {
   readonly input: EngineInput;
@@ -24,6 +26,7 @@ export interface ExecutorDeps {
   readonly llm: LlmClient;
   readonly findGame: (key: string) => CompiledGame;
   readonly sleep: (ms: number) => Promise<void>;
+  readonly speechDelivery?: (task: ClaimedTask) => Promise<SpeechDelivery>;
 }
 
 function succeeded(task: ClaimedTask, output: unknown): TaskResult {
@@ -41,11 +44,13 @@ function failed(task: ClaimedTask, reason: string): TaskResult {
 }
 
 export function createTaskExecutor(deps: ExecutorDeps) {
-  async function callModel(task: ClaimedTask, model: SeatModel): Promise<{ output: unknown } | { error: string; retryable: boolean }> {
+  async function callModel(task: ClaimedTask, model: SeatModel, settings: PlayerSpeechSettings, delivery: SpeechDelivery): Promise<{ output: unknown } | { error: string; retryable: boolean }> {
     const started = Date.now();
+    const temperature = settings.temperature;
+    const maxTokens = Math.min(settings.maxTokens, model.maxTokens);
     const base = {
-      matchId: task.matchId, requestId: task.requestId, seat: task.seat, modelId: model.modelId, modelName: model.name, prompt: task.request.prompt,
-      traceSettings: { model: model.model, providerId: model.providerId, temperature: model.temperature, maxTokens: model.maxTokens },
+      matchId: task.matchId, requestId: task.requestId, seat: task.seat, modelId: model.modelId, modelName: model.name, prompt: delivery.prompt,
+      traceSettings: { model: model.model, providerId: model.providerId, temperature, maxTokens },
     };
     let response: Awaited<ReturnType<LlmClient['complete']>>;
     try {
@@ -54,9 +59,9 @@ export function createTaskExecutor(deps: ExecutorDeps) {
         baseUrl: credentials.baseUrl,
         apiKey: credentials.apiKey,
         model: model.model,
-        messages: toChatMessages(task.request.prompt),
-        temperature: model.temperature,
-        maxTokens: model.maxTokens,
+        messages: toChatMessages(delivery.prompt),
+        temperature,
+        maxTokens,
         timeoutMs: LLM_TIMEOUT_MS,
       });
     } catch (error) {
@@ -69,7 +74,7 @@ export function createTaskExecutor(deps: ExecutorDeps) {
       }
       return { error: message, retryable: !quotaExhausted && error instanceof LlmError && error.retryable };
     }
-    const output = extractJson(response.content);
+    const output = delivery.cleanOutput(extractJson(response.content));
     await deps.tasks.recordCall({ ...base, rawResponse: response.content, output, error: null, latencyMs: Date.now() - started, usage: response.usage });
     return { output };
   }
@@ -101,9 +106,11 @@ export function createTaskExecutor(deps: ExecutorDeps) {
       const chain = await modelChain(task);
       if (!chain.length) return failed(task, '座位没有可用的模型');
       let lastError = '模型调用失败';
+      const settings = task.request.speechSettings ?? playerSpeechSettings(task.request.taskTemplate?.persona ?? '');
+      const delivery = deps.speechDelivery ? await deps.speechDelivery(task) : { prompt: task.request.prompt, cleanOutput: (output: unknown) => output };
       for (const model of chain) {
         for (let attempt = 1; attempt <= ATTEMPTS_PER_MODEL; attempt += 1) {
-          const result = await callModel(task, model);
+          const result = await callModel(task, model, settings, delivery);
           if ('output' in result) return succeeded(task, result.output);
           lastError = result.error;
           if (!result.retryable) break;

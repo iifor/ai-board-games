@@ -1,7 +1,11 @@
-import type { Channel, GameResult, StageEvent, StageEventMeta, StagePayload, TraceMark } from '@battle/shared';
+import type { MemoryCard, MemoryEvidence } from '@battle/shared';
+import type { Channel, GameResult, PlayerSpeechSettings, StageEvent, StageEventMeta, StagePayload, TraceMark } from '@battle/shared';
 import type { PhaseResult, TriggerEvent } from '../spec/context';
 
 export interface SeatProfile {
+  readonly modelKey?: string;
+  readonly appearanceName?: string;
+  readonly speechSettings?: PlayerSpeechSettings;
   readonly playerId: string;
   readonly name: string;
   readonly persona: string;
@@ -30,6 +34,7 @@ export type TemplateVars = Readonly<Record<string, string | number>>;
 
 /** 已发出、等待结果的 AI 请求（快照内的精简形态） */
 export interface PendingRequest {
+  readonly memoryContext?: { readonly offered: readonly MemoryCard[]; readonly evidence: readonly MemoryEvidence[]; readonly throughSeq: number };
   readonly id: string;
   readonly seat: number;
   readonly phaseId: string;
@@ -84,7 +89,18 @@ export interface PendingJump {
   readonly event: TriggerEvent;
 }
 
+export interface MatchPromptSet {
+  readonly sources: Readonly<Record<string, string>>;
+  readonly trials: Readonly<Record<string, { readonly source: string; readonly persona: string | null }>>;
+  readonly platform?: string;
+  readonly playerExpression?: string;
+}
+
 export interface EngineSnapshot {
+  readonly playerMemories?: Readonly<Record<string, readonly MemoryCard[]>>;
+  readonly memoryGenerations?: Readonly<Record<string, number>>;
+  readonly promptSet?: MatchPromptSet;
+  readonly announcementOverrides?: Readonly<Record<string, string>>;
   readonly engineVersion: 1;
   readonly gameKey: string;
   readonly specVersion: number;
@@ -130,8 +146,18 @@ export interface PromptLayers {
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
-/** 交给服务端执行的 AI 请求：prompt 已渲染完成，服务端只负责调用模型并回传原始输出 */
+/** 交给服务端执行的 AI 请求：prompt 已渲染；worker 可补充音色能力并校验朗读标记后回传输出。 */
 export interface AiRequest {
+  readonly memoryContext?: PendingRequest['memoryContext'];
+  readonly speechSettings?: PlayerSpeechSettings;
+  readonly taskTemplate?: {
+    readonly name: string;
+    readonly source: string;
+    readonly context: Readonly<Record<string, unknown>>;
+    readonly originalTask: string;
+    readonly persona: string;
+    readonly applied?: { readonly source: string; readonly persona: string | null };
+  };
   readonly id: string;
   readonly seat: number;
   readonly phaseId: string;
@@ -152,6 +178,8 @@ export type EngineInput =
   | { readonly kind: 'debug'; readonly command: DebugCommand };
 
 export interface AdvanceResult {
+  readonly acceptedRequestId?: string;
+  readonly acceptedOutput?: unknown;
   readonly trace: readonly TraceMark[];
   readonly snapshot: EngineSnapshot;
   readonly log: readonly LogEntry[];
@@ -161,6 +189,8 @@ export interface AdvanceResult {
 }
 
 export interface CreateMatchInput {
+  /** 服务端在开局时注入已校验的播报文案。 */
+  readonly announcementOverrides?: Readonly<Record<string, string>>;
   readonly seed: number;
   readonly players: readonly SeatProfile[];
   readonly params?: unknown;

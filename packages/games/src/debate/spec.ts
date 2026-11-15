@@ -1,4 +1,5 @@
 import { compileGame, defineGame, speechOutput } from '@battle/engine';
+import { DEBATE_SPEECH_MAX_CHARS } from '../speechLimits';
 import { debatePrompts as prompts } from './prompts';
 import { closingSpeakers, crossfireTurns, debateResult, debateSeatLabel, openingSpeakers, pickTopic } from './rules';
 import { debateParamsSchema, debateStateSchema } from './state';
@@ -7,7 +8,7 @@ const holdPosition = () => ({ speech: '我方坚持己方立场，请评委关�
 
 export const debateSpec = defineGame({
   key: 'debate',
-  version: 2,
+  version: 3,
   title: 'AI 辩论赛',
   description: '正反双方各四名辩手，经立论、攻辩、总结后由评委判定胜负并评选最佳辩手。',
   players: { min: 9, max: 12 },
@@ -30,7 +31,7 @@ export const debateSpec = defineGame({
       title: '立论',
       actors: openingSpeakers,
       prompt: prompts.opening,
-      output: speechOutput({ max: 300 }),
+      output: speechOutput({ max: DEBATE_SPEECH_MAX_CHARS }),
       fallback: holdPosition,
       next: 'crossfire',
     },
@@ -39,7 +40,7 @@ export const debateSpec = defineGame({
       title: '攻辩',
       actors: crossfireTurns,
       prompt: prompts.crossfireQuestion,
-      output: speechOutput({ max: 160 }),
+      output: speechOutput({ max: DEBATE_SPEECH_MAX_CHARS }),
       fallback: holdPosition,
       next: 'closing',
     },
@@ -48,7 +49,7 @@ export const debateSpec = defineGame({
       title: '总结陈词',
       actors: closingSpeakers,
       prompt: prompts.closing,
-      output: speechOutput({ max: 300 }),
+      output: speechOutput({ max: DEBATE_SPEECH_MAX_CHARS }),
       fallback: holdPosition,
       next: 'judging',
     },
@@ -59,7 +60,7 @@ export const debateSpec = defineGame({
       prompt: prompts.review,
       verdicts: { pro: '判正方胜', con: '判反方胜' },
       tieVerdict: { key: 'draw', label: '平局' },
-      commentMax: 200,
+      commentMax: DEBATE_SPEECH_MAX_CHARS,
       next: 'mvp',
     },
     mvp: {

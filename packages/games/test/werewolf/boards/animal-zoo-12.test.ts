@@ -28,16 +28,16 @@ describe('animal zoo', () => {
   it('roars at dawn when a wolf sits next to the bear, unless the penguin froze it', () => {
     expect(bear).toBe(6);
     expect(wolves).toContain(5);
-    expect(dawnNews(run())).toBe('天亮了，昨晚是平安夜。熊咆哮了。');
-    expect(dawnNews(run(act('penguin_freeze', penguin, [bear], 1)))).toBe('天亮了，昨晚是平安夜。熊没有咆哮。');
+    expect(dawnNews(run())).toBe('昨晚是平安夜。熊咆哮了。');
+    expect(dawnNews(run(act('penguin_freeze', penguin, [bear], 1)))).toBe('昨晚是平安夜。熊没有咆哮。');
   });
 
   it('judges the bear’s neighbours after last night’s deaths', () => {
     const bearOne = first(1, 'bear', BOARD, PLAYERS);
     const [left = 0] = roleSeats(1, 'rabbit', BOARD, PLAYERS);
     expect(left).toBe(bearOne - 1);
-    expect(dawnNews(run(undefined, 1))).toBe('天亮了，昨晚是平安夜。熊没有咆哮。');
-    expect(dawnNews(run(wolvesKill(left, 1), 1))).toBe(`天亮了，昨晚死亡的是：${left}号。熊咆哮了。`);
+    expect(dawnNews(run(undefined, 1))).toBe('昨晚是平安夜。熊没有咆哮。');
+    expect(dawnNews(run(wolvesKill(left, 1), 1))).toBe(`昨晚${left}号出局。熊咆哮了。`);
   });
 
   it('freezes a wolf to stop the whole pack, never itself, never twice in a row', () => {

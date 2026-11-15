@@ -18,7 +18,7 @@ const wildChildPrompts = definePrompts({
   ].join(''),
   wildChildWolf: [
     '你是{{me.label}}，身份是野孩子。你的榜样 {{state.wildChildModel}}号已经出局，你已变成狼人（狼人阵营）。',
-    '你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。白天发言时你可以在发言后宣布自爆。',
+    '你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆。',
   ].join(''),
   wildChildChoose: '野孩子请睁眼，选择一名玩家作为你的榜样。你不会得知他的身份；他出局时你会变成狼人。',
 });

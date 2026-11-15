@@ -1,0 +1,38 @@
+/* 轨迹在人物下层，反馈在人物前，发言/字幕/HUD 始终在上层。此根节点不建立 stacking context。 */
+.skill-interaction { position: absolute; inset: 0; pointer-events: none; color: var(--skill-color); }
+.skill-interaction[data-cancelled='true'] { display: none; }
+.skill-routes { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.skill-route-glow, .skill-route-core { fill: none; stroke: currentColor; stroke-linecap: round; stroke-dasharray: 1; opacity: 0; }
+.skill-route-glow { stroke-width: 12px; filter: blur(6px); }
+.skill-route-core { stroke-width: 2px; }
+.skill-projectile { opacity: 0; filter: drop-shadow(0 0 6px currentColor); }
+.skill-projectile circle { fill: currentColor; opacity: .3; }
+.skill-projectile-card { display: none; fill: #09182e; stroke: currentColor; stroke-width: 1.5px; }
+[data-skill='trade'] .skill-projectile-card { display: block; }
+[data-skill='trade'] .skill-projectile circle { display: none; }
+.skill-projectile-icon { fill: #081425; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.skill-source { position: absolute; z-index: 3; width: 58px; height: 58px; margin: -29px; }
+.skill-source > span { display: block; width: 100%; height: 100%; opacity: 0; border-radius: 50%; background: radial-gradient(circle, #09121a99, transparent 72%); filter: drop-shadow(0 0 9px currentColor); }
+.skill-source svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.skill-target { position: absolute; z-index: 3; transform: translate(-50%, -50%); }
+.skill-result-anchor { position: absolute; z-index: 4; transform: translate(-50%, -50%); text-align: center; }
+.skill-result-anchor[data-side='right'] { text-align: left; }
+.skill-result-anchor[data-side='left'] { text-align: right; }
+.skill-result { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; opacity: 0;
+  color: var(--skill-color); font-size: clamp(12px, 1.2vw, 19px); line-height: 1.4; font-weight: 800;
+  text-shadow: 0 2px 3px #040913, 0 0 8px #040913, 0 0 16px #040913; }
+.skill-result[data-tone='good'] { color: #7bffb5; }
+.skill-result[data-tone='evil'] { color: #ff8585; }
+.skill-global-result { position: absolute; z-index: 4; inset: 42% 15% auto; text-align: center; font-size: clamp(14px, 2vw, 28px); font-weight: 750; text-shadow: 0 2px 5px #071020; }
+.skill-global-result > span { display: block; opacity: 0; }
+.skill-wide-wave { position: absolute; z-index: 1; inset: 15%; border-radius: 50%; border: 2px solid currentColor; background: radial-gradient(ellipse, transparent 45%, color-mix(in srgb, currentColor 18%, transparent) 70%, transparent 74%); opacity: 0; }
+.skill-interaction[data-reduced-motion='true'] .skill-route-core { opacity: .5; stroke-dashoffset: 0; }
+.skill-interaction[data-reduced-motion='true'] .skill-result,
+.skill-interaction[data-reduced-motion='true'] .skill-thaw b,
+.skill-interaction[data-reduced-motion='true'] .skill-global-result > span { opacity: 1; }
+.skill-interaction[data-reduced-motion='true'] .skill-emblem { opacity: .6; }
+@media (max-width: 860px) {
+  .skill-route-glow { stroke-width: 7px; }
+  .skill-source { width: 38px; height: 38px; margin: -19px; }
+  .skill-global-result { inset: 18px 10% auto; }
+}

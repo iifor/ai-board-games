@@ -48,7 +48,7 @@ describe('spirit wolf', () => {
   it('learning the witch gives one antidote against that night’s poison, never for himself', () => {
     const saved = play(SEED, combine(learn(witch), act('witch_poison', witch, [villager], 1), act('spirit_wolf_antidote', spirit, [villager], 1)), BOARD);
     expect(requestsIn(saved, 'spirit_wolf_antidote')[0]?.legalTargets).toEqual([villager]);
-    expect(entries(saved, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(saved, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
     expect(stateOf(saved.snapshot).spiritWolf.antidote).toBe(false);
     const self = play(SEED, combine(learn(witch), act('witch_poison', witch, [spirit], 1)), BOARD);
     expect(requestsIn(self, 'spirit_wolf_antidote')).toHaveLength(0);
@@ -84,7 +84,7 @@ describe('spirit wolf', () => {
     ), BOARD);
     expect(requestsOn(run, 'spirit_wolf_shield', 1)).toHaveLength(0);
     expect(entries(run, 'action', 'seer_check_late').find((entry) => entry.round === 2)?.text).toBe(`查验 ${villager}号：无法验出`);
-    expect(entries(run, 'narration', 'dawn').find((entry) => entry.round === 2)?.text).toBe(`天亮了，昨晚死亡的是：${hunter}号。`);
+    expect(entries(run, 'narration', 'dawn').find((entry) => entry.round === 2)?.text).toBe(`天亮请睁眼。昨晚${hunter}号出局。`);
     expect(entries(run, 'narration', 'hunter_resolve')[0]?.text).toBe(`${villager}号中枪后没有出局。`);
     expect(requestsOn(run, 'spirit_wolf_shield', 3)[0]?.legalTargets).not.toContain(villager);
   });
@@ -97,6 +97,6 @@ describe('spirit wolf', () => {
       act('guard_protect', guard, [villager], 2),
       act('witch_save', witch, [villager], 2),
     ), BOARD);
-    expect(entries(run, 'narration', 'dawn').find((entry) => entry.round === 2)?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn').find((entry) => entry.round === 2)?.text).toBe('天亮请睁眼。昨晚是平安夜。');
   });
 });

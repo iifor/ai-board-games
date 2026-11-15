@@ -49,6 +49,17 @@ export function checkTemplates(spec: AnyGameSpec): string[] {
       announceTemplates.add(phase.text);
     } else if ('prompt' in phase) {
       requireRegistered(phase.prompt, `阶段 ${id}`);
+      if (phase.kind === 'speak') {
+        for (const declaration of Object.values(phase.declarations ?? {})) {
+          if (!declaration.listenerPrompt) continue;
+          requireRegistered(declaration.listenerPrompt, `阶段 ${id} 旁听声明`);
+          if (phase.mode === 'parallel') issues.push(`阶段 ${id} 的旁听声明需要串行发言`);
+        }
+      }
+      if (phase.kind === 'speak' && phase.followUp) {
+        requireRegistered(phase.followUp.prompt, `阶段 ${id} 补充回应`);
+        if (phase.mode === 'parallel') issues.push(`阶段 ${id} 的定向回应需要串行发言`);
+      }
     }
   }
 

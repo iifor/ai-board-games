@@ -1,4 +1,4 @@
-import { renderTemplate } from '../prompt/template';
+import { renderMatchTemplate } from '../prompt/matchTemplates';
 import { buildPublicContext } from '../prompt/visibleContext';
 import type { AnnouncePhase, ComputePhase, RevealPhase } from '../spec/phases';
 import { done, type PhaseExecutor } from './types';
@@ -8,7 +8,9 @@ import { done, type PhaseExecutor } from './types';
 export const announceExecutor: PhaseExecutor<AnnouncePhase<unknown, unknown>> = {
   enter() {},
   step(env, phase) {
-    const text = renderTemplate(phase.text, buildPublicContext(env.game, env.s));
+    const text = env.s.announcementOverrides?.[phase.text.name] ?? renderMatchTemplate(phase.text,
+      env.s.promptSet?.sources[phase.text.name], buildPublicContext(env.game, env.s),
+      name => env.record('failure', '播报模板无法渲染，使用基础模板', { template: name })).text;
     env.log({ kind: 'narration', text, channel: phase.channel ?? 'public' });
     return done();
   },

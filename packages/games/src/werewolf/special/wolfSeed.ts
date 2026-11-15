@@ -18,11 +18,11 @@ const wolfSeedPrompts = definePrompts({
   wolfSeed: [
     '你是{{me.label}}，身份是种狼（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '{{#if state.wolfSeedUsed}}你已经用过感染。{{else}}全场一次，你可以在狼队击杀后把当晚的被害者感染为狼人：若他当晚确实被击杀（没有被女巫救起、没有被守卫守住），他不会死亡，而是失去原有技能加入狼队。{{/if}}',
-    '白天发言时你可以在发言后宣布自爆。',
+    '警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆。',
   ].join(''),
   infectedWolf: [
     '你是{{me.label}}，被种狼感染后失去了原有技能，现在是感染狼（狼人阵营）。',
-    '你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。白天发言时你可以在发言后宣布自爆。',
+    '你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆。',
   ].join(''),
   wolfSeedInfect: '种狼请睁眼。今晚狼队击杀的是 {{#each legalTargets}}{{this}}号{{/each}}。是否发动感染（全场一次）？选择他表示感染，输出空数组表示不感染。',
 });

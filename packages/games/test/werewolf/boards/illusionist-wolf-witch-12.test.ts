@@ -72,7 +72,7 @@ describe('illusionist', () => {
 
   it('spares the phantom when the illusionist survives the night', () => {
     const run = play(SEED, combine(illusion(villagerB), wolvesKill(illusionist), act('witch_save', witch, [illusionist], 1)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
   });
 
   it('cannot cast while cursed by the wolf witch', () => {

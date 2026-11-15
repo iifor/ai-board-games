@@ -1,8 +1,9 @@
 import type {
   ModelDto, ModelInput, ModelTestResult, PlayerDto, PlayerInput, ProviderDto, ProviderInput,
-  VoiceDto, VoiceImportResult, VoiceInput, VoicePreviewResult,
+  AzureVoiceCatalogEntry, VoiceDto, VoiceImportResult, VoiceInput, VoicePreviewResult,
 } from '@battle/shared';
 import { http } from './http';
+import type { ModelImportInput, ModelImportResult, ProviderModelOption } from '@battle/shared';
 
 export interface ResourceApi<Dto, Input> {
   list(): Promise<Dto[]>;
@@ -27,10 +28,13 @@ export const playersApi = resource<PlayerDto, PlayerInput>('/api/admin/players')
 
 /** 资源 CRUD 之外的操作 */
 export const modelActions = {
+  catalog: (providerId: number) => http.get<ProviderModelOption[]>(`/api/admin/models/catalog/${providerId}`),
+  importSelected: (providerId: number, input: ModelImportInput) => http.post<ModelImportResult>(`/api/admin/models/catalog/${providerId}/import`, input),
   test: (id: number) => http.post<ModelTestResult>(`/api/admin/models/${id}/test`, {}),
 };
 
 export const voiceActions = {
+  azureCatalog: () => http.get<AzureVoiceCatalogEntry[]>('/api/admin/voices/azure/catalog'),
   preview: (id: number, text?: string) => http.post<VoicePreviewResult>(`/api/admin/voices/${id}/preview`, text ? { text } : {}),
   importDefaults: () => http.post<VoiceImportResult>('/api/admin/voices/import-defaults', {}),
 };

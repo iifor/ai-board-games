@@ -16,7 +16,7 @@ export function SpeakerSpotlight({ item, view }: SpeakerSpotlightProps) {
   const event = item?.event;
   if (!event || !view || !hasSpotlight(event.kind)) return null;
   const seat = seatOf(view, describeEvent(event).speaker);
-  const src = seat ? seatPortrait(seat.name, 'cutout') ?? seat.avatar : HOST_POSTER;
+  const src = seat ? seatPortrait(seat.appearanceName ?? seat.name, 'cutout') ?? seat.avatar : HOST_POSTER;
   const classes = ['speaker-spotlight', seat ? '' : 'is-host', src ? '' : 'is-card'].filter(Boolean).join(' ');
   return (
     <figure key={`${event.seq}-${src ?? 'card'}`} className={classes} aria-hidden="true">

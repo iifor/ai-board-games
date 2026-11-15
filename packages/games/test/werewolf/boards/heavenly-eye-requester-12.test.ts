@@ -39,7 +39,7 @@ describe('requester', () => {
   it('gets the hunter’s gun, which the demon shrugs off at night', () => {
     const run = play(SEED, combine(pray(hunter), wolvesKill(requester, 1), act('gift_shot', requester, [demon])), BOARD);
     expect(eliminated(run)[0]).toEqual({ seat: requester, round: 1, reason: '昨晚死亡' });
-    expect(entries(run, 'action', 'gift_shot')[0]).toMatchObject({ channel: 'public', text: `开枪带走 ${demon}号` });
+    expect(entries(run, 'action', 'gift_shot')[0]).toMatchObject({ channel: 'public', text: `向${demon}号开枪` });
     expect(entries(run, 'narration', 'gift_shot_resolve')[0]?.text).toBe(`${demon}号中枪后没有出局。`);
   });
 

@@ -1,0 +1,39 @@
+/* 桌面人物席位与手机头像共用一个悬浮/键盘入口，人物占位不随发言改变。 */
+.versus-layout .seat-card.seat-card-figure {
+  --platform-color: var(--team-color, #b9c9ed);
+  display: grid;
+  grid-template: 22px minmax(0, 1fr) 24px 19px / minmax(0, 1fr);
+  justify-items: center;
+  width: 100%; height: 100%; min-height: 0;
+  gap: 0; padding: 0;
+  border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none;
+}
+.versus-layout .seat-card-figure.seat-card-speaking { background: transparent; box-shadow: none; transform: none; }
+.seat-card-figure .seat-card-compact { display: none; }
+.versus-layout .seat-card-figure .ring-seat-head { position: relative; z-index: 2; font-size: clamp(11px, .95vw, 18px); }
+.versus-layout .seat-card-figure .ring-seat-platform { z-index: 2; font-size: clamp(13px, 1.1vw, 21px); width: min(82%, 110px); }
+.versus-layout .seat-card-figure .ring-seat-name { position: relative; z-index: 2; font-size: clamp(11px, .9vw, 17px); }
+.versus-layout .seat-card-figure .seat-figure-art { filter: drop-shadow(0 3px 5px #020818); }
+.versus-layout .seat-card-figure.seat-card-speaking .seat-figure-art { filter: brightness(1.12) drop-shadow(0 0 8px var(--platform-color)); }
+.versus-layout .seat-card-figure.seat-card-speaking .ring-seat-platform::before { box-shadow: 0 3px 0 var(--platform-color), 0 0 18px color-mix(in srgb, var(--platform-color) 55%, transparent); }
+.versus-layout:has(.seat-card-speaking) .seat-card-figure:not(.seat-card-speaking) .seat-figure { opacity: .76; }
+.versus-layout .seat-card-figure .seat-figure { transition: opacity 180ms ease-out; }
+.versus-layout .seat-card-figure .seat-spotlight-beam { background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--platform-color) 18%, transparent) 24%, color-mix(in srgb, var(--platform-color) 46%, transparent)); }
+.versus-layout .seat-card-figure .seat-spotlight-floor { background: radial-gradient(ellipse, color-mix(in srgb, var(--platform-color) 65%, white), color-mix(in srgb, var(--platform-color) 40%, transparent) 44%, transparent 76%); box-shadow: 0 0 20px color-mix(in srgb, var(--platform-color) 30%, transparent); }
+.versus-layout .seat-card-figure .seat-spotlight { inset: 16px 0 3px; }
+.versus-layout .seat-card-figure .seat-card-stamp { z-index: 2; top: 28px; }
+
+@media (max-width: 860px) {
+  .versus-layout .seat-card.seat-card-figure {
+    display: flex; height: auto; min-height: calc(var(--portrait-size) + 8px);
+    padding: 4px; border: 0; border-radius: 9px;
+    background: linear-gradient(180deg, #0c1938b8, #050b1cce);
+  }
+  .versus-layout .seat-card-figure > :is(.ring-seat-head, .seat-figure, .ring-seat-platform, .ring-seat-name, .seat-spotlight) { display: none; }
+  .versus-layout .seat-card-figure .seat-card-compact { display: flex; align-items: center; gap: 7px; min-width: 0; width: 100%; }
+  .versus-layout .seat-card-figure.seat-card-speaking { background: color-mix(in srgb, var(--platform-color) 18%, #0a1429); }
+  .versus-layout .seat-card-figure.seat-card-speaking .seat-card-body strong { color: var(--platform-color); }
+  .versus-layout .seat-card-figure .seat-card-avatar { flex-shrink: 0; }
+  .versus-layout .seat-card-figure .seat-card-body strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+}
+@media (prefers-reduced-motion: reduce) { .versus-layout .seat-card-figure .seat-figure { transition: none; } }

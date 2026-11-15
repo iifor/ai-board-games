@@ -16,14 +16,18 @@ import { http } from './http';
 export type LogEntryDto = StagePayload & StageEventMeta;
 
 export interface MatchFilter {
+  readonly limit?: number;
+  readonly offset?: number;
   readonly status?: MatchStatus;
   readonly debug?: boolean;
+  readonly source?: 'normal' | 'debug' | 'import';
 }
 
 export function listMatches(filter: MatchFilter = {}): Promise<MatchSummaryDto[]> {
-  const query = new URLSearchParams({ limit: '100' });
+  const query = new URLSearchParams({ limit: String(filter.limit ?? 100), offset: String(filter.offset ?? 0) });
   if (filter.status) query.set('status', filter.status);
   if (filter.debug !== undefined) query.set('debug', String(filter.debug));
+  if (filter.source) query.set('source', filter.source);
   return http.get<MatchSummaryDto[]>(`/api/admin/matches?${query.toString()}`);
 }
 

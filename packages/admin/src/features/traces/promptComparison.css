@@ -1,0 +1,12 @@
+.prompt-editor { display: grid; gap: 8px; min-width: 0; }
+.request-comparison { display: grid; gap: 8px; min-width: 0; }
+.request-comparison > label { font-weight: 600; }
+.request-comparison > .ant-select { width: 100%; min-width: 0; }
+.request-comparison > p { margin: 0; overflow-wrap: anywhere; }
+.prompt-editor label, .prompt-trial h4 { font-weight: 600; }
+.prompt-editor details > summary { cursor: pointer; padding-block: 5px; }
+.prompt-editor pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 22rem; overflow: auto; }
+.prompt-trials { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-block: 12px; }
+.prompt-trial { padding: 12px; border: 1px solid #d9d9d9; border-radius: 6px; }
+.prompt-trial h4 { margin: 0; }
+@media (max-width: 680px) { .prompt-trials { grid-template-columns: 1fr; } }

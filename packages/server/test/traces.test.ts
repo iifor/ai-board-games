@@ -32,6 +32,7 @@ describe('administrator match traces', () => {
     const full = await trace(match.id);
     expect(full.match.status).toBe('completed');
     expect(full.models).toEqual([]);
+    expect(full.match.roleNames?.witch).toBe('女巫');
     expect(full.nodes[0]?.label).toBe('开局');
     expect(full.nodes.at(-1)?.label).toBe('game_over');
     const tally = full.nodes.find((n) => n.kind === 'stage' && n.label === 'vote_tallied' && n.requestIds.length > 1)!;

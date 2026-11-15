@@ -14,15 +14,16 @@
   text-align: center;
 }
 .sentence-caption-line strong {
-  display: inline-block;
-  max-width: 190px;
+  /* 姓名完整参与行内排版，空间不足时换行，保持文字基线对齐。 */
+  display: inline;
   margin-inline-end: 14px;
   vertical-align: baseline;
   color: var(--caption-accent);
   font-size: clamp(13px, 1vw, 20px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+.sentence-caption-line strong > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .sentence-caption-line p {
   display: inline;

@@ -74,7 +74,7 @@ describe('demon hunter', () => {
 
   it('is immune to the witch’s poison', () => {
     const run = play(SEED, act('witch_poison', witch, [hunter], 1), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
     expect(stateOf(run.snapshot).potions.poison).toBe(false);
   });
 });

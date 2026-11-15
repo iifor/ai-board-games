@@ -1,0 +1,9 @@
+.resource-list { min-width: 0; }
+.resource-row-actions { white-space: nowrap; flex-wrap: nowrap; }
+.resource-list .ant-table-cell { vertical-align: middle; }
+.resource-list .resource-primary { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.resource-primary > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.resource-list .resource-ellipsis { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 100%; }
+.resource-list .resource-lines { display: grid; gap: 4px; }
+.resource-list .resource-lines small { color: #596579; }
+.resource-list .resource-full-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }

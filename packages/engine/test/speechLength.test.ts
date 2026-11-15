@@ -4,7 +4,6 @@ import {
   compileGame,
   DEFAULT_SPEECH_MAX_CHARS,
   definePrompts,
-  SPEECH_LENGTH_TOLERANCE,
   speechOutput,
   type AiRequest,
 } from '../src';
@@ -12,9 +11,6 @@ import { DEFAULT_COMMENT_MAX } from '../src/phases/judge';
 import { runToEnd, type RunRecord } from '../src/testing';
 import { agentWith } from './fixtures/agents';
 import { panelSpec } from './fixtures/panelGame';
-
-// 字数只在 speechOutput({ max }) / commentMax 写一次：引擎把它注入为 turn.maxChars，
-// 提示词说的数字与输出 schema 的上限来自同一个配置，一起变化。
 
 type PanelPhase = (typeof panelSpec)['phases'][string];
 type Pitch = Extract<PanelPhase, { kind: 'speak' }>;
@@ -52,12 +48,12 @@ function maxLengthOf(request: AiRequest, field: 'speech' | 'comment'): number | 
 }
 
 describe('speak length variable', () => {
-  it('renders the configured maximum as turn.maxChars and moves it together with the schema limit', () => {
+  it('renders the phase suggestion for a seat without speech settings', () => {
     for (const max of [60, 90]) {
       const run = runToEnd(panelWith({ pitch: { ...pitch(), output: speechOutput({ max }) } }), { seed: 1, playerCount: 3 });
       const [request] = requestsOf(run, 'speak');
       expect(request?.prompt.instruction).toBe(`请发言，不超过 ${max} 字。`);
-      expect(maxLengthOf(request as AiRequest, 'speech')).toBe(max * SPEECH_LENGTH_TOLERANCE);
+      expect(maxLengthOf(request as AiRequest, 'speech')).toBeUndefined();
     }
   });
 
@@ -96,14 +92,19 @@ describe('speak length variable', () => {
 });
 
 describe('judge comment length variable', () => {
-  it('renders commentMax as turn.maxChars together with the schema limit, defaulting when unset', () => {
+  it('keeps complete judgements above the suggested length, including when using the default', () => {
     const { commentMax: _configured, ...unset } = review();
     const cases: readonly (readonly [Review, number])[] = [[{ ...review(), commentMax: 45 }, 45], [unset, DEFAULT_COMMENT_MAX]];
     for (const [phase, expected] of cases) {
-      const run = runToEnd(panelWith({ review: phase }), { seed: 1, playerCount: 3 });
+      const game = panelWith({ review: phase });
+      const comment = '评'.repeat(expected + 100);
+      const run = runToEnd(game, { seed: 1, playerCount: 3, agent: agentWith(game, request =>
+        request.action === 'judge' ? { output: { verdict: 'first', comment } } : undefined) });
       const [request] = requestsOf(run, 'judge');
       expect(request?.prompt.instruction).toBe(`请判定哪位发言人表现更好，点评不超过 ${expected} 字。`);
-      expect(maxLengthOf(request as AiRequest, 'comment')).toBe(expected);
+      expect(maxLengthOf(request as AiRequest, 'comment')).toBeUndefined();
+      expect(requestsOf(run, 'judge')).toHaveLength(1);
+      expect(run.log.find(entry => entry.kind === 'judgement')).toMatchObject({ verdict: 'first', comment });
     }
   });
 });

@@ -1,4 +1,4 @@
-import { speechOf, type StageEvent } from '@battle/shared';
+import { isPlayerSpeech, speechOf, type StageEvent } from '@battle/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { describeEvent, displayDuration } from './playback/describe';
 import { dwell, playAudio, present, speak } from './playback/media';
@@ -9,11 +9,11 @@ describe('describeEvent', () => {
   it('maps speeches, votes and eliminations to subtitles', () => {
     expect(describeEvent({ ...meta, kind: 'speech', seat: 1, text: '大家好' })).toEqual({ speaker: 1, text: '大家好' });
     const tally: StageEvent = {
-      ...meta, kind: 'vote_tallied', title: '放逐投票', runoff: 0, ballots: [], abstained: [],
+      ...meta, view: { ...meta.view, gameKey: 'werewolf' }, phaseId: 'exile_vote', kind: 'vote_tallied', title: '放逐投票', runoff: 0, ballots: [], abstained: [],
       tally: [{ target: 2, votes: 3 }], tied: [], outcome: { kind: 'selected', seat: 2, byTieBreak: false },
     };
-    expect(describeEvent(tally).text).toBe('放逐投票：2号 3 票，2号当选');
-    expect(describeEvent({ ...meta, kind: 'seat_eliminated', seat: 2, reason: '被放逐' }).text).toBe('2号出局（被放逐）');
+    expect(describeEvent(tally).text).toBeNull();
+    expect(describeEvent({ ...meta, view: tally.view, kind: 'seat_eliminated', seat: 2, reason: '被放逐' }).text).toBeNull();
     expect(describeEvent({ ...meta, kind: 'fallback', seat: 1, reason: 'x' }).text).toBeNull();
   });
 
@@ -21,6 +21,9 @@ describe('describeEvent', () => {
     const judgement: StageEvent = { ...meta, kind: 'judgement', seat: 3, verdict: 'pro', verdictLabel: '正方胜', comment: '论证更完整' };
     expect(describeEvent(judgement)).toEqual({ speaker: 3, text: speechOf(judgement)?.text });
     expect(describeEvent(judgement).text).toBe('正方胜。论证更完整');
+    const fallback = { ...judgement, source: 'fallback' as const, comment: '3号本轮未能发言。判定由系统代选。' };
+    expect(isPlayerSpeech(fallback)).toBe(false);
+    expect(describeEvent(fallback)).toEqual({ speaker: null, text: '3号本轮未能发言。判定由系统代选。结果为正方胜。' });
     const action: StageEvent = { ...meta, kind: 'action', seat: 2, action: 'shoot', targets: [5], text: '2号开枪带走了5号' };
     expect(speechOf(action)).toEqual({ text: '2号开枪带走了5号', seat: null });
     expect(describeEvent(action)).toEqual({ speaker: 2, text: '2号开枪带走了5号' });
@@ -89,6 +92,17 @@ describe('media playback', () => {
     FakeAudio.instances = [];
   });
 
+  it('does not speak emotion tags when cloud audio falls back to browser speech', async () => {
+    const speakFn = stubSpeechSynthesis();
+    const control = new SegmentControl(1, false);
+    const done = speak('[冷静]先校准一个概念【愤怒】请回答', control);
+    expect(speakFn.mock.calls[0]?.[0]).toMatchObject({ text: '先校准一个概念请回答' });
+    control.abort();
+    await done;
+    await speak('[冷静]', new SegmentControl(1, false));
+    expect(speakFn).toHaveBeenCalledOnce();
+  });
+
   it('dwells for the text time when the browser refuses to play, instead of finishing instantly', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('Audio', class extends FakeAudio {
@@ -124,6 +138,8 @@ describe('media playback', () => {
     await vi.advanceTimersByTimeAsync(0);
     const audio = FakeAudio.instances[0];
     expect(audio?.playbackRate).toBe(1);
+    control.setRate(1.25);
+    expect(audio?.playbackRate).toBe(1.25);
     control.setRate(2);
     expect(audio?.playbackRate).toBe(2);
     if (audio) {
@@ -131,7 +147,7 @@ describe('media playback', () => {
       audio.currentTime = 3;
       audio.emit('timeupdate');
     }
-    expect(control.progress).toEqual({ kind: 'measured', fraction: 0.25 });
+    expect(control.progress).toEqual({ kind: 'measured', fraction: 0.25, positionMs: 3000 });
     expect(finished).toBe(false);
     audio?.emit('ended');
     await vi.advanceTimersByTimeAsync(0);
@@ -185,6 +201,51 @@ describe('present', () => {
     FakeAudio.instances = [];
   });
 
+  it('shows the sheriff’s direction animation silently and ignores cached direction audio', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('Audio', FakeAudio);
+    const speakFn = stubSpeechSynthesis();
+    const direction: StageEvent = { ...action, phaseId: 'speech_direction', action: '指定发言顺序', targets: [2],
+      text: '指定从 2号 开始发言', view: { ...meta.view, gameKey: 'werewolf' } };
+    const playback = present({ event: direction, audio: { url: '/cached-direction.mp3', mime: 'audio/mpeg' } }, new SegmentControl(1, false));
+    await vi.runAllTimersAsync();
+    await playback;
+    expect(describeEvent(direction).text).toBeNull();
+    expect(speakFn).not.toHaveBeenCalled();
+    expect(FakeAudio.instances).toHaveLength(0);
+  });
+
+  it.each([
+    ['blade', '狼刀命中'], ['heal', '解药生效 · 挡下狼刀'], ['shield', '守护成功 · 挡下狼刀'], ['dream', '梦游避开狼刀'],
+  ])('keeps the %s animation silent even when the replay carries cached audio', async (effect, title) => {
+    vi.useFakeTimers();
+    vi.stubGlobal('Audio', FakeAudio);
+    const speakFn = stubSpeechSynthesis();
+    const hit: StageEvent = { ...meta, view: { ...meta.view, gameKey: 'werewolf' }, phaseId: 'night_resolve',
+      channel: 'spectator', kind: 'revealed', text: `6号 · ${title}`, data: { target: 6, title, effect } };
+    const playback = present({ event: hit, audio: { url: '/cached-hit.mp3', mime: 'audio/mpeg' } }, new SegmentControl(1, false));
+    await vi.runAllTimersAsync();
+    await playback;
+    expect(speakFn).not.toHaveBeenCalled();
+    expect(FakeAudio.instances).toHaveLength(0);
+  });
+
+  it('keeps the silent exile tally visible long enough to read fractional votes', async () => {
+    vi.useFakeTimers();
+    const tally: StageEvent = {
+      ...meta, view: { ...meta.view, gameKey: 'werewolf' }, phaseId: 'exile_vote',
+      kind: 'vote_tallied', title: '放逐投票', runoff: 0, ballots: [], abstained: [],
+      tally: [{ target: 2, votes: 11.5 }, { target: 1, votes: 1 }], tied: [],
+      outcome: { kind: 'selected', seat: 2, byTieBreak: false },
+    };
+    let finished = false;
+    void present({ event: tally, audio: null }, new SegmentControl(1, false)).then(() => { finished = true; });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(finished).toBe(false);
+    await vi.runAllTimersAsync();
+    expect(finished).toBe(true);
+  });
+
   it.each([
     { phaseId: 'sheriff_signup', targets: [2] }, { phaseId: 'sheriff_signup', targets: [] },
     { phaseId: 'sheriff_withdraw', targets: [2] }, { phaseId: 'sheriff_withdraw', targets: [] },
@@ -230,6 +291,23 @@ describe('present', () => {
     expect(dwelt).toBe(true);
     expect(speakFn).toHaveBeenCalledTimes(1);
     expect(FakeAudio.instances).toHaveLength(1);
+  });
+
+  it('speaks the same public wake-up line as the host caption and keeps it visible when muted', async () => {
+    vi.useFakeTimers();
+    const speakFn = stubSpeechSynthesis();
+    const wake: StageEvent = { ...phase, phaseId: 'wolf_chat', view: { ...meta.view, gameKey: 'werewolf' },
+      kind: 'phase_started', title: '狼人夜聊', announcement: '狼人请睁眼。' };
+    expect(describeEvent(wake)).toEqual({ speaker: null, text: '狼人请睁眼。' });
+    const voice = new SegmentControl(1, false);
+    const speaking = present({ event: wake, audio: null }, voice);
+    expect(speakFn.mock.calls[0]?.[0]).toMatchObject({ text: '狼人请睁眼。', lang: 'zh-CN' });
+    voice.abort();
+    await speaking;
+    const muted = present({ event: wake, audio: null }, new SegmentControl(1, true));
+    await vi.advanceTimersByTimeAsync(displayDuration('狼人请睁眼。', 1));
+    await muted;
+    expect(speakFn).toHaveBeenCalledTimes(1);
   });
 
   it('dwells by text length instead of playing or speaking when muted', async () => {

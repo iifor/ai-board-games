@@ -1,14 +1,17 @@
-import { MODEL_DISABLED_REASONS, type ModelDisabledReason, type ModelDto, type ModelInput, type ModelTestResult } from '@battle/shared';
+import { DEFAULT_MODEL_MAX_TOKENS, MODEL_DISABLED_REASONS, type ModelDisabledReason, type ModelDto, type ModelInput, type ModelTestResult } from '@battle/shared';
 import type { Selectable } from 'kysely';
 import type { ModelsTable } from '../../db/schema';
 import { badRequest, notFound } from '../../utils/errors';
 import { extractJson, type LlmClient } from '../llm';
 import type { ProviderRepository } from '../providers/repository';
 import type { ProviderCredentials } from '../providers/service';
-import { DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE, TEST_MAX_TOKENS, TEST_PROMPT, TEST_TIMEOUT_MS } from './constants';
+import { TEST_MAX_TOKENS, TEST_PROMPT, TEST_TIMEOUT_MS } from './constants';
 import type { ModelRepository } from './repository';
+import { fetchProviderModelIds } from './providerCatalog';
+import type { ModelImportInput, ModelImportResult, ProviderModelOption } from '@battle/shared';
 
 export interface ModelServiceDeps {
+  readonly toolPrompt: (key: string, fallback: string) => Promise<string>;
   readonly repository: ModelRepository;
   readonly providers: ProviderRepository;
   /** 解密后的供应商连接信息，只用于连接测试 */
@@ -26,7 +29,6 @@ function toDto(row: Selectable<ModelsTable>): ModelDto {
     providerId: row.providerId,
     name: row.name,
     model: row.model,
-    temperature: row.temperature,
     maxTokens: row.maxTokens,
     fallbackModelId: row.fallbackModelId,
     enabled: row.enabled,
@@ -37,7 +39,7 @@ function toDto(row: Selectable<ModelsTable>): ModelDto {
   };
 }
 
-export function createModelService({ repository, providers, credentials, llm }: ModelServiceDeps) {
+export function createModelService({ repository, providers, credentials, llm, toolPrompt }: ModelServiceDeps) {
   async function assertReferences(input: ModelInput, selfId: number | null): Promise<void> {
     if (!(await providers.find(input.providerId))) throw badRequest('模型供应商不存在');
     const fallback = input.fallbackModelId ?? null;
@@ -56,8 +58,7 @@ export function createModelService({ repository, providers, credentials, llm }: 
       providerId: input.providerId,
       name: input.name,
       model: input.model,
-      temperature: input.temperature ?? DEFAULT_TEMPERATURE,
-      maxTokens: input.maxTokens ?? DEFAULT_MAX_TOKENS,
+      maxTokens: input.maxTokens ?? existing?.maxTokens ?? DEFAULT_MODEL_MAX_TOKENS,
       fallbackModelId: input.fallbackModelId ?? null,
       enabled,
       disabledReason: enabled ? null : (existing?.disabledReason ?? null),
@@ -67,6 +68,16 @@ export function createModelService({ repository, providers, credentials, llm }: 
 
   return {
     list: async (): Promise<ModelDto[]> => (await repository.list()).map(toDto),
+
+    async catalog(providerId: number): Promise<ProviderModelOption[]> {
+      const provider = await credentials(providerId);
+      const [ids, local] = await Promise.all([fetchProviderModelIds(provider), repository.importedIds(providerId)]);
+      const added = new Set(local.map(row => row.model));
+      return ids.map(id => ({ id, added: added.has(id) }));
+    },
+
+    importSelected: (providerId: number, input: ModelImportInput): Promise<ModelImportResult> =>
+      repository.importSelected(providerId, input.modelIds),
 
     async get(id: number): Promise<ModelDto> {
       const row = await repository.find(id);
@@ -98,6 +109,7 @@ export function createModelService({ repository, providers, credentials, llm }: 
       const row = await repository.find(id);
       if (!row) throw notFound('模型');
       const started = Date.now();
+      const prompt = await toolPrompt('modelTest', TEST_PROMPT);
       const fail = (message: string): ModelTestResult => ({ ok: false, latencyMs: Date.now() - started, message });
       try {
         const provider = await credentials(row.providerId);
@@ -105,9 +117,9 @@ export function createModelService({ repository, providers, credentials, llm }: 
           baseUrl: provider.baseUrl,
           apiKey: provider.apiKey,
           model: row.model,
-          messages: [{ role: 'user', content: TEST_PROMPT }],
+          messages: [{ role: 'user', content: prompt }],
           temperature: 0,
-          maxTokens: TEST_MAX_TOKENS,
+          maxTokens: Math.min(row.maxTokens, TEST_MAX_TOKENS),
           timeoutMs: TEST_TIMEOUT_MS,
         });
         const parsed = extractJson(response.content);

@@ -4,7 +4,7 @@ import { ok } from '../../utils/response';
 import { requestSource } from '../../utils/source';
 import { parseJson, parseQuery } from '../../utils/validate';
 import type { MatchService } from './service';
-import { createDebugMatchSchema, createMatchSchema, debugCommandSchema, listQuerySchema } from './validator';
+import { adminListQuerySchema, createDebugMatchSchema, createMatchSchema, debugCommandSchema, listQuerySchema } from './validator';
 
 export interface MatchControllerOptions {
   /** 只有部署在可信反向代理之后才相信 X-Forwarded-For，否则任何人换个请求头就能绕过限流 */
@@ -24,8 +24,8 @@ export function createMatchController(service: MatchService, options: MatchContr
     summary: async (c: Context<AppEnv>) => ok(c, await service.publicSummary(matchId(c))),
 
     adminList: async (c: Context<AppEnv>) => {
-      const { limit, status, debug } = parseQuery(c, listQuerySchema);
-      return ok(c, await service.list({ limit, ...(status ? { status } : {}), ...(debug === undefined ? {} : { debug }) }));
+      const { limit, offset, status, debug, source } = parseQuery(c, adminListQuerySchema);
+      return ok(c, await service.list({ limit, offset, ...(status ? { status } : {}), ...(source ? { source } : {}), ...(debug === undefined ? {} : { debug }) }));
     },
     adminCreate: async (c: Context<AppEnv>) => ok(c, await service.createDebug(await parseJson(c, createDebugMatchSchema)), 201),
     detail: async (c: Context<AppEnv>) => ok(c, await service.detail(matchId(c))),

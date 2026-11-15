@@ -15,6 +15,12 @@ export const werewolfTriggers: readonly TriggerSpec<WerewolfState, WerewolfParam
   ...specialDeathTriggers,
   { id: 'badge-transfer', on: 'seat_eliminated', when: isSheriffDeath, push: 'badge_transfer' },
   {
+    id: 'self-destruct-during-election', on: 'action_declared',
+    when: (ctx, event) => event.kind === 'action_declared' && event.action === 'selfDestruct'
+      && (ctx.phaseId === 'sheriff_speech' || ctx.phaseId === 'sheriff_pk_speech'),
+    jump: 'sheriff_self_destruct',
+  },
+  {
     id: 'self-destruct',
     on: 'action_declared',
     when: (_ctx, event) => event.kind === 'action_declared' && event.action === 'selfDestruct',

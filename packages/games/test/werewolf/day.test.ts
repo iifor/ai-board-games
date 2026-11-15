@@ -23,6 +23,51 @@ function signUp(...seats: number[]): Override {
 }
 
 describe('sheriff election', () => {
+  it('lets an off-platform wolf swallow the badge before the first speech, settling the first night exactly once', () => {
+    const [wolf = 0, poisoned = 0] = roleSeats(SEED, 'werewolf');
+    const run = play(SEED, combine(signUp(candidateA), act('witch_poison', null, [poisoned], 1),
+      request => request.phaseId === 'sheriff_speech' && request.action === 'act' && request.seat === wolf
+        ? { targets: [wolf] } : undefined));
+    expect(entries(run, 'speech', 'sheriff_speech')).toHaveLength(0);
+    expect(requestsIn(run, 'sheriff_speech').map(request => request.seat)).not.toContain(poisoned);
+    expect(eliminated(run).filter(death => death.round === 1)).toEqual([
+      { seat: wolf, round: 1, reason: '自爆' }, { seat: poisoned, round: 1, reason: '昨晚死亡' },
+    ]);
+    expect(entries(run, 'speech', 'last_words').map(entry => entry.seat)).toEqual([poisoned]);
+    expect(stateOf(run.snapshot).sheriff).toBeNull();
+    expect(requestsIn(run, 'sheriff_vote')).toHaveLength(0);
+    expect(run.requests.some(({ request, snapshot }) => request.phaseId === 'exile_vote' && snapshot.round === 1)).toBe(false);
+    expect(entries(run, 'phase_started', 'night_start').some(entry => entry.round === 2)).toBe(true);
+  });
+
+  it('lets listeners react to the final PK speech before the revote and resolves simultaneous declarations once', () => {
+    const wolves = roleSeats(SEED, 'werewolf');
+    const run = play(SEED, combine(signUp(candidateA, candidateB), split(['sheriff_vote'], candidateA, candidateB),
+      request => request.phaseId === 'sheriff_pk_speech' && request.id.includes(':listen:2:')
+        ? { targets: [request.seat] } : undefined));
+    const speeches = entries(run, 'speech', 'sheriff_pk_speech');
+    expect(speeches).toHaveLength(2);
+    const decisions = requestsIn(run, 'sheriff_pk_speech').filter(request => request.id.includes(':listen:2:'));
+    expect(decisions.map(request => request.seat).sort()).toEqual([...wolves].sort());
+    expect(decisions.every(request => request.prompt.history.includes(speeches[1]!.text))).toBe(true);
+    expect(eliminated(run).filter(death => death.round === 1)).toEqual([{ seat: Math.min(...wolves), round: 1, reason: '自爆' }]);
+    expect(requestsIn(run, 'sheriff_pk_vote')).toHaveLength(0);
+    expect(stateOf(run.snapshot).sheriff).toBeNull();
+  });
+
+  it('interrupts the public debate after one speech and offers listener decisions only during allowed phases', () => {
+    const run = play(SEED, (request, snapshot) => snapshot.round === 1 && request.phaseId === 'day_speech' && request.id.includes(':listen:1:')
+      ? { targets: [request.seat] } : undefined);
+    const speeches = entries(run, 'speech', 'day_speech').filter(entry => entry.round === 1);
+    const [death] = eliminated(run);
+    expect(speeches).toHaveLength(1);
+    expect(death?.seat).not.toBe(speeches[0]?.seat);
+    expect(death?.reason).toBe('自爆');
+    expect(entries(run, 'vote_tallied', 'exile_vote').some(entry => entry.round === 1)).toBe(false);
+    expect(run.requests.filter(({ request }) => request.id.includes(':listen:')).every(({ request }) =>
+      request.phaseId === 'day_speech' && request.action === 'act' && request.legalTargets?.[0] === request.seat)).toBe(true);
+  });
+
   it('elects by vote, excludes candidates from voting and gives the sheriff 1.5 votes', () => {
     const run = play(SEED, combine(
       signUp(candidateA, candidateB),
@@ -43,6 +88,8 @@ describe('sheriff election', () => {
   it('elects a lone candidate without a vote', () => {
     const run = play(SEED, signUp(candidateA));
     expect(requestsIn(run, 'sheriff_vote')).toHaveLength(0);
+    expect(entries(run, 'phase_started', 'sheriff_vote')).toHaveLength(0);
+    expect(entries(run, 'narration', 'sheriff_resolve')[0]?.text).toBe(`${candidateA}号当选警长。`);
     expect(stateOf(run.snapshot).sheriff).toBe(candidateA);
   });
 
@@ -50,8 +97,11 @@ describe('sheriff election', () => {
     const run = play(SEED, combine(signUp(candidateA, candidateB), split(['sheriff_vote', 'sheriff_pk_vote'], candidateA, candidateB)));
     const tallies = entries(run, 'vote_tallied').filter((entry) => entry.phaseId?.startsWith('sheriff'));
     expect(tallies[0]?.tied).toEqual([candidateA, candidateB].sort((x, y) => x - y));
-    expect(requestsIn(run, 'sheriff_pk_speech').map((request) => request.seat).sort()).toEqual([candidateA, candidateB].sort());
+    expect(requestsIn(run, 'sheriff_pk_speech').filter(request => request.action === 'speak').map((request) => request.seat).sort()).toEqual([candidateA, candidateB].sort());
     expect(requestsIn(run, 'sheriff_pk_vote')).toHaveLength(10);
+    const speakers = requestsIn(run, 'sheriff_pk_speech').filter(request => request.action === 'speak').map((r) => `${r.seat}号`).join('、');
+    expect(entries(run, 'phase_started', 'sheriff_pk_speech')[0]?.announcement).toBe(`${speakers}平票，请依次发言。`);
+    expect(entries(run, 'phase_started', 'sheriff_pk_vote')[0]?.announcement).toContain('重新投票');
     expect(tallies.map((entry) => entry.phaseId)).toEqual(['sheriff_vote', 'sheriff_pk_vote']);
     expect(stateOf(run.snapshot).sheriff).toBeNull();
   });
@@ -70,6 +120,7 @@ describe('day speeches and exile', () => {
     expect(direction?.seat).toBe(candidateA);
     const start = direction?.legalTargets?.[0] ?? 0;
     const order = entries(run, 'speech', 'day_speech').filter((entry) => entry.round === 1).map((entry) => entry.seat);
+    expect(entries(run, 'phase_started', 'day_speech')[0]?.announcement).toBe(`警长指定${start}号先发言。`);
     expect(order[0]).toBe(start);
     expect(order[order.length - 1]).toBe(candidateA);
     expect(order).toHaveLength(12);
@@ -88,12 +139,12 @@ describe('day speeches and exile', () => {
     const exile = entries(run, 'vote_tallied', 'exile_vote')[0];
     expect(exile).toMatchObject({ tied: [candidateA, candidateB].sort((x, y) => x - y), outcome: { kind: 'none' } });
     expect(eliminated(run).filter((death) => death.round === 1)).toEqual([]);
-    expect(entries(run, 'narration', 'exile_resolve')[0]?.text).toBe('本轮无人被放逐。');
+    expect(entries(run, 'narration', 'exile_resolve')[0]?.text).toBe('平票，本轮无人出局。');
   });
 
   it('reveals the idiot instead of exiling him, then takes away his vote', () => {
     const run = play(SEED, everyoneVotes('exile_vote', idiot, 1));
-    expect(entries(run, 'revealed', 'exile_resolve')[0]?.text).toContain(`${idiot}号翻牌`);
+    expect(entries(run, 'revealed', 'exile_resolve')[0]?.text).toContain(`${idiot}号是白痴，翻牌免死，失去投票权。`);
     expect(eliminated(run).some((death) => death.seat === idiot)).toBe(false);
     const dayTwo = requestsIn(run, 'exile_vote').filter((request) => request.id.startsWith('exile_vote#2'));
     expect(dayTwo.map((request) => request.seat)).not.toContain(idiot);

@@ -5,6 +5,8 @@ import { useAsync } from '../../../hooks/useAsync';
 import { errorMessage } from '../../../services/http';
 import { createDebugMatch, fetchCatalog, fetchPhaseGraph } from '../../../services/matches';
 import { playersApi } from '../../../services/resources';
+import { phaseLabel } from '../../traces/labels';
+import { playerLabel } from '../../resources/playerLabel';
 
 interface Values {
   gameKey: string;
@@ -34,6 +36,7 @@ export function CreateDebugMatchModal({ open, onClose, onCreated }: { readonly o
   const graph = useAsync(() => (gameKey ? fetchPhaseGraph(gameKey) : Promise.resolve(null)), [gameKey]);
   const game = catalog.status === 'ready' ? catalog.data.find((item) => item.key === gameKey) : undefined;
   const range = game?.variants.find((variant) => variant.key === variantKey)?.players ?? game?.players;
+  const roster = players.status === 'ready' ? players.data.filter((player) => player.enabled) : [];
 
   const submit = async () => {
     const values = await form.validateFields();
@@ -81,18 +84,26 @@ export function CreateDebugMatchModal({ open, onClose, onCreated }: { readonly o
         {!generatePlayers && (
           <Form.Item name="playerIds" label={`玩家（按选择顺序就座${range ? `，${range.min}–${range.max} 人` : ''}）`}
             rules={[{ required: true, type: 'array', min: range?.min ?? 1, max: range?.max ?? 32 }]}>
-            <Select mode="multiple" options={players.status === 'ready' ? players.data.filter((item) => item.enabled).map((item) => ({ value: item.id, label: item.name })) : []} />
+              <Select mode="multiple" options={roster.filter((player) => scripted || player.modelId !== null).map((player) => ({ value: player.id, label: playerLabel(player) }))} />
           </Form.Item>
         )}
         <Form.Item name="seed" label="种子（留空随机）"><InputNumber min={0} max={4294967295} style={{ width: '100%' }} /></Form.Item>
         <Form.Item name="breakpoints" label="断点（在进入这些阶段前暂停）">
-          <Select mode="multiple" options={[{ value: '*all', label: '全部阶段' }, ...(graph.status === 'ready' && graph.data ? graph.data.phases.map((phase) => ({ value: phase.id, label: phase.title ? `${phase.id}（${phase.title}）` : phase.id })) : [])]} />
+          <Select mode="multiple" options={[{ value: '*all', label: '全部阶段' }, ...(graph.status === 'ready' && graph.data ? graph.data.phases.map((phase) => {
+            const title = phase.title ?? phaseLabel(phase.id);
+            return { value: phase.id, label: title === phase.id ? phase.id : `${phase.id}（${title}）` };
+          }) : [])]} />
         </Form.Item>
         <Form.Item name="pacing" label="推进节奏">
           <Select options={[{ value: 'free', label: '不等待观众（连续生成）' }, { value: 'ack', label: '按观众播放确认推进' }]} />
         </Form.Item>
         <Form.Item name="scripted" label="脚本化（不调用模型与云端语音）" valuePropName="checked">
-          <Switch onChange={(checked) => { if (!checked) form.setFieldsValue({ chaos: false, generatePlayers: false }); }} />
+          <Switch onChange={(checked) => {
+            if (checked) return;
+            const bound = new Set(roster.filter((player) => player.modelId !== null).map((player) => player.id));
+            const selected = form.getFieldValue('playerIds') as number[] | undefined;
+            form.setFieldsValue({ chaos: false, generatePlayers: false, playerIds: selected?.filter((id) => bound.has(id)) ?? [] });
+          }} />
         </Form.Item>
         <Form.Item name="chaos" label="混沌脚本" valuePropName="checked" extra={CHAOS_HELP}>
           <Switch disabled={!scripted} />

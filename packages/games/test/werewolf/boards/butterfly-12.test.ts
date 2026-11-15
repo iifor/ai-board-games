@@ -35,7 +35,7 @@ describe('butterfly', () => {
     expect(onNight(run, 'wolf_chat', 1)).toHaveLength(0);
     expect(onNight(run, 'wolf_kill', 1)).toHaveLength(0);
     expect(entries(run, 'narration', 'night_blocks')[0]).toMatchObject({ channel: 'team:werewolf', text: '今晚有狼人被花蝴蝶抱住，狼队今晚不能击杀。' });
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
   });
 
   it('hugs at most twice and never itself', () => {

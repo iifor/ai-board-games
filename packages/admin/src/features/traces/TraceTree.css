@@ -1,0 +1,36 @@
+.trace-tree-panel {
+  container-type: inline-size;
+  --activity: 22%;
+  --signals: 16%;
+  --duration: 92px;
+  --tree-cols: minmax(0, 1fr) var(--activity) var(--signals);
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+.trace-tree-panel[data-measured=true] { --tree-cols: minmax(0, 1fr) var(--activity) var(--signals) var(--duration); }
+.trace-tree-head, .trace-tree-row { display: grid; grid-template-columns: var(--tree-cols); align-items: center; column-gap: 10px; }
+.trace-tree-head { padding: 9px 16px 9px 32px; background: #f6f8fb; color: #505c6b; font-size: 12px; border-bottom: 1px solid #e1e5eb; }
+.trace-tree-panel[data-measured=true] .trace-tree-head > :last-child, .trace-tree-duration { text-align: right; }
+.trace-tree-panel .ant-tree-treenode { align-items: center; min-height: 40px; padding-inline-end: 8px; border-bottom: 1px solid #f1f2f4; }
+.trace-tree-panel .ant-tree-node-content-wrapper { min-width: 0; }
+.trace-tree-panel .ant-tree-title { display: block; }
+.trace-tree-row { min-height: 36px; line-height: 1.45; }
+.trace-tree-row[data-level=round] .trace-tree-name { font-weight: 650; }
+.trace-tree-name { min-width: 0; overflow-wrap: anywhere; }
+.trace-tree-name small { margin-inline-start: 8px; color: #596779; }
+.trace-tree-name mark { background: #dceaff; color: #13355d; border-radius: 3px; }
+.trace-tree-activity, .trace-tree-signals { display: flex; flex-wrap: wrap; gap: 2px 8px; color: #556375; font-size: 12px; }
+.trace-tree-signals span { padding: 1px 6px; background: #fff4da; color: #794700; border-radius: 4px; }
+.trace-tree-signals [data-failure=true] { background: #fff0ed; color: #a32b24; }
+.trace-tree-duration { font-size: 12px; color: #485565; font-variant-numeric: tabular-nums; }
+.trace-tree-duration-label { display: none; }
+@container (max-width: 570px) {
+  .trace-tree-panel .trace-tree-head { display: none; }
+  .trace-tree-panel .trace-tree-row { display: flex; flex-wrap: wrap; gap: 3px 10px; padding-block: 5px; }
+  .trace-tree-name { flex-basis: 100%; }
+  .trace-tree-activity:empty, .trace-tree-signals:empty { display: none; }
+  .trace-tree-duration-label { display: inline; }
+  .trace-tree-duration[data-empty=true] { display: none; }
+}

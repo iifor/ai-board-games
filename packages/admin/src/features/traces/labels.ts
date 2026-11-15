@@ -13,3 +13,12 @@ const LABELS: Readonly<Record<string, string>> = {
 };
 
 export const traceLabel = (label: string) => LABELS[label] ?? label;
+
+const PHASE_LABELS: Readonly<Record<string, string>> = {
+  night_blocks: '夜间技能封锁播报',
+  night_reset: '夜间状态重置', night_resolve: '夜间结算',
+  witch_save: '使用解药', witch_poison: '使用毒药',
+  sheriff_resolve: '警长选举结算', speech_direction: '指定发言顺序',
+};
+
+export const phaseLabel = (id: string | null) => id ? PHASE_LABELS[id] ?? id : '对局';

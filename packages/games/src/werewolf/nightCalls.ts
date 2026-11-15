@@ -1,0 +1,45 @@
+import type { NIGHT_ORDER } from './rules/order';
+
+// 只在角色的公开行动时段开头叫一次。同一时段内的选目标、用药及私密结算不再叫号。
+const NIGHT_CALLS = {
+  thief_choose: 'thief',
+  cupid_link: 'cupid',
+  succubus_link: 'succubus',
+  ghost_bride_link: 'ghost_bride',
+  requester_pray: 'requester',
+  merchant_deal_early: 'black_merchant',
+  fortune_mark: 'fortune_teller',
+  magician_swap: 'magician',
+  dreamer_dream: 'dreamer',
+  hybrid_choose: 'hybrid',
+  wild_child_choose: 'wild_child',
+  wolf_witch_curse: 'wolf_witch',
+  nightmare_fear: 'nightmare',
+  penguin_freeze: 'penguin',
+  butterfly_hug: 'butterfly',
+  stalker_assassinate: 'stalker',
+  elder_silence: 'silence_elder',
+  guard_protect: 'guard',
+  illusionist_illusion: 'illusionist',
+  wolf_seed_infect: 'wolf_seed',
+  hidden_wolf_kill: 'hidden_wolf',
+  younger_brother_kill: 'wolf_younger_brother',
+  big_bad_wolf_decide: 'big_bad_wolf',
+  wolf_beauty_charm: 'wolf_beauty',
+  demon_check: 'demon',
+  seer_check: 'seer',
+  heavenly_eye_check: 'heavenly_eye',
+  fox_inspect: 'fox',
+  witch_save: 'witch',
+  spirit_wolf_learn: 'spirit_wolf',
+  spirit_wolf_antidote: 'spirit_wolf',
+  seer_check_late: 'seer',
+  merchant_deal: 'black_merchant',
+  demon_hunter_hunt: 'demon_hunter',
+  requester_kill: 'requester',
+  crow_curse: 'crow',
+  fox_check: 'nine_tailed_fox',
+} as const satisfies Partial<Record<(typeof NIGHT_ORDER)[number], string>>;
+
+export type NightRole = 'werewolf' | (typeof NIGHT_CALLS)[keyof typeof NIGHT_CALLS];
+export const nightCalls: ReadonlyMap<string, NightRole> = new Map(Object.entries(NIGHT_CALLS));

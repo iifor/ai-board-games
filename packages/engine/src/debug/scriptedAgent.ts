@@ -18,6 +18,8 @@ export function scriptedOutput(game: CompiledGame, snapshot: EngineSnapshot, req
 
   switch (phase.kind) {
     case 'speak': {
+      if (phase.followUp && pending.vars.replyTopics) return { speech: phase.followUp.fallbackText };
+      if (pending.action === 'act') return { targets: [] };
       const scripted = game.spec.debug?.speak?.(ctx, seat, pending.vars)
         ?? { speech: `【调试】${seatLabel(game, seat)}在「${phaseTitle(game, env.phaseId())}」的发言` };
       return phase.output.safeParse(scripted).success ? scripted : phase.fallback(ctx, seat);

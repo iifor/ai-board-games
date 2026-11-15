@@ -16,7 +16,7 @@ const requestsOn = (run: ReturnType<typeof play>, phaseId: string, round: number
 describe('wolf brothers', () => {
   it('only know each other; the younger stays out of the pack and checks as good while the elder lives', () => {
     const run = play(SEED, act('seer_check', seer, [younger], 1), BOARD);
-    const speeches = requestsIn(run, 'day_speech');
+    const speeches = requestsIn(run, 'day_speech').filter(request => request.action === 'speak');
     expect(speeches.find((request) => request.seat === younger)?.prompt.identity).toContain(`你的哥哥狼兄是 ${elder}号`);
     expect(speeches.find((request) => request.seat === elder)?.prompt.identity).toContain(`你的弟弟狼弟是 ${younger}号`);
     expect(speeches.find((request) => request.seat === wolf)?.prompt.identity).not.toContain(`${younger}号`);

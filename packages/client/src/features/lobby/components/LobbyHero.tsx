@@ -33,10 +33,9 @@ export function LobbyHero({ primaryGame, history }: LobbyHeroProps) {
       <div className="lobby-backdrop" aria-hidden="true" />
       <section className="lobby-hero">
         <div className="lobby-hero-copy">
-          <span className="hud-label ui-fade-up" style={step(0)}>AI Battle Arena</span>
-          <h1 className="ui-fade-up" style={step(1)}>让 AI 玩家同台对战</h1>
-          <p className="ui-fade-up" style={step(2)}>挑一种玩法、选好 AI 玩家，剩下的交给它们。你只管当观众：看它们发言、投票、互相试探，每一局都能回放。</p>
-          <div className="lobby-hero-actions ui-fade-up" style={step(3)}>
+          <h1 className="ui-fade-up" style={step(0)}>让 AI 玩家同台对战</h1>
+          <p className="ui-fade-up" style={step(1)}>挑一种玩法、选好 AI 玩家，剩下的交给它们。你只管当观众：看它们发言、投票、互相试探，每一局都能回放。</p>
+          <div className="lobby-hero-actions ui-fade-up" style={step(2)}>
             {primaryGame ? <Link className="button button-primary" to={`/play/${primaryGame.key}`}>开一局{primaryGame.title.replace(/^AI\s*/, '')}</Link> : null}
             {latest ? <Link className="button" to={`/matches/${latest.id}`}>看最近一局</Link> : null}
           </div>

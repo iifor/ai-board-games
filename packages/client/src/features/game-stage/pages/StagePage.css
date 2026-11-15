@@ -1,6 +1,8 @@
 .stage-shell {
   /* 舞台各层共用的尺寸：边距、控制条最大宽度（HUD 据此让位）、字幕栏最大高度（舞台底部据此留白，字幕不盖住座位） */
   --stage-gutter: 24px;
+  --stage-history-width: clamp(260px, 20vw, 400px);
+  --stage-history-height: min(clamp(360px, 76vh, 1100px), calc(100dvh - 170px));
   --stage-rail-width: 540px;
   --stage-subtitle-max-height: clamp(104px, 22vh, 220px);
   --mobile-speech-height: clamp(270px, 54svh, 600px);
@@ -77,9 +79,9 @@
   animation: stage-waiting 1.6s ease-in-out infinite;
 }
 
-/* 横屏矮窗口允许整桌纵向浏览，给人物和两条发言留出可读高度。 */
+/* 矮桌面窗口也固定在视口内，左下历史面板不会被推到屏幕之外。 */
 @media (min-width: 861px) and (max-height: 640px) {
-  .stage-shell[data-layout='circle'] { position: relative; min-height: 750px; }
+  .stage-shell[data-layout='circle'] { position: fixed; min-height: 0; }
 }
 
 @keyframes stage-waiting {
@@ -92,12 +94,55 @@
 .stage-actions {
   position: absolute;
   z-index: 40;
-  bottom: 22px;
+  top: 16px;
   left: var(--stage-gutter);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
   gap: 8px;
+}
+
+.stage-history {
+  position: absolute;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  z-index: 36;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--stage-history-width);
+  height: var(--stage-history-height);
+  min-height: 0;
+}
+.stage-history-overview { left: var(--stage-gutter); }
+.stage-history-speech { right: var(--stage-gutter); }
+.stage-history[hidden] { display: none; }
+.stage-history .stage-record {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  background: rgb(0 0 0 / 30%);
+  border: 0;
+  backdrop-filter: none;
+  box-shadow: none;
+  text-shadow: 0 1px 3px #020812, 0 0 6px #020812;
+}
+.stage-history .stage-record header { border-bottom: 0; }
+.stage-history .stage-record h2 { font-size: 12px; }
+.stage-history .stage-feed-filters button { font-size: 11px; }
+.stage-history .event-feed li {
+  background: transparent;
+  padding: 4px 6px;
+  font-size: clamp(12px, .75vw, 14px);
+  line-height: 1.55;
+}
+@media (min-width: 861px) {
+  .stage-shell > .stage-hud { top: 70px; }
+  .stage-shell[data-layout='circle'] > .stage-arena {
+    top: 144px;
+    left: calc(var(--stage-history-width) + var(--stage-gutter) + 16px);
+    right: calc(var(--stage-history-width) + var(--stage-gutter) + 16px);
+  }
+  .stage-shell[data-layout='versus'] { padding-top: 70px; }
 }
 
 /* 窄屏先提供播放控制和字幕；终局遮罩仍相对视口定位。 */
@@ -130,5 +175,15 @@
   .stage-shell > .stage-arena { order: 6; position: relative; }
   .stage-shell > .phase-banner { display: none; }
   .stage-shell > .stage-actions { order: 9; flex-direction: row; flex-wrap: wrap; }
+
+  /* 辩论队伍在手机上沿文档排列，底部字幕随页面排版，避免覆盖立场和头像。 */
+  .stage-shell[data-layout='versus'] > .sentence-captions {
+    position: static;
+    inset: auto;
+    order: 7;
+    align-self: center;
+    transform: none;
+  }
+  .stage-shell[data-layout='versus']:has(> .sentence-captions) { padding-bottom: 12px; }
 
 }

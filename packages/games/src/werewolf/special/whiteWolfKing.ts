@@ -8,7 +8,7 @@ import type { SpecialDescriptor } from './types';
 // 白狼王：狼人阵营，自爆时可以带走一名玩家（被带走者没有遗言）。
 
 const whiteWolfKingPrompts = definePrompts({
-  whiteWolfKing: '你是{{me.label}}，身份是白狼王（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。白天发言时你可以在发言后宣布自爆，自爆时还能带走一名玩家。',
+  whiteWolfKing: '你是{{me.label}}，身份是白狼王（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆，自爆时还能带走一名玩家。',
   whiteWolfKingBlast: '你已自爆，可以带走一名存活玩家，也可以输出空数组不带人。',
 });
 

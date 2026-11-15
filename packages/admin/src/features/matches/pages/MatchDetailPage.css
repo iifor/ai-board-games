@@ -1,8 +1,15 @@
 .match-detail {
   display: grid;
   gap: 16px;
-  padding-top: 16px;
+  min-width: 0;
 }
+
+.match-detail h1 { margin: 0 0 10px; font-size: 20px; }
+.match-detail > section { min-width: 0; }
+.match-detail h2 { margin: 0 0 10px; font-size: 16px; }
+.match-workspace-tabs { min-width: 0; }
+.match-trace-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.match-info code, .match-info a { overflow-wrap: anywhere; }
 
 .match-detail-debug {
   display: grid;

@@ -57,7 +57,7 @@ const YOUNGER_BROTHER: RoleTraits = { hiddenFromPack: true, appearsGoodWhile: 'w
 export const ROLE_CATALOG: Readonly<Record<string, RoleEntry>> = {
   werewolf: role('狼人', 'werewolf', 'wolf'),
   white_wolf_king: role('白狼王', 'werewolf', 'wolf'),
-  wolf_beauty: role('狼美人', 'werewolf', 'wolf', { noSelfDestruct: true }),
+  wolf_beauty: role('狼美人', 'werewolf', 'wolf'),
   demon: role('恶魔', 'werewolf', 'wolf', NIGHT_IMMUNE),
   evil_knight: role('恶灵骑士', 'werewolf', 'wolf', NIGHT_IMMUNE),
   nightmare: role('梦魇', 'werewolf', 'wolf'),

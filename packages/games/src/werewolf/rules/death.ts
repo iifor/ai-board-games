@@ -69,7 +69,7 @@ export function recordShot(ctx: WerewolfContext, decisions: readonly ActDecision
 export function describeShot(ctx: WerewolfContext, _seat: unknown, targets: readonly number[]): string {
   const [target] = targets;
   const shooter = anonymousShots(ctx) ? '' : '猎人';
-  return target === undefined ? `${shooter}放弃开枪` : `${shooter}开枪带走 ${target}号`;
+  return target === undefined ? `${shooter}放弃开枪` : `${shooter}向${target}号开枪`;
 }
 
 export function resolveShot(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
@@ -107,7 +107,11 @@ export function settleShot(ctx: WerewolfContext, reason: string): ComputeOutcome
   if (traits.delayedDeath) {
     return { state: woundRogue(state, target, ctx.round, true), log: [{ kind: 'narration', text: `${target}号中枪后进入负伤状态，没有立即出局。` }] };
   }
-  return { state, eliminate: [{ seat: target, reason, cause }] };
+  return {
+    state,
+    log: [{ kind: 'narration', text: `${target}号中枪出局。` }],
+    eliminate: [{ seat: target, reason, cause }],
+  };
 }
 
 /** 自爆：狼人出局，当天放逐取消，直接入夜 */
@@ -115,7 +119,6 @@ export function resolveSelfDestruct(ctx: WerewolfContext): ComputeOutcome<Werewo
   const seat = ctx.trigger?.seat;
   if (seat === undefined) return {};
   return {
-    log: [{ kind: 'narration', text: `${seat}号狼人自爆，今天的放逐投票取消，直接进入黑夜。` }],
     eliminate: [{ seat, reason: '自爆', cause: 'self_destruct' }],
   };
 }

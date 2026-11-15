@@ -1,5 +1,7 @@
 import { speechOutput, type ActPhase } from '@battle/engine';
+import { WEREWOLF_SPEECH_MAX_CHARS } from '../../speechLimits';
 import { werewolfPrompts as prompts } from '../prompts';
+import { line } from '../announcements';
 import { announceBlocks, blockedSeats, nightActors, wolvesBlocked } from '../rules/block';
 import { boardConfig, hasRole } from '../rules/board';
 import {
@@ -13,6 +15,7 @@ import {
   witchPoisonTargets,
   witchSaveTargets,
   wolfChatOrder,
+  wolfChatFallback,
   wolfKillTargets,
 } from '../rules/night';
 import { resolveNight } from '../rules/nightResolution';
@@ -45,19 +48,20 @@ export const nightPhases = {
   wolf_chat: {
     kind: 'speak',
     title: '狼人夜聊',
-    enabled: (ctx) => !wolvesBlocked(ctx),
-    actors: wolfChatOrder,
+    actors: (ctx) => wolvesBlocked(ctx) ? [] : wolfChatOrder(ctx).map((seat, index) => ({
+      seat, vars: { isProposer: index === 0 ? 1 : 0, replyTopics: '' },
+    })),
     prompt: prompts.wolfChat,
-    output: speechOutput({ max: 80 }),
-    fallback: () => ({ speech: '听大家的安排。' }),
+    followUp: { prompt: prompts.wolfChatReply, fallbackText: '这项配合我还没有确认。' },
+    output: speechOutput({ max: WEREWOLF_SPEECH_MAX_CHARS }),
+    fallback: wolfChatFallback,
     channel: () => 'team:werewolf',
     next: nightAfter('wolf_chat'),
   },
   wolf_kill: {
     kind: 'vote',
     title: '狼人击杀',
-    enabled: (ctx) => !wolvesBlocked(ctx),
-    voters: aliveWolves,
+    voters: (ctx) => wolvesBlocked(ctx) ? [] : aliveWolves(ctx),
     candidates: wolfKillTargets,
     prompt: prompts.wolfKill,
     allowAbstain: true,
@@ -70,13 +74,13 @@ export const nightPhases = {
   seer_check_late: { ...seerCheck, enabled: (ctx) => hasRole(ctx, 'seer') && seerWakesLate(ctx), next: nightAfter('seer_check_late') },
   witch_save: {
     kind: 'act',
-    title: '女巫用药',
     action: '使用解药',
     enabled: (ctx) => hasRole(ctx, 'witch'),
     actors: (ctx) => nightActors(ctx, 'witch'),
     targets: witchSaveTargets,
     allowNone: true,
     prompt: prompts.witchSave,
+    decisionNotice: (targets, ctx) => line(ctx, 'witchSave', { 座号: targets[0]! }),
     apply: applyWitchSave,
     next: nightAfter('witch_save'),
   },
@@ -88,6 +92,7 @@ export const nightPhases = {
     targets: witchPoisonTargets,
     allowNone: true,
     prompt: prompts.witchPoison,
+    decisionNotice: (_targets, ctx) => line(ctx, 'witchPoison'),
     apply: applyWitchPoison,
     next: nightAfter('witch_poison'),
   },

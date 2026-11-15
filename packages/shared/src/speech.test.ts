@@ -39,6 +39,21 @@ const CASES: Record<StagePayloadKind, { readonly payload: StagePayload; readonly
 };
 
 describe('speechOf', () => {
+  it('reads the public phase announcement in the host voice and leaves legacy titles silent', () => {
+    const title = { kind: 'phase_started', title: '狼人夜聊' } as const;
+    expect(speechOf(event(title))).toBeNull();
+    expect(speechOf(event({ ...title, announcement: '狼人请睁眼。' }))).toEqual({ seat: null, text: '狼人请睁眼。' });
+  });
+  it('names the seat on a self-destruct declaration and preserves authored replay text', () => {
+    const blast = { view, channel: 'public', round: 1, seq: 12, phaseId: 'day_speech', kind: 'action', seat: 6, action: '自爆', targets: [], text: '宣布自爆' } as const;
+    expect(speechOf(blast)?.text).toBe('6号自爆。');
+    expect(speechOf({ ...blast, text: '6号选择自爆。' })?.text).toBe('6号选择自爆。');
+  });
+  it('closes the review after an announced winner and reads the result when there was no review', () => {
+    const end = event(CASES.game_over.payload);
+    expect(speechOf({ ...end, view: { ...view, extra: { winnerAnnounced: true } } })?.text).toBe('本局复盘结束。');
+    expect(speechOf(end)?.text).toBe('好人阵营获胜');
+  });
   it.each(Object.entries(CASES))('%s', (_kind, { payload, expected }) => {
     expect(speechOf(event(payload))).toEqual(expected);
   });

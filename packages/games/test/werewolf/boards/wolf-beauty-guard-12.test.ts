@@ -6,7 +6,6 @@ const SEED = 8;
 const beauty = first(SEED, 'wolf_beauty', BOARD);
 const witch = first(SEED, 'witch', BOARD);
 const hunter = first(SEED, 'hunter', BOARD);
-const [wolf = 0] = roleSeats(SEED, 'werewolf', BOARD);
 const [villager = 0] = roleSeats(SEED, 'villager', BOARD);
 
 const charm = (target: number, night: number) => act('wolf_beauty_charm', beauty, [target], night);
@@ -25,7 +24,7 @@ describe('wolf beauty', () => {
 
   it('takes the charmed player with her when she dies at night; a charmed hunter cannot shoot', () => {
     const run = play(SEED, combine(charm(hunter, 1), act('witch_poison', witch, [beauty], 1)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe(`天亮了，昨晚死亡的是：${[beauty, hunter].sort((a, b) => a - b).map((seat) => `${seat}号`).join('、')}。`);
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe(`昨晚${[beauty, hunter].sort((a, b) => a - b).map((seat) => `${seat}号`).join('、')}出局。`);
     expect(requestsIn(run, 'hunter_shot')).toHaveLength(0);
     expect(lastWordsBy(run).sort()).toEqual([beauty, hunter].sort());
   });
@@ -45,10 +44,11 @@ describe('wolf beauty', () => {
     expect(eliminated(run).filter((death) => death.round <= 2).map((death) => death.seat)).toEqual([beauty]);
   });
 
-  it('cannot self-destruct, unlike the other wolves', () => {
-    const run = play(SEED, undefined, BOARD);
-    const speeches = requestsIn(run, 'day_speech');
-    expect(speeches.find((request) => request.seat === beauty)?.prompt.output).not.toContain('selfDestruct');
-    expect(speeches.find((request) => request.seat === wolf)?.prompt.output).toContain('selfDestruct');
+  it('leaves the charmed player alive when the beauty self-destructs', () => {
+    const run = play(SEED, combine(charm(villager, 1), (request) =>
+      request.phaseId === 'day_speech' && request.seat === beauty && request.action === 'speak'
+        ? { speech: '我自爆。', declare: 'selfDestruct' } : undefined), BOARD);
+    expect(eliminated(run).filter(death => death.round === 1)).toEqual([{ seat: beauty, round: 1, reason: '自爆' }]);
+    expect(lastWordsBy(run)).not.toContain(beauty);
   });
 });

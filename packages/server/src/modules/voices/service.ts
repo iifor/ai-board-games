@@ -1,6 +1,6 @@
 import {
   VOICE_GENDERS, VOICE_PROVIDERS,
-  type VoiceDto, type VoiceGender, type VoiceImportResult, type VoiceInput, type VoicePreviewResult, type VoiceProvider,
+  type AzureVoiceCatalogEntry, type VoiceDto, type VoiceGender, type VoiceImportResult, type VoiceInput, type VoicePreviewResult, type VoiceProvider,
 } from '@battle/shared';
 import type { Selectable } from 'kysely';
 import type { VoicesTable } from '../../db/schema';
@@ -43,13 +43,13 @@ function signature(voice: { readonly provider: string; readonly voiceName: strin
   return `${voice.provider}|${voice.voiceName.toLowerCase()}|${voice.style ?? ''}`;
 }
 
-export function createVoiceService(repository: VoiceRepository, tts: Pick<TtsService, 'synthesize'>) {
+export function createVoiceService(repository: VoiceRepository, tts: Pick<TtsService, 'synthesize'>, azureCatalog: () => Promise<AzureVoiceCatalogEntry[]>) {
   const values = (input: VoiceInput) => ({
     name: input.name,
     provider: input.provider,
     voiceName: input.voiceName,
     language: input.language ?? DEFAULT_LANGUAGE,
-    gender: input.gender ?? null,
+    ...(input.gender !== undefined ? { gender: input.gender } : {}),
     style: input.style ?? '',
     rate: input.rate ?? DEFAULT_PERCENT,
     pitch: input.pitch ?? DEFAULT_PERCENT,
@@ -58,6 +58,7 @@ export function createVoiceService(repository: VoiceRepository, tts: Pick<TtsSer
   });
 
   return {
+    azureCatalog,
     list: async (): Promise<VoiceDto[]> => (await repository.list()).map(toDto),
 
     async get(id: number): Promise<VoiceDto> {

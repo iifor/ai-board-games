@@ -10,4 +10,6 @@ export const gameRegistry: ReadonlyMap<string, CompiledGame> = new Map(GAMES.map
 export { debateGame } from './debate';
 export type { DebateParams, DebateState, DebateTopic } from './debate';
 export { werewolfGame } from './werewolf';
+export { werewolfAnnouncements } from './werewolf/announcements';
+export { nightActionPrompts } from './werewolf/nightActions';
 export type { WerewolfParams, WerewolfState } from './werewolf';

@@ -21,7 +21,7 @@
   width: var(--ring-w, auto);
   height: var(--ring-h, 100%);
   max-width: 100%;
-  aspect-ratio: 2.2;
+  aspect-ratio: 1.7;
 }
 
 .circle-table {
@@ -36,6 +36,7 @@
 /* 调整窗口时，座位随椭圆轨道平滑移动。 */
 .circle-seat {
   position: absolute;
+  z-index: 2;
   transform: translate(-50%, -50%) scale(var(--seat-scale));
   transition: left var(--ui-motion-normal) var(--ui-ease-out), top var(--ui-motion-normal) var(--ui-ease-out), transform var(--ui-motion-normal) var(--ui-ease-out);
 }
@@ -43,6 +44,7 @@
 /* 圆桌中央：上下两排座位之间的区域，立绘 / 票板放在这里 */
 .circle-center {
   position: absolute;
+  z-index: 5;
   inset: calc(var(--ring-card-h) + 8px) calc(var(--ring-card-w) + 16px);
   display: grid;
   place-items: center;
@@ -59,6 +61,8 @@
 }
 .circle-center .stage-record { width: min(100%, 720px); height: 100%; }
 .circle-center:has(> .speech-carousel) {
+  --speech-track-width: 72rem;
+  --speech-track-top: 2%;
   inset: 0;
   margin: auto;
   width: var(--speech-w);
@@ -83,75 +87,6 @@
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
-}
-.ring-seat-head {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  max-width: 100%;
-  color: var(--platform-color);
-  font-size: 12px;
-  font-weight: 750;
-}
-.ring-seat-head > * {
-  overflow: hidden;
-  padding-inline: 6px;
-  border-radius: 5px;
-  background: rgb(7 15 28 / 88%);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ring-seat-head em { color: var(--ui-brand-strong); font-style: normal; }
-.seat-figure {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: end center;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-}
-.seat-figure-art { width: 100%; height: 100%; min-height: 0; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 3px 4px #020818); }
-.seat-figure-art[data-art='portrait'] { width: 78%; border-radius: 32% 32% 8px 8px; object-fit: cover; object-position: center 16%; }
-.seat-figure:not(:has(img)) {
-  background: radial-gradient(ellipse 15% 19% at 50% 33%, #97adc5 96%, transparent 100%),
-    radial-gradient(ellipse 35% 40% at 50% 86%, #455c77 95%, transparent 100%);
-}
-.ring-seat-platform {
-  position: relative;
-  isolation: isolate;
-  display: grid;
-  place-items: center;
-  width: min(76%, 88px);
-  color: var(--platform-color);
-  font-size: 14px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 3px #06101b;
-}
-.ring-seat-platform::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  inset: -6px 0 0;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 24%, color-mix(in srgb, var(--platform-color) 40%, #142031), #132030 65%, #09121e 85%);
-  box-shadow: 0 3px 0 color-mix(in srgb, var(--platform-color) 70%, #101c2a), 0 5px 8px #07112080;
-}
-.ring-seat-name {
-  align-self: end;
-  max-width: 96%;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: #0a1424cf;
-  color: #f4f6fc;
-  font-size: 12px;
-  line-height: 1.15;
-  font-weight: 650;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .circle-seat .seat-card-asleep { opacity: 1; filter: none; }
 .circle-seat .seat-card-asleep .seat-figure-art { filter: saturate(.68) brightness(.82) drop-shadow(0 2px 4px #020818); }

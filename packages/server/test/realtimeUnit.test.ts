@@ -141,11 +141,13 @@ describe('audio resolver', () => {
     expect(await resolver.audioFor('m_1', judgement, false)).toEqual({ url: '/api/media/x', mime: 'audio/mpeg' });
     await resolver.audioFor('m_1', action, false);
     expect(await resolver.audioFor('m_1', title, false)).toBeNull();
+    await resolver.audioFor('m_1', { ...title, seq: 4, announcement: '狼人请睁眼。' }, false);
     // 脚本化对局不合成
     expect(await resolver.audioFor('m_2', judgement, true)).toBeNull();
     expect(synthesized).toEqual([
       { text: '正方胜。论证清晰。', voice: 'seat-3' },
       { text: '2 号开枪带走了 5 号', voice: '主持人' },
+      { text: '狼人请睁眼。', voice: '主持人' },
     ]);
   });
 });
@@ -166,11 +168,18 @@ describe('tts cache key', () => {
     const repository: MediaRepository = {
       find: async (id) => {
         const row = stored.get(id);
-        return row ? { ...row, createdAt: new Date() } : undefined;
+        return row ? { ...row, captions: null, createdAt: new Date() } : undefined;
+      },
+      reference: async id => {
+        const row = stored.get(id);
+        return row ? { mime: row.mime, captions: null } : undefined;
       },
       exists: async (id) => stored.has(id),
       locked: (id, work) => work({
-        exists: async () => stored.has(id),
+        reference: async () => {
+          const row = stored.get(id);
+          return row ? { mime: row.mime, captions: null } : undefined;
+        },
         insert: async (values) => {
           stored.set(id, { id, ...values });
         },

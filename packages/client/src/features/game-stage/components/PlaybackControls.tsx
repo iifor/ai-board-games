@@ -3,6 +3,7 @@ import { SPEEDS, type PlaybackOptions } from '../types';
 import './PlaybackControls.css';
 
 interface PlaybackControlsProps {
+  readonly hideFeedButton?: boolean;
   readonly compact?: boolean;
   readonly children?: import('react').ReactNode;
   readonly options: PlaybackOptions;
@@ -18,7 +19,7 @@ interface PlaybackControlsProps {
  * 快捷键本身由舞台页的 useStageShortcuts 处理，这里只在按钮上标出提示（title 与 aria-keyshortcuts）。
  * 状态文字只是展示，不做 live region（舞台上只有字幕栏会被读屏播报）
  */
-export function PlaybackControls({ options, pending, finished, feedOpen, onChange, onToggleFeed, children, compact = false }: PlaybackControlsProps) {
+export function PlaybackControls({ options, pending, finished, feedOpen, onChange, onToggleFeed, children, compact = false, hideFeedButton = false }: PlaybackControlsProps) {
   const status = finished ? '播放完毕' : options.paused ? '已暂停' : pending > 0 ? `已缓冲 ${pending} 段` : '等待下一段…';
   return (
     <div className="playback-rail glass-panel" role="toolbar" aria-label="播放控制">
@@ -40,7 +41,7 @@ export function PlaybackControls({ options, pending, finished, feedOpen, onChang
       <button type="button" className={options.muted ? 'is-active' : ''} aria-pressed={options.muted} title={SHORTCUT_HINTS.mute.title} aria-keyshortcuts={SHORTCUT_HINTS.mute.keys} onClick={() => onChange({ ...options, muted: !options.muted })}>
         {options.muted ? '已静音' : '静音'}
       </button>
-      <button type="button" className={feedOpen ? 'is-active' : ''} aria-pressed={feedOpen} title={SHORTCUT_HINTS.feed.title} aria-keyshortcuts={SHORTCUT_HINTS.feed.keys} onClick={onToggleFeed}>记录</button>
+      {!hideFeedButton && <button type="button" className={feedOpen ? 'is-active' : ''} aria-pressed={feedOpen} title={SHORTCUT_HINTS.feed.title} aria-keyshortcuts={SHORTCUT_HINTS.feed.keys} onClick={onToggleFeed}>记录</button>}
       {!compact && <span className="playback-status">{status}</span>}
       {children}
     </div>

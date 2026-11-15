@@ -6,6 +6,13 @@ export type VoteOutcome =
   | { readonly kind: 'selected'; readonly seat: number; readonly byTieBreak: boolean }
   | { readonly kind: 'none' };
 
+export type SystemChoice = 'fallback' | 'only_target' | 'request_failed';
+
+export function systemChoiceLabel(source: SystemChoice): string {
+  if (source === 'request_failed') return '请求失败';
+  return source === 'fallback' ? '系统代选' : '规则自动选择唯一目标';
+}
+
 export interface VoteBallot {
   readonly voter: number;
   readonly target: number;
@@ -29,13 +36,19 @@ export interface GameResult {
 }
 
 export type StagePayload =
-  | { readonly kind: 'phase_started'; readonly title: string }
-  | { readonly kind: 'narration'; readonly text: string }
-  | { readonly kind: 'speech'; readonly seat: number; readonly text: string }
+  | { readonly kind: 'phase_started'; readonly title: string; readonly announcement?: string }
+  | { readonly kind: 'narration'; readonly text: string; readonly purpose?: 'decision' | 'missed_speech' }
+  | {
+      readonly kind: 'speech';
+      readonly seat: number;
+      readonly text: string;
+      readonly replyRequests?: readonly { readonly seat: number; readonly task: string }[];
+    }
   | {
       readonly kind: 'action';
       readonly seat: number;
       readonly action: string;
+      readonly source?: SystemChoice;
       readonly targets: readonly number[];
       readonly text: string;
     }
@@ -46,6 +59,7 @@ export type StagePayload =
       readonly ballots: readonly VoteBallot[];
       /** 弃票的座位 */
       readonly abstained: readonly number[];
+      readonly systemChoices?: Readonly<Record<number, SystemChoice>>;
       readonly tally: readonly VoteTallyRow[];
       readonly tied: readonly number[];
       readonly outcome: VoteOutcome | null;
@@ -53,18 +67,20 @@ export type StagePayload =
   | {
       readonly kind: 'judgement';
       readonly seat: number;
+      readonly source?: 'fallback';
       readonly verdict: string;
       readonly verdictLabel: string;
       readonly comment: string;
     }
   | { readonly kind: 'seat_eliminated'; readonly seat: number; readonly reason: string }
   | { readonly kind: 'revealed'; readonly text: string; readonly data: Readonly<Record<string, unknown>> }
-  | { readonly kind: 'fallback'; readonly seat: number; readonly reason: string }
+  | { readonly kind: 'fallback'; readonly seat: number; readonly reason: string; readonly action?: 'act' | 'vote' | 'speak' | 'judge' }
   | { readonly kind: 'game_over'; readonly result: GameResult };
 
 export type StagePayloadKind = StagePayload['kind'];
 
 export interface StageEventMeta {
+  readonly inspectionResult?: string;
   readonly seq: number;
   readonly round: number;
   readonly phaseId: string | null;
@@ -75,6 +91,9 @@ export interface AudienceSeat {
   readonly seat: number;
   readonly name: string;
   readonly avatar: string | null;
+  readonly appearanceName?: string;
+  readonly modelKey?: string;
+  readonly persona?: string;
   readonly label: string;
   readonly alive: boolean;
   /** 观众不可见时为 null */

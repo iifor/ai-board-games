@@ -74,6 +74,24 @@ describe('history compression by round', () => {
     expect(short).toHaveLength(11);
   });
 
+  it('keeps recent coordination with its speaker and team visibility after older history is truncated', () => {
+    const earlier = Array.from({ length: DEFAULT_HISTORY_LIMIT + 10 }, (): LogDraft => ({ kind: 'narration', text: '早先的播报' }));
+    const log = logOf([earlier, [
+      { kind: 'speech', seat: 1, text: '我提议改刀。', channel: 'team:town', replyRequests: [{ seat: 3, task: '明天跟我核票' }] },
+      speech(3, '我不同意这个分工。', 'team:town'),
+    ]]);
+    const snapshot = snapshotWith(log, 2);
+    for (const seat of [1, 3, 4]) {
+      const history = formatHistory(chainGame, snapshot, seatOf(seat));
+      expect(history).toContain('条记录已省略');
+      expect(history).toContain('1号 玩家1：我提议改刀。（提出分工：请3号确认「明天跟我核票」）');
+      expect(history).toContain('3号 玩家3：我不同意这个分工。');
+    }
+    for (const viewer of [seatOf(2), { ...seatOf(4), teamSince: log.length + 1 }]) {
+      expect(formatHistory(chainGame, snapshot, viewer)).not.toMatch(/改刀|核票|不同意/);
+    }
+  });
+
   it('shows a round-three speaker the first-day structure but not its speeches', () => {
     // 每轮三方平票、无人出局，对局跑满 6 轮；发言正文按轮次编号
     const votes: Record<number, number> = { 1: 3, 2: 3, 3: 4, 4: 1, 5: 1 };

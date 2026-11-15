@@ -16,6 +16,7 @@ export interface LlmUsage {
 }
 
 export interface LlmResponse {
+  readonly truncated?: boolean;
   readonly content: string;
   readonly usage: LlmUsage | null;
 }
@@ -25,7 +26,7 @@ export interface LlmResponse {
  * quotaExhausted 表示供应商明确返回额度耗尽 / 欠费，模型应被停用并切换备用模型。
  */
 export class LlmError extends Error {
-  constructor(message: string, readonly retryable: boolean, readonly quotaExhausted = false) {
+  constructor(message: string, readonly retryable: boolean, readonly quotaExhausted = false, readonly outputLimit = false) {
     super(message);
     this.name = 'LlmError';
   }

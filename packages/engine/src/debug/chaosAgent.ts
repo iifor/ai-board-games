@@ -64,6 +64,7 @@ function legalChaosOutput(game: CompiledGame, snapshot: EngineSnapshot, request:
       if (phase.allowNone && rng.next() < CHAOS_RATES.decline) return { targets: [] };
       return { targets: rng.shuffle(legal).slice(0, Math.min(phase.count ?? 1, legal.length)) };
     case 'speak': {
+      if (pending.action === 'act') return { targets: rng.next() < CHAOS_RATES.declare ? [pending.seat] : [] };
       const scripted = scriptedOutput(game, snapshot, request);
       const declarations = allowedDeclarations(env, phase, env.seat(pending.seat));
       if (declarations.length === 0 || rng.next() >= CHAOS_RATES.declare) return scripted;

@@ -13,24 +13,22 @@ import {
 import type { SpecialDescriptor } from './types';
 
 // 狼王：狼人阵营，被放逐、被猎人枪杀、被狼人误刀（如魔术师换号后）出局时可以开枪带走一名玩家；
-// 被毒杀、摄梦而死、自爆、殉情、被炸死时不能开枪。有狼王的板子里猎人与狼王开枪都不翻牌：
+// 被毒杀可以开枪，摄梦而死、自爆、殉情、被炸死时不能开枪。有狼王的板子里猎人与狼王开枪都不翻牌：
 // 两者共用标题中性的"开枪"阶段（death_shot），播报与出局原因都不说明开枪者身份。
 
 const wolfKingPrompts = definePrompts({
   wolfKing: [
     '你是{{me.label}}，身份是狼王（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
-    '你被放逐、被猎人枪杀或被狼人误刀出局时可以开枪带走一名玩家；被女巫毒杀、因摄梦死亡或自爆时不能开枪。开枪时不翻牌，其他人分不清开枪的是猎人还是狼王。',
-    '白天发言时你可以在发言后宣布自爆（自爆时不能开枪）。',
+    '你被放逐、被女巫毒杀、被猎人枪杀或被狼人误刀出局时可以开枪带走一名玩家；摄梦死亡或自爆时不能开枪。开枪时不翻牌，其他人分不清开枪的是猎人还是狼王。',
+    '警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆（自爆时不能开枪）。',
   ].join(''),
   deathShot: '你已出局，可以开枪带走一名存活玩家，也可以输出空数组放弃开枪。',
 });
 
-/** 狼王不能开枪的出局原因：猎人不能开枪的原因（NO_SHOT_CAUSES）之外，还有摄梦而死与自爆 */
-const WOLF_KING_NO_SHOT: ReadonlySet<string> = new Set([...NO_SHOT_CAUSES, 'dream', 'self_destruct']);
-
 function canWolfKingShoot(ctx: WerewolfContext, event: TriggerEvent): boolean {
   if (event.kind !== 'seat_eliminated' || ctx.seats.get(event.seat).role !== 'wolf_king') return false;
-  return !WOLF_KING_NO_SHOT.has(event.cause);
+  if (event.cause === 'poison') return true;
+  return event.cause !== 'dream' && event.cause !== 'self_destruct' && !NO_SHOT_CAUSES.has(event.cause);
 }
 
 const wolfKingPhases = {

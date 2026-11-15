@@ -41,3 +41,8 @@ export const listQuerySchema = z.object({
   status: z.enum(['created', 'running', 'waiting_ai', 'paused', 'completed', 'failed']).optional(),
   debug: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
 });
+
+export const adminListQuerySchema = listQuerySchema.extend({
+  source: z.enum(['normal', 'debug', 'import']).optional(),
+  offset: z.coerce.number().int().min(0).max(2147483647).default(0),
+});

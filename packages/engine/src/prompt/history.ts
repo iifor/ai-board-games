@@ -1,3 +1,4 @@
+import { systemChoiceLabel } from '@battle/shared';
 import type { CompiledGame } from '../compiler/compile';
 import { seatLabel } from '../runtime/labels';
 import type { EngineSnapshot, LogEntry, Seat } from '../runtime/types';
@@ -29,21 +30,30 @@ function bonusVotes(entry: Extract<LogEntry, { kind: 'vote_tallied' }>): string[
 
 /** 日志条目 → 给 AI 看的一行文本；fallback 等运营信息不会出现在这里 */
 export function formatEntry(game: CompiledGame, s: EngineSnapshot, entry: LogEntry): string | null {
-  const label = (seatNo: number): string => labelOf(game, s, seatNo);
+  return formatHistoryEntry(entry, seatNo => labelOf(game, s, seatNo));
+}
+
+export function formatHistoryEntry(entry: LogEntry, label: (seatNo: number) => string): string | null {
   switch (entry.kind) {
     case 'phase_started':
       return `【${entry.title}】`;
     case 'narration':
       return `主持人：${entry.text}`;
-    case 'speech':
-      return `${label(entry.seat)}：${entry.text}`;
+    case 'speech': {
+      const requests = entry.replyRequests?.map(r => `请${r.seat}号确认「${r.task}」`).join('、');
+      return `${label(entry.seat)}：${entry.text}${requests ? `（提出分工：${requests}）` : ''}`;
+    }
     case 'action':
       return `${label(entry.seat)}：${entry.text}`;
     case 'vote_tallied': {
-      const votes = entry.ballots.map((ballot) => `${ballot.voter}号→${ballot.target}号`);
+      const source = (seat: number) => {
+        const choice = entry.systemChoices?.[seat];
+        return choice ? `（${systemChoiceLabel(choice)}）` : '';
+      };
+      const votes = entry.ballots.map((ballot) => `${ballot.voter}号→${ballot.target}号${source(ballot.voter)}`);
       const bonus = bonusVotes(entry);
       const extra = bonus.length ? [`额外票：${bonus.join('、')}`] : [];
-      const abstained = entry.abstained.length ? [`弃票：${entry.abstained.map((seat) => `${seat}号`).join('、')}`] : [];
+      const abstained = entry.abstained.length ? [`弃票：${entry.abstained.map((seat) => `${seat}号${source(seat)}`).join('、')}`] : [];
       const ballots = [...votes, ...extra, ...abstained].join('，') || '无人投票';
       const outcome = entry.outcome?.kind === 'selected'
         ? `结果：${label(entry.outcome.seat)}`

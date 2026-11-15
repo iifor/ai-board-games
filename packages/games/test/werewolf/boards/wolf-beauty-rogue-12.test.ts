@@ -30,7 +30,7 @@ describe('wolf-beauty-rogue board', () => {
 describe('old rogue', () => {
   it('survives the poison silently and leaves after the next day’s speeches', () => {
     const run = play(SEED, act('witch_poison', witch, [rogue], 1), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
     expect(run.log.some((entry) => 'text' in entry && entry.channel === 'public' && entry.text.includes('中毒'))).toBe(false);
     expect(eliminated(run)[0]).toEqual({ seat: rogue, round: 2, reason: '发言结束后出局' });
     expect(daySpeakers(run, 2)).toContain(rogue);
@@ -70,7 +70,7 @@ describe('old rogue', () => {
 describe('weakened wolf beauty', () => {
   it('takes nobody with her when poisoned', () => {
     const run = play(SEED, combine(charm(villager, 1), act('witch_poison', witch, [beauty], 1)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe(`天亮了，昨晚死亡的是：${beauty}号。`);
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe(`昨晚${beauty}号出局。`);
     expect(run.requests[0]?.request.prompt.rules).toContain('本局的狼美人被女巫毒杀时不能带走被魅惑的玩家');
   });
 

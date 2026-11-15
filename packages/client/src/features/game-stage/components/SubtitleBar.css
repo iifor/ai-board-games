@@ -81,11 +81,10 @@
 }
 
 .subtitle-speaker strong {
-  overflow: hidden;
   font-size: 15px;
   font-weight: 900;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .subtitle-body {

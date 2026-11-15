@@ -23,7 +23,10 @@ let t: TestApp;
 let token: string;
 const tts = fakeTts();
 beforeAll(async () => {
-  t = await createTestApp({}, { llm: connectionLlm(), ttsProviders: { azure: tts } });
+  t = await createTestApp({}, {
+    llm: connectionLlm(), ttsProviders: { azure: tts },
+    azureVoiceCatalog: async () => [{ voiceName: 'zh-CN-XiaoxiaoNeural', styles: ['chat', 'cheerful'] }],
+  });
   token = await t.adminToken();
 });
 afterAll(async () => t.cleanup());
@@ -68,12 +71,44 @@ describe('model providers', () => {
 });
 
 describe('models, voices and players', () => {
+  it('keeps player speech overrides through rebinding and can restore personality defaults', async () => {
+    const provider = await createProvider('发言设置');
+    const model = await createModel(provider.id, '发言模型');
+    const input = { name: '惜字如金的玩家', persona: '高冷寡言' };
+    const player = dataOf(await t.call<PlayerDto>('POST', '/api/admin/players', { token, body: input }));
+    const path = `/api/admin/players/${player.id}`;
+    const edit = async (fields: Partial<PlayerDto>) => dataOf(await t.call<PlayerDto>('PUT', path, { token, body: { name: input.name, ...fields } }));
+    expect(player).toMatchObject({ temperature: null, maxTokens: null, speechMaxChars: null });
+    const overrides = { temperature: 0, maxTokens: 1536, speechMaxChars: 90 };
+    expect(await edit({ modelId: model.id, ...overrides })).toMatchObject({ ...overrides, persona: input.persona });
+    expect(await edit({ modelId: null })).toMatchObject(overrides);
+    expect(await edit({ temperature: null })).toMatchObject({ temperature: null, maxTokens: 1536 });
+    expect((await t.call('PUT', path, { token, body: { name: input.name, speechMaxChars: 501 } })).status).toBe(400);
+  });
+  it('allows an unbound profile to be bound, edited, unbound and bound again', async () => {
+    const provider = await createProvider('解绑供应商');
+    const model = await createModel(provider.id, '可解绑模型');
+    const profile = { name: '保留玩家', persona: '原有人设' };
+    const player = dataOf(await t.call<PlayerDto>('POST', '/api/admin/players', { token, body: profile }));
+    const path = `/api/admin/players/${player.id}`;
+    const visible = async () => dataOf(await t.call<PublicPlayerDto[]>('GET', '/api/toc/players')).some(row => row.id === player.id);
+    expect(player.modelId).toBeNull();
+    expect(await visible()).toBe(false);
+    const bind = () => t.call<PlayerDto>('PUT', path, { token, body: { ...profile, modelId: model.id } });
+    dataOf(await bind());
+    expect(dataOf(await t.call<PlayerDto>('PUT', path, { token, body: profile })).modelId).toBe(model.id);
+    expect(await visible()).toBe(true);
+    expect(dataOf(await t.call<PlayerDto>('PUT', path, { token, body: { ...profile, modelId: null } }))).toMatchObject({ ...profile, id: player.id, modelId: null });
+    expect(await visible()).toBe(false);
+    dataOf(await bind());
+    expect(await visible()).toBe(true);
+  });
   it('checks references and protects resources still in use', async () => {
     const provider = await createProvider('模型供应商');
     const missingProvider = await t.call('POST', '/api/admin/models', { token, body: { providerId: 99999, name: 'x', model: 'm' } });
     expect(missingProvider.status).toBe(400);
-    const primary = await createModel(provider.id, '主模型', { temperature: 0.3, maxTokens: 512 });
-    expect(primary).toMatchObject({ temperature: 0.3, maxTokens: 512, fallbackModelId: null });
+    const primary = await createModel(provider.id, '主模型', { maxTokens: 512 });
+    expect(primary).toMatchObject({ maxTokens: 512, fallbackModelId: null });
     const backup = await createModel(provider.id, '备用模型');
     const linked = dataOf(await t.call<ModelDto>('PUT', `/api/admin/models/${primary.id}`, {
       token,
@@ -97,15 +132,27 @@ describe('models, voices and players', () => {
     expect(providerInUse.status).toBe(409);
   });
 
-  it('lists only enabled players publicly, without model details', async () => {
+  it('lists enabled players by model and keeps optional nicknames private', async () => {
     const provider = await createProvider('公开列表');
-    const model = await createModel(provider.id, '公开模型');
-    await t.call('POST', '/api/admin/players', { token, body: { name: '可见', modelId: model.id } });
-    await t.call('POST', '/api/admin/players', { token, body: { name: '隐藏', modelId: model.id, enabled: false } });
+    const key = 'gpt-4.1-mini-2025-04-14';
+    const model = await createModel(provider.id, key, { model: key });
+    const add = async (fields: Record<string, unknown>) => dataOf(await t.call<PlayerDto>('POST', '/api/admin/players', { token, body: { modelId: model.id, ...fields } }));
+    const original = await add({ name: '豆包', persona: '谨慎' });
+    const anonymous = await add({});
+    const blank = await add({ name: '   ' });
+    const hidden = await add({ name: '隐藏', enabled: false });
+    expect(anonymous.name).toBe('');
+    expect(blank.name).toBe('');
+    const path = '/api/admin/players/' + original.id;
+    expect(dataOf(await t.call<PlayerDto>('PUT', path, { token, body: { name: '' } }))).toMatchObject({
+      id: original.id, name: '', persona: '谨慎', modelDisplayName: 'GPT-4.1 mini',
+    });
     const listed = dataOf(await t.call<PublicPlayerDto[]>('GET', '/api/toc/players'));
-    expect(listed.map((player) => player.name)).toContain('可见');
-    expect(listed.map((player) => player.name)).not.toContain('隐藏');
-    expect(Object.keys(listed[0] ?? {})).toEqual(['id', 'name', 'avatar', 'persona']);
+    expect(listed.find(p => p.id === original.id)).toEqual({
+      id: original.id, name: 'GPT-4.1 mini', modelKey: key, appearanceName: 'doubao', avatar: null, persona: '谨慎',
+    });
+    expect(listed.filter(p => [anonymous.id, blank.id].includes(p.id)).map(p => p.name)).toEqual(['GPT-4.1 mini', 'GPT-4.1 mini']);
+    expect(listed.some(p => p.id === hidden.id)).toBe(false);
   });
 
   it('returns 404 for missing resources and rejects bad ids', async () => {
@@ -165,9 +212,9 @@ describe('enabled is preserved on update when omitted', () => {
     const providerKept = dataOf(await t.call<ProviderDto>('PUT', `/api/admin/providers/${provider.id}`, { token, body: { name: '停用保留2', baseUrl: 'https://api.example.com/v1' } }));
     expect(providerKept).toMatchObject({ name: '停用保留2', enabled: false });
 
-    const voice = dataOf(await t.call<VoiceDto>('POST', '/api/admin/voices', { token, body: { name: '停用音色', provider: 'browser', voiceName: 'zh-CN', enabled: false } }));
-    const voiceKept = dataOf(await t.call<VoiceDto>('PUT', `/api/admin/voices/${voice.id}`, { token, body: { name: '停用音色', provider: 'browser', voiceName: 'zh-TW' } }));
-    expect(voiceKept).toMatchObject({ voiceName: 'zh-TW', enabled: false });
+    const voice = dataOf(await t.call<VoiceDto>('POST', '/api/admin/voices', { token, body: { name: '停用音色', provider: 'browser', voiceName: 'zh-CN', gender: '女', enabled: false } }));
+    const voiceKept = dataOf(await t.call<VoiceDto>('PUT', `/api/admin/voices/${voice.id}`, { token, body: { name: '停用音色改名', provider: 'browser', voiceName: 'zh-CN' } }));
+    expect(voiceKept).toMatchObject({ name: '停用音色改名', gender: '女', enabled: false });
     const voiceOn = dataOf(await t.call<VoiceDto>('PUT', `/api/admin/voices/${voice.id}`, { token, body: { name: '停用音色', provider: 'browser', voiceName: 'zh-TW', enabled: true } }));
     expect(voiceOn.enabled).toBe(true);
 
@@ -179,6 +226,12 @@ describe('enabled is preserved on update when omitted', () => {
 });
 
 describe('voice parameters, preview and catalog import', () => {
+  it('requires admin authentication for the Azure style catalog and returns the shared DTO', async () => {
+    const path = '/api/admin/voices/azure/catalog';
+    expect((await t.call('GET', path)).status).toBe(401);
+    const result = await t.call('GET', path, { token });
+    expect(dataOf(result)).toEqual([{ voiceName: 'zh-CN-XiaoxiaoNeural', styles: ['chat', 'cheerful'] }]);
+  });
   it('stores voice parameters and previews through the configured TTS provider', async () => {
     const voice = dataOf(await t.call<VoiceDto>('POST', '/api/admin/voices', {
       token,

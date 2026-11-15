@@ -67,11 +67,12 @@ export function SeatPopover({ seat, speeches, anchor, arenaRef, onClose }: SeatP
   return (
     <div ref={ref} id="seat-profile" className="seat-popover glass-panel" role="region" aria-labelledby="seat-popover-name" data-team={seat.team ?? undefined} data-side={placement?.side ?? 'right'} style={style}>
       <header className="seat-popover-head">
-        <Avatar className="seat-popover-avatar" variant="portrait" name={seat.name} avatar={seat.avatar} fallback={String(seat.seat)}>
+        <Avatar className="seat-popover-avatar" variant="portrait" name={seat.appearanceName ?? seat.name} avatar={seat.avatar} fallback={String(seat.seat)}>
           <b className="seat-popover-no">{seat.seat}</b>
         </Avatar>
         <div className="seat-popover-identity">
           <strong id="seat-popover-name">{seat.name}</strong>
+          {seat.modelKey && seat.modelKey !== seat.name && <small className="seat-popover-model">{seat.modelKey}</small>}
           <span className="seat-popover-meta">
             <em className="ui-pill ui-pill-soft">{seat.seat} 号{seat.position === null ? '' : ` · ${seat.position}号位`}</em>
             <em className="ui-pill ui-pill-accent">{seat.roleName ?? '身份未知'}</em>
@@ -80,15 +81,18 @@ export function SeatPopover({ seat, speeches, anchor, arenaRef, onClose }: SeatP
           </span>
         </div>
       </header>
-      <ol className="seat-popover-speeches" aria-label="本局发言" tabIndex={0}>
-        {speeches.map((speech) => (
-          <li key={speech.seq} className={`seat-popover-${speech.kind}`}>
-            <small>{speech.title} · {KIND_LABELS[speech.kind]}</small>
-            <p>{speech.text}</p>
-          </li>
-        ))}
-        {speeches.length === 0 ? <li className="seat-popover-empty">还没有公开发言</li> : null}
-      </ol>
+      <div className="seat-popover-details" role="group" aria-label={seat.persona ? '人设与本局发言' : '本局发言'} tabIndex={0}>
+        {seat.persona && <p className="seat-popover-persona">{seat.persona}</p>}
+        <ol className="seat-popover-speeches">
+          {speeches.map((speech) => (
+            <li key={speech.seq} className={`seat-popover-${speech.kind}`}>
+              <small>{speech.title} · {KIND_LABELS[speech.kind]}</small>
+              <p>{speech.text}</p>
+            </li>
+          ))}
+          {speeches.length === 0 ? <li className="seat-popover-empty">还没有公开发言</li> : null}
+        </ol>
+      </div>
     </div>
   );
 }

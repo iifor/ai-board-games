@@ -83,7 +83,10 @@ function assignSeats(game: CompiledGame, input: CreateMatchInput, assign: Assign
     const position = roleSpec.positions !== undefined && next <= roleSpec.positions ? next : null;
     return {
       seat: index + 1,
-      profile: { playerId: profile.playerId, name: profile.name, persona: profile.persona, avatar: profile.avatar },
+      profile: { playerId: profile.playerId, name: profile.name, persona: profile.persona, avatar: profile.avatar,
+        ...(profile.modelKey && { modelKey: profile.modelKey }),
+        ...(profile.appearanceName && { appearanceName: profile.appearanceName }),
+        ...(profile.speechSettings && { speechSettings: { ...profile.speechSettings } }) },
       role,
       team: roleSpec.team,
       position,
@@ -113,6 +116,7 @@ export function createSnapshot(game: CompiledGame, input: CreateMatchInput): Eng
   }
 
   const snapshot: EngineSnapshot = {
+    ...(input.announcementOverrides && { announcementOverrides: Object.freeze({ ...input.announcementOverrides }) }),
     engineVersion: 1,
     gameKey: game.spec.key,
     specVersion: game.spec.version,

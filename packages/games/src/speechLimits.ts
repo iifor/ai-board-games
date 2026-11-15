@@ -1,0 +1,2 @@
+export const WEREWOLF_SPEECH_MAX_CHARS = 500;
+export const DEBATE_SPEECH_MAX_CHARS = 500;

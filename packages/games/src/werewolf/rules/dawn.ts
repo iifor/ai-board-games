@@ -1,6 +1,8 @@
 import type { ComputeOutcome } from '@battle/engine';
+import { joinNotices, line } from '../announcements';
 import { specialDawnSteps } from '../special';
 import type { PendingDeath, WerewolfState } from '../state';
+import { boardConfig } from './board';
 import type { WerewolfContext } from './context';
 import type { DawnDraft } from './types';
 import { wolvesSweep } from './victory';
@@ -24,12 +26,13 @@ export function announceDawn(ctx: WerewolfContext): ComputeOutcome<WerewolfState
     notes: [],
   };
   const { state, notes, effects = [] } = specialDawnSteps.reduce<DawnDraft>((draft, step) => step(ctx, draft), initial);
+  const wake = ctx.round === 1 && boardConfig(ctx).sheriff ? '' : line(ctx, 'wake');
   const news = deaths.length
-    ? `天亮了，昨晚死亡的是：${deaths.map((death) => `${death.seat}号`).join('、')}。`
-    : '天亮了，昨晚是平安夜。';
+    ? line(ctx, 'nightDeaths', { 座位名单: deaths.map((death) => `${death.seat}号`).join('、') })
+    : line(ctx, 'peaceful');
   return {
     state,
-    log: [{ kind: 'narration', text: [news, ...notes].join('') }, ...effects],
+    log: [{ kind: 'narration', text: joinNotices(wake, news, ...notes) }, ...effects],
     eliminate: deaths.map((death) => ({ seat: death.seat, reason: '昨晚死亡', cause: death.cause })),
   };
 }

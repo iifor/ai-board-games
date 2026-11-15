@@ -17,7 +17,7 @@ const [wolfA = 0] = wolves;
 const lastWordsBy = (run: ReturnType<typeof play>) => entries(run, 'speech', 'last_words').map((entry) => entry.seat);
 
 function selfDestruct(seat: number, round: number): Override {
-  return (request, snapshot) => request.phaseId === 'day_speech' && request.seat === seat && snapshot.round === round
+  return (request, snapshot) => request.phaseId === 'day_speech' && request.action === 'speak' && request.seat === seat && snapshot.round === round
     ? { speech: '我自爆。', declare: 'selfDestruct' }
     : undefined;
 }
@@ -42,7 +42,7 @@ describe('hunter', () => {
     const nightOne = play(SEED, combine(wolvesKill(hunter, 1), shoot));
     expect(eliminated(nightOne).slice(0, 2).map((death) => death.seat)).toEqual([hunter, villagerB]);
     expect(lastWordsBy(nightOne)).toEqual([hunter, villagerB]);
-    expect(entries(nightOne, 'action', 'hunter_shot')[0]).toMatchObject({ channel: 'public', text: `猎人开枪带走 ${villagerB}号` });
+    expect(entries(nightOne, 'action', 'hunter_shot')[0]).toMatchObject({ channel: 'public', text: `猎人向${villagerB}号开枪` });
 
     const nightTwo = play(SEED, combine(wolvesKill(hunter, 2), shoot));
     expect(eliminated(nightTwo).slice(0, 2).map((death) => death.seat)).toEqual([hunter, villagerB]);
@@ -112,7 +112,7 @@ describe('sheriff badge', () => {
 describe('self-destruct', () => {
   it('is only offered to wolves during day speeches', () => {
     const run = play(SEED);
-    const daySpeech = requestsIn(run, 'day_speech');
+    const daySpeech = requestsIn(run, 'day_speech').filter(request => request.action === 'speak');
     expect(daySpeech.find((request) => request.seat === wolfA)?.prompt.output).toContain('selfDestruct=自爆');
     expect(daySpeech.find((request) => request.seat === villagerA)?.prompt.output).not.toContain('selfDestruct');
     expect(requestsIn(run, 'sheriff_speech').length + requestsIn(run, 'wolf_chat').length).toBeGreaterThan(0);

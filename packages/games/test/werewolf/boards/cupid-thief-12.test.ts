@@ -15,6 +15,13 @@ const wolfVotes = (votes: Readonly<Record<number, number | null>>, night = 1): O
   (request.phaseId === 'wolf_kill' && snapshot.round === night ? { target: votes[request.seat] ?? null } : undefined);
 
 describe('thief', () => {
+  it('keeps the thief card if the model never returns a valid card choice', () => {
+    const run = play(SEED, request => request.phaseId === 'thief_choose' ? {} : undefined, BOARD);
+    expect(run.snapshot.seats.find(seat => seat.seat === thief)?.role).toBe('thief');
+    expect(entries(run, 'action', 'thief_choose')).toContainEqual(expect.objectContaining({ source: 'request_failed', targets: [] }));
+    expect(entries(run, 'narration', 'thief_take')).toHaveLength(0);
+  });
+
   it('deals 12 of the 14 cards and lets the thief take one of the two extras', () => {
     expect(seatsOf(SEED, BOARD)).toHaveLength(12);
     const run = play(SEED, act('thief_choose', thief, [thief], 1), BOARD);
@@ -60,7 +67,7 @@ describe('cupid', () => {
     const run = play(SEED, combine(link(wolf, villager), wolfVotes({ [wolf]: villagerC, [wolfB]: villagerB, [king]: villagerB })), BOARD);
     expect(stateOf(run.snapshot).thirdParty).toEqual({ kind: 'lovers', seats: [wolf, villager, cupid].sort((a, b) => a - b), core: [wolf, villager] });
     expect(entries(run, 'vote_tallied', 'wolf_kill')[0]?.outcome).toMatchObject({ kind: 'selected', seat: villagerB });
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
   });
 
   it('settles the day link before the shot: the partner is already out, so the lover cannot shoot them and they cannot shoot back', () => {

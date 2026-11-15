@@ -22,7 +22,7 @@ const bearDawnRoar: DawnStep = (ctx, draft) => {
     && nearestNeighbors(ctx, bear, survives).some((seat) => checksAsWolf(ctx, ctx.seats.get(seat)));
   const text = roars ? '熊咆哮了' : '熊没有咆哮';
   const effects = [...(draft.effects ?? [])];
-  if (bear !== undefined) effects.push(spectatorEffect('inspect', bear, text));
+  if (bear !== undefined) effects.push(spectatorEffect('inspect', bear, text, 'dawn'));
   return { ...draft, notes: [...draft.notes, text + '。'], effects };
 };
 

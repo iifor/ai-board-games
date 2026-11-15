@@ -38,7 +38,7 @@ const bearRoarNote: DawnStep = (ctx, draft) => {
   if (!tamer) return draft;
   const tamerAlive = tamer.alive && !draft.deaths.some((death) => death.seat === tamer.seat);
   const text = tamerAlive && ctx.state.bearRoars ? '熊咆哮了' : '熊没有咆哮';
-  return { ...draft, notes: [...draft.notes, text + '。'], effects: [...(draft.effects ?? []), spectatorEffect('inspect', tamer.seat, text)] };
+  return { ...draft, notes: [...draft.notes, text + '。'], effects: [...(draft.effects ?? []), spectatorEffect('inspect', tamer.seat, text, 'dawn')] };
 };
 
 const bearTamerPhases = {

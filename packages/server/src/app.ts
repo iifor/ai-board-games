@@ -1,4 +1,7 @@
 import { createNodeWebSocket } from '@hono/node-ws';
+import { announcementRoutes } from './modules/announcements/routes';
+import { perspectiveRoutes } from './modules/perspectives/routes';
+import { memoryRoutes } from './modules/player-memory/routes';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { Services } from './container';
@@ -15,8 +18,10 @@ import { playerRoutes, publicPlayerRoutes } from './modules/players';
 import { providerRoutes } from './modules/providers';
 import { MAX_CLIENT_FRAME_BYTES, realtimeRoutes } from './modules/realtime';
 import { mediaRoutes } from './modules/tts';
+import { replayRoutes } from './modules/replay-imports/routes';
 import { voiceRoutes } from './modules/voices';
 import { traceRoutes } from './modules/traces/routes';
+import { catalogRoutes } from './modules/prompt-catalog/routes';
 import type { AppEnv } from './types';
 
 export interface AppOptions {
@@ -37,7 +42,9 @@ export function createApp(services: Services, options: AppOptions = { trustProxy
   wss.options.maxPayload = MAX_CLIENT_FRAME_BYTES;
   app.use('*', requestId);
   app.use('/api/toc/*', bodyLimit({ maxSize: PUBLIC_BODY_LIMIT }));
-  app.use('/api/admin/*', bodyLimit({ maxSize: ADMIN_BODY_LIMIT }));
+  const adminLimit = bodyLimit({ maxSize: ADMIN_BODY_LIMIT });
+  const importLimit = bodyLimit({ maxSize: 12 * 1024 * 1024 });
+  app.use('/api/admin/*', (c,next) => (c.req.path.startsWith('/api/admin/replay-imports') ? importLimit : adminLimit)(c,next));
   app.onError(errorHandler);
   app.notFound(notFoundHandler);
 
@@ -54,9 +61,14 @@ export function createApp(services: Services, options: AppOptions = { trustProxy
   app.route('/api/admin/providers', guarded(providerRoutes(services.providers)));
   app.route('/api/admin/models', guarded(modelRoutes(services.models)));
   app.route('/api/admin/voices', guarded(voiceRoutes(services.voices)));
+  app.route('/api/admin/announcements', guarded(announcementRoutes(services.announcements)));
+  app.route('/api/admin/perspectives', guarded(perspectiveRoutes(services.perspectives)));
+  app.route('/api/admin/player-memory', guarded(memoryRoutes(services.playerMemory)));
+  app.route('/api/admin/replay-imports', guarded(replayRoutes(services.replayImports)));
   app.route('/api/admin/players', guarded(playerRoutes(services.players)));
   app.route('/api/admin/matches', guarded(adminMatchRoutes(services.matches)));
-  app.route('/api/admin/traces', guarded(traceRoutes(services.traces)));
+  app.route('/api/admin/traces', guarded(traceRoutes(services.traces, services.promptComparisons)));
   app.route('/api/admin/games', guarded(adminGameRoutes(services.games)));
+  app.route('/api/admin/prompts', guarded(catalogRoutes(services.promptCatalog)));
   return { app, injectWebSocket };
 }

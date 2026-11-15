@@ -18,12 +18,14 @@ describe('werewolf properties', () => {
 
   it('keeps hidden roles out of non-wolf prompts', () => {
     for (const run of runs.slice(0, 20)) {
-      const wolves = run.snapshot.seats.filter((seat) => seat.team === 'werewolf').map((seat) => seat.seat);
+      const proposals = new Set(run.log.flatMap(entry =>
+        entry.kind === 'speech' && entry.phaseId === 'wolf_chat' && entry.text !== '同意。' ? [entry.text] : []));
+      expect(proposals.size).toBeGreaterThan(0);
       for (const { request, snapshot } of run.requests) {
         const viewer = snapshot.seats.find((seat) => seat.seat === request.seat);
         if (!viewer || viewer.team === 'werewolf' || snapshot.rolesRevealed) continue;
         expect(request.prompt.identity).not.toContain('狼队友');
-        for (const wolf of wolves) expect(request.prompt.history).not.toContain(`${wolf}号 玩家${wolf}：【调试】${wolf}号 玩家${wolf}在「狼人夜聊」`);
+        for (const proposal of proposals) expect(request.prompt.history).not.toContain(proposal);
       }
     }
   });

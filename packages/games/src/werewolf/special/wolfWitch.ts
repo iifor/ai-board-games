@@ -16,7 +16,7 @@ const wolfWitchPrompts = definePrompts({
     '你是{{me.label}}，身份是狼巫（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '每晚你第一个单独睁眼，可以诅咒一名好人阵营玩家，使他直到下一个夜晚到来之前不能发动任何技能；诅咒过的下一晚不能再诅咒。',
     '{{#if state.wolfWitchLastNight}}你最近一次诅咒是在第{{state.wolfWitchLastNight}}夜。{{/if}}',
-    '白天发言时你可以在发言后宣布自爆。',
+    '警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆。',
   ].join(''),
   wolfWitchCurse: '狼巫请睁眼，选择一名好人阵营玩家进行诅咒，也可以输出空数组不诅咒。',
 });

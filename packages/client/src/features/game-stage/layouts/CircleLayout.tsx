@@ -4,17 +4,21 @@ import { planFlight, type FlightPlan, type VoteFlight } from '../animation/ballo
 import { BallotFlight } from '../components/BallotFlight';
 import { SeatCard } from '../components/SeatCard';
 import { SignupEffect } from '../components/SheriffSignup';
+import { SkillInteraction } from '../components/SkillInteraction';
+import { useSeatAnchors } from '../hooks/useSeatAnchors';
+import { skillRecipients } from '../animation/skillPlan';
+import { SKILL_ART } from '../animation/skillArt';
 import { isAsleep } from '../utils';
-import { fitRingBox, ringGeometry, seatAnchors, speechBox, type RingGeometry, type RingSize } from './ringGeometry';
+import { fitRingBox, ringGeometry, seatAnchors, speechBox, RING_RATIO, type RingGeometry, type RingSize } from './ringGeometry';
 import type { LayoutProps } from './types';
 import './CircleLayout.css';
 
 /** 立绘、座号与名牌的设计尺寸，同时用于碰撞检查与动效落点。 */
 const SEAT_CARD: RingSize = { width: 144, height: 184 };
 /** 量到容器尺寸之前（首帧、静态渲染）按这个比例摆放 */
-const FALLBACK_BOX: RingSize = { width: 1320, height: 600 };
+const FALLBACK_BOX: RingSize = { width: 600 * RING_RATIO, height: 600 };
 
-type RingVar = '--seat-scale' | '--ring-card-w' | '--ring-card-h' | '--ring-w' | '--ring-h' | '--speech-w' | '--speech-h';
+type RingVar = '--seat-scale' | '--ring-card-w' | '--ring-card-h' | '--ring-w' | '--ring-h' | '--speech-w' | '--speech-h' | '--cast-color';
 type RingStyle = CSSProperties & Partial<Record<RingVar, string | number>>;
 
 const percent = (value: number | undefined, total: number) => `${((value ?? 0) / total) * 100}%`;
@@ -31,11 +35,13 @@ function flightPlanOf(vote: VoteFlight | null, seats: readonly number[], geometr
  * 椭圆半径再由盒子、座位数与卡片尺寸算出，放不下时整体缩小卡片。
  * 警长标记来自 view.extra；夜晚未行动的座位闭眼；计票时选票在座位之间飞行
  */
-export function CircleLayout({ view, speaking, center, badges, period = 'day', vote = null, cue, cueSeq, signup, onSeatSelect, selectedSeat = null }: LayoutProps) {
+export function CircleLayout({ view, speaking, center, badges, period = 'day', vote = null, cue, cueSeq, signup, control = null, skillMarks = [], onSeatSelect, selectedSeat = null }: LayoutProps) {
   const sheriff = typeof view.extra.sheriff === 'number' ? view.extra.sheriff : null;
   const arenaRef = useRef<HTMLDivElement | null>(null);
+  const ringRef = useRef<HTMLDivElement | null>(null);
+  const anchors = useSeatAnchors(ringRef, !!cue);
   const arena = useElementSize(arenaRef);
-  const box = useMemo(() => (arena ? fitRingBox(arena, 2.2) : FALLBACK_BOX), [arena]);
+  const box = useMemo(() => (arena ? fitRingBox(arena) : FALLBACK_BOX), [arena]);
   const count = view.seats.length;
   const figureScale = Math.max(1, Math.min(1.5, box.height / 750));
   const geometry = useMemo(() => ringGeometry(count, box, {
@@ -44,7 +50,9 @@ export function CircleLayout({ view, speaking, center, badges, period = 'day', v
   const seatNumbers = useMemo(() => view.seats.map((seat) => seat.seat), [view.seats]);
   const flight = useMemo(() => flightPlanOf(vote, seatNumbers, geometry, box), [vote, seatNumbers, geometry, box]);
   const speech = speechBox(box, geometry);
+  const recipients = cue ? skillRecipients(cue) : [];
   const ringStyle: RingStyle = {
+    ...(cue ? { '--cast-color': SKILL_ART[cue.kind][0] } : {}),
     '--speech-w': `${speech.width}px`,
     '--speech-h': `${speech.height}px`,
     '--seat-scale': geometry.scale * figureScale,
@@ -54,7 +62,7 @@ export function CircleLayout({ view, speaking, center, badges, period = 'day', v
   };
   return (
     <div className="circle-layout" ref={arenaRef}>
-      <div className="circle-ring" style={ringStyle}>
+      <div className="circle-ring" style={ringStyle} ref={ringRef}>
         <div className="circle-table" aria-hidden="true" />
         {view.seats.map((seat, index) => {
           const position = geometry.seats[index];
@@ -63,7 +71,7 @@ export function CircleLayout({ view, speaking, center, badges, period = 'day', v
             <div key={seat.seat} className="circle-seat" data-seat={seat.seat} style={{ left: percent(position?.x, box.width), top: percent(position?.y, box.height) }}>
               <div className="circle-seat-card ui-fade-up" style={signup?.seat === seat.seat ? { position: 'relative', '--signup-duration': `${400 / signup.rate}ms` } as CSSProperties : undefined}>
                 <SeatCard seat={seat} speaking={seat.seat === speaking} asleep={isAsleep(seat, speaking, period) && cue?.actor !== seat.seat && !cue?.targets.includes(seat.seat)} badges={seatBadges} variant="stack" onSelect={onSeatSelect} selected={seat.seat === selectedSeat}
-                  cue={cue?.targets.includes(seat.seat) ? cue.kind : undefined} cueSeq={cueSeq} acting={cue?.actor === seat.seat} />
+                  cue={cue && recipients.includes(seat.seat) ? cue.kind : undefined} cueSeq={cueSeq} acting={cue?.actor === seat.seat || !!cue?.sources?.includes(seat.seat)} marks={skillMarks.filter((mark) => mark.seat === seat.seat)} />
                 {signup?.seat === seat.seat && <SignupEffect key={signup.seq} choice={signup} />}
               </div>
             </div>
@@ -73,6 +81,7 @@ export function CircleLayout({ view, speaking, center, badges, period = 'day', v
           {center}
         </div>
         {vote && flight ? <BallotFlight key={vote.seq} plan={flight} /> : null}
+        {cue && <SkillInteraction key={cueSeq} cue={cue} anchors={anchors} control={control} />}
       </div>
     </div>
   );

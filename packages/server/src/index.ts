@@ -22,6 +22,7 @@ async function main(): Promise<void> {
   const server = serve({ fetch: app.fetch, port: config.port }, ({ port }) => logger.info('服务已启动', { port, instance: services.instanceId }));
   injectWebSocket(server);
   services.worker.start();
+  services.memoryWorker.start();
   services.reaper.start();
 
   const shutdown = (signal: string) => {
@@ -33,7 +34,7 @@ async function main(): Promise<void> {
       process.exit(0);
     }, config.shutdown.timeoutMs * 2);
     deadline.unref();
-    void services.worker.stop()
+    void Promise.all([services.worker.stop(), services.memoryWorker.stop()])
       .then(() => services.bus.stop())
       .catch((error: unknown) => logger.error('关闭跨实例通知失败', { error: errorMessage(error) }))
       .then(() => {

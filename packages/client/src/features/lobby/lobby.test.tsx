@@ -127,7 +127,7 @@ describe('lobby components', () => {
 
   it('staggers the hero and the game cards on first paint', () => {
     const hero = renderToStaticMarkup(<MemoryRouter><LobbyHero primaryGame={werewolf} history={{ status: 'loading' }} /></MemoryRouter>);
-    expect(hero.match(/class="[^"]*ui-fade-up/g)?.length).toBeGreaterThanOrEqual(5);
+    expect(hero.match(/class="[^"]*ui-fade-up/g)).toHaveLength(4);
     expect(hero).not.toContain('class="lobby-hero ui-fade-up"');
     const cards = renderToStaticMarkup(<MemoryRouter><GameList games={[werewolf, { ...werewolf, key: 'debate', title: 'AI 辩论赛' }]} /></MemoryRouter>);
     expect(cards).toContain('style="--i:5"');
@@ -164,6 +164,21 @@ describe('lobby components', () => {
     );
     expect(html.indexOf('>2<')).toBeLessThan(html.indexOf('阿明'));
     expect(html).toContain('冷静');
+  });
+
+  it('seats two profiles with the same model name and preserves each portrait', () => {
+    const players = [
+      { id: 3, name: 'GPT-4.1 mini', appearanceName: 'doubao', avatar: null, persona: '惜字如金' },
+      { id: 8, name: 'GPT-4.1 mini', appearanceName: 'grok', avatar: null, persona: '爱追问' },
+    ];
+    const picker = renderToStaticMarkup(<PlayerPicker players={players} selected={[8, 3]} onToggle={() => {}} />);
+    expect(picker).toContain('惜字如金');
+    expect(picker).toContain('爱追问');
+    expect(picker).toContain('/player-posters/doubao.webp');
+    expect(picker).toContain('/player-posters/grok.webp');
+    const seats = renderToStaticMarkup(<SeatGrid seated={players} max={2} onUnseat={() => {}} />);
+    expect(seats).toContain('1 号 GPT-4.1 mini，点击取消就座');
+    expect(seats).toContain('2 号 GPT-4.1 mini，点击取消就座');
   });
 
   it('names the debate groups and uses the absolute seat for each side', () => {

@@ -1,3 +1,4 @@
+import { line } from '../announcements';
 import type { ActDecision, ComputeOutcome, Seat, VoteOutcome } from '@battle/engine';
 import type { WerewolfState } from '../state';
 import { seededRotation, type WerewolfContext } from './context';
@@ -59,7 +60,7 @@ export function resolveSheriff(ctx: WerewolfContext): ComputeOutcome<WerewolfSta
   const candidates = ctx.state.sheriffCandidates;
   const only = candidates.length === 1 ? candidates[0] ?? null : null;
   const sheriff = ctx.state.sheriff ?? only;
-  const text = sheriff === null ? '警长竞选结束，本局没有警长。' : `${sheriff}号当选警长。`;
+  const text = sheriff === null ? line(ctx, 'sheriffNone') : line(ctx, 'sheriffElected', { 座号: sheriff });
   return { state: { ...ctx.state, sheriff, sheriffCandidates: [] }, log: [{ kind: 'narration', text }] };
 }
 

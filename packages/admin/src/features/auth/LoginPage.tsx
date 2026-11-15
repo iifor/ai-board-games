@@ -1,3 +1,4 @@
+import { PROJECT_NAME } from '@battle/shared';
 import { App, Button, Card, Form, Input } from 'antd';
 import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router';
@@ -30,7 +31,7 @@ export function LoginPage() {
 
   return (
     <div className="auth-page">
-      <Card title="AI 对战 · 管理后台" className="auth-card">
+      <Card title={`${PROJECT_NAME} · 管理后台`} className="auth-card">
         <Form<LoginValues> layout="vertical" onFinish={submit} requiredMark={false}>
           <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
             <Input autoComplete="username" />

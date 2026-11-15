@@ -1,19 +1,17 @@
-import type { ModelDto, ModelInput } from '@battle/shared';
-import { Form, Input, InputNumber, Select, Space, Switch, Tag, Typography } from 'antd';
-import { useSearchParams } from 'react-router';
+import { DEFAULT_MODEL_MAX_TOKENS, type ModelDto, type ModelInput, type ProviderDto } from '@battle/shared';
+import { Button, Form, Input, InputNumber, Select, Space, Switch, Tag, Typography } from 'antd';
+import type { FilterValues } from '../../components/ListFilterBar';
 import { useAsync } from '../../hooks/useAsync';
-import { modelsApi, providersApi } from '../../services/resources';
+import { modelsApi } from '../../services/resources';
 import { formatTime } from '../../utils/format';
 import { ModelActions } from './ModelActions';
-import { ResourcePage } from './ResourcePage';
+import { ResourceList } from './ResourcePage';
 import { StatusTag } from './StatusTag';
-import { enabledFilter, type ResourceFilter } from './utils';
+import { enabledFilter } from './utils';
 
 interface Values {
-  providerId: number;
   name: string;
   model: string;
-  temperature: number;
   maxTokens: number;
   fallbackModelId: number | null;
   enabled: boolean;
@@ -31,49 +29,62 @@ function statusOf(model: ModelDto) {
   return <StatusTag enabled={model.enabled} />;
 }
 
-export function ModelsPage() {
-  const [params] = useSearchParams();
-  const providers = useAsync(providersApi.list, []);
-  const models = useAsync(modelsApi.list, []);
-  const providerName = (id: number) => (providers.status === 'ready' ? providers.data.find((item) => item.id === id)?.name : null) ?? `#${id}`;
+interface Props {
+  readonly provider: ProviderDto;
+  readonly revision: number;
+  readonly onCatalog: () => void;
+  readonly filters: FilterValues;
+  readonly onFilter: (values: FilterValues) => void;
+  readonly creating: boolean;
+  readonly onCreateChange: (open: boolean) => void;
+  readonly onModelsChanged: () => void;
+}
+
+export function ModelsPage({ provider, revision, onCatalog, filters, onFilter, creating, onCreateChange, onModelsChanged }: Props) {
+  const models = useAsync(modelsApi.list, [revision]);
+  const reload = () => { models.reload(); onModelsChanged(); };
+  const list = models.status === 'ready'
+    ? { ...models, data: models.data.filter(item => item.providerId === provider.id), reload }
+    : {...models, reload};
   const modelName = (id: number | null) => (id === null ? '—' : (models.status === 'ready' ? models.data.find((item) => item.id === id)?.name : null) ?? `#${id}`);
-  const providerFilter: ResourceFilter<ModelDto> = {
-    key: 'providerId',
-    placeholder: '供应商',
-    options: () => (providers.status === 'ready' ? providers.data.map((item) => ({ value: String(item.id), label: item.name })) : []),
-    matches: (dto, value) => String(dto.providerId) === value,
-  };
 
   return (
-    <ResourcePage<ModelDto, ModelInput, Values>
+    <ResourceList<ModelDto, ModelInput, Values>
       title="模型"
+      list={list}
+      fitTableToPage
+      actionsWidth={list.status === 'ready' && list.data.some(m => m.disabledReason === 'quota_exhausted') ? 300 : 224}
+      tableMinWidth={0}
+      creation={{ open: creating, change: onCreateChange, label: '添加模型' }}
       api={modelsApi}
       searchPlaceholder="搜索名称或模型 ID"
       search={(dto) => [dto.name, dto.model]}
-      filters={[providerFilter, enabledFilter<ModelDto>()]}
-      initialFilters={{ providerId: params.get('providerId') ?? undefined }}
-      rowActions={(dto, reload) => <ModelActions model={dto} reload={() => { reload(); models.reload(); }} />}
+      filters={[enabledFilter<ModelDto>()]}
+      filterState={{ value: filters, change: onFilter }}
+      headerExtra={() => <Button disabled={!provider.enabled} onClick={onCatalog}>拉取模型</Button>}
+      rowActions={(dto, reload) => <ModelActions model={dto} reload={reload} />}
       columns={[
-        { title: '名称', dataIndex: 'name' },
-        { title: '供应商', dataIndex: 'providerId', render: providerName },
-        { title: '模型 ID', dataIndex: 'model' },
-        { title: '温度', dataIndex: 'temperature', width: 70 },
-        { title: '最大 tokens', dataIndex: 'maxTokens', width: 100 },
-        { title: '备用模型', dataIndex: 'fallbackModelId', render: modelName },
-        { title: '状态', key: 'status', render: (_, dto) => statusOf(dto) },
+        { title: '模型', key: 'model', render: (_, dto) => (
+          <div className="model-resource-info">
+            <span className="resource-ellipsis" title={dto.name}>{dto.name}</span>
+            <small className="resource-ellipsis" title={dto.model}>{dto.model}</small>
+            <small className="model-compact-detail">模型输出上限 {dto.maxTokens} tokens</small>
+            <small className="model-fallback-detail">备用模型 · {modelName(dto.fallbackModelId)}</small>
+            <div className="model-compact-detail">{statusOf(dto)}</div>
+          </div>
+        ) },
+        { title: '输出上限', dataIndex: 'maxTokens', width: 110, render: (value:number) => <span title="tokens">{value}</span> },
+        { title: '备用模型', dataIndex: 'fallbackModelId', width: 130, responsive: ['xxl'], ellipsis: true, render: modelName },
+        { title: '状态', key: 'status', width: 114, responsive: ['lg'], render: (_, dto) => statusOf(dto) },
       ]}
-      defaults={{ temperature: 0.7, maxTokens: 1024, fallbackModelId: null, enabled: true }}
+      defaults={{ maxTokens: DEFAULT_MODEL_MAX_TOKENS, fallbackModelId: null, enabled: true }}
       toValues={(dto) => dto}
-      toInput={(values) => values}
+      toInput={(values) => ({ ...values, providerId: provider.id })}
       fields={(editing) => (
         <>
-          <Form.Item name="providerId" label="供应商" rules={[{ required: true }]}>
-            <Select options={providers.status === 'ready' ? providers.data.map((item) => ({ value: item.id, label: item.name })) : []} />
-          </Form.Item>
           <Form.Item name="name" label="名称" extra="后台展示用，可与模型 ID 不同" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="model" label="模型 ID" extra="调用接口时发送的模型标识" rules={[{ required: true }]}><Input placeholder="gpt-4o-mini" /></Form.Item>
-          <Form.Item name="temperature" label="温度" rules={[{ required: true }]}><InputNumber min={0} max={2} step={0.1} /></Form.Item>
-          <Form.Item name="maxTokens" label="最大 tokens" rules={[{ required: true }]}><InputNumber min={16} max={32000} /></Form.Item>
+          <Form.Item name="maxTokens" label="模型输出上限（tokens）" rules={[{ required: true }]}><InputNumber min={16} max={32000} /></Form.Item>
           <Form.Item name="fallbackModelId" label="备用模型（主模型多次失败或额度耗尽后切换）">
             <Select
               allowClear

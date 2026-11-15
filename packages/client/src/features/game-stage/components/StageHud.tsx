@@ -1,6 +1,6 @@
-import type { AudienceView, MatchSummaryDto } from '@battle/shared';
+import type { AudienceView, MatchSummaryDto, StageEvent } from '@battle/shared';
 import type { StreamConnection } from '../types';
-import { roundLabel } from '../utils';
+import { periodOf, roundLabel } from '../utils';
 import './StageHud.css';
 
 interface StageHudProps {
@@ -9,6 +9,7 @@ interface StageHudProps {
   readonly connection: StreamConnection;
   readonly ended: boolean;
   readonly replay?: boolean;
+  readonly event?: StageEvent | undefined;
 }
 
 /** LIVE 标记的文字与修饰类：已结束 > 连上 > 自动重连已放弃 > 连接中 */
@@ -20,21 +21,26 @@ function liveBadge(connection: StreamConnection, ended: boolean, replay: boolean
 }
 
 /** 顶部直播条：游戏与板子、LIVE 状态、当前阶段 */
-export function StageHud({ summary, view, connection, ended, replay = summary.status === 'completed' }: StageHudProps) {
+export function StageHud({ summary, view, event, connection, ended, replay = summary.status === 'completed' }: StageHudProps) {
   const live = liveBadge(connection, ended, replay);
   const phase = view?.phase;
   const mode = summary.variantName ?? (typeof view?.extra.board === 'string' ? view.extra.board : null);
   const title = phase?.title === phase?.id && /^[a-z_]+$/.test(phase?.id ?? '') ? '技能结算' : phase?.title;
-  const status = view && title ? `${roundLabel(view)} · ${title}` : view?.status === 'completed' ? '对局已结束' : '准备中';
+  const night = view?.gameKey === 'werewolf' && periodOf(view) === 'night';
+  let step = title;
+  if (night && event?.kind === 'phase_started' && event.channel === 'public' && event.announcement) step = event.announcement.replace(/。$/, '');
+  if (night && event?.kind === 'narration' && event.channel.startsWith('private:')) step = '法官私讯';
+  const status = view && step ? `${night ? `第 ${view.round} 夜` : roundLabel(view)} · ${step}`
+    : view?.status === 'completed' ? '对局已结束' : '准备中';
   return (
     <header className="stage-hud glass-panel" aria-label="对局状态">
       <div className="stage-hud-identity">
         {mode && <span className="hud-label">{mode}</span>}
-        <strong>{summary.gameTitle}</strong>
+        <strong>{summary.importTitle ?? summary.gameTitle}</strong>
       </div>
       <div className={`stage-hud-live ${live.className}`}>
         <i aria-hidden="true" />
-        <b>{live.label}</b>
+        <b>{ended && summary.importTitle ? '回放结束' : live.label}</b>
       </div>
       <p key={status} className="stage-hud-status">{status}</p>
     </header>

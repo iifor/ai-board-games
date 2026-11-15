@@ -27,7 +27,7 @@
   .seat-popover[data-side='left']::before { inset-inline: 100% auto; }
 }
 
-.seat-popover-speeches:focus-visible {
+.seat-popover-details:focus-visible {
   outline: none;
   background: #23324a;
 }
@@ -99,17 +99,24 @@
   background: var(--ui-danger-soft);
 }
 
-/* 发言列表：只有它滚动，头部固定 */
-.seat-popover-speeches {
-  display: grid;
-  gap: 8px;
+.seat-popover-model, .seat-popover-persona { overflow-wrap: anywhere; }
+.seat-popover-model { color: var(--ui-text-dim); }
+.seat-popover-persona { margin: 0 0 12px; line-height: 1.5; }
+
+.seat-popover-details {
   min-height: 0;
   margin: 12px 0 0;
   padding: 12px 2px 0 0;
   border-top: 1px solid var(--ui-border);
   overflow-y: auto;
-  list-style: none;
   font-size: 13px;
+}
+.seat-popover-speeches {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 
 .seat-popover-speeches li {

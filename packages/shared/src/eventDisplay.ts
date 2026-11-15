@@ -1,0 +1,57 @@
+import { speechOf } from './speech';
+import type { StageEvent } from './stage';
+
+export interface EventDisplay {
+  /** 说话的座位；主持播报为 null */
+  readonly speaker: number | null;
+  /** 字幕文本；纯状态事件为 null */
+  readonly text: string | null;
+}
+
+function voteSummary(event: Extract<StageEvent, { kind: 'vote_tallied' }>): string {
+  const rows = event.tally.map((row) => `${row.target}号 ${row.votes} 票`).join('，') || '无人投票';
+  if (event.phaseId === 'wolf_kill' && event.outcome) return event.outcome.kind === 'selected'
+    ? `狼刀锁定 ${event.outcome.seat}号（${rows}）` : '狼队今晚没有锁定目标';
+  if (event.outcome === null) return `${event.title}：${rows}，平票，进入复投`;
+  if (event.outcome.kind === 'none') return `${event.title}：${rows}，无人当选`;
+  return `${event.title}：${rows}，${event.outcome.seat}号当选${event.outcome.byTieBreak ? '（平票随机）' : ''}`;
+}
+
+/** 字幕上的说话人：发言、点评、行动都显示当事座位（行动虽由主持人声音读出，字幕仍归到行动者） */
+function speakerOf(event: StageEvent): number | null {
+  switch (event.kind) {
+    case 'speech':
+      return event.seat;
+    case 'judgement':
+    case 'action':
+      return event.source ? null : event.seat;
+    default:
+      return null;
+  }
+}
+
+/** 不朗读的事件的字幕：计票摘要、出局提示、阶段标题；兜底记录不上字幕 */
+function silentText(event: StageEvent): string | null {
+  switch (event.kind) {
+    case 'vote_tallied':
+      if (event.view.gameKey === 'werewolf' && ['exile_vote', 'sheriff_vote', 'sheriff_pk_vote'].includes(event.phaseId ?? '')) return null;
+      return voteSummary(event);
+    case 'seat_eliminated':
+      if (event.view.gameKey === 'werewolf' && event.reason === '被放逐') return null;
+      return `${event.seat}号出局（${event.reason}）`;
+    case 'phase_started':
+      return event.title;
+    default:
+      return null;
+  }
+}
+
+/**
+ * 舞台事件 → 字幕内容。要朗读的事件（由 @battle/shared 的 speechOf 决定，服务端合成语音用的是同一处）
+ * 字幕就是朗读文本；其余事件只上字幕不朗读
+ */
+export function describeEvent(event: StageEvent): EventDisplay {
+  const speech = speechOf(event);
+  if (speech) return { speaker: speakerOf(event), text: speech.text };
+  return { speaker: null, text: silentText(event) };
+}

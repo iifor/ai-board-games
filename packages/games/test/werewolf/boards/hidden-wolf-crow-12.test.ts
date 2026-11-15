@@ -58,21 +58,22 @@ describe('crow', () => {
     expect(requestsIn(run, 'last_words')[0]?.prompt.history).toContain(`额外票：${villager}号+1`);
   });
 
-  it('says where the votes came from when the curse alone decides the exile, and when it tops up real ballots', () => {
-    // 全员弃票：被诅咒者仍以诅咒票被放逐，但播报必须说明票来自诅咒，而不是零票当选
+  it('mentions the extra vote only when everyone abstains and keeps counts in the tally', () => {
+    // 全员弃票：被诅咒者仍以诅咒票被放逐，法官只说明由额外票放逐
     const silent = play(SEED, curse(villager, 1), BOARD);
     expect(entries(silent, 'narration', 'exile_resolve').find((entry) => entry.round === 1)?.text)
-      .toBe(`${villager}号没有得到任何选票，但有额外票（乌鸦的诅咒 1 票），以 1 票被放逐。`);
-    expect(requestsIn(silent, 'last_words')[0]?.prompt.history).toContain('但有额外票（乌鸦的诅咒 1 票）');
-    // 有选票时同样公开构成：选票与诅咒票分开写
+      .toBe(`因额外票，${villager}号玩家被放逐，请发表遗言。`);
+    expect(requestsIn(silent, 'last_words')[0]?.prompt.history).toContain(`额外票：${villager}号+1`);
+    // 有选票时按普通放逐播报
     const twoVoters = (request: { phaseId: string; seat: number }, snapshot: { round: number }) =>
       (request.phaseId === 'exile_vote' && snapshot.round === 1 && [seer, hidden].includes(request.seat) ? { target: villager } : undefined);
     const voted = play(SEED, combine(curse(villager, 1), twoVoters), BOARD);
     expect(entries(voted, 'narration', 'exile_resolve').find((entry) => entry.round === 1)?.text)
-      .toBe(`${villager}号得 3 票（选票 2 票，乌鸦的诅咒 1 票），被放逐。`);
+      .toBe(`${villager}号玩家被放逐，请发表遗言。`);
     // 没有额外票参与的放逐不播报构成
     const plain = play(SEED, (request, snapshot) => (request.phaseId === 'exile_vote' && snapshot.round === 1 ? { target: villagerB } : undefined), BOARD);
-    expect(entries(plain, 'narration', 'exile_resolve').filter((entry) => entry.round === 1)).toEqual([]);
+    expect(entries(plain, 'narration', 'exile_resolve').filter((entry) => entry.round === 1).map((e) => e.text))
+      .toEqual([`${villagerB}号玩家被放逐，请发表遗言。`]);
   });
 
   it('curses privately, never itself, and never the same player two nights in a row', () => {

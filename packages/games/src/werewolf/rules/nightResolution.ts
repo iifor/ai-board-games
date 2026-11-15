@@ -35,12 +35,12 @@ const wolfKill: NightStep = (ctx, tally) => {
   const victim = swapTarget(ctx, wolfTarget);
   const guardedSeat = guarded === null ? null : swapTarget(ctx, guarded);
   const blocked = (guardedSeat === victim) !== saved;
-  if (isDreamed(ctx, victim)) return noteTally(tally, spectatorEffect('dream', victim, '梦游避开狼刀'));
+  if (isDreamed(ctx, victim)) return noteTally(tally, spectatorEffect('dream', victim, '梦游避开狼刀', 'dawn'));
   if (blocked) {
-    if (guardedSeat === victim) return noteTally(tally, spectatorEffect('shield', victim, '守护成功 · 挡下狼刀'));
+    if (guardedSeat === victim) return noteTally(tally, spectatorEffect('shield', victim, '守护成功 · 挡下狼刀', 'dawn'));
     // 大树的第一条命仍会在后续结算中消耗。
     if (ctx.seats.get(victim).role === 'big_tree' && ctx.state.bigTreeHits === 0) return tally;
-    return noteTally(tally, spectatorEffect('heal', victim, '解药生效 · 挡下狼刀'));
+    return noteTally(tally, spectatorEffect('heal', victim, '解药生效 · 挡下狼刀', 'dawn'));
   }
   if (poisonKills(ctx, victim)) return tally;
   return addDeath(tally, victim, 'wolf');

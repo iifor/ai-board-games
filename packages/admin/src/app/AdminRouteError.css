@@ -1,0 +1,20 @@
+.admin-route-error {
+  display: grid;
+  place-items: center;
+  min-height: 70vh;
+  padding: 16px;
+}
+
+.admin-route-error > .ant-result {
+  width: min(100%, 480px);
+  padding: clamp(24px, 5vw, 48px) clamp(16px, 4vw, 32px);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.admin-route-error h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.4;
+}

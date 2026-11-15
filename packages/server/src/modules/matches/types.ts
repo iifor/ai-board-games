@@ -2,6 +2,7 @@ import type { AiRequest, EngineSnapshot } from '@battle/engine';
 import type { GameResult, MatchPacing, MatchStatus, StageEvent } from '@battle/shared';
 
 export interface MatchRow {
+  readonly importTitle?: string | null;
   readonly traceDeleted: boolean;
   readonly id: string;
   readonly gameKey: string;

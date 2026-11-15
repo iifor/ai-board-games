@@ -1,12 +1,8 @@
-import { speechOf, type StageEvent } from '@battle/shared';
+import { isPlayerSpeech, speechOf, stripSpeechTags, type PlayerSpeech } from '@battle/shared';
 import type { StreamItem } from '../types';
-import { seatOf } from '../utils';
+import { seatOf, speakerLabel } from '../utils';
 
-export type PlayerSpeech = Extract<StageEvent, { kind: 'speech' | 'judgement' }>;
-
-export function isPlayerSpeech(event: StageEvent | undefined): event is PlayerSpeech {
-  return event?.kind === 'speech' || event?.kind === 'judgement';
-}
+export { isPlayerSpeech, type PlayerSpeech } from '@battle/shared';
 
 /** 只接受该视角已经播完的段落；暂停时正在展示的那一条也可能已在 played 中。 */
 export function speechHistory(played: readonly StreamItem[], beforeSeq: number): PlayerSpeech[] {
@@ -19,7 +15,7 @@ export function speechHistory(played: readonly StreamItem[], beforeSeq: number):
 
 export function speechLineParts(event: PlayerSpeech) {
   const name = seatOf(event.view, event.seat)?.name;
-  const text = speechOf(event)!.text;
+  const text = stripSpeechTags(speechOf(event)!.text);
   const speaker = `${event.seat}号 ${name}`;
   // 脚本回放的台词已写入署名，保留原文和判定，只给内嵌的座号、名字着色。
   const debugPrefix = event.kind === 'judgement' ? `${event.verdictLabel}。【调试】` : '【调试】';
@@ -30,5 +26,5 @@ export function speechLineParts(event: PlayerSpeech) {
       }
     }
   }
-  return { prefix: '', speaker: name ? `${event.seat} 号 · ${name}` : `${event.seat} 号`, body: ` ${text}` };
+  return { prefix: '', speaker: speakerLabel(event.seat, name), body: ` ${text}` };
 }

@@ -11,7 +11,7 @@ import type { SpecialDescriptor } from './types';
 
 // 盗贼：有底牌的板子开局抽出两张底牌（rules/deal.ts，结果在 state.thief，只有盗贼本人可见）。
 // 盗贼首夜第一个睁眼，从两张底牌中拿一张作为自己的身份（compute 改派角色与阵营）：其中有狼人阵营的牌时必须拿它（不再询问），
-// 否则自己选择。盗贼牌被抽作底牌时本局没有盗贼，阶段照常出现（标题只依据牌堆），没有人行动。
+// 两张身份相同时直接发牌，其余情况自己选择。盗贼牌被抽作底牌时本局没有盗贼，阶段照常出现。
 
 const thiefPrompts = definePrompts({
   thief: '你是{{me.label}}，身份是盗贼。首夜你第一个睁眼，从法官手中的两张底牌（{{state.thief.first}}、{{state.thief.second}}）中拿一张作为自己的身份；其中有狼人阵营的牌时必须拿它。',
@@ -24,9 +24,11 @@ function thiefSeat(ctx: WerewolfContext): number | undefined {
   return ctx.seats.alive().withRole(THIEF).ids()[0];
 }
 
-/** 两张底牌中的狼人阵营的牌：有则必须拿走 */
+/** 两张相同底牌或强制狼牌均没有选择空间。 */
 function forcedCard(ctx: WerewolfContext): string | undefined {
-  return ctx.state.thief?.cards.find(isWolfCard);
+  const cards = ctx.state.thief?.cards;
+  if (!cards) return undefined;
+  return cards[0] === cards[1] ? cards[0] : cards.find(isWolfCard);
 }
 
 function chosenCard(ctx: WerewolfContext): string | undefined {
@@ -34,8 +36,9 @@ function chosenCard(ctx: WerewolfContext): string | undefined {
   if (forced !== undefined) return forced;
   const [first, second] = ctx.state.thief?.cards ?? [];
   const decision = ctx.results.thief_choose;
-  const takesFirst = decision?.kind === 'act' && decision.decisions.some((item) => item.targets.length > 0);
-  return takesFirst ? first : second;
+  const choice = decision?.kind === 'act' ? decision.decisions[0] : undefined;
+  if (!choice) return undefined;
+  return choice.targets.length ? first : second;
 }
 
 function take(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
@@ -43,7 +46,7 @@ function take(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const role = chosenCard(ctx);
   if (seat === undefined || role === undefined) return {};
   const name = roleName(role);
-  const text = forcedCard(ctx) === undefined ? `你拿走了${name}，从现在起你的身份是${name}。` : `底牌中有狼人阵营的牌，你必须拿走${name}，从现在起你的身份是${name}。`;
+  const text = isWolfCard(role) ? `底牌中有狼人阵营的牌，你必须拿走${name}，从现在起你的身份是${name}。` : `你拿走了${name}，从现在起你的身份是${name}。`;
   const log: LogDraft[] = [{ kind: 'narration', text, channel: `private:${seat}` }];
   if (ROLE_CATALOG[role]?.team === 'werewolf') log.push({ kind: 'narration', text: `盗贼 ${seat}号 拿到了${name}，成为你们的狼队友。`, channel: 'team:werewolf' });
   return { state: addSeatNote(ctx.state, seat, `你原本是盗贼，首夜拿走了${name}。`), reassign: [{ seat, role }], log };

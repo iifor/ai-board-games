@@ -1,6 +1,6 @@
 import type { StageEvent, VoteBallot } from '@battle/shared';
 import type { RingPoint } from '../layouts/ringGeometry';
-import { describeEvent, displayDuration } from '../playback/describe';
+import { describeEvent, displayDuration, voteBoardDuration } from '../playback/describe';
 
 export type VoteEvent = Extract<StageEvent, { kind: 'vote_tallied' }>;
 
@@ -87,7 +87,9 @@ export function flightTiming(count: number, budgetMs: number): FlightTiming {
 
 /** 当前计票事件的飞行安排：按播放速度缩放的停留时长决定预算；减少动效时预算为 0（票板立刻长条） */
 export function voteFlightOf(event: VoteEvent, rate: number | null, reducedMotion: boolean): VoteFlight {
-  const dwell = rate === null ? null : displayDuration(describeEvent(event).text, rate);
+  const { text } = describeEvent(event);
+  const duration = text === null ? voteBoardDuration(event) : displayDuration(text, 1);
+  const dwell = rate === null ? null : duration / rate;
   const budget = reducedMotion ? 0 : flightBudgetMs(dwell);
   const count = event.ballots.length + event.abstained.length;
   return { seq: event.seq, ballots: event.ballots, abstained: event.abstained, timing: flightTiming(count, budget) };

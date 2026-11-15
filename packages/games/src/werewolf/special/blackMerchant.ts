@@ -7,7 +7,6 @@ import { nightAfter } from '../rules/order';
 import { addDeath } from '../rules/tally';
 import type { NightStep } from '../rules/types';
 import type { WerewolfParams, WerewolfState } from '../state';
-import type { GiftSkill } from '../stateExtended';
 import { GIFT_LABELS, grantGift } from './gifts';
 import type { SpecialDescriptor } from './types';
 
@@ -44,17 +43,21 @@ function recordDeal(ctx: WerewolfContext, decisions: readonly ActDecision[]): We
   return target === undefined ? ctx.state : { ...ctx.state, merchant: { used: true, target } };
 }
 
-function chooseSkill(skill: GiftSkill) {
-  return (ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState => (decisions.some((decision) => decision.targets.length > 0)
-    ? { ...ctx.state, night: { ...ctx.state.night, merchantSkill: skill } }
-    : ctx.state);
+function chooseSkill(skill: 'check' | 'gun') {
+  return (ctx: WerewolfContext, decisions: readonly ActDecision[]): WerewolfState => {
+    const choice = decisions[0];
+    if (!choice) return ctx.state;
+    const selected = choice.targets.length ? skill : skill === 'gun' ? 'poison' : null;
+    return { ...ctx.state, night: { ...ctx.state.night, merchantSkill: selected } };
+  };
 }
 
 /** 交易结算：对象是狼人则黑商天亮出局（对方不知情），否则对方成为幸运儿 */
 function settle(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const target = ctx.state.merchant.target;
   if (target === null) return {};
-  const skill = ctx.state.night.merchantSkill ?? 'poison';
+  const skill = ctx.state.night.merchantSkill;
+  if (!skill) return { state: { ...ctx.state, merchant: { used: false, target: null } } };
   if (isWolf(ctx.seats.get(target))) return { state: { ...ctx.state, night: { ...ctx.state.night, merchantBackfire: true } } };
   const usage = skill === 'gun' ? '出局时你可以直接开枪带走一名玩家（不翻牌）' : '你可以在今晚或之后的某个夜晚使用一次';
   return {
@@ -93,7 +96,7 @@ const deal = {
   apply: recordDeal,
 } as const satisfies Omit<ActPhase<WerewolfState, WerewolfParams>, 'prompt' | 'next'>;
 
-const skillQuestion = (skill: GiftSkill) => ({
+const skillQuestion = (skill: 'check' | 'gun') => ({
   kind: 'act',
   action: `赠送${GIFT_LABELS[skill]}`,
   targets: (_ctx: WerewolfContext, seat: Seat) => [seat.seat],
@@ -126,7 +129,7 @@ const blackMerchantPhases = {
     ...skillQuestion('check'),
     actors: (ctx) => ctx.seats.alive().withRole(MERCHANT),
     prompt: blackMerchantPrompts.merchantSkillCheck,
-    next: 'merchant_skill_gun',
+    next: [{ when: ctx => ctx.result?.kind === 'act' && ctx.result.decisions.length > 0, goto: 'merchant_skill_gun' }, { goto: 'merchant_settle' }],
   },
   merchant_skill_gun: {
     ...skillQuestion('gun'),

@@ -1,3 +1,4 @@
+import { line } from '../announcements';
 import { findResult, type ActDecision, type ComputeOutcome, type Seat, type VoteBonus, type VoteOutcome } from '@battle/engine';
 import { specialExileHooks } from '../special';
 import type { WerewolfState } from '../state';
@@ -72,53 +73,31 @@ function heldByExile(ctx: WerewolfContext, target: Seat, state: WerewolfState): 
   return null;
 }
 
-interface BonusShare {
-  readonly label: string;
-  readonly votes: number;
-}
-
-/** 被放逐者拿到的各来源额外票（乌鸦的诅咒等），按登记的来源说明归类 */
-function bonusSharesFor(ctx: WerewolfContext, target: number): BonusShare[] {
-  return specialExileHooks.flatMap((hooks) => {
-    const votes = (hooks.bonus?.(ctx) ?? []).filter((item) => item.target === target).reduce((sum, item) => sum + item.votes, 0);
-    return votes > 0 ? [{ label: hooks.bonusLabel ?? '额外票', votes }] : [];
-  });
-}
-
-/**
- * 额外票参与了放逐时公开得票构成（选票含警长的 1.5 票）：
- * 全员弃票、只靠诅咒票当选的情况下明确说明票从哪里来，不会显示为零票当选。
- */
-function describeExileVotes(ctx: WerewolfContext, target: number): string | null {
-  const bonus = bonusSharesFor(ctx, target);
-  if (bonus.length === 0) return null;
-  const ballots = findResult(ctx.results, 'exile_vote', 'vote')?.ballots ?? [];
-  const cast = ballots.filter((ballot) => ballot.target === target).reduce((sum, ballot) => sum + ballot.weight, 0);
-  const total = cast + bonus.reduce((sum, item) => sum + item.votes, 0);
-  const extra = bonus.map(({ label, votes }) => `${label} ${votes} 票`).join('、');
-  return cast > 0
-    ? `${target}号得 ${total} 票（选票 ${cast} 票，${extra}），被放逐。`
-    : `${target}号没有得到任何选票，但有额外票（${extra}），以 ${total} 票被放逐。`;
-}
-
 /** 白痴首次被放逐时翻牌免死；特殊角色的免死结算（魔狼翻牌）；其他人出局；平票或全部弃票则无人出局 */
 export function resolveExile(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const target = ctx.state.exileTarget;
   const state = { ...ctx.state, exileTarget: null };
-  if (target === null) return { state, log: [{ kind: 'narration', text: '本轮无人被放逐。' }] };
+  const vote = findResult(ctx.results, 'exile_vote', 'vote');
+  if (target === null) {
+    const key = vote?.tied.length ? 'exileTie' : vote?.ballots.length === 0 ? 'exileAbstained' : 'exileNone';
+    // 分场景台词优先；旧局或后台只设置了通用的无人放逐台词时继续沿用。
+    const overrides = ctx.announcementOverrides;
+    const wording = overrides?.exileNone && !overrides[key] ? 'exileNone' : key;
+    return { state, log: [{ kind: 'narration', text: line(ctx, wording) }] };
+  }
   const seat = ctx.seats.get(target);
   if (seat.role === 'idiot' && !ctx.state.idiotRevealed && !skillsLost(ctx, seat)) {
     return {
       state: { ...state, idiotRevealed: true },
-      log: [{ kind: 'revealed', text: `${target}号翻牌，身份是白痴，免于出局，但此后失去投票权。`, data: { seat: target, role: 'idiot' } }],
+      log: [{ kind: 'revealed', text: line(ctx, 'idiotRevealed', { 座号: target }), data: { seat: target, role: 'idiot' } }],
     };
   }
   const held = heldByExile(ctx, seat, state);
   if (held) return held;
-  const composition = describeExileVotes(ctx, target);
+  const wording = vote?.ballots.length === 0 ? 'exileBonusOnly' : 'exile';
   return {
     state,
-    ...(composition === null ? {} : { log: [{ kind: 'narration' as const, text: composition }] }),
+    log: [{ kind: 'narration', text: line(ctx, wording, { 座号: target }) }],
     eliminate: [{ seat: target, reason: '被放逐', cause: 'exile' }],
   };
 }

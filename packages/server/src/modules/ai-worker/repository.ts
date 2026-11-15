@@ -16,7 +16,6 @@ export interface SeatModel {
   readonly modelId: number;
   readonly name: string;
   readonly model: string;
-  readonly temperature: number;
   readonly maxTokens: number;
   readonly providerId: number;
   readonly fallbackModelId: number | null;
@@ -24,13 +23,13 @@ export interface SeatModel {
   readonly enabled: boolean;
 }
 
-/** 必须大于单个任务的最长耗时（2 个模型 × 2 次 × 60 秒超时 + 退避），否则会被重复领取、重复调用模型 */
+/** 覆盖主备两个模型各三次 60 秒调用及退避，避免任务仍在执行时被重复领取。 */
 const CLAIM_TTL = '10 minutes';
 
 export function createAiTaskRepository(db: Db) {
   async function modelById(id: number): Promise<SeatModel | undefined> {
     return db.selectFrom('models')
-      .select(['id as modelId', 'name', 'model', 'temperature', 'maxTokens', 'providerId', 'fallbackModelId', 'enabled'])
+      .select(['id as modelId', 'name', 'model', 'maxTokens', 'providerId', 'fallbackModelId', 'enabled'])
       .where('id', '=', id).executeTakeFirst();
   }
 

@@ -59,6 +59,7 @@ export interface VariantContext {
 
 /** 规则函数、条件、选择器拿到的只读上下文 */
 export interface RuleContext<S, P> {
+  readonly announcementOverrides?: Readonly<Record<string, string>>;
   readonly state: ReadonlyValue<S>;
   readonly params: ReadonlyValue<P>;
   readonly seats: SeatQuery;

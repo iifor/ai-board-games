@@ -7,6 +7,7 @@ import { conflict, notFound } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import type { MatchRepository } from './repository';
 import { boundary, recordTrace } from '../traces/record';
+import { recordMemoryAdvance } from '../player-memory/repository';
 import { TERMINAL_STATUSES, type AdvanceOutcome, type LockedMatchRow, type TaskCompletion } from './types';
 
 const NOTHING: Omit<AdvanceOutcome, 'status'> = { events: [], tasks: [], stale: false };
@@ -67,8 +68,10 @@ export function createMatchRuntime(repository: MatchRepository, findGame: (key: 
       const lastSeq = result.stageEvents.reduce((max, event) => Math.max(max, event.seq), row.lastSeq);
       const status: MatchStatus = result.status;
       await repository.saveAdvance(trx, matchId, { snapshot: result.snapshot, status, lastSeq, result: result.snapshot.result });
-      await repository.insertTasks(trx, matchId, result.aiRequests);
+      const tasks = result.aiRequests;
+      await repository.insertTasks(trx, matchId, tasks);
       await repository.insertEvents(trx, matchId, result.stageEvents);
+      await recordMemoryAdvance(trx, row, input, result);
       if (completion) await repository.completeTask(trx, matchId, completion, row.traceDeleted);
       const marks = [...result.trace];
       if (input.kind === 'start') {
@@ -78,7 +81,7 @@ export function createMatchRuntime(repository: MatchRepository, findGame: (key: 
         marks.unshift(boundary('control', input.command, input, row.snapshot));
       }
       await recordTrace(trx, row, source, marks);
-      return { status, events: result.stageEvents, tasks: result.aiRequests, stale: false };
+      return { status, events: result.stageEvents, tasks, stale: false };
     });
 
     if (outcome.events.length) {

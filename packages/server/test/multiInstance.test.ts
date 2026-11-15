@@ -113,7 +113,7 @@ describe('mutual exclusion across instances', () => {
       synthesize: async (text) => {
         calls += 1;
         await slow(150);
-        return { data: Buffer.from(`audio:${text}`), mime: 'audio/mpeg' };
+        return { data: Buffer.from(`audio:${text}`), mime: 'audio/mpeg', captions: [{ text, startMs: 50, endMs: 1800 }] };
       },
     };
     const ttsA = createTtsService({ azure: provider }, a.services.repositories.media);
@@ -121,6 +121,8 @@ describe('mutual exclusion across instances', () => {
     const voice: VoiceChoice = { provider: 'azure', voiceName: 'zh-CN-Test', language: 'zh-CN', style: '', rate: '', pitch: '' };
     const [fromA, fromB] = await Promise.all([ttsA.audioFor('同一句话', voice), ttsB.audioFor('同一句话', voice)]);
     expect(fromA).toEqual(fromB);
+    expect(fromB?.captions).toEqual([{ text: '同一句话', startMs: 50, endMs: 1800 }]);
+    expect(await ttsB.audioFor('同一句话', voice)).toEqual(fromA);
     expect(fromA?.url).toMatch(/^\/api\/media\/[0-9a-f]{40}$/);
     expect(calls).toBe(1);
     expect(await a.services.repositories.media.exists(fromA?.url.slice('/api/media/'.length) ?? '')).toBe(true);

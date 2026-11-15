@@ -20,10 +20,10 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
     response = await fetch(path, {
       method,
       headers: {
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(body === undefined || body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     });
   } catch {
     throw new ApiError(0, '网络连接失败，请检查服务是否启动');

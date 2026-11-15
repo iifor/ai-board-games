@@ -13,18 +13,18 @@ describe('bear tamer', () => {
 
   it('roars at dawn together with the death news when a neighbour is a wolf', () => {
     expect(leftWolf).toBe(tamer - 1);
-    expect(dawnText(play(SEED, undefined, BOARD), 1)).toBe('天亮了，昨晚是平安夜。熊咆哮了。');
+    expect(dawnText(play(SEED, undefined, BOARD), 1)).toBe('昨晚是平安夜。熊咆哮了。');
   });
 
   it('re-checks the neighbours before each night', () => {
     const run = play(SEED, everyoneVotes('exile_vote', leftWolf, 1), BOARD);
     expect(eliminated(run)[0]).toEqual({ seat: leftWolf, round: 1, reason: '被放逐' });
-    expect(dawnText(run, 2)).toBe('天亮了，昨晚是平安夜。熊没有咆哮。');
+    expect(dawnText(run, 2)).toBe('天亮请睁眼。昨晚是平安夜。熊没有咆哮。');
   });
 
   it('stays quiet once the tamer is dead', () => {
     const run = play(SEED, wolvesKill(tamer, 1), BOARD);
-    expect(dawnText(run, 1)).toBe(`天亮了，昨晚死亡的是：${tamer}号。熊没有咆哮。`);
+    expect(dawnText(run, 1)).toBe(`昨晚${tamer}号出局。熊没有咆哮。`);
   });
 
   it('does not roar for the hidden wolf', () => {
@@ -34,8 +34,8 @@ describe('bear tamer', () => {
     const hidden = first(seed, 'hidden_wolf', BOARD);
     expect(hidden).toBe(bearTamer + 2);
     const run = play(seed, everyoneVotes('exile_vote', bearTamer + 1, 1), BOARD);
-    expect(dawnText(run, 1)).toBe('天亮了，昨晚是平安夜。熊没有咆哮。');
-    expect(dawnText(run, 2)).toBe('天亮了，昨晚是平安夜。熊没有咆哮。');
+    expect(dawnText(run, 1)).toBe('昨晚是平安夜。熊没有咆哮。');
+    expect(dawnText(run, 2)).toBe('天亮请睁眼。昨晚是平安夜。熊没有咆哮。');
   });
 });
 

@@ -1,6 +1,7 @@
 import { compileGame, defineGame } from '@battle/engine';
 import { boardVariants, DEFAULT_BOARD, findBoard, PLAYER_RANGE } from './boards';
 import { dayPhases } from './phases/day';
+import { phaseAnnouncement } from './phases/announcements';
 import { deathPhases } from './phases/death';
 import { nightPhases } from './phases/night';
 import { postgamePhases } from './phases/postgame';
@@ -9,6 +10,7 @@ import { werewolfPrompts } from './prompts';
 import { roleSpecs } from './roleSpecs';
 import { dealBoard } from './rules/deal';
 import { isNightPhase } from './rules/order';
+import { wolfChatFallback } from './rules/night';
 import { decideWinner, werewolfResult } from './rules/victory';
 import { specialPhases, specialPrompts } from './special';
 import { initialWerewolfState } from './setup';
@@ -22,7 +24,7 @@ const prompts = { ...werewolfPrompts, ...specialPrompts };
 
 export const werewolfSpec = defineGame<WerewolfState, WerewolfParams>({
   key: 'werewolf',
-  version: 7,
+  version: 13,
   title: 'AI 狼人杀',
   description: '狼人杀（多数板子 12 人），支持多个板子；首日竞选警长。',
   players: PLAYER_RANGE,
@@ -46,9 +48,11 @@ export const werewolfSpec = defineGame<WerewolfState, WerewolfParams>({
   gameOver: { when: (ctx) => decideWinner(ctx) !== null, goto: 'postgame_reveal' },
   end: werewolfResult,
   budget: { maxRounds: MAX_DAYS },
+  debug: { speak: (ctx, seat) => ctx.phaseId === 'wolf_chat' ? wolfChatFallback(ctx, seat) : undefined },
   presentation: {
     layout: 'circle',
     audienceView: 'omniscient',
+    phaseAnnouncement,
     revealOnEnd: ['roles'],
     view: (ctx) => ({
       board: ctx.state.board.name,
@@ -56,6 +60,7 @@ export const werewolfSpec = defineGame<WerewolfState, WerewolfParams>({
       idiotRevealed: ctx.state.idiotRevealed,
       /** 昼夜，供舞台切换背景 */
       period: isNightPhase(ctx.phaseId) ? 'night' : 'day',
+      ...(ctx.phaseId === null && ctx.results.mvp_vote ? { winnerAnnounced: true } : {}),
     }),
   },
 });

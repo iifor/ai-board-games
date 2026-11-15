@@ -9,6 +9,11 @@ export type { ScriptedReply } from './debug/chaosAgent';
 export { EngineInputError, SpecError, SpecMismatchError, TemplateError } from './errors';
 export { toChatMessages, type ChatMessage } from './prompt/assemble';
 export type { PromptTemplate } from './prompt/template';
+export { collectTemplatePaths, parseTemplate, renderTemplate } from './prompt/template';
+export { buildPublicContext, buildSeatContext } from './prompt/visibleContext';
+export { platformContract } from './prompt/platform';
+export { playerExpression } from './prompt/playerExpression';
+export { speechMaxOf } from './spec/define';
 export { advance } from './runtime/advance';
 export type { Rng } from './runtime/rng';
 export { SeatQuery, type SeatRef, type SeatSelection } from './runtime/seats';
@@ -22,6 +27,7 @@ export type {
   DebugCommand,
   EngineInput,
   EngineSnapshot,
+  MatchPromptSet,
   EngineStatus,
   JsonSchema,
   LogDraft,
@@ -42,7 +48,7 @@ export type {
   TriggerEventKind,
   VariantContext,
 } from './spec/context';
-export { DEFAULT_SPEECH_MAX_CHARS, defineGame, definePrompts, SPEECH_LENGTH_TOLERANCE, speechOutput } from './spec/define';
+export { DEFAULT_SPEECH_MAX_CHARS, defineGame, definePrompts, speechOutput } from './spec/define';
 export type {
   ActPhase,
   AnnouncePhase,
@@ -76,4 +82,7 @@ export type {
   VariantSpec,
   Visibility,
 } from './spec/types';
-export { privateChannel, teamChannel } from './visibility/channels';
+export { privateChannel, teamChannel, seatCanSee } from './visibility/channels';
+export { formatHistoryEntry } from './prompt/history';
+export { evidenceOf, memoryEvidenceEntries, recall as recallPlayerMemory } from './prompt/playerMemory';
+export { formatAnnouncement, type AnnouncementDefinition } from '@battle/shared';

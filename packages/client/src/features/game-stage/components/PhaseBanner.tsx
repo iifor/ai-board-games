@@ -5,6 +5,7 @@ import './PhaseBanner.css';
 export function PhaseBanner({ item }: { readonly item: StreamItem | null }) {
   const event = item?.event;
   if (!event || event.kind !== 'phase_started') return null;
+  if (event.view.gameKey === 'werewolf' && event.view.extra.period === 'night' && event.announcement) return null;
   const unit = event.view.gameKey === 'werewolf' ? '天' : '轮';
   return (
     <div key={event.seq} className="phase-banner" aria-hidden="true">

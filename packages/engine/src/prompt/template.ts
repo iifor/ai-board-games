@@ -88,7 +88,7 @@ function resolve(template: PromptTemplate, context: unknown, scope: unknown, pat
   let value: unknown = head === 'this' ? scope : context;
   const segments = head === 'this' ? rest : [head ?? '', ...rest];
   for (const segment of segments) {
-    if (value === null || typeof value !== 'object' || !(segment in value)) {
+    if (value === null || typeof value !== 'object' || !Object.hasOwn(value, segment)) {
       throw new TemplateError(template.name, `未知变量 {{${path}}}`);
     }
     value = (value as Record<string, unknown>)[segment];
@@ -96,26 +96,34 @@ function resolve(template: PromptTemplate, context: unknown, scope: unknown, pat
   return value;
 }
 
-function renderNodes(template: PromptTemplate, nodes: readonly TemplateNode[], context: unknown, scope: unknown): string {
+interface RenderBudget { remaining: number; steps: number }
+
+function renderNodes(template: PromptTemplate, nodes: readonly TemplateNode[], context: unknown, scope: unknown, budget?: RenderBudget): string {
+  function emit(value: string): string {
+    if (budget && (budget.remaining -= value.length) < 0) throw new TemplateError(template.name, '渲染结果过长');
+    return value;
+  }
+  if (budget && --budget.steps < 0) throw new TemplateError(template.name, '模板循环过多');
   return nodes.map((node) => {
-    if (node.type === 'text') return node.value;
+    if (node.type === 'text') return emit(node.value);
     const value = resolve(template, context, scope, node.path);
     if (node.type === 'var') {
       if (value === null) return '';
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return emit(String(value));
       throw new TemplateError(template.name, `{{${node.path}}} 不是可输出的标量`);
     }
     if (node.type === 'each') {
       if (!Array.isArray(value)) throw new TemplateError(template.name, `{{#each ${node.path}}} 需要数组`);
-      return value.map((item: unknown) => renderNodes(template, node.body, context, item)).join('');
+      return value.map((item: unknown) => renderNodes(template, node.body, context, item, budget)).join('');
     }
     const truthy = Array.isArray(value) ? value.length > 0 : Boolean(value);
-    return renderNodes(template, truthy ? node.then : node.otherwise, context, scope);
+    return renderNodes(template, truthy ? node.then : node.otherwise, context, scope, budget);
   }).join('');
 }
 
-export function renderTemplate(template: PromptTemplate, context: Readonly<Record<string, unknown>>): string {
-  return renderNodes(template, template.nodes, context, undefined).trim();
+export function renderTemplate(template: PromptTemplate, context: Readonly<Record<string, unknown>>, limit?: number): string {
+  const budget = limit === undefined ? undefined : { remaining: limit, steps: limit };
+  return renderNodes(template, template.nodes, context, undefined, budget).trim();
 }
 
 export function collectTemplatePaths(template: PromptTemplate): TemplatePath[] {

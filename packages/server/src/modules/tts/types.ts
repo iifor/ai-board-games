@@ -1,8 +1,9 @@
-import type { VoiceProvider } from '@battle/shared';
+import type { AudioCaptionCue, VoiceControlSupport, VoiceProvider } from '@battle/shared';
 
 export interface SynthesizedAudio {
   readonly data: Buffer;
   readonly mime: string;
+  readonly captions?: readonly AudioCaptionCue[];
 }
 
 /** 合成时用到的音色参数（来自 voices 表） */
@@ -13,12 +14,30 @@ export interface VoiceSpec {
   readonly style: string;
   readonly rate: string;
   readonly pitch: string;
+  /** Azure 经能力校验后的分段文本与风格，用于 SSML 和缓存寻址。 */
+  readonly segments?: readonly StyledSpeechSegment[];
+  readonly controls?: VoiceControlSupport;
+}
+
+export interface StyledSpeechSegment {
+  readonly text: string;
+  readonly style: string;
+  readonly rate?: string;
+  readonly pitch?: string;
+  readonly pauseBeforeMs?: number;
+}
+
+export interface PreparedSpeech {
+  readonly text: string;
+  readonly voice: VoiceSpec;
 }
 
 /** 云端语音合成；browser 音色由前端自己朗读，不经过服务端 */
 export interface TtsProvider {
   /** 合成器自身会改变音频的参数（模型名、输出格式等），参与音频缓存键：换模型不会命中旧缓存 */
   readonly signature: string;
+  /** 缓存寻址前完成标签清理与风格解析；无此步骤的供应商直接使用原始输入。 */
+  prepare?(text: string, voice: VoiceSpec): Promise<PreparedSpeech>;
   synthesize(text: string, voice: VoiceSpec): Promise<SynthesizedAudio>;
 }
 

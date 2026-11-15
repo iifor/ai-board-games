@@ -18,8 +18,8 @@ export function MatchList({ matches }: { readonly matches: readonly MatchSummary
       {matches.map((match, index) => (
         <li key={match.id} className="card match-row ui-fade-up" data-game={match.gameKey} style={rowStyle(index)}>
           <Link to={`/matches/${match.id}`}>
-            <strong>{formatMatchTitle(match)}</strong>
-            <span className="ui-pill ui-pill-accent">{formatWinner(match)}</span>
+            <strong>{match.importTitle ?? formatMatchTitle(match)}</strong>
+            <span className="ui-pill ui-pill-accent">{match.importTitle ? '导入回放' : formatWinner(match)}</span>
             <time dateTime={match.createdAt}>{formatDateTime(match.createdAt)}</time>
             <b className="match-row-replay">回放 →</b>
           </Link>

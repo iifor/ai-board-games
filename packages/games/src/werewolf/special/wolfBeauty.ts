@@ -11,13 +11,13 @@ import { NIGHT_DEATH_CAUSES, type WerewolfState } from '../state';
 import type { SpecialDescriptor } from './types';
 
 // 狼美人：狼人阵营，狼人击杀后单独魅惑一名其他存活玩家（可不魅惑）。狼美人在当晚或天亮后的白天出局时，
-// 当晚被魅惑者随之殉情：夜里死亡时并入当晚死讯，白天出局时由触发器立即结算。殉情的猎人不能开枪。不能自爆。
+// 夜里死亡时殉情并入死讯，白天非自爆出局时由触发器结算。殉情的猎人不能开枪。
 // 不受魅惑影响的角色（老流氓，特性 charmImmune）不会殉情；板子参数 wolfBeautyPoisonLink 为 false 时，狼美人被毒杀不带人。
 
 const wolfBeautyPrompts = definePrompts({
   wolfBeauty: [
     '你是{{me.label}}，身份是狼美人（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
-    '每晚狼人击杀后，你可以单独魅惑一名玩家；你在当晚或天亮后的白天出局时，被魅惑的玩家会随你殉情。你不能自爆。',
+    '每晚狼人击杀后，你可以单独魅惑一名玩家。你可以自爆，自爆只让你自己出局，不会带走被魅惑者。其他出局方式按本局魅惑规则结算。',
   ].join(''),
   wolfBeautyCharm: '狼美人请睁眼，选择今晚要魅惑的玩家，也可以输出空数组不魅惑。',
 });
@@ -46,7 +46,7 @@ const wolfBeautyNightLink: NightStep = (ctx, tally) => {
 
 /** 狼美人在白天出局（天亮公布的夜间死亡已在夜里结算），被魅惑者仍存活 */
 function diesByDay(ctx: WerewolfContext, event: TriggerEvent): boolean {
-  if (event.kind !== 'seat_eliminated' || NIGHT_DEATH_CAUSES.has(event.cause)) return false;
+  if (event.kind !== 'seat_eliminated' || event.cause === 'self_destruct' || NIGHT_DEATH_CAUSES.has(event.cause)) return false;
   return ctx.seats.get(event.seat).role === 'wolf_beauty' && linkedLover(ctx) !== null;
 }
 

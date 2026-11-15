@@ -25,14 +25,14 @@ describe('dreamer', () => {
 
   it('turns the wolf kill on the sleepwalker into an empty knife and wastes potions on him', () => {
     const knifed = play(SEED, combine(dream(villager, 1), wolvesKill(villager, 1)), BOARD);
-    expect(dawnText(knifed, 1)).toBe('天亮了，昨晚是平安夜。');
+    expect(dawnText(knifed, 1)).toBe('昨晚是平安夜。');
 
     const poisoned = play(SEED, combine(dream(villager, 1), act('witch_poison', witch, [villager], 1)), BOARD);
-    expect(dawnText(poisoned, 1)).toBe('天亮了，昨晚是平安夜。');
+    expect(dawnText(poisoned, 1)).toBe('昨晚是平安夜。');
     expect(stateOf(poisoned.snapshot).potions.poison).toBe(false);
 
     const saved = play(SEED, combine(dream(villager, 1), wolvesKill(villager, 1), act('witch_save', witch, [villager], 1)), BOARD);
-    expect(dawnText(saved, 1)).toBe('天亮了，昨晚是平安夜。');
+    expect(dawnText(saved, 1)).toBe('昨晚是平安夜。');
     expect(stateOf(saved.snapshot).potions.antidote).toBe(false);
   });
 
@@ -66,16 +66,16 @@ describe('wolf king', () => {
       { seat: king, round: 1, reason: '被放逐' },
       { seat: villager, round: 1, reason: '被枪杀' },
     ]);
-    expect(entries(run, 'action', 'death_shot')[0]).toMatchObject({ channel: 'public', text: `开枪带走 ${villager}号` });
+    expect(entries(run, 'action', 'death_shot')[0]).toMatchObject({ channel: 'public', text: `向${villager}号开枪` });
     expect(entries(run, 'phase_started').some((entry) => entry.title === '猎人开枪')).toBe(false);
   });
 
-  it('cannot shoot when poisoned or after self-destructing', () => {
-    const poisoned = play(SEED, act('witch_poison', witch, [king], 1), BOARD);
-    expect(deathsOn(poisoned, 1)).toEqual([king]);
-    expect(requestsIn(poisoned, 'death_shot')).toHaveLength(0);
+  it('can shoot when poisoned and cannot shoot after self-destructing', () => {
+    const poisoned = play(SEED, combine(act('witch_poison', witch, [king], 1), act('death_shot', king, [villager])), BOARD);
+    expect(deathsOn(poisoned, 1)).toEqual([king, villager].sort((a, b) => a - b));
+    expect(requestsIn(poisoned, 'death_shot').map(request => request.seat)).toEqual([king]);
 
-    const blast: Override = (request, snapshot) => request.phaseId === 'day_speech' && request.seat === king && snapshot.round === 1
+    const blast: Override = (request, snapshot) => request.phaseId === 'day_speech' && request.action === 'speak' && request.seat === king && snapshot.round === 1
       ? { speech: '我自爆。', declare: 'selfDestruct' }
       : undefined;
     const destructed = play(SEED, blast, BOARD);
@@ -86,7 +86,7 @@ describe('wolf king', () => {
   it('makes the hunter shoot through the same neutral phase', () => {
     const run = play(SEED, combine(everyoneVotes('exile_vote', hunter, 1), act('death_shot', hunter, [villager])), BOARD);
     expect(requestsIn(run, 'hunter_shot')).toHaveLength(0);
-    expect(entries(run, 'action', 'death_shot')[0]?.text).toBe(`开枪带走 ${villager}号`);
+    expect(entries(run, 'action', 'death_shot')[0]?.text).toBe(`向${villager}号开枪`);
     expect(run.requests[0]?.request.prompt.rules).toContain('本局猎人和狼王开枪时都不翻牌');
   });
 });

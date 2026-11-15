@@ -48,12 +48,14 @@ describe('stage shortcuts', () => {
 
   it('steps through the speeds the controls offer and clamps at both ends', () => {
     expect(stepSpeed(1, -1)).toBe(1);
-    expect(stepSpeed(1, 1)).toBe(1.5);
+    expect(stepSpeed(1, 1)).toBe(1.25);
+    expect(stepSpeed(1.25, 1)).toBe(1.5);
+    expect(stepSpeed(1.25, -1)).toBe(1);
     expect(stepSpeed(1.5, 1)).toBe(2);
     expect(stepSpeed(2, 1)).toBe(3);
     expect(stepSpeed(3, 1)).toBe(3);
     expect(stepSpeed(3, -1)).toBe(2);
-    expect(stepSpeed(1.2, 1)).toBe(1.5);
+    expect(stepSpeed(1.2, 1)).toBe(1.25);
     expect(stepSpeed(1.2, -1)).toBe(1);
   });
 
@@ -61,7 +63,7 @@ describe('stage shortcuts', () => {
     expect(applyShortcut('toggle-pause', options)).toEqual({ ...options, paused: true });
     expect(applyShortcut('toggle-mute', { ...options, muted: true })).toEqual({ ...options, muted: false });
     expect(applyShortcut('speed-up', options)).toEqual({ ...options, speed: 2 });
-    expect(applyShortcut('speed-down', options)).toEqual({ ...options, speed: 1 });
+    expect(applyShortcut('speed-down', options)).toEqual({ ...options, speed: 1.25 });
     expect(applyShortcut('toggle-feed', options)).toBeNull();
     expect(applyShortcut('toggle-result', options)).toBeNull();
   });

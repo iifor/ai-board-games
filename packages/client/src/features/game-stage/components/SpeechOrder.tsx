@@ -1,6 +1,6 @@
 import type { AudienceView } from '@battle/shared';
 import { SPEECH_ORDER_LIMIT } from '../constants';
-import { seatOf } from '../utils';
+import { seatOf, speakerLabel } from '../utils';
 import './SpeechOrder.css';
 
 interface SpeechOrderProps {
@@ -17,7 +17,7 @@ export function SpeechOrder({ seats, current, view }: SpeechOrderProps) {
       {shown.length < seats.length ? <li className="ui-pill speech-order-more">…</li> : null}
       {shown.map((seat) => (
         <li key={seat} className={`ui-pill ${seat === current ? 'is-current' : ''}`}>
-          {seatOf(view, seat)?.name ?? `${seat}号`}
+          {speakerLabel(seat, seatOf(view, seat)?.name)}
         </li>
       ))}
     </ol>

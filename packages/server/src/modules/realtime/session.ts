@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger';
 import { PREFETCH_EVENTS, TERMINAL_STATUSES } from '../matches/types';
 import type { AudioResolver } from './audio';
 import { encode, type StreamSocket } from './protocol';
-import { forPlayerSeat } from './perspective';
+import { forPlayerSeat, visibleOnStage, visibleToPlayerSeat } from './perspective';
 
 /** 播放流只需要对局的这几个字段 */
 export interface StreamMatch {
@@ -71,7 +71,7 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
     for (let i = 0; i < PREFETCH_EVENTS; i += 1) {
       const next = await deps.matches.nextEvent(matchId, seq);
       if (!next) return;
-      if (seat === undefined || next.channel === 'public') void deps.audio.audioFor(matchId, next, scripted);
+      if (visibleOnStage(next) && (seat === undefined || visibleToPlayerSeat(next, seat))) void deps.audio.audioFor(matchId, next, scripted);
       seq = next.seq;
     }
   }
@@ -121,7 +121,7 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
         close();
         return;
       }
-      const visible = seat === undefined ? next : forPlayerSeat(next, seat);
+      const visible = !visibleOnStage(next) ? null : seat === undefined ? next : forPlayerSeat(next, seat);
       if (visible) await send(visible, match.scripted);
       else {
         cursor = next.seq;

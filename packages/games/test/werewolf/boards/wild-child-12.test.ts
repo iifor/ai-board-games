@@ -50,7 +50,7 @@ describe('wild child', () => {
     expect(veteran?.prompt.history).toContain('第一夜密谋');
     expect(veteran?.prompt.identity).toContain(`${child}号`);
     expect(entries(run, 'action', 'seer_check').find((entry) => entry.round === 2)?.text).toBe(`查验 ${child}号：狼人`);
-    expect(requestsOn(run, 'day_speech', 2).find((request) => request.seat === child)?.prompt.output).toContain('selfDestruct');
+    expect(requestsOn(run, 'day_speech', 2).find((request) => request.seat === child && request.action === 'speak')?.prompt.output).toContain('selfDestruct');
   });
 
   it('stays good when he dies before the model', () => {

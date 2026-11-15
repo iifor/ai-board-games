@@ -31,7 +31,8 @@ export interface AiPhaseExecutor<Ph extends PhaseSpec<unknown, unknown>> extends
   schema(env: ExecEnv, phase: Ph, pending: PendingRequest): ZodType;
   /** 已通过 schema 的值是否合法；返回错误原因或 null */
   check(env: ExecEnv, phase: Ph, pending: PendingRequest, value: unknown): string | null;
-  fallback(env: ExecEnv, phase: Ph, pending: PendingRequest): unknown;
+  /** 消费未取得有效回复的轮次，返回调用链记录的结果。 */
+  skipFailed(env: ExecEnv, phase: Ph, pending: PendingRequest): unknown;
   store(env: ExecEnv, phase: Ph, pending: PendingRequest, value: unknown): void;
 }
 

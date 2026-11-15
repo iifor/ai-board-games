@@ -44,7 +44,7 @@ describe('magician', () => {
   it('lets the wolves knife their own king, who may then shoot', () => {
     const run = play(SEED, combine(swap(villager, king, 1), wolvesKill(villager, 1), act('death_shot', king, [villagerB])), BOARD);
     expect(deathsOn(run, 1)).toEqual([king, villagerB].sort((a, b) => a - b));
-    expect(entries(run, 'action', 'death_shot')[0]?.text).toBe(`开枪带走 ${villagerB}号`);
+    expect(entries(run, 'action', 'death_shot')[0]?.text).toBe(`向${villagerB}号开枪`);
   });
 
   it('swaps each number only once and restores numbers at dawn', () => {

@@ -52,7 +52,7 @@ describe('board registry', () => {
 describe('guard', () => {
   it('protects the wolf target', () => {
     const run = play(SEED, combine(wolvesKill(villager), guardOn(villager, 1)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
   });
 
   it('kills the target when guarded and saved on the same night', () => {
@@ -70,7 +70,7 @@ describe('guard', () => {
 });
 
 describe('white wolf king', () => {
-  const blastDay: Override = (request, snapshot) => request.phaseId === 'day_speech' && request.seat === king && snapshot.round === 1
+  const blastDay: Override = (request, snapshot) => request.phaseId === 'day_speech' && request.action === 'speak' && request.seat === king && snapshot.round === 1
     ? { speech: '我自爆。', declare: 'selfDestruct' }
     : undefined;
 
@@ -87,6 +87,35 @@ describe('white wolf king', () => {
   it('lets a blasted hunter shoot back', () => {
     const run = play(SEED, combine(blastDay, act('white_wolf_king_blast', king, [hunter]), act('hunter_shot', hunter, [villager])), BOARD);
     expect(eliminated(run).slice(0, 3).map((death) => death.seat)).toEqual([king, hunter, villager]);
+  });
+
+  it('lets an off-platform white wolf king choose a living victim during the campaign', () => {
+    const run = play(SEED, combine(
+      act('sheriff_signup', villager, [villager], 1),
+      request => request.phaseId === 'sheriff_speech' && request.action === 'act'
+        && request.seat === king && request.id.includes(':listen:1:') ? { targets: [king] } : undefined,
+      act('white_wolf_king_blast', king, [villagerB]),
+    ), BOARD);
+    expect(eliminated(run).filter(death => death.round === 1)).toEqual([
+      { seat: king, round: 1, reason: '自爆' },
+      { seat: villagerB, round: 1, reason: '被白狼王带走' },
+    ]);
+    expect(entries(run, 'speech', 'last_words')).toHaveLength(0);
+    expect(stateOf(run.snapshot).sheriff).toBeNull();
+  });
+
+  it('reminds only the white wolf king at each eligible day speech', () => {
+    const run = play(SEED, undefined, BOARD);
+    const speeches = requestsIn(run, 'day_speech').filter(request => request.seat === king);
+    expect(speeches.length).toBeGreaterThan(1);
+    for (const { request } of run.requests) {
+      const eligible = request.seat === king && request.phaseId === 'day_speech' && request.action === 'speak';
+      expect(request.prompt.instruction.includes('带走一名玩家对狼队的价值')).toBe(eligible);
+      if (eligible) {
+        expect(request.prompt.instruction).toContain('"declare": "selfDestruct"');
+        expect(request.prompt.output).toContain('selfDestruct');
+      }
+    }
   });
 
   it('is an ordinary wolf to the seer and the wolf team', () => {

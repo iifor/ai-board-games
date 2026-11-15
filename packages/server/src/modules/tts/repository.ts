@@ -2,6 +2,7 @@ import type { Transaction } from 'kysely';
 import type { Db } from '../../db/database';
 import { assetLock } from '../../db/locks';
 import type { Database } from '../../db/schema';
+import type { AudioCaptionCue } from '@battle/shared';
 
 type Executor = Db | Transaction<Database>;
 
@@ -10,11 +11,12 @@ export interface NewMediaAsset {
   readonly voiceName: string;
   readonly mime: string;
   readonly data: Buffer;
+  readonly captions?: readonly AudioCaptionCue[];
 }
 
 /** 持锁事务里对同一个音频的读写 */
 export interface LockedAsset {
-  exists(): Promise<boolean>;
+  reference(): Promise<{ mime: string; captions: readonly AudioCaptionCue[] | null } | undefined>;
   insert(values: NewMediaAsset): Promise<void>;
 }
 
@@ -24,6 +26,7 @@ export function createMediaRepository(db: Db) {
 
   return {
     find: (id: string) => db.selectFrom('mediaAssets').selectAll().where('id', '=', id).executeTakeFirst(),
+    reference: (id: string) => db.selectFrom('mediaAssets').select(['mime', 'captions']).where('id', '=', id).executeTakeFirst(),
     exists: (id: string) => exists(id, db),
     /**
      * 在持有该音频 advisory lock 的事务里执行 work（再查 → 合成 → 写入）：
@@ -33,9 +36,11 @@ export function createMediaRepository(db: Db) {
       db.transaction().execute(async (trx) => {
         await assetLock(trx, id);
         return work({
-          exists: () => exists(id, trx),
+          reference: () => trx.selectFrom('mediaAssets').select(['mime', 'captions']).where('id', '=', id).executeTakeFirst(),
           insert: async (values) => {
-            await trx.insertInto('mediaAssets').values({ id, ...values }).onConflict((oc) => oc.column('id').doNothing()).execute();
+            await trx.insertInto('mediaAssets').values({
+              id, ...values, captions: values.captions ? JSON.stringify(values.captions) : null,
+            }).onConflict((oc) => oc.column('id').doNothing()).execute();
           },
         });
       }),

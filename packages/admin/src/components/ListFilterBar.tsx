@@ -20,7 +20,7 @@ interface Props {
 export function ListFilterBar({ value, onChange, searchPlaceholder, selects = [] }: Props) {
   const set = (key: string, next: string | undefined) => onChange({ ...value, [key]: next || undefined });
   return (
-    <Space wrap style={{ marginBottom: 12 }}>
+    <Space wrap>
       <Input.Search
         allowClear
         placeholder={searchPlaceholder}

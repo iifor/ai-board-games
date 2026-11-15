@@ -27,9 +27,9 @@ export function PlayerPicker({ players, selected, groups, onToggle, registerSour
             <button type="button" className={`player-option ${seat ? 'player-option-selected' : ''}`} aria-pressed={seat > 0} onClick={() => onToggle(player.id)}>
               <span className="player-option-seat" data-team={assignment?.team} key={seat} aria-hidden={!seat}>{assignment?.label ?? (seat || '+')}</span>
               <span className="player-option-figure" ref={(element) => registerSource?.(player.id, element)}>
-                <Avatar className="player-option-portrait" variant="poster" name={player.name} avatar={player.avatar} />
+                <Avatar className="player-option-portrait" variant="poster" name={player.appearanceName ?? player.name} avatar={player.avatar} />
               </span>
-              <span className="player-option-name">{player.name}</span>
+              <span className="player-option-name" title={player.modelKey}>{player.name}</span>
               {player.persona ? <span className="player-option-persona">{player.persona}</span> : null}
             </button>
           </li>

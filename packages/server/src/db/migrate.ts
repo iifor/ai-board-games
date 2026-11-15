@@ -11,6 +11,21 @@ import * as matchPhaseId from './migrations/007_match_phase_id';
 import * as matchTraceNodes from './migrations/008_match_trace_nodes';
 import * as aiCallTraceSettings from './migrations/009_ai_call_trace_settings';
 import * as traceDeletion from './migrations/010_trace_deletion';
+import * as nullablePlayerModel from './migrations/011_nullable_player_model';
+
+import * as replayImports from './migrations/012_replay_imports';
+import * as promptComparisons from './migrations/013_prompt_comparisons';
+import * as modelSamplingDefaults from './migrations/014_model_sampling_defaults';
+import * as appliedPrompts from './migrations/015_applied_prompts';
+import * as playerSpeech from './migrations/016_player_speech';
+import * as announcementTemplates from './migrations/017_announcement_templates';
+import * as promptTemplates from './migrations/018_prompt_templates';
+import * as playerOutputBudget from './migrations/019_player_output_budget';
+import * as playerMemory from './migrations/020_player_memory';
+import * as mediaCaptions from './migrations/021_media_captions';
+import * as playerIdentity from './migrations/022_player_identity';
+import * as memoryReviewCalls from './migrations/023_memory_review_calls';
+import * as forgetPlayerMemory from './migrations/024_forget_player_memory';
 
 /** 迁移按 key 排序执行；新增迁移在此登记 */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {
@@ -24,6 +39,20 @@ const MIGRATIONS: Readonly<Record<string, Migration>> = {
   '008_match_trace_nodes': matchTraceNodes,
   '009_ai_call_trace_settings': aiCallTraceSettings,
   '010_trace_deletion': traceDeletion,
+  '011_nullable_player_model': nullablePlayerModel,
+  '012_replay_imports': replayImports,
+  '013_prompt_comparisons': promptComparisons,
+  '014_model_sampling_defaults': modelSamplingDefaults,
+  '015_applied_prompts': appliedPrompts,
+  '016_player_speech': playerSpeech,
+  '017_announcement_templates': announcementTemplates,
+  '018_prompt_templates': promptTemplates,
+  '019_player_output_budget': playerOutputBudget,
+  '020_player_memory': playerMemory,
+  '021_media_captions': mediaCaptions,
+  '022_player_identity': playerIdentity,
+  '023_memory_review_calls': memoryReviewCalls,
+  '024_forget_player_memory': forgetPlayerMemory,
 };
 
 const provider: MigrationProvider = { getMigrations: async () => MIGRATIONS };

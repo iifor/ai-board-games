@@ -103,6 +103,25 @@ describe('postgame', () => {
     expect(run.snapshot.result?.mvp).toBe(Math.min(...wolves));
   });
 
+  it.each([true, false])('finishes after optional speeches (skip everyone: %s)', skipEveryone => {
+    const speaker = villagers[0]!;
+    const result = play(SEED, combine(killEachNight(villagers), request => {
+      if (request.phaseId !== 'postgame_speech') return undefined;
+      return { speech: !skipEveryone && request.seat === speaker ? '首夜的判断值得复盘。' : null };
+    }));
+    const turns = requestsIn(result, 'postgame_speech');
+    expect(turns.map(turn => turn.seat)).toEqual(requestsIn(run, 'postgame_speech').map(turn => turn.seat));
+    expect(turns.every(turn => turn.attempt === 1)).toBe(true);
+    expect(entries(result, 'fallback', 'postgame_speech')).toHaveLength(0);
+    const expectedSeats = skipEveryone ? [] : [speaker];
+    expect(entries(result, 'speech', 'postgame_speech').map(entry => entry.seat)).toEqual(expectedSeats);
+    expect(result.stageEvents.flatMap(event =>
+      event.kind === 'speech' && event.phaseId === 'postgame_speech' ? [event.seat] : [],
+    )).toEqual(expectedSeats);
+    expect(result.snapshot.result).toEqual(run.snapshot.result);
+    expect(result.stageEvents.at(-1)?.kind).toBe('game_over');
+  });
+
   it('keeps the stage in daytime on the final game-over event', () => {
     // 终局记录没有当前阶段，舞台背景不能因此切回夜晚
     const last = run.stageEvents[run.stageEvents.length - 1];

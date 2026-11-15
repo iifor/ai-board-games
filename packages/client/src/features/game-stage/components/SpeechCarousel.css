@@ -8,13 +8,13 @@
   width: min(100%, 1200px);
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 10px;
 }
 .speech-backdrop {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  overflow: visible;
   pointer-events: none;
 }
 .speech-figure {
@@ -24,6 +24,8 @@
   height: 96%;
   object-fit: contain;
   object-position: center bottom;
+  transform: scale(1.08);
+  transform-origin: center bottom;
   animation: speech-figure-in 320ms ease-out both;
 }
 .speech-backdrop:not(:has(img))::before {
@@ -34,30 +36,28 @@
     radial-gradient(ellipse 40% 50% at 50% 90%, #4d6177 98%, transparent);
   opacity: .5;
 }
-/* 历史和最新发言处于同一个滚动容器，进度条固定在容器下方。 */
+/* 中央只显示当前发言，历史由舞台两侧的独立面板展示。 */
 .speech-track {
   position: absolute;
   z-index: 1;
-  inset: 8% 0 4%;
+  inset: var(--speech-track-top, 8%) 0 4%;
   margin-inline: auto;
-  width: min(100%, 64rem);
+  width: min(100%, var(--speech-track-width, 64rem));
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: center;
   gap: clamp(6px, 1.5cqh, 12px);
   text-align: left;
   color: #f8fbff;
   text-shadow: 0 1px 5px #020812, 0 0 12px #02081280;
 }
 .speech-messages {
+  flex-shrink: 0;
   min-height: 0;
-  max-height: 100%;
   padding: clamp(10px, 2cqh, 20px) clamp(10px, 2cqw, 20px);
   border-radius: 12px;
-  background: linear-gradient(180deg, rgb(7 16 28 / 40%), rgb(7 16 28 / 56%));
-  overflow: hidden auto;
-  overflow-anchor: none;
-  overscroll-behavior-y: contain;
+  background: linear-gradient(180deg, rgb(7 16 28 / 28%), rgb(7 16 28 / 40%));
+  overflow: visible;
 }
 .speech-history {
   list-style: none;
@@ -75,14 +75,14 @@
 .speech-history li + li { margin-top: .7em; }
 .speech-history .speech-author { color: inherit; font-weight: 650; }
 .speech-focus { min-width: 0; }
-.speech-turn { color: #fff; }
+.speech-turn { color: #fff; opacity: .85; }
 .speech-turn .speech-author { color: var(--speech-accent); font-weight: 750; }
 .speech-turn p {
   margin: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   color: #fff;
-  font-size: clamp(17px, 3cqw, 32px);
+  font-size: var(--speech-fit-size, clamp(16px, 2.7cqw, 29px));
   line-height: 1.5;
   font-weight: 650;
   animation: speech-turn-in 260ms ease-out both;

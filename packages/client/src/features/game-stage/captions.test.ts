@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { captionIndexAt, sentenceCues } from './playback/captions';
+import { captionIndexAt, captionIndexAtTime, sentenceCues } from './playback/captions';
 import { progressFraction, type SegmentProgress } from './playback/segment';
+
+describe('Azure caption timeline', () => {
+  it('waits for actual spoken time and keeps the previous sentence during a pause', () => {
+    const cues = [{ text: '第一句。', startMs: 50, endMs: 900 }, { text: '第二句。', startMs: 1900, endMs: 4000 }];
+    expect(captionIndexAtTime(cues, 0)).toBe(-1);
+    expect(captionIndexAtTime(cues, 50)).toBe(0);
+    expect(captionIndexAtTime(cues, 1800)).toBe(0);
+    expect(captionIndexAtTime(cues, 1900)).toBe(1);
+    expect(captionIndexAtTime(cues, 4500)).toBe(1);
+    expect(captionIndexAtTime([], 50)).toBe(-1);
+    expect(captionIndexAtTime(cues, NaN)).toBe(-1);
+  });
+});
 
 describe('sentence captions', () => {
   it('keeps sentence punctuation, quotation marks and paragraph boundaries', () => {

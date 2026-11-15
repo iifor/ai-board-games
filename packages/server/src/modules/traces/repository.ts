@@ -43,6 +43,7 @@ export function createTraceRepository(db: Db) {
         await tx.updateTable('matches').set({ traceDeleted: true }).where('id', '=', matchId).execute();
         await tx.deleteFrom('matchTraceNodes').where('matchId', '=', matchId).execute();
         await tx.deleteFrom('aiCalls').where('matchId', '=', matchId).execute();
+        await tx.deleteFrom('promptComparisons').where('matchId', '=', matchId).execute();
         await tx.updateTable('aiTasks').set({ request: '{}', output: null, error: null }).where('matchId', '=', matchId)
           .where('status', 'in', ['succeeded', 'failed', 'cancelled']).execute();
         return true;
@@ -62,7 +63,9 @@ export function createTraceRepository(db: Db) {
           .where('matchId', '=', matchId).where('requestId', 'in', ids).orderBy('seat').execute() : [];
         const calls = ids.length ? await tx.selectFrom('aiCalls').selectAll()
           .where('matchId', '=', matchId).where('requestId', 'in', ids).orderBy('id').execute() : [];
-        return { data: node.data, event: stage?.event ?? null, tasks, calls };
+        const decisions = ids.length ? await tx.selectFrom('playerDecisions').select('note')
+          .where('matchId', '=', matchId).where('requestId', 'in', ids).execute() : [];
+        return { data: node.data, event: stage?.event ?? null, tasks, calls, decisions };
       });
     },
   };

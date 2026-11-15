@@ -1,6 +1,7 @@
 import { aiExecutorFor } from '../phases/registry';
 import { templateByName, type RequestDraft } from '../phases/types';
 import { assemblePrompt } from '../prompt/assemble';
+import { recall, memoryHistory, memoryOutputSchema } from '../prompt/playerMemory';
 import { budgetLimits } from '../runtime/budget';
 import type { ExecEnv } from '../runtime/env';
 import type { PendingRequest } from '../runtime/types';
@@ -15,7 +16,14 @@ export function issueRequest(env: ExecEnv, draft: RequestDraft, attempt = 1, pre
   const registered = env.game.prompts.get(draft.template.name);
   if (registered !== draft.template) throw new Error(`模板 "${draft.template.name}" 未登记在 spec.prompts 中`);
 
+  const viewer = env.seat(draft.seat);
+  const settings = viewer.profile.speechSettings;
+  const vars = settings && (draft.action === 'speak' || draft.action === 'judge')
+    ? { ...draft.vars, maxChars: settings.speechMaxChars }
+    : draft.vars;
+  const memoryContext = recall(s, viewer, draft.action);
   const pending: PendingRequest = {
+    ...(memoryContext && { memoryContext }),
     id: `${env.phaseId()}#${s.cursor.visit}:${draft.slot}:a${attempt}`,
     seat: draft.seat,
     phaseId: env.phaseId(),
@@ -24,15 +32,18 @@ export function issueRequest(env: ExecEnv, draft: RequestDraft, attempt = 1, pre
     action: draft.action,
     attempt,
     legalTargets: draft.legalTargets,
-    vars: draft.vars,
+    vars,
     templateName: draft.template.name,
     previousError,
   };
-  const outputSchema = toJsonSchema(aiExecutorFor(phase).schema(env, phase, pending));
-  const prompt = assemblePrompt(env.game, s, {
-    viewer: env.seat(draft.seat),
+  const baseSchema = toJsonSchema(aiExecutorFor(phase).schema(env, phase, pending));
+  const outputSchema = memoryContext ? memoryOutputSchema(baseSchema, memoryContext) : baseSchema;
+  const { prompt, taskTemplate } = assemblePrompt(env.game, s, {
+    action: draft.action,
+    onFallback: name => env.record('failure', '已保存模板无法渲染，使用基础模板', { template: name }, { seat: draft.seat, requestIds: [pending.id] }),
+    viewer,
     instruction: draft.template,
-    vars: draft.vars,
+    vars,
     legalTargets: draft.legalTargets,
     outputSchema,
     previousError,
@@ -42,12 +53,15 @@ export function issueRequest(env: ExecEnv, draft: RequestDraft, attempt = 1, pre
   env.record('request', pending.action, { template: pending.templateName, previousError, previousRequestId: env.activeRequestId }, { seat: pending.seat, requestIds: [pending.id] });
   s.budgetUsed.aiRequests += 1;
   env.out.aiRequests.push({
+    ...(memoryContext && { memoryContext }),
+    ...(settings && { speechSettings: settings }),
     id: pending.id,
     seat: pending.seat,
     phaseId: pending.phaseId,
     action: pending.action,
     attempt,
-    prompt,
+    prompt: memoryContext ? { ...prompt, history: [prompt.history, memoryHistory(memoryContext, s.seats)].filter(Boolean).join('\n\n') } : prompt,
+    taskTemplate,
     outputSchema,
     legalTargets: pending.legalTargets,
   });

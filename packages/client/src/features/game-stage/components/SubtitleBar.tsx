@@ -1,4 +1,4 @@
-import type { AudienceView } from '@battle/shared';
+import { stripSpeechTags, type AudienceView } from '@battle/shared';
 import { Avatar } from '../../../components/Avatar';
 import { HOST_POSTER } from '../../../utils/posters';
 import { useSegmentState } from '../hooks/useSegmentState';
@@ -24,12 +24,13 @@ interface SubtitleBarProps {
 export function SubtitleBar({ item, view, control = null, quietIdle = false }: SubtitleBarProps) {
   const { progress } = useSegmentState(control);
   const display = item ? describeEvent(item.event) : null;
-  if (!item || !display?.text) {
+  const text = stripSpeechTags(display?.text ?? '');
+  if (!item || !display || !text.trim()) {
     if (quietIdle) return <div className="subtitle-live-only" aria-live="polite" aria-atomic="true" />;
     return <div className="subtitle-bar glass-panel is-idle" aria-live="polite" aria-atomic="true">等待下一段内容…</div>;
   }
   if (quietIdle && item.event.kind === 'phase_started') {
-    return <div className="subtitle-live-only" aria-live="polite" aria-atomic="true">{display.text}</div>;
+    return <div className="subtitle-live-only" aria-live="polite" aria-atomic="true">{text}</div>;
   }
   const seat = seatOf(view, display.speaker);
   const name = seat ? seat.name : '主持人';
@@ -38,14 +39,14 @@ export function SubtitleBar({ item, view, control = null, quietIdle = false }: S
     <div className="subtitle-bar glass-panel" data-kind={item.event.kind} data-team={seat?.team} aria-live="polite" aria-atomic="true">
       <div key={item.event.seq} className="subtitle-inner">
         <div className="subtitle-speaker">
-          {seat ? <Avatar className="subtitle-avatar" variant="portrait" name={seat.name} avatar={seat.avatar} /> : <Avatar className="subtitle-avatar" name={name} src={HOST_POSTER} />}
+          {seat ? <Avatar className="subtitle-avatar" variant="portrait" name={seat.appearanceName ?? seat.name} avatar={seat.avatar} /> : <Avatar className="subtitle-avatar" name={name} src={HOST_POSTER} />}
           <span>
             <small>{seat ? `${kind} · ${seat.seat} 号` : kind}</small>
             <strong>{name}</strong>
           </span>
         </div>
         <div className="subtitle-body">
-          <p>{display.text}</p>
+          <p>{text}</p>
           <SubtitleProgress progress={progress} />
         </div>
       </div>

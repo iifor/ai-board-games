@@ -1,9 +1,12 @@
 import type { Insertable, Updateable } from 'kysely';
 import type { Db } from '../../db/database';
 import type { ModelsTable } from '../../db/schema';
+import { importProviderModels } from './importModels';
 
 export function createModelRepository(db: Db) {
   return {
+    importedIds: (providerId: number) => db.selectFrom('models').select('model').where('providerId', '=', providerId).execute(),
+    importSelected: (providerId: number, ids: readonly string[]) => importProviderModels(db, providerId, ids),
     list: () => db.selectFrom('models').selectAll().orderBy('id').execute(),
     find: (id: number) => db.selectFrom('models').selectAll().where('id', '=', id).executeTakeFirst(),
     /** 各供应商下的模型数（count 由 pg 以字符串返回） */

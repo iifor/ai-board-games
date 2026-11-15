@@ -11,6 +11,12 @@ export const PUBLIC_CREATION_LOCK = 7201;
 const JOB_LOCK_SPACE = 1;
 /** 两键形式的 space：按音频 ID 哈希的 TTS 合成锁 */
 const TTS_ASSET_LOCK_SPACE = 2;
+const PROMPT_TEMPLATE_LOCK_SPACE = 3;
+
+/** 目录和板子配置写入不同的表，同一模板的保存与应用须按提交顺序分配发布序号。 */
+export async function promptTemplateLock(trx: Transaction<Database>, group: string, key: string) {
+  await sql`select pg_advisory_xact_lock(${PROMPT_TEMPLATE_LOCK_SPACE}, hashtext(${group + '/' + key}))`.execute(trx);
+}
 
 export const JOB_LOCKS = {
   /** 无人观看对局的回收：同一时刻只有一个实例清扫 */

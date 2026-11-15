@@ -1,3 +1,4 @@
+import { systemChoiceLabel, type SystemChoice } from '@battle/shared';
 import { z } from 'zod';
 import type { ExecEnv } from '../runtime/env';
 import { toSeatNumbers } from '../runtime/seats';
@@ -6,7 +7,7 @@ import type { ActDecision } from '../spec/context';
 import type { ActPhase } from '../spec/phases';
 import { privateChannel } from '../visibility/channels';
 import { seatNumber } from './seatNumber';
-import { done, issue, type AiPhaseExecutor } from './types';
+import { done, issue, type AiPhaseExecutor, type RequestDraft } from './types';
 
 interface ActState {
   readonly actors: number[];
@@ -47,16 +48,19 @@ export const actExecutor: AiPhaseExecutor<Phase> = {
     const state = env.phaseState<ActState>();
     if (state.issued) return complete(env, phase);
     state.issued = true;
-    const drafts = state.actors
-      .filter((seat) => (state.legal[String(seat)] ?? []).length > 0)
-      .map((seat) => ({
-        slot: `s${seat}`,
-        seat,
-        action: 'act' as const,
-        template: phase.prompt,
-        vars: {},
-        legalTargets: state.legal[String(seat)] ?? [],
-      }));
+    const drafts: RequestDraft[] = [];
+    for (const seat of state.actors) {
+      const legalTargets = state.legal[String(seat)] ?? [];
+      if (!legalTargets.length) continue;
+      if (legalTargets.length === 1 && !phase.allowNone) {
+        storeDecision(env, phase, seat, legalTargets, 'only_target');
+      } else {
+        if (phase.decisionNotice) {
+          env.log({ kind: 'narration', purpose: 'decision', channel: privateChannel(seat), text: phase.decisionNotice(legalTargets, env.ctx()) });
+        }
+        drafts.push({ slot: `s${seat}`, seat, action: 'act', template: phase.prompt, vars: {}, legalTargets });
+      }
+    }
     return drafts.length ? issue(drafts) : complete(env, phase);
   },
 
@@ -78,33 +82,35 @@ export const actExecutor: AiPhaseExecutor<Phase> = {
     return illegal.length ? `${illegal.join('、')} 不是合法目标` : null;
   },
 
-  fallback(env, phase, pending) {
-    const mode = phase.fallbackMode ?? (phase.allowNone ? 'none' : 'random');
-    if (mode === 'none') {
-      if (!phase.allowNone) throw new Error(`阶段 ${env.phaseId()} 不允许放弃，fallbackMode 不能为 none`);
-      return { targets: [] };
-    }
-    const rng = env.ctx().random(`fallback:${pending.id}`);
-    return { targets: rng.shuffle(pending.legalTargets ?? []).slice(0, targetCount(phase, pending)) };
+  skipFailed(env, phase, pending) {
+    const seat = env.seat(pending.seat);
+    env.log({ kind: 'action', seat: seat.seat, action: phase.action, targets: [], source: 'request_failed',
+      channel: phase.channel?.(env.ctx(), seat) ?? privateChannel(seat.seat), text: `请求失败，放弃${phase.action}` });
+    // 没有玩家决定。部分玩法把主动提交空数组解释为选择另一个选项。
+    return { skipped: true, targets: [] };
   },
 
   store(env, phase, pending, value) {
-    const state = env.phaseState<ActState>();
-    const seat = env.seat(pending.seat);
-    const { targets } = value as ActOutput;
-    state.decisions[String(seat.seat)] = targets;
-    const ctx = env.ctx();
-    const fallbackText = targets.length
-      ? `${phase.action}：${targets.map((target) => `${target}号`).join('、')}`
-      : `放弃${phase.action}`;
-    const text = phase.describe?.(ctx, seat, targets) ?? fallbackText;
-    env.log({
-      kind: 'action',
-      seat: seat.seat,
-      action: phase.action,
-      targets,
-      text,
-      channel: phase.channel?.(ctx, seat) ?? privateChannel(seat.seat),
-    });
+    storeDecision(env, phase, pending.seat, (value as ActOutput).targets);
   },
 };
+
+function storeDecision(env: ExecEnv, phase: Phase, seatId: number, targets: number[], source?: SystemChoice) {
+  const state = env.phaseState<ActState>();
+  const seat = env.seat(seatId);
+  state.decisions[String(seat.seat)] = targets;
+  const ctx = env.ctx();
+  const fallbackText = targets.length
+    ? `${phase.action}：${targets.map((target) => `${target}号`).join('、')}`
+    : `放弃${phase.action}`;
+  const text = phase.describe?.(ctx, seat, targets) ?? fallbackText;
+  env.log({
+    kind: 'action',
+    seat: seat.seat,
+    action: phase.action,
+    targets,
+    ...(source && { source }),
+    text: source ? `${systemChoiceLabel(source)}：${text}` : text,
+    channel: phase.channel?.(ctx, seat) ?? privateChannel(seat.seat),
+  });
+}

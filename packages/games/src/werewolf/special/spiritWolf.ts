@@ -29,7 +29,7 @@ const spiritWolfPrompts = definePrompts({
     '{{#if state.spiritWolf.checks}}你的查验记录：{{#each state.spiritWolf.checks}}第{{this.night}}夜查验 {{this.target}}号，结果是{{this.result}}；{{/each}}{{/if}}',
     '{{#if state.spiritWolf.antidote}}你还有一瓶解毒剂。{{/if}}',
     '{{#if state.spiritWolf.lastShield}}你上一晚庇护的是 {{state.spiritWolf.lastShield}}号，今晚不能再庇护他。{{/if}}',
-    '白天发言时你可以在发言后宣布自爆。',
+    '警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆。',
   ].join(''),
   spiritWolfLearn: '灵狼请睁眼，选择一名好人阵营玩家，学习他的技能。',
   spiritWolfAntidote: '女巫今晚毒了 {{#each legalTargets}}{{this}}号{{/each}}。是否使用你的解毒剂救他？选择他表示使用，输出空数组表示不使用。',
@@ -132,7 +132,7 @@ function resolveShot(ctx: WerewolfContext): ComputeOutcome<WerewolfState> {
   const target = ctx.state.pendingShot;
   const settled = settleShot(ctx, '被灵狼带走');
   if (shooter === undefined || target === null || !ctx.seats.get(target).alive) return settled;
-  const reveal = { kind: 'revealed', text: `${shooter}号翻牌，身份是灵狼（学到了猎人的技能），开枪带走 ${target}号。`, data: { seat: shooter, role: SPIRIT_WOLF } } as const;
+  const reveal = { kind: 'revealed', text: `${shooter}号翻牌，身份是灵狼（学到了猎人的技能），向${target}号开枪。`, data: { seat: shooter, role: SPIRIT_WOLF } } as const;
   return { ...settled, log: [reveal, ...(settled.log ?? [])] };
 }
 

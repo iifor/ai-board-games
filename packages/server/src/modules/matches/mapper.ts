@@ -9,6 +9,7 @@ export function toSummary(row: MatchRow, seats: readonly SeatRow[], game: Compil
   return {
     id: row.id,
     gameKey: row.gameKey,
+    ...(row.importTitle ? { importTitle: row.importTitle } : {}),
     gameTitle: game?.spec.title ?? row.gameKey,
     variantKey: row.variantKey,
     variantName: variant?.name ?? null,

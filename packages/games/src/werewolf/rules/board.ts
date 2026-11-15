@@ -19,7 +19,7 @@ export function boardConfig(ctx: Pick<WerewolfContext, 'variant'>): BoardConfig 
 const decks = new Map<string, ReadonlySet<string>>();
 
 /** 本局牌堆里的角色（含盗贼板子被抽作底牌的牌）：公开信息 */
-function deckRoles(ctx: Pick<WerewolfContext, 'variant'>): ReadonlySet<string> {
+export function deckRoles(ctx: Pick<WerewolfContext, 'variant'>): ReadonlySet<string> {
   const key = ctx.variant?.key ?? DEFAULT_BOARD;
   const cached = decks.get(key);
   if (cached) return cached;

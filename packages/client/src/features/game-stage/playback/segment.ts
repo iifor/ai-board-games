@@ -5,7 +5,7 @@
  */
 export type SegmentProgress =
   | { readonly kind: 'timed'; readonly fraction: number; readonly startedAt: number; readonly remainingMs: number }
-  | { readonly kind: 'measured'; readonly fraction: number };
+  | { readonly kind: 'measured'; readonly fraction: number; readonly positionMs?: number };
 
 export interface SegmentState {
   readonly rate: number;

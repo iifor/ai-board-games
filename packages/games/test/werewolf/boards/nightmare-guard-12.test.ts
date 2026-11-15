@@ -60,11 +60,11 @@ describe('nightmare', () => {
     const run = play(SEED, combine(fear(wolf, 1), wolvesKill(villager, 1)), BOARD);
     expect(onNight(run, 'wolf_kill', 1)).toHaveLength(0);
     expect(entries(run, 'narration', 'night_blocks')[0]).toMatchObject({ channel: 'team:werewolf' });
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
   });
 
   it('can self-destruct', () => {
     const run = play(SEED, undefined, BOARD);
-    expect(requestsIn(run, 'day_speech').find((request) => request.seat === nightmare)?.prompt.output).toContain('selfDestruct');
+    expect(requestsIn(run, 'day_speech').filter(request => request.action === 'speak').find((request) => request.seat === nightmare)?.prompt.output).toContain('selfDestruct');
   });
 });

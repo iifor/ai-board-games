@@ -22,7 +22,7 @@ describe('silence elder', () => {
 
   it('announces the silence with the death news and skips the silenced seat in day speeches', () => {
     const run = play(SEED, combine(act('elder_silence', elder, [villager], 1), act('elder_silence', elder, [villagerB], 2)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe(`天亮了，昨晚是平安夜。今天被禁言的是 ${villager}号，他在白天发言环节不能发言。`);
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe(`昨晚是平安夜。今天被禁言的是 ${villager}号，他在白天发言环节不能发言。`);
     expect(speakersOn(run, 1)).not.toContain(villager);
     expect(speakersOn(run, 1)).toHaveLength(11);
     expect(requestsIn(run, 'exile_vote').some((request) => request.seat === villager)).toBe(true);
@@ -32,7 +32,7 @@ describe('silence elder', () => {
 
   it('keeps the silence secret until dawn and drops it when the target dies that night', () => {
     const run = play(SEED, combine(act('elder_silence', elder, [villager], 1), wolvesKill(villager, 1)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe(`天亮了，昨晚死亡的是：${villager}号。`);
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe(`昨晚${villager}号出局。`);
     expect(entries(run, 'action', 'elder_silence')[0]?.channel).toBe(`private:${elder}`);
     const nightRequests = run.requests.filter(({ request, snapshot }) => snapshot.round === 1 && request.phaseId === 'wolf_chat');
     for (const { snapshot } of nightRequests) expect(stateOf(snapshot).silencedToday).toBeNull();

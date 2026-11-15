@@ -1,9 +1,11 @@
+import { isPlayerSpeech } from '@battle/shared';
 import { useEffect, useRef } from 'react';
-import { describeEvent } from '../playback/describe';
+import { describeEvent, hostLabel } from '../playback/describe';
 import type { StreamItem } from '../types';
+import { speakerLabel } from '../utils';
 import './EventFeed.css';
 
-export type FeedFilter = 'all' | 'speech';
+export type FeedFilter = 'all' | 'speech' | 'overview';
 
 interface EventFeedProps {
   readonly items: readonly StreamItem[];
@@ -18,7 +20,10 @@ export function EventFeed({ items, filter = 'all' }: EventFeedProps) {
     if (list) list.scrollTop = list.scrollHeight;
   }, [items.length, filter]);
 
-  const visible = filter === 'speech' ? items.filter(({ event }) => event.kind === 'speech' || event.kind === 'judgement') : items;
+  const visible = items.filter(({event}) => {
+    const speech = isPlayerSpeech(event);
+    return filter === 'speech' ? speech : filter === 'overview' ? !speech : true;
+  });
   return (
     <ol className="event-feed" ref={listRef}>
       {visible.map(({ event }) => {
@@ -27,7 +32,7 @@ export function EventFeed({ items, filter = 'all' }: EventFeedProps) {
         const seat = speaker === null ? null : event.view.seats.find((candidate) => candidate.seat === speaker);
         return (
           <li key={event.seq} className={`event-feed-${event.kind}`}>
-            {event.kind === 'phase_started' ? <strong>{text}</strong> : <><span>{seat ? seat.name : '主持人'}</span>{text}</>}
+            {event.kind === 'phase_started' ? <strong>{text}</strong> : <><span>{seat ? speakerLabel(seat.seat, seat.name) : hostLabel(event)}</span>{text}</>}
           </li>
         );
       })}

@@ -14,6 +14,12 @@ const [lucky = 0, villager = 0] = roleSeats(SEED, 'villager', BOARD);
 
 const dealWith = (target: number): Override => act('merchant_deal_early', merchant, [target], 1);
 const pick = (phaseId: string): Override => act(phaseId, merchant, [merchant], 1);
+
+it.each(['merchant_skill_check', 'merchant_skill_gun'])('abandons a trade when %s fails instead of gifting poison', phase => {
+  const run = play(SEED, combine(dealWith(lucky), request => request.phaseId === phase ? {} : undefined), BOARD);
+  expect(stateOf(run.snapshot).gifts[String(lucky)]).toBeUndefined();
+  expect(stateOf(run.snapshot).merchant).toEqual({ used: false, target: null });
+});
 const requestsOn = (run: ReturnType<typeof play>, phaseId: string, round: number) =>
   run.requests.filter(({ request, snapshot }) => request.phaseId === phaseId && snapshot.round === round).map(({ request }) => request);
 
@@ -44,7 +50,7 @@ describe('black merchant (first night)', () => {
       { seat: lucky, round: 1, reason: '昨晚死亡' },
       { seat: wolfB, round: 1, reason: '被枪杀' },
     ]);
-    expect(entries(run, 'action', 'gift_shot')[0]).toMatchObject({ channel: 'public', text: `开枪带走 ${wolfB}号` });
+    expect(entries(run, 'action', 'gift_shot')[0]).toMatchObject({ channel: 'public', text: `向${wolfB}号开枪` });
   });
 
   it('gives a poison that can be used later', () => {
@@ -59,7 +65,7 @@ describe('big tree', () => {
 
   it('survives the first wolf kill and dies on the second', () => {
     const run = play(SEED, combine(deal, wolvesKill(tree, 1), wolvesKill(tree, 2)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
     expect(entries(run, 'narration', 'night_resolve')[0]).toMatchObject({ channel: `private:${tree}`, round: 1 });
     expect(eliminated(run)[0]).toEqual({ seat: tree, round: 2, reason: '昨晚死亡' });
     expect(entries(run, 'phase_started').some((entry) => entry.title === '大树倒下')).toBe(false);
@@ -67,7 +73,7 @@ describe('big tree', () => {
 
   it('wastes the antidote on a tree that still has two lives', () => {
     const run = play(SEED, combine(deal, wolvesKill(tree, 1), act('witch_save', witch, [tree], 1), wolvesKill(tree, 2)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
     expect(eliminated(run)[0]).toEqual({ seat: tree, round: 2, reason: '昨晚死亡' });
   });
 

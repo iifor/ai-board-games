@@ -15,7 +15,7 @@ const nightmarePrompts = definePrompts({
     '你是{{me.label}}，身份是梦魇（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '每晚你第一个睁眼，可以恐惧一名玩家，使他当晚的夜间技能失效（猎人当晚被狼人击杀时不能开枪；恐惧到狼人会让狼队当晚不能击杀）。',
     '{{#if state.nightmareLastTarget}}你上一晚恐惧的是 {{state.nightmareLastTarget}}号，今晚不能再恐惧他。{{/if}}',
-    '白天发言时你可以在发言后宣布自爆。',
+    '警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆。',
   ].join(''),
   nightmareFear: '梦魇请睁眼，选择今晚要恐惧的玩家，也可以输出空数组不恐惧。',
 });

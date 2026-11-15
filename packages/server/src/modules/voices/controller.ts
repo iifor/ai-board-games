@@ -10,6 +10,10 @@ import { voicePreviewSchema, voiceSchema } from './validator';
 export function voiceController(service: VoiceService) {
   return {
     ...crudController(service, { create: voiceSchema, update: voiceSchema }),
+    azureCatalog: async (c: Context<AppEnv>) => {
+      c.header('Cache-Control', 'private, no-store');
+      return ok(c, await service.azureCatalog());
+    },
     preview: async (c: Context<AppEnv>) => {
       const { text } = await parseJson(c, voicePreviewSchema);
       return ok(c, await service.preview(parseId(c.req.param('id')), text));

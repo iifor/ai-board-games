@@ -1,5 +1,6 @@
 import type { AiCallDto, MatchSeatDto, MatchStatus } from './matches';
 import type { StageEvent } from '../stage';
+import type { MemoryCard, MemoryDecision } from './playerMemory';
 
 export type TraceKind = 'phase' | 'request' | 'decision' | 'settlement' | 'stage' | 'log' | 'control' | 'failure';
 
@@ -42,13 +43,17 @@ export interface ModelUsageDto {
 }
 
 export interface MatchTraceDto {
-  readonly match: TraceMatchDto & { readonly seats: readonly MatchSeatDto[]; readonly error: string | null };
+  readonly match: TraceMatchDto & {
+    readonly seats: readonly MatchSeatDto[]; readonly error: string | null;
+    readonly roleNames?: Readonly<Record<string, string>>;
+  };
   readonly nodes: readonly TraceNodeDto[];
   readonly models: readonly ModelUsageDto[];
   readonly calls: readonly Pick<AiCallDto, 'id' | 'requestId' | 'modelName' | 'seat' | 'latencyMs' | 'createdAt' | 'error'>[];
 }
 
 export interface TraceRequestDto {
+  readonly memory?: { readonly offered: readonly MemoryCard[]; readonly decision: MemoryDecision | null };
   readonly id: string;
   readonly seat: number;
   readonly action: string;

@@ -1,0 +1,49 @@
+.admin-account {
+  position: relative;
+  flex: none;
+  padding: 8px;
+  border-top: 1px solid #edf0f3;
+}
+
+.admin-account-trigger {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #253246;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.admin-account-trigger:hover,
+.admin-account-trigger[aria-expanded='true'] { background: #f3f6fa; }
+.admin-account-trigger:focus-visible { outline: 2px solid #1677ff; outline-offset: -2px; }
+
+.admin-account-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #e9effb;
+  color: #36558b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-account-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.admin-account-more { color: #58677c; font-size: 18px; }

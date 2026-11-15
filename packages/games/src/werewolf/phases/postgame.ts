@@ -1,4 +1,6 @@
+import { line } from '../announcements';
 import { speechOutput } from '@battle/engine';
+import { WEREWOLF_SPEECH_MAX_CHARS } from '../../speechLimits';
 import { werewolfPrompts as prompts } from '../prompts';
 import { postgameSpeakers, resolveMvp } from '../rules/postgame';
 import { werewolfResult } from '../rules/victory';
@@ -9,7 +11,7 @@ export const postgamePhases = {
     kind: 'reveal',
     title: '赛后复盘',
     revealRoles: true,
-    content: (ctx) => ({ text: `${werewolfResult(ctx).summary}。公布所有身份。` }),
+    content: (ctx) => ({ text: line(ctx, 'winner', { 胜负结果: werewolfResult(ctx).summary }) }),
     next: 'mvp_vote',
   },
   mvp_vote: {
@@ -27,8 +29,9 @@ export const postgamePhases = {
     kind: 'speak',
     title: '赛后发言',
     actors: postgameSpeakers,
+    allowSkip: true,
     prompt: prompts.postgameSpeech,
-    output: speechOutput({ max: 180 }),
+    output: speechOutput({ max: WEREWOLF_SPEECH_MAX_CHARS }),
     fallback: () => ({ speech: '这局大家都辛苦了。' }),
     next: 'end',
   },

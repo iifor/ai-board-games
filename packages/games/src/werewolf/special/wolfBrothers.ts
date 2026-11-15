@@ -19,16 +19,16 @@ const wolfBrothersPrompts = definePrompts({
   wolfElderBrother: [
     '你是{{me.label}}，身份是狼兄（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '{{#if state.knownWolves}}你的弟弟狼弟是 {{#each state.knownWolves}}{{this}}号 {{/each}}：他不和狼队一起夜聊、击杀，狼队其他人不认识他，你出局前预言家查验他为好人。{{/if}}',
-    '你出局后的下一晚，狼弟可以单独击杀一名玩家；再之后一晚，他会加入狼队。白天发言时你可以在发言后宣布自爆。',
+    '你出局后的下一晚，狼弟可以单独击杀一名玩家；再之后一晚，他会加入狼队。警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆。',
   ].join(''),
   wolfYoungerBrother: [
     '你是{{me.label}}，身份是狼弟（狼人阵营）。{{#if state.knownWolves}}你的哥哥狼兄是 {{#each state.knownWolves}}{{this}}号 {{/each}}。{{/if}}',
     '你暂时不和狼队一起夜聊、击杀，也不认识其他狼人；狼兄出局前预言家查验你为好人。',
-    '狼兄出局后的下一晚你可以单独击杀一名玩家，再之后一晚你会加入狼队。白天发言时你可以在发言后宣布自爆。',
+    '狼兄出局后的下一晚你可以单独击杀一名玩家，再之后一晚你会加入狼队。警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆。',
   ].join(''),
   wolfYoungerBrotherPack: [
     '你是{{me.label}}，身份是狼弟（狼人阵营）。狼兄已经出局，你已加入狼队。',
-    '你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。白天发言时你可以在发言后宣布自爆。',
+    '你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆。',
   ].join(''),
   youngerBrotherKill: '狼弟请睁眼。狼兄已经出局，今晚你可以单独击杀一名玩家，也可以输出空数组不杀人。',
 });

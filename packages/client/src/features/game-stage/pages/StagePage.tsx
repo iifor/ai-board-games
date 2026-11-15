@@ -4,7 +4,6 @@ import { Link, useParams } from 'react-router';
 import { StatusView } from '../../../components/StatusView';
 import { useAsync } from '../../../hooks/useAsync';
 import { fetchMatch } from '../../../services/matches';
-import type { FeedFilter } from '../components/EventFeed';
 import { DebateTitle } from '../components/DebateTitle';
 import { StageRecord } from '../components/StageRecord';
 import { PhaseBanner } from '../components/PhaseBanner';
@@ -30,7 +29,7 @@ import { debateTopicOf } from '../layouts/debateTopic';
 import './StagePage.css';
 
 /**
- * 实时与回放共用舞台；记录在桌心或正反方之间展开。
+ * 实时与回放共用舞台；当前发言居中，历史记录独立停靠左下角。
  * 页面组合播放、舞台快捷键和悬浮座位资料。
  */
 export function StagePage() {
@@ -43,7 +42,7 @@ export function StagePage() {
 
 function StageViewer({ summary }: { readonly summary: MatchSummaryDto }) {
   const setting = useAudienceSetting(summary.id, summary.seats);
-  const [options, setOptions] = useState<PlaybackOptions>({ speed: 1, paused: false, muted: false });
+  const [options, setOptions] = useState<PlaybackOptions>({ speed: 1, paused: false, muted: summary.debug && summary.scripted });
   const seat = setting.seat;
   return <StageSession key={seat ?? 'god'} summary={summary} seat={seat} start={setting.afterSeq}
     options={options} setOptions={setOptions} switchMode={setting.switchMode} />;
@@ -62,8 +61,8 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
   const [session, setSession] = useState(0);
   const stream = useMatchStream(summary.id, session, seat, session === 0 ? start : 0);
   const debate = summary.layout === 'versus';
-  const [feedOpen, setFeedOpen] = useState(false);
-  const [feedFilter, setFeedFilter] = useState<FeedFilter>('all');
+  const [feedOpen, setFeedOpen] = useState(true);
+  const [speechOpen, setSpeechOpen] = useState(true);
   const playback = usePlayback(stream.items, stream.ack, options);
   const finished = stream.ended && playback.pending === 0 && !playback.current;
   const resultDialog = useResultDialog(finished);
@@ -86,16 +85,16 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
   const topicTitle = debate ? debateTopicOf(playback.view)?.title : undefined;
   // 播完后字幕栏停在最后一段（终局摘要），而不是回到"等待下一段"
   const subtitleItem = playback.current ?? playback.played.at(-1) ?? null;
-  const record = feedOpen ? <StageRecord items={playback.current ? [...playback.played, playback.current] : playback.played}
-    filter={feedFilter} onFilter={setFeedFilter} onClose={() => setFeedOpen(false)} /> : null;
+  const shown = subtitleItem?.event;
+  const historyItems = isPlayerSpeech(shown) ? playback.played.filter(item => item.event.seq !== shown.seq) : playback.played;
 
   return (
     <div className="stage-shell" data-game={gameKey} data-layout={layout} data-period={period} data-finished={finished}>
       <StageBackdrop gameKey={gameKey} period={period} />
       {topicTitle && <DebateTitle title={topicTitle} />}
-      <StageHud summary={summary} view={playback.view} connection={stream.connection} ended={finished}
+      <StageHud summary={summary} view={playback.view} event={shown} connection={stream.connection} ended={finished}
         replay={summary.status === 'completed' || session > 0 || stream.ended} />
-      <PlaybackControls compact={!debate} options={options} pending={playback.pending} finished={finished} feedOpen={feedOpen} onChange={setOptions} onToggleFeed={toggleFeed}>
+      <PlaybackControls hideFeedButton compact={!debate} options={options} pending={playback.pending} finished={finished} feedOpen={feedOpen} onChange={setOptions} onToggleFeed={toggleFeed}>
       <label className="audience-setting">
         <select aria-label="观战视角" value={seat === null ? 'god' : 'player'} onChange={(e) => {
           const seq = playback.current?.event.seq ?? playback.played.at(-1)?.event.seq;
@@ -106,7 +105,7 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
       {stream.error ? <StageError message={stream.error} onRetry={stream.connection === 'lost' ? stream.retry : null} /> : null}
       <div className="stage-arena" ref={arenaRef}>
         <Stage layout={layout} view={playback.view} current={playback.current} played={playback.played} control={playback.control}
-          record={record} onSeatSelect={selectSeat} selectedSeat={selected?.seat ?? null} />
+          playbackPaused={options.paused} playbackSpeed={options.speed} onSeatSelect={selectSeat} selectedSeat={selected?.seat ?? null} />
         {selected && selectedSeat && !(hasResult && resultDialog.open) ? (
           <SeatPopover key={selected.seat} seat={selectedSeat} speeches={selectedSpeeches} anchor={selected.anchor} arenaRef={arenaRef} onClose={closeSeat} />
         ) : null}
@@ -117,8 +116,19 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
           <SubtitleBar quietIdle item={subtitleItem} view={playback.view} control={playback.control} />}
       </>}
       <SentenceCaptions item={subtitleItem} control={playback.control} announce={!debate} />
+      <div className="stage-history stage-history-overview" hidden={!feedOpen}>
+        <StageRecord items={playback.current ? [...playback.played,playback.current] : playback.played}
+          filter="overview" onClose={() => setFeedOpen(false)} />
+      </div>
+      <div className="stage-history stage-history-speech" hidden={!speechOpen}>
+        <StageRecord title="发言记录" items={historyItems} filter="speech" onClose={() => setSpeechOpen(false)} />
+      </div>
       <div className="stage-actions">
         <Link className="button" to="/">← 返回大厅</Link>
+        <button type="button" className="button" aria-pressed={feedOpen} title={SHORTCUT_HINTS.feed.title}
+          aria-keyshortcuts={SHORTCUT_HINTS.feed.keys} onClick={toggleFeed}>对局记录</button>
+        <button type="button" className="button" aria-pressed={speechOpen}
+          onClick={() => setSpeechOpen(open => !open)}>发言记录</button>
         {hasResult && !resultDialog.open ? <button type="button" className="button button-primary" title={SHORTCUT_HINTS.result.title} aria-keyshortcuts={SHORTCUT_HINTS.result.keys} onClick={resultDialog.show}>查看结果</button> : null}
       </div>
       {hasResult && resultDialog.open && stream.result ? (

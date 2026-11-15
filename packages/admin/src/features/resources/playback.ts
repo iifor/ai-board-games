@@ -1,4 +1,4 @@
-import type { VoiceDto } from '@battle/shared';
+import { stripSpeechTags, type VoiceDto } from '@battle/shared';
 
 let current: HTMLAudioElement | null = null;
 
@@ -12,6 +12,8 @@ export async function playAudio(url: string): Promise<void> {
 
 /** 浏览器本地朗读：优先按音色名匹配本地语音，否则按语言 */
 export function speakInBrowser(voice: Pick<VoiceDto, 'voiceName' | 'language'>, text: string): void {
+  text = stripSpeechTags(text);
+  if (!text.trim()) throw new Error('朗读内容不能为空');
   if (!('speechSynthesis' in window)) throw new Error('当前浏览器不支持本地朗读');
   const synth = window.speechSynthesis;
   synth.cancel();

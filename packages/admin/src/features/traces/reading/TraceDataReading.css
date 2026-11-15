@@ -1,0 +1,19 @@
+.trace-json-scroll.trace-read-scroll { background: #fff; padding: 2px 4px; font: inherit; }
+.trace-reading { display: grid; gap: 16px; color: #20334a; }
+.trace-reading h4, .trace-reading p, .trace-read-facts, .trace-read-facts dd { margin: 0; }
+.trace-reading h4 { font-size: 15px; }
+.trace-reading p, .trace-read-facts dd { white-space: pre-wrap; overflow-wrap: anywhere; }
+.trace-reading section > h4, .trace-read-title { margin-bottom: 7px; }
+.trace-read-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.trace-read-title span, .trace-read-facts dt { color: #526478; font-size: 13px; }
+.trace-read-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr)); gap: 8px 14px; }
+.trace-read-facts > div { min-width: 0; padding: 5px 9px; border-inline-start: 2px solid #dce5ee; }
+.trace-read-facts dd { font-weight: 550; }
+.trace-read-roster { overflow-x: auto; }
+.trace-read-roster table { border-collapse: collapse; width: 100%; }
+.trace-read-roster th, .trace-read-roster td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #e5ebf1; }
+.trace-read-roster thead th { background: #f2f5f9; white-space: nowrap; }
+.trace-read-roster [data-alive=true] { color: #23714b; }
+.trace-read-roster [data-alive=false] { color: #9b422e; }
+.trace-reading summary { cursor: pointer; color: #235d97; }
+.trace-reading details[open] > summary { margin-bottom: 6px; }

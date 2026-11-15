@@ -23,6 +23,8 @@ function frozen<T>(value: T): T {
 function workingCopy(snapshot: EngineSnapshot): EngineSnapshot {
   return {
     ...snapshot,
+    ...(snapshot.promptSet && { promptSet: frozen(snapshot.promptSet) }),
+    ...(snapshot.announcementOverrides && { announcementOverrides: frozen(snapshot.announcementOverrides) }),
     seats: frozen(snapshot.seats),
     state: frozen(snapshot.state),
     params: frozen(snapshot.params),
@@ -84,5 +86,6 @@ export function advance(game: CompiledGame, snapshot: EngineSnapshot, input: Eng
   const env = new ExecEnv(game, workingCopy(snapshot), out, collectTrace);
   applyInput(env, input);
   runUntilBlocked(env);
-  return { snapshot: env.s, log: out.log, stageEvents: out.stageEvents, aiRequests: out.aiRequests, status: env.s.status, trace: env.trace };
+  return { snapshot: env.s, log: out.log, stageEvents: out.stageEvents, aiRequests: out.aiRequests, status: env.s.status, trace: env.trace,
+    ...(env.acceptedRequestId && { acceptedRequestId: env.acceptedRequestId, acceptedOutput: env.acceptedOutput }) };
 }

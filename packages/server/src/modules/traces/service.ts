@@ -10,7 +10,7 @@ function matchDto(row: Omit<TraceMatchDto, 'status' | 'createdAt'> & { status: s
     status: row.status as MatchStatus, createdAt: row.createdAt.toISOString() };
 }
 
-export function createTraceService(repository: TraceRepository) {
+export function createTraceService(repository: TraceRepository, rolesOf: (gameKey: string) => Readonly<Record<string, { name: string }>> | undefined) {
   return {
     async remove(matchId: string) {
       if (!await repository.remove(matchId)) throw notFound('对局');
@@ -22,7 +22,8 @@ export function createTraceService(repository: TraceRepository) {
       const result = await repository.overview(matchId);
       if (!result) throw notFound('对局');
       return {
-        match: { ...matchDto(result.match), error: result.match.error, seats: result.seats },
+        match: { ...matchDto(result.match), error: result.match.error, seats: result.seats,
+          roleNames: Object.fromEntries(Object.entries(rolesOf(result.match.gameKey) ?? {}).map(([id, role]) => [id, role.name])) },
         nodes: result.nodes.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
         models: result.models,
         calls: result.calls.map((call) => ({ ...call, createdAt: call.createdAt.toISOString() })),
@@ -37,6 +38,8 @@ export function createTraceService(repository: TraceRepository) {
           const request = task.request as AiRequest;
           return {
             id: request.id, seat: request.seat, action: request.action, attempt: request.attempt,
+            ...(request.memoryContext && { memory: { offered: request.memoryContext.offered,
+              decision: result.decisions.find(d => d.note.requestId === request.id)?.note ?? null } }),
             prompt: { ...request.prompt }, messages: toChatMessages(request.prompt), legalTargets: request.legalTargets, outputSchema: request.outputSchema,
             status: task.status, output: task.output, error: task.error,
             calls: result.calls.filter((call) => call.requestId === task.requestId).map((call) => ({

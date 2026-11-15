@@ -32,7 +32,7 @@ const SEAT_COLUMNS = ['seat', 'playerId', 'playerName', 'modelId', 'voiceId'] as
 
 /** 对局元数据列：不含快照（快照带全部日志，只有推进、脚本化输出与后台日志需要） */
 const MATCH_COLUMNS = [
-  'id', 'gameKey', 'variantKey', 'status', 'debug', 'scripted', 'chaos', 'pacing', 'phaseId', 'version',
+  'id', 'importTitle', 'gameKey', 'variantKey', 'status', 'debug', 'scripted', 'chaos', 'pacing', 'phaseId', 'version',
   'lastSeq', 'ackedSeq', 'result', 'error', 'createdAt', 'completedAt', 'traceDeleted',
 ] as const;
 
@@ -84,10 +84,14 @@ export function createMatchRepository(db: Db) {
       return row ? toRow(row) : undefined;
     },
 
-    async list(filter: { readonly debug?: boolean; readonly status?: MatchStatus; readonly limit: number }): Promise<MatchRow[]> {
-      let query = db.selectFrom('matches').select(MATCH_COLUMNS).orderBy('createdAt', 'desc').limit(filter.limit);
+    async list(filter: { readonly debug?: boolean; readonly source?: 'normal' | 'debug' | 'import'; readonly status?: MatchStatus; readonly limit: number; readonly offset?: number }): Promise<MatchRow[]> {
+      let query = db.selectFrom('matches').select(MATCH_COLUMNS).orderBy('createdAt', 'desc').orderBy('id', 'desc')
+        .limit(filter.limit).offset(filter.offset ?? 0);
       if (filter.debug !== undefined) query = query.where('debug', '=', filter.debug);
       if (filter.status) query = query.where('status', '=', filter.status);
+      if (filter.source === 'import') query = query.where('importTitle', 'is not', null);
+      if (filter.source === 'normal') query = query.where('importTitle', 'is', null).where('debug', '=', false);
+      if (filter.source === 'debug') query = query.where('importTitle', 'is', null).where('debug', '=', true);
       return (await query.execute()).map(toRow);
     },
 

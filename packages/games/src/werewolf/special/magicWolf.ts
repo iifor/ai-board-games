@@ -13,7 +13,7 @@ import type { SpecialDescriptor } from './types';
 const magicWolfPrompts = definePrompts({
   magicWolf: [
     '你是{{me.label}}，身份是魔狼（狼人阵营）。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
-    '白天发言时你可以在发言后宣布自爆：自爆后直接进入黑夜，当晚所有神职的技能都会被你封印。',
+    '警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆：自爆后直接进入黑夜，当晚所有神职的技能都会被你封印。',
     '你是最后一名狼人时若被放逐，你会翻牌并凭借血脉之力存活到下一个天亮之后才出局（这一晚你仍可以击杀）。',
   ].join(''),
 });

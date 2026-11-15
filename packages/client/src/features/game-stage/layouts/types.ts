@@ -6,6 +6,8 @@ import type { StagePeriod } from '../utils';
 import type { SignupChoice } from '../animation/sheriffSignup';
 
 export interface LayoutProps {
+  readonly control?: import('../playback/segment').SegmentControl | null;
+  readonly skillMarks?: readonly import('../animation/skillTypes').SkillMark[];
   readonly signup?: SignupChoice | null;
   readonly cue?: import('../animation/skillCue').SkillCue | null;
   readonly cueSeq?: number | undefined;

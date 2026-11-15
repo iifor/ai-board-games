@@ -1,4 +1,4 @@
-# AI Board Games
+# 各执一词 · AT ODDS
 
 通用 AI 对战平台：用 TypeScript 声明一个游戏的流程、规则和提示词，由引擎调度 AI 玩家完成对局，C 端实时播放与回放，B 端配置模型与玩家、查看 Trace 并调试。
 

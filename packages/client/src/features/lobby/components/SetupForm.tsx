@@ -71,7 +71,7 @@ export function SetupForm({ game, players, initial }: SetupFormProps) {
             <details className="setup-settings setup-debug-settings" open={players.length === 0 || undefined}>
               <summary>模拟开局 <small>本地调试</small></summary>
               <div className="setup-debug">
-                <p>{board ? `${board.name} · ` : ''}{players.length ? '使用当局临时玩家，由脚本执行行动。' : '玩家库为空，可以用临时玩家体验这局游戏。'}</p>
+                <p>{board ? `${board.name} · ` : ''}{players.length ? '使用当局临时玩家，由脚本执行行动。' : '暂无可用的模型玩家，可以用临时玩家开局。'}</p>
                 <button type="button" className={players.length ? 'button' : 'button button-primary'} disabled={setup.submitting || setup.topicPartial}
                   onClick={() => void start('generated')}>{setup.submitting ? '正在创建对局…' : `生成 ${setup.range.min} 名模拟玩家并开局`}</button>
               </div>

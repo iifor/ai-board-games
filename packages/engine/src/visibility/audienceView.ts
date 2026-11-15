@@ -35,6 +35,8 @@ export function buildAudienceView(
       seat: seat.seat,
       name: seat.profile.name,
       avatar: seat.profile.avatar,
+      ...(seat.profile.modelKey && { modelKey: seat.profile.modelKey, persona: seat.profile.persona }),
+      ...(seat.profile.appearanceName && { appearanceName: seat.profile.appearanceName }),
       label: seatLabel(game, seat),
       alive: seat.alive,
       role: visible ? seat.role : null,

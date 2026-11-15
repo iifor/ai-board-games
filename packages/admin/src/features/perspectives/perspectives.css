@@ -1,0 +1,15 @@
+.perspective-panel { background: #fff; border: 1px solid #dce2ea; border-radius: 12px; padding: clamp(16px, 1.2vw, 28px); min-width: 0; }
+.perspective-panel > .ant-input-search { max-width: 310px; }
+.perspective-panel p { color: #526071; line-height: 1.6; }
+.perspective-panel h3 { margin: 20px 0 6px; }
+.perspective-panel td { overflow-wrap: anywhere; white-space: pre-wrap; }
+.perspective-panel small { display: block; color: #596779; }
+.perspective-panel .perspective-history-trigger { display: block; padding-inline: 0; }
+.perspective-history-list { list-style: none; padding: 0; margin: 0; width: max-content; max-width: min(420px, calc(100vw - 56px)); max-height: min(320px, 50vh); overflow: auto; }
+.perspective-history-list li { white-space: pre-wrap; overflow-wrap: anywhere; }
+.perspective-history-list li + li { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #b9c3d0; }
+.perspective-controls { display: flex; margin-bottom: 12px; }
+.perspective-controls .ant-select { min-width: 135px; }
+.perspective-prompt details { padding: 12px 0; border-bottom: 1px solid #e5e9ef; }
+.perspective-prompt summary { cursor: pointer; font-weight: 600; }
+.perspective-prompt pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }

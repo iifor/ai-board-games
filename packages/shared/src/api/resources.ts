@@ -1,4 +1,5 @@
 // B 端可配置资源：模型供应商、模型、音色、AI 玩家。
+import type { PlayerSpeechOverrides } from '../playerSpeech';
 
 export interface ProviderDto {
   readonly id: number;
@@ -31,7 +32,6 @@ export interface ModelDto {
   readonly providerId: number;
   readonly name: string;
   readonly model: string;
-  readonly temperature: number;
   readonly maxTokens: number;
   readonly fallbackModelId: number | null;
   readonly enabled: boolean;
@@ -45,7 +45,6 @@ export interface ModelInput {
   readonly providerId: number;
   readonly name: string;
   readonly model: string;
-  readonly temperature?: number | undefined;
   readonly maxTokens?: number | undefined;
   readonly fallbackModelId?: number | null | undefined;
   /**
@@ -62,11 +61,31 @@ export interface ModelTestResult {
   readonly message: string;
 }
 
+export interface ProviderModelOption {
+  readonly id: string;
+  readonly added: boolean;
+}
+
+export interface ModelImportInput {
+  readonly modelIds: readonly string[];
+}
+
+export interface ModelImportResult {
+  readonly created: number;
+  readonly skipped: number;
+}
+
 export const VOICE_PROVIDERS = ['azure', 'mimo', 'browser'] as const;
 export type VoiceProvider = (typeof VOICE_PROVIDERS)[number];
 
 export const VOICE_GENDERS = ['男', '女', '中性'] as const;
 export type VoiceGender = (typeof VOICE_GENDERS)[number];
+
+/** 当前 Azure 区域目录中一个音色支持的风格；空数组表示只提供默认风格。 */
+export interface AzureVoiceCatalogEntry {
+  readonly voiceName: string;
+  readonly styles: readonly string[];
+}
 
 export interface VoiceDto {
   readonly id: number;
@@ -120,21 +139,29 @@ export interface VoiceImportResult {
 
 export interface PlayerDto {
   readonly id: number;
+  /** 后台昵称，未填写时为空字符串。 */
   readonly name: string;
+  readonly modelDisplayName: string | null;
   readonly avatar: string | null;
   readonly persona: string;
-  readonly modelId: number;
+  /** null 表示采用当前人设建议。 */
+  readonly temperature: number | null;
+  readonly maxTokens: number | null;
+  readonly speechMaxChars: number | null;
+  readonly modelId: number | null;
   readonly voiceId: number | null;
   readonly enabled: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
 
-export interface PlayerInput {
-  readonly name: string;
+export interface PlayerInput extends PlayerSpeechOverrides {
+  /** 省略保留原昵称，空字符串清除。 */
+  readonly name?: string | undefined;
   readonly avatar?: string | null | undefined;
   readonly persona?: string | undefined;
-  readonly modelId: number;
+  /** null 解除绑定；省略时创建为未绑定、更新时保留原绑定。 */
+  readonly modelId?: number | null | undefined;
   readonly voiceId?: number | null | undefined;
   /** 创建时默认 true；更新时省略表示保留原值 */
   readonly enabled?: boolean | undefined;
@@ -143,7 +170,10 @@ export interface PlayerInput {
 /** C 端选人用的公开玩家信息 */
 export interface PublicPlayerDto {
   readonly id: number;
+  /** 当前绑定模型的公开显示名。 */
   readonly name: string;
+  readonly modelKey?: string;
+  readonly appearanceName?: string;
   readonly avatar: string | null;
   readonly persona: string;
 }

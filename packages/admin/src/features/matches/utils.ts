@@ -1,4 +1,4 @@
-import type { MatchDetailDto, MatchStatus, MatchSummaryDto } from '@battle/shared';
+import { systemChoiceLabel, type MatchDetailDto, type MatchStatus, type MatchSummaryDto } from '@battle/shared';
 import type { LogEntryDto } from '../../services/matches';
 
 /** 列表与详情共用的对局类型文案：公开 / 调试 / 调试 · 脚本化 / 调试 · 脚本化 · 混沌 */
@@ -41,7 +41,8 @@ export function describeLog(entry: LogEntryDto): string {
     case 'vote_tallied': {
       const ballots = entry.ballots.map((ballot) => `${ballot.voter}→${ballot.target}${ballot.weight !== 1 ? `(×${ballot.weight})` : ''}`).join(' ');
       const outcome = entry.outcome === null ? '平票复投' : entry.outcome.kind === 'selected' ? `${entry.outcome.seat}号当选` : '无人当选';
-      return `${entry.title}：${ballots || '无人投票'}${entry.abstained.length ? `；弃票 ${entry.abstained.join('、')}` : ''} → ${outcome}`;
+      const sources = Object.entries(entry.systemChoices ?? {}).map(([seat, source]) => `${seat}号${systemChoiceLabel(source)}`);
+      return `${entry.title}：${ballots || '无人投票'}${entry.abstained.length ? `；弃票 ${entry.abstained.join('、')}` : ''} → ${outcome}${sources.length ? `（${sources.join('、')}）` : ''}`;
     }
     case 'judgement':
       return `${entry.seat}号 ${entry.verdictLabel}：${entry.comment}`;

@@ -1,11 +1,11 @@
-import { isSheriffChoice, isSheriffSignup, type AudienceView } from '@battle/shared';
+import { isSheriffChoice, isSheriffSignup, systemChoiceLabel, type AudienceView } from '@battle/shared';
 import type { StreamItem } from '../types';
 
 export interface SignupChoice {
   readonly seq: number;
   readonly seat: number;
   readonly joined: boolean;
-  readonly label: '上警' | '不上警' | '退水' | '继续竞选';
+  readonly label: string;
   readonly rate: number;
 }
 
@@ -21,8 +21,8 @@ export function sheriffSignup(view: AudienceView, played: readonly StreamItem[],
   if (isSheriffChoice(event)) {
     const withdraw = event.phaseId === 'sheriff_withdraw';
     const joined = withdraw ? !event.targets.includes(event.seat) : event.targets.includes(event.seat);
-    choice = { seq: event.seq, seat: event.seat, joined, rate,
-      label: withdraw ? joined ? '继续竞选' : '退水' : joined ? '上警' : '不上警' };
+    const label = withdraw ? joined ? '继续竞选' : '退水' : joined ? '上警' : '不上警';
+    choice = { seq: event.seq, seat: event.seat, joined, rate, label: event.source ? `${label}（${systemChoiceLabel(event.source)}）` : label };
   }
   if (view.gameKey !== 'werewolf' || view.status !== 'running' || !ELECTION_PHASES.has(view.phase?.id ?? '')) return { candidates, choice: null };
   for (const { event: item } of current ? [...played, current] : played) {

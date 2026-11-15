@@ -32,7 +32,7 @@ export function ResultPanel({ result, view, summary, onReplay, onClose }: Result
         {mvp ? (
           <div className="result-mvp-block">
             <span className="hud-label">MVP</span>
-            <Avatar className="result-mvp-avatar" variant="portrait" name={mvp.name} avatar={mvp.avatar}
+            <Avatar className="result-mvp-avatar" variant="portrait" name={mvp.appearanceName ?? mvp.name} avatar={mvp.avatar}
               placeholder={<span className="result-mvp-placeholder" />}>
               <b className="result-mvp-seat">{mvp.seat}</b>
             </Avatar>

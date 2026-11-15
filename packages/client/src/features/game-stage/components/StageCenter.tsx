@@ -1,7 +1,7 @@
 import type { AudienceView } from '@battle/shared';
 import { describeEvent } from '../playback/describe';
 import type { StreamItem } from '../types';
-import { seatOf, speechOrderOf } from '../utils';
+import { seatOf, speakerLabel, speechOrderOf } from '../utils';
 import { SpeakerSpotlight } from './SpeakerSpotlight';
 import { SpeechOrder } from './SpeechOrder';
 import { VoteBoard } from './VoteBoard';
@@ -23,7 +23,7 @@ export function StageCenter({ view, current, played, voteDelayMs = 0 }: StageCen
     const seat = seatOf(view, event.seat);
     return (
       <div key={event.seq} className="stage-center stage-center-eliminated">
-        <strong>{seat ? seat.name : `${event.seat}号`} 出局</strong>
+        <strong>{speakerLabel(event.seat, seat?.name)} 出局</strong>
         <span>{event.reason}</span>
       </div>
     );

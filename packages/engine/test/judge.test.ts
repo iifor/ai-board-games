@@ -30,14 +30,16 @@ describe('judge', () => {
     expect(judgements[0]).toMatchObject({ verdictLabel: '支持 1 号位', channel: 'public' });
   });
 
-  it('falls back to a valid verdict when output is invalid', () => {
+  it('records a pass without a verdict when no valid judgement is received', () => {
     const run = runToEnd(panelGame, {
       seed: 1,
       playerCount: 3,
       agent: agentWith(panelGame, (request) => (request.action === 'judge' ? { output: { verdict: 'nobody', comment: '' } } : undefined)),
     });
-    expect(['first', 'second']).toContain(run.snapshot.result?.winner);
+    expect(run.snapshot.result?.winner).toBe('draw');
     expect(run.log.filter((entry) => entry.kind === 'fallback')).toHaveLength(1);
+    expect(run.log.some(entry => entry.kind === 'judgement')).toBe(false);
+    expect(run.log).toContainEqual(expect.objectContaining({ kind: 'speech', seat: 3, text: '过~' }));
   });
 
   it('assigns positions and public roles', () => {

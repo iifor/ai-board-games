@@ -12,7 +12,7 @@ interface SpeakerAvatarProps {
 export function SpeakerAvatar({ seat, className }: SpeakerAvatarProps) {
   return (
     <span className={['speaker-avatar', className].filter(Boolean).join(' ')} data-team={seat.team ?? undefined}>
-      <Avatar className="speaker-avatar-image" name={seat.name} avatar={seat.avatar} fallback={String(seat.seat)}>
+      <Avatar className="speaker-avatar-image" name={seat.appearanceName ?? seat.name} avatar={seat.avatar} fallback={String(seat.seat)}>
         <b className="speaker-avatar-no">{seat.seat}</b>
       </Avatar>
     </span>

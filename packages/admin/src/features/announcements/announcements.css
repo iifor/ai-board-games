@@ -1,0 +1,51 @@
+.announcement-page { min-width: 0; }
+.announcement-inventory, .announcement-inspector {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: clamp(16px, 1.2vw, 28px);
+  background: #fff;
+  border: 1px solid #dce2ea;
+  border-radius: 12px;
+}
+.announcement-tools { margin-bottom: 16px; }
+.announcement-page td { overflow-wrap: anywhere; }
+.announcement-page td small { display: block; margin-top: 2px; color: #596779; }
+.announcement-name {
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #225a90;
+  text-align: start;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.announcement-name:hover { text-decoration: underline; }
+.announcement-name:focus-visible { outline: 2px solid #1677ff; outline-offset: 3px; }
+.announcement-selected > td { background: #edf5ff; }
+.announcement-selected > td:first-child { box-shadow: inset 3px 0 #1677ff; }
+.announcement-page.is-wide {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: clamp(16px, 1.1vw, 28px);
+}
+.announcement-page.is-wide:not(:has(.announcement-inspector)) .announcement-inventory { grid-column: 1 / -1; }
+.announcement-inspector { position: sticky; top: 20px; max-height: calc(100dvh - 40px); overflow: auto; container-type: inline-size; }
+.announcement-inspector h2 { margin: 0; color: #202d3d; font-size: 20px; }
+.announcement-inspector .announcement-actions { margin-top: 12px; padding-top: 16px; border-top: 1px solid #e5e9ef; }
+.announcement-composer { display: grid; gap: 16px; min-width: 0; }
+.announcement-field { min-width: 0; }
+.announcement-variables { padding-top: 8px; color: #596779; }
+@container (min-width: 760px) {
+  .announcement-composer { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+}
+.announcement-editor { display: grid; gap: 16px; padding-block: 8px; }
+.announcement-editor p { margin: 0; }
+.announcement-editor label { display: block; margin-bottom: 6px; font-weight: 600; }
+.announcement-editor code { color: #254a75; }
+.announcement-scope { color: #596779; }
+.announcement-preview { min-width: 0; padding: 12px 14px; background: #f5f7fa; border-radius: 6px; }
+.announcement-preview p { margin-top: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.announcement-actions { display: flex; justify-content: space-between; align-items: center; }

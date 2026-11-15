@@ -1,0 +1,69 @@
+.night-transition {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  width: min(100%, 19rem);
+  height: 100%;
+  max-height: 11rem;
+  pointer-events: none;
+  user-select: none;
+  color: #dce6f2;
+}
+.night-transition span {
+  font: 600 clamp(12px, 1vw, 15px)/1.4 var(--ui-font, sans-serif);
+  letter-spacing: .18em;
+  text-shadow: 0 1px 6px #031022;
+}
+.night-sky {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 15rem);
+  height: clamp(46px, 9vh, 92px);
+  overflow: hidden;
+  background: radial-gradient(ellipse, #829fc72e, transparent 68%);
+  mask-image: linear-gradient(90deg, transparent, black 15% 85%, transparent);
+}
+.night-sky i { position: absolute; display: block; }
+.night-lunar-disc, .night-call-wave {
+  inset: 40% auto auto 50%;
+  width: clamp(25px, 4.8vh, 46px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.night-lunar-disc {
+  background:
+    radial-gradient(ellipse at 35% 62%, #b6c7d8 4%, transparent 12%),
+    radial-gradient(ellipse at 67% 35%, #bdccda 3%, transparent 14%),
+    radial-gradient(circle at 38% 32%, #fff9e6 8%, #e0e5e4 57%, #9db4c9 92%);
+  box-shadow: 0 0 12px #e6eaf46b, 0 0 33px #adccee3b;
+}
+.night-orbit {
+  inset: 19% 5% -75%;
+  border: 1px solid #a8c5ee45;
+  border-radius: 50%;
+  transform: rotate(-12deg);
+}
+.night-mist {
+  inset: 30% -30% -10%;
+  background:
+    radial-gradient(ellipse at 22% 61%, #7290ab78, transparent 38%),
+    radial-gradient(ellipse at 67% 53%, #b2c6d867, transparent 31%);
+  filter: blur(3px);
+  animation: night-mist-drift calc(8s / var(--night-rate)) ease-in-out infinite alternate;
+}
+.night-call-wave {
+  border: 1px solid #e4ecf6;
+  animation: night-call-wave calc(.95s / var(--night-rate)) ease-out both;
+}
+.night-transition[data-paused='true'] i { animation-play-state: paused; }
+@keyframes night-mist-drift { from { transform: translateX(-8%); } to { transform: translateX(9%); } }
+@keyframes night-call-wave {
+  from { opacity: .65; transform: translate(-50%, -50%) scale(1.05); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(2.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .night-mist { animation: none; }
+  .night-call-wave { display: none; }
+}

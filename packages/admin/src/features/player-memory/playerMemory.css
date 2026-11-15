@@ -1,0 +1,5 @@
+.memory-record { padding-block: 18px; border-bottom: 1px solid #d9d9d9; overflow-wrap: anywhere; }
+.memory-record small { color: #626262; }
+.memory-record header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.memory-record h3 { margin: 6px 0; }
+.memory-record p { white-space: pre-wrap; }

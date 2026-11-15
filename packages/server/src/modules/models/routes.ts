@@ -4,5 +4,8 @@ import type { ModelService } from './service';
 
 export function modelRoutes(service: ModelService) {
   const controller = modelController(service);
-  return crudRoutes(controller).post('/:id/test', controller.test);
+  return crudRoutes(controller)
+    .post('/:id/test', controller.test)
+    .get('/catalog/:providerId', controller.catalog)
+    .post('/catalog/:providerId/import', controller.importSelected);
 }

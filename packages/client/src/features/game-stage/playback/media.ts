@@ -1,7 +1,9 @@
-import { isSheriffChoice, speechOf } from '@battle/shared';
+import { isSheriffChoice, speechOf, stripSpeechTags } from '@battle/shared';
 import type { StreamItem } from '../types';
-import { describeEvent, displayDuration } from './describe';
+import { describeEvent, displayDuration, voteBoardDuration } from './describe';
 import type { SegmentControl } from './segment';
+import { skillCue } from '../animation/skillCue';
+import { holdSkill, skillDuration } from '../animation/skillTiming';
 
 const now = () => Date.now();
 
@@ -10,6 +12,10 @@ const now = () => Date.now();
  * fromFraction：从这个比例开始停留——音频或朗读中途静音时，接着走完剩余部分。
  */
 export function dwell(control: SegmentControl, text: string | null, fromFraction = 0): Promise<void> {
+  return dwellForDuration(control, displayDuration(text, 1), fromFraction);
+}
+
+function dwellForDuration(control: SegmentControl, durationMs: number, fromFraction = 0): Promise<void> {
   if (control.signal.aborted) return Promise.resolve();
   return new Promise((resolve) => {
     let fraction = Math.min(1, Math.max(0, fromFraction));
@@ -23,7 +29,7 @@ export function dwell(control: SegmentControl, text: string | null, fromFraction
       resolve();
     };
     const arm = () => {
-      remaining = Math.round(displayDuration(text, control.rate) * (1 - fraction));
+      remaining = Math.round(durationMs * (1 - fraction) / control.rate);
       startedAt = now();
       control.setProgress({ kind: 'timed', fraction, startedAt, remainingMs: remaining });
       timer = setTimeout(finish, remaining);
@@ -80,13 +86,13 @@ export function playAudio(url: string, control: SegmentControl, text: string | n
       else audio.playbackRate = control.rate;
     });
     audio.addEventListener('timeupdate', () => {
-      if (!settled) control.setProgress({ kind: 'measured', fraction: fraction() });
+      if (!settled) control.setProgress({ kind: 'measured', fraction: fraction(), positionMs: audio.currentTime * 1000 });
     });
     audio.addEventListener('ended', finish, { once: true });
     audio.addEventListener('error', () => fallback(0), { once: true });
     control.signal.addEventListener('abort', finish, { once: true });
     // 第一次 timeupdate 之前先给个 0%，进度条立刻出现而不是空一拍
-    control.setProgress({ kind: 'measured', fraction: 0 });
+    control.setProgress({ kind: 'measured', fraction: 0, positionMs: 0 });
     audio.play().catch(() => fallback(0));
   });
 }
@@ -98,6 +104,8 @@ export function playAudio(url: string, control: SegmentControl, text: string | n
  */
 export function speak(text: string, control: SegmentControl): Promise<void> {
   if (control.signal.aborted) return Promise.resolve();
+  text = stripSpeechTags(text);
+  if (!text.trim()) return Promise.resolve();
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return dwell(control, text);
   return new Promise((resolve) => {
     const rate = control.rate;
@@ -142,9 +150,16 @@ export function speak(text: string, control: SegmentControl): Promise<void> {
 export function present(item: StreamItem, control: SegmentControl): Promise<void> {
   // 旧回放可能已缓存这段语音，仍以当前展示规则为准，短暂停留供座位动效播放。
   if (isSheriffChoice(item.event)) return dwell(control, null);
+  const cue = skillCue(item.event);
+  return Promise.all([presentMedia(item, control), cue ? holdSkill(skillDuration(cue), control) : Promise.resolve()]).then(() => undefined);
+}
+
+function presentMedia(item: StreamItem, control: SegmentControl): Promise<void> {
   const { text } = describeEvent(item.event);
-  if (!control.muted && item.audio) return playAudio(item.audio.url, control, text);
+  if (item.event.kind === 'vote_tallied' && text === null) return dwellForDuration(control, voteBoardDuration(item.event));
+  if (item.event.kind === 'action' && item.event.phaseId === 'speech_direction' && text === null) return dwell(control, null);
   const speech = control.muted ? null : speechOf(item.event);
+  if (speech && item.audio) return playAudio(item.audio.url, control, text);
   if (speech) return speak(speech.text, control);
   return dwell(control, text);
 }

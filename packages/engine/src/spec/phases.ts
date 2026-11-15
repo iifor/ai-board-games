@@ -50,7 +50,10 @@ export interface SpeakTurn {
 /** 发言时可附带声明的动作（如狼人自爆）；声明后引擎派发 action_declared 事件 */
 export interface DeclarationSpec<S, P> {
   readonly label: string;
+  /** 顺序发言中，允许其他有权座位在发言窗口私下选择是否声明。 */
+  readonly listenerPrompt?: PromptTemplate;
   allowed(ctx: RuleContext<S, P>, seat: Seat): boolean;
+  describe?(ctx: RuleContext<S, P>, seat: Seat): string;
 }
 
 export interface AnnouncePhase<S, P> extends PhaseBase<S, P> {
@@ -65,6 +68,10 @@ export interface SpeakPhase<S, P> extends AiPhaseBase<S, P> {
   actors(ctx: RuleContext<S, P>): SeatSelection | readonly SpeakTurn[];
   /** sequential：一次一人，后发言者能看到前面的发言；parallel：同时发出 */
   readonly mode?: 'sequential' | 'parallel';
+  /** 串行发言中可点名同频道参与者确认分工；首轮结束后每人最多补一次。 */
+  readonly followUp?: { readonly prompt: PromptTemplate; readonly fallbackText: string };
+  /** 允许以 { speech: null } 主动跳过该回合，不写发言事件。 */
+  readonly allowSkip?: boolean;
   readonly output: ZodType<SpeechOutput>;
   /** 返回错误原因表示内容不合格，null 表示通过 */
   validate?(output: SpeechOutput, ctx: RuleContext<S, P>, seat: Seat): string | null;
@@ -80,11 +87,13 @@ export interface ActPhase<S, P> extends AiPhaseBase<S, P> {
   readonly action: string;
   actors(ctx: RuleContext<S, P>): SeatSelection;
   targets(ctx: RuleContext<S, P>, seat: Seat): SeatSelection;
+  /** 仅在该座位确实有合法选择时私下播报一次，重试不重复。 */
+  decisionNotice?(legalTargets: readonly number[], ctx: RuleContext<S, P>): string;
   /** 每人选择的目标数，默认 1 */
   readonly count?: number;
   /** 允许放弃（输出空数组），如女巫不用药 */
   readonly allowNone?: boolean;
-  /** 兜底方式：random 随机合法目标，none 放弃；默认 allowNone 时为 none，否则为 random */
+  /** @deprecated 请求失败统一跳过行动。 */
   readonly fallbackMode?: 'random' | 'none';
   /** 默认写入该座位的私密频道 */
   channel?(ctx: RuleContext<S, P>, seat: Seat): Channel;
@@ -115,7 +124,7 @@ export interface VotePhase<S, P> extends AiPhaseBase<S, P> {
   bonus?(ctx: RuleContext<S, P>): readonly VoteBonus[];
   /** 允许弃票（输出 target: null） */
   readonly allowAbstain?: boolean;
-  /** 兜底方式：random 随机合法目标，abstain 弃票；默认 random */
+  /** @deprecated 请求失败统一弃票。 */
   readonly fallbackMode?: 'random' | 'abstain';
   apply?(ctx: RuleContext<S, P>, outcome: VoteOutcome): NoInfer<S>;
   /** 计票结果的公开范围，默认 public */
@@ -136,6 +145,7 @@ export interface JudgePhase<S, P> extends AiPhaseBase<S, P> {
   readonly tieVerdict: { readonly key: string; readonly label: string };
   readonly commentMax?: number;
   readonly channel?: Channel;
+  /** @deprecated 请求失败时评委弃权。 */
   fallback?(ctx: RuleContext<S, P>, seat: Seat): JudgeFallback;
 }
 

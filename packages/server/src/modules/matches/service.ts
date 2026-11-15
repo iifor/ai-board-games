@@ -1,14 +1,18 @@
 import { randomInt, randomUUID } from 'node:crypto';
+import { playerSpeechSettings } from '@battle/shared';
 import { createSnapshot, EngineInputError, type CompiledGame, type LogEntry, type SeatProfile } from '@battle/engine';
-import type { AiCallDto, CreateDebugMatchRequest, CreateMatchRequest, GeneratedMatchRequest, MatchDetailDto, MatchStatus, MatchSummaryDto } from '@battle/shared';
+import type { AiCallDto, CreateDebugMatchRequest, CreateMatchRequest, GeneratedMatchRequest, MatchDetailDto, MatchSummaryDto } from '@battle/shared';
 import { badRequest, notFound, tooManyRequests } from '../../utils/errors';
 import type { PlayerRepository } from '../players/repository';
+import { publicPlayer } from '../players/service';
 import type { CreationLimiter } from './limits';
 import { generateSeats } from './generatedSeats';
 import { toAiCall, toDetail, toSummary } from './mapper';
 import type { MatchRepository } from './repository';
 import type { MatchRuntime } from './runtime';
 import type { MatchRow, SeatRow } from './types';
+import { readMatchPrompts } from '../prompt-catalog/settingsRepository';
+import { loadMemoryBank } from '../player-memory/repository';
 
 export interface MatchServiceDeps {
   readonly repository: MatchRepository;
@@ -27,17 +31,25 @@ export interface MatchServiceDeps {
 export function createMatchService(deps: MatchServiceDeps) {
   const { repository } = deps;
 
-  async function seatsFor(playerIds: readonly number[]): Promise<{ profiles: SeatProfile[]; seats: SeatRow[] }> {
+  async function seatsFor(playerIds: readonly number[], scripted: boolean): Promise<{ profiles: SeatProfile[]; seats: SeatRow[] }> {
     const rows = await deps.players.findMany(playerIds);
     const byId = new Map(rows.map((row) => [row.id, row]));
     const ordered = playerIds.map((id) => byId.get(id));
     const missing = playerIds.filter((id, index) => !ordered[index]?.enabled);
     if (missing.length) throw badRequest(`玩家不存在或已停用：${missing.join('、')}`);
     const players = ordered.filter((row): row is NonNullable<typeof row> => row !== undefined);
-    return {
-      profiles: players.map((row) => ({ playerId: String(row.id), name: row.name, persona: row.persona, avatar: row.avatar })),
-      seats: players.map((row, index) => ({ seat: index + 1, playerId: row.id, playerName: row.name, modelId: row.modelId, voiceId: row.voiceId })),
-    };
+    if (!scripted) {
+      const unbound = players.filter((row) => row.modelId === null);
+      if (unbound.length) throw badRequest(`玩家尚未绑定模型：${unbound.map(row => '#' + row.id).join('、')}`);
+    }
+    const profiles = players.map(row => {
+      const { id, ...profile } = publicPlayer(row);
+      return { ...profile, playerId: String(id), speechSettings: playerSpeechSettings(row.persona, row) };
+    });
+    const seats = players.map((row, index) => ({
+      seat: index + 1, playerId: row.id, playerName: profiles[index]!.name, modelId: row.modelId, voiceId: row.voiceId,
+    }));
+    return { profiles, seats };
   }
 
   /** 开局事务里插入之前执行的检查（公开开局的上限判断） */
@@ -47,7 +59,7 @@ export function createMatchService(deps: MatchServiceDeps) {
     const game = deps.findGame(request.gameKey);
     const { profiles, seats } = request.generatePlayers
       ? generateSeats(game, request.variant)
-      : await seatsFor(request.playerIds);
+      : await seatsFor(request.playerIds, debug?.scripted === true);
     const seed = debug?.seed ?? randomInt(0, 2 ** 32);
     let snapshot;
     try {
@@ -65,6 +77,8 @@ export function createMatchService(deps: MatchServiceDeps) {
     const id = `m_${randomUUID()}`;
     await repository.transaction(async (trx) => {
       if (guard) await guard(trx);
+      const lockedPrompts = await readMatchPrompts(trx, game, snapshot.variantKey);
+      const memory = debug ? {} : await loadMemoryBank(trx, profiles.map(p => Number(p.playerId)), game.spec.key);
       await repository.insert(trx, {
         id,
         gameKey: game.spec.key,
@@ -78,7 +92,7 @@ export function createMatchService(deps: MatchServiceDeps) {
         // 混沌脚本只在脚本化对局里有意义；校验层已拒绝"混沌但不脚本化"，这里再兜一次底
         chaos: debug?.scripted === true && debug.chaos === true,
         pacing: debug?.pacing ?? 'ack',
-        snapshot,
+        snapshot: { ...snapshot, ...lockedPrompts, ...memory },
       }, seats);
     });
     await deps.runtime.advanceMatch(id, { kind: 'start' });
@@ -137,7 +151,7 @@ export function createMatchService(deps: MatchServiceDeps) {
     },
 
     /** 列表：对局一查、座位一查，不随条数增加查询次数 */
-    async list(filter: { readonly debug?: boolean; readonly status?: MatchStatus; readonly limit: number }): Promise<MatchSummaryDto[]> {
+    async list(filter: Parameters<typeof repository.list>[0]): Promise<MatchSummaryDto[]> {
       const rows = await repository.list(filter);
       const seatsByMatch = await repository.seatsByMatch(rows.map((row) => row.id));
       return rows.map((row) => toSummary(row, seatsByMatch.get(row.id) ?? [], deps.tryGame(row.gameKey)));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advance, compileGame, createSnapshot, EngineInputError, SPEECH_LENGTH_TOLERANCE, speechOutput, type LogEntry } from '../src';
+import { advance, compileGame, createSnapshot, EngineInputError, speechOutput, type LogEntry } from '../src';
 import { toJsonSchema } from '../src/ai/outputContract';
 import { makePlayers, runToEnd } from '../src/testing';
 import { agentWith } from './fixtures/agents';
@@ -43,7 +43,12 @@ describe('speak', () => {
     const attempts = run.requests.filter(({ request }) => request.phaseId === 'talk' && request.seat === 1 && request.id.includes('#1:'));
     expect(attempts.map(({ request }) => request.attempt)).toEqual([1, 2]);
     expect(attempts[1]?.request.prompt.output).toContain('上一次的输出不合法');
-    expect(speeches(run.log).find((entry) => entry.seat === 1)?.text).toBe('1号没有想好怎么说');
+    const passes = speeches(run.log).filter(entry => entry.seat === 1);
+    expect(passes.length).toBeGreaterThan(0);
+    expect(passes.every(entry => entry.text === '过~')).toBe(true);
+    const next = run.requests.find(({ request }) => request.phaseId === 'talk' && request.seat === 2);
+    expect(next?.request.prompt.history).toContain('过~');
+    expect(next?.request.prompt.history).not.toContain('1号没有想好怎么说');
     expect(run.log.find((entry) => entry.kind === 'fallback' && entry.seat === 1)).toMatchObject({ channel: 'host' });
   });
 
@@ -59,9 +64,8 @@ describe('speak', () => {
     expect(speeches(run.log).some((entry) => entry.text.includes('机密词'))).toBe(false);
   });
 
-  it('accepts a speech up to twice the stated limit without retry or fallback', () => {
-    // talk 的提示词说"不超过 80 字"：略超的发言仍然可用，不该被重试、兜底整段丢掉
-    const long = '长'.repeat(80 * SPEECH_LENGTH_TOLERANCE);
+  it('accepts a speech up to the stated limit without retry or fallback', () => {
+    const long = '长'.repeat(80);
     const run = runToEnd(secretGame, {
       seed: 3,
       agent: agentWith(secretGame, (request) => (request.phaseId === 'talk' && request.seat === 1 ? { output: { speech: long } } : undefined)),
@@ -71,15 +75,15 @@ describe('speak', () => {
     expect(run.log.some((entry) => entry.kind === 'fallback' && entry.seat === 1)).toBe(false);
   });
 
-  it('still rejects a speech beyond twice the stated limit', () => {
-    const tooLong = '长'.repeat(80 * SPEECH_LENGTH_TOLERANCE + 1);
+  it('keeps a speech beyond the suggested length on the first attempt', () => {
+    const tooLong = '长'.repeat(700);
     const run = runToEnd(secretGame, {
       seed: 3,
       agent: agentWith(secretGame, (request) => (request.phaseId === 'talk' && request.seat === 1 ? { output: { speech: tooLong } } : undefined)),
     });
     const retry = run.requests.find(({ request }) => request.phaseId === 'talk' && request.seat === 1 && request.attempt === 2);
-    expect(retry?.request.prompt.output).toContain('上一次的输出不合法');
-    expect(speeches(run.log).find((entry) => entry.seat === 1)?.text).toBe('1号没有想好怎么说');
+    expect(retry).toBeUndefined();
+    expect(speeches(run.log).find((entry) => entry.seat === 1)?.text).toBe(tooLong);
   });
 
   it('falls back immediately when the transport reports failure', () => {
@@ -88,22 +92,55 @@ describe('speak', () => {
       agent: agentWith(secretGame, (request) => (request.phaseId === 'talk' ? { failed: 'timeout' } : undefined)),
     });
     expect(run.requests.filter(({ request }) => request.phaseId === 'talk' && request.attempt > 1)).toHaveLength(0);
+    expect(speeches(run.log).filter(entry => entry.phaseId === 'talk').every(entry => entry.text === '过~')).toBe(true);
     expect(run.log.filter((entry) => entry.kind === 'fallback' && entry.reason.includes('timeout')).length).toBeGreaterThan(0);
   });
 });
 
 describe('speechOutput', () => {
-  it('tells the model the target length while enforcing the tolerated hard limit', () => {
+  it('requires nonempty speech without imposing the suggested length on JSON', () => {
     const schema = speechOutput({ max: 60 });
-    expect(schema.safeParse({ speech: 'x'.repeat(60 * SPEECH_LENGTH_TOLERANCE) }).success).toBe(true);
-    expect(schema.safeParse({ speech: 'x'.repeat(60 * SPEECH_LENGTH_TOLERANCE + 1) }).success).toBe(false);
-    expect(toJsonSchema(schema)).toMatchObject({
-      properties: { speech: { maxLength: 60 * SPEECH_LENGTH_TOLERANCE, description: expect.stringContaining('60 字') } },
-    });
+    expect(schema.safeParse({ speech: 'x'.repeat(60) }).success).toBe(true);
+    expect(schema.safeParse({ speech: 'x'.repeat(61) }).success).toBe(true);
+    expect(schema.safeParse({ speech: '   ' }).success).toBe(false);
+    expect(toJsonSchema(schema)).not.toHaveProperty('properties.speech.maxLength');
   });
 });
 
 describe('act', () => {
+  it.each([false, true])('resolves a unique target directly unless declining is allowed (%s)', optional => {
+    const { mark, vote } = secretSpec.phases;
+    if (mark?.kind !== 'act' || vote?.kind !== 'vote') throw new Error('fixture phases');
+    const game = compileGame({ ...secretSpec, phases: { ...secretSpec.phases,
+      mark: { ...mark, targets: () => [2], allowNone: optional },
+      vote: { ...vote, candidates: () => [2], allowAbstain: optional },
+    } });
+    const run = runToEnd(game, { seed: 3, playerCount: 4, params: { rounds: 1 } });
+    for (const id of ['mark', 'vote']) {
+      expect(run.requests.filter(r => r.request.phaseId === id)).toHaveLength(optional ? 4 : 0);
+    }
+    if (!optional) {
+      const actions = run.log.filter(e => e.kind === 'action' && e.phaseId === 'mark');
+      expect(actions).toHaveLength(4);
+      for (const e of actions) if (e.kind === 'action') expect(e).toMatchObject({ channel: 'private:' + e.seat, targets: [2] });
+      expect(actions[0]).toMatchObject({ source: 'only_target', text: expect.stringContaining('规则自动选择唯一目标') });
+      expect(run.log.find(e => e.kind === 'vote_tallied')).toMatchObject({ systemChoices: { 1: 'only_target', 2: 'only_target', 3: 'only_target', 4: 'only_target' } });
+      expect(run.snapshot.results.vote).toMatchObject({ kind: 'vote', outcome: { kind: 'selected', seat: 2 } });
+    }
+  });
+
+  it('skips a failed mandatory action and abstains in a mandatory vote', () => {
+    const run = runToEnd(secretGame, { seed: 3, params: { rounds: 1 }, agent: agentWith(secretGame, request =>
+      request.seat === 1 && ['mark', 'vote'].includes(request.phaseId) ? { failed: 'network' } : undefined) });
+    const mark = run.log.find(e => e.kind === 'action' && e.seat === 1 && e.phaseId === 'mark');
+    expect(mark).toMatchObject({ channel: 'private:1', targets: [], source: 'request_failed', text: '请求失败，放弃标记' });
+    expect((run.snapshot.state as SecretState).marks).not.toHaveProperty('1');
+    const votes = run.requests.filter(r => r.request.phaseId === 'vote');
+    expect(votes.find(r => r.request.seat === 1)?.request.prompt.history).toContain('请求失败，放弃标记');
+    expect(votes.find(r => r.request.seat === 2)?.request.prompt.history).not.toContain('请求失败，放弃标记');
+    expect(run.log.find(e => e.kind === 'vote_tallied')).toMatchObject({ systemChoices: { 1: 'request_failed' }, abstained: [1] });
+  });
+
   it('rejects illegal targets, logs privately and applies decisions', () => {
     const run = runToEnd(secretGame, {
       seed: 5,

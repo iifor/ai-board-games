@@ -1,5 +1,6 @@
 import type { ColumnType, Generated } from 'kysely';
-import type { TraceKind, TraceModelSettings } from '@battle/shared';
+import type { MemoryDecision, MemoryEvidence, MemoryReviewCall, ReviewOutcome } from '@battle/shared';
+import type { AudioCaptionCue, PromptComparisonRecord, TraceKind, TraceModelSettings } from '@battle/shared';
 
 // 列名在 TS 中为 camelCase，由 CamelCasePlugin 映射为数据库中的 snake_case。
 
@@ -31,7 +32,7 @@ export interface ModelsTable {
   providerId: number;
   name: string;
   model: string;
-  temperature: number;
+  temperature: number | null;
   maxTokens: number;
   fallbackModelId: number | null;
   enabled: boolean;
@@ -60,11 +61,16 @@ export interface VoicesTable {
 }
 
 export interface PlayersTable {
+  memoryGeneration: Generated<number>;
   id: Generated<number>;
-  name: string;
+  name: string | null;
+  appearanceName: string | null;
   avatar: string | null;
   persona: string;
-  modelId: number;
+  temperature: number | null;
+  maxTokens: number | null;
+  speechMaxChars: number | null;
+  modelId: number | null;
   voiceId: number | null;
   enabled: boolean;
   createdAt: CreatedAt;
@@ -75,6 +81,7 @@ export interface PlayersTable {
 type Json<T> = ColumnType<T, string, string>;
 
 export interface MatchesTable {
+  importTitle: string | null;
   traceDeleted: Generated<boolean>;
   id: string;
   gameKey: string;
@@ -156,6 +163,7 @@ export interface MediaAssetsTable {
   voiceName: string;
   mime: string;
   data: Buffer;
+  captions: ColumnType<readonly AudioCaptionCue[] | null, string | null | undefined, string | null>;
   createdAt: CreatedAt;
 }
 
@@ -166,6 +174,25 @@ export interface RequestWindowsTable {
 }
 
 export interface Database {
+  memoryReviewCalls: Omit<MemoryReviewCall, 'id' | 'createdAt'> & { id: Generated<number>; createdAt: CreatedAt };
+  playerMemoryUses: { memoryId: number; matchId: string; requestId: string; round: number; phaseId: string; action: string };
+  playerDecisions: { matchId: string; requestId: string; ownerId: number; note: Json<MemoryDecision> };
+  playerMemoryReviews: { matchId: string; ownerId: number; seat: number; attempts: Generated<number>;
+    status: Generated<string>; availableAt: ColumnType<Date, never, Date> };
+  playerMemories: { id: Generated<number>; forgotten: Generated<boolean>; ownerId: number; matchId: string; gameKey: string; subjectId: number | null;
+    subjectName: string | null; phaseId: string | null; action: string | null; content: string; evidence: Json<readonly MemoryEvidence[]>;
+    requestId: string | null; outcome: ReviewOutcome; previousId: number | null; createdAt: CreatedAt };
+  promptTemplates: { gameKey: string; templateName: string; source: string; revision: number; publicationOrder: Generated<string> };
+  announcementTemplates: { gameKey: string; key: string; customText: string | null; revision: number };
+  appliedPrompts: {
+    publicationOrder: Generated<string>;
+    gameKey: string; variantKey: string; templateName: string; source: string; persona: string | null; comparisonId: number;
+  };
+  promptComparisons: {
+    id: Generated<number>; matchId: string; requestId: string;
+    result: Json<Omit<PromptComparisonRecord, 'id' | 'createdAt'>>; createdAt: CreatedAt;
+  };
+  replayImports: { id: string; title: string; revision: Generated<number>; matchId: string | null; document: Json<import('@battle/shared').ReplayDocument> };
   matchTraceNodes: {
     id: Generated<number>; matchId: string; round: number; phaseId: string | null; visit: number;
     kind: TraceKind; label: string; seat: number | null; seq: number | null;

@@ -1,4 +1,5 @@
 import { speechOutput } from '@battle/engine';
+import { WEREWOLF_SPEECH_MAX_CHARS } from '../../speechLimits';
 import { werewolfPrompts as prompts } from '../prompts';
 import {
   applySignup,
@@ -12,6 +13,7 @@ import {
   sheriffVoters,
 } from '../rules/sheriff';
 import type { WerewolfPhases } from './types';
+import { wolfDeclarations } from './selfDestruct';
 
 const campaignFallback = () => ({ speech: '我会认真带队，请大家支持我。' });
 
@@ -33,8 +35,9 @@ export const sheriffPhases = {
     kind: 'speak',
     title: '竞选发言',
     actors: campaignOrder,
+    declarations: wolfDeclarations,
     prompt: prompts.sheriffSpeech,
-    output: speechOutput({ max: 150 }),
+    output: speechOutput({ max: WEREWOLF_SPEECH_MAX_CHARS }),
     fallback: campaignFallback,
     next: 'sheriff_withdraw',
   },
@@ -69,8 +72,9 @@ export const sheriffPhases = {
     kind: 'speak',
     title: '警长 PK',
     actors: pkOrder,
+    declarations: wolfDeclarations,
     prompt: prompts.sheriffPkSpeech,
-    output: speechOutput({ max: 120 }),
+    output: speechOutput({ max: WEREWOLF_SPEECH_MAX_CHARS }),
     fallback: campaignFallback,
     next: 'sheriff_pk_vote',
   },

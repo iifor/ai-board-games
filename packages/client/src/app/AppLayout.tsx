@@ -1,3 +1,4 @@
+import { PROJECT_NAME } from '@battle/shared';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import './AppLayout.css';
 
@@ -8,7 +9,7 @@ export function AppLayout() {
   return (
     <div className="app-layout">
       <header className="app-nav">
-        <strong className="app-brand"><i aria-hidden="true" />AI 对战</strong>
+        <strong className="app-brand"><i aria-hidden="true" />{PROJECT_NAME}</strong>
         <nav>
           <NavLink to="/" end>大厅</NavLink>
           <NavLink to="/history">历史对局</NavLink>

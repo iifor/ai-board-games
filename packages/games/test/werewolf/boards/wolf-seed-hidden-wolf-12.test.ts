@@ -19,7 +19,7 @@ const roleOf = (run: ReturnType<typeof play>, seat: number) => run.snapshot.seat
 describe('wolf seed', () => {
   it('turns a successfully killed victim into a pack wolf instead of killing him', () => {
     const run = play(SEED, combine(infect(villager), act('seer_check', seer, [villager], 2)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
     expect(entries(run, 'action', 'wolf_seed_infect')[0]).toMatchObject({ channel: 'team:werewolf', text: `种狼对 ${villager}号 发动感染` });
     expect(roleOf(run, villager)).toMatchObject({ role: 'infected_wolf', team: 'werewolf' });
     expect(entries(run, 'narration', 'night_resolve').map((entry) => entry.channel)).toEqual([`private:${villager}`, 'team:werewolf']);
@@ -30,7 +30,7 @@ describe('wolf seed', () => {
 
   it('fails when the witch saves the victim, and the infection is still spent', () => {
     const run = play(SEED, combine(infect(villager), act('witch_save', witch, [villager], 1)), BOARD);
-    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('天亮了，昨晚是平安夜。');
+    expect(entries(run, 'narration', 'dawn')[0]?.text).toBe('昨晚是平安夜。');
     expect(roleOf(run, villager)?.role).toBe('villager');
     expect(stateOf(run.snapshot).wolfSeedUsed).toBe(true);
     expect(requestsIn(run, 'wolf_seed_infect')).toHaveLength(1);

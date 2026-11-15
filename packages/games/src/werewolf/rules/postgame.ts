@@ -1,3 +1,4 @@
+import { line } from '../announcements';
 import { expectResult, type ComputeOutcome } from '@battle/engine';
 import type { WerewolfState } from '../state';
 import type { WerewolfContext } from './context';
@@ -17,7 +18,7 @@ export function resolveMvp(ctx: WerewolfContext): ComputeOutcome<WerewolfState> 
     const preferred = pool.filter((seat) => onWinningSide(ctx, seat, winner));
     mvp = Math.min(...(preferred.length ? preferred : pool));
   }
-  return { state: { ...ctx.state, mvp }, log: [{ kind: 'narration', text: `本局 MVP：${mvp}号。` }] };
+  return { state: { ...ctx.state, mvp }, log: [{ kind: 'narration', text: line(ctx, 'mvp', { 座号: mvp }) }] };
 }
 
 /** 赛后发言：按座位号依次发言，MVP 最后 */

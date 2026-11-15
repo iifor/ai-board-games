@@ -42,7 +42,7 @@ export function SeatGrid({ seated, max, groups, onUnseat, registerSlot, arrivalD
               {player ? (
                 <button type="button" className="seat-chip" style={chipStyle(arrivalDelay?.(player.id) || index * SEAT_STAGGER)}
                   onClick={() => onUnseat(player.id)} aria-label={`${label}${player.name}，点击取消就座`}>
-                  <Avatar className="seat-chip-avatar" variant="poster" name={player.name} avatar={player.avatar} />
+                  <Avatar className="seat-chip-avatar" variant="poster" name={player.appearanceName ?? player.name} avatar={player.avatar} />
                   <b className="seat-chip-no" aria-hidden="true">{position || index + 1}</b>
                   <i className="seat-chip-remove" aria-hidden="true">×</i>
                   <span className="seat-chip-name">{player.name}</span>

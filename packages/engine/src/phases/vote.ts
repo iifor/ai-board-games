@@ -1,11 +1,11 @@
-import type { VoteBallot, VoteOutcome } from '@battle/shared';
+import type { SystemChoice, VoteBallot, VoteOutcome } from '@battle/shared';
 import { z } from 'zod';
 import type { ExecEnv } from '../runtime/env';
 import { toSeatNumbers } from '../runtime/seats';
 import type { VotePhase } from '../spec/phases';
 import { seatNumber } from './seatNumber';
 import { tallyBallots, type Tally } from './tally';
-import { done, issue, type AiPhaseExecutor, type StepOutcome } from './types';
+import { done, issue, type AiPhaseExecutor, type RequestDraft, type StepOutcome } from './types';
 
 interface VoteState {
   stage: number;
@@ -15,6 +15,7 @@ interface VoteState {
   /** 座位 → 目标；null 为弃票 */
   ballots: Record<string, number | null>;
   ballotRequests?: Record<string, string>;
+  systemChoices?: Record<number, SystemChoice>;
   /** 额外票：座位 → 票数（进入阶段时确定；旧快照中可能没有） */
   readonly bonus?: Record<string, number>;
   issued: boolean;
@@ -55,6 +56,7 @@ function finalize(env: ExecEnv, phase: Phase, outcome: VoteOutcome, tied: readon
     runoff: state.stage,
     ballots,
     abstained: abstainersOf(state),
+    ...(state.systemChoices && { systemChoices: state.systemChoices }),
     tally: tallyRound(state).rows,
     tied: [...tied],
     outcome,
@@ -77,17 +79,19 @@ function startRunoff(env: ExecEnv, phase: Phase, tied: readonly number[]): StepO
     runoff: state.stage,
     ballots,
     abstained: abstainersOf(state),
+    ...(state.systemChoices && { systemChoices: state.systemChoices }),
     tally: tallyRound(state).rows,
     tied: [...tied],
     outcome: null,
     channel: phase.channel ?? 'public',
   }, Object.values(state.ballotRequests ?? {}));
   state.stage += 1;
-  state.ballotRequests = {};
   state.candidates = Object.fromEntries(
     state.voters.map((voter) => [String(voter), (state.candidates[String(voter)] ?? []).filter((seat) => tied.includes(seat))]),
   );
   state.ballots = {};
+  state.ballotRequests = {};
+  delete state.systemChoices;
   state.issued = false;
   return voteExecutor.step(env, phase);
 }
@@ -134,16 +138,19 @@ export const voteExecutor: AiPhaseExecutor<Phase> = {
     const state = env.phaseState<VoteState>();
     if (state.issued) return resolve(env, phase);
     state.issued = true;
-    const drafts = state.voters
-      .filter((voter) => (state.candidates[String(voter)] ?? []).length > 0)
-      .map((voter) => ({
-        slot: `r${state.stage}:${voter}`,
-        seat: voter,
-        action: 'vote' as const,
-        template: phase.prompt,
-        vars: { runoff: state.stage },
-        legalTargets: state.candidates[String(voter)] ?? [],
-      }));
+    const drafts: RequestDraft[] = [];
+    for (const voter of state.voters) {
+      const legalTargets = state.candidates[String(voter)] ?? [];
+      const [only] = legalTargets;
+      if (only === undefined) continue;
+      if (legalTargets.length === 1 && !phase.allowAbstain) {
+        state.ballots[String(voter)] = only;
+        (state.systemChoices ??= {})[voter] = 'only_target';
+      } else {
+        drafts.push({ slot: `r${state.stage}:${voter}`, seat: voter, action: 'vote',
+          template: phase.prompt, vars: { runoff: state.stage }, legalTargets });
+      }
+    }
     return drafts.length ? issue(drafts) : resolve(env, phase);
   },
 
@@ -163,12 +170,12 @@ export const voteExecutor: AiPhaseExecutor<Phase> = {
     return (pending.legalTargets ?? []).includes(target) ? null : `${target} 不是合法的投票对象`;
   },
 
-  fallback(env, phase, pending) {
-    if (phase.fallbackMode === 'abstain') {
-      if (!phase.allowAbstain) throw new Error(`阶段 ${env.phaseId()} 不允许弃票，fallbackMode 不能为 abstain`);
-      return { target: null };
-    }
-    return { target: env.ctx().random(`fallback:${pending.id}`).pick(pending.legalTargets ?? []) };
+  skipFailed(env, phase, pending) {
+    const abstention = { target: null };
+    voteExecutor.store(env, phase, pending, abstention);
+    const state = env.phaseState<VoteState>();
+    (state.systemChoices ??= {})[pending.seat] = 'request_failed';
+    return abstention;
   },
 
   store(env, _phase, pending, value) {

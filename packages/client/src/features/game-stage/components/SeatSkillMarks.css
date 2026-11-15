@@ -1,0 +1,38 @@
+.seat-skill-marks { position: absolute; z-index: 2; right: 3px; top: 40px; display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
+.seat-skill-mark { display: flex; align-items: center; gap: 2px; filter: drop-shadow(0 1px 2px #020713) drop-shadow(0 0 3px #020713); }
+.seat-skill-mark svg { width: 17px; height: 17px; fill: #091122bb; stroke: currentColor; stroke-width: 2.5; }
+.seat-skill-mark b { font-size: 10px; }
+.seat-skill-backdrops {
+  position: absolute;
+  z-index: 0;
+  inset: 22px 4px 34px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  align-items: center;
+  pointer-events: none;
+}
+.seat-skill-emblem {
+  width: 100%;
+  height: 100%;
+  fill: rgb(5 12 24 / 28%);
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .7;
+  filter: drop-shadow(0 2px 3px #020713) drop-shadow(0 0 7px currentColor);
+}
+.seat-skill-emblem[data-kind='reveal'] { transform: rotate(-9deg); }
+.seat-skill-mark[data-prominent] {
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px 4px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: rgb(5 12 24 / 78%);
+  max-width: 58px;
+}
+.seat-skill-mark[data-prominent] svg { width: 28px; height: 28px; fill: none; }
+.seat-skill-mark[data-prominent][data-kind='bond'] { transform: translateX(12px); }
+.seat-skill-mark[data-prominent] b { line-height: 1.25; text-align: center; overflow-wrap: anywhere; }

@@ -1,26 +1,13 @@
-import { SPEECH_LENGTH_TOLERANCE, type AiRequest, type CompiledGame } from '@battle/engine';
-import { runToEnd } from '@battle/engine/testing';
+import type { CompiledGame } from '@battle/engine';
+import { makePlayers, runToEnd } from '@battle/engine/testing';
 import { describe, expect, it } from 'vitest';
 import { GAMES } from '../src';
-
-// 字数只在各阶段的 speechOutput({ max }) / commentMax 配置一次，模板用 {{turn.maxChars}} 引用。
-// 守住两件事：模板里不再手写数字；跑一局，每条发言与点评请求的提示词说的数字都与输出 schema 的上限一致。
+import { DEBATE_SPEECH_MAX_CHARS, WEREWOLF_SPEECH_MAX_CHARS } from '../src/speechLimits';
 
 const MAX_CHARS_TAG = '{{turn.maxChars}}';
 
-function hardLimit(request: AiRequest, field: 'speech' | 'comment'): number {
-  const properties = request.outputSchema.properties as Readonly<Record<string, { readonly maxLength?: number } | undefined>> | undefined;
-  const maxLength = properties?.[field]?.maxLength;
-  if (maxLength === undefined) throw new Error(`${request.id} 的输出 schema 没有 ${field}.maxLength`);
-  return maxLength;
-}
-
-/** 提示词应当告诉模型的数字：发言是 schema 硬上限除以容差，点评就是硬上限 */
-function statedLimit(request: AiRequest): number {
-  return request.action === 'speak' ? hardLimit(request, 'speech') / SPEECH_LENGTH_TOLERANCE : hardLimit(request, 'comment');
-}
-
 describe.each(GAMES.map((game): [string, CompiledGame] => [game.spec.key, game]))('%s prompt length limits', (_key, game) => {
+  const limit = game.spec.key === 'debate' ? DEBATE_SPEECH_MAX_CHARS : WEREWOLF_SPEECH_MAX_CHARS;
   it('never hardcodes a character count in templates', () => {
     for (const template of game.prompts.values()) expect(template.source, template.name).not.toMatch(/\d+\s*字/);
   });
@@ -29,13 +16,36 @@ describe.each(GAMES.map((game): [string, CompiledGame] => [game.spec.key, game])
     for (const [id, phase] of Object.entries(game.spec.phases)) {
       if (phase.kind !== 'speak' && phase.kind !== 'judge') continue;
       expect(phase.prompt.source, id).toContain(MAX_CHARS_TAG);
+      if (phase.kind === 'speak') {
+        expect(phase.output.safeParse({ speech: '字'.repeat(limit) }).success, id).toBe(true);
+        expect(phase.output.safeParse({ speech: '字'.repeat(limit + 1) }).success, id).toBe(true);
+      } else expect(phase.commentMax, id).toBe(limit);
     }
   });
 
-  it('states the same limit as the output schema in every speech and judgement request', () => {
-    const run = runToEnd(game, { seed: 1, maxAdvances: 2000 });
+  it('uses each seat’s suggested length in spoken prompts only', () => {
+    const players = makePlayers(game.spec.players.max).map((player, index) => ({
+      ...player,
+      speechSettings: { speechMaxChars: index % 2 === 0 ? 80 : 350, temperature: 0.6, maxTokens: 3072 },
+    }));
+    const run = runToEnd(game, { seed: 1, players, maxAdvances: 2000 });
     const requests = run.requests.map(({ request }) => request).filter((request) => request.action === 'speak' || request.action === 'judge');
     expect(requests.length).toBeGreaterThan(0);
-    for (const request of requests) expect(request.prompt.instruction, request.id).toContain(`不超过 ${statedLimit(request)} 字`);
+    for (const request of requests) {
+      const field = request.action === 'speak' ? 'speech' : 'comment';
+      expect(request.outputSchema).not.toHaveProperty(['properties', field, 'maxLength']);
+      expect(request.prompt.instruction, request.id).toContain(`建议 ${players[request.seat - 1]!.speechSettings.speechMaxChars} 字以内`);
+    }
+  });
+
+  it('includes delivery cues exactly once for spoken turns across games', () => {
+    const { requests } = runToEnd(game, { seed: 1, maxAdvances: 2000 });
+    const cue = '半角方括号 [ ]';
+    for (const { request } of requests) {
+      const spoken = request.action === 'speak' || request.action === 'judge';
+      if (spoken) expect(request.prompt.identity, request.id).toContain('[短停][放慢]');
+      const layers = Object.values(request.prompt).join('\n');
+      expect(layers.split(cue).length - 1, request.id).toBe(spoken ? 1 : 0);
+    }
   });
 });

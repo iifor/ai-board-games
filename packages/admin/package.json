@@ -10,12 +10,14 @@
     "check": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@ant-design/icons": "catalog:",
     "@battle/shared": "workspace:*",
+    "@dagrejs/dagre": "2.0.4",
+    "antd": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-router": "catalog:",
-    "antd": "catalog:",
-    "@ant-design/icons": "catalog:"
+    "react-json-tree": "0.20.1",
+    "react-router": "catalog:"
   },
   "devDependencies": {
     "@types/react": "catalog:",

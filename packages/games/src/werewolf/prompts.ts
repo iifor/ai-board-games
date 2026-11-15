@@ -1,4 +1,5 @@
 import { definePrompts } from '@battle/engine';
+import { nightFallsDefault } from './announcements';
 
 export const werewolfPrompts = definePrompts({
   rules: [
@@ -13,7 +14,7 @@ export const werewolfPrompts = definePrompts({
   werewolf: [
     '你是{{me.label}}，身份是狼人。你的狼队友：{{#each teammates}}{{this.label}}{{#if this.alive}}{{else}}（已出局）{{/if}} {{/each}}。',
     '{{#if state.knownWolves}}你还认识离群的狼同伴：{{#each state.knownWolves}}{{this}}号 {{/each}}（夜里你们不能交流，也看不见彼此的刀法）。{{/if}}',
-    '你们要隐藏身份、误导好人。白天发言时你可以在发言后宣布自爆，自爆会让你出局并跳过当天的放逐投票，直接进入黑夜。',
+    '你们要隐藏身份、误导好人。警上竞选、警长 PK 和公投前发言期间，你可以在自己或他人发言时自爆，自爆会让你出局并跳过当天的放逐投票，直接进入黑夜。',
   ].join(''),
   seer: '你是{{me.label}}，身份是预言家。{{#if state.seerChecks}}你的查验记录：{{#each state.seerChecks}}第{{this.night}}夜查验 {{this.target}}号，结果是{{this.result}}；{{/each}}{{else}}你还没有查验过任何人。{{/if}}',
   witch: '你是{{me.label}}，身份是女巫。{{#if state.potions.antidote}}你还有解药。{{else}}你的解药已用完。{{/if}}{{#if state.potions.poison}}你还有毒药。{{else}}你的毒药已用完。{{/if}}',
@@ -21,25 +22,36 @@ export const werewolfPrompts = definePrompts({
   idiot: '你是{{me.label}}，身份是白痴。被放逐时你会翻牌免于出局，但此后失去投票权。',
   villager: '你是{{me.label}}，身份是村民。你没有特殊技能，需要通过发言和投票找出狼人。',
   rabbit: '你是{{me.label}}，身份是兔兔（平民）。你没有特殊技能，需要通过发言和投票找出狼人。',
-  nightFalls: '天黑请闭眼。第 {{round}} 夜开始。',
-  wolfChat: '现在是第 {{round}} 夜，狼人请睁眼。请和队友商量今晚击杀谁，不超过 {{turn.maxChars}} 字。',
-  wolfKill: '请投票决定今晚击杀的玩家；狼人全部弃票则今晚不杀人。',
+  nightFalls: nightFallsDefault,
+  wolfChat: [
+    '第 {{round}} 夜，狼队私聊。',
+    '{{#if turn.isProposer}}今晚由你先提议。说出你建议的狼刀目标或空刀方案，简短说明理由。只用你目前知道的信息。',
+    '{{else}}先看本夜狼队私聊里的提议和队友回复。认同就只说「同意」，不用复述或补充理由。有不同意见就直接说出你的主张和理由。{{/if}}',
+    '{{#if turn.replyTopics}}队友请你确认以下分工，请在本次发言回应：{{turn.replyTopics}}。{{/if}}',
+    '新战术确实需要队友配合时，在发言中说清分工，并在 replyRequests 填上对应队友和事项。仅建议换刀或表示同意时省略该字段。',
+    '需要说明理由时，建议 {{turn.maxChars}} 字以内。',
+  ].join(''),
+  wolfChatReply: '第 {{round}} 夜，狼队私聊。队友在你发言后提出了新的配合要求：\n{{turn.replyTopics}}\n结合本夜私聊，简短说明你接受哪些分工，有异议就说原因。这是最后一轮回应，接下来各自投刀。',
+  wolfKill: '请投票决定今晚击杀的玩家。若今晚有狼队私聊，结合所有队友的最新意见和补充回应独立投票；队友先前说的「同意」只针对当时的提议。狼人全部弃票则今晚不杀人。',
   seerCheck: '预言家请睁眼，选择今晚要查验的玩家。',
   witchSave: '女巫请睁眼。今晚被狼人击杀的是 {{#each legalTargets}}{{this}}号{{/each}}。是否使用解药救他？选择他表示使用，输出空数组表示不使用。',
   witchPoison: '是否使用毒药？选择一名玩家毒杀，输出空数组表示不使用。',
   dawn: '天亮了。',
   sheriffSignup: '现在开始警长竞选。是否上警参选？选择你自己表示参选，输出空数组表示不参选。',
-  sheriffSpeech: '你正在竞选警长，请发表竞选发言，不超过 {{turn.maxChars}} 字。',
+  sheriffSpeech: '你正在竞选警长，请发表竞选发言，建议 {{turn.maxChars}} 字以内。',
   sheriffWithdraw: '竞选发言结束。是否退水（放弃竞选）？选择你自己表示退水，输出空数组表示继续竞选。',
   sheriffVote: '请从候选人中投票选出警长，也可以弃票。',
-  sheriffPkSpeech: '警长竞选平票，请参与 PK 的候选人再次发言，不超过 {{turn.maxChars}} 字。',
+  sheriffPkSpeech: '警长竞选平票，请参与 PK 的候选人再次发言，建议 {{turn.maxChars}} 字以内。',
   speechDirection: '你是警长，请决定今天的发言顺序：从你左右相邻的两名玩家中选一名，从他开始、朝远离你的方向依次发言，你最后发言。',
-  daySpeech: '现在是第 {{round}} 天的白天发言，请分析局势并表明立场，不超过 {{turn.maxChars}} 字。',
+  daySpeech: '现在是第 {{round}} 天的白天发言，请分析局势并表明立场，建议 {{turn.maxChars}} 字以内。'
+    + '{{#if turn.whiteWolfKingCanBlast}}\n请根据目前听到的发言、自己被放逐的风险和带走一名玩家对狼队的价值，决定是否现在自爆。投票开始后不能再自爆。'
+    + '若发动，在本次回复的 JSON 中加入 "declare": "selfDestruct"，随后会单独询问带走谁；若继续潜伏，正常发言并省略 declare。{{/if}}',
+  selfDestructDecision: '{{#if turn.opening}}{{turn.speaker}}号即将发言。{{else}}请结合{{turn.speaker}}号刚说的话。{{/if}}现在仍在发言窗口，请私下决定是否立即自爆。考虑自己被放逐的风险和发动技能对阵营的价值。发动则在 targets 中填写自己的座号；继续听则填空数组。白狼王自爆后另选带人目标。投票开始后不能再自爆。',
   exileVote: '请投票放逐一名玩家，也可以弃票。平票时无人出局。',
-  lastWords: '你已出局，请发表遗言，不超过 {{turn.maxChars}} 字。',
+  lastWords: '你已出局，请发表遗言，建议 {{turn.maxChars}} 字以内。',
   hunterShot: '你是猎人，已经出局。你可以开枪带走一名存活玩家，也可以输出空数组放弃开枪。',
   badgeTransfer: '你是警长，已经出局。请把警徽移交给一名存活玩家，或输出空数组撕毁警徽。',
   postgameReveal: '游戏结束，公布所有身份。',
   mvpVote: '游戏已结束，所有身份已公开（见座位信息）。请投票选出本局表现最好的玩家（MVP），也可以弃票。',
-  postgameSpeech: '游戏已结束，所有身份已公开：{{#each seats}}{{this.label}}是{{this.roleName}}；{{/each}}请简单复盘这一局，不超过 {{turn.maxChars}} 字。',
+  postgameSpeech: '游戏已结束，所有身份已公开：{{#each seats}}{{this.label}}是{{this.roleName}}；{{/each}}你可以选择是否参与复盘。有想分享的判断或转折，就用 speech 简单发言，建议 {{turn.maxChars}} 字以内；如果没有想补充的，把 speech 设为 null，直接跳过。',
 });

@@ -90,7 +90,9 @@ export function enterPhase(env: ExecEnv): boolean {
   s.visits[phaseId] = visit;
   s.cursor = { phaseId, entered: true, visit, phaseState: null };
   env.record('phase', phase.title ?? phaseId, { action: phase.kind, trigger: s.activeTrigger });
-  if (phase.title) env.log({ kind: 'phase_started', title: phase.title });
+  const announcement = env.game.spec.presentation.phaseAnnouncement?.(env.ctx());
+  if (announcement) env.log({ kind: 'phase_started', title: phase.title ?? announcement, announcement });
+  else if (phase.title) env.log({ kind: 'phase_started', title: phase.title });
   executorFor(phase).enter(env, phase);
   return true;
 }

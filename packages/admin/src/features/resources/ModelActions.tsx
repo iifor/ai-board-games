@@ -30,7 +30,6 @@ export function ModelActions({ model, reload }: Props) {
         providerId: model.providerId,
         name: model.name,
         model: model.model,
-        temperature: model.temperature,
         maxTokens: model.maxTokens,
         fallbackModelId: model.fallbackModelId,
         enabled: true,
@@ -45,7 +44,7 @@ export function ModelActions({ model, reload }: Props) {
   };
 
   return (
-    <Space>
+    <Space className="model-test-actions" size={4}>
       <Button size="small" loading={busy} onClick={() => test(false)}>测试</Button>
       {model.disabledReason === 'quota_exhausted' ? (
         <Button size="small" type="primary" ghost loading={busy} onClick={() => test(true)}>重新启用</Button>

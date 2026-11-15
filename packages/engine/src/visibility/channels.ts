@@ -12,10 +12,10 @@ export function privateChannel(seat: number): Channel {
 }
 
 /** AI 玩家能否看到某频道的内容；host 频道任何 AI 都看不到 */
-export function seatCanSee(channel: Channel, viewer: Seat): boolean {
+export function seatCanSee(channel: Channel, viewer: { readonly seat: number; readonly team: string | null }): boolean {
   if (channel === 'public') return true;
   if (channel === 'host') return false;
-  if (channel.startsWith('team:')) return channel === teamChannel(viewer.team);
+  if (channel.startsWith('team:')) return viewer.team !== null && channel === teamChannel(viewer.team);
   return channel === privateChannel(viewer.seat);
 }
 

@@ -9,6 +9,7 @@ import { PlaybackControls } from './components/PlaybackControls';
 import { StageError } from './components/StageError';
 import { SpeakerSpotlight } from './components/SpeakerSpotlight';
 import { StageHud } from './components/StageHud';
+import { StageRecord } from './components/StageRecord';
 import { SubtitleBar } from './components/SubtitleBar';
 import { VoteBoard } from './components/VoteBoard';
 import { SegmentControl } from './playback/segment';
@@ -25,6 +26,29 @@ describe('stage derivations', () => {
   });
 
   const item = (event: StageEvent): StreamItem => ({ event, audio: null });
+
+  it('separates flow events from player speeches and judgements in independent records', () => {
+    const items = [
+      item({...meta,kind:'phase_started',title:'流程阶段'}),
+      item({...meta,seq:2,kind:'narration',text:'主持流程说明'}),
+      item({...meta,seq:3,kind:'speech',seat:1,text:'第一位玩家的发言'}),
+      item({...meta,seq:4,kind:'speech',seat:2,text:'第二位玩家的发言'}),
+      item({...meta,seq:5,kind:'judgement',seat:3,verdict:'pro',verdictLabel:'正方胜',comment:'评委点评历史'}),
+    ];
+    const overview = renderToStaticMarkup(<StageRecord items={items} filter="overview" onClose={() => {}} />);
+    const speeches = renderToStaticMarkup(<StageRecord title="发言记录" items={items} filter="speech" onClose={() => {}} />);
+    expect(overview).toContain('流程阶段');
+    expect(overview).toContain('主持流程说明');
+    expect(overview).not.toContain('玩家的发言');
+    expect(overview).not.toContain('评委点评历史');
+    expect(speeches).toContain('第一位玩家的发言');
+    expect(speeches).toContain('第二位玩家的发言');
+    expect(speeches).toContain('评委点评历史');
+    expect(speeches).not.toContain('主持流程说明');
+    expect(speeches).not.toContain('流程阶段');
+    expect(speeches).toContain('aria-label="收起发言记录"');
+    expect(overview).not.toContain('只看发言');
+  });
 
   it('keeps night phases in the record and the live region without drawing a duplicate subtitle', () => {
     const phase = item({ ...meta, kind: 'phase_started', title: '狼人夜聊' });
@@ -111,11 +135,12 @@ describe('stage visuals', () => {
 
   it('delays the vote board bars until the ballots have landed', () => {
     const tally: StageEvent = {
-      ...meta, kind: 'vote_tallied', title: '放逐投票', runoff: 0, ballots: [], abstained: [],
+      ...meta, view: { ...view, gameKey: 'werewolf' }, phaseId: 'exile_vote', kind: 'vote_tallied', title: '放逐投票', runoff: 0, ballots: [], abstained: [],
       tally: [{ target: 1, votes: 2 }, { target: 2, votes: 1 }], tied: [], outcome: { kind: 'selected', seat: 1, byTieBreak: false },
     };
     const html = renderToStaticMarkup(<VoteBoard event={tally} view={view} delayMs={1000} />);
     expect(html).toContain('animation-delay:1000ms');
+    expect(html).toContain('玩家1 得票最高');
     expect(html).toContain('animation-delay:1120ms');
     expect(html).toContain('animation-delay:1090ms');
     expect(html).toContain('animation-delay:1580ms');

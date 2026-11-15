@@ -122,6 +122,20 @@ describe('game over waits for queued chains', () => {
 });
 
 describe('jump triggers', () => {
+  it.each(['', '  ', null, 'unknown'])('handles an optional declaration %j without losing valid speech', (declare) => {
+    const run = runToEnd(chainGame, {
+      seed: 1, playerCount: 5,
+      agent: agentWith(chainGame, (request) => {
+        if (request.phaseId !== 'talk' || request.seat !== 2) return undefined;
+        return { output: { speech: '继续讨论', declare: request.attempt === 1 ? declare : '' } };
+      }),
+    });
+    const turns = run.requests.filter(({ request, snapshot }) => request.phaseId === 'talk' && request.seat === 2 && snapshot.round === 1);
+    expect(turns.map(({ request }) => request.attempt)).toEqual(declare === 'unknown' ? [1, 2] : [1]);
+    expect(entries(run.log, 'speech')).toContainEqual(expect.objectContaining({ seat: 2, text: '继续讨论' }));
+    expect(entries(run.log, 'action').some(entry => entry.text === '宣布引爆')).toBe(false);
+  });
+
   it('aborts the current phase, clears pending requests and enters the next round', () => {
     const run = runToEnd(chainGame, { seed: 1, playerCount: 5, agent: scenario({}, null, 1) });
     const talk = entries(run.log, 'speech').filter((entry) => entry.phaseId === 'talk');

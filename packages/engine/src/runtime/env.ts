@@ -19,6 +19,8 @@ export interface Emitted {
 
 /** 单次推进的执行环境：持有可变的工作快照，并收集本次产出的日志、舞台事件与 AI 请求 */
 export class ExecEnv {
+  acceptedRequestId?: string;
+  acceptedOutput?: unknown;
   readonly trace: TraceMark[] = [];
   activeRequestId: string | null = null;
 
@@ -63,6 +65,7 @@ export class ExecEnv {
     const scope = `${s.cursor.phaseId ?? 'end'}#${s.cursor.visit}`;
     return {
       state: s.state,
+      ...(s.announcementOverrides && { announcementOverrides: s.announcementOverrides }),
       params: s.params,
       seats: new SeatQuery(s.seats),
       round: s.round,

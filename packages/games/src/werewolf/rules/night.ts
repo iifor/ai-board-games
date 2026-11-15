@@ -25,7 +25,16 @@ export function aliveWolves(ctx: WerewolfContext): SeatQuery {
 
 /** 狼人夜聊：种子决定的狼人先发言，之后按座位号顺时针 */
 export function wolfChatOrder(ctx: WerewolfContext): number[] {
-  return seededRotation(ctx, aliveWolves(ctx).ids(), 'wolf-chat');
+  const seats = aliveWolves(ctx).ids();
+  return seats.length < 2 ? [] : seededRotation(ctx, seats, 'wolf-chat');
+}
+
+/** 调试局和调用失败时也按当晚的发言顺序生成台词。发言不替代稍后的狼刀投票。 */
+export function wolfChatFallback(ctx: WerewolfContext, seat: Seat) {
+  if (seat.seat !== wolfChatOrder(ctx)[0]) return { speech: '同意。' };
+  const targets = wolfKillTargets(ctx).ids();
+  const speech = targets.length ? `我提议今晚选${ctx.random('wolf-chat-target').pick(targets)}号，把票集中起来。` : '今晚没有可选目标，我提议空刀。';
+  return { speech };
 }
 
 /** 狼人只能击杀存活的非狼人玩家（不能自刀；狼队不认识的隐狼可以被选中），有占卜师标记时只能在标记范围内 */

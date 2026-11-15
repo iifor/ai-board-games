@@ -11,7 +11,7 @@ import { NO_GIFTS, type GiftSkill } from '../stateExtended';
 import type { SpecialDescriptor } from './types';
 
 // 额外技能（黑商的幸运儿、祈求者）：预言家的验、女巫的毒各用一次，可以当晚使用也可以留到之后的夜晚；
-// 猎人的枪在出局时直接开枪，不翻牌（公开记录只写"开枪带走 X号"，被带走者的出局原因为"被枪杀"）。
+// 猎人的枪在出局时直接开枪，不翻牌。公开播报先报开枪目标，再报结算结果，被带走者的出局原因为"被枪杀"。
 // 额外技能不覆盖原有技能；神职持有者在大树倒下后同样失去额外技能。
 
 const giftPrompts = definePrompts({
@@ -112,7 +112,7 @@ const giftPhases = {
     allowNone: true,
     prompt: giftPrompts.giftShot,
     channel: () => 'public',
-    describe: (_ctx, _seat, targets) => (targets[0] === undefined ? '放弃开枪' : `开枪带走 ${targets[0]}号`),
+    describe: (_ctx, _seat, targets) => (targets[0] === undefined ? '放弃开枪' : `向${targets[0]}号开枪`),
     apply: applyShot,
     next: 'gift_shot_resolve',
   },

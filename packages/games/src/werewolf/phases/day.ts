@@ -1,5 +1,7 @@
 import { speechOutput } from '@battle/engine';
+import { WEREWOLF_SPEECH_MAX_CHARS } from '../../speechLimits';
 import { werewolfPrompts as prompts } from '../prompts';
+import { wolfDeclarations } from './selfDestruct';
 import {
   applyDirection,
   daySpeakers,
@@ -11,7 +13,6 @@ import {
   recordExile,
   resolveExile,
 } from '../rules/day';
-import { canSelfDestruct } from '../rules/death';
 import { announceDawn } from '../rules/dawn';
 import { dayAfter } from '../rules/order';
 import { exileWeight } from '../rules/sheriff';
@@ -33,13 +34,14 @@ export const dayPhases = {
   day_speech: {
     kind: 'speak',
     title: '白天发言',
-    actors: daySpeakers,
+    actors: (ctx) => daySpeakers(ctx).map(number => {
+      const seat = ctx.seats.get(number);
+      return { seat, vars: { whiteWolfKingCanBlast: seat.role === 'white_wolf_king' && wolfDeclarations.selfDestruct.allowed(ctx, seat) ? 1 : 0 } };
+    }),
     prompt: prompts.daySpeech,
-    output: speechOutput({ max: 150 }),
+    output: speechOutput({ max: WEREWOLF_SPEECH_MAX_CHARS }),
     fallback: () => ({ speech: '我先听听大家的意见，暂时没有更多信息。' }),
-    declarations: {
-      selfDestruct: { label: '自爆', allowed: (_ctx, seat) => canSelfDestruct(seat) },
-    },
+    declarations: wolfDeclarations,
     next: dayAfter('day_speech'),
   },
   exile_vote: {

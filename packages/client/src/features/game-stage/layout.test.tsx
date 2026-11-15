@@ -41,11 +41,14 @@ describe('layouts', () => {
     const title = renderToStaticMarkup(<DebateTitle title={debateTopicOf(view)!.title} />);
     expect(title).toContain('<h1 class="versus-topic"><span>测试辩题</span></h1>');
     expect(html).not.toContain('测试辩题');
-    expect(html).toContain('<h3>正方</h3><p>支持</p></header><div class="ui-fade-up">');
-    expect(html).toContain('<h3>反方</h3><p>反对</p></header><div class="ui-fade-up">');
+    expect(html).toContain('<h3>正方</h3><p title="支持">支持</p></header><div class="versus-team-seats">');
+    expect(html).toContain('<h3>反方</h3><p title="反对">反对</p></header><div class="versus-team-seats">');
     expect(html.indexOf('玩家1')).toBeLessThan(html.indexOf('字幕'));
     expect(html).toContain('seat-card-speaking');
-    expect(html).toContain('class="seat-mic"');
+    expect(html.match(/class="seat-spotlight"/g)).toHaveLength(1);
+    expect(html).not.toContain('class="seat-mic"');
+    expect(html).toContain('正方一辩');
+    expect(html).toContain('反方一辩');
     expect(html).toContain('评委席');
   });
 
@@ -54,7 +57,7 @@ describe('layouts', () => {
     expect(debateTopicOf(partial)).toEqual({ title: '辩题', con: '反对', pro: '' });
     const html = renderToStaticMarkup(<VersusLayout view={partial} speaking={null} center={null} />);
     expect(html).toContain('<h3>正方</h3></header>');
-    expect(html).toContain('<h3>反方</h3><p>反对</p>');
+    expect(html).toContain('<h3>反方</h3><p title="反对">反对</p>');
     expect(debateTopicOf(null)).toBeNull();
   });
 
@@ -90,20 +93,21 @@ describe('layouts', () => {
     expect(render({ ...meta, kind: 'narration', text: '主持播报' })).not.toContain('speech-carousel');
   });
 
-  it.each(['circle', 'versus'] as const)('keeps all prior player speeches in %s history while the active judgement appears once', (layout) => {
+  it.each(['circle', 'versus'] as const)('separates %s current judgement from the historical record', (layout) => {
     const speech = { event: { ...meta, kind: 'speech' as const, seat: 1, text: '首条发言' }, audio: null };
     const last = { event: { ...speech.event, seq: 2, text: '上一位的观点' }, audio: null };
     const host = { event: { ...meta, seq: 3, kind: 'narration' as const, text: '请继续' }, audio: null };
     const judge = { event: { ...meta, seq: 4, kind: 'judgement' as const, seat: 3, verdict: 'pro', verdictLabel: '正方胜', comment: '最后点评' }, audio: null };
     const html = renderToStaticMarkup(<Stage layout={layout} view={view} current={null} played={[speech, last, host, judge]} />);
-    expect(html).toContain('aria-label="发言记录"');
+    expect(html).toContain('aria-label="当前发言"');
     expect(html.match(/class="speech-messages"/g)).toHaveLength(1);
     expect(html).not.toContain('role="region" aria-label="历史发言"');
-    expect(html).toContain('<li data-seq="1"');
-    expect(html).toContain('<li data-seq="2"');
-    expect(html.indexOf('首条发言')).toBeLessThan(html.indexOf('上一位的观点'));
+    expect(html).not.toContain('首条发言');
     expect(html).toContain('data-slot="current" data-seq="4"');
-    expect(html).toContain('上一位的观点');
+    expect(html).not.toContain('上一位的观点');
+    const record = renderToStaticMarkup(<StageRecord items={[speech,last,host]} filter="speech" onFilter={() => {}} onClose={() => {}} />);
+    expect(record.indexOf('首条发言')).toBeLessThan(record.indexOf('上一位的观点'));
+    expect(record).not.toContain('最后点评');
     expect(html).toContain('最后点评');
     expect(html.match(/最后点评/g)).toHaveLength(1);
     expect(html).toContain('<strong class="speech-author">3 号 · 玩家3</strong> 正方胜。最后点评');
@@ -159,7 +163,7 @@ describe('layouts', () => {
     ];
     const html = renderToStaticMarkup(<CircleLayout view={{ ...wolfView, seats }} speaking={null} center={null} />);
     expect(html).toContain('class="ring-seat-platform">1 号</b>');
-    expect(html).toContain('class="ring-seat-platform">2 号</b><span class="ring-seat-name">月白</span>');
+    expect(html).toContain('class="ring-seat-platform">2 号</b><span class="ring-seat-name" title="月白">月白</span>');
     expect(html).toContain('class="ring-seat-head"><span class="ring-seat-role">村民</span><em>警长</em></span>');
     expect(html).not.toContain('seat-card-no');
   });
@@ -272,6 +276,26 @@ describe('layouts', () => {
 });
 
 describe('ring geometry', () => {
+  it('brings seats 4 and 10 inward with the rounder ring while keeping their animation anchors aligned', () => {
+    const arena = {width:2400,height:1000};
+    const previousBox = fitRingBox(arena,2.2), roundBox = fitRingBox(arena);
+    const card = {width:144,height:184};
+    const previous = ringGeometry(12,previousBox,card), round = ringGeometry(12,roundBox,card);
+    expect(roundBox.width / roundBox.height).toBe(1.7);
+    const anchors = seatAnchors(Array.from({length:12},(_,i)=>i+1),round);
+    for (const index of [3,9]) {
+      expect(Math.abs(round.seats[index]!.x-roundBox.width/2)).toBeLessThan(Math.abs(previous.seats[index]!.x-previousBox.width/2));
+      expect(anchors.get(index+1)).toEqual(round.seats[index]);
+    }
+  });
+  it('uses spare width beside the speech surface without losing reading height', () => {
+    const box = { width: 1600, height: 750 };
+    const geometry = ringGeometry(12, box, { width: 144, height: 184 });
+    const speech = speechBox(box, geometry);
+    expect(speech.width).toBeGreaterThan(speech.height * 2.3);
+    expect(speech.height).toBeGreaterThan(300);
+  });
+
   it.each([6, 9, 12, 16])('keeps the speech surface clear of all %i seat buttons', (count) => {
     const box = { width: 1000, height: 600 };
     const geometry = ringGeometry(count, box, { width: 144, height: 184 });
