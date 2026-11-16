@@ -18,7 +18,7 @@ describe('judge', () => {
 
   it('uses the tie verdict on equal counts', () => {
     const run = runToEnd(panelGame, { seed: 1, playerCount: 4, agent: verdictAgent({ 3: 'first', 4: 'second' }) });
-    expect(run.snapshot.result?.winner).toBe('draw');
+    expect(run.snapshot.result).toMatchObject({ winner: 'draw', winners: [] });
   });
 
   it('judges in order and later judges see earlier comments', () => {
@@ -36,10 +36,10 @@ describe('judge', () => {
       playerCount: 3,
       agent: agentWith(panelGame, (request) => (request.action === 'judge' ? { output: { verdict: 'nobody', comment: '' } } : undefined)),
     });
-    expect(run.snapshot.result?.winner).toBe('draw');
+    expect(run.snapshot.result).toMatchObject({ winner: 'draw', winners: [] });
     expect(run.log.filter((entry) => entry.kind === 'fallback')).toHaveLength(1);
     expect(run.log.some(entry => entry.kind === 'judgement')).toBe(false);
-    expect(run.log).toContainEqual(expect.objectContaining({ kind: 'speech', seat: 3, text: '过~' }));
+    expect(run.log).toContainEqual(expect.objectContaining({ kind: 'speech', seat: 3, text: '过~', source: 'fallback' }));
   });
 
   it('assigns positions and public roles', () => {

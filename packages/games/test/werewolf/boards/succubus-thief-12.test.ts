@@ -47,6 +47,8 @@ describe('succubus', () => {
     expect(new Set(out)).toEqual(new Set([...kills, ...exiles, seer, wolfB]));
     expect(run.snapshot.seats.filter((seat) => seat.alive).map((seat) => seat.seat).sort((a, b) => a - b)).toEqual([partner, succubus].sort((a, b) => a - b));
     expect(run.snapshot.result).toMatchObject({ winner: 'lovers', winnerLabel: '情侣阵营胜利', summary: expect.stringContaining('其他玩家全部出局（第 4 天）') });
+    // 获胜方 key 不是任何座位的阵营：终局阵容按逐座位的 winners 高亮情侣两人
+    expect(run.snapshot.result?.winners).toEqual([partner, succubus].sort((a, b) => a - b));
     expect(requestsIn(run, 'mvp_vote').length).toBe(12);
   });
 });

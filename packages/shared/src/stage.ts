@@ -33,6 +33,11 @@ export interface GameResult {
   readonly summary: string;
   readonly mvp: number | null;
   readonly endReason: EndReason;
+  /**
+   * 获胜的座位（升序）：获胜方 key 不一定等于座位阵营（狼人杀的隐狼、情侣、混血儿等按规则归边），终局阵容按它高亮。
+   * 平局或无胜负时为空；旧结果和导入回放没有这个字段，展示端退回按阵营判断。
+   */
+  readonly winners?: readonly number[];
 }
 
 export type StagePayload =
@@ -41,6 +46,8 @@ export type StagePayload =
   | {
       readonly kind: 'speech';
       readonly seat: number;
+      /** 系统代发的台词（请求失败后的"过~"），不是玩家本人的发言 */
+      readonly source?: 'fallback';
       readonly text: string;
       readonly replyRequests?: readonly { readonly seat: number; readonly task: string }[];
     }

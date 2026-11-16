@@ -54,7 +54,10 @@ describe('hybrid board', () => {
   it('wins or loses with the master', () => {
     const wolfMaster = play(SEED, combine(chooseMaster(wolf), killEachNight([...villagers, hybrid])), BOARD);
     expect(wolfMaster.snapshot.result?.summary).toContain(`混血儿 ${hybrid}号主人是 ${wolf}号（狼人阵营），随之胜利`);
+    expect(wolfMaster.snapshot.result?.winners).toContain(hybrid);
     const goodMaster = play(SEED, combine(chooseMaster(villager), killEachNight([...villagers, hybrid])), BOARD);
     expect(goodMaster.snapshot.result?.summary).toContain(`混血儿 ${hybrid}号主人是 ${villager}号（好人阵营），随之落败`);
+    expect(goodMaster.snapshot.result?.winners).not.toContain(hybrid);
+    expect(goodMaster.snapshot.result?.winners).toContain(wolf);
   });
 });

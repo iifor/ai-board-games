@@ -52,9 +52,4 @@
 .debate-broadcast .speech-order { flex: none; }
 .debate-broadcast .vote-board { flex: none; }
 
-@media (max-width: 860px) {
-  .debate-broadcast { overflow: visible; }
-  .debate-broadcast .subtitle-bar { padding: 14px; }
-  .debate-broadcast .subtitle-inner { gap: 10px; }
-  .debate-broadcast .subtitle-body p { max-height: 38vh; font-size: 17px; }
-}
+

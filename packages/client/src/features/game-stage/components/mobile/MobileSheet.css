@@ -1,0 +1,58 @@
+.mobile-sheet {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 6px;
+  padding: 4px 12px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  background: rgb(5 12 26 / 90%);
+  backdrop-filter: blur(12px);
+}
+/* 展开：盖住舞台区，停在控制栏上方（--mobile-controls-height 由 MobileStage.css 给出） */
+.mobile-sheet.is-open {
+  position: absolute;
+  z-index: 50;
+  right: 12px;
+  bottom: calc(var(--mobile-controls-height) + env(safe-area-inset-bottom));
+  left: 12px;
+  height: min(64svh, 560px);
+}
+.mobile-sheet-handle {
+  justify-self: center;
+  width: 44px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.mobile-sheet-handle::before { content: ''; display: block; height: 4px; border-radius: 2px; background: var(--ui-border-strong); }
+.mobile-sheet-tabs { display: flex; gap: 6px; }
+.mobile-sheet-tabs button {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--ui-radius-pill);
+  color: var(--ui-text-muted);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 800;
+}
+.mobile-sheet-tabs button[aria-selected='true'] { color: #fff; background: var(--game-accent-soft, rgb(255 255 255 / 14%)); }
+.mobile-sheet-peek {
+  display: -webkit-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  overflow: hidden;
+  color: var(--ui-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.mobile-sheet-body { min-height: 0; overflow: auto; }
+.mobile-sheet-body .event-feed li { font-size: 14px; }
+.mobile-sheet-body .seat-popover-details { max-height: none; }
+.mobile-sheet-hint { margin: 16px 0; color: var(--ui-text-muted); font-size: 14px; text-align: center; }

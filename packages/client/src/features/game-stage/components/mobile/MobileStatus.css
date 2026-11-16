@@ -1,0 +1,15 @@
+.mobile-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-self: flex-start;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: var(--ui-radius-pill);
+  color: #c9d3e4;
+  background: rgb(5 12 26 / 66%);
+  font-size: 12px;
+}
+.mobile-status b { color: var(--ui-text); font-weight: 800; }
+.mobile-status [data-team] b { color: var(--team-color, var(--ui-text)); }
+.mobile-status-sheriff b { color: #ffd76a; }

@@ -1,4 +1,5 @@
 import type { GameResult, MatchStatus, StageEvent } from '@battle/shared';
+import { errorMessage } from '../../utils/errors';
 import type { EventBus } from '../../utils/eventBus';
 import { logger } from '../../utils/logger';
 import { PREFETCH_EVENTS, TERMINAL_STATUSES } from '../matches/types';
@@ -82,7 +83,9 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
     awaiting = event.seq;
     lastStatus = null;
     socket.send(encode({ type: 'event', event, audio }));
-    void prefetchAudio(event.seq, scripted);
+    void prefetchAudio(event.seq, scripted).catch((error: unknown) => {
+      logger.warn('预取后续语音失败', { matchId, seq: event.seq, error: errorMessage(error) });
+    });
   }
 
   async function markAcked(seq: number): Promise<void> {
@@ -91,8 +94,8 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
   }
 
   /**
-   * 断线前最后一次 ack 可能没送到：重连带来的 afterSeq 就是观众已播完的进度，补记为确认，
-   * 后台"观众确认"不会少一个，ack 节奏的闸门也不会卡住。记录失败只记日志，不影响续播。
+   * 观众确认先记为待补记，在下一步推送开头写库：ack、跳过的不可见事件、重连带来的 afterSeq 都走这里，
+   * 后台"观众确认"不会少一个，ack 节奏的闸门也不会卡住。写库失败只记日志、不影响续播，进度留到下一步再补。
    */
   async function settlePendingAck(): Promise<void> {
     if (pendingAck === null) return;
@@ -101,7 +104,8 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
     try {
       await markAcked(seq);
     } catch (error) {
-      logger.warn('补记观众续播进度失败', { matchId, seq, error: (error as Error).message });
+      pendingAck = Math.max(pendingAck ?? 0, seq);
+      logger.warn('补记观众确认失败', { matchId, seq, error: errorMessage(error) });
     }
   }
 
@@ -125,7 +129,7 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
       if (visible) await send(visible, match.scripted);
       else {
         cursor = next.seq;
-        await markAcked(cursor);
+        pendingAck = cursor;
         dirty = true;
       }
     } else if (TERMINAL_STATUSES.has(match.status)) {
@@ -157,7 +161,9 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
         await step();
       } while (dirty && !closed && awaiting === null);
     } catch (error) {
-      logger.error('推送对局事件失败', { matchId, error: (error as Error).message });
+      logger.error('推送对局事件失败', { matchId, error: errorMessage(error) });
+      // 出错时同一次故障往往也断了总线监听，不能指望通知唤醒；没在等 ack 就按兜底间隔重试
+      if (!closed && awaiting === null) schedulePoll();
     } finally {
       pumping = false;
     }
@@ -183,11 +189,12 @@ export function createMatchStream(matchId: string, socket: StreamSocket, deps: S
       if (afterSeq > 0) pendingAck = afterSeq;
       void pump();
     },
+    /** 不会 reject：确认在下一步推送开头写库，推送的错误由 pump 记录并重试 */
     async ack(seq: number): Promise<void> {
       if (awaiting === null || seq !== awaiting) return;
       cursor = seq;
       awaiting = null;
-      await markAcked(seq);
+      pendingAck = seq;
       await pump();
     },
     dispose(): void {

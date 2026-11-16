@@ -46,6 +46,8 @@ export function createTraceRepository(db: Db) {
         await tx.deleteFrom('promptComparisons').where('matchId', '=', matchId).execute();
         await tx.updateTable('aiTasks').set({ request: '{}', output: null, error: null }).where('matchId', '=', matchId)
           .where('status', 'in', ['succeeded', 'failed', 'cancelled']).execute();
+        // 玩家决策笔记里的判断理由来自模型输出，与调用链一起清除；选择本身与游戏日志一致，保留供记忆复盘
+        await tx.updateTable('playerDecisions').set({ note: sql`jsonb_set(note, '{judgement}', '""')` }).where('matchId', '=', matchId).execute();
         return true;
       });
     },

@@ -1,5 +1,7 @@
 import { speechOf, type AudioRef, type StageEvent } from '@battle/shared';
 import type { MatchRepository } from '../matches/repository';
+import { errorMessage } from '../../utils/errors';
+import { logger } from '../../utils/logger';
 import type { TtsService, VoiceChoice } from '../tts';
 import type { VoiceRepository } from '../voices/repository';
 
@@ -33,9 +35,19 @@ export function createAudioResolver(deps: AudioResolverDeps) {
       const key = `${matchId}:${event.seq}`;
       const existing = inflight.get(key);
       if (existing) return existing;
-      const job = voiceFor(matchId, content.seat).then((voice) => deps.tts.audioFor(content.text, voice));
+      // 合成失败已由 TTS 服务降级为 null；这里兜住读音色的数据库错误，同样交给前端朗读，且不缓存失败结果
+      const job = voiceFor(matchId, content.seat).then((voice) => deps.tts.audioFor(content.text, voice)).then(
+        (audio) => {
+          setTimeout(() => inflight.delete(key), 60_000);
+          return audio;
+        },
+        (error: unknown) => {
+          inflight.delete(key);
+          logger.warn('读取播报音色失败', { matchId, seq: event.seq, error: errorMessage(error) });
+          return null;
+        },
+      );
       inflight.set(key, job);
-      void job.finally(() => setTimeout(() => inflight.delete(key), 60_000));
       return job;
     },
   };

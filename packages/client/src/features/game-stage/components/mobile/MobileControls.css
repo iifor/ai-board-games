@@ -1,0 +1,20 @@
+.mobile-controls {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+}
+.mobile-controls button {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  color: var(--ui-text);
+  background: rgb(5 12 26 / 82%);
+  font-size: 14px;
+  font-weight: 800;
+}
+.mobile-controls button[aria-pressed='true'] { color: #fff; background: var(--game-accent-soft, rgb(255 255 255 / 14%)); }
+.mobile-controls button:disabled { opacity: .45; }
+.mobile-controls .mobile-controls-speed { color: #fff5cf; }
+.mobile-controls .is-primary { color: var(--ui-on-brand, #1b1200); background: var(--ui-brand); border-color: transparent; }

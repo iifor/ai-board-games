@@ -37,10 +37,5 @@
   animation: caption-in 140ms ease-out;
 }
 @keyframes caption-in { from { opacity: .4; } }
-@media (max-width: 860px) {
-  .sentence-captions { padding: 10px 14px; }
-  .sentence-caption-line strong { max-width: 100%; }
-  .sentence-caption-line p { font-size: 18px; }
-  .stage-shell:has(> .sentence-captions) { padding-bottom: calc(148px + env(safe-area-inset-bottom)); }
-}
+
 @media (prefers-reduced-motion: reduce) { .sentence-caption-line p { animation: none; } }

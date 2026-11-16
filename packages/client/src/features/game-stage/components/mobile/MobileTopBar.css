@@ -1,0 +1,66 @@
+.mobile-topbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 10px;
+}
+.mobile-topbar-back,
+.mobile-topbar-more > summary {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  color: var(--ui-text);
+  background: rgb(5 12 26 / 70%);
+  font-size: 18px;
+  text-decoration: none;
+  cursor: pointer;
+  list-style: none;
+}
+.mobile-topbar-more > summary::-webkit-details-marker { display: none; }
+.mobile-topbar-title { display: grid; min-width: 0; line-height: 1.2; }
+.mobile-topbar-title strong { overflow: hidden; color: #fff5cf; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.mobile-topbar-title small { overflow: hidden; color: var(--ui-text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.mobile-topbar-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid rgb(255 215 106 / 44%);
+  border-radius: var(--ui-radius-pill);
+  color: #fff4c4;
+  background: rgb(22 12 4 / 64%);
+  font-size: 11px;
+  font-weight: 900;
+}
+.mobile-topbar-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--ui-text-dim); }
+.mobile-topbar-live.is-live i { background: var(--ui-success); box-shadow: 0 0 10px rgb(114 240 164 / 78%); }
+.mobile-topbar-live.is-lost i { background: var(--ui-danger); }
+.mobile-topbar-more { position: relative; }
+.mobile-topbar-menu {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  gap: 8px;
+  min-width: 160px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: rgb(5 12 26 / 96%);
+}
+.mobile-topbar-status {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: var(--ui-radius-pill);
+  color: var(--ui-text);
+  background: var(--game-accent-soft, rgb(255 255 255 / 10%));
+  font-size: 12px;
+  font-weight: 800;
+  animation: ui-fade-up var(--ui-motion-normal) var(--ui-ease-out) both;
+}

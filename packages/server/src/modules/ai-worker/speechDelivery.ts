@@ -72,7 +72,7 @@ export function cleanSpeechOutput(output: unknown, action: AiRequest['action'], 
       return canonical ? `[${canonical}]` : '';
     }
     if (speechControl(label)) return '';
-    if (square && /^[\p{Script=Han}a-zA-Z_-]+$/u.test(label)) return '';
+    // 未登记的方括号内容是正文（[查杀]、[金水]、[3号]），与共享解析器同一口径；删掉会改变发言含义，也会从其他玩家的历史里消失
     return whole;
   });
   return { ...record, [key]: cleaned };

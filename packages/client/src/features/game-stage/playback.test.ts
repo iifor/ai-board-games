@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { describeEvent, displayDuration } from './playback/describe';
 import { dwell, playAudio, present, speak } from './playback/media';
 import { SegmentControl, progressFraction } from './playback/segment';
+import { AUDIO_STALL_MS, SPEECH_WATCHDOG_FACTOR, SPEECH_WATCHDOG_GRACE_MS } from './constants';
 import { meta } from './stage.fixtures';
 
 describe('describeEvent', () => {
@@ -126,6 +127,40 @@ describe('media playback', () => {
     await vi.advanceTimersByTimeAsync(displayDuration(text, 1) - 100);
     expect(finished).toBe(false);
     await vi.advanceTimersByTimeAsync(200);
+    expect(finished).toBe(true);
+  });
+
+  it('finishes browser speech that never reports its end, so the segment is still acknowledged', async () => {
+    vi.useFakeTimers();
+    stubSpeechSynthesis();
+    let finished = false;
+    void speak(text, new SegmentControl(1, false)).then(() => { finished = true; });
+    await vi.advanceTimersByTimeAsync(displayDuration(text, 1) * SPEECH_WATCHDOG_FACTOR);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(SPEECH_WATCHDOG_GRACE_MS);
+    expect(finished).toBe(true);
+  });
+
+  it('dwells for the rest of the text when server audio stops making progress without an error', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('Audio', FakeAudio);
+    let finished = false;
+    void playAudio('/api/media/x', new SegmentControl(1, false), text).then(() => { finished = true; });
+    await vi.advanceTimersByTimeAsync(0);
+    const audio = FakeAudio.instances[0];
+    if (audio) {
+      audio.duration = 10;
+      audio.currentTime = 5;
+      audio.emit('timeupdate');
+    }
+    // 有进度时不触发；之后卡住不动，到期改为停留剩余一半的展示时间
+    await vi.advanceTimersByTimeAsync(AUDIO_STALL_MS - 100);
+    expect(audio?.paused).toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(audio?.paused).toBe(true);
+    await vi.advanceTimersByTimeAsync(displayDuration(text, 1) / 2 - 300);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(300);
     expect(finished).toBe(true);
   });
 

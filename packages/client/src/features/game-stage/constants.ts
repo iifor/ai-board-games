@@ -31,5 +31,22 @@ export const SHORTCUT_HINTS = {
   result: { title: '查看结果（R）', keys: 'R' },
 } as const;
 
+/**
+ * 播放看门狗：播放没有结束，客户端就不会 ack，ack 节奏的对局随之停住。
+ * 浏览器朗读超过预计时长的 2 倍再加 5 秒仍未结束（Chrome 偶发不触发 onend）按已播完处理；
+ * 服务端音频连续这么久没有播放进度（网络卡住却不报 error）改为按字数停留走完剩余部分。
+ */
+export const SPEECH_WATCHDOG_FACTOR = 2;
+export const SPEECH_WATCHDOG_GRACE_MS = 5000;
+export const AUDIO_STALL_MS = 8000;
+
+/** 与 CSS 的窄屏断点一致：此宽度及以下整页换成手机舞台（hooks/useNarrowStage） */
+export const NARROW_STAGE_MAX_WIDTH = 860;
+/**
+ * 记录面板默认展开所需的视口宽度：面板展开时舞台会让出两侧位置，
+ * 圆桌在这个宽度以上仍放得下一圈座位，辩论赛还要放下左右各两列辩手，更宽才默认展开。
+ */
+export const RECORD_PANELS_MIN_WIDTH = { circle: 1280, versus: 1700 } as const;
+
 /** 座位弹层与卡片之间的间距（px） */
 export const POPOVER_GAP = 12;

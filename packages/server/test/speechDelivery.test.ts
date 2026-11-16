@@ -29,10 +29,12 @@ describe('voice-specific player tags', () => {
     expect(delivery.prompt.identity).not.toContain('[平静]');
   });
 
-  it('cleans unsupported and invented directions without deleting seat references or normal wide brackets', () => {
-    expect(cleanSpeechOutput({ speech: '[冷静][短停][抬高音调][瞎编标签]请听[3号]关于【投票】的解释。', declare: null }, 'speak', ['平静', '短停'])).toEqual({
+  it('cleans unsupported registered directions without deleting seat references, game terms or normal wide brackets', () => {
+    expect(cleanSpeechOutput({ speech: '[冷静][短停][抬高音调]请听[3号]关于【投票】的解释。', declare: null }, 'speak', ['平静', '短停'])).toEqual({
       speech: '[平静][短停]请听[3号]关于【投票】的解释。', declare: null,
     });
+    // 未登记的方括号内容是正文：狼人杀术语删掉会改变发言含义
+    expect(cleanSpeechOutput({ speech: '我验了3号[查杀]，5号是[金水]。' }, 'speak', [])).toEqual({ speech: '我验了3号[查杀]，5号是[金水]。' });
     expect(cleanSpeechOutput({ comment: '[愤怒]论据充分' }, 'judge', [])).toEqual({ comment: '论据充分' });
   });
 
@@ -62,7 +64,7 @@ describe('worker delivery integration', () => {
     const llm: LlmClient = { complete: async request => {
       calls.push(request);
       const answer = JSON.parse(answerFor(request)) as Record<string, unknown>;
-      return { content: JSON.stringify({ ...answer, speech: '[短停][放慢][抬高音调][愤怒][不存在的语气]这两句话需要解释。', comment: '[抬高音调]论证充分。' }), usage: null };
+      return { content: JSON.stringify({ ...answer, speech: '[短停][放慢][抬高音调][愤怒]这两句话需要解释。', comment: '[抬高音调]论证充分。' }), usage: null };
     } };
     const app = await createTestApp({ tts: { azure: { key: 'fixture', region: 'eastasia' }, mimo: null } }, {
       llm, azureVoiceCatalog: async () => [{ voiceName, styles: ['chat'] }],
@@ -87,7 +89,7 @@ describe('worker delivery integration', () => {
         if (entry.kind === 'judgement') return [entry.comment];
         return [];
       });
-      expect(JSON.stringify(spoken)).not.toMatch(/抬高音调|愤怒|不存在的语气/);
+      expect(JSON.stringify(spoken)).not.toMatch(/抬高音调|愤怒/);
       expect(rows[0]?.rawResponse).toContain('[抬高音调]');
     } finally { await app.cleanup(); }
   });

@@ -23,17 +23,5 @@
 .versus-layout .seat-card-figure .seat-spotlight { inset: 16px 0 3px; }
 .versus-layout .seat-card-figure .seat-card-stamp { z-index: 2; top: 28px; }
 
-@media (max-width: 860px) {
-  .versus-layout .seat-card.seat-card-figure {
-    display: flex; height: auto; min-height: calc(var(--portrait-size) + 8px);
-    padding: 4px; border: 0; border-radius: 9px;
-    background: linear-gradient(180deg, #0c1938b8, #050b1cce);
-  }
-  .versus-layout .seat-card-figure > :is(.ring-seat-head, .seat-figure, .ring-seat-platform, .ring-seat-name, .seat-spotlight) { display: none; }
-  .versus-layout .seat-card-figure .seat-card-compact { display: flex; align-items: center; gap: 7px; min-width: 0; width: 100%; }
-  .versus-layout .seat-card-figure.seat-card-speaking { background: color-mix(in srgb, var(--platform-color) 18%, #0a1429); }
-  .versus-layout .seat-card-figure.seat-card-speaking .seat-card-body strong { color: var(--platform-color); }
-  .versus-layout .seat-card-figure .seat-card-avatar { flex-shrink: 0; }
-  .versus-layout .seat-card-figure .seat-card-body strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-}
+
 @media (prefers-reduced-motion: reduce) { .versus-layout .seat-card-figure .seat-figure { transition: none; } }

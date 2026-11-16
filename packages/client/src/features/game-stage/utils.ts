@@ -1,6 +1,7 @@
-import { isPlayerSpeech, speechOf, type AudienceSeat, type AudienceView, type StageEvent } from '@battle/shared';
-import { POPOVER_GAP, TEAM_LABELS } from './constants';
+import { isPlayerSpeech, speechOf, stripSpeechTags, type AudienceSeat, type AudienceView, type GameResult, type StageEvent, type StageLayout } from '@battle/shared';
+import { POPOVER_GAP, RECORD_PANELS_MIN_WIDTH, TEAM_LABELS } from './constants';
 import { SPEEDS, type PlaybackOptions, type SeatSpeech, type ShortcutKeyLike, type StageShortcut, type StreamItem } from './types';
+import { describeEvent } from './playback/describe';
 
 export type StagePeriod = 'day' | 'night';
 
@@ -91,13 +92,19 @@ export function rosterByTeam(view: AudienceView): readonly TeamRoster[] {
   return [...groups.entries()].map(([team, seats]) => ({ team, label: teamLabel(team), seats }));
 }
 
-/** 某个座位在本局的公开发言与评委判定（已播放的，旧的在前），每条带轮次与阶段标题；判定文本与字幕同口径（"判定。点评"） */
+/** 获胜的座位：优先用结果里的逐座位名单（按规则归边，如隐狼、情侣、混血儿）；旧结果和导入回放没有名单，退回阵营等于获胜方 */
+export function winningSeats(view: AudienceView, result: GameResult): ReadonlySet<number> {
+  return new Set(result.winners ?? view.seats.filter((seat) => seat.team !== null && seat.team === result.winner).map((seat) => seat.seat));
+}
+
+/** 某个座位在本局的公开发言与评委判定（已播放的，旧的在前），每条带轮次与阶段标题；判定文本与字幕同口径（"判定。点评"），不含朗读标记 */
 export function speechesOfSeat(played: readonly StreamItem[], seat: number): readonly SeatSpeech[] {
   const speeches: SeatSpeech[] = [];
   for (const { event } of played) {
     if (!isPlayerSpeech(event) || event.seat !== seat) continue;
-    const text = speechOf(event)?.text;
-    if (text === undefined) continue;
+    const spoken = speechOf(event)?.text;
+    if (spoken === undefined) continue;
+    const text = stripSpeechTags(spoken);
     const phase = event.view.phase?.title;
     speeches.push({ seq: event.seq, kind: event.kind, title: phase ? `${roundLabel(event.view)} · ${phase}` : roundLabel(event.view), text });
   }
@@ -192,4 +199,52 @@ export function popoverPlacement(anchor: Box, arena: Box, size: { readonly width
   if (right <= maxLeft) return { left: right, top, side: 'right' };
   if (left >= 0) return { left, top, side: 'left' };
   return { left: clamp(right, 0, maxLeft), top, side: 'right' };
+}
+
+/** 打开舞台时记录面板是否默认展开：窗口够宽、展开后舞台仍放得下座位时才展开（两侧面板同开同关） */
+export function recordPanelsOpenByDefault(layout: StageLayout, viewportWidth: number): boolean {
+  const min = layout === 'versus' ? RECORD_PANELS_MIN_WIDTH.versus : RECORD_PANELS_MIN_WIDTH.circle;
+  return viewportWidth >= min;
+}
+
+export interface CampCount {
+  readonly team: string;
+  readonly label: string;
+  readonly alive: number;
+}
+
+export interface AliveSummary {
+  readonly alive: number;
+  readonly total: number;
+  /** 各阵营存活人数；有座位的阵营观众看不到（玩家视角）时为空，避免按部分信息给出误导的数字 */
+  readonly camps: readonly CampCount[];
+}
+
+/** 手机局势条：存活人数，以及观众能看到全部阵营时各阵营的存活人数（按座号先后出现的顺序） */
+export function aliveSummary(view: AudienceView): AliveSummary {
+  const alive = view.seats.filter((seat) => seat.alive);
+  const known = view.seats.every((seat) => seat.team !== null);
+  const counts = new Map<string, number>();
+  if (known) for (const seat of alive) counts.set(seat.team!, (counts.get(seat.team!) ?? 0) + 1);
+  const camps = [...counts.entries()].map(([team, count]) => ({ team, label: teamLabel(team), alive: count }));
+  return { alive: alive.length, total: view.seats.length, camps };
+}
+
+/** 手机控制栏的倍速按钮：每点一次换下一档，最快一档之后回到 1× */
+export function cycleSpeed(speed: number): number {
+  return SPEEDS.find((value) => value > speed) ?? SPEEDS[0];
+}
+
+/** 记录抽屉收起时露出的一行：所选标签下最新一条记录（发言 / 对局流程），朗读标记不展示 */
+export function latestRecordLine(items: readonly StreamItem[], speech: boolean): string | null {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const event = items[index]!.event;
+    if (isPlayerSpeech(event) !== speech) continue;
+    const { speaker, text } = describeEvent(event);
+    if (!text) continue;
+    const seat = speaker === null ? null : event.view.seats.find((candidate) => candidate.seat === speaker);
+    const body = stripSpeechTags(text);
+    return seat ? `${speakerLabel(seat.seat, seat.name)}：${body}` : body;
+  }
+  return null;
 }

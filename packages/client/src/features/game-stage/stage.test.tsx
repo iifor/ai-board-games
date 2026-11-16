@@ -15,7 +15,7 @@ import { VoteBoard } from './components/VoteBoard';
 import { SegmentControl } from './playback/segment';
 import { meta, seat, summary, view } from './stage.fixtures';
 import type { StreamItem } from './types';
-import { hasSpotlight, judgeBadges, periodOf, rosterByTeam, speechOrderOf } from './utils';
+import { hasSpotlight, judgeBadges, periodOf, recordPanelsOpenByDefault, rosterByTeam, speechOrderOf } from './utils';
 
 describe('stage derivations', () => {
   it('puts the acting seat in the spotlight for actions but not for tallies or phase titles', () => {
@@ -50,6 +50,16 @@ describe('stage derivations', () => {
     expect(overview).not.toContain('只看发言');
   });
 
+  it('shows speeches in the record without reading directions', () => {
+    const feed = renderToStaticMarkup(<EventFeed items={[
+      item({ ...meta, kind: 'speech', seat: 1, text: '[冷静]我方认为【愤怒】这不对[停顿]，[3号]请回答。' }),
+      item({ ...meta, seq: 2, kind: 'speech', seat: 2, text: '[停顿]' }),
+    ]} />);
+    expect(feed).toContain('我方认为这不对，[3号]请回答。');
+    expect(feed).not.toMatch(/冷静|愤怒|停顿/);
+    expect(feed.match(/event-feed-speech/g)).toHaveLength(1);
+  });
+
   it('keeps night phases in the record and the live region without drawing a duplicate subtitle', () => {
     const phase = item({ ...meta, kind: 'phase_started', title: '狼人夜聊' });
     expect(renderToStaticMarkup(<EventFeed items={[phase]} />)).toContain('狼人夜聊');
@@ -68,6 +78,14 @@ describe('stage derivations', () => {
     expect(speechOrderOf(speeches, null, { ...view, phase: { id: 'other', title: 'x' } })).toEqual([]);
     expect(judgeBadges([item({ ...meta, kind: 'judgement', seat: 3, verdict: 'pro', verdictLabel: '正方胜', comment: '' })])).toEqual({ 3: ['正方胜'] });
     expect(rosterByTeam(view).map((group) => [group.label, group.seats.length])).toEqual([['正方', 1], ['反方', 1], ['评委', 1]]);
+  });
+
+  it('opens the record panels by default only when the stage still has room for the seats beside them', () => {
+    expect(recordPanelsOpenByDefault('circle', 1440)).toBe(true);
+    expect(recordPanelsOpenByDefault('circle', 1100)).toBe(false);
+    expect(recordPanelsOpenByDefault('versus', 1440)).toBe(false);
+    expect(recordPanelsOpenByDefault('versus', 1920)).toBe(true);
+    expect(recordPanelsOpenByDefault('circle', 375)).toBe(false);
   });
 });
 

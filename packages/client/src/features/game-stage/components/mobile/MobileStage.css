@@ -1,0 +1,50 @@
+/* 单屏：整页固定在视口里，只有记录抽屉与发言卡内部滚动 */
+.mobile-stage {
+  --mobile-controls-height: 58px;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) 12px 0;
+  overflow: hidden;
+  color: var(--ui-text);
+  background: #02091b;
+  isolation: isolate;
+}
+.mobile-stage > .stage-backdrop { position: absolute; inset: 0; z-index: -1; }
+.mobile-stage-topic {
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: rgb(5 12 26 / 80%);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: center;
+}
+.mobile-stage > * { flex: none; }
+.mobile-stage-arena {
+  flex: 1 1 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+.mobile-stage-card { min-height: 0; max-height: 32svh; overflow: auto; }
+.mobile-stage-card .subtitle-bar {
+  position: static;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  transform: none;
+  background: rgb(5 12 26 / 88%);
+}
+.mobile-stage-card .vote-board { position: static; width: auto; max-width: none; margin: 0; transform: none; }
+/* 说话人头像已经在舞台中间放大显示，卡片里只留名字一行 */
+.mobile-stage-card .subtitle-bar { min-height: 0; padding: 10px 14px; }
+.mobile-stage-card .subtitle-avatar { display: none; }
+.mobile-stage-card .subtitle-inner { gap: 6px; }
+.mobile-stage-card .subtitle-speaker { padding: 0 0 6px 9px; }
+.mobile-stage-card .subtitle-bar p { max-height: none; font-size: 16px; }

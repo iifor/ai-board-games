@@ -109,13 +109,31 @@ function budgetWinner(ctx: WerewolfContext): WerewolfWinner {
   return third && thirdPartyStanding(ctx) ? third.kind : 'good';
 }
 
+/** 只用于获胜名单的归边（混血儿跟随主人）；没有干预时为 null */
+function listedSide(ctx: WerewolfContext, seat: Seat): 'good' | 'werewolf' | null {
+  for (const hooks of specialVictoryHooks) {
+    const side = hooks.listedSide?.(ctx, seat);
+    if (side !== null && side !== undefined) return side;
+  }
+  return null;
+}
+
+/** 获胜的座位：按规则归边（离群的狼、情侣、丘比特、混血儿等），不是简单的阵营等于获胜方 */
+function winningSeats(ctx: WerewolfContext, winner: WerewolfWinner): number[] {
+  return ctx.seats.ids().filter((seat) => {
+    const side = winner === 'good' || winner === 'werewolf' ? listedSide(ctx, ctx.seats.get(seat)) : null;
+    return side !== null && !inThirdParty(ctx, seat) ? side === winner : onWinningSide(ctx, seat, winner);
+  });
+}
+
 export function werewolfResult(ctx: WerewolfContext): EndResult {
   const mvp = ctx.state.mvp;
   if (ctx.endReason === 'budget') {
     const winner = budgetWinner(ctx);
-    return { winner, winnerLabel: LABELS[winner], summary: withNotes(ctx, winner, `达到天数上限，按存活情况判定${LABELS[winner]}`), mvp };
+    const summary = withNotes(ctx, winner, `达到天数上限，按存活情况判定${LABELS[winner]}`);
+    return { winner, winnerLabel: LABELS[winner], summary, mvp, winners: winningSeats(ctx, winner) };
   }
   const winner = decideWinner(ctx) ?? 'good';
   const summary = withNotes(ctx, winner, `${LABELS[winner]}：${winReason(ctx, winner)}（第 ${ctx.round} 天）`);
-  return { winner, winnerLabel: LABELS[winner], summary, mvp };
+  return { winner, winnerLabel: LABELS[winner], summary, mvp, winners: winningSeats(ctx, winner) };
 }

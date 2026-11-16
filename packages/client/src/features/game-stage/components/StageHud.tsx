@@ -1,6 +1,6 @@
 import type { AudienceView, MatchSummaryDto, StageEvent } from '@battle/shared';
 import type { StreamConnection } from '../types';
-import { periodOf, roundLabel } from '../utils';
+import { liveBadge, matchMode, stageStatus } from '../hudStatus';
 import './StageHud.css';
 
 interface StageHudProps {
@@ -12,26 +12,11 @@ interface StageHudProps {
   readonly event?: StageEvent | undefined;
 }
 
-/** LIVE 标记的文字与修饰类：已结束 > 连上 > 自动重连已放弃 > 连接中 */
-function liveBadge(connection: StreamConnection, ended: boolean, replay: boolean): { readonly label: string; readonly className: string } {
-  if (ended) return { label: '已结束', className: 'is-ended' };
-  if (connection === 'open' || (connection === 'closed' && replay)) return replay ? { label: '回放', className: 'is-replay' } : { label: 'LIVE', className: 'is-live' };
-  if (connection === 'lost') return { label: '连接中断', className: 'is-lost' };
-  return { label: '连接中', className: '' };
-}
-
 /** 顶部直播条：游戏与板子、LIVE 状态、当前阶段 */
 export function StageHud({ summary, view, event, connection, ended, replay = summary.status === 'completed' }: StageHudProps) {
   const live = liveBadge(connection, ended, replay);
-  const phase = view?.phase;
-  const mode = summary.variantName ?? (typeof view?.extra.board === 'string' ? view.extra.board : null);
-  const title = phase?.title === phase?.id && /^[a-z_]+$/.test(phase?.id ?? '') ? '技能结算' : phase?.title;
-  const night = view?.gameKey === 'werewolf' && periodOf(view) === 'night';
-  let step = title;
-  if (night && event?.kind === 'phase_started' && event.channel === 'public' && event.announcement) step = event.announcement.replace(/。$/, '');
-  if (night && event?.kind === 'narration' && event.channel.startsWith('private:')) step = '法官私讯';
-  const status = view && step ? `${night ? `第 ${view.round} 夜` : roundLabel(view)} · ${step}`
-    : view?.status === 'completed' ? '对局已结束' : '准备中';
+  const mode = matchMode(summary, view);
+  const status = stageStatus(view, event);
   return (
     <header className="stage-hud glass-panel" aria-label="对局状态">
       <div className="stage-hud-identity">

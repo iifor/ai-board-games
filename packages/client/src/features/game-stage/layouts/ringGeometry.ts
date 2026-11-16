@@ -135,3 +135,11 @@ export function seatAnchors(seats: readonly number[], geometry: RingGeometry): R
   });
   return anchors;
 }
+
+/** 手机圆桌：座位中心在正方形容器里的百分比位置（1 号在正上方，顺时针），radius 也是容器边长的百分比 */
+export function ringPercents(count: number, radius = 40): RingPoint[] {
+  return equalArcAngles(count, radius, radius).map((angle) => {
+    const offset = point(angle, radius, radius);
+    return { x: 50 + offset.x, y: 50 + offset.y };
+  });
+}

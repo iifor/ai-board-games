@@ -91,25 +91,5 @@
   .versus-stage:has(> .speech-carousel) { min-height: 230px; }
 }
 
-@media (max-width: 860px) {
-  .versus-layout {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto auto auto;
-    grid-template-areas: "center center" "pro con" "bench bench";
-    height: auto; gap: 16px 10px;
-  }
-  .versus-center { grid-area: center; width: 100%; }
-  .versus-stage:has(> .speech-carousel) { height: var(--mobile-speech-height); }
-  .versus-side-pro { grid-area: pro; }
-  .versus-side-con { grid-area: con; }
-  .versus-side { align-content: start; gap: 7px; }
-  .versus-team-seats { grid-template: none / minmax(0, 1fr); gap: 7px; }
-  .versus-bench { grid-area: bench; }
-  .versus-bench-seats { gap: 8px; }
-  .versus-layout .seat-card { --portrait-size: clamp(46px, 8vw, 65px); gap: 7px; padding: 4px; border-radius: 9px; }
-  .versus-layout .seat-card-body { gap: 2px; }
-  .versus-layout .seat-card-body strong { font-size: 14px; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
-  .versus-layout .seat-card-role { font-size: 11px; }
-  .versus-layout .versus-bench-seats .seat-card { width: min(calc(50% - 4px), 208px); height: auto; }
-}
+
 @media (prefers-reduced-motion: reduce) { .versus-team-seats > .ui-fade-up { animation: none; } }

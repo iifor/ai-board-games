@@ -31,8 +31,4 @@
 .skill-interaction[data-reduced-motion='true'] .skill-thaw b,
 .skill-interaction[data-reduced-motion='true'] .skill-global-result > span { opacity: 1; }
 .skill-interaction[data-reduced-motion='true'] .skill-emblem { opacity: .6; }
-@media (max-width: 860px) {
-  .skill-route-glow { stroke-width: 7px; }
-  .skill-source { width: 38px; height: 38px; margin: -19px; }
-  .skill-global-result { inset: 18px 10% auto; }
-}
+

@@ -15,15 +15,4 @@
   width: max-content;
   margin-inline: auto;
 }
-@media (max-width: 860px) {
-  .versus-topic {
-    position: sticky;
-    z-index: 38;
-    top: 0;
-    order: 0;
-    padding: 8px 5px;
-    border-radius: 8px;
-    background: rgb(7 16 32 / 94%);
-    font-size: clamp(20px, 3.4vw, 28px);
-  }
-}
+

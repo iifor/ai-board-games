@@ -66,7 +66,7 @@ src/
 | --- | --- | --- |
 | `GET /api/health` | 数据库可用返回 `{ status: 'ok', instance }`（`instance` 是应答实例启动时生成的随机 ID），否则 503 | 无 |
 | `GET /api/toc/games` | 游戏目录（来自注册表，含变体及角色构成；固定公开席位的游戏另含有序的 `seatGroups`） | 无 |
-| `GET /api/toc/players` | 已启用且已绑定模型的玩家。返回玩家 ID、模型显示名、完整模型标识、立绘标识、头像和人设 | 无 |
+| `GET /api/toc/players` | 已启用、且主模型或备用模型可用（模型启用且所属供应商启用，与 AI worker 的模型链一致）的玩家；模型因额度耗尽被自动停用后不再出现。返回玩家 ID、模型显示名、完整模型标识、立绘标识、头像和人设 | 无 |
 | `POST /api/admin/auth/login` | 登录，返回 JWT（12 小时）与是否需改密 | 无 |
 | `POST /api/admin/auth/password` | 修改密码（新密码至少 12 位） | 登录（允许未改密） |
 | `GET /api/admin/auth/me` | 当前管理员 | 登录（允许未改密） |
@@ -80,7 +80,7 @@ src/
 | `POST /api/admin/voices/import-defaults` | 导入内置音色目录（`modules/voices/catalog.ts`，沿用旧版默认语音包），按（来源、音色名、风格）与名称去重，可重复执行 | 管理员 |
 | `GET /api/admin/voices/azure/catalog` | 使用服务端 Azure 语音密钥及区域读取官方音色目录，返回音色标识与支持的风格。成功结果在服务实例缓存 10 分钟，并发请求合并；失败不缓存，未配置、超时或上游错误返回 50201。HTTP 响应为 `private, no-store`。 | 管理员 |
 | 同上 `/api/admin/players` | AI 玩家（模型、音色引用检查） | 管理员 |
-| `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`）；每来源每小时 10 局（来源默认是连接地址，`TRUST_PROXY=true` 时才取 `X-Forwarded-For`），进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制（上限判断与插入在同一事务内用 advisory lock 串行化，并发请求不会一起越过）；公开接口请求体上限 64 KB | 无 |
+| `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`）；每来源每小时 10 局（来源默认是连接地址，`TRUST_PROXY=true` 时才取 `X-Forwarded-For`），进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制（上限判断与插入在同一事务内用 advisory lock 串行化，并发请求不会一起越过）；公开接口请求体上限 64 KB；非脚本化对局的每个玩家都必须有可用的主模型或备用模型，否则 400 | 无 |
 | `GET /api/toc/matches`、`GET /api/toc/matches/:id` | 已完成的公开对局历史、对局概要（含舞台布局 `layout`，前端不必再查游戏目录；游戏已不在注册表时为 `circle`）。调试局的可见性见"调试局对外可见性" | 无 |
 | `GET /api/media/:id` | 合成音频（按音色与文本哈希寻址，长期缓存） | 无 |
 | `WS /api/toc/ws/matches/:id` | 播放流，见下文"实时推送"；客户端帧超过 16 KB 直接以 1008 关闭；对局可见性与 `GET /api/toc/matches/:id` 同一口径 | 无 |
@@ -111,7 +111,7 @@ src/
 ## 对局运行时
 
 - **推进**（`modules/matches/runtime.ts`）：一个事务内 `SELECT … FOR UPDATE` 锁定对局行 → 调用引擎 `advance` → 写回快照、新的 AI 任务、舞台事件，以及（来自 worker 时）完成的任务；提交后通过事件总线通知 worker 与实时网关（总线跨实例，见"多实例"）。引擎计算放在 try 内：`EngineInputError` 对 AI 结果视为过期（任务记为 cancelled），对其他输入返回 409；`SpecMismatchError`（快照来自旧版本的游戏定义，见下文"部署与游戏版本"）立即把对局标为 failed（错误"游戏规则已更新，这局无法继续，已终止"，触发的任务记为 cancelled）；引擎其他异常把对局标为 failed。后两种情况都会取消该局其余未完成的任务，与 `failMatch` 共用同一段终止逻辑。数据库错误不吞掉，整个事务回滚并向上抛出。完结任务只作用于仍为 queued / running 的任务：迟到的重复结果不会把已 succeeded 的任务改写成 cancelled。
-- **AI worker**（`modules/ai-worker`）：事件驱动（总线跨实例唤醒）+ 每秒兜底轮询（处理重试、过期领取与丢失的通知）。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型），每次领取 `attempts` 加一。执行或推进抛错（如数据库故障）时只记日志等待重新领取；领取次数达到 `AI_TASK_MAX_ATTEMPTS`（默认 3）仍失败则由 `runtime.failMatch` 把对局标为 failed（错误"AI 处理多次失败，对局已终止"）、任务记为 failed、其余任务取消，并通过总线通知在线观众，不再无限重试、重复付费调用模型。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；开启混沌脚本（`chaos`）的脚本化对局改用引擎的 `chaosReply`：按对局种子与请求 ID 以固定概率弃票、放弃可放弃的动作、附带自爆等声明、给出非法输出（引擎重问后再兜底）或模拟一次调用失败——模拟失败是一次"已完成但失败"的任务（任务记为 failed、以 `ai_failed` 交回引擎走兜底，对局继续），不是执行异常，不计入下面的领取次数上限。否则依次尝试座位玩家的主模型与备用模型中仍启用的部分（主模型被停用时直接用备用模型），每个模型首次调用后最多重试两次，间隔 0.5 秒、1 秒；网络中断、超时、HTTP 408、临时限流（429）、5xx 和空内容可重试，全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`（脚本化与混沌对局不写）。
+- **AI worker**（`modules/ai-worker`）：事件驱动（总线跨实例唤醒）+ 每秒兜底轮询（处理重试、过期领取与丢失的通知）。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型），每次领取 `attempts` 加一。执行或推进抛错（如数据库故障）时只记日志等待重新领取；领取次数达到 `AI_TASK_MAX_ATTEMPTS`（默认 3）仍失败则由 `runtime.failMatch` 把对局标为 failed（错误"AI 处理多次失败，对局已终止"）、任务记为 failed、其余任务取消，并通过总线通知在线观众，不再无限重试、重复付费调用模型。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；开启混沌脚本（`chaos`）的脚本化对局改用引擎的 `chaosReply`：按对局种子与请求 ID 以固定概率弃票、放弃可放弃的动作、附带自爆等声明、给出非法输出（引擎重问后再兜底）或模拟一次调用失败——模拟失败是一次"已完成但失败"的任务（任务记为 failed、以 `ai_failed` 交回引擎走兜底，对局继续），不是执行异常，不计入下面的领取次数上限。否则依次尝试座位玩家的主模型与备用模型中仍启用的部分（主模型被停用时直接用备用模型），每个模型首次调用后最多重试两次，间隔 0.5 秒、1 秒；网络中断、超时、HTTP 408、临时限流（429）、5xx 和空内容可重试，全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`（脚本化与混沌对局不写）。发言与点评落库前按座位音色整理朗读标记（`speechDelivery.ts`）：已登记的情绪 / 控制标签换成当前音色支持的写法，不支持的移除；未登记的方括号内容（`[3号]`、`[查杀]`、`[金水]`）是正文，原样保留。
 - **优雅关闭**（`src/index.ts`）：收到 SIGINT / SIGTERM 后先停回收器，再 `worker.stop()`：不再领取新任务，等待进行中的任务最多 `SHUTDOWN_TIMEOUT_MS`（默认 10 秒），超时则记录还没结束的任务（matchId、requestId）并继续关闭——它们的领取在 10 分钟后过期，由下一个实例重新领取。随后关闭跨实例通知的监听连接、HTTP 监听与连接池；整个关闭流程超过 2 倍 `SHUTDOWN_TIMEOUT_MS` 仍没结束（例如被卡住的任务占着连接）就直接退出。
 - **无人观看回收**（`modules/matches/reaper.ts`）：每分钟把 `MATCH_IDLE_MINUTES` 内没有动静（既没推进也没有观众确认，`updated_at` 在确认时也会刷新）的 ack 节奏公开对局标为 failed 并取消其排队任务，通过总线通知在线观众；调试局不回收。进行中计数也只算这个窗口内有动静的对局。每次清扫先在事务里拿 `pg_try_advisory_xact_lock`，拿不到（另一实例正在扫）就跳过，`sweep()` 返回 null。
 - **额度耗尽自动停用**：供应商返回 4xx 且错误码在 `modules/llm/quota.ts` 的列表中（百炼 `Arrearage` / `AllocationQuota.FreeTierOnly`、火山 `*BillOverdue`、OpenAI `insufficient_quota` 等）时，LLM 客户端抛出 `quotaExhausted` 的 `LlmError`；worker 不重试，把该模型标为 `enabled = false`、`disabled_reason = 'quota_exhausted'` 并切换备用模型。管理员补充额度后在后台"测试"通过再"重新启用"（`PUT` 时 `enabled: true` 清除原因）。普通限流（429 但没有这些错误码）仍只是重试。
@@ -130,10 +130,11 @@ Azure 字幕由 `azureTransport` 使用官方 SDK 在同一次合成中接收 Wo
 1. 客户端连接后发送 `{ type: 'hello', afterSeq }`（10 秒内未发送则从头开始）。
 2. 服务端逐个推送 `{ type: 'event', event, audio }`，客户端播放完毕发送 `{ type: 'ack', seq }` 后才推送下一个；推送时预先为之后的 3 个事件准备语音。
 3. 暂时没有新事件时推送 `status`（状态没变不重复发）；对局结束且事件推完后推送 `{ type: 'end', result }` 并关闭；失败推送 `status: failed`。推送进行中收到的总线通知会记为"待重查"，本轮结束后再查一次，不会丢掉唤醒。
-4. 等待"尚未产生的事件"期间，每 `STREAM_POLL_MS`（默认 2000 毫秒）兜底重查一次数据库：另一实例的 worker 提交的事件正常情况下经总线即时送达，兜底重查只是通知丢失（监听连接重连期间）时的安全网；等待观众 ack 期间不查（推送由 ack 驱动），连接关闭时清掉定时器。
-5. 断线重连用最后确认的 seq 作为 `afterSeq` 续播；已结束的对局从 0 开始即为回放，与实时走同一条路径。`afterSeq > 0` 同时视为对该进度的一次确认：第一次查到对局后补记 `markAcked(afterSeq)`（断线前最后一次 ack 可能没送到，后台"观众确认"不会少一个；补记失败只记日志不影响续播），对公开接口不可见的对局不补记。
-6. 多个观众时，`matches.acked_seq` 取最大确认值；确认进度只增不减，且不超过 `last_seq`（客户端报的 `afterSeq` 不能把 ack 节奏的闸门抬到事件之前）。
-7. 客户端帧上限 16 KB（`MAX_CLIENT_FRAME_BYTES`，按 UTF-8 字节计）：`app.ts` 把它设成 ws 服务器的 `maxPayload`（`createNodeWebSocket` 不透传选项，但 ws 在升级连接时才读取 `wss.options`），超过的帧在协议层就以 1009（message too big）关闭、不会先缓冲整帧；网关在解析前再按字节数检查一次，命中时以 1008 关闭，作为第二道防线。
+4. 等待"尚未产生的事件"期间，每 `STREAM_POLL_MS`（默认 2000 毫秒）兜底重查一次数据库：另一实例的 worker 提交的事件正常情况下经总线即时送达，兜底重查只是通知丢失（监听连接重连期间）时的安全网；等待观众 ack 期间不查（推送由 ack 驱动），连接关闭时清掉定时器。某一步推送抛错（如数据库短暂不可用）时记日志，没在等 ack 就按同样间隔重试，不依赖可能同时断开的总线通知。
+5. 断线重连用最后确认的 seq 作为 `afterSeq` 续播；已结束的对局从 0 开始即为回放，与实时走同一条路径。`afterSeq > 0` 同时视为对该进度的一次确认：第一次查到对局后补记 `markAcked(afterSeq)`（断线前最后一次 ack 可能没送到，后台"观众确认"不会少一个），对公开接口不可见的对局不补记。
+6. 观众的 `ack`、跳过的不可见事件与重连的 `afterSeq` 都先记为待补记，在下一步推送开头写库；写库失败只记日志、不影响续播，进度留到下一步再补。语音准备读取音色失败时同样记日志并返回 `audio: null`（交给前端朗读），失败结果不缓存。
+7. 多个观众时，`matches.acked_seq` 取最大确认值；确认进度只增不减，且不超过 `last_seq`（客户端报的 `afterSeq` 不能把 ack 节奏的闸门抬到事件之前）。
+8. 客户端帧上限 16 KB（`MAX_CLIENT_FRAME_BYTES`，按 UTF-8 字节计）：`app.ts` 把它设成 ws 服务器的 `maxPayload`（`createNodeWebSocket` 不透传选项，但 ws 在升级连接时才读取 `wss.options`），超过的帧在协议层就以 1009（message too big）关闭、不会先缓冲整帧；网关在解析前再按字节数检查一次，命中时以 1008 关闭，作为第二道防线。
 
 ### 多实例
 
@@ -147,7 +148,7 @@ Azure 字幕由 `azureTransport` 使用官方 SDK 在同一次合成中接收 Wo
 - **初始管理员**：`bootstrap` 先快速查表，为空时在持 `pg_advisory_xact_lock(1, 2)` 的事务里再查一次才插入，多实例同时启动只创建一个。
 - **本来就安全的部分**：AI 任务领取 `FOR UPDATE SKIP LOCKED`；公开开局上限在事务里持 advisory lock（单键 7201）串行化。所有 advisory lock 键登记在 `db/locks.ts`。
 
-运维要点：每个实例比连接池多占一条数据库连接（LISTEN）；NOTIFY 是 PostgreSQL 内置功能，不需要扩展；advisory lock 与 NOTIFY 都是数据库范围而非 schema 范围，共用一个库、不同 schema 的部署会互相等待锁（只影响效率，不影响正确性），通道名已按 schema 区分。测试里 `createTestApp` 可传 `{ schema }` 复用另一个实例的 schema，用来搭两个实例（`test/multiInstance.test.ts`）。
+运维要点：每个实例比连接池多占一条数据库连接（LISTEN）；连接池监听 `error` 事件，数据库重启或切换时空闲连接报错只记日志，进程不会退出，连接池自行补建连接；NOTIFY 是 PostgreSQL 内置功能，不需要扩展；advisory lock 与 NOTIFY 都是数据库范围而非 schema 范围，共用一个库、不同 schema 的部署会互相等待锁（只影响效率，不影响正确性），通道名已按 schema 区分。测试里 `createTestApp` 可传 `{ schema }` 复用另一个实例的 schema，用来搭两个实例（`test/multiInstance.test.ts`）。
 
 ### 部署与游戏版本
 
@@ -171,11 +172,11 @@ Azure 字幕由 `azureTransport` 使用官方 SDK 在同一次合成中接收 Wo
 
 管理员查询接口 `GET /api/admin/player-memory/players/:id` 支持 `offset`、`limit`、`gameKey` 和 `subjectId`。返回分页记忆、证据、后续提示词及引用状态、待复盘和失败计数，响应禁止缓存。调用链节点详情在有记忆的请求上返回 `memory.offered` 和 `memory.decision`；排队、拒绝、失败或兜底时后者为空。
 
-管理员调用 `DELETE /api/admin/player-memory/players/:id/memories/:memoryId` 忘记一条，或 `DELETE /api/admin/player-memory/players/:id` 清空该玩家的所有记忆。迁移 024 添加遗忘标记及玩家的清空批次。遗忘擦除记忆正文、证据与关联对象，保留编号和版本关系用于识别失效修订。历史对局快照、决策与复盘调用明细继续反映当时的实际执行。清空会同时取消该玩家排队或执行中的复盘；迟到回复无法再写入。新开局和终局入队均按玩家行锁同步清空批次，兼容迁移前开局的快照（批次 0）。
+管理员调用 `DELETE /api/admin/player-memory/players/:id/memories/:memoryId` 忘记一条，或 `DELETE /api/admin/player-memory/players/:id` 清空该玩家的所有记忆。迁移 024 添加遗忘标记及玩家的清空批次。遗忘擦除记忆正文、证据与关联对象，保留编号和版本关系用于识别失效修订。删除对局时，这局产生且修正了其他对局记忆的记忆以同样方式转为遗忘墓碑并解除对局关联（迁移 025：`match_id` 可空，约束只有已遗忘的记忆可以没有来源对局），被修正的旧记忆继续隐藏；其余记忆随对局级联删除。历史对局快照、决策与复盘调用明细继续反映当时的实际执行。清空会同时取消该玩家排队或执行中的复盘；迟到回复无法再写入。新开局和终局入队均按玩家行锁同步清空批次，兼容迁移前开局的快照（批次 0）。
 
 管理端 `GET /api/admin/traces` 可按游戏 / 状态分页列出对局；`GET /api/admin/traces/:id` 返回当前玩法注册的角色展示名、节点索引、每次模型尝试的摘要和分模型用量；`GET /api/admin/traces/:id/nodes/:node` 按需读取关联决策、提示词、模型参数 / 输出及对应舞台快照。三个接口及删除共用管理员鉴权。节点随对局推进在同一事务写入 `match_trace_nodes`，以对局内的阶段访问、请求 ID 和事件 seq 建立关联。脚本局采集决策和规则节点，模型传输次数为零。
 
-`DELETE /api/admin/traces/:id` 锁定对局行，设置 `matches.trace_deleted`，删除本局节点、`ai_calls` 和已完结任务缓存的请求 / 输出 / 错误，同一事务提交。进行中的任务仅在执行期间保留必要输入，完成或取消后清空。模型传输在事务外执行，写入明细前在共享行锁内复核删除标记。重复删除幂等；之后新推进不会重新采集。对局状态、游戏日志、舞台事件、回放与音频继续保留。私密调用链接口及模型调用明细响应使用 `private, no-store`。
+`DELETE /api/admin/traces/:id` 锁定对局行，设置 `matches.trace_deleted`，删除本局节点、`ai_calls` 和已完结任务缓存的请求 / 输出 / 错误，并清空 `player_decisions` 中来自模型的判断理由（`note.judgement`；与日志一致的选择保留供记忆复盘），同一事务提交。删除后继续推进时新的决策不再保存判断理由。进行中的任务仅在执行期间保留必要输入，完成或取消后清空。模型传输在事务外执行，写入明细前在共享行锁内复核删除标记。重复删除幂等；之后新推进不会重新采集。对局状态、游戏日志、舞台事件、回放与音频继续保留。私密调用链接口及模型调用明细响应使用 `private, no-store`。
 
 PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 public）。启动时自动执行迁移，失败则拒绝启动。
 

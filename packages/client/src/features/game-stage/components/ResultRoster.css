@@ -86,6 +86,15 @@
   color: #ffd0d6;
 }
 
+/* 组内只有部分座位获胜：逐行用金色标出（整组获胜时由卡片光晕表示） */
+.result-roster-team li.is-winner strong {
+  color: #ffe9a8;
+}
+
+.result-roster-team li.is-winner span {
+  color: #ffd98a;
+}
+
 @keyframes result-sweep {
   to {
     transform: translateX(120%);

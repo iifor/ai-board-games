@@ -1,0 +1,71 @@
+.mobile-seat {
+  --seat-size: clamp(38px, 11vw, 48px);
+  --seat-ring: var(--ui-border-strong);
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  color: var(--ui-text);
+  background: none;
+  cursor: pointer;
+}
+.mobile-seat[data-team='werewolf'], .mobile-seat[data-team='lone_wolf'] { --seat-ring: rgb(255 107 114 / 75%); }
+.mobile-seat-avatar {
+  width: var(--seat-size);
+  height: var(--seat-size);
+  border: 2px solid var(--seat-ring);
+  border-radius: 50%;
+  background: #172338;
+  overflow: hidden;
+  transition: border-color var(--ui-motion-fast) ease, box-shadow var(--ui-motion-fast) ease;
+}
+.mobile-seat-no {
+  position: absolute;
+  top: calc(var(--seat-size) - 14px);
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  color: #fff;
+  background: rgb(5 13 24 / 92%);
+  font-size: 11px;
+  line-height: 18px;
+}
+.mobile-seat-badge {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #2b1a00;
+  background: #ffd76a;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 18px;
+}
+.mobile-seat-role {
+  max-width: calc(var(--seat-size) + 20px);
+  padding: 0 5px;
+  overflow: hidden;
+  border-radius: 6px;
+  color: #dfe7f5;
+  background: rgb(5 12 26 / 72%);
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mobile-seat.is-speaking .mobile-seat-avatar {
+  border-color: var(--team-color, var(--ui-brand-strong));
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 12%), 0 0 16px var(--team-color, var(--ui-brand-strong));
+}
+.mobile-seat.is-selected .mobile-seat-avatar { box-shadow: 0 0 0 3px var(--ui-focus-ring, #7fb2ff); }
+.mobile-seat.is-out .mobile-seat-avatar { border-style: dashed; filter: grayscale(1); opacity: .45; }
+.mobile-seat.is-out .mobile-seat-role { text-decoration: line-through; }
+.mobile-seat:focus-visible { outline: none; }
+.mobile-seat:focus-visible .mobile-seat-avatar { box-shadow: 0 0 0 3px var(--ui-focus-ring, #7fb2ff); }

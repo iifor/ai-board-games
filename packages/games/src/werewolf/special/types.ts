@@ -12,6 +12,8 @@ import type { WerewolfState } from '../state';
 export interface VictoryHooks {
   /** 该座位最终所属的一方（如丘比特跟随情侣）：MVP 平票时据此判断是否属于胜利一方；不干预时返回 null */
   side?(ctx: WerewolfContext, seat: Seat): 'good' | 'werewolf' | null;
+  /** 只用于终局获胜名单的归边（如混血儿跟随主人）；MVP 平票按规则口径不考虑它。不干预时返回 null */
+  listedSide?(ctx: WerewolfContext, seat: Seat): 'good' | 'werewolf' | null;
   /** 暂缓判定（如随狼队出局的隐狼尚未结算） */
   defer?(ctx: WerewolfContext): boolean;
   /** 终局说明末尾附加的个人结果（如混血儿跟随主人）；本局没有该角色时返回 null */

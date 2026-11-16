@@ -36,7 +36,7 @@
     radial-gradient(ellipse 40% 50% at 50% 90%, #4d6177 98%, transparent);
   opacity: .5;
 }
-/* 中央只显示当前发言，历史由舞台两侧的独立面板展示。 */
+/* 中央只显示当前发言，历史由舞台两侧的独立面板展示；发言卡贴在立绘下部，脸和上半身不被文字压住。 */
 .speech-track {
   position: absolute;
   z-index: 1;
@@ -45,7 +45,7 @@
   width: min(100%, var(--speech-track-width, 64rem));
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-end;
   gap: clamp(6px, 1.5cqh, 12px);
   text-align: left;
   color: #f8fbff;
@@ -55,8 +55,10 @@
   flex-shrink: 0;
   min-height: 0;
   padding: clamp(10px, 2cqh, 20px) clamp(10px, 2cqw, 20px);
+  border: 1px solid rgb(255 255 255 / 8%);
   border-radius: 12px;
-  background: linear-gradient(180deg, rgb(7 16 28 / 28%), rgb(7 16 28 / 40%));
+  background: linear-gradient(180deg, rgb(7 16 28 / 74%), rgb(7 16 28 / 86%));
+  backdrop-filter: blur(8px);
   overflow: visible;
 }
 .speech-history {
@@ -75,7 +77,7 @@
 .speech-history li + li { margin-top: .7em; }
 .speech-history .speech-author { color: inherit; font-weight: 650; }
 .speech-focus { min-width: 0; }
-.speech-turn { color: #fff; opacity: .85; }
+.speech-turn { color: #fff; }
 .speech-turn .speech-author { color: var(--speech-accent); font-weight: 750; }
 .speech-turn p {
   margin: 0;

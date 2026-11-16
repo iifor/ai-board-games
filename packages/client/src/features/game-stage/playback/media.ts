@@ -4,8 +4,12 @@ import { describeEvent, displayDuration, voteBoardDuration } from './describe';
 import type { SegmentControl } from './segment';
 import { skillCue } from '../animation/skillCue';
 import { holdSkill, skillDuration } from '../animation/skillTiming';
+import { AUDIO_STALL_MS, SPEECH_WATCHDOG_FACTOR, SPEECH_WATCHDOG_GRACE_MS } from '../constants';
 
 const now = () => Date.now();
+
+/** 正在朗读的对象；只为保持引用，防止被回收 */
+const speaking = new Set<SpeechSynthesisUtterance>();
 
 /**
  * 按字数停留（没有音频 / 静音时的展示时长）；倍速改变时按已走过的比例重排剩余时间。
@@ -64,12 +68,19 @@ export function playAudio(url: string, control: SegmentControl, text: string | n
     audio.playbackRate = control.rate;
     const startedAt = now();
     let settled = false;
+    let stallTimer: ReturnType<typeof setTimeout> | null = null;
     const fraction = () =>
       Number.isFinite(audio.duration) && audio.duration > 0 ? Math.min(1, audio.currentTime / audio.duration) : estimatedFraction(startedAt, text, control.rate);
     const stop = () => {
       settled = true;
+      if (stallTimer !== null) clearTimeout(stallTimer);
       unsubscribe();
       audio.pause();
+    };
+    /** 每次有播放进度就重新计时；长时间没有进度（缓冲卡死、ended 没触发）就按剩余比例停留 */
+    const watchStall = () => {
+      if (stallTimer !== null) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => fallback(fraction()), AUDIO_STALL_MS);
     };
     const finish = () => {
       if (settled) return;
@@ -86,13 +97,16 @@ export function playAudio(url: string, control: SegmentControl, text: string | n
       else audio.playbackRate = control.rate;
     });
     audio.addEventListener('timeupdate', () => {
-      if (!settled) control.setProgress({ kind: 'measured', fraction: fraction(), positionMs: audio.currentTime * 1000 });
+      if (settled) return;
+      control.setProgress({ kind: 'measured', fraction: fraction(), positionMs: audio.currentTime * 1000 });
+      watchStall();
     });
     audio.addEventListener('ended', finish, { once: true });
     audio.addEventListener('error', () => fallback(0), { once: true });
     control.signal.addEventListener('abort', finish, { once: true });
     // 第一次 timeupdate 之前先给个 0%，进度条立刻出现而不是空一拍
     control.setProgress({ kind: 'measured', fraction: 0, positionMs: 0 });
+    watchStall();
     audio.play().catch(() => fallback(0));
   });
 }
@@ -111,8 +125,17 @@ export function speak(text: string, control: SegmentControl): Promise<void> {
     const rate = control.rate;
     const startedAt = now();
     let settled = false;
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Chrome 会回收没有 JS 引用的朗读对象，之后 onend 永远不来；朗读期间一直持有它
+    speaking.add(utterance);
+    const watchdog = setTimeout(() => {
+      window.speechSynthesis.cancel();
+      finish();
+    }, displayDuration(text, rate) * SPEECH_WATCHDOG_FACTOR + SPEECH_WATCHDOG_GRACE_MS);
     const stop = () => {
       settled = true;
+      clearTimeout(watchdog);
+      speaking.delete(utterance);
       unsubscribe();
     };
     const finish = () => {
@@ -126,7 +149,6 @@ export function speak(text: string, control: SegmentControl): Promise<void> {
       window.speechSynthesis.cancel();
       void dwell(control, text, estimatedFraction(startedAt, text, rate)).then(resolve);
     };
-    const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'zh-CN';
     utterance.rate = rate;
     utterance.onend = finish;
