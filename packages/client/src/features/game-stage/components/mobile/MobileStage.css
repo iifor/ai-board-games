@@ -1,18 +1,21 @@
 /* 单屏：整页固定在视口里，只有记录抽屉与发言卡内部滚动 */
 .mobile-stage {
-  --mobile-controls-height: 58px;
+  --mobile-sheet-peek: 92px;
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: max(10px, env(safe-area-inset-top)) 12px 0;
+  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
   overflow: hidden;
   color: var(--ui-text);
   background: #02091b;
   isolation: isolate;
 }
 .mobile-stage > .stage-backdrop { position: absolute; inset: 0; z-index: -1; }
+.mobile-stage > * { flex: none; }
+/* 座位区占满剩余高度；发言卡与抽屉位都是固定高度，不会把它挤没 */
+.mobile-stage > .mobile-stage-arena { flex: 1 1 0; }
 .mobile-stage-topic {
   margin: 0;
   padding: 6px 12px;
@@ -24,27 +27,29 @@
   line-height: 1.4;
   text-align: center;
 }
-.mobile-stage > * { flex: none; }
-.mobile-stage-arena {
-  flex: 1 1 0;
-  container-type: size;
-  display: grid;
-  place-items: center;
-  min-height: 0;
+/* 抽屉位：收起时抽屉填满它；展开的抽屉从这里向上浮起盖住舞台，占位高度不变，座位不跳 */
+.mobile-stage-sheet-slot {
+  position: relative;
+  height: var(--mobile-sheet-peek);
 }
-.mobile-stage-card { min-height: 0; max-height: 32svh; overflow: auto; }
-.mobile-stage-card .subtitle-bar {
-  position: static;
-  width: auto;
-  max-width: none;
-  margin: 0;
-  transform: none;
-  background: rgb(5 12 26 / 88%);
+
+/* 横屏或矮窗口：左边座位舞台，右边阶段信息、发言卡、抽屉与控制栏 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .mobile-stage {
+    --mobile-sheet-peek: 60px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.95fr);
+    grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "top top" "arena topic" "arena status" "arena error" "arena card" "arena sheet" "arena controls";
+    gap: 0 12px;
+  }
+  .mobile-stage > .mobile-topbar { grid-area: top; margin-bottom: 6px; }
+  .mobile-stage > .mobile-stage-topic { grid-area: topic; margin-bottom: 6px; font-size: 13px; }
+  .mobile-stage > .mobile-status { grid-area: status; margin-bottom: 6px; }
+  .mobile-stage > .stage-error { grid-area: error; margin-bottom: 6px; }
+  .mobile-stage > .mobile-stage-arena { grid-area: arena; min-height: 0; }
+  .mobile-stage > .mobile-stage-card { grid-area: card; height: auto; margin-bottom: 6px; }
+  .mobile-stage > .mobile-stage-sheet-slot { grid-area: sheet; }
+  /* 横屏高度紧：收起的抽屉只留标签行，最新一条记录不露出 */
+  .mobile-stage-sheet-slot .mobile-sheet:not(.is-open) .mobile-sheet-peek { display: none; }
 }
-.mobile-stage-card .vote-board { position: static; width: auto; max-width: none; margin: 0; transform: none; }
-/* 说话人头像已经在舞台中间放大显示，卡片里只留名字一行 */
-.mobile-stage-card .subtitle-bar { min-height: 0; padding: 10px 14px; }
-.mobile-stage-card .subtitle-avatar { display: none; }
-.mobile-stage-card .subtitle-inner { gap: 6px; }
-.mobile-stage-card .subtitle-speaker { padding: 0 0 6px 9px; }
-.mobile-stage-card .subtitle-bar p { max-height: none; font-size: 16px; }

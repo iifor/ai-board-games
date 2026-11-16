@@ -8,6 +8,7 @@ import { PlayerPicker } from './PlayerPicker';
 import { SeatGrid } from './SeatGrid';
 import { SetupActionBar } from './SetupActionBar';
 import { TopicFields } from './TopicFields';
+import { blocksImplicitSubmit } from '../utils';
 import './SetupForm.css';
 
 interface SetupFormProps {
@@ -44,7 +45,8 @@ export function SetupForm({ game, players, initial }: SetupFormProps) {
   };
 
   return (
-    <form className="setup-form" data-game={game.key} onSubmit={(event) => { event.preventDefault(); void start('players'); }}>
+    <form className="setup-form" data-game={game.key} onSubmit={(event) => { event.preventDefault(); void start('players'); }}
+      onKeyDown={(event) => { if (event.target instanceof HTMLInputElement && blocksImplicitSubmit(event.key, event.target)) event.preventDefault(); }}>
       <header className="setup-header">
         <Link to="/" className="setup-back">← 返回大厅</Link>
         <div className="setup-title">

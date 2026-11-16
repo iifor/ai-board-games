@@ -5,6 +5,7 @@ import { MobileRing } from './components/mobile/MobileRing';
 import { MobileSheet } from './components/mobile/MobileSheet';
 import { MobileStatus } from './components/mobile/MobileStatus';
 import { MobileVersus } from './components/mobile/MobileVersus';
+import { followScrollTop } from './hooks/useFollowSpeech';
 import { phaseTitle } from './hudStatus';
 import { ringPercents } from './layouts/ringGeometry';
 import { meta, seat, view } from './stage.fixtures';
@@ -48,6 +49,14 @@ describe('phone stage helpers', () => {
     expect(right!.x).toBeCloseTo(90);
     expect(bottom!.y).toBeCloseTo(90);
     expect(left!.x).toBeCloseTo(10);
+  });
+
+  it('keeps the line being read inside the speech card as a long speech plays', () => {
+    // 600px 高的文字放在 150px 的卡片里：开头不滚，读到一半时那一行停在卡片上方约 40%，读完停在底部
+    expect(followScrollTop(0, 600, 150)).toBe(0);
+    expect(followScrollTop(0.5, 600, 150)).toBe(240);
+    expect(followScrollTop(1, 600, 150)).toBe(450);
+    expect(followScrollTop(0.7, 100, 150)).toBe(0);
   });
 
   it('never shows an internal phase id as a title', () => {

@@ -1,0 +1,31 @@
+.mobile-stage-arena {
+  container-type: size;
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+}
+/* 固定高度：不随发言长短伸缩，座位区因此稳定；长发言在卡片内跟读滚动（useFollowSpeech） */
+.mobile-stage-card {
+  height: clamp(96px, 19svh, 190px);
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--ui-radius-lg);
+}
+.mobile-stage-card .subtitle-bar {
+  position: static;
+  width: auto;
+  max-width: none;
+  min-height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 10px 14px;
+  transform: none;
+  background: rgb(5 12 26 / 88%);
+}
+/* 说话人头像已经在舞台中间放大显示，卡片里只留名字一行 */
+.mobile-stage-card .subtitle-avatar { display: none; }
+.mobile-stage-card .subtitle-inner { gap: 6px; }
+.mobile-stage-card .subtitle-speaker { padding: 0 0 6px 9px; }
+.mobile-stage-card .subtitle-bar p { max-height: none; overflow: visible; font-size: 16px; }
+.mobile-stage-card .vote-board { position: static; width: auto; max-width: none; margin: 0; transform: none; }

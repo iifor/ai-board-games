@@ -39,6 +39,7 @@ C 端通过 `POST /api/toc/matches` 开始游戏，服务端在创建时锁定�
 
 动效用 CSS 为主、Web Animations API 为辅（无动画库）。`prefers-reduced-motion` 下 CSS 动画由 `global.css` 统一关闭（组件 CSS 另把自己的错峰延迟归零，避免空白），JS 动效在 `lobby/animations.ts` 里判断后直接不动：
 - 大厅：头图各元素与游戏卡片错峰淡入上浮（`.ui-fade-up` + `--i`，卡片排在头图之后）；游戏卡片悬停 / 键盘聚焦（`:focus-within`）是同一套状态：上浮、一道扫光（`::after` 动画一次）、图标亮起游戏强调色，说明与标签不动；"最近一局"卡片悬停上浮、背景缓慢放大并随指针轻微视差（`useParallax` 把偏移写成 `--px` / `--py`，纯计算 `parallaxOffset`），有最近一局时条幅显示胜方与时间，右侧"去开一局 → / 回放 →"做成胶囊按钮。没有最近对局时，「去开一局」直达默认玩法配置页。大厅重试会重新加载失败的最近对局。板子搜索显示匹配数，方向键可在可见结果中切换，模拟开局区同步显示所选板子及开局人数。
+- 开局只能通过点击按钮触发：表单里的文本框（模式搜索、辩题）按回车会被浏览器隐式提交，`SetupForm` 用 `utils.blocksImplicitSubmit` 拦下，避免误开一局真实调用模型的对局。
 - 开局选人时，`useSeatFlights` 让头像从卡片飞到对应座位。两种补满方式都按新座号错峰入座，清空时按座号淡出。切换狼人杀模式会同时更新角色标签、席位数和底栏人数提示；如果超员，多出的座位标红并允许逐一取消。
 - 历史：行错峰淡入上浮（错峰只排前 10 行），悬停 / 聚焦上浮并点亮右侧"回放 →"。
 - 舞台：狼人杀昼夜背景按 `view.extra.period` 圆形揭开切换（`StageBackdrop`）；进入新阶段时大标题横扫而过（`PhaseBanner`）；发言者座位亮起扩散光环、立绘站在圆桌中央（`SpeakerSpotlight`，主持人也站在这里；行动事件如开枪、自爆由当事座位站到中央），没有立绘的玩家换成"发言者大卡"（`SpeakerCard`：大头像 + 名字 + 座位号 + 观众可见的身份 / 阵营，光环取阵营色 `--team-color`，进场同样用 `spotlight-in`；主持人始终用立绘）；夜晚没有在行动的存活座位闭眼（`SeatCard` 的 `seat-card-asleep`：人物略微压暗；正在行动的座位亮着发言光环，出局者保持出局样式；天亮靠座位卡既有的 opacity / filter 过渡交叉淡入）；字幕栏从下方滑入、文字从左向右揭开，进度条跟随真实播放进度（`SubtitleBar` + `SubtitleProgress`）；计票时选票从投票者座位沿弧线飞到目标座位（`BallotFlight`，Web Animations API：错峰起飞、落地时目标卡片一弹，弃票在原座位闪烁消失；时长 = 这段停留时长的六成、封顶 3 秒，随倍速缩放，没有当前段时 1.2 秒，纯计算在 `animation/ballotFlight.ts`），飞完票板的票数条才依次长出、当选者金色高亮（`VoteBoard` 的 `delayMs`；只有登记了 `ballotFlight` 的布局会飞，减少动效时不飞、票板立刻长条）；出局座位变灰并盖"出局"戳；终局结果以对话框弹出，展示带座号的 MVP 圆形头像（配置头像优先，其次为内置肖像，缺图时显示通用人像）、按阵营逐行揭示的阵容（`--i` 全表行号错峰；胜负按 `result.winners` 逐座位判断，旧结果退回阵营等于获胜方：整组获胜的阵营在最后一行亮出后扫过一道光并留下金色光晕，组内只有部分座位获胜时这些行用金色标出「获胜」）与"同样阵容再来一局 / 从头回放"（`ResultPanel`、`ResultRoster`），可关闭后再用"查看结果"打开。
@@ -66,10 +67,10 @@ src/
                           animation/*（ballotFlight：选票飞行的预算 / 时序 / 弧线 / 计划，纯计算；motion：prefers-reduced-motion 探测，JS 动效据此不动）、
                           constants（阵营标签、重连参数、快捷键提示文案、座位弹层间距）、
                           utils（昼夜、座位、夜晚步骤、发言顺序、评委判定、终局阵容、快捷键判定 / 倍速档 / 选项变化、座位发言汇总、弹层定位）、
-                          hudStatus（直播标记、玩法模式、阶段文案，桌面 HUD 与手机顶栏共用）、useNarrowStage（≤860px 切换手机舞台）、useRecordPanels（桌面记录面板开关）、
+                          hudStatus（直播标记、玩法模式、阶段文案，桌面 HUD 与手机顶栏共用）、useNarrowStage（≤860px 切换手机舞台）、useFollowSpeech（手机发言卡跟读滚动）、useRecordPanels（桌面记录面板开关）、
                           components/*（StageBackdrop、StageHud、StageError、PlaybackControls、SeatCard（按钮，样式抹平在 SeatCardButton.css）、SeatPopover（内容为 SeatProfile）、SeatProfile、Stage、StageCenter、SpeechOrder、
                           VoteBoard、BallotFlight、SpeakerSpotlight、SpeakerCard（含 SpeakerAvatar）、SubtitleBar、SubtitleProgress、PhaseBanner、ResultPanel、ResultRoster、EventFeed）、
-                          components/mobile/*（MobileStage 及 MobileTopBar、MobileStatus、MobileRing、MobileVersus、MobileSeat、MobileSpeaker、MobileSheet、MobileControls）、
+                          components/mobile/*（MobileStage 及 MobilePlayfield、MobileTopBar、MobileStatus、MobileRing、MobileVersus、MobileSeat、MobileSpeaker、MobileSheet、MobileControls）、
                           stage.fixtures（测试共用的观众视图 / 事件元信息 / 对局概要）
     history/              MatchList（行错峰进场、悬停点亮"回放"）
   styles/global.css       设计令牌、基础样式（.button、.glass-panel、.ui-pill）、通用动效
@@ -77,11 +78,11 @@ src/
 
 ## 手机舞台
 
-视口宽度 ≤860px（`constants.NARROW_STAGE_MAX_WIDTH`，`hooks/useNarrowStage` 监听，旋转或调整窗口时随之切换）时，`StagePage` 整页渲染 `components/mobile/MobileStage`。数据与桌面共用：同一个对局流、`usePlayback`、ack、终局对话框与观战视角切换，只换展示。单屏布局固定在视口内，自上而下：
+视口宽度 ≤860px（`constants.NARROW_STAGE_MAX_WIDTH`，`hooks/useNarrowStage` 以 `width < 861px` 监听，与桌面样式的 `min-width: 861px` 严格互补，旋转或调整窗口时随之切换）时，`StagePage` 整页渲染 `components/mobile/MobileStage`。数据与桌面共用：同一个对局流、`usePlayback`、ack、终局对话框与观战视角切换，只换展示。单屏布局固定在视口内。座位区与发言卡由 `MobilePlayfield` 提供（后台导入试播在窄窗口下复用它）：发言卡高度固定（`clamp(96px, 19svh, 190px)`），不随发言长短伸缩，座位区占满其余高度，因此换段时座位不跳；长发言在卡片内跟读滚动（`hooks/useFollowSpeech`：换段回到顶部，播放中把正在读的位置保持在卡片上方约 40%）。记录抽屉放在固定高度的抽屉位里，展开时向上浮起覆盖舞台，占位不变。横屏或矮窗口（横向且高度 ≤560px）改为左右两栏：左边座位区，右边阶段、局势、发言卡、抽屉与控制栏。竖屏自上而下：
 
 - `MobileTopBar`：返回、游戏与板子、直播 / 回放标记、更多菜单（观战视角）；下一行是当前阶段（`hudStatus.stageStatus`）。辩论赛在其下显示辩题。
 - `MobileStatus`（狼人杀）：存活人数、观众能看到全部阵营时各阵营存活人数（`utils.aliveSummary`；玩家视角看不到别人的阵营时只给存活人数）、警长。
-- 座位舞台：狼人杀是 `MobileRing`（座位等分在正方形容器的圆周上，`ringGeometry.ringPercents`，1 号在正上方顺时针），辩论赛是 `MobileVersus`（正反方各一列，评委在中间下方）。`MobileSeat` 是圆形头像加座号与可见身份：正在发言亮起阵营色光圈，出局变灰加虚线框，警长带"警"字，上帝视角下狼人阵营带红圈。中间的 `MobileSpeaker` 放大当前说话人；主持播报显示主持人；空档显示昼夜与阶段名（内部结算阶段显示"技能结算"，`hudStatus.phaseTitle`）。
+- 座位舞台：狼人杀是 `MobileRing`（座位等分在正方形容器的圆周上，`ringGeometry.ringPercents`，1 号在正上方顺时针），辩论赛是 `MobileVersus`（正反方各一列，评委在中间下方）。圆桌边长取舞台宽度与"舞台高度 − 52px"中较小者，上下留出顶部头像与底部身份标签的空间；座位与桌心头像按圆桌宽度缩放（容器单位），桌子窄于 230px 时不显示身份标签。辩论赛每列头像按舞台高度收缩。`MobileSeat` 是圆形头像加座号与可见身份：正在发言亮起阵营色光圈，出局变灰加虚线框，警长带"警"字，上帝视角下狼人阵营带红圈。中间的 `MobileSpeaker` 放大当前说话人；主持播报显示主持人；空档显示昼夜与阶段名（内部结算阶段显示"技能结算"，`hudStatus.phaseTitle`）。
 - 发言卡：复用 `SubtitleBar`（隐藏头像，只留说话人一行与进度），计票时换成 `VoteBoard`。这是手机上唯一的当前文本，不再叠加底部逐句字幕，也不显示中央大立绘。
 - `MobileSheet`：记录抽屉，标签为发言 / 对局 / 座位。收起时露出所选标签下最新一条已播完的记录（`utils.latestRecordLine`，不含正在播的这段）；展开后盖住舞台区、停在控制栏上方。点座位打开抽屉的「座位」标签，内容是与桌面弹层共用的 `SeatProfile`。
 - `MobileControls`：暂停 / 继续、倍速（点按依次切换 1 / 1.25 / 1.5 / 2 / 3×，`utils.cycleSpeed`）、静音、记录、有结果时的「结果」。
@@ -152,7 +153,7 @@ src/
   - `game-stage/playback.test.ts`：字幕映射与朗读选择（与 `speechOf` 一致）、展示时长、媒体播放（假 `Audio` + 假计时器：自动播放被拦截、倍速实时生效、中途静音、停留重排、朗读不结束与音频卡住时的看门狗）、`present` 选路（有音频播音频 / 行动用浏览器声音 / 公开阶段台词朗读 / 普通标题只停留 / 静音全停留）。
   - `game-stage/stream.test.ts`：退避步长；假 WebSocket + 假计时器：重连时 hello 带播放到的 seq、1/2/4/8/15 秒退避后报错与手动重试、结束后不重连、卸载取消重连。
   - `game-stage/layout.test.tsx`：布局与终局面板静态渲染（夜晚闭眼座位、圆桌里的选票飞行层、终局对话框"遮罩即根元素、卡片唯一网格项"的结构与 `ResultPanel.css` 的遮罩契约、阵容逐行揭示下标与获胜阵营、MVP 的配置头像、模拟玩家肖像和缺图占位）、焦点循环、环形几何（含窄舞台下圆桌盒子与座位全部落在盒子内、座位号 → 坐标）。
-  - `game-stage/mobile.test.tsx`：手机舞台的局势统计（玩家视角不报阵营）、倍速循环、抽屉露出的最新一条、圆周座位位置、内部阶段名兜底，以及圆桌 / 辩论两列 / 局势条 / 记录抽屉的静态渲染。
+  - `game-stage/mobile.test.tsx`：手机舞台的局势统计（玩家视角不报阵营）、倍速循环、发言卡跟读滚动位置、抽屉露出的最新一条、圆周座位位置、内部阶段名兜底，以及圆桌 / 辩论两列 / 局势条 / 记录抽屉的静态渲染。
   - `game-stage/stage.test.tsx`：夜晚步骤 / 发言顺序 / 评委判定 / 阵容推导、海报匹配、昼夜、字幕栏与票板（含票数条按 `delayMs` 推迟）、发言者大卡 / 主持人与有立绘玩家的立绘、进度条、唯一 live region、HUD 连接状态与错误面板、流地址。
   - `game-stage/interaction.test.tsx`：快捷键判定（键 → 动作、修饰键与输入框不响应、按钮上的空格让给按钮）、倍速档步进与两端钳位、选项变化、控制条的快捷键提示；座位发言汇总（按座位、按播放顺序、轮次 / 阶段标题、判定口径）、弹层定位（贴右、翻左、夹回、间距）、悬浮资料与座位的静态渲染（身份、阵营、存活、出局、发言列表和 `aria-details`）。
   - `game-stage/flight.test.ts`：选票飞行纯计算——预算（停留时长六成、封顶、无倍速兜底）、时序分配（单张时长与间隔的上下限、随倍速缩放、减少动效为 0）、弧线控制点与采样、关键帧首尾、飞行计划（按投票者排序、弃票在后、无坐标跳过）。

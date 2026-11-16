@@ -22,6 +22,9 @@
   min-height: 0;
 }
 .mobile-versus-side .mobile-seat-role { display: none; }
+/* 一列放四位辩手：头像按舞台高度收缩，长发言或横屏时也放得下 */
+.mobile-versus .mobile-seat { --seat-size: clamp(26px, min(13cqw, calc((100cqh - 56px) / 4.6)), 48px); }
+.mobile-versus .mobile-speaker-avatar { width: clamp(40px, min(22cqw, 36cqh), 92px); height: clamp(40px, min(22cqw, 36cqh), 92px); }
 .mobile-versus-center {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
