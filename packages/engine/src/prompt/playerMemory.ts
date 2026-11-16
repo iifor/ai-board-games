@@ -9,7 +9,7 @@ export function memoryEvidenceEntries(log: readonly LogEntry[]) {
   const fallback = new Set(log.flatMap(e => e.kind === 'fallback' && !e.action ? [[e.round, e.phaseId, e.seat].join('/')] : []));
   return log.filter(e => e.kind !== 'fallback' && e.kind !== 'phase_started' &&
     !(e.kind === 'narration' && e.purpose === 'missed_speech') &&
-    !((e.kind === 'action' || e.kind === 'judgement') && e.source) &&
+    !((e.kind === 'action' || e.kind === 'judgement' || e.kind === 'speech') && e.source) &&
     !((e.kind === 'speech' || e.kind === 'judgement' || e.kind === 'action') && fallback.has([e.round, e.phaseId, e.seat].join('/'))));
 }
 

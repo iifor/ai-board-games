@@ -2,6 +2,7 @@ import { z, type ZodType } from 'zod';
 import type { ExecEnv } from '../runtime/env';
 import type { TemplateVars } from '../runtime/types';
 import type { SpeakPhase } from '../spec/phases';
+import { seatNumber } from './seatNumber';
 
 export interface TurnState {
   readonly seat: number;
@@ -11,7 +12,7 @@ export interface TurnState {
 }
 
 const replyRequest = z.object({
-  seat: z.number().int().positive(),
+  seat: seatNumber(z.number().int().positive()),
   task: z.string().trim().min(1).max(200).describe('请该队友确认的具体分工'),
 });
 export interface ReplyOutput { readonly replyRequests?: readonly z.infer<typeof replyRequest>[] | null }

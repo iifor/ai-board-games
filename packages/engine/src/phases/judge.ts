@@ -66,7 +66,7 @@ export const judgeExecutor: AiPhaseExecutor<Phase> = {
   },
 
   skipFailed(env, phase, pending) {
-    env.log({ kind: 'speech', seat: pending.seat, text: '过~', channel: phase.channel ?? 'public' });
+    env.log({ kind: 'speech', seat: pending.seat, text: '过~', channel: phase.channel ?? 'public', source: 'fallback' });
     env.phaseState<JudgeState>().next += 1;
     return { verdict: null, comment: '过~' };
   },

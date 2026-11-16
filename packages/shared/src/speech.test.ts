@@ -68,7 +68,7 @@ describe('speechOf', () => {
     expect(speechOf({ ...choice, view: { ...view, gameKey: 'debate' } })).not.toBeNull();
     expect(speechOf({ ...choice, kind: 'narration', text: '开始警长竞选' })).not.toBeNull();
     expect(speechOf({ ...choice, kind: 'narration', phaseId: 'sheriff_resolve', text: '2号当选警长。' })).not.toBeNull();
-    expect(speechOf({ ...choice, kind: 'speech', seat: 2, phaseId: 'sheriff_speech', text: '竞选发言' })).not.toBeNull();
+    expect(speechOf({ ...event({ kind: 'speech', seat: 2, text: '竞选发言' }), phaseId: 'sheriff_speech' })).not.toBeNull();
   });
 });
 

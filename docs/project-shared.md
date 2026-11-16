@@ -41,7 +41,7 @@
 | --- | --- | --- |
 | `phase_started` | `title`、`announcement?` | 进入阶段；可选的公开主持台词随事件保存 |
 | `narration` | `text`、可选的 `purpose: 'decision' | 'missed_speech'` | 主持播报。行动前的法官询问发送到接收座位的私密频道，客户端以主持人声音朗读，技能动效等实际行动发生时播放。 |
-| `speech` | `seat`、`text`、可选的 `replyRequests` | 玩家发言。有效的配合请求随原发言共享同一频道，每项含接收座号和分工；朗读使用原台词。 |
+| `speech` | `seat`、`text`、可选的 `replyRequests`、可选的 `source: 'fallback'`（请求失败后系统代发的「过~」） | 玩家发言。有效的配合请求随原发言共享同一频道，每项含接收座号和分工；朗读使用原台词。 |
 | `action` | `seat`、`action`、`targets`、`text`、可选的 `source`（`request_failed` 请求失败并放弃，`only_target` 唯一目标，历史 `fallback` 表示系统代选） | 玩家动作（默认私密，公开模式下观众看不到） |
 | `vote_tallied` | `title`、`runoff`、`ballots`、`abstained`、`tally`、`tied`、`outcome`、可选的 `systemChoices`（按本轮投票座位记录来源，包括弃票） | 一轮计票；`ballots` 含票权，`abstained` 为弃票座位，`outcome` 为 null 表示平票进入复投 |
 | `judgement` | `seat`、`verdict`、`verdictLabel`、`comment`、可选的 `source: 'fallback'` | 评委判定 |

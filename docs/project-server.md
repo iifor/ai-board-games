@@ -130,10 +130,11 @@ Azure 字幕由 `azureTransport` 使用官方 SDK 在同一次合成中接收 Wo
 1. 客户端连接后发送 `{ type: 'hello', afterSeq }`（10 秒内未发送则从头开始）。
 2. 服务端逐个推送 `{ type: 'event', event, audio }`，客户端播放完毕发送 `{ type: 'ack', seq }` 后才推送下一个；推送时预先为之后的 3 个事件准备语音。
 3. 暂时没有新事件时推送 `status`（状态没变不重复发）；对局结束且事件推完后推送 `{ type: 'end', result }` 并关闭；失败推送 `status: failed`。推送进行中收到的总线通知会记为"待重查"，本轮结束后再查一次，不会丢掉唤醒。
-4. 等待"尚未产生的事件"期间，每 `STREAM_POLL_MS`（默认 2000 毫秒）兜底重查一次数据库：另一实例的 worker 提交的事件正常情况下经总线即时送达，兜底重查只是通知丢失（监听连接重连期间）时的安全网；等待观众 ack 期间不查（推送由 ack 驱动），连接关闭时清掉定时器。
-5. 断线重连用最后确认的 seq 作为 `afterSeq` 续播；已结束的对局从 0 开始即为回放，与实时走同一条路径。`afterSeq > 0` 同时视为对该进度的一次确认：第一次查到对局后补记 `markAcked(afterSeq)`（断线前最后一次 ack 可能没送到，后台"观众确认"不会少一个；补记失败只记日志不影响续播），对公开接口不可见的对局不补记。
-6. 多个观众时，`matches.acked_seq` 取最大确认值；确认进度只增不减，且不超过 `last_seq`（客户端报的 `afterSeq` 不能把 ack 节奏的闸门抬到事件之前）。
-7. 客户端帧上限 16 KB（`MAX_CLIENT_FRAME_BYTES`，按 UTF-8 字节计）：`app.ts` 把它设成 ws 服务器的 `maxPayload`（`createNodeWebSocket` 不透传选项，但 ws 在升级连接时才读取 `wss.options`），超过的帧在协议层就以 1009（message too big）关闭、不会先缓冲整帧；网关在解析前再按字节数检查一次，命中时以 1008 关闭，作为第二道防线。
+4. 等待"尚未产生的事件"期间，每 `STREAM_POLL_MS`（默认 2000 毫秒）兜底重查一次数据库：另一实例的 worker 提交的事件正常情况下经总线即时送达，兜底重查只是通知丢失（监听连接重连期间）时的安全网；等待观众 ack 期间不查（推送由 ack 驱动），连接关闭时清掉定时器。某一步推送抛错（如数据库短暂不可用）时记日志，没在等 ack 就按同样间隔重试，不依赖可能同时断开的总线通知。
+5. 断线重连用最后确认的 seq 作为 `afterSeq` 续播；已结束的对局从 0 开始即为回放，与实时走同一条路径。`afterSeq > 0` 同时视为对该进度的一次确认：第一次查到对局后补记 `markAcked(afterSeq)`（断线前最后一次 ack 可能没送到，后台"观众确认"不会少一个），对公开接口不可见的对局不补记。
+6. 观众的 `ack`、跳过的不可见事件与重连的 `afterSeq` 都先记为待补记，在下一步推送开头写库；写库失败只记日志、不影响续播，进度留到下一步再补。语音准备读取音色失败时同样记日志并返回 `audio: null`（交给前端朗读），失败结果不缓存。
+7. 多个观众时，`matches.acked_seq` 取最大确认值；确认进度只增不减，且不超过 `last_seq`（客户端报的 `afterSeq` 不能把 ack 节奏的闸门抬到事件之前）。
+8. 客户端帧上限 16 KB（`MAX_CLIENT_FRAME_BYTES`，按 UTF-8 字节计）：`app.ts` 把它设成 ws 服务器的 `maxPayload`（`createNodeWebSocket` 不透传选项，但 ws 在升级连接时才读取 `wss.options`），超过的帧在协议层就以 1009（message too big）关闭、不会先缓冲整帧；网关在解析前再按字节数检查一次，命中时以 1008 关闭，作为第二道防线。
 
 ### 多实例
 
@@ -147,7 +148,7 @@ Azure 字幕由 `azureTransport` 使用官方 SDK 在同一次合成中接收 Wo
 - **初始管理员**：`bootstrap` 先快速查表，为空时在持 `pg_advisory_xact_lock(1, 2)` 的事务里再查一次才插入，多实例同时启动只创建一个。
 - **本来就安全的部分**：AI 任务领取 `FOR UPDATE SKIP LOCKED`；公开开局上限在事务里持 advisory lock（单键 7201）串行化。所有 advisory lock 键登记在 `db/locks.ts`。
 
-运维要点：每个实例比连接池多占一条数据库连接（LISTEN）；NOTIFY 是 PostgreSQL 内置功能，不需要扩展；advisory lock 与 NOTIFY 都是数据库范围而非 schema 范围，共用一个库、不同 schema 的部署会互相等待锁（只影响效率，不影响正确性），通道名已按 schema 区分。测试里 `createTestApp` 可传 `{ schema }` 复用另一个实例的 schema，用来搭两个实例（`test/multiInstance.test.ts`）。
+运维要点：每个实例比连接池多占一条数据库连接（LISTEN）；连接池监听 `error` 事件，数据库重启或切换时空闲连接报错只记日志，进程不会退出，连接池自行补建连接；NOTIFY 是 PostgreSQL 内置功能，不需要扩展；advisory lock 与 NOTIFY 都是数据库范围而非 schema 范围，共用一个库、不同 schema 的部署会互相等待锁（只影响效率，不影响正确性），通道名已按 schema 区分。测试里 `createTestApp` 可传 `{ schema }` 复用另一个实例的 schema，用来搭两个实例（`test/multiInstance.test.ts`）。
 
 ### 部署与游戏版本
 

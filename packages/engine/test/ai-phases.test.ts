@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { advance, compileGame, createSnapshot, EngineInputError, speechOutput, type LogEntry } from '../src';
+import { advance, compileGame, createSnapshot, EngineInputError, memoryEvidenceEntries, speechOutput, type LogEntry } from '../src';
+import { z } from 'zod';
 import { toJsonSchema } from '../src/ai/outputContract';
+import { listenerSchema } from '../src/phases/listenerDecisions';
+import { withReplyRequests } from '../src/phases/speakReplies';
 import { makePlayers, runToEnd } from '../src/testing';
 import { agentWith } from './fixtures/agents';
 import { secretGame, secretSpec, type SecretState } from './fixtures/secretGame';
@@ -94,6 +97,21 @@ describe('speak', () => {
     expect(run.requests.filter(({ request }) => request.phaseId === 'talk' && request.attempt > 1)).toHaveLength(0);
     expect(speeches(run.log).filter(entry => entry.phaseId === 'talk').every(entry => entry.text === '过~')).toBe(true);
     expect(run.log.filter((entry) => entry.kind === 'fallback' && entry.reason.includes('timeout')).length).toBeGreaterThan(0);
+  });
+
+  it('marks the system pass as a fallback so memory never learns it as the player’s own words', () => {
+    const run = runToEnd(secretGame, {
+      seed: 4,
+      agent: agentWith(secretGame, (request) => (request.phaseId === 'talk' && request.seat === 1 ? { failed: 'timeout' } : undefined)),
+    });
+    const talk = speeches(run.log).filter(entry => entry.phaseId === 'talk');
+    const passes = talk.filter(entry => entry.seat === 1);
+    expect(passes.length).toBeGreaterThan(0);
+    expect(passes.every(entry => entry.text === '过~' && entry.source === 'fallback')).toBe(true);
+    expect(talk.filter(entry => entry.seat !== 1).every(entry => entry.source === undefined)).toBe(true);
+    const evidence = new Set(memoryEvidenceEntries(run.log).map(entry => entry.seq));
+    expect(passes.some(entry => evidence.has(entry.seq))).toBe(false);
+    expect(talk.filter(entry => entry.seat !== 1).every(entry => evidence.has(entry.seq))).toBe(true);
   });
 });
 
@@ -234,5 +252,25 @@ describe('input validation', () => {
     const run = runToEnd(game, { seed: 1, playerCount: 4 });
     expect(run.requests).toHaveLength(3);
     expect(run.snapshot.result?.endReason).toBe('budget');
+  });
+});
+
+describe('seat numbers in listener and reply outputs', () => {
+  it('accepts a digit string when a listener declares on its own seat, and still rejects other seats', () => {
+    const schema = listenerSchema(2);
+    expect(schema.parse({ targets: ['2'] })).toEqual({ targets: [2] });
+    expect(schema.parse({ targets: [] })).toEqual({ targets: [] });
+    expect(schema.safeParse({ targets: ['3'] }).success).toBe(false);
+    expect(schema.safeParse({ targets: ['2.0'] }).success).toBe(false);
+    expect(toJsonSchema(schema)).toMatchObject({ properties: { targets: { items: { const: 2 } } } });
+  });
+
+  it('keeps a reply request whose seat is written as a digit string', () => {
+    const schema = withReplyRequests(z.object({ speech: z.string() }), [3]);
+    expect(schema.parse({ speech: '跟我核票', replyRequests: [{ seat: '3', task: '明天核票' }] }))
+      .toEqual({ speech: '跟我核票', replyRequests: [{ seat: 3, task: '明天核票' }] });
+    expect(toJsonSchema(schema)).toMatchObject({
+      properties: { replyRequests: { anyOf: [{ items: { properties: { seat: { type: 'integer', exclusiveMinimum: 0 } } } }, { type: 'null' }] } },
+    });
   });
 });

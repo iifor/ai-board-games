@@ -1,4 +1,4 @@
-import type { CompiledGame } from '@battle/engine';
+import { playerExpression, type CompiledGame } from '@battle/engine';
 import { makePlayers, runToEnd } from '@battle/engine/testing';
 import { describe, expect, it } from 'vitest';
 import { GAMES } from '../src';
@@ -38,12 +38,12 @@ describe.each(GAMES.map((game): [string, CompiledGame] => [game.spec.key, game])
     }
   });
 
-  it('includes delivery cues exactly once for spoken turns across games', () => {
+  it('includes the player expression guide exactly once for spoken turns across games', () => {
     const { requests } = runToEnd(game, { seed: 1, maxAdvances: 2000 });
-    const cue = '半角方括号 [ ]';
+    const cue = '朗读标记清单';
     for (const { request } of requests) {
       const spoken = request.action === 'speak' || request.action === 'judge';
-      if (spoken) expect(request.prompt.identity, request.id).toContain('[短停][放慢]');
+      if (spoken) expect(request.prompt.identity, request.id).toContain(playerExpression);
       const layers = Object.values(request.prompt).join('\n');
       expect(layers.split(cue).length - 1, request.id).toBe(spoken ? 1 : 0);
     }

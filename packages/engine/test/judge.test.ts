@@ -39,7 +39,7 @@ describe('judge', () => {
     expect(run.snapshot.result?.winner).toBe('draw');
     expect(run.log.filter((entry) => entry.kind === 'fallback')).toHaveLength(1);
     expect(run.log.some(entry => entry.kind === 'judgement')).toBe(false);
-    expect(run.log).toContainEqual(expect.objectContaining({ kind: 'speech', seat: 3, text: '过~' }));
+    expect(run.log).toContainEqual(expect.objectContaining({ kind: 'speech', seat: 3, text: '过~', source: 'fallback' }));
   });
 
   it('assigns positions and public roles', () => {

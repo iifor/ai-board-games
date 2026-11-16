@@ -118,6 +118,68 @@ describe('realtime stream reconnect', () => {
   });
 });
 
+describe('realtime stream failures', () => {
+  const view: StageEvent['view'] = { gameKey: 'debate', title: 'AI 辩论赛', round: 1, phase: null, status: 'running', seats: [], extra: {}, result: null };
+  const narration = (seq: number): StageEvent => ({ kind: 'narration', text: `第 ${seq} 段`, seq, round: 1, phaseId: null, channel: 'public', view });
+  const live: StreamMatch = { status: 'waiting_ai', scripted: true, result: null, error: null };
+  const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it('keeps retrying after a failed step instead of stalling until a notification arrives', async () => {
+    // 数据库短暂不可用：第一次查询失败，同一次故障往往也断了总线监听，只能靠兜底重查恢复
+    let failures = 1;
+    const sent: string[] = [];
+    const stream = createMatchStream('m_4', { send: (data) => sent.push(data), close: () => {} }, {
+      bus: createEventBus(),
+      audio: { audioFor: async () => null },
+      matches: {
+        find: async () => {
+          if (failures > 0) {
+            failures -= 1;
+            throw new Error('connection terminated');
+          }
+          return live;
+        },
+        nextEvent: async (_id, after) => (after < 1 ? narration(1) : undefined),
+        markAcked: async () => {},
+      },
+    }, { pollMs: 10 });
+    stream.hello(0);
+    await tick(40);
+    const types = sent.map((data) => (JSON.parse(data) as { type: string }).type);
+    expect(types).toEqual(['event']);
+    stream.dispose();
+  });
+
+  it('never rejects an ack whose write fails and records that progress on the next step', async () => {
+    const acked: number[] = [];
+    let failWrite = true;
+    const sent: string[] = [];
+    const stream = createMatchStream('m_5', { send: (data) => sent.push(data), close: () => {} }, {
+      bus: createEventBus(),
+      audio: { audioFor: async () => null },
+      matches: {
+        find: async () => live,
+        nextEvent: async (_id, after) => (after < 1 ? narration(1) : undefined),
+        markAcked: async (_id, seq) => {
+          if (failWrite) {
+            failWrite = false;
+            throw new Error('connection terminated');
+          }
+          acked.push(seq);
+        },
+      },
+    }, { pollMs: 10 });
+    stream.hello(0);
+    await tick();
+    await expect(stream.ack(1)).resolves.toBeUndefined();
+    expect(acked).toEqual([]);
+    // 兜底重查的下一步把没写进去的确认补上
+    await tick(30);
+    expect(acked).toEqual([1]);
+    stream.dispose();
+  });
+});
+
 describe('audio resolver', () => {
   const view: StageEvent['view'] = { gameKey: 'werewolf', title: '狼人杀', round: 1, phase: null, status: 'running', seats: [], extra: {}, result: null };
   const meta = { round: 1, phaseId: null, channel: 'public' } as const;
@@ -149,6 +211,25 @@ describe('audio resolver', () => {
       { text: '2 号开枪带走了 5 号', voice: '主持人' },
       { text: '狼人请睁眼。', voice: '主持人' },
     ]);
+  });
+
+  it('falls back to browser speech when the voice lookup fails, without caching the failure', async () => {
+    let lookups = 0;
+    const resolver = createAudioResolver({
+      voices: { findEnabledByName: async () => undefined },
+      matches: {
+        seatVoice: async () => {
+          lookups += 1;
+          if (lookups === 1) throw new Error('connection terminated');
+          return { ...voice, voiceName: 'seat-3' };
+        },
+      },
+      tts: { audioFor: async () => ({ url: '/api/media/y', mime: 'audio/mpeg' }) },
+    });
+    const speech: StageEvent = { kind: 'speech', seat: 3, text: '我是好人。', seq: 1, ...meta, view };
+    await expect(resolver.audioFor('m_1', speech, false)).resolves.toBeNull();
+    expect(await resolver.audioFor('m_1', speech, false)).toEqual({ url: '/api/media/y', mime: 'audio/mpeg' });
+    expect(lookups).toBe(2);
   });
 });
 

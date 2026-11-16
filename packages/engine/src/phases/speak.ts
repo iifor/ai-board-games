@@ -1,5 +1,6 @@
 import { applyDeclaration, speakSchema } from '../ai/declarations';
 import type { ExecEnv } from '../runtime/env';
+import type { PendingRequest } from '../runtime/types';
 import { toSeatNumbers, type SeatSelection } from '../runtime/seats';
 import { replySeats, scheduleReplies, withReplyRequests, type ReplyOutput, type TurnState } from './speakReplies';
 import { DEFAULT_SPEECH_MAX_CHARS, speechMaxOf } from '../spec/define';
@@ -105,34 +106,40 @@ export const speakExecutor: AiPhaseExecutor<Phase> = {
   skipFailed(env, phase, pending) {
     if (pending.action === 'act') return { skipped: true, targets: [] };
     const pass = { speech: '过~' };
-    speakExecutor.store(env, phase, pending, pass);
+    storeSpeech(env, phase, pending, pass, 'fallback');
     return pass;
   },
 
   store(env, phase, pending, value) {
-    const state = env.phaseState<SpeakState>();
-    if (pending.action === 'act') {
-      // 同一批请求的模型可能乱序返回；同时声明时按座号裁决。
-      if ((value as { targets: number[] }).targets.length && (!state.declaration || pending.seat < state.declaration.seat)) {
-        state.declaration = { seat: pending.seat, declare: String(pending.vars.declaration) };
-      }
+    if (pending.action !== 'act') {
+      storeSpeech(env, phase, pending, value);
       return;
     }
-    const seat = env.seat(pending.seat);
-    if (phase.mode !== 'parallel' && turnIndex(pending.slot) === state.next) {
-      state.next += 1;
-      state.issued = false;
+    const state = env.phaseState<SpeakState>();
+    // 同一批请求的模型可能乱序返回；同时声明时按座号裁决。
+    if ((value as { targets: number[] }).targets.length && (!state.declaration || pending.seat < state.declaration.seat)) {
+      state.declaration = { seat: pending.seat, declare: String(pending.vars.declaration) };
     }
-    const text = (value as { speech: string | null }).speech;
-    if (text === null) return;
-    const requests = (value as ReplyOutput).replyRequests;
-    const index = turnIndex(pending.slot);
-    const replyRequests = phase.followUp && requests?.length
-      ? scheduleReplies(state.turns, index, phase.followUp.prompt.name, replySeats(env, phase, state.turns, index), requests)
-      : [];
-    env.log({ kind: 'speech', seat: seat.seat, text, channel: phase.channel?.(env.ctx(), seat) ?? 'public',
-      ...(replyRequests.length && { replyRequests }) });
-    state.speeches.push({ seat: seat.seat, text });
-    applyDeclaration(env, phase, seat, value);
   },
 };
+
+/** source 标记系统代发的台词（兜底"过~"），跨局记忆据此排除，不当作玩家本人的表达 */
+function storeSpeech(env: ExecEnv, phase: Phase, pending: PendingRequest, value: unknown, source?: 'fallback'): void {
+  const state = env.phaseState<SpeakState>();
+  const seat = env.seat(pending.seat);
+  if (phase.mode !== 'parallel' && turnIndex(pending.slot) === state.next) {
+    state.next += 1;
+    state.issued = false;
+  }
+  const text = (value as { speech: string | null }).speech;
+  if (text === null) return;
+  const requests = (value as ReplyOutput).replyRequests;
+  const index = turnIndex(pending.slot);
+  const replyRequests = phase.followUp && requests?.length
+    ? scheduleReplies(state.turns, index, phase.followUp.prompt.name, replySeats(env, phase, state.turns, index), requests)
+    : [];
+  env.log({ kind: 'speech', seat: seat.seat, text, channel: phase.channel?.(env.ctx(), seat) ?? 'public',
+    ...(source && { source }), ...(replyRequests.length && { replyRequests }) });
+  state.speeches.push({ seat: seat.seat, text });
+  applyDeclaration(env, phase, seat, value);
+}

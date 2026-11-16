@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ExecEnv } from '../runtime/env';
 import type { SpeakPhase } from '../spec/phases';
+import { exactSeatNumber } from './seatNumber';
 import type { RequestDraft } from './types';
 
 export function listenerDrafts(env: ExecEnv, phase: SpeakPhase<unknown, unknown>, speaker: number, boundary: number): RequestDraft[] {
@@ -21,5 +22,5 @@ export function listenerDrafts(env: ExecEnv, phase: SpeakPhase<unknown, unknown>
 }
 
 export function listenerSchema(seat: number) {
-  return z.object({ targets: z.array(z.literal(seat)).max(1).describe('选择自己的座号表示发动；空数组表示放弃') });
+  return z.object({ targets: z.array(exactSeatNumber(seat)).max(1).describe('选择自己的座号表示发动；空数组表示放弃') });
 }

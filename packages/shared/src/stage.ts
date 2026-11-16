@@ -41,6 +41,8 @@ export type StagePayload =
   | {
       readonly kind: 'speech';
       readonly seat: number;
+      /** 系统代发的台词（请求失败后的"过~"），不是玩家本人的发言 */
+      readonly source?: 'fallback';
       readonly text: string;
       readonly replyRequests?: readonly { readonly seat: number; readonly task: string }[];
     }
