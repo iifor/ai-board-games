@@ -31,6 +31,35 @@ describe('public creation guards', () => {
     }
   });
 
+  it('only offers and seats players whose primary or fallback model can actually be called', async () => {
+    const t = await createTestApp({ matches: { maxActive: 100, idleMs: 30 * 60_000 } }, { llm: scriptedLlm() });
+    try {
+      const playerIds = await seedPlayers(t, 9);
+      const primaryId = (await t.services.players.get(playerIds[0]!)).modelId!;
+      const primary = await t.db.selectFrom('models').select(['fallbackModelId', 'providerId']).where('id', '=', primaryId).executeTakeFirstOrThrow();
+      const listed = async () => dataOf(await t.call<{ id: number }[]>('GET', '/api/toc/players')).map((player) => player.id);
+      const start = () => t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } });
+
+      // 主模型额度耗尽被停用：备用模型仍可用，照常开局
+      await t.db.updateTable('models').set({ enabled: false }).where('id', '=', primaryId).execute();
+      expect(await listed()).toEqual(expect.arrayContaining(playerIds));
+      expect((await start()).status).toBe(201);
+
+      // 主备都停用：不再出现在选人列表，也不能开局
+      await t.db.updateTable('models').set({ enabled: false }).where('id', '=', primary.fallbackModelId!).execute();
+      expect(await listed()).not.toContain(playerIds[0]);
+      expect(await start()).toMatchObject({ status: 400, body: { message: expect.stringContaining('模型与备用模型都不可用') } });
+
+      // 模型启用但供应商停用，同样不可用
+      await t.db.updateTable('models').set({ enabled: true }).where('id', 'in', [primaryId, primary.fallbackModelId!]).execute();
+      await t.db.updateTable('modelProviders').set({ enabled: false }).where('id', '=', primary.providerId).execute();
+      expect(await listed()).not.toContain(playerIds[0]);
+      expect((await start()).status).toBe(400);
+    } finally {
+      await t.cleanup();
+    }
+  });
+
   it('reaps ack-paced public matches nobody has acknowledged for a while', async () => {
     const t = await createTestApp({}, { llm: scriptedLlm() });
     try {

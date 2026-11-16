@@ -66,7 +66,7 @@ src/
 | --- | --- | --- |
 | `GET /api/health` | 数据库可用返回 `{ status: 'ok', instance }`（`instance` 是应答实例启动时生成的随机 ID），否则 503 | 无 |
 | `GET /api/toc/games` | 游戏目录（来自注册表，含变体及角色构成；固定公开席位的游戏另含有序的 `seatGroups`） | 无 |
-| `GET /api/toc/players` | 已启用且已绑定模型的玩家。返回玩家 ID、模型显示名、完整模型标识、立绘标识、头像和人设 | 无 |
+| `GET /api/toc/players` | 已启用、且主模型或备用模型可用（模型启用且所属供应商启用，与 AI worker 的模型链一致）的玩家；模型因额度耗尽被自动停用后不再出现。返回玩家 ID、模型显示名、完整模型标识、立绘标识、头像和人设 | 无 |
 | `POST /api/admin/auth/login` | 登录，返回 JWT（12 小时）与是否需改密 | 无 |
 | `POST /api/admin/auth/password` | 修改密码（新密码至少 12 位） | 登录（允许未改密） |
 | `GET /api/admin/auth/me` | 当前管理员 | 登录（允许未改密） |
@@ -80,7 +80,7 @@ src/
 | `POST /api/admin/voices/import-defaults` | 导入内置音色目录（`modules/voices/catalog.ts`，沿用旧版默认语音包），按（来源、音色名、风格）与名称去重，可重复执行 | 管理员 |
 | `GET /api/admin/voices/azure/catalog` | 使用服务端 Azure 语音密钥及区域读取官方音色目录，返回音色标识与支持的风格。成功结果在服务实例缓存 10 分钟，并发请求合并；失败不缓存，未配置、超时或上游错误返回 50201。HTTP 响应为 `private, no-store`。 | 管理员 |
 | 同上 `/api/admin/players` | AI 玩家（模型、音色引用检查） | 管理员 |
-| `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`）；每来源每小时 10 局（来源默认是连接地址，`TRUST_PROXY=true` 时才取 `X-Forwarded-For`），进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制（上限判断与插入在同一事务内用 advisory lock 串行化，并发请求不会一起越过）；公开接口请求体上限 64 KB | 无 |
+| `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`）；每来源每小时 10 局（来源默认是连接地址，`TRUST_PROXY=true` 时才取 `X-Forwarded-For`），进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制（上限判断与插入在同一事务内用 advisory lock 串行化，并发请求不会一起越过）；公开接口请求体上限 64 KB；非脚本化对局的每个玩家都必须有可用的主模型或备用模型，否则 400 | 无 |
 | `GET /api/toc/matches`、`GET /api/toc/matches/:id` | 已完成的公开对局历史、对局概要（含舞台布局 `layout`，前端不必再查游戏目录；游戏已不在注册表时为 `circle`）。调试局的可见性见"调试局对外可见性" | 无 |
 | `GET /api/media/:id` | 合成音频（按音色与文本哈希寻址，长期缓存） | 无 |
 | `WS /api/toc/ws/matches/:id` | 播放流，见下文"实时推送"；客户端帧超过 16 KB 直接以 1008 关闭；对局可见性与 `GET /api/toc/matches/:id` 同一口径 | 无 |
@@ -172,11 +172,11 @@ Azure 字幕由 `azureTransport` 使用官方 SDK 在同一次合成中接收 Wo
 
 管理员查询接口 `GET /api/admin/player-memory/players/:id` 支持 `offset`、`limit`、`gameKey` 和 `subjectId`。返回分页记忆、证据、后续提示词及引用状态、待复盘和失败计数，响应禁止缓存。调用链节点详情在有记忆的请求上返回 `memory.offered` 和 `memory.decision`；排队、拒绝、失败或兜底时后者为空。
 
-管理员调用 `DELETE /api/admin/player-memory/players/:id/memories/:memoryId` 忘记一条，或 `DELETE /api/admin/player-memory/players/:id` 清空该玩家的所有记忆。迁移 024 添加遗忘标记及玩家的清空批次。遗忘擦除记忆正文、证据与关联对象，保留编号和版本关系用于识别失效修订。历史对局快照、决策与复盘调用明细继续反映当时的实际执行。清空会同时取消该玩家排队或执行中的复盘；迟到回复无法再写入。新开局和终局入队均按玩家行锁同步清空批次，兼容迁移前开局的快照（批次 0）。
+管理员调用 `DELETE /api/admin/player-memory/players/:id/memories/:memoryId` 忘记一条，或 `DELETE /api/admin/player-memory/players/:id` 清空该玩家的所有记忆。迁移 024 添加遗忘标记及玩家的清空批次。遗忘擦除记忆正文、证据与关联对象，保留编号和版本关系用于识别失效修订。删除对局时，这局产生且修正了其他对局记忆的记忆以同样方式转为遗忘墓碑并解除对局关联（迁移 025：`match_id` 可空，约束只有已遗忘的记忆可以没有来源对局），被修正的旧记忆继续隐藏；其余记忆随对局级联删除。历史对局快照、决策与复盘调用明细继续反映当时的实际执行。清空会同时取消该玩家排队或执行中的复盘；迟到回复无法再写入。新开局和终局入队均按玩家行锁同步清空批次，兼容迁移前开局的快照（批次 0）。
 
 管理端 `GET /api/admin/traces` 可按游戏 / 状态分页列出对局；`GET /api/admin/traces/:id` 返回当前玩法注册的角色展示名、节点索引、每次模型尝试的摘要和分模型用量；`GET /api/admin/traces/:id/nodes/:node` 按需读取关联决策、提示词、模型参数 / 输出及对应舞台快照。三个接口及删除共用管理员鉴权。节点随对局推进在同一事务写入 `match_trace_nodes`，以对局内的阶段访问、请求 ID 和事件 seq 建立关联。脚本局采集决策和规则节点，模型传输次数为零。
 
-`DELETE /api/admin/traces/:id` 锁定对局行，设置 `matches.trace_deleted`，删除本局节点、`ai_calls` 和已完结任务缓存的请求 / 输出 / 错误，同一事务提交。进行中的任务仅在执行期间保留必要输入，完成或取消后清空。模型传输在事务外执行，写入明细前在共享行锁内复核删除标记。重复删除幂等；之后新推进不会重新采集。对局状态、游戏日志、舞台事件、回放与音频继续保留。私密调用链接口及模型调用明细响应使用 `private, no-store`。
+`DELETE /api/admin/traces/:id` 锁定对局行，设置 `matches.trace_deleted`，删除本局节点、`ai_calls` 和已完结任务缓存的请求 / 输出 / 错误，并清空 `player_decisions` 中来自模型的判断理由（`note.judgement`；与日志一致的选择保留供记忆复盘），同一事务提交。删除后继续推进时新的决策不再保存判断理由。进行中的任务仅在执行期间保留必要输入，完成或取消后清空。模型传输在事务外执行，写入明细前在共享行锁内复核删除标记。重复删除幂等；之后新推进不会重新采集。对局状态、游戏日志、舞台事件、回放与音频继续保留。私密调用链接口及模型调用明细响应使用 `private, no-store`。
 
 PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 public）。启动时自动执行迁移，失败则拒绝启动。
 

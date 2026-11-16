@@ -41,6 +41,10 @@ export function createMatchService(deps: MatchServiceDeps) {
     if (!scripted) {
       const unbound = players.filter((row) => row.modelId === null);
       if (unbound.length) throw badRequest(`玩家尚未绑定模型：${unbound.map(row => '#' + row.id).join('、')}`);
+      // 模型或供应商停用后开局，每个请求都只能走兜底，整局没有真实的 AI，却仍占用对局名额
+      const usable = await deps.players.withUsableModel(players.map((row) => row.id));
+      const stalled = players.filter((row) => !usable.has(row.id));
+      if (stalled.length) throw badRequest(`玩家的模型与备用模型都不可用（已停用或供应商已停用）：${stalled.map(row => '#' + row.id).join('、')}`);
     }
     const profiles = players.map(row => {
       const { id, ...profile } = publicPlayer(row);

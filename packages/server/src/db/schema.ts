@@ -179,7 +179,7 @@ export interface Database {
   playerDecisions: { matchId: string; requestId: string; ownerId: number; note: Json<MemoryDecision> };
   playerMemoryReviews: { matchId: string; ownerId: number; seat: number; attempts: Generated<number>;
     status: Generated<string>; availableAt: ColumnType<Date, never, Date> };
-  playerMemories: { id: Generated<number>; forgotten: Generated<boolean>; ownerId: number; matchId: string; gameKey: string; subjectId: number | null;
+  playerMemories: { id: Generated<number>; forgotten: Generated<boolean>; ownerId: number; matchId: string | null; gameKey: string; subjectId: number | null;
     subjectName: string | null; phaseId: string | null; action: string | null; content: string; evidence: Json<readonly MemoryEvidence[]>;
     requestId: string | null; outcome: ReviewOutcome; previousId: number | null; createdAt: CreatedAt };
   promptTemplates: { gameKey: string; templateName: string; source: string; revision: number; publicationOrder: Generated<string> };

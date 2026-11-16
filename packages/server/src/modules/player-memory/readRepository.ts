@@ -1,5 +1,5 @@
 import type { MemoryReviewCallPage, PlayerMemoryPage } from '@battle/shared';
-import { sql } from 'kysely';
+import { sql, type NotNull } from 'kysely';
 import type { Db } from '../../db/database';
 import { notFound } from '../../utils/errors';
 
@@ -25,7 +25,8 @@ export function memoryReader(db: Db) {
           sql<number>`count(*) filter(where status in ('queued','running'))::int`.as('pending'),
           sql<number>`count(*) filter(where status='failed')::int`.as('failed'),
         ]).executeTakeFirstOrThrow();
-        const memories = await query.selectAll().orderBy('id', 'desc').limit(limit).offset(offset).execute();
+        // 只列未遗忘的记忆；约束 player_memory_source 保证它们都有来源对局（无来源的只有删除对局留下的墓碑）
+        const memories = await query.selectAll().$narrowType<{ matchId: NotNull }>().orderBy('id', 'desc').limit(limit).offset(offset).execute();
         const sourceMatches = [...new Set(memories.map(m => m.matchId))];
         const notes = sourceMatches.length ? await tx.selectFrom('playerDecisions').select('note')
           .where('ownerId', '=', ownerId).where('matchId', 'in', sourceMatches).execute() : [];

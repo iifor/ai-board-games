@@ -30,7 +30,8 @@ export function acceptedDecision(row: LockedMatchRow, input: EngineInput, result
   const decision: MemoryDecision = {
     matchId: row.id, requestId: pending.id, round: row.snapshot.round, throughSeq: context.throughSeq,
     phaseId: pending.phaseId, action: pending.action,
-    choice: choices[pending.action].slice(0, 1200), judgement: note.judgement || output.reason?.slice(0, 300) || '',
+    // 判断理由是模型的私下输出（memoryNote / reason），不属于游戏日志：本局调用链已删除时不再保存
+    choice: choices[pending.action].slice(0, 1200), judgement: row.traceDeleted ? '' : note.judgement || output.reason?.slice(0, 300) || '',
     evidence: context.evidence.filter(e => note.evidence.includes(e.seq)).slice(0, 4), offered,
     cited: offered.filter(id => note.cited.includes(id)),
   };

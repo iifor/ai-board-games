@@ -6,6 +6,7 @@ import { JOB_LOCKS, PUBLIC_CREATION_LOCK, tryJobLock } from '../../db/locks';
 import type { Database } from '../../db/schema';
 import { VOICE_CHOICE_COLUMNS } from '../voices/repository';
 import { recordTrace, boundary } from '../traces/record';
+import { retireMatchMemories } from '../player-memory/forgetRepository';
 import type { LockedMatchRow, MatchRow, SeatRow, TaskCompletion } from './types';
 
 type Executor = Db | Transaction<Database>;
@@ -213,7 +214,10 @@ export function createMatchRepository(db: Db) {
       });
     },
 
-    remove: (id: string) => db.deleteFrom('matches').where('id', '=', id).executeTakeFirst(),
+    remove: (id: string) => db.transaction().execute(async (trx) => {
+      await retireMatchMemories(trx, id);
+      return trx.deleteFrom('matches').where('id', '=', id).executeTakeFirst();
+    }),
 
     aiCalls: (matchId: string) => db.selectFrom('aiCalls').selectAll().where('matchId', '=', matchId).orderBy('id').execute(),
   };
