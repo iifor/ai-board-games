@@ -151,12 +151,14 @@ export function finishGame(env: ExecEnv, reason: GameResult['endReason']): void 
   s.jump = null;
   s.cursor = emptyCursor(null);
   const end = env.game.spec.end(env.ctx(null, reason));
+  const winners = end.winners ?? (end.winner === null ? [] : s.seats.filter((seat) => seat.team === end.winner).map((seat) => seat.seat));
   const result: GameResult = {
     winner: end.winner,
     winnerLabel: end.winnerLabel,
     summary: end.summary,
     mvp: end.mvp ?? null,
     endReason: reason,
+    winners: [...winners].sort((a, b) => a - b),
   };
   s.status = 'completed';
   s.result = result;

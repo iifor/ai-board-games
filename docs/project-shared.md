@@ -52,7 +52,7 @@
 
 - `StageEventMeta`：`seq`（单局内递增）、`round`、`phaseId`、`channel`。
 - `AudienceView`：`gameKey`、`title`、`round`、`phase`、`status`、`seats`（不可见的身份字段为 null）、`extra`（游戏自定义的公开数据）、`result`。每个事件都附带事件发生当时的视图，前端可直接渲染，不需要自己累积状态。
-- `GameResult`：`winner`、`winnerLabel`、`summary`、`mvp`、`endReason`（`normal` / `budget`）。
+- `GameResult`：`winner`、`winnerLabel`、`summary`、`mvp`、`endReason`（`normal` / `budget`），以及可选的 `winners`（获胜座位，升序；平局为空）。获胜方 key 不一定等于座位阵营（狼人杀的离群的狼、情侣、混血儿等按规则归边），展示端按 `winners` 逐座位判断；旧结果与导入回放没有该字段，退回阵营等于 `winner`。
 
 ## REST 契约（api/*）
 

@@ -102,6 +102,11 @@ describe('seat popover', () => {
     expect(speechesOfSeat(played, 9)).toEqual([]);
   });
 
+  it('shows a seat\'s speeches without reading directions but keeps game terms in brackets', () => {
+    const tagged = [item({ ...meta, kind: 'speech', seat: 1, text: '[冷静]我验了3号[查杀]【愤怒】别装了[停顿]。' })];
+    expect(speechesOfSeat(tagged, 1)[0]?.text).toBe('我验了3号[查杀]别装了。');
+  });
+
   it('places the popover beside the card, flips it to the left at the right edge and keeps it inside the arena', () => {
     const arena = { left: 100, top: 50, width: 1000, height: 600 };
     const size = { width: 320, height: 400 };

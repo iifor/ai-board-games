@@ -243,6 +243,12 @@ describe('layouts', () => {
     expect(roster).toContain('--i:0');
     expect(roster).toContain('--i:2');
     expect(roster).toMatch(/result-roster-team is-winner" data-team="pro"/);
+    // 获胜方按座位：组内只有部分座位获胜时逐行标出，整组不亮
+    const mixed: AudienceView = { ...view, seats: [seat(1, 'werewolf', 1), seat(2, 'werewolf', 1), seat(3, 'good', 1), seat(4, 'good', 1)] };
+    const split = renderToStaticMarkup(<ResultRoster view={mixed} result={{ ...result, winner: 'lovers', winners: [1, 3] }} />);
+    expect(split).not.toContain('is-winner" data-team');
+    expect(split.match(/<li class="(is-out )?is-winner"/g)).toHaveLength(2);
+    expect(split.match(/ · 获胜/g)).toHaveLength(2);
     const noPoster = renderToStaticMarkup(<ResultPanel result={result} view={view} />);
     expect(noPoster).toContain('result-mvp-placeholder');
     expect(noPoster).toContain('result-mvp-seat');

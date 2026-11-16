@@ -38,9 +38,14 @@ const hybridPhases = {
 } satisfies WerewolfPhases;
 
 /** 混血儿最终所属的阵营：跟随主人（离群的狼也算狼人阵营）；没有主人时算好人 */
-function hybridSide(ctx: WerewolfContext, seat: Seat): string {
+function hybridSide(ctx: WerewolfContext, seat: Seat): 'good' | 'werewolf' {
   const master = ctx.state.hybridMaster;
   return isWolf(master === null ? seat : ctx.seats.get(master)) ? 'werewolf' : 'good';
+}
+
+/** 终局获胜名单中的归边：只对混血儿生效（MVP 平票的"优先胜利阵营"仍按座位阵营，见规则文档） */
+function hybridVictorySide(ctx: WerewolfContext, seat: Seat): 'good' | 'werewolf' | null {
+  return seat.role === 'hybrid' ? hybridSide(ctx, seat) : null;
 }
 
 /** 终局说明中的混血儿结果；本局没有混血儿时为 null */
@@ -59,5 +64,5 @@ export const hybridSpecial: SpecialDescriptor = {
   prompts: hybridPrompts,
   identities: { hybrid: hybridPrompts.hybrid },
   phases: hybridPhases,
-  victory: { note: hybridSummary },
+  victory: { listedSide: hybridVictorySide, note: hybridSummary },
 };

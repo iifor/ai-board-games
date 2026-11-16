@@ -50,6 +50,16 @@ describe('stage derivations', () => {
     expect(overview).not.toContain('只看发言');
   });
 
+  it('shows speeches in the record without reading directions', () => {
+    const feed = renderToStaticMarkup(<EventFeed items={[
+      item({ ...meta, kind: 'speech', seat: 1, text: '[冷静]我方认为【愤怒】这不对[停顿]，[3号]请回答。' }),
+      item({ ...meta, seq: 2, kind: 'speech', seat: 2, text: '[停顿]' }),
+    ]} />);
+    expect(feed).toContain('我方认为这不对，[3号]请回答。');
+    expect(feed).not.toMatch(/冷静|愤怒|停顿/);
+    expect(feed.match(/event-feed-speech/g)).toHaveLength(1);
+  });
+
   it('keeps night phases in the record and the live region without drawing a duplicate subtitle', () => {
     const phase = item({ ...meta, kind: 'phase_started', title: '狼人夜聊' });
     expect(renderToStaticMarkup(<EventFeed items={[phase]} />)).toContain('狼人夜聊');

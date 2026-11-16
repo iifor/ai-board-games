@@ -62,6 +62,8 @@ export interface EndResult {
   readonly winnerLabel: string;
   readonly summary: string;
   readonly mvp?: number | null;
+  /** 获胜的座位；省略时引擎取阵营等于 winner 的座位 */
+  readonly winners?: readonly number[];
 }
 
 export interface PresentationSpec<S, P> {

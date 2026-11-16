@@ -14,6 +14,15 @@ describe('flow', () => {
       .toEqual(['第1轮开始', '第2轮开始', '第3轮开始']);
   });
 
+  it('lists the winning seats by team unless the game names them', () => {
+    const run = runToEnd(secretGame, { seed: 3 });
+    const winner = run.snapshot.result?.winner ?? null;
+    const byTeam = run.snapshot.seats.filter((seat) => seat.team === winner).map((seat) => seat.seat);
+    expect(run.snapshot.result?.winners).toEqual(byTeam);
+    const named = compileGame({ ...counterSpec(1), end: () => ({ winner: 'x', winnerLabel: 'x', summary: 'x', winners: [3, 1] }) });
+    expect(runToEnd(named, { seed: 1 }).snapshot.result?.winners).toEqual([1, 3]);
+  });
+
   it('ends by budget when rounds exceed maxRounds', () => {
     const run = runToEnd(compileGame(counterSpec(10, { budget: { maxRounds: 2 } })), { seed: 1 });
     expect(run.snapshot.result?.endReason).toBe('budget');

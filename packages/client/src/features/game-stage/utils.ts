@@ -1,4 +1,4 @@
-import { isPlayerSpeech, speechOf, type AudienceSeat, type AudienceView, type StageEvent } from '@battle/shared';
+import { isPlayerSpeech, speechOf, stripSpeechTags, type AudienceSeat, type AudienceView, type GameResult, type StageEvent } from '@battle/shared';
 import { POPOVER_GAP, TEAM_LABELS } from './constants';
 import { SPEEDS, type PlaybackOptions, type SeatSpeech, type ShortcutKeyLike, type StageShortcut, type StreamItem } from './types';
 
@@ -91,13 +91,19 @@ export function rosterByTeam(view: AudienceView): readonly TeamRoster[] {
   return [...groups.entries()].map(([team, seats]) => ({ team, label: teamLabel(team), seats }));
 }
 
-/** 某个座位在本局的公开发言与评委判定（已播放的，旧的在前），每条带轮次与阶段标题；判定文本与字幕同口径（"判定。点评"） */
+/** 获胜的座位：优先用结果里的逐座位名单（按规则归边，如隐狼、情侣、混血儿）；旧结果和导入回放没有名单，退回阵营等于获胜方 */
+export function winningSeats(view: AudienceView, result: GameResult): ReadonlySet<number> {
+  return new Set(result.winners ?? view.seats.filter((seat) => seat.team !== null && seat.team === result.winner).map((seat) => seat.seat));
+}
+
+/** 某个座位在本局的公开发言与评委判定（已播放的，旧的在前），每条带轮次与阶段标题；判定文本与字幕同口径（"判定。点评"），不含朗读标记 */
 export function speechesOfSeat(played: readonly StreamItem[], seat: number): readonly SeatSpeech[] {
   const speeches: SeatSpeech[] = [];
   for (const { event } of played) {
     if (!isPlayerSpeech(event) || event.seat !== seat) continue;
-    const text = speechOf(event)?.text;
-    if (text === undefined) continue;
+    const spoken = speechOf(event)?.text;
+    if (spoken === undefined) continue;
+    const text = stripSpeechTags(spoken);
     const phase = event.view.phase?.title;
     speeches.push({ seq: event.seq, kind: event.kind, title: phase ? `${roundLabel(event.view)} · ${phase}` : roundLabel(event.view), text });
   }

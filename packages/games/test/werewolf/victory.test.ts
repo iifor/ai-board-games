@@ -55,7 +55,7 @@ describe('victory', () => {
 
   it('gives wolves the win once every villager is dead', () => {
     const run = play(SEED, killEachNight(villagers));
-    expect(run.snapshot.result).toMatchObject({ winner: 'werewolf' });
+    expect(run.snapshot.result).toMatchObject({ winner: 'werewolf', winners: [...wolves].sort((a, b) => a - b) });
     expect(run.snapshot.result?.summary).toContain('屠边');
     expect(eliminated(run).map((death) => death.seat)).toEqual(villagers);
   });

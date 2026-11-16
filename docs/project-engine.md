@@ -59,7 +59,7 @@ GameSpec 关键字段：
 | `variants` / `defaultVariant` | 玩法变体（如狼人杀板子）：`name`、`description`、`assign`（替换角色分配）、`players`、`config`（规则通过 `ctx.variant.config` 读取，由游戏自行校验）；开局输入 `variant` 选择，缺省取 `defaultVariant` |
 | `state` | `schema` 决定状态类型；`visibility` 声明每个字段对 AI 的可见性，**未声明即不可见** |
 | `start` / `phases` | 阶段字典；`end` 是保留的终局目标 |
-| `end` | 胜者判定，返回 `winner`、`winnerLabel`、`summary`、`mvp` |
+| `end` | 胜者判定，返回 `winner`、`winnerLabel`、`summary`、`mvp`，可选 `winners`（获胜座位；省略时引擎取阵营等于 `winner` 的座位，写入 `GameResult.winners`） |
 | `triggers` | 事件触发器，见下文"阶段栈与触发器" |
 | `gameOver` | `{ when, goto }`：阶段完成后检查，但只在主流程上（阶段栈为空）且没有排队的触发器链时判定——已触发的出局连锁（遗言、开枪……）先全部结算，开枪带走狼人可以推翻票数判定；命中时转入 `goto`（赛后环节或 `end`），只触发一次 |
 | `budget` | `maxRounds`、`maxPhaseVisits`（默认 100）、`maxAiRequests`（默认 1000）、`maxStackDepth`（默认 8）；超限按 `endReason: 'budget'` 终局 |
