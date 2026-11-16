@@ -63,6 +63,8 @@ export interface MatchDetailDto extends MatchSummaryDto {
   readonly error: string | null;
   /** 调试局当前所在阶段 */
   readonly phaseId: string | null;
+  /** 发起这局的身份码持有人；后台调试局、导入回放或身份码已删除时为 null */
+  readonly startedBy: string | null;
 }
 
 export interface AiCallDto {

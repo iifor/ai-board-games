@@ -30,7 +30,7 @@ describe('ai task bookkeeping', () => {
     const t = await createTestApp({}, { llm: scriptedLlm() });
     try {
       const playerIds = await seedPlayers(t, 9);
-      const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } }));
+      const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds } }));
       const [first] = await t.services.repositories.aiTasks.claim(1, PREFETCH_EVENTS);
       expect(first?.attempts).toBe(1);
       await t.db.updateTable('aiTasks').set({ claimedUntil: new Date(Date.now() - 1000) }).where('matchId', '=', created.id).execute();

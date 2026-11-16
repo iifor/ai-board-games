@@ -8,7 +8,8 @@ describe('public creation guards', () => {
     const t = await createTestApp({ matches: { maxActive: 2, idleMs: 30 * 60_000 } }, { llm: scriptedLlm() });
     try {
       const playerIds = await seedPlayers(t, 9);
-      const results = await Promise.all(Array.from({ length: 6 }, () => t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } })));
+      const { token } = await t.access();
+      const results = await Promise.all(Array.from({ length: 6 }, () => t.call('POST', '/api/toc/matches', { token, body: { gameKey: 'debate', playerIds } })));
       expect(results.filter((result) => result.status === 201)).toHaveLength(2);
       expect(results.filter((result) => result.status === 429)).toHaveLength(4);
     } finally {
@@ -16,16 +17,20 @@ describe('public creation guards', () => {
     }
   });
 
-  it('ignores X-Forwarded-For unless the proxy is trusted, so the per-source limit cannot be spoofed', async () => {
+  it('limits creation per access code, whatever address the requests come from', async () => {
     const t = await createTestApp({ matches: { maxActive: 100, idleMs: 30 * 60_000 } }, { llm: scriptedLlm() });
     try {
       const playerIds = await seedPlayers(t, 9);
+      const { token } = await t.access();
       for (let index = 0; index < 10; index += 1) {
-        const created = await t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds }, headers: { 'x-forwarded-for': `10.0.0.${index}` } });
+        const created = await t.call('POST', '/api/toc/matches', { token, body: { gameKey: 'debate', playerIds }, headers: { 'x-forwarded-for': `10.0.0.${index}` } });
         expect(created.status).toBe(201);
       }
-      const spoofed = await t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds }, headers: { 'x-forwarded-for': '10.0.0.99' } });
-      expect(spoofed).toMatchObject({ status: 429, body: { message: expect.stringContaining('频繁') } });
+      const limited = await t.call('POST', '/api/toc/matches', { token, body: { gameKey: 'debate', playerIds } });
+      expect(limited).toMatchObject({ status: 429, body: { message: expect.stringContaining('频繁') } });
+      // 另一个身份码有自己的额度
+      const other = await t.access({ username: '另一位' });
+      expect((await t.call('POST', '/api/toc/matches', { token: other.token, body: { gameKey: 'debate', playerIds } })).status).toBe(201);
     } finally {
       await t.cleanup();
     }
@@ -38,7 +43,8 @@ describe('public creation guards', () => {
       const primaryId = (await t.services.players.get(playerIds[0]!)).modelId!;
       const primary = await t.db.selectFrom('models').select(['fallbackModelId', 'providerId']).where('id', '=', primaryId).executeTakeFirstOrThrow();
       const listed = async () => dataOf(await t.call<{ id: number }[]>('GET', '/api/toc/players')).map((player) => player.id);
-      const start = () => t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } });
+      const { token } = await t.access();
+      const start = () => t.call('POST', '/api/toc/matches', { token, body: { gameKey: 'debate', playerIds } });
 
       // 主模型额度耗尽被停用：备用模型仍可用，照常开局
       await t.db.updateTable('models').set({ enabled: false }).where('id', '=', primaryId).execute();
@@ -64,7 +70,7 @@ describe('public creation guards', () => {
     const t = await createTestApp({}, { llm: scriptedLlm() });
     try {
       const playerIds = await seedPlayers(t, 9);
-      const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } }));
+      const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds } }));
       const statuses: string[] = [];
       t.services.bus.on('match:status', (payload) => statuses.push(`${payload.matchId}:${payload.status}`));
       expect(await t.services.reaper.sweep()).toEqual([]);

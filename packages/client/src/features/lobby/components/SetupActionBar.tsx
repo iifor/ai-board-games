@@ -10,10 +10,12 @@ interface SetupActionBarProps {
   readonly hint: string | null;
   readonly topicPartial: boolean;
   readonly submitting: boolean;
+  /** 本机还没有开局凭证：点击后先输入身份码 */
+  readonly needsAccess: boolean;
 }
 
 /** 固定在底部的操作条：就座进度 + 开始按钮（表单的 submit）；人数刚凑够时按钮脉冲一次 */
-export function SetupActionBar({ boardName, count, range, hint, topicPartial, submitting }: SetupActionBarProps) {
+export function SetupActionBar({ boardName, count, range, hint, topicPartial, submitting, needsAccess }: SetupActionBarProps) {
   const ready = !hint && !topicPartial;
   const status = topicPartial ? '辩题请填完整或全部留空' : (hint ?? readyLabel(count, range));
   const pulse = usePulseOnce(ready);
@@ -33,7 +35,7 @@ export function SetupActionBar({ boardName, count, range, hint, topicPartial, su
         disabled={!ready || submitting}
         onAnimationEnd={pulse.settle}
       >
-        {submitting ? '正在开局…' : '开始对局'}
+        {submitting ? '正在开局…' : needsAccess ? '输入身份码开局' : '开始对局'}
       </button>
     </div>
   );

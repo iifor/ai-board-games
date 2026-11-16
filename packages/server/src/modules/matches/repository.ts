@@ -27,6 +27,8 @@ export interface NewMatch {
   readonly chaos: boolean;
   readonly pacing: MatchPacing;
   readonly snapshot: EngineSnapshot;
+  /** 公开开局时使用的身份码；后台开局为 null */
+  readonly accessCodeId?: number | null;
 }
 
 const SEAT_COLUMNS = ['seat', 'playerId', 'playerName', 'modelId', 'voiceId'] as const;
@@ -218,6 +220,13 @@ export function createMatchRepository(db: Db) {
       await retireMatchMemories(trx, id);
       return trx.deleteFrom('matches').where('id', '=', id).executeTakeFirst();
     }),
+
+    /** 发起这局的身份码持有人；后台开局、导入回放或身份码已删除时为 null */
+    async starter(matchId: string): Promise<string | null> {
+      const row = await db.selectFrom('matches').innerJoin('accessCodes', 'accessCodes.id', 'matches.accessCodeId')
+        .select('accessCodes.username').where('matches.id', '=', matchId).executeTakeFirst();
+      return row?.username ?? null;
+    },
 
     aiCalls: (matchId: string) => db.selectFrom('aiCalls').selectAll().where('matchId', '=', matchId).orderBy('id').execute(),
   };

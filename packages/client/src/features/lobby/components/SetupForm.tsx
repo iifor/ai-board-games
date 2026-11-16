@@ -1,5 +1,6 @@
 import type { GameCatalogItem, PublicPlayerDto } from '@battle/shared';
 import { Link, useNavigate } from 'react-router';
+import { AccessBadge, AccessCodeDialog, useAccess } from '../../access';
 import { GAMES_WITH_TOPIC } from '../constants';
 import { useMatchSetup, type SetupInitial } from '../hooks/useMatchSetup';
 import { useSeatFlights } from '../hooks/useSeatFlights';
@@ -19,13 +20,19 @@ interface SetupFormProps {
 
 /** 开局共享同一份选人状态；在更新座位前量取飞行动效的起点与落点。 */
 export function SetupForm({ game, players, initial }: SetupFormProps) {
-  const setup = useMatchSetup(game, players, initial);
+  const access = useAccess();
+  const setup = useMatchSetup(game, players, initial, { onAccessRejected: (reason) => access.reject(reason, startWithToken) });
   const flights = useSeatFlights();
   const navigate = useNavigate();
-  const start = async (mode: 'players' | 'generated') => {
-    const id = await setup.submit(mode);
+  async function start(mode: 'players' | 'generated', token?: string) {
+    const id = await setup.submit(mode, token);
     if (id) navigate(`/matches/${id}`);
-  };
+  }
+  function startWithToken(token: string) {
+    void start('players', token);
+  }
+  /** 真实玩家开局：有凭证直接开，没有则先输身份码，验证通过后继续开局 */
+  const startPlayers = () => (access.access ? startWithToken(access.access.token) : access.request(startWithToken));
   const board = game.variants.find((variant) => variant.key === setup.variant) ?? null;
   const seated = setup.selected.flatMap((id) => players.filter((player) => player.id === id));
 
@@ -45,7 +52,8 @@ export function SetupForm({ game, players, initial }: SetupFormProps) {
   };
 
   return (
-    <form className="setup-form" data-game={game.key} onSubmit={(event) => { event.preventDefault(); void start('players'); }}
+    <>
+    <form className="setup-form" data-game={game.key} onSubmit={(event) => { event.preventDefault(); startPlayers(); }}
       onKeyDown={(event) => { if (event.target instanceof HTMLInputElement && blocksImplicitSubmit(event.key, event.target)) event.preventDefault(); }}>
       <header className="setup-header">
         <Link to="/" className="setup-back">← 返回大厅</Link>
@@ -53,6 +61,7 @@ export function SetupForm({ game, players, initial }: SetupFormProps) {
           <h1>{game.title}</h1>
           <span>{setup.range.min === setup.range.max ? setup.range.min : `${setup.range.min}–${setup.range.max}`} 人</span>
         </div>
+        {access.access ? <AccessBadge access={access.access} onSignOut={access.signOut} /> : null}
       </header>
       {game.variants.length > 0 && <BoardPicker variants={game.variants} value={setup.variant} onChange={setup.setVariant} />}
       <div className={players.length ? 'setup-columns' : 'setup-columns setup-empty'}>
@@ -101,7 +110,11 @@ export function SetupForm({ game, players, initial }: SetupFormProps) {
         hint={setup.hint}
         topicPartial={setup.topicPartial}
         submitting={setup.submitting}
+        needsAccess={!access.access}
       />}
     </form>
+    {access.dialogOpen ? <AccessCodeDialog notice={access.notice} error={access.error} submitting={access.submitting}
+      onSubmit={(code) => void access.submit(code)} onCancel={access.cancel} /> : null}
+    </>
   );
 }

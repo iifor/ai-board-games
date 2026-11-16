@@ -1,3 +1,5 @@
+/** 后台令牌的 JWT audience，与 C 端开局凭证互不通用 */
+export const ADMIN_TOKEN_AUDIENCE = 'admin';
 export const TOKEN_TTL_SECONDS = 12 * 60 * 60;
 /** 同一来源对同一用户名在窗口期内允许的失败次数（按来源区分，别处猜错密码锁不住正常管理员） */
 export const MAX_FAILED_LOGINS = 10;

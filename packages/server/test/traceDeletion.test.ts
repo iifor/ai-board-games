@@ -11,7 +11,7 @@ it('deletes only the selected trace, purges calls and finished payloads, and sti
     const token = await t.adminToken();
     const playerIds = await seedPlayers(t, 9);
     t.services.worker.start();
-    const create = () => t.call<MatchSummaryDto>('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } }).then(dataOf);
+    const create = async () => dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds } }));
     const selected = await create();
     const original = await watch(server.port, selected.id, 0);
     expect(original.end?.type).toBe('end');

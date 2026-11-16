@@ -48,6 +48,7 @@ React 19 + Vite 8 + react-router 7 + antd 6（中文语言包）。开发端口 
 | `/models` | 加载供应商后自动选中接口返回的第一个，进入左右布局的模型工作区。没有供应商时显示新增入口。「管理供应商」或「收起模型列表」进入 `/models?tab=providers`，在表格中新增、编辑和删除供应商。旧地址 `/providers` 仍可进入供应商管理。 |
 | `/models/:providerId` | 左侧搜索和切换供应商，右侧显示对应模型列表。已访问的供应商列表保持挂载，切换、收起和展开保留各自的搜索、状态筛选、分页和滚动位置。支持测试、重新启用、编辑和删除。手动新增归属当前供应商，备用模型可跨供应商选择。「拉取模型」搜索目录并批量添加，已添加项会标记。保存新启用的供应商后自动打开目录，停用的供应商进入手动配置。旧地址 `/models?providerId=<id>` 会跳转并保留筛选条件。 |
 | `/voices` | 自动选中第一个来源 Azure 语音，进入与模型管理共用的左右布局。左侧搜索和切换 Azure 语音、Mimo、浏览器朗读，并显示各自的音色数。「导入默认音色」在左侧导入所有来源的默认目录。 |
+| `/access-codes` | 身份码：C 端开局需要的凭据。列表显示用户名、尾号、状态（可用 / 局数已用完 / 已过期 / 已停用）、已开局与上限、有效期、最近开局时间，可按用户名、尾号或状态筛选。新建时填写用户名、有效天数（7 / 30 / 90 / 365 天快捷选项）和可选的局数上限；生成后弹窗展示明文码，只显示这一次，可复制码或整段发送文案。编辑可改用户名、局数上限、停用，有效期留空保持不变、填写则从现在起重新计算。「重新生成」换发新码，旧码与已登录的设备立即失效；删除后已有对局保留，详情页的发起人显示为空。 |
 | `/voices/:provider` | 右侧显示所选来源的音色，支持搜索、按语言和状态筛选，以及试听、新建、编辑和删除。空来源也可添加音色。旧地址 `/voices?provider=<来源>` 会选中对应来源。新建音色自动归入当前来源，编辑时可调整来源。 |
 
 ## 目录
@@ -57,10 +58,11 @@ src/
   app/            App（ConfigProvider + antd App + AuthProvider）、路由、后台布局（侧边菜单）
   components/     ListFilterBar（关键字 + 下拉筛选栏）
   hooks/useAsync  数据加载三态与 reload
-  services/       tokenStore（localStorage，不可用时退化为内存）、http（附带令牌；401 清除令牌并通知、40301 通知改密）、auth、resources（CRUD 与 modelActions / voiceActions）、matches
+  services/       tokenStore（localStorage，不可用时退化为内存）、http（附带令牌；401 清除令牌并通知、40301 通知改密）、auth、resources（CRUD 与 modelActions / voiceActions）、matches、accessCodes
   utils/format    formatTime（zh-CN、24 小时制）；对局标题（"游戏 · 板子"）用 @battle/shared 的 formatMatchTitle，与 C 端共用
   features/
     auth/         AuthContext、LoginPage、ChangePasswordPage、RequireAuth
+    access-codes/ AccessCodesPage（列表与筛选）、AccessCodeFormModal（新建 / 编辑）、AccessCodeSecretModal（一次性展示明文码）、useAccessCodes（列表与操作）、utils（表单换算、筛选、发送文案）
     resources/    ResourcePage（通用列表 + 筛选 + 新建/编辑弹窗 + 删除 + 行操作/工具栏扩展）、utils（客户端筛选）、StatusTag（启用 / 停用，四个资源页共用）、四个资源页面配置，
                   ResourceWorkspace（左右布局）、ResourceNavigation（来源搜索和选择）、ModelActions（测试 / 重新启用）、VoiceFormFields、VoiceActions（试听 / 导入默认音色）、playback（音频与浏览器朗读）
     matches/      列表、详情、TracePanel、LogPanel、DebugControls、PhaseGraph、CreateDebugMatchModal、useMatchDetail、utils（状态标签、对局类型文案、日志描述、进度标记）

@@ -6,7 +6,7 @@ import { hashPassword, verifyPassword } from '../../utils/crypto';
 import { badRequest, tooManyRequests, unauthorized } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import { windowKey, type WindowStore } from '../../utils/windowStore';
-import { FAILED_LOGIN_WINDOW_MS, MAX_FAILED_LOGINS, MAX_FAILED_LOGINS_PER_SOURCE, TOKEN_TTL_SECONDS } from './constants';
+import { ADMIN_TOKEN_AUDIENCE, FAILED_LOGIN_WINDOW_MS, MAX_FAILED_LOGINS, MAX_FAILED_LOGINS_PER_SOURCE, TOKEN_TTL_SECONDS } from './constants';
 import type { AuthRepository } from './repository';
 
 export function createAuthService(repository: AuthRepository, config: Pick<AppConfig, 'jwtSecret' | 'bootstrapAdmin'>, failures: WindowStore) {
@@ -57,15 +57,15 @@ export function createAuthService(repository: AuthRepository, config: Pick<AppCo
       }
       await failures.clear(accountKey(source, username));
       const exp = Math.floor(now / 1000) + TOKEN_TTL_SECONDS;
-      const token = await sign({ sub: user.id, exp }, config.jwtSecret, 'HS256');
+      const token = await sign({ sub: user.id, aud: ADMIN_TOKEN_AUDIENCE, exp }, config.jwtSecret, 'HS256');
       return { token, expiresAt: new Date(exp * 1000).toISOString(), mustChangePassword: user.mustChangePassword };
     },
 
-    /** 校验令牌并读取最新的账号状态（改密状态以数据库为准） */
+    /** 校验令牌并读取最新的账号状态（改密状态以数据库为准）；只接受后台 audience，C 端凭证不能冒充管理员 */
     async authenticate(token: string): Promise<AdminIdentity> {
       let subject: unknown;
       try {
-        subject = (await verify(token, config.jwtSecret, 'HS256')).sub;
+        subject = (await verify(token, config.jwtSecret, { alg: 'HS256', aud: ADMIN_TOKEN_AUDIENCE })).sub;
       } catch {
         throw unauthorized('登录已失效，请重新登录');
       }

@@ -19,6 +19,7 @@ import { catalogService } from './modules/prompt-catalog/service';
 import { debateTopicAnnouncement } from './modules/announcements/debateTopic';
 import { createPgNotifier, type BusTransport } from './db/notifier';
 import { createAiTaskRepository, createAiWorker, createTaskExecutor } from './modules/ai-worker';
+import { createAccessCodeRepository, createAccessCodeService, FAILED_ACCESS_WINDOW_MS } from './modules/access-codes';
 import { createAuthRepository, createAuthService, FAILED_LOGIN_WINDOW_MS } from './modules/auth';
 import { createGameService } from './modules/games';
 import { createHealthRepository, createHealthService } from './modules/health';
@@ -63,6 +64,7 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
   const announcements = announcementService(announcementRepository(db), debate && debateTopicAnnouncement(debate, catalog));
   const repositories = {
     auth: createAuthRepository(db),
+    accessCodes: createAccessCodeRepository(db),
     providers: createProviderRepository(db),
     models: createModelRepository(db),
     voices: createVoiceRepository(db),
@@ -73,8 +75,11 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
     requestWindows: createRequestWindowRepository(db),
     health: createHealthRepository(db),
   };
-  // 开局限流与登录锁定共用一张表，保留期取两者里最长的窗口
-  const windows = createDbWindowStore(repositories.requestWindows, { retentionMs: Math.max(CREATION_WINDOW_MS, FAILED_LOGIN_WINDOW_MS) });
+  // 开局限流、登录锁定与身份码输错计数共用一张表，保留期取其中最长的窗口
+  const windows = createDbWindowStore(repositories.requestWindows, {
+    retentionMs: Math.max(CREATION_WINDOW_MS, FAILED_LOGIN_WINDOW_MS, FAILED_ACCESS_WINDOW_MS),
+  });
+  const accessCodes = createAccessCodeService(repositories.accessCodes, config, windows);
   const llm = external.llm ?? createOpenAiCompatibleClient();
   const providers = createProviderService(repositories.providers, config.secretKey, repositories.models.countByProvider);
   const toolPrompt = async (key: string, fallback: string) => (await catalog.get('system', key))?.source ?? fallback;
@@ -100,6 +105,7 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
     findGame: games.find,
     tryGame: (key) => registry.get(key) ?? null,
     limiter: createCreationLimiter(windows),
+    access: accessCodes,
     maxActive: config.matches.maxActive,
     idleMs: config.matches.idleMs,
     // 生产环境里调试局不对外；开发与测试用 C 端舞台验收脚本化调试局
@@ -122,6 +128,7 @@ export function createServices(db: Db, config: AppConfig, registry: ReadonlyMap<
     runtime,
     tts,
     auth: createAuthService(repositories.auth, config, windows),
+    accessCodes,
     providers,
     models,
     voices: createVoiceService(repositories.voices, tts, azureVoiceCatalog),

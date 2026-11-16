@@ -44,7 +44,7 @@ it('forgets one owned record without reactivating its prior version, then clears
     expect(dataOf(await del(one)).forgotten).toBe(0);
     const partial = dataOf(await t.call<PlayerMemoryPage>('GET', path + '?gameKey=debate', { token }));
     expect(partial.records.map(m => m.id)).toEqual([previous.id]);
-    const next = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: players }, 'forget');
+    const next = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: players }, (await t.access()).grant);
     const snapshot = await t.services.repositories.matches.snapshot(next.id);
     expect(snapshot?.playerMemories?.[owner]).toEqual([]);
     expect(snapshot?.playerMemories?.[other]?.map(m => m.id)).toEqual([keep.id]);
@@ -72,7 +72,7 @@ it('fences already-running, queued and pre-reset active matches while allowing n
     const token = await t.adminToken();
     const players = await seedPlayers(t, 9);
     const owner = players[0]!;
-    const normal = () => t.services.matches.createPublic({ gameKey: 'debate', playerIds: players }, 'reset');
+    const normal = async () => t.services.matches.createPublic({ gameKey: 'debate', playerIds: players }, (await t.access()).grant);
     const first = await normal();
     const historical = await seedMemory(t, first.id, owner, 'debate');
     const concurrent = await normal();

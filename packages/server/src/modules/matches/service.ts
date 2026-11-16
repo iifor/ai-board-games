@@ -5,6 +5,8 @@ import type { AiCallDto, CreateDebugMatchRequest, CreateMatchRequest, GeneratedM
 import { badRequest, notFound, tooManyRequests } from '../../utils/errors';
 import type { PlayerRepository } from '../players/repository';
 import { publicPlayer } from '../players/service';
+import type { AccessGrant } from '../../types';
+import type { AccessCodeService } from '../access-codes/service';
 import type { CreationLimiter } from './limits';
 import { generateSeats } from './generatedSeats';
 import { toAiCall, toDetail, toSummary } from './mapper';
@@ -21,6 +23,8 @@ export interface MatchServiceDeps {
   readonly findGame: (key: string) => CompiledGame;
   readonly tryGame: (key: string) => CompiledGame | null;
   readonly limiter: CreationLimiter;
+  /** 公开开局在同一事务内扣减身份码的局数 */
+  readonly access: Pick<AccessCodeService, 'consume'>;
   readonly maxActive: number;
   /** 多久没有动静（推进或观众确认）就不再算进行中 */
   readonly idleMs: number;
@@ -59,7 +63,9 @@ export function createMatchService(deps: MatchServiceDeps) {
   /** 开局事务里插入之前执行的检查（公开开局的上限判断） */
   type CreationGuard = Parameters<MatchRepository['transaction']>[0];
 
-  async function create(request: CreateDebugMatchRequest, debug: CreateDebugMatchRequest | null, guard: CreationGuard | null): Promise<MatchSummaryDto> {
+  async function create(
+    request: CreateDebugMatchRequest, debug: CreateDebugMatchRequest | null, guard: CreationGuard | null, accessCodeId: number | null = null,
+  ): Promise<MatchSummaryDto> {
     const game = deps.findGame(request.gameKey);
     const { profiles, seats } = request.generatePlayers
       ? generateSeats(game, request.variant)
@@ -97,6 +103,7 @@ export function createMatchService(deps: MatchServiceDeps) {
         chaos: debug?.scripted === true && debug.chaos === true,
         pacing: debug?.pacing ?? 'ack',
         snapshot: { ...snapshot, ...lockedPrompts, ...memory },
+        accessCodeId,
       }, seats);
     });
     await deps.runtime.advanceMatch(id, { kind: 'start' });
@@ -122,15 +129,19 @@ export function createMatchService(deps: MatchServiceDeps) {
   }
 
   return {
-    /** C 端开局：按来源限流 + 同时进行的公开对局数上限（上限判断与插入在同一事务里串行化，并发请求不会一起越过） */
-    async createPublic(request: CreateMatchRequest, source: string): Promise<MatchSummaryDto> {
-      await deps.limiter.check(source);
+    /**
+     * C 端开局：凭身份码按码限流 + 同时进行的公开对局数上限 + 身份码局数扣减。
+     * 上限判断、扣减与插入在同一事务里串行化，并发请求不会一起越过；任一步失败都整体回滚，不白扣局数。
+     */
+    async createPublic(request: CreateMatchRequest, grant: AccessGrant): Promise<MatchSummaryDto> {
+      await deps.limiter.check(`access-code:${grant.codeId}`);
       return create(request, null, async (trx) => {
         await repository.lockPublicCreation(trx);
         if ((await repository.countActivePublic(new Date(Date.now() - deps.idleMs), trx)) >= deps.maxActive) {
           throw tooManyRequests('当前进行中的对局较多，请稍后再试');
         }
-      });
+        await deps.access.consume(trx, grant);
+      }, grant.codeId);
     },
 
     createDebug: (request: CreateDebugMatchRequest) => create(request, request, null),
@@ -151,7 +162,7 @@ export function createMatchService(deps: MatchServiceDeps) {
 
     async detail(id: string): Promise<MatchDetailDto> {
       const { row, seats, game } = await load(id);
-      return toDetail(row, seats, game);
+      return toDetail(row, seats, game, await repository.starter(id));
     },
 
     /** 列表：对局一查、座位一查，不随条数增加查询次数 */
@@ -176,7 +187,7 @@ export function createMatchService(deps: MatchServiceDeps) {
     async debugCommand(id: string, command: 'continue' | 'step' | 'run' | 'skip'): Promise<MatchDetailDto> {
       await deps.runtime.advanceMatch(id, { kind: 'debug', command });
       const { row, seats, game } = await load(id);
-      return toDetail(row, seats, game);
+      return toDetail(row, seats, game, await repository.starter(id));
     },
 
     async remove(id: string): Promise<void> {

@@ -1,0 +1,7 @@
+.access-code-page { min-width: 0; }
+.access-code-toolbar { margin-bottom: 8px; }
+.access-code-create { margin-inline-start: auto; }
+.access-code-intro { margin: 0 0 12px; color: #596579; }
+.access-code-actions { white-space: nowrap; flex-wrap: nowrap; }
+.access-code-secret { margin: 16px 0 4px; font-size: 22px; letter-spacing: 0.08em; text-align: center; user-select: all; }
+.access-code-secret-expiry { margin: 0 0 16px; color: #596579; text-align: center; }

@@ -78,7 +78,7 @@ it('records private grounded memories across two real match workflows and distin
     expect((await t.call('GET', path)).status).toBe(401);
     expect((await t.call('GET', path + '?limit=10000', { token })).status).toBe(400);
     t.services.worker.start();
-    const first = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: ids }, 'first');
+    const first = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: ids }, (await t.access()).grant);
     await finish(t, first.id);
     await sql`alter table player_memories add check (content <> '测试记忆保存失败')`.execute(t.db);
     for (let i = 0; i < ids.length; i++) expect(await t.services.memoryWorker.runOne()).toBe(true);
@@ -106,7 +106,7 @@ it('records private grounded memories across two real match workflows and distin
     const originalProfile = await t.services.players.get(owner);
     await t.services.players.update(owner, { name: '', modelId: alternate.id });
     expect(await t.services.players.get(owner)).toMatchObject({ id: owner, persona: originalProfile.persona, voiceId: originalProfile.voiceId });
-    const second = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: [...ids].reverse() }, 'second');
+    const second = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: [...ids].reverse() }, (await t.access()).grant);
     await finish(t, second.id);
     expect(second.seats.find(s => s.playerId === owner)?.name).toBe(alternate.name);
     expect((await t.services.matches.publicSummary(first.id)).seats).toContainEqual(originalSeat);
@@ -173,7 +173,7 @@ it('carries network retries, field feedback and output-limit adjustments across 
   try {
     const ids = await seedPlayers(t, 9);
     t.services.worker.start();
-    const match = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: ids }, 'queue-retry');
+    const match = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: ids }, (await t.access()).grant);
     await finish(t, match.id);
     await t.db.updateTable('models').set({ fallbackModelId: null, maxTokens: 4096 }).where('model', '=', 'main-model').execute();
     await t.db.updateTable('playerMemoryReviews').set({ availableAt: new Date(Date.now() + 86_400_000) }).execute();

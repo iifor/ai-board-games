@@ -25,7 +25,7 @@ const watch = (matchId: string, afterSeq: number, limit?: number) => watchOn(ser
 describe('realtime playback', () => {
   it('streams a live match one acknowledged event at a time, with audio', async () => {
     const playerIds = await seedPlayers(t, 9);
-    const match = dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } }));
+    const match = dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds } }));
     const first = await watch(match.id, 0, 5);
     expect(first.events.map((event) => event.seq)).toEqual([...first.events.map((event) => event.seq)].sort((a, b) => a - b));
 

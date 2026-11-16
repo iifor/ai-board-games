@@ -87,7 +87,7 @@ describe('lobby components', () => {
 
   it('puts the seating status on the action bar from the catalog range', () => {
     const bar = (count: number, range: { min: number; max: number }) =>
-      renderToStaticMarkup(<SetupActionBar boardName="预女猎白" count={count} range={range} hint={selectionHint(count, range)} topicPartial={false} submitting={false} />);
+      renderToStaticMarkup(<SetupActionBar boardName="预女猎白" count={count} range={range} hint={selectionHint(count, range)} topicPartial={false} submitting={false} needsAccess={false} />);
     expect(bar(9, { min: 9, max: 12 })).toContain('可开局，还可再加 3 人');
     expect(bar(12, { min: 9, max: 12 })).toContain('人数已满，可以开始');
     expect(bar(7, { min: 9, max: 12 })).toContain('还需选择 2 名玩家');
@@ -149,7 +149,7 @@ describe('lobby components', () => {
 
   it('pulses the start button only while seating is complete and gives role pills their stagger index', () => {
     const bar = (count: number) =>
-      renderToStaticMarkup(<SetupActionBar boardName="预女猎白" count={count} range={{ min: 9, max: 12 }} hint={selectionHint(count, { min: 9, max: 12 })} topicPartial={false} submitting={false} />);
+      renderToStaticMarkup(<SetupActionBar boardName="预女猎白" count={count} range={{ min: 9, max: 12 }} hint={selectionHint(count, { min: 9, max: 12 })} topicPartial={false} submitting={false} needsAccess={false} />);
     expect(bar(9)).toContain('is-pulsing');
     expect(bar(9)).toContain('setup-action-progress is-ready');
     expect(bar(7)).not.toContain('is-pulsing');

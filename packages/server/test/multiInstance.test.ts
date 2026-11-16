@@ -87,12 +87,15 @@ describe('event bus across instances', () => {
 });
 
 describe('shared counters across instances', () => {
-  it('shares the per-source creation limit: the second instance sees the first instance\'s matches', async () => {
+  it('shares the per-code creation limit: the second instance sees the first instance\'s matches', async () => {
     const playerIds = await seedPlayers(a, 9);
+    const code = await a.access();
     for (let index = 0; index < 10; index += 1) {
-      expect((await a.call<MatchSummaryDto>('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } })).status).toBe(201);
+      expect((await a.call<MatchSummaryDto>('POST', '/api/toc/matches', { token: code.token, body: { gameKey: 'debate', playerIds } })).status).toBe(201);
     }
-    const onB = await b.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } });
+    // 同一个身份码在另一个实例上换取凭证（两个实例的签名密钥不同）
+    const { token } = await b.services.accessCodes.createSession(code.secret, 'test');
+    const onB = await b.call('POST', '/api/toc/matches', { token, body: { gameKey: 'debate', playerIds } });
     expect(onB).toMatchObject({ status: 429, body: { code: API_ERROR_CODES.tooManyRequests, message: expect.stringContaining('频繁') } });
   });
 

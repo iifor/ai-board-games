@@ -27,7 +27,7 @@ C 端通过 `POST /api/toc/matches` 开始游戏，服务端在创建时锁定�
 | 路径 | 页面 | 说明 |
 | --- | --- | --- |
 | `/` | `LobbyPage` | 头图（入口按钮 + 最近一局）、游戏目录（`GET /api/toc/games`）、最近对局（`GET /api/toc/matches`）。目录与历史分开加载：历史失败只在最近对局区显示错误与重试（头图条幅显示"暂时拉不到"），不冒充"还没有完成的对局"，头图与目录照常 |
-| `/play/:gameKey` | `SetupPage` | 狼人杀在选人前展示可搜索的模式列表与当前模式的角色构成，玩家按座号就座，「按序补满」沿候选列表补位。辩论赛侧栏按目录的公开分组展示正方、反方和评委，「随机补满」抽取空位人选。点已选卡或座位可离席，侧栏可展开辩题或本地模拟开局。底栏按当前人数提示是否可开局。终局可带入同一模式与玩家再开一局。 |
+| `/play/:gameKey` | `SetupPage` | 狼人杀在选人前展示可搜索的模式列表与当前模式的角色构成，玩家按座号就座，「按序补满」沿候选列表补位。辩论赛侧栏按目录的公开分组展示正方、反方和评委，「随机补满」抽取空位人选。点已选卡或座位可离席，侧栏可展开辩题或本地模拟开局。底栏按当前人数提示是否可开局。真实玩家开局需要身份码：本机没有凭证时按钮显示「输入身份码开局」，点击后弹出输码框，验证通过后直接继续开局；服务端拒绝凭证（停用、过期、重新生成）时清除凭证并带着原因重新弹框，局数用完则在表单下方提示。已有凭证时标题区显示持有人与剩余局数，可退出换码。本地模拟开局不需要身份码。终局可带入同一模式与玩家再开一局。 |
 | `/matches/:matchId` | `StagePage` | 对局舞台；实时观看与回放是同一页面、同一条播放流 |
 | `/history` | `HistoryPage` | 已完成的公开对局 |
 
@@ -53,9 +53,11 @@ src/
   app/                    路由、外层布局（导航；舞台路由不套导航）
   components/             StatusView（加载中 / 出错 / 空状态）、Avatar（海报 / 头像 / 首字）
   hooks/                  useAsync（一次性数据加载）、useElementSize（ResizeObserver 量尺寸）、useDialogFocus（对话框焦点移入 / 循环 / 还回 + Escape）
-  services/               http（统一解析 ApiResponse，业务错误转 ApiError）、games、matches
+  services/               http（统一解析 ApiResponse，业务错误转 ApiError；可附带开局凭证）、games、matches、access（身份码换凭证、查询持有人）
   utils/                  posters.ts（玩家名 → 内置海报）、format.ts（胜方、日期时间；对局标题用 @battle/shared 的 formatMatchTitle）
   features/
+    access/               useAccess（本机凭证、输码对话框、输码后继续原动作、进入页面时刷新持有人信息）、AccessCodeDialog、AccessBadge、
+                          stores/accessStore（localStorage 读写，不可用或过期时视为没有凭证；只是便利缓存，权限以服务端为准）
     lobby/                LobbyHero、GameList（GameIcon）、RecentMatches、SetupForm（BoardPicker、SeatGrid、PlayerPicker、TopicFields、SetupActionBar）、
                           hooks（useMatchSetup：支持路由 state 带入的初值、fillRandom 返回新坐下的玩家；useSeatFlights：登记选人头像与座位槽、触发飞入 / 淡出并记录落地时刻；
                           usePulseOnce；useParallax）、animations（纯计算：arcPoints / flightKeyframes / flightDuration / parallaxOffset；执行：flyTo / fadeOut，reduced-motion 下返回 0）、

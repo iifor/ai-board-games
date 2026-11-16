@@ -19,7 +19,7 @@ describe('scripted debug matches', () => {
     const firstId = playerIds[0]!;
     const profile = await t.services.players.get(firstId);
     await t.services.players.update(firstId, { ...profile, modelId: null });
-    const live = await t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } });
+    const live = await t.call('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds } });
     expect(live.status).toBe(400);
     expect(live.body.message).toContain('尚未绑定模型');
     const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/admin/matches', {
@@ -206,7 +206,7 @@ describe('public matches', () => {
 
   it('only runs ahead of the audience by a few events', async () => {
     const playerIds = await seedPlayers(t, 9);
-    const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } }));
+    const created = dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds } }));
     await t.services.worker.idle();
     const match = await t.services.repositories.matches.find(created.id);
     expect(match?.status).toBe('waiting_ai');
@@ -218,14 +218,14 @@ describe('public matches', () => {
   });
 
   it('validates players and limits concurrent public matches', async () => {
-    const missing = await t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds: [999_999] } });
+    const missing = await t.call('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds: [999_999] } });
     expect(missing).toMatchObject({ status: 400 });
     const playerIds = await seedPlayers(t, 5);
-    const tooFew = await t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } });
+    const tooFew = await t.call('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds } });
     expect(tooFew).toMatchObject({ status: 400, body: { message: expect.stringContaining('9-12') } });
     const more = await seedPlayers(t, 9);
-    await t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds: more } });
-    const blocked = await t.call('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds: more } });
+    await t.call('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds: more } });
+    const blocked = await t.call('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds: more } });
     expect(blocked).toMatchObject({ status: 429, body: { code: API_ERROR_CODES.tooManyRequests } });
   });
 

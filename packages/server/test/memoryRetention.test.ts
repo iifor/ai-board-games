@@ -25,7 +25,7 @@ it('clears the model\'s private judgement from player decisions when the trace i
     const token = await t.adminToken();
     const ids = await seedPlayers(t, 9);
     t.services.worker.start();
-    const match = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: ids }, 'retention');
+    const match = await t.services.matches.createPublic({ gameKey: 'debate', playerIds: ids }, (await t.access()).grant);
     await finish(t, match.id);
     const notes = async () => (await t.db.selectFrom('playerDecisions').select('note').where('matchId', '=', match.id).execute()).map((row) => row.note);
     const before = await notes();

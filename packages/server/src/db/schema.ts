@@ -16,6 +16,23 @@ export interface AdminUsersTable {
   updatedAt: UpdatedAt;
 }
 
+/** 身份码（迁移 026） */
+export interface AccessCodesTable {
+  id: Generated<number>;
+  username: string;
+  codeHash: string;
+  codeHint: string;
+  generation: Generated<number>;
+  expiresAt: Date;
+  maxMatches: number | null;
+  usedMatches: Generated<number>;
+  disabled: Generated<boolean>;
+  lastUsedAt: Date | null;
+  createdBy: number | null;
+  createdAt: CreatedAt;
+  updatedAt: UpdatedAt;
+}
+
 export interface ModelProvidersTable {
   id: Generated<number>;
   name: string;
@@ -107,6 +124,8 @@ export interface MatchesTable {
   createdAt: CreatedAt;
   updatedAt: UpdatedAt;
   completedAt: Date | null;
+  /** 发起这局的身份码（迁移 026）；后台开局与导入回放为 null */
+  accessCodeId: ColumnType<number | null, number | null | undefined, number | null>;
 }
 
 export interface MatchSeatsTable {
@@ -199,6 +218,7 @@ export interface Database {
     requestIds: Json<readonly string[]>; inputRequestId: string | null; data: Json<unknown> | null; createdAt: CreatedAt;
   };
   adminUsers: AdminUsersTable;
+  accessCodes: AccessCodesTable;
   modelProviders: ModelProvidersTable;
   models: ModelsTable;
   voices: VoicesTable;

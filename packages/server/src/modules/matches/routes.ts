@@ -1,13 +1,15 @@
 import { Hono } from 'hono';
+import { requireAccess } from '../../middlewares/auth';
 import type { AppEnv } from '../../types';
-import { createMatchController, type MatchControllerOptions } from './controller';
+import type { AccessCodeService } from '../access-codes/service';
+import { createMatchController } from './controller';
 import type { MatchService } from './service';
 
-/** C 端：开局、历史、对局概要（实时推送走 WebSocket） */
-export function publicMatchRoutes(service: MatchService, options?: MatchControllerOptions) {
-  const controller = createMatchController(service, options);
+/** C 端：开局（需要身份码凭证）、历史、对局概要（实时推送走 WebSocket） */
+export function publicMatchRoutes(service: MatchService, access: AccessCodeService) {
+  const controller = createMatchController(service);
   return new Hono<AppEnv>()
-    .post('/', controller.createPublic)
+    .post('/', requireAccess(access), controller.createPublic)
     .get('/', controller.history)
     .get('/:id', controller.summary);
 }

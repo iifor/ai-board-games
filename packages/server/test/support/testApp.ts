@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { gameRegistry } from '@battle/games';
-import { isApiSuccess, type ApiResponse } from '@battle/shared';
+import { isApiSuccess, type AccessCodeInput, type ApiResponse } from '@battle/shared';
 import { sql } from 'kysely';
 import { createApp } from '../../src/app';
 import type { AppConfig } from '../../src/config/env';
+import type { AccessGrant } from '../../src/types';
 import { createServices, type ExternalDeps } from '../../src/container';
 import { createDatabase } from '../../src/db/database';
 import { migrateToLatest } from '../../src/db/migrate';
@@ -59,6 +60,24 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, external
     return dataOf(relogin).token;
   }
 
+  /**
+   * 建一个身份码并换取 C 端开局凭证：token 用于 HTTP 接口，grant 用于直接调用 service。
+   * 不传参数时同一实例复用一个默认身份码（不限局数、一天后过期）。
+   */
+  let defaultAccess: Promise<TestAccess> | null = null;
+  function access(input?: Partial<AccessCodeInput>): Promise<TestAccess> {
+    if (!input) return (defaultAccess ??= issueAccess({}));
+    return issueAccess(input);
+  }
+  async function issueAccess(input: Partial<AccessCodeInput>): Promise<TestAccess> {
+    const admin = await db.selectFrom('adminUsers').select('id').orderBy('id').executeTakeFirstOrThrow();
+    const created = await services.accessCodes.create({
+      username: '测试用户', expiresAt: new Date(Date.now() + 24 * 60 * 60_000).toISOString(), maxMatches: null, ...input,
+    }, admin.id);
+    const { token } = await services.accessCodes.createSession(created.secret, 'test');
+    return { id: created.accessCode.id, secret: created.secret, token, grant: await services.accessCodes.authenticate(token) };
+  }
+
   async function cleanup(): Promise<void> {
     await services.worker.stop();
     await services.bus.stop();
@@ -66,7 +85,14 @@ export async function createTestApp(overrides: Partial<AppConfig> = {}, external
     await db.destroy();
   }
 
-  return { app, injectWebSocket, db, services, config, schema, call, adminToken, cleanup };
+  return { app, injectWebSocket, db, services, config, schema, call, adminToken, access, cleanup };
+}
+
+export interface TestAccess {
+  readonly id: number;
+  readonly secret: string;
+  readonly token: string;
+  readonly grant: AccessGrant;
 }
 
 export type TestApp = Awaited<ReturnType<typeof createTestApp>>;

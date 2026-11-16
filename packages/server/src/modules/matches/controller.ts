@@ -1,22 +1,16 @@
 import type { Context } from 'hono';
 import type { AppEnv } from '../../types';
 import { ok } from '../../utils/response';
-import { requestSource } from '../../utils/source';
 import { parseJson, parseQuery } from '../../utils/validate';
 import type { MatchService } from './service';
 import { adminListQuerySchema, createDebugMatchSchema, createMatchSchema, debugCommandSchema, listQuerySchema } from './validator';
 
-export interface MatchControllerOptions {
-  /** 只有部署在可信反向代理之后才相信 X-Forwarded-For，否则任何人换个请求头就能绕过限流 */
-  readonly trustProxy: boolean;
-}
-
 const matchId = (c: Context<AppEnv>) => c.req.param('id') ?? '';
 
-export function createMatchController(service: MatchService, options: MatchControllerOptions = { trustProxy: false }) {
+export function createMatchController(service: MatchService) {
   return {
     createPublic: async (c: Context<AppEnv>) =>
-      ok(c, await service.createPublic(await parseJson(c, createMatchSchema), requestSource(c, options.trustProxy)), 201),
+      ok(c, await service.createPublic(await parseJson(c, createMatchSchema), c.get('access')), 201),
     history: async (c: Context<AppEnv>) => {
       const { limit } = parseQuery(c, listQuerySchema);
       return ok(c, await service.list({ debug: false, status: 'completed', limit }));

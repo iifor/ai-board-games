@@ -6,6 +6,7 @@ export { describeEvent, type EventDisplay } from './eventDisplay';
 export type * from './api/promptCatalog';
 export type { ComparisonModel, PromptComparisonInput, PromptComparisonRecord, PromptTrial, PromptComparisonContext } from './api/promptComparison';
 export type { AdminLoginRequest, AdminLoginResponse, AdminProfile, ChangePasswordRequest } from './api/auth';
+export type * from './api/access';
 export { API_ERROR_CODES, isApiSuccess } from './api/common';
 export type { ApiErrorCode, ApiFailure, ApiResponse, ApiSuccess } from './api/common';
 export { MODEL_DISABLED_REASONS, VOICE_GENDERS, VOICE_PROVIDERS } from './api/resources';

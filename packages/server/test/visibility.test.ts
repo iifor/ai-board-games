@@ -66,7 +66,7 @@ describe('debug match visibility on public routes', () => {
 
   it('keeps public matches viewable in production', async () => {
     const playerIds = await seedPlayers(production.t, 9);
-    const created = dataOf(await production.t.call<MatchSummaryDto>('POST', '/api/toc/matches', { body: { gameKey: 'debate', playerIds } }));
+    const created = dataOf(await production.t.call<MatchSummaryDto>('POST', '/api/toc/matches', { token: (await production.t.access()).token, body: { gameKey: 'debate', playerIds } }));
     expect(dataOf(await production.t.call<MatchSummaryDto>('GET', `/api/toc/matches/${created.id}`)).debug).toBe(false);
     expect((await firstMessage(production, created.id)).type).not.toBe('error');
   });

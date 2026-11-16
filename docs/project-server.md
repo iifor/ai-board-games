@@ -45,10 +45,10 @@ src/
   index.ts          入口：加载配置 → 连接数据库 → 迁移 → 初始化管理员 → 启动跨实例通知监听 → 启动 HTTP，处理有上限的优雅关闭（见"优雅关闭"）
   app.ts            路由装配与全局中间件；路由只拿到 service（含 health、realtime），不直接接触仓储或数据库
   container.ts      组合根：创建 repository / service 并注入依赖；每次调用就是一个实例（生成实例 ID、跨实例总线）
-  types.ts          Hono 上下文类型（requestId、admin）
+  types.ts          Hono 上下文类型（requestId、admin、access）
   config/env.ts     环境变量校验（错误信息不含取值）
   db/               Kysely 实例、表类型、迁移（db/migrations/*.ts，在 db/migrate.ts 登记）、advisory lock 键（locks.ts）、LISTEN/NOTIFY 传输层（notifier.ts）
-  middlewares/      requestId、管理员鉴权、统一错误处理
+  middlewares/      requestId、管理员鉴权、C 端开局凭证校验、统一错误处理
   utils/            统一响应、业务错误、参数校验、加密、日志、通用 CRUD controller/routes、事件总线（进程内 eventBus 与跨实例 pgEventBus）、滑动窗口存储接口（windowStore）
   modules/<name>/   repository / service / controller(或经 utils/crud) / routes / validator
 ```
@@ -56,7 +56,7 @@ src/
 - controller 只解析参数、调用 service、包装响应；service 承载业务规则（引用检查、加密、默认值）；repository 只做数据库访问（包括实时播放取座位音色、健康检查的 `select 1`）。
 - 资源型模块复用 `utils/crud.ts` 的标准 controller 与 REST 路由，避免四份重复代码。
 - 资源的 `enabled`：创建时省略默认 true；更新时省略保留原值（`utils/enabled.ts`）。这样额度耗尽被系统停用的模型不会被一次普通编辑悄悄重新启用。
-- 限流来源：`utils/source.ts` 的 `requestSource`，开局限流与登录锁定共用；只有 `TRUST_PROXY=true` 才取 `X-Forwarded-For`。两者的计数都放在 `request_windows` 表（`modules/limits`），多实例共享，见"多实例"。
+- 限流来源：`utils/source.ts` 的 `requestSource`，登录锁定、身份码输错锁定与本地调试开局限流共用；只有 `TRUST_PROXY=true` 才取 `X-Forwarded-For`。公开开局按身份码限流，不看来源。这些计数都放在 `request_windows` 表（`modules/limits`），多实例共享，见"多实例"。
 
 ## 接口
 
@@ -80,7 +80,10 @@ src/
 | `POST /api/admin/voices/import-defaults` | 导入内置音色目录（`modules/voices/catalog.ts`，沿用旧版默认语音包），按（来源、音色名、风格）与名称去重，可重复执行 | 管理员 |
 | `GET /api/admin/voices/azure/catalog` | 使用服务端 Azure 语音密钥及区域读取官方音色目录，返回音色标识与支持的风格。成功结果在服务实例缓存 10 分钟，并发请求合并；失败不缓存，未配置、超时或上游错误返回 50201。HTTP 响应为 `private, no-store`。 | 管理员 |
 | 同上 `/api/admin/players` | AI 玩家（模型、音色引用检查） | 管理员 |
-| `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`）；每来源每小时 10 局（来源默认是连接地址，`TRUST_PROXY=true` 时才取 `X-Forwarded-For`），进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制（上限判断与插入在同一事务内用 advisory lock 串行化，并发请求不会一起越过）；公开接口请求体上限 64 KB；非脚本化对局的每个玩家都必须有可用的主模型或备用模型，否则 400 | 无 |
+| `GET/POST /api/admin/access-codes`，`PUT/DELETE /api/admin/access-codes/:id`，`POST /api/admin/access-codes/:id/regenerate` | 身份码：列表、新建（`username`、`expiresAt`、`maxMatches`）、编辑（可同时停用）、删除、重新生成。新建与重新生成的响应含一次性明文码 `secret`，标记 `private, no-store` | 管理员 |
+| `POST /api/toc/matches` | C 端开局（`gameKey`、`variant`、`params`、`playerIds`），需要 `Authorization: Bearer <开局凭证>`（见"身份码"）。每个身份码每小时 10 局；进行中的公开对局受 `MAX_ACTIVE_MATCHES` 限制；上限判断、身份码局数扣减与插入在同一事务内用 advisory lock 串行化，并发请求不会一起越过，开局失败不扣局数；公开接口请求体上限 64 KB；非脚本化对局的每个玩家都必须有可用的主模型或备用模型，否则 400 | 开局凭证 |
+| `POST /api/toc/access/session` | 用身份码 `{ code }` 换取开局凭证，返回 `token`、`tokenExpiresAt`、用户名、身份码有效期与剩余局数；输入不区分大小写，忽略空格与连字符。同一来源 15 分钟内输错 10 次后锁定 | 无 |
+| `GET /api/toc/access/me` | 凭证对应的用户名、有效期与剩余局数（`null` 为不限） | 开局凭证 |
 | `GET /api/toc/matches`、`GET /api/toc/matches/:id` | 已完成的公开对局历史、对局概要（含舞台布局 `layout`，前端不必再查游戏目录；游戏已不在注册表时为 `circle`）。调试局的可见性见"调试局对外可见性" | 无 |
 | `GET /api/media/:id` | 合成音频（按音色与文本哈希寻址，长期缓存） | 无 |
 | `WS /api/toc/ws/matches/:id` | 播放流，见下文"实时推送"；客户端帧超过 16 KB 直接以 1008 关闭；对局可见性与 `GET /api/toc/matches/:id` 同一口径 | 无 |
@@ -101,6 +104,18 @@ src/
 - 密码用 scrypt（随机盐）存储；JWT 用 HS256 + `JWT_SECRET`，每次请求从数据库读取账号最新状态。
 - 未改初始密码的账号只能访问改密与 `me` 接口，其余后台接口返回 40301。
 - 登录锁定（滑动窗口计数，存在 `request_windows` 表里，多实例共享）：同一来源对同一用户名 15 分钟内失败 10 次后锁定；同一来源对任意用户名累计失败 30 次也锁定。按来源区分，别处猜错密码锁不住正常管理员。
+- 后台令牌与 C 端开局凭证共用 `JWT_SECRET`，用 `aud` 区分（`admin` / `access`），各自的中间件只接受自己的 audience，开局凭证不能访问后台，后台令牌也不能开局。迁移 026 之前签发的后台令牌没有 `aud`，升级后需要重新登录一次。
+
+## 身份码
+
+C 端开局会调用模型，需要管理员发放的身份码；观战、直播与回放仍然公开。模块位于 `modules/access-codes`。
+
+- 管理员在后台新建身份码，填写用户名、有效期（最长 366 天）和可选的局数上限。明文码为 16 位（去掉易混淆字符的 30 个字符，4 位一组），只在新建和重新生成时返回一次；库里只存 SHA-256 与末 4 位。
+- C 端用身份码换取开局凭证（JWT，`aud: access`，载荷含身份码 ID 与 `generation`），有效期取 30 天与身份码有效期中较早者。
+- 每次使用凭证都重新读取身份码：停用、过期、重新生成（`generation` 递增）或删除后立即返回 40101，前端据此清除凭证并要求重新输码。局数用完返回 40302，凭证本身仍可查询剩余局数。
+- 开局扣减在开局事务内用一条带条件的 `UPDATE` 完成（未停用、未过期、`generation` 一致、未超上限），并发开局不会越过上限，开局失败整体回滚。
+- 对局记录 `matches.access_code_id`；后台对局详情的 `startedBy` 显示发起人，身份码删除后置空。
+- 身份码不在配置导出范围内，跨环境迁移后需要重新发放。
 
 ## 密钥
 
@@ -183,6 +198,7 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 | 表 | 说明 |
 | --- | --- |
 | `admin_users` | 管理员 |
+| `access_codes` | 身份码：用户名、码哈希与末 4 位、`generation`、有效期、局数上限与已用局数、停用标记、最近开局时间、创建人（迁移 026）；`matches.access_code_id` 引用它，删除时置空 |
 | `model_providers` | 供应商（加密的 API Key + 掩码） |
 | `models` | 模型参数、备用模型（自引用，删除时置空）、系统停用原因与时间（`disabled_reason` / `disabled_at`，迁移 003） |
 | `voices` | 音色：来源、音色名、语言、性别、风格、语速、音调、试听文本、说明（迁移 003） |
@@ -193,7 +209,7 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 | `match_stage_events` | 按 seq 的舞台事件，实时推送与回放共用 |
 | `ai_calls` | 每次模型调用的分层 prompt、原始响应、解析结果、错误、耗时与用量 |
 | `media_assets` | 合成音频缓存及可选的 `captions` JSONB 时间轴（迁移 021） |
-| `request_windows` | 开局限流与登录锁定的滑动窗口记录（`key`、`at`，索引 `(key, at)`；迁移 006），写入时顺带清理过期行 |
+| `request_windows` | 开局限流、登录锁定与身份码输错计数的滑动窗口记录（`key`、`at`，索引 `(key, at)`；迁移 006），写入时顺带清理过期行 |
 
 ## 配置
 

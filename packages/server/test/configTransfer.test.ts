@@ -46,7 +46,7 @@ it('round-trips only configuration, re-encrypts keys, keeps bindings and publica
     await source.db.insertInto('announcementTemplates').values({
       gameKey: 'werewolf', key: 'nightFalls', customText: '迁移叫号', revision: 2,
     }).execute();
-    const match = await source.services.matches.createPublic({ gameKey: 'debate', playerIds: ids }, 'config-transfer-test');
+    const match = await source.services.matches.createPublic({ gameKey: 'debate', playerIds: ids }, (await source.access()).grant);
     await source.db.insertInto('playerMemories').values({
       ownerId: owner, matchId: match.id, gameKey: 'debate', content: '历史记忆不迁移',
       subjectId: null, subjectName: null, phaseId: null, action: null, evidence: '[]',

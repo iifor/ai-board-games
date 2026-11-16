@@ -9,8 +9,7 @@ it('公开开局时固定规则、身份、任务和平台模板，行动时按�
   try {
     const token = await t.adminToken();
     const playerIds = await seedPlayers(t, 9);
-    const create = async () => dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches',
-      { body: { gameKey: 'debate', playerIds } }));
+    const create = async () => dataOf(await t.call<MatchSummaryDto>('POST', '/api/toc/matches', { token: (await t.access()).token, body: { gameKey: 'debate', playerIds } }));
     const old = await create();
     const save = (key: string, source: string, revision = 0) => t.call('PUT', '/api/admin/prompts/' + key, { token, body: { source, revision } });
     const source = '请{{me.label}}向{{turn.targetLabel}}提一个问题。';

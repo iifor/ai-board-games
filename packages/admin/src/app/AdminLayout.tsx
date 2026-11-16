@@ -11,6 +11,7 @@ const MENU = [
   { key: '/players', label: '玩家管理' },
   { key: '/models', label: '模型管理' },
   { key: '/voices', label: '音色管理' },
+  { key: '/access-codes', label: '身份码' },
 ];
 
 export function AdminLayout() {

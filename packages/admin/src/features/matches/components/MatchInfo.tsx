@@ -21,6 +21,7 @@ export function MatchInfo({ detail, log, calls }: Props) {
         <Descriptions.Item label="事件进度">已推送 {detail.lastSeq} / 观众确认 {detail.ackedSeq}</Descriptions.Item>
         <Descriptions.Item label="模型调用">{calls.length} 次（失败 {calls.filter((call) => call.error).length}）</Descriptions.Item>
         <Descriptions.Item label="兜底">{fallbacks} 次</Descriptions.Item>
+        <Descriptions.Item label="发起人">{detail.startedBy ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="结果" span={3}>{detail.result ? `${detail.result.winnerLabel} · ${detail.result.summary}` : '—'}</Descriptions.Item>
         <Descriptions.Item label="座位" span={3}>{detail.seats.map((seat) => `${seat.seat}号 ${seat.name}`).join('，')}</Descriptions.Item>
         <Descriptions.Item label="C 端观看" span={{ xs: 1, md: 2 }}><a href={watchUrl} target="_blank" rel="noreferrer">{watchUrl}</a></Descriptions.Item>

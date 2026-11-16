@@ -58,6 +58,8 @@
 
 `AzureVoiceCatalogEntry` 是 Azure 区域目录中的 `{ voiceName, styles }`，用于后台按音色选择风格。`styles` 为空表示目录未列出额外风格；自然风格由后台以空字符串保存。目录接口只返回标识及风格，不返回密钥。
 
+`api/access.ts` 定义身份码契约：后台列表 `AccessCodeDto`（只含末 4 位 `codeHint`，状态 `active` / `disabled` / `expired` / `exhausted` 由服务端按停用、有效期、局数推算）、新建与编辑共用的 `AccessCodeInput`、一次性返回明文码的 `AccessCodeSecret`，以及 C 端的 `AccessSessionRequest`、`AccessSessionResponse`（含开局凭证）与 `AccessProfile`（`remainingMatches` 为 null 表示不限）。管理端对局详情 `MatchDetailDto.startedBy` 是发起这局的身份码用户名，后台开局、导入回放或身份码已删除时为 null。
+
 `api/traces.ts` 定义管理员可见的调用链契约：轻量节点索引包含阶段访问、直接请求 ID、此次推进输入和事件序号；节点详情含规则快照、关联决策、模型尝试或舞台视图。调用链独立删除后管理端对局详情通过 `traceDeleted` 表示停止采集。观众协议不包含这些诊断字段。
 
 `GeneratedMatchRequest` 仅含游戏键、可选板子与参数，供本地调试开局使用。`CreateDebugMatchRequest` 支持按 `playerIds` 选择已有玩家，或用 `generatePlayers: true`、`scripted: true` 生成阵容，二者互斥。生成座位的 `MatchSeatDto.playerId` 为 `null`，可通过本局座位号区分。

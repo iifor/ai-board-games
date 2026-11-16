@@ -1,6 +1,6 @@
-import type { GameCatalogItem, PublicPlayerDto } from '@battle/shared';
+import { API_ERROR_CODES, type GameCatalogItem, type PublicPlayerDto } from '@battle/shared';
 import { useState } from 'react';
-import { errorMessage } from '../../../services/http';
+import { ApiError, errorMessage } from '../../../services/http';
 import { createLocalDebugMatch, createMatch } from '../../../services/matches';
 import { GAMES_WITH_TOPIC } from '../constants';
 import type { SetupInitial, TopicDraft } from '../types';
@@ -18,8 +18,13 @@ function initialSelection(players: readonly PublicPlayerDto[], initial: SetupIni
   return (initial?.playerIds ?? []).filter((id) => known.has(id)).slice(0, max);
 }
 
+export interface MatchSetupOptions {
+  /** 服务端不认可开局凭证（未输码、停用、过期或已换码），由调用方清除凭证并重新要码 */
+  readonly onAccessRejected?: (reason: string) => void;
+}
+
 /** 开局表单状态：板子、玩家（按选中顺序就座）、可选辩题；提交后返回对局 ID */
-export function useMatchSetup(game: GameCatalogItem, players: readonly PublicPlayerDto[], initial?: SetupInitial) {
+export function useMatchSetup(game: GameCatalogItem, players: readonly PublicPlayerDto[], initial?: SetupInitial, options: MatchSetupOptions = {}) {
   const [variant, setVariant] = useState<string | null>(() => initialVariant(game, initial));
   const [selected, setSelected] = useState<number[]>(() => initialSelection(players, initial, playerRange(game, initialVariant(game, initial)).max));
   const [topic, setTopic] = useState<TopicDraft>({ title: '', pro: '', con: '' });
@@ -37,8 +42,9 @@ export function useMatchSetup(game: GameCatalogItem, players: readonly PublicPla
     return added;
   };
 
-  const submit = async (mode: 'players' | 'generated'): Promise<string | null> => {
-    if (submitting || topicPartial || (mode === 'players' && hint)) return null;
+  /** 真实玩家开局需要身份码凭证；本地模拟开局不需要 */
+  const submit = async (mode: 'players' | 'generated', token?: string): Promise<string | null> => {
+    if (submitting || topicPartial || (mode === 'players' && (hint || !token))) return null;
     setSubmitting(true);
     setError(null);
     try {
@@ -46,9 +52,13 @@ export function useMatchSetup(game: GameCatalogItem, players: readonly PublicPla
       const request = { gameKey: game.key, variant: variant ?? undefined, params };
       const match = mode === 'generated'
         ? await createLocalDebugMatch(request)
-        : await createMatch({ ...request, playerIds: selected });
+        : await createMatch({ ...request, playerIds: selected }, token ?? '');
       return match.id;
     } catch (cause) {
+      if (mode === 'players' && cause instanceof ApiError && cause.code === API_ERROR_CODES.unauthorized && options.onAccessRejected) {
+        options.onAccessRejected(cause.message);
+        return null;
+      }
       setError(errorMessage(cause));
       return null;
     } finally {

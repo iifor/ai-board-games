@@ -4,6 +4,7 @@ import { MatchDetailPage, MatchListPage } from '../features/matches';
 import { MatchPageLayout, MatchTabRedirect } from '../features/matches/pages/MatchPageLayout';
 import { ModelManagementPage, PlayersPage, VoicesPage } from '../features/resources';
 
+import { AccessCodesPage } from '../features/access-codes';
 import { AdminLayout } from './AdminLayout';
 import { PerspectivePage } from '../features/perspectives/PerspectivePage';
 import { PromptCatalogPage } from '../features/prompts/PromptCatalogPage';
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([{
           { path: 'replay-imports', element: <Navigate to="/matches?import=1" replace /> },
           { path: 'traces', element: <Navigate to="/matches" replace /> },
           { path: 'traces/:matchId', element: <MatchTabRedirect tab="trace" /> },
+          { path: 'access-codes', element: <AccessCodesPage /> },
           { path: 'players', element: <PlayersPage /> },
           { path: 'models/:providerId?', element: <ModelManagementPage /> },
           { path: 'providers', element: <Navigate to="/models?tab=providers" replace /> },

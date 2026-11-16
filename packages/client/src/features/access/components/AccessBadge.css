@@ -1,0 +1,17 @@
+.access-badge {
+  border-color: var(--ui-border);
+  color: var(--ui-text-muted);
+}
+
+.access-badge-exit {
+  padding: 0;
+  border: 0;
+  color: var(--game-accent-strong);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.access-badge-exit:hover {
+  text-decoration: underline;
+}

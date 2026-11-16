@@ -57,7 +57,7 @@ describe('generated debug players', () => {
     expect((await t.call('POST', admin, { body: generated })).status).toBe(401);
     expect((await t.call('POST', admin, { token, body: { ...generated, scripted: false } })).status).toBe(400);
     expect((await t.call('POST', admin, { token, body: { ...generated, playerIds: [1] } })).status).toBe(400);
-    expect((await t.call('POST', '/api/toc/matches', { body: generated })).status).toBe(400);
+    expect((await t.call('POST', '/api/toc/matches', { token: (await t.access()).token, body: generated })).status).toBe(400);
     expect((await local({ gameKey: 'debate', scripted: false })).status).toBe(400);
     expect((await local({ gameKey: 'werewolf', variant: 'unknown' })).status).toBe(400);
     expect((await local({ gameKey: 'debate' }, { Origin: 'https://example.com' })).status).toBe(404);
