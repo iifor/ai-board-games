@@ -1,5 +1,5 @@
-import { isPlayerSpeech, speechOf, stripSpeechTags, type AudienceSeat, type AudienceView, type GameResult, type StageEvent } from '@battle/shared';
-import { POPOVER_GAP, TEAM_LABELS } from './constants';
+import { isPlayerSpeech, speechOf, stripSpeechTags, type AudienceSeat, type AudienceView, type GameResult, type StageEvent, type StageLayout } from '@battle/shared';
+import { POPOVER_GAP, RECORD_PANELS_MIN_WIDTH, TEAM_LABELS } from './constants';
 import { SPEEDS, type PlaybackOptions, type SeatSpeech, type ShortcutKeyLike, type StageShortcut, type StreamItem } from './types';
 
 export type StagePeriod = 'day' | 'night';
@@ -198,4 +198,10 @@ export function popoverPlacement(anchor: Box, arena: Box, size: { readonly width
   if (right <= maxLeft) return { left: right, top, side: 'right' };
   if (left >= 0) return { left, top, side: 'left' };
   return { left: clamp(right, 0, maxLeft), top, side: 'right' };
+}
+
+/** 打开舞台时记录面板是否默认展开：窗口够宽、展开后舞台仍放得下座位时才展开（两侧面板同开同关） */
+export function recordPanelsOpenByDefault(layout: StageLayout, viewportWidth: number): boolean {
+  const min = layout === 'versus' ? RECORD_PANELS_MIN_WIDTH.versus : RECORD_PANELS_MIN_WIDTH.circle;
+  return viewportWidth >= min;
 }

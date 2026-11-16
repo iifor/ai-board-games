@@ -40,5 +40,13 @@ export const SPEECH_WATCHDOG_FACTOR = 2;
 export const SPEECH_WATCHDOG_GRACE_MS = 5000;
 export const AUDIO_STALL_MS = 8000;
 
+/** 与 CSS 的窄屏断点一致：此宽度及以下记录面板改为底部抽屉、一次只开一个 */
+export const NARROW_STAGE_MAX_WIDTH = 860;
+/**
+ * 记录面板默认展开所需的视口宽度：面板展开时舞台会让出两侧位置，
+ * 圆桌在这个宽度以上仍放得下一圈座位，辩论赛还要放下左右各两列辩手，更宽才默认展开。
+ */
+export const RECORD_PANELS_MIN_WIDTH = { circle: 1280, versus: 1700 } as const;
+
 /** 座位弹层与卡片之间的间距（px） */
 export const POPOVER_GAP = 12;

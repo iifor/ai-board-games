@@ -38,7 +38,13 @@
 }
 @keyframes caption-in { from { opacity: .4; } }
 @media (max-width: 860px) {
-  .sentence-captions { padding: 10px 14px; }
+  /* 窄屏字幕固定在视口底部、页面在它下面滚动：铺满宽度并加底色，不和座位标签叠字 */
+  .sentence-captions {
+    inset: auto 0 0;
+    width: auto;
+    padding: 18px 14px max(12px, env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, transparent, rgb(3 8 20 / 88%) 28%);
+  }
   .sentence-caption-line strong { max-width: 100%; }
   .sentence-caption-line p { font-size: 18px; }
   .stage-shell:has(> .sentence-captions) { padding-bottom: calc(148px + env(safe-area-inset-bottom)); }
