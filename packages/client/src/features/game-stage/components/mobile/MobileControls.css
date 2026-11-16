@@ -1,4 +1,5 @@
 .mobile-controls {
+  grid-area: controls;
   display: flex;
   gap: 8px;
   padding: 8px 0 max(8px, env(safe-area-inset-bottom));

@@ -8,13 +8,11 @@
   background: rgb(5 12 26 / 90%);
   backdrop-filter: blur(12px);
 }
-/* 展开：盖住舞台区，停在控制栏上方（--mobile-controls-height 由 MobileStage.css 给出） */
+/* 收起时填满抽屉位；展开时从抽屉位底部向上浮起，盖住舞台区（占位高度由 MobileStage.css 的抽屉位保持） */
+.mobile-sheet { position: absolute; inset: 0; }
 .mobile-sheet.is-open {
-  position: absolute;
   z-index: 50;
-  right: 12px;
-  bottom: calc(var(--mobile-controls-height) + env(safe-area-inset-bottom));
-  left: 12px;
+  top: auto;
   height: min(64svh, 560px);
 }
 .mobile-sheet-handle {

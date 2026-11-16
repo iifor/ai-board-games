@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { NARROW_STAGE_MAX_WIDTH } from '../constants';
 
-const QUERY = `(max-width: ${NARROW_STAGE_MAX_WIDTH}px)`;
+// 与桌面样式的 min-width: 861px 严格互补：缩放后出现 860.5px 这类小数宽度时两边不会都不生效
+const QUERY = `(width < ${NARROW_STAGE_MAX_WIDTH + 1}px)`;
 
 function subscribe(onChange: () => void): () => void {
   if (typeof window === 'undefined' || !window.matchMedia) return () => {};

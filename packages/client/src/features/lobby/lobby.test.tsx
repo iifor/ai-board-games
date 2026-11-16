@@ -12,7 +12,7 @@ import { PlayerPicker } from './components/PlayerPicker';
 import { RecentMatches } from './components/RecentMatches';
 import { SeatGrid } from './components/SeatGrid';
 import { SetupActionBar } from './components/SetupActionBar';
-import { fillOpenSeats, filterVariants, isSetupInitial, playerRange, readyLabel, rematchStateOf, selectionHint, toggleSelection } from './utils';
+import { blocksImplicitSubmit, fillOpenSeats, filterVariants, isSetupInitial, playerRange, readyLabel, rematchStateOf, selectionHint, toggleSelection } from './utils';
 
 const werewolf: GameCatalogItem = {
   key: 'werewolf', title: 'AI 狼人杀', description: '12 人', players: { min: 12, max: 12 }, layout: 'circle',
@@ -229,5 +229,16 @@ describe('lobby animations', () => {
     const fake = {} as HTMLElement;
     expect(flyTo(fake, fake)).toBe(0);
     expect(fadeOut(fake)).toBe(0);
+  });
+});
+
+describe('setup form submission', () => {
+  it('starts a match only from the button, never from Enter in a text field', () => {
+    expect(blocksImplicitSubmit('Enter', { tagName: 'INPUT', type: 'search' })).toBe(true);
+    expect(blocksImplicitSubmit('Enter', { tagName: 'INPUT', type: 'text' })).toBe(true);
+    expect(blocksImplicitSubmit('Enter', { tagName: 'INPUT' })).toBe(true);
+    expect(blocksImplicitSubmit('Enter', { tagName: 'BUTTON', type: 'submit' })).toBe(false);
+    expect(blocksImplicitSubmit('Enter', { tagName: 'INPUT', type: 'checkbox' })).toBe(false);
+    expect(blocksImplicitSubmit('a', { tagName: 'INPUT', type: 'search' })).toBe(false);
   });
 });

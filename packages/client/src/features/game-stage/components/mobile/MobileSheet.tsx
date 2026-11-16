@@ -36,7 +36,7 @@ export function MobileSheet({ open, tab, items, history, seat, seatSpeeches, onT
         ))}
       </div>
       {open ? (
-        <div className="mobile-sheet-body" role="tabpanel">
+        <div className="mobile-sheet-body" role="tabpanel" data-team={tab === 'seat' ? seat?.team ?? undefined : undefined}>
           {tab === 'seat'
             ? seat ? <SeatProfile seat={seat} speeches={seatSpeeches} nameId="mobile-seat-name" /> : <p className="mobile-sheet-hint">点座位查看资料</p>
             : <EventFeed items={items} filter={tab === 'speech' ? 'speech' : 'overview'} />}

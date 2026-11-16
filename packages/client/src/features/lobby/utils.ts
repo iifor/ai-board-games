@@ -60,3 +60,12 @@ export function isSetupInitial(value: unknown): value is SetupInitial {
   const idsOk = record.playerIds === undefined || (Array.isArray(record.playerIds) && record.playerIds.every((id) => typeof id === 'number'));
   return variantOk && idsOk && (record.variant !== undefined || record.playerIds !== undefined);
 }
+
+/**
+ * 表单里的文本框按回车会隐式提交（浏览器替用户点了提交按钮），而开局会真实调用模型：
+ * 只允许点击按钮开局，文本框（搜索、辩题）里的回车一律拦下。按钮、复选框等不在此列
+ */
+export function blocksImplicitSubmit(key: string, target: { readonly tagName: string; readonly type?: string }): boolean {
+  if (key !== 'Enter' || target.tagName !== 'INPUT') return false;
+  return !['button', 'submit', 'reset', 'checkbox', 'radio', 'image'].includes(target.type ?? 'text');
+}

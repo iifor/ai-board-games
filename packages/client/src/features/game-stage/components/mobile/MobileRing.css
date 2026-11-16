@@ -1,9 +1,14 @@
-/* 正方形容器：取可用宽高中较小的一边，圆桌在任何手机比例下都是圆的 */
+/*
+ * 正方形容器：边长取舞台宽度与"舞台高度 − 上下留白"中较小者（上方留出顶部座位的半个头像，下方留出底部座位的头像与身份标签），
+ * 圆桌在任何手机比例下都是圆的，标签也不会伸进下方的发言卡。不支持容器单位的浏览器按视口高度估算。
+ */
 .mobile-ring {
+  container: mobile-ring / inline-size;
   position: relative;
-  width: min(100%, 100cqh);
+  width: min(100%, 45svh);
+  width: min(100%, calc(100cqh - 52px));
   aspect-ratio: 1;
-  margin: auto;
+  margin: 18px auto auto;
 }
 .mobile-ring::before {
   content: '';
@@ -13,12 +18,19 @@
   border-radius: 50%;
 }
 .mobile-ring > .mobile-seat {
+  --seat-size: clamp(26px, 13cqw, 48px);
   position: absolute;
   transform: translate(-50%, calc(-1 * var(--seat-size) / 2));
 }
 .mobile-ring-center {
   position: absolute;
-  inset: 26%;
+  inset: 24%;
   display: grid;
   place-items: center;
+}
+.mobile-ring .mobile-speaker-avatar { width: clamp(34px, 24cqw, 92px); height: clamp(34px, 24cqw, 92px); }
+.mobile-ring .mobile-speaker figcaption { max-width: 48cqw; font-size: 11px; }
+/* 桌子太小时不放身份标签，避免互相叠住；身份仍在座位的读屏标签与座位资料里 */
+@container mobile-ring (max-width: 230px) {
+  .mobile-seat-role, .mobile-speaker figcaption { display: none; }
 }

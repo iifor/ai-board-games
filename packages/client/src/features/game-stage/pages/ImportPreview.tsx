@@ -8,7 +8,11 @@ import { usePlayback } from '../hooks/usePlayback';
 import { periodOf } from '../utils';
 import { debateTopicOf } from '../layouts/debateTopic';
 import type { PlaybackOptions } from '../types';
+import { useNarrowStage } from '../hooks/useNarrowStage';
+import { MobilePlayfield } from '../components/mobile/MobilePlayfield';
 import './StagePage.css';
+import '../components/mobile/MobileStage.css';
+import '../components/mobile/MobileControls.css';
 
 const ack = () => {};
 function PreviewStage({data}:{data:ReplayPreview}) {
@@ -18,15 +22,27 @@ function PreviewStage({data}:{data:ReplayPreview}) {
   const play = usePlayback(segments,ack,options), view = play.view;
   const layout = items[0]?.event.view.gameKey === 'debate' ? 'versus' : 'circle';
   const period = periodOf(view), topic = debateTopicOf(view);
+  const narrow = useNarrowStage();
+  const played = [...items.slice(0,data.start),...play.played];
+  const controls = <>
+    <button type="button" className="button" onClick={()=>set({...options,paused:!options.paused})}>{options.paused?'继续':'暂停'}</button>
+    <button type="button" className="button" onClick={()=>set({...options,speed:options.speed===1?3:1})}>{options.speed}×</button>
+    {!play.pending && <b>回放结束</b>}
+  </>;
+  // 后台窗口较窄时（试播 iframe 宽 96vw）与手机舞台同一套座位区与发言卡
+  if (narrow) return <div className="mobile-stage" data-game={view?.gameKey} data-period={period}>
+    <StageBackdrop gameKey={items[0]!.event.view.gameKey} period={period} />
+    {topic?.title && <p className="mobile-stage-topic">{topic.title}</p>}
+    <MobilePlayfield layout={layout} view={view} current={play.current} played={played} control={play.control} />
+    <nav className="mobile-controls" aria-label="播放控制">{controls}</nav>
+  </div>;
   return <div className="stage-shell" data-game={view?.gameKey} data-layout={layout} data-period={period}>
     <StageBackdrop gameKey={items[0]!.event.view.gameKey} period={period} />
     {topic?.title && <DebateTitle title={topic.title}/>}
     <div className="stage-arena"><Stage layout={layout} view={view} current={play.current}
-      played={[...items.slice(0,data.start),...play.played]} control={play.control} playbackPaused={options.paused} playbackSpeed={options.speed}/></div>
+      played={played} control={play.control} playbackPaused={options.paused} playbackSpeed={options.speed}/></div>
     <SentenceCaptions item={play.current} control={play.control} announce={false}/>
-    <div className="stage-actions"><button className="button" onClick={()=>set({...options,paused:!options.paused})}>{options.paused?'继续':'暂停'}</button>
-      <button className="button" onClick={()=>set({...options,speed:options.speed===1?3:1})}>{options.speed}×</button>
-      {!play.pending && <b>回放结束</b>}</div>
+    <div className="stage-actions">{controls}</div>
   </div>;
 }
 export function ImportPreview() {
