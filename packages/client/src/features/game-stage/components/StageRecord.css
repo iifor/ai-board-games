@@ -58,6 +58,4 @@
   font-size: 16px;
 }
 
-@media (max-width: 860px) {
-  .stage-record { height: min(400px, 48vh); }
-}
+

@@ -5,7 +5,6 @@
   --stage-history-height: min(clamp(360px, 76vh, 1100px), calc(100dvh - 170px));
   --stage-rail-width: 540px;
   --stage-subtitle-max-height: clamp(104px, 22vh, 220px);
-  --mobile-speech-height: clamp(270px, 54svh, 600px);
   /* 记录面板：顶部在 HUD 之下、底部让出字幕；展开时舞台让出的宽度（收起为 0）由下方 :has 规则切换 */
   --stage-history-top: 144px;
   --stage-history-bottom: calc(var(--stage-subtitle-max-height) + 34px);
@@ -163,61 +162,5 @@
   .stage-shell[data-layout='versus'] { padding-top: 70px; }
 }
 
-/* 窄屏先提供播放控制和字幕；终局遮罩仍相对视口定位。 */
-@media (max-width: 860px) {
-  .stage-shell {
-    position: static;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-height: 100vh;
-    padding: 12px;
-    overflow: visible;
-  }
+/* 窄屏（≤860px）整页换成 components/mobile/MobileStage，这里只有桌面舞台的布局。 */
 
-  .stage-shell > :is(.stage-hud, .stage-arena, .subtitle-bar, .playback-rail, .stage-actions) {
-    position: static;
-    inset: auto;
-    width: auto;
-    max-width: none;
-    transform: none;
-  }
-
-  .stage-backdrop {
-    position: fixed;
-  }
-
-  .stage-shell > .stage-hud { order: 1; }
-  .stage-shell > .playback-rail { order: 2; justify-content: flex-start; border-radius: 16px; }
-  .stage-shell > .subtitle-bar { order: 4; }
-  .stage-shell > .stage-arena { order: 6; position: relative; }
-  .stage-shell > .phase-banner { display: none; }
-  .stage-shell > .stage-actions { order: 9; flex-direction: row; flex-wrap: wrap; }
-
-  /* 辩论队伍在手机上沿文档排列，底部字幕随页面排版，避免覆盖立场和头像。 */
-  .stage-shell[data-layout='versus'] > .sentence-captions {
-    position: static;
-    inset: auto;
-    order: 7;
-    align-self: center;
-    transform: none;
-  }
-  .stage-shell[data-layout='versus']:has(> .sentence-captions) { padding-bottom: 12px; }
-
-  /* 记录面板在窄屏是底部抽屉（一次只开一个，见 useRecordPanels），盖在字幕之上，不再浮在 HUD 和舞台中间 */
-  .stage-shell > .stage-history {
-    position: fixed;
-    z-index: 55;
-    inset: auto 0 0;
-    width: auto;
-    height: min(62svh, 560px);
-    max-height: none;
-    padding: 0 8px env(safe-area-inset-bottom);
-  }
-  .stage-shell > .stage-history .stage-record {
-    height: 100%;
-    border-radius: 16px 16px 0 0;
-    background: rgb(5 12 26 / 94%);
-  }
-
-}

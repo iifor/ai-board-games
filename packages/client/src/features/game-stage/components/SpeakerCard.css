@@ -98,20 +98,4 @@
   color: var(--speaker-ring);
 }
 
-@media (max-width: 860px) {
-  .stage-arena .speaker-spotlight.is-card { width: min(100%, 320px); height: auto; padding: 0; }
-  .stage-arena .speaker-card {
-    width: 100%; grid-template-columns: 52px minmax(0, 1fr); grid-template-rows: auto auto;
-    justify-items: start; align-items: center; padding: 10px 16px; gap: 3px 12px; text-align: left;
-  }
-  .stage-arena .speaker-card .speaker-avatar { grid-row: 1 / 3; width: 50px; height: 50px; }
-  .stage-arena .speaker-card .speaker-avatar-image { width: 46px; height: 46px; font-size: 17px; white-space: nowrap; }
-  .stage-arena .speaker-card .speaker-avatar-no { right: -4px; bottom: -3px; min-width: 18px; height: 18px; padding: 0 3px; font-size: 10px; }
-  .stage-arena .speaker-card-meta { justify-content: flex-start; gap: 3px; }
-  .stage-arena .speaker-card-name { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 17px; }
-  .speaker-avatar-image {
-    width: 84px;
-    height: 84px;
-    font-size: 30px;
-  }
-}
+

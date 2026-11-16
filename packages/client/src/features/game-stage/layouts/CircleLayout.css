@@ -11,7 +11,7 @@
 }
 
 /* 量到舞台尺寸后宽高由 fitRingBox 算出写进 --ring-w / --ring-h（高度占满、宽度不超过舞台）；
-   量到之前高度占满、宽度按比例兜底。只写自定义属性不写内联宽高，窄屏规则才能把它改回网格。
+   量到之前高度占满、宽度按比例兜底。只写自定义属性不写内联宽高，媒体查询才能改写它。
    座位坐标与卡片缩放由 ringGeometry 算出并写进自定义属性 */
 .circle-ring {
   --seat-scale: 1;
@@ -99,50 +99,4 @@
 .circle-seat .seat-card[data-effect-target] .ring-seat-platform::before { filter: drop-shadow(0 0 6px var(--fx-color)); }
 .circle-seat .seat-card-stamp { top: 24px; right: auto; left: 2px; z-index: 2; }
 
-@media (max-width: 860px) {
-  .circle-ring {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 96px), 1fr));
-    gap: 8px;
-    width: 100%;
-    height: auto;
-    max-width: none;
-    aspect-ratio: auto;
-  }
 
-  .circle-table {
-    display: none;
-  }
-
-  .circle-seat {
-    position: static;
-    transform: none;
-    min-width: 0;
-  }
-
-  .circle-seat .seat-card-stack {
-    width: 100%;
-    height: clamp(146px, 29vw, 180px);
-  }
-
-  .circle-layout {
-    height: auto;
-  }
-
-  .ballot-flight {
-    display: none;
-  }
-
-  .circle-center {
-    position: static;
-    grid-column: 1 / -1;
-    grid-row: 1;
-    min-height: 0;
-    gap: 6px;
-  }
-
-  .circle-center .stage-record { height: min(390px, 46vh); }
-  .circle-center:has(> .speech-carousel) { width: 100%; height: var(--mobile-speech-height); }
-
-  .circle-center .speaker-spotlight { height: clamp(100px, 20vh, 160px); }
-}

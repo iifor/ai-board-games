@@ -21,6 +21,8 @@ import { useMatchStream } from '../hooks/useMatchStream';
 import { useAudienceSetting } from '../hooks/useAudienceSetting';
 import { usePlayback } from '../hooks/usePlayback';
 import { useRecordPanels } from '../hooks/useRecordPanels';
+import { useNarrowStage } from '../hooks/useNarrowStage';
+import { MobileStage } from '../components/mobile/MobileStage';
 import { useResultDialog } from '../hooks/useResultDialog';
 import { useStageShortcuts } from '../hooks/useStageShortcuts';
 import type { PlaybackOptions, SeatSelection } from '../types';
@@ -62,6 +64,7 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
   const [session, setSession] = useState(0);
   const stream = useMatchStream(summary.id, session, seat, session === 0 ? start : 0);
   const debate = summary.layout === 'versus';
+  const narrow = useNarrowStage();
   const { feedOpen, speechOpen, toggleFeed, toggleSpeech, closeFeed, closeSpeech } = useRecordPanels(summary.layout);
   const playback = usePlayback(stream.items, stream.ack, options);
   const finished = stream.ended && playback.pending === 0 && !playback.current;
@@ -86,20 +89,29 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
   const subtitleItem = playback.current ?? playback.played.at(-1) ?? null;
   const shown = subtitleItem?.event;
   const historyItems = isPlayerSpeech(shown) ? playback.played.filter(item => item.event.seq !== shown.seq) : playback.played;
+  const replay = summary.status === 'completed' || session > 0 || stream.ended;
+  const replayFromStart = () => { closeSeat(); setSession((value) => value + 1); };
+  const perspective = (
+    <label className="audience-setting">
+      <select aria-label="观战视角" value={seat === null ? 'god' : 'player'} onChange={(e) => {
+        const seq = playback.current?.event.seq ?? playback.played.at(-1)?.event.seq;
+        switchMode(e.target.value === 'player', seq === undefined ? start : Math.max(0, seq - 1));
+      }}><option value="god">上帝视角</option><option value="player">{seat === null ? '随机玩家' : `玩家 · ${seat}号`}</option></select>
+    </label>
+  );
+  if (narrow) {
+    return <MobileStage summary={summary} playback={playback} stream={stream} options={options} onOptions={setOptions} finished={finished}
+      replay={replay} perspective={perspective}
+      result={hasResult && stream.result ? { value: stream.result, open: resultDialog.open, show: resultDialog.show, hide: resultDialog.hide, onReplay: replayFromStart } : null} />;
+  }
 
   return (
     <div className="stage-shell" data-game={gameKey} data-layout={layout} data-period={period} data-finished={finished}>
       <StageBackdrop gameKey={gameKey} period={period} />
       {topicTitle && <DebateTitle title={topicTitle} />}
-      <StageHud summary={summary} view={playback.view} event={shown} connection={stream.connection} ended={finished}
-        replay={summary.status === 'completed' || session > 0 || stream.ended} />
+      <StageHud summary={summary} view={playback.view} event={shown} connection={stream.connection} ended={finished} replay={replay} />
       <PlaybackControls hideFeedButton compact={!debate} options={options} pending={playback.pending} finished={finished} feedOpen={feedOpen} onChange={setOptions} onToggleFeed={toggleFeed}>
-      <label className="audience-setting">
-        <select aria-label="观战视角" value={seat === null ? 'god' : 'player'} onChange={(e) => {
-          const seq = playback.current?.event.seq ?? playback.played.at(-1)?.event.seq;
-          switchMode(e.target.value === 'player', seq === undefined ? start : Math.max(0, seq - 1));
-        }}><option value="god">上帝视角</option><option value="player">{seat === null ? '随机玩家' : `玩家 · ${seat}号`}</option></select>
-      </label>
+        {perspective}
       </PlaybackControls>
       {stream.error ? <StageError message={stream.error} onRetry={stream.connection === 'lost' ? stream.retry : null} /> : null}
       <div className="stage-arena" ref={arenaRef}>
@@ -131,7 +143,7 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
         {hasResult && !resultDialog.open ? <button type="button" className="button button-primary" title={SHORTCUT_HINTS.result.title} aria-keyshortcuts={SHORTCUT_HINTS.result.keys} onClick={resultDialog.show}>查看结果</button> : null}
       </div>
       {hasResult && resultDialog.open && stream.result ? (
-        <ResultPanel result={stream.result} view={playback.view} summary={summary} onReplay={() => { closeSeat(); setSession((value) => value + 1); }} onClose={resultDialog.hide} />
+        <ResultPanel result={stream.result} view={playback.view} summary={summary} onReplay={replayFromStart} onClose={resultDialog.hide} />
       ) : null}
     </div>
   );

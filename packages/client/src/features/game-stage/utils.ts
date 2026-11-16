@@ -1,6 +1,7 @@
 import { isPlayerSpeech, speechOf, stripSpeechTags, type AudienceSeat, type AudienceView, type GameResult, type StageEvent, type StageLayout } from '@battle/shared';
 import { POPOVER_GAP, RECORD_PANELS_MIN_WIDTH, TEAM_LABELS } from './constants';
 import { SPEEDS, type PlaybackOptions, type SeatSpeech, type ShortcutKeyLike, type StageShortcut, type StreamItem } from './types';
+import { describeEvent } from './playback/describe';
 
 export type StagePeriod = 'day' | 'night';
 
@@ -204,4 +205,46 @@ export function popoverPlacement(anchor: Box, arena: Box, size: { readonly width
 export function recordPanelsOpenByDefault(layout: StageLayout, viewportWidth: number): boolean {
   const min = layout === 'versus' ? RECORD_PANELS_MIN_WIDTH.versus : RECORD_PANELS_MIN_WIDTH.circle;
   return viewportWidth >= min;
+}
+
+export interface CampCount {
+  readonly team: string;
+  readonly label: string;
+  readonly alive: number;
+}
+
+export interface AliveSummary {
+  readonly alive: number;
+  readonly total: number;
+  /** 各阵营存活人数；有座位的阵营观众看不到（玩家视角）时为空，避免按部分信息给出误导的数字 */
+  readonly camps: readonly CampCount[];
+}
+
+/** 手机局势条：存活人数，以及观众能看到全部阵营时各阵营的存活人数（按座号先后出现的顺序） */
+export function aliveSummary(view: AudienceView): AliveSummary {
+  const alive = view.seats.filter((seat) => seat.alive);
+  const known = view.seats.every((seat) => seat.team !== null);
+  const counts = new Map<string, number>();
+  if (known) for (const seat of alive) counts.set(seat.team!, (counts.get(seat.team!) ?? 0) + 1);
+  const camps = [...counts.entries()].map(([team, count]) => ({ team, label: teamLabel(team), alive: count }));
+  return { alive: alive.length, total: view.seats.length, camps };
+}
+
+/** 手机控制栏的倍速按钮：每点一次换下一档，最快一档之后回到 1× */
+export function cycleSpeed(speed: number): number {
+  return SPEEDS.find((value) => value > speed) ?? SPEEDS[0];
+}
+
+/** 记录抽屉收起时露出的一行：所选标签下最新一条记录（发言 / 对局流程），朗读标记不展示 */
+export function latestRecordLine(items: readonly StreamItem[], speech: boolean): string | null {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const event = items[index]!.event;
+    if (isPlayerSpeech(event) !== speech) continue;
+    const { speaker, text } = describeEvent(event);
+    if (!text) continue;
+    const seat = speaker === null ? null : event.view.seats.find((candidate) => candidate.seat === speaker);
+    const body = stripSpeechTags(text);
+    return seat ? `${speakerLabel(seat.seat, seat.name)}：${body}` : body;
+  }
+  return null;
 }

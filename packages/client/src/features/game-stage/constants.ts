@@ -40,7 +40,7 @@ export const SPEECH_WATCHDOG_FACTOR = 2;
 export const SPEECH_WATCHDOG_GRACE_MS = 5000;
 export const AUDIO_STALL_MS = 8000;
 
-/** 与 CSS 的窄屏断点一致：此宽度及以下记录面板改为底部抽屉、一次只开一个 */
+/** 与 CSS 的窄屏断点一致：此宽度及以下整页换成手机舞台（hooks/useNarrowStage） */
 export const NARROW_STAGE_MAX_WIDTH = 860;
 /**
  * 记录面板默认展开所需的视口宽度：面板展开时舞台会让出两侧位置，

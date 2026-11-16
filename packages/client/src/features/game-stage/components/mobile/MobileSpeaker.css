@@ -1,0 +1,29 @@
+.mobile-speaker {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: 0;
+  text-align: center;
+  animation: ui-fade-up var(--ui-motion-normal) var(--ui-ease-out) both;
+}
+.mobile-speaker-avatar {
+  width: clamp(64px, 20vw, 92px);
+  height: clamp(64px, 20vw, 92px);
+  border: 3px solid var(--team-color, var(--ui-brand-strong));
+  border-radius: 50%;
+  background: #172338;
+  box-shadow: 0 0 22px var(--team-color, var(--ui-brand-soft));
+  overflow: hidden;
+}
+.mobile-speaker figcaption {
+  max-width: 36vw;
+  overflow: hidden;
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mobile-speaker.is-idle span { color: var(--ui-text-muted); font-size: 34px; line-height: 1; }
+.mobile-speaker.is-idle small { color: var(--ui-text-muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .mobile-speaker { animation: none; } }
