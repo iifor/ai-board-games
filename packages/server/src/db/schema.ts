@@ -12,6 +12,8 @@ export interface AdminUsersTable {
   username: string;
   passwordHash: string;
   mustChangePassword: boolean;
+  /** 令牌代次（迁移 027）：改密或退出登录时递增，旧令牌失效 */
+  tokenGeneration: Generated<number>;
   createdAt: CreatedAt;
   updatedAt: UpdatedAt;
 }

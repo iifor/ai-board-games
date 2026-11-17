@@ -64,6 +64,8 @@ const bombmanTriggers: WerewolfTriggers = [
     on: 'seat_eliminated',
     when: (ctx, event) => event.kind === 'seat_eliminated' && event.cause === 'exile'
       && ctx.seats.get(event.seat).role === 'bombman' && voters(ctx, event.seat).length > 0,
+    // 放逐他本身已经分出胜负（如他是最后一个神职）时对局直接结束，不再引爆
+    unlessGameOver: true,
     push: 'bombman_blast',
   },
 ];

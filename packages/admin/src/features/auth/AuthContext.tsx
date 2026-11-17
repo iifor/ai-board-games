@@ -1,14 +1,17 @@
-import type { AdminProfile } from '@battle/shared';
+import { API_ERROR_CODES, type AdminLoginResponse, type AdminProfile } from '@battle/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { fetchProfile, login as loginRequest } from '../../services/auth';
-import { AUTH_EVENTS } from '../../services/http';
+import { fetchProfile, login as loginRequest, logout as logoutRequest } from '../../services/auth';
+import { ApiError, AUTH_EVENTS } from '../../services/http';
 import { tokenStore } from '../../services/tokenStore';
 
 interface AuthState {
   readonly profile: AdminProfile | null;
   readonly loading: boolean;
   login(username: string, password: string): Promise<void>;
-  logout(): void;
+  /** 改密成功后换上服务端签发的新令牌（旧令牌已被吊销） */
+  replaceToken(result: AdminLoginResponse): Promise<void>;
+  /** 先让服务端吊销令牌，无论结果如何本机都会退出；吊销失败时抛出，供调用方提示 */
+  logout(): Promise<void>;
   refresh(): Promise<void>;
 }
 
@@ -54,9 +57,20 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       tokenStore.set(result.token);
       await refresh();
     },
-    logout() {
-      tokenStore.clear();
-      setProfile(null);
+    async replaceToken(result) {
+      tokenStore.set(result.token);
+      await refresh();
+    },
+    async logout() {
+      try {
+        await logoutRequest();
+      } catch (error) {
+        // 401 说明令牌本来就已失效，等同于吊销成功
+        if (!(error instanceof ApiError && error.code === API_ERROR_CODES.unauthorized)) throw error;
+      } finally {
+        tokenStore.clear();
+        setProfile(null);
+      }
     },
     refresh,
   }), [profile, loading, refresh]);

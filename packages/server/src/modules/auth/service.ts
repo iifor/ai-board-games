@@ -6,7 +6,7 @@ import { hashPassword, verifyPassword } from '../../utils/crypto';
 import { badRequest, tooManyRequests, unauthorized } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import { windowKey, type WindowStore } from '../../utils/windowStore';
-import { ADMIN_TOKEN_AUDIENCE, FAILED_LOGIN_WINDOW_MS, MAX_FAILED_LOGINS, MAX_FAILED_LOGINS_PER_SOURCE, TOKEN_TTL_SECONDS } from './constants';
+import { ADMIN_TOKEN_AUDIENCE, EXPIRED_SESSION, FAILED_LOGIN_WINDOW_MS, MAX_FAILED_LOGINS, MAX_FAILED_LOGINS_PER_SOURCE, TOKEN_TTL_SECONDS } from './constants';
 import type { AuthRepository } from './repository';
 
 export function createAuthService(repository: AuthRepository, config: Pick<AppConfig, 'jwtSecret' | 'bootstrapAdmin'>, failures: WindowStore) {
@@ -18,6 +18,12 @@ export function createAuthService(repository: AuthRepository, config: Pick<AppCo
     const since = new Date(now - FAILED_LOGIN_WINDOW_MS);
     const [account, bySource] = await Promise.all([failures.count(accountKey(source, username), since), failures.count(sourceKey(source), since)]);
     if (account >= MAX_FAILED_LOGINS || bySource >= MAX_FAILED_LOGINS_PER_SOURCE) throw tooManyRequests('登录失败次数过多，请稍后再试');
+  }
+
+  async function issue(id: number, generation: number, mustChangePassword: boolean, now: number): Promise<AdminLoginResponse> {
+    const exp = Math.floor(now / 1000) + TOKEN_TTL_SECONDS;
+    const token = await sign({ sub: id, gen: generation, aud: ADMIN_TOKEN_AUDIENCE, exp }, config.jwtSecret, 'HS256');
+    return { token, expiresAt: new Date(exp * 1000).toISOString(), mustChangePassword };
   }
 
   async function recordFailure(source: string, username: string, now: number): Promise<void> {
@@ -56,29 +62,39 @@ export function createAuthService(repository: AuthRepository, config: Pick<AppCo
         throw unauthorized('用户名或密码错误');
       }
       await failures.clear(accountKey(source, username));
-      const exp = Math.floor(now / 1000) + TOKEN_TTL_SECONDS;
-      const token = await sign({ sub: user.id, aud: ADMIN_TOKEN_AUDIENCE, exp }, config.jwtSecret, 'HS256');
-      return { token, expiresAt: new Date(exp * 1000).toISOString(), mustChangePassword: user.mustChangePassword };
+      return issue(user.id, user.tokenGeneration, user.mustChangePassword, now);
     },
 
-    /** 校验令牌并读取最新的账号状态（改密状态以数据库为准）；只接受后台 audience，C 端凭证不能冒充管理员 */
+    /**
+     * 校验令牌并读取最新的账号状态（改密状态以数据库为准）；只接受后台 audience，C 端凭证不能冒充管理员。
+     * 令牌代次必须等于账号当前代次：改密或退出登录后旧令牌立即失效。
+     */
     async authenticate(token: string): Promise<AdminIdentity> {
-      let subject: unknown;
+      let payload: Record<string, unknown>;
       try {
-        subject = (await verify(token, config.jwtSecret, { alg: 'HS256', aud: ADMIN_TOKEN_AUDIENCE })).sub;
+        payload = await verify(token, config.jwtSecret, { alg: 'HS256', aud: ADMIN_TOKEN_AUDIENCE });
       } catch {
-        throw unauthorized('登录已失效，请重新登录');
+        throw unauthorized(EXPIRED_SESSION);
       }
-      const user = typeof subject === 'number' ? await repository.findById(subject) : undefined;
-      if (!user) throw unauthorized('登录已失效，请重新登录');
+      const { sub, gen } = payload;
+      if (typeof sub !== 'number' || typeof gen !== 'number') throw unauthorized(EXPIRED_SESSION);
+      const user = await repository.findById(sub);
+      if (!user || user.tokenGeneration !== gen) throw unauthorized(EXPIRED_SESSION);
       return { id: user.id, username: user.username, mustChangePassword: user.mustChangePassword };
     },
 
-    async changePassword(id: number, currentPassword: string, newPassword: string): Promise<void> {
+    /** 改密后其他令牌全部失效，返回给当前会话一枚新令牌 */
+    async changePassword(id: number, currentPassword: string, newPassword: string, now = Date.now()): Promise<AdminLoginResponse> {
       const user = await repository.findById(id);
       if (!user || !(await verifyPassword(currentPassword, user.passwordHash))) throw badRequest('当前密码不正确');
       if (currentPassword === newPassword) throw badRequest('新密码不能与当前密码相同');
-      await repository.updatePassword(id, await hashPassword(newPassword));
+      const generation = await repository.updatePassword(id, await hashPassword(newPassword));
+      return issue(id, generation, false, now);
+    },
+
+    /** 退出登录：该账号已签发的令牌全部失效（单管理员场景下即所有设备一起退出） */
+    async logout(id: number): Promise<void> {
+      await repository.revokeTokens(id);
     },
 
     profile(identity: AdminIdentity): AdminProfile {

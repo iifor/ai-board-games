@@ -97,7 +97,7 @@ GameSpec 关键字段：
 ### 阶段栈与触发器
 
 - 事件：`seat_eliminated`（`seat`、`cause`、`reason`，任何淘汰都会派发）与 `action_declared`（`seat`、`action`，来自发言声明）。
-- 触发器 `{ id, on, when?(ctx, event), push | jump, round? }` 按声明顺序匹配。
+- 触发器 `{ id, on, when?(ctx, event), push | jump, round?, unlessGameOver? }` 按声明顺序匹配。`unlessGameOver: true` 表示事件发生时 `gameOver.when` 已成立就不触发（炸弹人：放逐他本身已分出胜负时不再引爆）；默认不设，照常排队、链结算完再判胜负（猎人开枪可以推翻结论）。
 - `push`：排入队列，等主流程上的当前阶段完成后插入；原本要去的目标（含轮次加一）压入阶段栈，插入链末尾 `return` 时再继续前往。队列只在主流程（阶段栈为空）上被消费：一条链内部的转换（如开枪 → 结算）不会被别的触发器插队，链 `return` 后才按排队顺序执行下一条。插入链中再触发的事件同样排队，所以遗言、开枪、被枪杀者的遗言会按触发顺序串起来。
 - `jump`：立即中止当前阶段（作废其未完成的 AI 请求），清空阶段栈与队列后跳转，可附带轮次加一。
 - 插入链中的阶段通过 `ctx.trigger` 读取触发事件（如出局者座位）。

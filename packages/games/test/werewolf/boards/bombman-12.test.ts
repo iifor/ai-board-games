@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { act, combine, eliminated, entries, first, play, requestsIn, roleSeats, wolvesKill, type Override } from '../helpers';
+import { act, combine, eliminated, entries, everyoneVotes, first, play, requestsIn, roleSeats, wolvesKill, type Override } from '../helpers';
 
 const BOARD = 'bombman-12';
 const SEED = 1;
@@ -53,6 +53,17 @@ describe('bombman', () => {
   it('also wins alone by taking every wolf and every remaining god', () => {
     const run = play(SEED, combine(exileBombman([...wolves, witch, seer, hunter]), blast), BOARD);
     expect(run.snapshot.result?.winner).toBe('bombman');
+  });
+
+  it('does not blast when his exile already decides the game', () => {
+    // 首夜刀预言家、第 1 天放逐猎人、第 2 夜刀女巫：第 2 天狼人放逐最后一个神职炸弹人，屠神成立
+    const exileLastGod: Override = (request, snapshot) => request.phaseId === 'exile_vote' && snapshot.round === 2
+      ? { target: wolves.includes(request.seat) ? bombman : null }
+      : undefined;
+    const run = play(SEED, combine(wolvesKill(seer, 1), wolvesKill(witch, 2), everyoneVotes('exile_vote', hunter, 1), exileLastGod, blast), BOARD);
+    expect(requestsIn(run, 'bombman_blast')).toHaveLength(0);
+    expect(eliminated(run).filter((death) => death.reason === '被炸弹人炸死')).toHaveLength(0);
+    expect(run.snapshot.result).toMatchObject({ winner: 'werewolf', endReason: 'normal' });
   });
 
   it('cannot blast when he dies any other way', () => {

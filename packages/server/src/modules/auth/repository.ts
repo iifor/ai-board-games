@@ -19,8 +19,16 @@ export function createAuthRepository(db: Db) {
     findById: (id: number) => db.selectFrom('adminUsers').selectAll().where('id', '=', id).executeTakeFirst(),
     create: (username: string, passwordHash: string, executor: Executor = db) =>
       executor.insertInto('adminUsers').values({ username, passwordHash, mustChangePassword: true }).returning('id').executeTakeFirstOrThrow(),
-    updatePassword: (id: number, passwordHash: string) =>
-      db.updateTable('adminUsers').set({ passwordHash, mustChangePassword: false, updatedAt: new Date() }).where('id', '=', id).execute(),
+    /** 改密同时递增令牌代次，返回新代次：此前签发的令牌全部失效 */
+    updatePassword: async (id: number, passwordHash: string): Promise<number> => {
+      const row = await db.updateTable('adminUsers')
+        .set((eb) => ({ passwordHash, mustChangePassword: false, tokenGeneration: eb('tokenGeneration', '+', 1), updatedAt: new Date() }))
+        .where('id', '=', id).returning('tokenGeneration').executeTakeFirstOrThrow();
+      return row.tokenGeneration;
+    },
+    /** 退出登录：递增令牌代次，该账号已签发的令牌全部失效 */
+    revokeTokens: (id: number) =>
+      db.updateTable('adminUsers').set((eb) => ({ tokenGeneration: eb('tokenGeneration', '+', 1), updatedAt: new Date() })).where('id', '=', id).execute(),
   };
 }
 

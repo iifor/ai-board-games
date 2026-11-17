@@ -24,8 +24,7 @@ export function ChangePasswordPage() {
   const submit = async (values: PasswordValues) => {
     setSubmitting(true);
     try {
-      await changePassword({ currentPassword: values.currentPassword, newPassword: values.newPassword });
-      await auth.refresh();
+      await auth.replaceToken(await changePassword({ currentPassword: values.currentPassword, newPassword: values.newPassword }));
       message.success('密码已修改');
       navigate('/', { replace: true });
     } catch (error) {

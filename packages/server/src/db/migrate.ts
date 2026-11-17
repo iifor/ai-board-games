@@ -28,6 +28,7 @@ import * as memoryReviewCalls from './migrations/023_memory_review_calls';
 import * as forgetPlayerMemory from './migrations/024_forget_player_memory';
 import * as memoryTombstones from './migrations/025_memory_tombstones';
 import * as accessCodes from './migrations/026_access_codes';
+import * as adminTokenGeneration from './migrations/027_admin_token_generation';
 
 /** 迁移按 key 排序执行；新增迁移在此登记 */
 const MIGRATIONS: Readonly<Record<string, Migration>> = {
@@ -57,6 +58,7 @@ const MIGRATIONS: Readonly<Record<string, Migration>> = {
   '024_forget_player_memory': forgetPlayerMemory,
   '025_memory_tombstones': memoryTombstones,
   '026_access_codes': accessCodes,
+  '027_admin_token_generation': adminTokenGeneration,
 };
 
 const provider: MigrationProvider = { getMigrations: async () => MIGRATIONS };

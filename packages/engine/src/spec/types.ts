@@ -99,6 +99,8 @@ export interface TriggerSpec<S, P> {
   readonly jump?: string;
   /** 仅 jump：跳转时轮次加一 */
   readonly round?: 'increment';
+  /** 事件发生时 `gameOver.when` 已成立则不触发（如炸弹人：放逐他本身已分出胜负时不再引爆）；默认照常触发，链结算完再判胜负 */
+  readonly unlessGameOver?: boolean;
 }
 
 /** 胜负已分时转入的阶段（赛后环节或 end）；在主流程上、排队的触发器链全部结算后检查，只会触发一次 */

@@ -10,5 +10,6 @@ export function authRoutes(service: AuthService, options: AuthControllerOptions)
   return new Hono<AppEnv>()
     .post('/login', controller.login)
     .post('/password', passwordStage, controller.changePassword)
+    .post('/logout', passwordStage, controller.logout)
     .get('/me', passwordStage, controller.me);
 }

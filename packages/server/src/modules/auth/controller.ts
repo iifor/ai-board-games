@@ -19,7 +19,10 @@ export function createAuthController(service: AuthService, options: AuthControll
     },
     changePassword: async (c: Context<AppEnv>) => {
       const { currentPassword, newPassword } = await parseJson(c, changePasswordSchema);
-      await service.changePassword(c.get('admin').id, currentPassword, newPassword);
+      return ok(c, await service.changePassword(c.get('admin').id, currentPassword, newPassword));
+    },
+    logout: async (c: Context<AppEnv>) => {
+      await service.logout(c.get('admin').id);
       return ok(c, null);
     },
     me: (c: Context<AppEnv>) => ok(c, service.profile(c.get('admin'))),

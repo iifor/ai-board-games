@@ -1,7 +1,8 @@
 import { KeyOutlined, LogoutOutlined, MoreOutlined } from '@ant-design/icons';
-import { Dropdown, type MenuProps } from 'antd';
+import { App, Dropdown, type MenuProps } from 'antd';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { errorMessage } from '../../services/http';
 import { useAuth } from './AuthContext';
 import './AccountMenu.css';
 
@@ -14,6 +15,7 @@ const items = [
 export function AccountMenu() {
   const { profile, logout } = useAuth();
   const navigate = useNavigate();
+  const { message } = App.useApp();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   if (!profile) return null;
@@ -31,7 +33,9 @@ export function AccountMenu() {
         menu={{ items, 'aria-label': '账号操作', onClick: ({ key }) => {
           setOpen(false);
           if (key === 'password') navigate('/password');
-          if (key === 'logout') logout();
+          if (key === 'logout') {
+            logout().catch((error: unknown) => message.warning(`已在本机退出，但服务端未能注销登录：${errorMessage(error)}`));
+          }
         } }}>
         <button ref={triggerRef} type="button" className="admin-account-trigger" aria-haspopup="menu" aria-expanded={open}
           aria-label={`${username} 的账号菜单`} title={username}>

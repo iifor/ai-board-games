@@ -56,7 +56,7 @@ src/
 - controller 只解析参数、调用 service、包装响应；service 承载业务规则（引用检查、加密、默认值）；repository 只做数据库访问（包括实时播放取座位音色、健康检查的 `select 1`）。
 - 资源型模块复用 `utils/crud.ts` 的标准 controller 与 REST 路由，避免四份重复代码。
 - 资源的 `enabled`：创建时省略默认 true；更新时省略保留原值（`utils/enabled.ts`）。这样额度耗尽被系统停用的模型不会被一次普通编辑悄悄重新启用。
-- 限流来源：`utils/source.ts` 的 `requestSource`，登录锁定、身份码输错锁定与本地调试开局限流共用；只有 `TRUST_PROXY=true` 才取 `X-Forwarded-For`。公开开局按身份码限流，不看来源。这些计数都放在 `request_windows` 表（`modules/limits`），多实例共享，见"多实例"。
+- 限流来源：`utils/source.ts` 的 `requestSource`，登录锁定、身份码输错锁定与本地调试开局限流共用；只有 `TRUST_PROXY=true` 才取 `X-Forwarded-For`，且只取最右一项（唯一一层可信代理追加的对端地址；左侧各项可被客户端伪造）。代理之后却保持 false 会让所有人共用代理地址，一人输错即锁住所有人。公开开局按身份码限流，不看来源。这些计数都放在 `request_windows` 表（`modules/limits`），多实例共享，见"多实例"。
 
 ## 接口
 
@@ -68,7 +68,8 @@ src/
 | `GET /api/toc/games` | 游戏目录（来自注册表，含变体及角色构成；固定公开席位的游戏另含有序的 `seatGroups`） | 无 |
 | `GET /api/toc/players` | 已启用、且主模型或备用模型可用（模型启用且所属供应商启用，与 AI worker 的模型链一致）的玩家；模型因额度耗尽被自动停用后不再出现。返回玩家 ID、模型显示名、完整模型标识、立绘标识、头像和人设 | 无 |
 | `POST /api/admin/auth/login` | 登录，返回 JWT（12 小时）与是否需改密 | 无 |
-| `POST /api/admin/auth/password` | 修改密码（新密码至少 12 位） | 登录（允许未改密） |
+| `POST /api/admin/auth/password` | 修改密码（新密码至少 12 位）；吊销该账号所有已签发令牌，返回给当前会话的新令牌（结构同登录） | 登录（允许未改密） |
+| `POST /api/admin/auth/logout` | 退出登录：吊销该账号所有已签发令牌（所有设备一起退出） | 登录（允许未改密） |
 | `GET /api/admin/auth/me` | 当前管理员 | 登录（允许未改密） |
 | `GET/POST /api/admin/providers`，`GET/PUT/DELETE /api/admin/providers/:id` | 模型供应商（含模型数） | 管理员 |
 | 同上 `/api/admin/models` | 模型（供应商、备用模型引用检查；`PUT` 省略 `enabled` 保留原值，`enabled: true` 会清除系统停用原因） | 管理员 |
@@ -102,6 +103,7 @@ src/
 
 - 管理员表为空时，用 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 创建首个账号（必须改密）；已有账号时环境变量不会覆盖。未配置时只记录警告。创建在持 advisory lock 的事务里再查一次表，多实例同时启动只会创建一个账号。
 - 密码用 scrypt（随机盐）存储；JWT 用 HS256 + `JWT_SECRET`，每次请求从数据库读取账号最新状态。
+- 后台令牌载荷含 `gen`（签发时 `admin_users.token_generation`，迁移 027），必须等于账号当前代次；改密与退出登录时代次加一，已签发的令牌立即失效（包括用初始密码登录、尚未改密的其他会话）。迁移 027 之前签发的令牌没有 `gen`，升级后需要重新登录一次。
 - 未改初始密码的账号只能访问改密与 `me` 接口，其余后台接口返回 40301。
 - 登录锁定（滑动窗口计数，存在 `request_windows` 表里，多实例共享）：同一来源对同一用户名 15 分钟内失败 10 次后锁定；同一来源对任意用户名累计失败 30 次也锁定。按来源区分，别处猜错密码锁不住正常管理员。
 - 后台令牌与 C 端开局凭证共用 `JWT_SECRET`，用 `aud` 区分（`admin` / `access`），各自的中间件只接受自己的 audience，开局凭证不能访问后台，后台令牌也不能开局。迁移 026 之前签发的后台令牌没有 `aud`，升级后需要重新登录一次。
@@ -197,7 +199,7 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 
 | 表 | 说明 |
 | --- | --- |
-| `admin_users` | 管理员 |
+| `admin_users` | 管理员：用户名、密码哈希、是否需改密、令牌代次 `token_generation`（迁移 027） |
 | `access_codes` | 身份码：用户名、码哈希与末 4 位、`generation`、有效期、局数上限与已用局数、停用标记、最近开局时间、创建人（迁移 026）；`matches.access_code_id` 引用它，删除时置空 |
 | `model_providers` | 供应商（加密的 API Key + 掩码） |
 | `models` | 模型参数、备用模型（自引用，删除时置空）、系统停用原因与时间（`disabled_reason` / `disabled_at`，迁移 003） |
