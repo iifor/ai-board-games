@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  // 缺省按生产处理（失败即关闭）：忘了配置时不会对外挂出本地调试开局接口、也不会公开调试局
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
   PORT: z.coerce.number().int().positive().default(3100),
   DATABASE_URL: z.string().min(1, '必须配置 DATABASE_URL'),
   DATABASE_SCHEMA: z.string().regex(/^[a-z_][a-z0-9_]*$/, 'DATABASE_SCHEMA 只能包含小写字母、数字和下划线').default('public'),

@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router';
 import { StatusView } from '../../../components/StatusView';
 import { useAsync } from '../../../hooks/useAsync';
 import { fetchMatch } from '../../../services/matches';
+import { AudioUnlockPrompt } from '../components/AudioUnlockPrompt';
 import { DebateTitle } from '../components/DebateTitle';
 import { StageRecord } from '../components/StageRecord';
 import { PhaseBanner } from '../components/PhaseBanner';
@@ -114,6 +115,7 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
         {perspective}
       </PlaybackControls>
       {stream.error ? <StageError message={stream.error} onRetry={stream.connection === 'lost' ? stream.retry : null} /> : null}
+      <AudioUnlockPrompt muted={options.muted} />
       <div className="stage-arena" ref={arenaRef}>
         <Stage layout={layout} view={playback.view} current={playback.current} played={playback.played} control={playback.control}
           playbackPaused={options.paused} playbackSpeed={options.speed} onSeatSelect={selectSeat} selectedSeat={selected?.seat ?? null} />

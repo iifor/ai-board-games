@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import type { usePlayback } from '../../hooks/usePlayback';
 import type { PlaybackOptions, StreamState } from '../../types';
 import { periodOf, seatOf, speechesOfSeat } from '../../utils';
+import { AudioUnlockPrompt } from '../AudioUnlockPrompt';
 import { ResultPanel } from '../ResultPanel';
 import { StageBackdrop } from '../StageBackdrop';
 import { StageError } from '../StageError';
@@ -55,6 +56,7 @@ export function MobileStage({ summary, playback, stream, options, onOptions, fin
       {topic ? <p className="mobile-stage-topic">{topic}</p> : null}
       {!debate && view ? <MobileStatus view={view} /> : null}
       {stream.error ? <StageError message={stream.error} onRetry={stream.connection === 'lost' ? stream.retry : null} /> : null}
+      <AudioUnlockPrompt muted={options.muted} />
       <MobilePlayfield layout={summary.layout} view={view} current={current} played={played} control={control} selected={selected} onSelect={select} />
       <div className="mobile-stage-sheet-slot">
         <MobileSheet open={sheet.open} tab={sheet.tab} items={items} history={played} seat={seat} seatSpeeches={seat ? speechesOfSeat(played, seat.seat) : []}

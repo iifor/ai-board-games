@@ -6,13 +6,17 @@ import { hashPassword, verifyPassword } from '../../utils/crypto';
 import { badRequest, tooManyRequests, unauthorized } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import { windowKey, type WindowStore } from '../../utils/windowStore';
-import { ADMIN_TOKEN_AUDIENCE, EXPIRED_SESSION, FAILED_LOGIN_WINDOW_MS, MAX_FAILED_LOGINS, MAX_FAILED_LOGINS_PER_SOURCE, TOKEN_TTL_SECONDS } from './constants';
+import {
+  ADMIN_TOKEN_AUDIENCE, EXPIRED_SESSION, FAILED_LOGIN_WINDOW_MS, MAX_CONCURRENT_PASSWORD_CHECKS, MAX_FAILED_LOGINS, MAX_FAILED_LOGINS_PER_SOURCE, TOKEN_TTL_SECONDS,
+} from './constants';
 import type { AuthRepository } from './repository';
 
 export function createAuthService(repository: AuthRepository, config: Pick<AppConfig, 'jwtSecret' | 'bootstrapAdmin'>, failures: WindowStore) {
   /** 失败计数放在 WindowStore（数据库）里，多实例共享：来源 + 用户名 一份，来源累计一份 */
   const accountKey = (source: string, username: string) => windowKey('login', source, username);
   const sourceKey = (source: string) => windowKey('login-source', source);
+  /** 本实例正在进行的登录校验数 */
+  let checksInFlight = 0;
 
   async function assertNotLocked(source: string, username: string, now: number): Promise<void> {
     const since = new Date(now - FAILED_LOGIN_WINDOW_MS);
@@ -53,16 +57,26 @@ export function createAuthService(repository: AuthRepository, config: Pick<AppCo
       if (created) logger.info('已创建初始管理员账号', { username });
     },
 
-    /** source 是请求来源（连接地址或可信代理给出的地址），锁定按来源 + 用户名计 */
+    /**
+     * source 是请求来源（连接地址或可信代理给出的地址），锁定按来源 + 用户名计。
+     * 先占用本实例的校验名额再查锁定：并发请求不能一起越过"先查后记"的窗口（最多多出名额数 - 1 次），
+     * 大量并发登录也只会排到 429，不会让 scrypt 占满 libuv 线程池拖慢模型与 TTS 请求。
+     */
     async login(username: string, password: string, source: string, now = Date.now()): Promise<AdminLoginResponse> {
-      await assertNotLocked(source, username, now);
-      const user = await repository.findByUsername(username);
-      if (!user || !(await verifyPassword(password, user.passwordHash))) {
-        await recordFailure(source, username, now);
-        throw unauthorized('用户名或密码错误');
+      if (checksInFlight >= MAX_CONCURRENT_PASSWORD_CHECKS) throw tooManyRequests('登录请求过多，请稍后再试');
+      checksInFlight += 1;
+      try {
+        await assertNotLocked(source, username, now);
+        const user = await repository.findByUsername(username);
+        if (!user || !(await verifyPassword(password, user.passwordHash))) {
+          await recordFailure(source, username, now);
+          throw unauthorized('用户名或密码错误');
+        }
+        await failures.clear(accountKey(source, username));
+        return await issue(user.id, user.tokenGeneration, user.mustChangePassword, now);
+      } finally {
+        checksInFlight -= 1;
       }
-      await failures.clear(accountKey(source, username));
-      return issue(user.id, user.tokenGeneration, user.mustChangePassword, now);
     },
 
     /**

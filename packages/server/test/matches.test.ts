@@ -282,4 +282,15 @@ describe('match listing and viewer progress', () => {
     await t.services.repositories.matches.markAcked(id, 0);
     expect((await t.services.repositories.matches.find(id))?.ackedSeq).toBe(before?.lastSeq);
   });
+
+  it('only counts as someone watching when the acknowledgement moves forward', async () => {
+    const id = created[0]?.id ?? '';
+    await t.services.repositories.matches.markAcked(id, 1_000_000);
+    const stale = new Date(Date.now() - 60 * 60_000);
+    await t.db.updateTable('matches').set({ updatedAt: stale }).where('id', '=', id).execute();
+    // 已确认到最新事件后，反复 hello / ack 同一位置不刷新 updated_at，回收器仍能结束无人观看的对局
+    for (const seq of [1, 1_000_000]) await t.services.repositories.matches.markAcked(id, seq);
+    const row = await t.db.selectFrom('matches').select('updatedAt').where('id', '=', id).executeTakeFirstOrThrow();
+    expect(row.updatedAt).toEqual(stale);
+  });
 });

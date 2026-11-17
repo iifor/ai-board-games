@@ -32,10 +32,25 @@ export function onTraceRemoved(listener: (id: string) => void) {
   };
 }
 
-/** 跨设备删除，或从浏览器前进/后退缓存恢复时，重新向服务端核实。 */
-export function onAdminViewResumed(refresh: () => void) {
-  const restored = (event: PageTransitionEvent) => { if (event.persisted) refresh(); };
-  window.addEventListener('focus', refresh);
+/** 回到页面时两次核实之间至少间隔这么久，避免来回切换标签页时反复拉取大体积数据 */
+export const VIEW_RESUME_MIN_INTERVAL_MS = 30_000;
+
+/**
+ * 跨设备删除，或从浏览器前进/后退缓存恢复时，重新向服务端核实。
+ * 标签页重新可见（visibilitychange）时节流：距上次核实（或订阅开始）不足 minIntervalMs 不刷新；
+ * 从前进/后退缓存恢复的页面一定刷新。
+ */
+export function onAdminViewResumed(refresh: () => void, minIntervalMs = VIEW_RESUME_MIN_INTERVAL_MS) {
+  let last = Date.now();
+  const run = () => {
+    last = Date.now();
+    refresh();
+  };
+  const visible = () => {
+    if (document.visibilityState === 'visible' && Date.now() - last >= minIntervalMs) run();
+  };
+  const restored = (event: PageTransitionEvent) => { if (event.persisted) run(); };
+  document.addEventListener('visibilitychange', visible);
   window.addEventListener('pageshow', restored);
-  return () => { window.removeEventListener('focus', refresh); window.removeEventListener('pageshow', restored); };
+  return () => { document.removeEventListener('visibilitychange', visible); window.removeEventListener('pageshow', restored); };
 }

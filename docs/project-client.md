@@ -31,7 +31,7 @@ C 端通过 `POST /api/toc/matches` 开始游戏，服务端在创建时锁定�
 | `/matches/:matchId` | `StagePage` | 对局舞台；实时观看与回放是同一页面、同一条播放流 |
 | `/history` | `HistoryPage` | 已完成的公开对局 |
 
-路由用 react-router 7（`createBrowserRouter`），`app/` 只做路由与外层布局；舞台路由全屏铺满、不显示导航。
+路由用 react-router 7（`createBrowserRouter`），`app/` 只做路由与外层布局；舞台路由全屏铺满、不显示导航。路由表在 `app/routes.tsx`（`router.tsx` 只负责创建浏览器路由）。页面渲染出错或地址不存在时显示 `RouteError`（样式在 `RouteError.css`）：不存在的地址提示检查链接，渲染异常提供「刷新重试」，两者都有「返回大厅」，不会白屏。外层错误页兜住布局自身与未匹配地址，内层错误页在大厅 / 开局 / 历史出错时保留顶部导航。
 
 ## 视觉与动效
 
@@ -50,7 +50,7 @@ C 端通过 `POST /api/toc/matches` 开始游戏，服务端在创建时锁定�
 
 ```txt
 src/
-  app/                    路由、外层布局（导航；舞台路由不套导航）
+  app/                    routes（路由表）、router（浏览器路由）、外层布局（导航；舞台路由不套导航）、RouteError（路由错误页）
   components/             StatusView（加载中 / 出错 / 空状态）、Avatar（海报 / 头像 / 首字）
   hooks/                  useAsync（一次性数据加载）、useElementSize（ResizeObserver 量尺寸）、useDialogFocus（对话框焦点移入 / 循环 / 还回 + Escape）
   services/               http（统一解析 ApiResponse，业务错误转 ApiError；可附带开局凭证）、games、matches、access（身份码换凭证、查询持有人）
@@ -64,14 +64,14 @@ src/
                           types（SetupInitial：终局 → 开局的路由 state 契约）、utils（选人、就座提示 selectionHint / readyLabel、板子搜索、rematchStateOf / isSetupInitial）
     game-stage/           stream/*（connection：连接 / 续播 / ack / 重连状态机，React 之外可测；reconnect：退避步长）、
                           useMatchStream（包一层 connection，session 变化时从头重订）、usePlayback、useSegmentState（订阅当前段的倍速 / 静音 / 进度）、
-                          useResultDialog（终局卡开合）、useStageShortcuts（舞台快捷键：监听 keydown，键 → 动作交给 utils）、playback/*（describe 字幕映射、segment 每段的实时控制与进度、media 音频 / 朗读 / 停留与 present 选路）、
+                          useResultDialog（终局卡开合）、useStageShortcuts（舞台快捷键：监听 keydown，键 → 动作交给 utils）、playback/*（describe 字幕映射、segment 每段的实时控制与进度、media 音频 / 朗读 / 停留与 present 选路、playSegment 播放一段并在出错时照常推进、audioUnlock 自动播放拦截状态与点击解锁）、useAutoplayUnlock（订阅拦截状态并提供解锁动作）、
                           layouts/*（registry：布局组件 + 是否播选票飞行、CircleLayout + ringGeometry、VersusLayout）、
                           animation/*（ballotFlight：选票飞行的预算 / 时序 / 弧线 / 计划，纯计算；motion：prefers-reduced-motion 探测，JS 动效据此不动）、
                           constants（阵营标签、重连参数、快捷键提示文案、座位弹层间距）、
                           utils（昼夜、座位、夜晚步骤、发言顺序、评委判定、终局阵容、快捷键判定 / 倍速档 / 选项变化、座位发言汇总、弹层定位）、
                           hudStatus（直播标记、玩法模式、阶段文案，桌面 HUD 与手机顶栏共用）、useNarrowStage（≤860px 切换手机舞台）、useFollowSpeech（手机发言卡跟读滚动）、useRecordPanels（桌面记录面板开关）、
                           components/*（StageBackdrop、StageHud、StageError、PlaybackControls、SeatCard（按钮，样式抹平在 SeatCardButton.css）、SeatPopover（内容为 SeatProfile）、SeatProfile、Stage、StageCenter、SpeechOrder、
-                          VoteBoard、BallotFlight、SpeakerSpotlight、SpeakerCard（含 SpeakerAvatar）、SubtitleBar、SubtitleProgress、PhaseBanner、ResultPanel、ResultRoster、EventFeed）、
+                          VoteBoard、BallotFlight、SpeakerSpotlight、SpeakerCard（含 SpeakerAvatar）、SubtitleBar、SubtitleProgress、PhaseBanner、ResultPanel、ResultRoster、EventFeed、AudioUnlockPrompt）、
                           components/mobile/*（MobileStage 及 MobilePlayfield、MobileTopBar、MobileStatus、MobileRing、MobileVersus、MobileSeat、MobileSpeaker、MobileSheet、MobileControls）、
                           stage.fixtures（测试共用的观众视图 / 事件元信息 / 对局概要）
     history/              MatchList（行错峰进场、悬停点亮"回放"）
@@ -111,8 +111,9 @@ src/
 - `useMatchStream(matchId)`：连接 `WS /api/toc/ws/matches/:id`（逻辑在 `stream/connection.ts` 的 `MatchStreamConnection`），连上即发 `hello`，按 seq 去重地累积事件；收到 `end` / `error` / `status: failed` 后不再重连。
   - 续播与丢失的 ack：`hello.afterSeq` 是**最后播放完的 seq**（不是最后收到的），服务端从它之后续推并把它当作确认；所以断线期间播完的事件虽然 ack 发不出去，重连时也会由 hello 一并补上，后台"观众确认"不会少一个。
   - 重连策略：断开后按 1、2、4、8、15 秒退避重连（步长确定，无抖动；`constants.ts` 的 `RECONNECT_*`），服务端对 hello 的任何回应都清零失败计数；连续失败 `MAX_CONNECT_FAILURES`（6）次后放弃自动重连，`connection` 变为 `lost`、`error` 为"连接中断，请刷新重试"，舞台顶部出现带"重试"的错误面板（`StageError`），`retry()` 清零计数立即重连。连接状态 `connecting / open / lost / closed` 由 HUD 显示为 连接中 / LIVE / 连接中断 / 已结束。
-- `usePlayback(items, ack, options)`：依次播放事件（`playback/media.ts` 的 `present`）——有服务端音频播音频；否则 `@battle/shared` 的 `speechOf(event)` 不为 null 的事件用浏览器朗读 `speechOf(event).text`（发言、评委判定 + 点评、主持播报、揭示、行动、终局总结；行动由主持人声音读，字幕仍归到行动者座位）；其余按字数停留。**每个事件播放完才 ack**，服务端据此推进下一个事件，因此观众暂停时 AI 也会在领先若干事件后停止生成。暂停只阻止开始新的事件；只有卸载页面或切换对局时才中止正在播放的事件。
+- `usePlayback(items, ack, options)`：依次播放事件（`playback/media.ts` 的 `present`）——有服务端音频播音频；否则 `@battle/shared` 的 `speechOf(event)` 不为 null 的事件用浏览器朗读 `speechOf(event).text`（发言、评委判定 + 点评、主持播报、揭示、行动、终局总结；行动由主持人声音读，字幕仍归到行动者座位）；其余按字数停留。**每个事件播放完才 ack**，服务端据此推进下一个事件，因此观众暂停时 AI 也会在领先若干事件后停止生成。暂停只阻止开始新的事件；只有卸载页面或切换对局时才中止正在播放的事件。每段由 `playback/playSegment` 包一层：`present` 同步抛错或返回的 Promise 拒绝时记 `console.error` 并照常 ack、进入下一段（被中止的段不推进），一段出错不会让舞台停住，也不会让 ack 节奏的对局停止生成。
 - 每段内容由一个 `SegmentControl`（`playback/segment.ts`）承载实时控制与进度：倍速立即作用于音频 `playbackRate` 与停留计时器（按已走过的比例重排剩余时间）；浏览器朗读的语速只能在开始前设定，倍速改变要到下一段才生效。静音立即停掉正在播的音频 / 朗读，剩余部分按字数停留走完；取消静音只对下一段生效。播放看门狗（`constants.ts`）：浏览器朗读超过预计时长的 2 倍再加 5 秒仍未结束（Chrome 偶发不触发 `onend`，朗读期间另外持有 `SpeechSynthesisUtterance` 引用以防被回收）按播完处理；服务端音频连续 8 秒没有播放进度（缓冲卡死却不报错）改为按剩余比例停留。否则这一段永远不 ack，ack 节奏的对局会停住。
+- 自动播放被拦截（直接打开对局链接、iOS Safari 等，`audio.play()` 以 `NotAllowedError` 拒绝，或浏览器朗读报 `not-allowed`）时，这一段照常按字数停留推进，同时由 `playback/audioUnlock` 记下"被拦截"；未静音时桌面舞台与手机舞台都在顶部中间显示「点击开启声音」（`components/AudioUnlockPrompt`，状态来自 `hooks/useAutoplayUnlock`）。点击时在同一手势里播一段静音 WAV 解锁一个可复用的音频元素（并唤醒浏览器朗读），之后每段服务端音频都换 `src` 复用这个元素播放（iOS 按元素放行）；本段已转为停留的继续走完，下一段起有声音。解锁失败时提示保留并记日志，可以再点。复用元素时每段的监听器挂在各自的 `AbortController` 上，结束时一并摘除。
 - 停留时长 `displayDuration` 按字数估算（160ms / 字，最少 0.9 秒，不封顶），倍速缩短；静音时全部按停留时长展示。
 - 字幕进度条（`SubtitleProgress`）：音频在播时跟随音频元素 `timeupdate` 报告的实际进度；朗读与停留按同一个 `displayDuration` 线性推进（CSS 动画，倍速改变时从当前比例重新起算）。只有字幕栏订阅进度，舞台其它部分不随进度重渲染。
 - `playback/describe.ts` 把舞台事件映射为字幕。朗读内容统一取自 `speechOf`，包括随阶段标题展示的法官台词。夜间叫号的声音和字幕都归主持人。狼人杀白天的警长票和放逐票由投票面板展示，放逐最高票标为「得票最高」。主字幕随法官公布实际结果，普通放逐与遗言邀请合播一次。
@@ -153,6 +154,8 @@ src/
 - 开发端口 `5173`，`/api`（含 WebSocket）代理到 `http://127.0.0.1:3100`。
 - 测试（vitest，`environment: node`，无需浏览器）按主题分文件，夹具在 `game-stage/stage.fixtures.ts`：
   - `game-stage/playback.test.ts`：字幕映射与朗读选择（与 `speechOf` 一致）、展示时长、媒体播放（假 `Audio` + 假计时器：自动播放被拦截、倍速实时生效、中途静音、停留重排、朗读不结束与音频卡住时的看门狗）、`present` 选路（有音频播音频 / 行动用浏览器声音 / 公开阶段台词朗读 / 普通标题只停留 / 静音全停留）。
+  - `game-stage/autoplay.test.tsx`：`playSegment` 在播放拒绝 / 同步抛错时仍推进、中止时不推进；`NotAllowedError` 与朗读 `not-allowed` 上报拦截且照常按字数停留，其他失败不算拦截；点击解锁后复用同一个音频元素播放后续段，解锁失败时提示保留；提示按钮的静态渲染。
+  - `app/routeError.test.tsx`：用静态路由渲染真实路由表的未匹配地址（找不到页面 + 返回大厅）与出错路由（刷新重试 + 返回大厅）。
   - `game-stage/stream.test.ts`：退避步长；假 WebSocket + 假计时器：重连时 hello 带播放到的 seq、1/2/4/8/15 秒退避后报错与手动重试、结束后不重连、卸载取消重连。
   - `game-stage/layout.test.tsx`：布局与终局面板静态渲染（夜晚闭眼座位、圆桌里的选票飞行层、终局对话框"遮罩即根元素、卡片唯一网格项"的结构与 `ResultPanel.css` 的遮罩契约、阵容逐行揭示下标与获胜阵营、MVP 的配置头像、模拟玩家肖像和缺图占位）、焦点循环、环形几何（含窄舞台下圆桌盒子与座位全部落在盒子内、座位号 → 坐标）。
   - `game-stage/mobile.test.tsx`：手机舞台的局势统计（玩家视角不报阵营）、倍速循环、发言卡跟读滚动位置、抽屉露出的最新一条、圆周座位位置、内部阶段名兜底，以及圆桌 / 辩论两列 / 局势条 / 记录抽屉的静态渲染。

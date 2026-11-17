@@ -5,6 +5,7 @@ import type { SegmentControl } from './segment';
 import { skillCue } from '../animation/skillCue';
 import { holdSkill, skillDuration } from '../animation/skillTiming';
 import { AUDIO_STALL_MS, SPEECH_WATCHDOG_FACTOR, SPEECH_WATCHDOG_GRACE_MS } from '../constants';
+import { audioElementFor, isAutoplayBlockedError, reportAutoplayBlocked } from './audioUnlock';
 
 const now = () => Date.now();
 
@@ -58,14 +59,16 @@ function estimatedFraction(startedAt: number, text: string | null, rate: number)
 /**
  * 播放服务端音频直到结束；倍速实时作用于 playbackRate，进度来自 timeupdate。
  * 播放失败（最常见是刷新 / 书签进入对局时浏览器拦截自动播放）不能当作"播放完成"，
- * 否则每个事件 0 毫秒就 ack，整局会被秒放；改为按字数停留。
+ * 否则每个事件 0 毫秒就 ack，整局会被秒放；改为按字数停留。被拦截时另外上报（audioUnlock），舞台提示点击开启声音。
  * 中途静音：停下音频，剩余部分按字数停留。
+ * 解锁后各段复用同一个音频元素，所以监听器都挂在本段的 listening 上，结束时一起摘掉。
  */
 export function playAudio(url: string, control: SegmentControl, text: string | null): Promise<void> {
   if (control.signal.aborted) return Promise.resolve();
   return new Promise((resolve) => {
-    const audio = new Audio(url);
+    const audio = audioElementFor(url);
     audio.playbackRate = control.rate;
+    const listening = new AbortController();
     const startedAt = now();
     let settled = false;
     let stallTimer: ReturnType<typeof setTimeout> | null = null;
@@ -75,6 +78,7 @@ export function playAudio(url: string, control: SegmentControl, text: string | n
       settled = true;
       if (stallTimer !== null) clearTimeout(stallTimer);
       unsubscribe();
+      listening.abort();
       audio.pause();
     };
     /** 每次有播放进度就重新计时；长时间没有进度（缓冲卡死、ended 没触发）就按剩余比例停留 */
@@ -100,14 +104,17 @@ export function playAudio(url: string, control: SegmentControl, text: string | n
       if (settled) return;
       control.setProgress({ kind: 'measured', fraction: fraction(), positionMs: audio.currentTime * 1000 });
       watchStall();
-    });
-    audio.addEventListener('ended', finish, { once: true });
-    audio.addEventListener('error', () => fallback(0), { once: true });
+    }, { signal: listening.signal });
+    audio.addEventListener('ended', finish, { once: true, signal: listening.signal });
+    audio.addEventListener('error', () => fallback(0), { once: true, signal: listening.signal });
     control.signal.addEventListener('abort', finish, { once: true });
     // 第一次 timeupdate 之前先给个 0%，进度条立刻出现而不是空一拍
     control.setProgress({ kind: 'measured', fraction: 0, positionMs: 0 });
     watchStall();
-    audio.play().catch(() => fallback(0));
+    audio.play().catch((error: unknown) => {
+      if (isAutoplayBlockedError(error)) reportAutoplayBlocked();
+      fallback(0);
+    });
   });
 }
 
@@ -152,7 +159,11 @@ export function speak(text: string, control: SegmentControl): Promise<void> {
     utterance.lang = 'zh-CN';
     utterance.rate = rate;
     utterance.onend = finish;
-    utterance.onerror = fallback;
+    utterance.onerror = (event) => {
+      // iOS 等在用户点击之前不允许朗读：同样提示开启声音，这段按字数停留
+      if (event.error === 'not-allowed') reportAutoplayBlocked();
+      fallback();
+    };
     const unsubscribe = control.subscribe(() => {
       if (control.muted) fallback();
     });

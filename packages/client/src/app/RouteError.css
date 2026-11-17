@@ -1,0 +1,31 @@
+.route-error {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  width: min(100% - 32px, 480px);
+  margin: clamp(48px, 14vh, 120px) auto;
+  padding: clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px);
+  text-align: center;
+  animation: ui-fade-up var(--ui-motion-slow) var(--ui-ease-out) both;
+}
+
+.route-error h1 {
+  margin: 0;
+  color: var(--ui-text);
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+.route-error p {
+  margin: 0;
+  color: var(--ui-text-muted);
+  line-height: 1.6;
+}
+
+.route-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
+}

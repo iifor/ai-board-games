@@ -11,3 +11,4 @@ export {
   type RunRecord,
 } from './harness';
 export { assertDeterministic, assertNoLeak, assertTerminates } from './properties';
+export { omniscientStageProblems, requestStructuralProblems } from './structuralLeak';

@@ -2,9 +2,9 @@ import { API_ERROR_CODES, formatMatchTitle } from '@battle/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TracePanel } from './features/matches/components/TracePanel';
-import { channelColor, describeLog, matchTypeLabel, progressChanged } from './features/matches/utils';
+import { channelColor, describeLog, matchTypeLabel, nextDetailPoll, progressChanged } from './features/matches/utils';
 import { applyFilters, enabledFilter, uniqueOptions, type ResourceFilter } from './features/resources/utils';
-import { AUTH_EVENTS, http } from './services/http';
+import { ApiError, AUTH_EVENTS, http, isNotFoundError } from './services/http';
 import { tokenStore } from './services/tokenStore';
 
 const meta = { seq: 1, round: 1, phaseId: 'vote', channel: 'host' as const };
@@ -36,6 +36,17 @@ describe('match utils', () => {
     expect(matchTypeLabel({ debug: true, scripted: true, chaos: true })).toBe('调试 · 脚本化 · 混沌');
     // 混沌只在脚本化对局里有意义：服务端不会存成这样，前端也不显示
     expect(matchTypeLabel({ debug: true, scripted: false, chaos: true })).toBe('调试');
+  });
+
+  it('polls a running match every 2s, stops on the end or a missing match, and backs off on repeated failures', () => {
+    expect(nextDetailPoll({ kind: 'loaded', terminal: false }, 0)).toBe(2000);
+    expect(nextDetailPoll({ kind: 'loaded', terminal: true }, 0)).toBeNull();
+    expect(nextDetailPoll({ kind: 'stale' }, 0)).toBe(2000);
+    expect(nextDetailPoll({ kind: 'failed', notFound: true }, 1)).toBeNull();
+    expect([1, 2, 3, 20].map((failures) => nextDetailPoll({ kind: 'failed', notFound: false }, failures))).toEqual([2000, 4000, 8000, 30_000]);
+    expect(isNotFoundError(new ApiError(API_ERROR_CODES.notFound, '对局不存在'))).toBe(true);
+    expect(isNotFoundError(new ApiError(404, '服务返回了无法识别的响应（404）'))).toBe(true);
+    expect(isNotFoundError(new ApiError(API_ERROR_CODES.internal, '内部错误'))).toBe(false);
   });
 
   it('formats the match title with the shared helper, with the board when there is one', () => {
@@ -83,6 +94,20 @@ describe('http auth handling', () => {
     expect(vi.mocked(fetch).mock.calls[0]?.[1]?.headers).toMatchObject({ Authorization: 'Bearer t-1' });
     expect(tokenStore.get()).toBeNull();
     expect(events).toEqual([AUTH_EVENTS.expired]);
+  });
+
+  it('keeps a newer login when a slow request made with the old token comes back 401', async () => {
+    tokenStore.set('t-old');
+    const events: string[] = [];
+    vi.stubGlobal('window', { dispatchEvent: (event: Event) => events.push(event.type) });
+    let respond: (response: Response) => void = () => undefined;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { respond = resolve; })));
+    const slow = http.get('/api/admin/matches');
+    tokenStore.set('t-new');
+    respond(new Response(JSON.stringify({ code: API_ERROR_CODES.unauthorized, message: '登录已失效' })));
+    await expect(slow).rejects.toThrow('登录已失效');
+    expect(tokenStore.get()).toBe('t-new');
+    expect(events).toEqual([]);
   });
 
   it('asks for a password change and returns data on success', async () => {

@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import type { AudioCaptionCue, AudioRef, VoiceProvider } from '@battle/shared';
 import { badRequest, upstream } from '../../utils/errors';
 import { logger } from '../../utils/logger';
+import { createSemaphore } from '../../utils/semaphore';
+import { MAX_CONCURRENT_SYNTHESES } from './constants';
 import type { MediaRepository } from './repository';
 import type { SynthesizedAudio, TtsProvider, TtsProviders, VoiceSpec } from './types';
 
@@ -18,9 +20,16 @@ export function assetId(provider: Pick<TtsProvider, 'signature'>, voice: VoiceCh
   return createHash('sha256').update(key).digest('hex').slice(0, 40);
 }
 
-export function createTtsService(providers: TtsProviders, repository: MediaRepository) {
+export interface TtsServiceOptions {
+  /** 同时持锁合成的上限，见 MAX_CONCURRENT_SYNTHESES */
+  readonly maxConcurrent?: number;
+}
+
+export function createTtsService(providers: TtsProviders, repository: MediaRepository, options: TtsServiceOptions = {}) {
   /** 本进程内同一音频只合成一次（快路径）；跨实例靠仓储的 advisory lock */
   const inflight = new Map<string, Promise<AudioRef>>();
+  /** 先拿名额再开持锁事务：同时占用的连接数不超过上限，排队期间不占连接 */
+  const slots = createSemaphore(options.maxConcurrent ?? MAX_CONCURRENT_SYNTHESES);
 
   const reference = (id: string, asset: { readonly mime: string; readonly captions?: readonly AudioCaptionCue[] | null }): AudioRef => ({
     url: `/api/media/${id}`, mime: asset.mime, ...(asset.captions?.length ? { captions: asset.captions } : {}),
@@ -50,14 +59,14 @@ export function createTtsService(providers: TtsProviders, repository: MediaRepos
     if (cached) return reference(id, cached);
     const existing = inflight.get(id);
     if (existing) return existing;
-    const job = repository.locked(id, async (asset): Promise<AudioRef> => {
-      // 等锁期间另一实例可能已经合成并提交
+    const job = slots.run(() => repository.locked(id, async (asset): Promise<AudioRef> => {
+      // 排队或等锁期间另一实例可能已经合成并提交
       const cached = await asset.reference();
       if (cached) return reference(id, cached);
       const audio = await callProvider(provider, text, voice);
       await asset.insert({ provider: voice.provider, voiceName: voice.voiceName, ...audio });
       return reference(id, audio);
-    }).finally(() => inflight.delete(id));
+    })).finally(() => inflight.delete(id));
     inflight.set(id, job);
     return job;
   }

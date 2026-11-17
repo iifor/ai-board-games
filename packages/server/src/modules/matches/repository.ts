@@ -176,11 +176,13 @@ export function createMatchRepository(db: Db) {
         .executeTakeFirst(),
 
     /**
-     * 观众确认也算"有人在看"：updated_at 一并刷新，供进行中计数与回收器判断。
+     * 观众确认也算"有人在看"：确认进度真正前进时才刷新 updated_at，供进行中计数与回收器判断；
+     * 重复确认、重连时的 afterSeq 不前进就不算，任何人反复连上来都不能让无人观看的对局永远占着名额。
      * 确认进度只增不减，且不超过已产生的事件数：续播时客户端报的 afterSeq 不能把 ack 节奏的闸门抬到事件之前。
      */
     markAcked: (id: string, seq: number) =>
-      db.updateTable('matches').set({ ackedSeq: sql`greatest(acked_seq, least(last_seq, ${seq}))`, updatedAt: new Date() }).where('id', '=', id).execute(),
+      db.updateTable('matches').set({ ackedSeq: sql`least(last_seq, ${seq})`, updatedAt: new Date() })
+        .where('id', '=', id).where(sql<boolean>`acked_seq < least(last_seq, ${seq})`).execute(),
 
     /** 近期有动静的进行中公开对局数；传入事务时与 lockPublicCreation 在同一事务内判断 */
     async countActivePublic(since: Date, executor: Executor = db): Promise<number> {

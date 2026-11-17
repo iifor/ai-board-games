@@ -36,7 +36,7 @@ function ProviderKeyField({ provider }: { readonly provider: ProviderDto | null 
     );
   }
   return (
-    <Form.Item name="apiKey" label={provider ? '新 API Key（留空保留原密钥）' : 'API Key'} rules={[{ required: !provider }]}>
+    <Form.Item name="apiKey" label={provider ? '新 API Key（留空保留原密钥；接口地址换域名时必须重填）' : 'API Key'} rules={[{ required: !provider }]}>
       <Input.Password autoComplete="new-password" />
     </Form.Item>
   );

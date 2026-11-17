@@ -1,5 +1,7 @@
 import { systemChoiceLabel, type MatchDetailDto, type MatchStatus, type MatchSummaryDto } from '@battle/shared';
 import type { LogEntryDto } from '../../services/matches';
+import { backoffDelay, type NextPoll } from '../../utils/polling';
+import { DETAIL_POLL_MAX_BACKOFF_MS, DETAIL_POLL_MS } from './constants';
 
 /** 列表与详情共用的对局类型文案：公开 / 调试 / 调试 · 脚本化 / 调试 · 脚本化 · 混沌 */
 export function matchTypeLabel(match: Pick<MatchSummaryDto, 'debug' | 'scripted' | 'chaos'>): string {
@@ -70,4 +72,20 @@ export const progressMarkerOf = (detail: MatchDetailDto): ProgressMarker => ({ l
 /** 事件进度或状态变了，才值得重新拉完整日志与 AI 调用（两者带着六层提示词与原始回复，体积大） */
 export function progressChanged(prev: ProgressMarker | null, next: ProgressMarker): boolean {
   return prev === null || prev.lastSeq !== next.lastSeq || prev.status !== next.status;
+}
+
+/** 一次详情加载的结果：拿到了详情 / 被更新的请求作废 / 失败（对局不存在时不必再试） */
+export type DetailLoadOutcome =
+  | { readonly kind: 'loaded'; readonly terminal: boolean }
+  | { readonly kind: 'stale' }
+  | { readonly kind: 'failed'; readonly notFound: boolean };
+
+/**
+ * 下一次轮询详情前等多久：对局结束或不存在（404）就停；失败按 2、4、8… 秒退避（封顶 30 秒，failures 为连续失败次数）；
+ * 其余照常 2 秒。
+ */
+export function nextDetailPoll(outcome: DetailLoadOutcome, failures: number): NextPoll {
+  if (outcome.kind === 'loaded') return outcome.terminal ? null : DETAIL_POLL_MS;
+  if (outcome.kind === 'stale') return DETAIL_POLL_MS;
+  return outcome.notFound ? null : backoffDelay(DETAIL_POLL_MS, failures, DETAIL_POLL_MAX_BACKOFF_MS);
 }

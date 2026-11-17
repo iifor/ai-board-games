@@ -24,6 +24,8 @@ async function postCompletion(request: LlmRequest, parameters: ChatParameters, s
         [parameters.tokenField]: request.maxTokens,
         response_format: { type: 'json_object' },
       }),
+      // 不跟随重定向：带着 Authorization 跳到别的地址等于把 Key 交出去（与模型目录请求一致）
+      redirect: 'error',
       signal,
     });
   } catch (error) {

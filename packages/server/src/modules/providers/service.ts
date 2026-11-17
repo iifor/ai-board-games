@@ -62,8 +62,16 @@ export function createProviderService(repository: ProviderRepository, secretKey:
       return toDto(row, 0);
     },
 
-    /** 省略 apiKey 或 enabled 时保留原值 */
+    /**
+     * 省略 apiKey 或 enabled 时保留原值。
+     * 接口地址换到别的域名时必须同时提供新 Key：否则后台账号只改地址再点"测试"，服务端就会带着解密后的原 Key 请求新地址，等于读出明文。
+     */
     async update(id: number, input: ProviderInput): Promise<ProviderDto> {
+      if (!input.apiKey) {
+        const current = await repository.find(id);
+        if (!current) throw notFound('模型供应商');
+        if (new URL(current.baseUrl).origin !== new URL(input.baseUrl).origin) throw badRequest('接口地址换了域名，需要重新填写 API Key');
+      }
       const key = input.apiKey ? { apiKeyEncrypted: encryptSecret(input.apiKey, secretKey), apiKeyHint: maskSecret(input.apiKey) } : {};
       const row = await repository.update(id, { name: input.name, baseUrl: input.baseUrl, ...enabledUpdate(input), ...key });
       if (!row) throw notFound('模型供应商');

@@ -7,3 +7,5 @@ export const MAX_FAILED_LOGINS = 10;
 /** 同一来源在窗口期内对任意用户名累计允许的失败次数（防止换用户名无限猜） */
 export const MAX_FAILED_LOGINS_PER_SOURCE = 30;
 export const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000;
+/** 每个实例同时进行的登录校验（scrypt）上限，超出直接 429：限住锁定检查的并发越界，也不让登录洪水占满线程池 */
+export const MAX_CONCURRENT_PASSWORD_CHECKS = 4;

@@ -1,5 +1,6 @@
 import { API_ERROR_CODES } from '@battle/shared';
 import { sign } from 'hono/jwt';
+import { MAX_CONCURRENT_PASSWORD_CHECKS, MAX_FAILED_LOGINS } from '../src/modules/auth/constants';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ADMIN, createTestApp, dataOf, type TestApp } from './support/testApp';
 
@@ -110,6 +111,21 @@ describe('admin auth', () => {
       }
       const forged = await fresh.call('POST', '/api/admin/auth/login', { body: ADMIN, headers: { 'x-forwarded-for': '10.9.99.1, 203.0.113.77' } });
       expect(forged).toMatchObject({ status: 429, body: { code: API_ERROR_CODES.tooManyRequests } });
+    } finally {
+      await fresh.cleanup();
+    }
+  });
+
+  it('does not let a concurrent burst slip past the lockout', async () => {
+    const fresh = await createTestApp({ http: { trustProxy: true } });
+    try {
+      const headers = { 'x-forwarded-for': '203.0.113.88' };
+      const burst = await Promise.all(Array.from({ length: 40 }, (_, i) =>
+        fresh.call('POST', '/api/admin/auth/login', { body: { username: ADMIN.username, password: `bad-${i}` }, headers })));
+      const checked = burst.filter((attempt) => attempt.status === 401).length;
+      expect(checked).toBeLessThanOrEqual(MAX_FAILED_LOGINS + MAX_CONCURRENT_PASSWORD_CHECKS - 1);
+      // 超出名额的请求不跑 scrypt、直接 429
+      expect(burst.every((attempt) => attempt.status === 401 || attempt.status === 429)).toBe(true);
     } finally {
       await fresh.cleanup();
     }

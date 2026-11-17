@@ -52,13 +52,25 @@ describe('model providers', () => {
     expect((await t.services.providers.credentials(created.id)).apiKey).toBe(API_KEY);
   });
 
-  it('keeps the key when updating without one', async () => {
+  it('keeps the key when updating without one on the same host', async () => {
     const created = await createProvider('保留密钥');
     const updated = dataOf(await t.call<ProviderDto>('PUT', `/api/admin/providers/${created.id}`, {
       token,
-      body: { name: '保留密钥', baseUrl: 'https://other.example.com', enabled: false },
+      body: { name: '保留密钥', baseUrl: 'https://api.example.com/v2', enabled: false },
     }));
-    expect(updated).toMatchObject({ baseUrl: 'https://other.example.com', enabled: false, apiKeyMasked: '****7654' });
+    expect(updated).toMatchObject({ baseUrl: 'https://api.example.com/v2', enabled: false, apiKeyMasked: '****7654' });
+  });
+
+  it('requires a new key when the base URL moves to another host, so the stored key cannot be sent elsewhere', async () => {
+    const created = await createProvider('换域名');
+    const moved = await t.call('PUT', `/api/admin/providers/${created.id}`, { token, body: { name: '换域名', baseUrl: 'https://attacker.example.net/v1' } });
+    expect(moved.status).toBe(400);
+    expect((await t.services.providers.credentials(created.id)).baseUrl).toBe('https://api.example.com/v1');
+    const withKey = dataOf(await t.call<ProviderDto>('PUT', `/api/admin/providers/${created.id}`, {
+      token,
+      body: { name: '换域名', baseUrl: 'https://other.example.com/v1', apiKey: 'sk-new-key-1234' },
+    }));
+    expect(withKey).toMatchObject({ baseUrl: 'https://other.example.com/v1', apiKeyMasked: '****1234' });
   });
 
   it('validates input and rejects duplicates', async () => {

@@ -105,7 +105,7 @@ src/
 - 密码用 scrypt（随机盐）存储；JWT 用 HS256 + `JWT_SECRET`，每次请求从数据库读取账号最新状态。
 - 后台令牌载荷含 `gen`（签发时 `admin_users.token_generation`，迁移 027），必须等于账号当前代次；改密与退出登录时代次加一，已签发的令牌立即失效（包括用初始密码登录、尚未改密的其他会话）。迁移 027 之前签发的令牌没有 `gen`，升级后需要重新登录一次。
 - 未改初始密码的账号只能访问改密与 `me` 接口，其余后台接口返回 40301。
-- 登录锁定（滑动窗口计数，存在 `request_windows` 表里，多实例共享）：同一来源对同一用户名 15 分钟内失败 10 次后锁定；同一来源对任意用户名累计失败 30 次也锁定。按来源区分，别处猜错密码锁不住正常管理员。
+- 登录锁定（滑动窗口计数，存在 `request_windows` 表里，多实例共享）：同一来源对同一用户名 15 分钟内失败 10 次后锁定；同一来源对任意用户名累计失败 30 次也锁定。按来源区分，别处猜错密码锁不住正常管理员。每个实例同时最多 4 个登录校验（`MAX_CONCURRENT_PASSWORD_CHECKS`），先占名额再查锁定，超出直接 429、不跑 scrypt：并发请求越过"先查后记"窗口的次数有上限，登录洪水也不会占满 libuv 线程池。
 - 后台令牌与 C 端开局凭证共用 `JWT_SECRET`，用 `aud` 区分（`admin` / `access`），各自的中间件只接受自己的 audience，开局凭证不能访问后台，后台令牌也不能开局。迁移 026 之前签发的后台令牌没有 `aud`，升级后需要重新登录一次。
 
 ## 身份码
@@ -123,14 +123,14 @@ C 端开局会调用模型，需要管理员发放的身份码；观战、直播
 
 配置跨环境迁移使用根目录的 `config:export` / `config:import` 命令。模块按配置白名单读取，在同一快照导出，并加密整份文件。导入在事务中保留 ID、恢复备用模型及玩家绑定、校正自增与发布序列；目标配置表和对局表须为空。供应商密钥可通过 `CONFIG_SOURCE_SECRET_KEY` 解包后用目标 `SECRET_KEY` 重加密。配置文件不包含历史对局、玩家记忆或管理员账号，详见 [配置迁移](operations/config-transfer.md)。
 
-模型供应商的 API Key 用 AES-256-GCM 与 `SECRET_KEY`（32 字节 base64）加密存储，另存末 4 位掩码用于展示；接口永不返回明文，只有服务端内部的 `providers.credentials()` 会解密（供 P4 调用模型）。
+模型供应商的 API Key 用 AES-256-GCM 与 `SECRET_KEY`（32 字节 base64）加密存储，另存末 4 位掩码用于展示；接口永不返回明文，只有服务端内部的 `providers.credentials()` 会解密（供 P4 调用模型）。更新时省略 Key 保留原密钥，但接口地址换到别的域名（origin 不同）时必须同时提供新 Key，否则 400：防止只改地址再点"测试"把原 Key 发到别处。模型调用与目录请求都不跟随重定向（`redirect: 'error'`）。
 
 ## 对局运行时
 
 - **推进**（`modules/matches/runtime.ts`）：一个事务内 `SELECT … FOR UPDATE` 锁定对局行 → 调用引擎 `advance` → 写回快照、新的 AI 任务、舞台事件，以及（来自 worker 时）完成的任务；提交后通过事件总线通知 worker 与实时网关（总线跨实例，见"多实例"）。引擎计算放在 try 内：`EngineInputError` 对 AI 结果视为过期（任务记为 cancelled），对其他输入返回 409；`SpecMismatchError`（快照来自旧版本的游戏定义，见下文"部署与游戏版本"）立即把对局标为 failed（错误"游戏规则已更新，这局无法继续，已终止"，触发的任务记为 cancelled）；引擎其他异常把对局标为 failed。后两种情况都会取消该局其余未完成的任务，与 `failMatch` 共用同一段终止逻辑。数据库错误不吞掉，整个事务回滚并向上抛出。完结任务只作用于仍为 queued / running 的任务：迟到的重复结果不会把已 succeeded 的任务改写成 cancelled。
 - **AI worker**（`modules/ai-worker`）：事件驱动（总线跨实例唤醒）+ 每秒兜底轮询（处理重试、过期领取与丢失的通知）。`FOR UPDATE SKIP LOCKED` 原子领取任务，领取 10 分钟过期后可被重新领取（大于单个任务的最长耗时，避免重复调用模型），每次领取 `attempts` 加一。执行或推进抛错（如数据库故障）时只记日志等待重新领取；领取次数达到 `AI_TASK_MAX_ATTEMPTS`（默认 3）仍失败则由 `runtime.failMatch` 把对局标为 failed（错误"AI 处理多次失败，对局已终止"）、任务记为 failed、其余任务取消，并通过总线通知在线观众，不再无限重试、重复付费调用模型。`pacing: 'ack'` 的对局只在观众未确认的事件不超过 3 个时才领取，无人观看时自然停止消耗；`free` 不等待（调试、离线跑局）。脚本化对局用引擎的 `scriptedOutput`；开启混沌脚本（`chaos`）的脚本化对局改用引擎的 `chaosReply`：按对局种子与请求 ID 以固定概率弃票、放弃可放弃的动作、附带自爆等声明、给出非法输出（引擎重问后再兜底）或模拟一次调用失败——模拟失败是一次"已完成但失败"的任务（任务记为 failed、以 `ai_failed` 交回引擎走兜底，对局继续），不是执行异常，不计入下面的领取次数上限。否则依次尝试座位玩家的主模型与备用模型中仍启用的部分（主模型被停用时直接用备用模型），每个模型首次调用后最多重试两次，间隔 0.5 秒、1 秒；网络中断、超时、HTTP 408、临时限流（429）、5xx 和空内容可重试，全部失败交给引擎 `ai_failed` 兜底。每次模型调用写入 `ai_calls`（脚本化与混沌对局不写）。发言与点评落库前按座位音色整理朗读标记（`speechDelivery.ts`）：已登记的情绪 / 控制标签换成当前音色支持的写法，不支持的移除；未登记的方括号内容（`[3号]`、`[查杀]`、`[金水]`）是正文，原样保留。
 - **优雅关闭**（`src/index.ts`）：收到 SIGINT / SIGTERM 后先停回收器，再 `worker.stop()`：不再领取新任务，等待进行中的任务最多 `SHUTDOWN_TIMEOUT_MS`（默认 10 秒），超时则记录还没结束的任务（matchId、requestId）并继续关闭——它们的领取在 10 分钟后过期，由下一个实例重新领取。随后关闭跨实例通知的监听连接、HTTP 监听与连接池；整个关闭流程超过 2 倍 `SHUTDOWN_TIMEOUT_MS` 仍没结束（例如被卡住的任务占着连接）就直接退出。
-- **无人观看回收**（`modules/matches/reaper.ts`）：每分钟把 `MATCH_IDLE_MINUTES` 内没有动静（既没推进也没有观众确认，`updated_at` 在确认时也会刷新）的 ack 节奏公开对局标为 failed 并取消其排队任务，通过总线通知在线观众；调试局不回收。进行中计数也只算这个窗口内有动静的对局。每次清扫先在事务里拿 `pg_try_advisory_xact_lock`，拿不到（另一实例正在扫）就跳过，`sweep()` 返回 null。
+- **无人观看回收**（`modules/matches/reaper.ts`）：每分钟把 `MATCH_IDLE_MINUTES` 内没有动静（既没推进也没有观众确认；只有确认进度真正前进时才刷新 `updated_at`，重连或重复确认同一位置不算，任何人反复连上来都不能让无人观看的对局一直占着名额）的 ack 节奏公开对局标为 failed 并取消其排队任务，通过总线通知在线观众；调试局不回收。进行中计数也只算这个窗口内有动静的对局。每次清扫先在事务里拿 `pg_try_advisory_xact_lock`，拿不到（另一实例正在扫）就跳过，`sweep()` 返回 null。
 - **额度耗尽自动停用**：供应商返回 4xx 且错误码在 `modules/llm/quota.ts` 的列表中（百炼 `Arrearage` / `AllocationQuota.FreeTierOnly`、火山 `*BillOverdue`、OpenAI `insufficient_quota` 等）时，LLM 客户端抛出 `quotaExhausted` 的 `LlmError`；worker 不重试，把该模型标为 `enabled = false`、`disabled_reason = 'quota_exhausted'` 并切换备用模型。管理员补充额度后在后台"测试"通过再"重新启用"（`PUT` 时 `enabled: true` 清除原因）。普通限流（429 但没有这些错误码）仍只是重试。
 - **LLM**（`modules/llm`）：OpenAI 兼容 Chat Completions，要求 JSON 对象输出，`toChatMessages` 排布分层 prompt；从回复中提取 JSON（兼容代码块），取不出时把原文交给引擎校验并重问。
 - **模型参数兼容**：官方 OpenAI 使用 `max_completion_tokens`（包括推理和可见输出），其他兼容端点默认使用 `max_tokens`。只有上游 400 明确要求替换旧字段，或明确拒绝自定义温度时，才按提示调整并重发；不移除输出上限和 JSON 要求。后台连接测试和实际对局共用该逻辑。连接测试最多使用 512 个输出 token，且不超过该模型的配置；耗尽预算但没有可见内容时会提示原因。
@@ -160,7 +160,7 @@ Azure 字幕由 `azureTransport` 使用官方 SDK 在同一次合成中接收 Wo
 - **事件总线**（`utils/pgEventBus.ts` + `db/notifier.ts`）：`EventBus` 接口不变，`emit` 先投递给本进程的监听者（播放流、worker），再 `pg_notify` 到通道 `battle_<DATABASE_SCHEMA>`，载荷是 `{ instance, event, payload }` 的 JSON（远小于 NOTIFY 的 8000 字节上限，超过则不发只记日志）。通道名带 schema：NOTIFY 是整个数据库范围的，同一个库里不同 schema 的部署（以及并行跑的测试）互不串扰。每个实例启动时生成随机 `instanceId`（健康检查返回它），收到自己发的通知按 ID 丢掉，本地监听者不会收到两次；其他实例的通知解析校验（zod）后投递给本地监听者。四种事件都跨实例：`match:events` 唤醒观众的播放流、`tasks:queued` 与 `match:acked` 唤醒 worker（ack 节奏的对局靠观众确认推进）、`match:status` 通知观众状态变化。
 - **监听连接**：LISTEN 不能走连接池（连接被回收就收不到），每个实例用一条专用 `pg.Client`，`index.ts` 在 worker 与 HTTP 之前 `bus.start()`，关闭时在 worker 停止后 `bus.stop()`。连接断开时记日志并按退避重连（0.5 秒起翻倍，封顶 10 秒）；重连期间本地投递照常，丢失的通知由兜底轮询（播放流 `STREAM_POLL_MS`、worker 每秒）补上，所以轮询仍然保留。首次连接失败也不阻止启动，同样转入重连。NOTIFY 走连接池，发送失败只记日志。
 - **限流与锁定计数**（`request_windows` 表，`modules/limits`）：`WindowStore` 接口 `{ count, add, clear, prune }`，生产用数据库实现（`createDbWindowStore`），内存实现只供单元测试。开局限流（每来源每小时 10 局）与登录锁定（来源 + 用户名 15 分钟 10 次、来源累计 30 次）都写这张表，key 由用途与来源拼成（`windowKey`，各段 URL 编码，不会串）。清理不用定时任务：每 64 次 `add` 把早于最长窗口（1 小时）的记录与本次插入放在同一条语句里（data-modifying CTE）删掉，表的大小由保留期内的请求数决定。计数与记录不是同一条语句，并发请求可能略微越过上限——限流只求近似。
-- **TTS 合成**：进程内按音频 ID 的 inflight 表是快路径；跨实例由 `media` 仓储的 `locked(id, work)` 在事务里持 `pg_advisory_xact_lock(2, hashtext(id))`，后到的实例等锁后再查一次就命中缓存，不重复付费。合成期间占用一个连接池连接（最长 `TTS_TIMEOUT_MS`）。
+- **TTS 合成**：进程内按音频 ID 的 inflight 表是快路径；跨实例由 `media` 仓储的 `locked(id, work)` 在事务里持 `pg_advisory_xact_lock(2, hashtext(id))`，后到的实例等锁后再查一次就命中缓存，不重复付费。合成期间占用一个连接池连接（最长 `TTS_TIMEOUT_MS`），所以每个实例同时最多 3 个持锁合成（`tts/constants.ts` 的 `MAX_CONCURRENT_SYNTHESES`，`utils/semaphore.ts`），先拿名额再开事务，排队的请求不占连接；连接池取连接最多等 15 秒（`connectionTimeoutMillis`），用满时报错而不是无限挂起。
 - **回收器**：每次清扫 `pg_try_advisory_xact_lock(1, 1)`，拿不到就跳过，下个周期再试。
 - **初始管理员**：`bootstrap` 先快速查表，为空时在持 `pg_advisory_xact_lock(1, 2)` 的事务里再查一次才插入，多实例同时启动只创建一个。
 - **本来就安全的部分**：AI 任务领取 `FOR UPDATE SKIP LOCKED`；公开开局上限在事务里持 advisory lock（单键 7201）串行化。所有 advisory lock 键登记在 `db/locks.ts`。
@@ -215,7 +215,7 @@ PostgreSQL 16，连接时通过 `search_path` 指定 `DATABASE_SCHEMA`（默认 
 
 ## 配置
 
-见 `.env.example`：`PORT`（默认 3100）、`DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_POOL_MAX`、`JWT_SECRET`（≥32 字符）、`SECRET_KEY`、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（≥12 字符）、`AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`、`MIMO_API_KEY` / `MIMO_BASE_URL` / `MIMO_TTS_MODEL`、`AI_CONCURRENCY`（默认 4）、`AI_TASK_MAX_ATTEMPTS`（默认 3，一个 AI 任务最多领取几次）、`MAX_ACTIVE_MATCHES`（默认 5）、`MATCH_IDLE_MINUTES`（默认 30）、`STREAM_POLL_MS`（默认 2000，播放流等待新事件时的兜底重查间隔；跨实例事件经 LISTEN/NOTIFY 即时送达，这只是监听连接重连期间丢失通知时的安全网）、`SHUTDOWN_TIMEOUT_MS`（默认 10000，优雅关闭时最多等待进行中 AI 任务的毫秒数）、`TRUST_PROXY`（默认 false）；`NODE_ENV` 为 `production` 时调试局对公开接口不可见。`pnpm --filter @battle/server dev` 读取根目录 `.env`。
+见 `.env.example`：`PORT`（默认 3100）、`DATABASE_URL`、`DATABASE_SCHEMA`、`DATABASE_POOL_MAX`、`JWT_SECRET`（≥32 字符）、`SECRET_KEY`、`ADMIN_USERNAME`、`ADMIN_PASSWORD`（≥12 字符）、`AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`、`MIMO_API_KEY` / `MIMO_BASE_URL` / `MIMO_TTS_MODEL`、`AI_CONCURRENCY`（默认 4）、`AI_TASK_MAX_ATTEMPTS`（默认 3，一个 AI 任务最多领取几次）、`MAX_ACTIVE_MATCHES`（默认 5）、`MATCH_IDLE_MINUTES`（默认 30）、`STREAM_POLL_MS`（默认 2000，播放流等待新事件时的兜底重查间隔；跨实例事件经 LISTEN/NOTIFY 即时送达，这只是监听连接重连期间丢失通知时的安全网）、`SHUTDOWN_TIMEOUT_MS`（默认 10000，优雅关闭时最多等待进行中 AI 任务的毫秒数）、`TRUST_PROXY`（默认 false）；`NODE_ENV`（默认 `production`，本机开发在 `.env` 里设为 `development`）为 `production` 时调试局对公开接口不可见，只有 `development` 挂出本地调试开局接口。`pnpm --filter @battle/server dev` 读取根目录 `.env`。
 
 ## 测试
 

@@ -153,8 +153,16 @@ GameSpec 关键字段：
 ## 测试工具（@battle/engine/testing）
 
 - `runToEnd(game, { seed, playerCount | players, params, agent, debug, onPause })`：在内存中跑完一局，记录全部日志、舞台事件、AI 请求及发出时的快照。默认 agent 为脚本化输出。
-- `assertTerminates(game, seeds)`、`assertDeterministic(game, options)`、`assertNoLeak(game, run)`：每个游戏都应以 100 个种子运行三项性质检查。泄露检查以文本比对为准，少于 4 个字符的内容不参与比对。
-- 混沌模式 `chaosReply(game, snapshot, request)`（`debug/chaosAgent.ts`，由 `@battle/engine` 导出，服务端的混沌调试局也用它）与测试代理 `chaosAgent(game)`（`testing/chaos.ts`）：默认脚本永远合法、从不弃票、从不声明，覆盖不到重试、兜底、弃票、放弃与自爆等分支。混沌脚本按固定概率（`CHAOS_RATES`：传输失败 3%、不合法输出 10%、允许弃票时弃票 30%、可放弃的动作放弃 50%、有权声明时附带声明 25%）做出这些行为，每个决定由对局种子与请求 ID 派生，同一种子可复现。每个游戏另以 30 个种子跑混沌模式，断言终局、不泄露，且至少出现过一次弃票、一次声明（狼人杀为自爆）与一次兜底。默认的 `scriptedOutput` 不受影响（服务端的脚本化对局依赖它的精确输出）。
+- `assertTerminates(game, seeds)`、`assertDeterministic(game, options)`、`assertNoLeak(game, run)`：每个游戏都应以 100 个种子运行三项性质检查。
+- `assertNoLeak` 分两层：
+  - **结构检查**（`testing/structuralLeak.ts`，也单独导出 `requestStructuralProblems`、`omniscientStageProblems`）：不做文本比对，与内容长短无关。对每个 AI 请求，用发出时的快照和引擎自己的可见性函数逐项核对：
+    - L4 历史必须恰好等于 `formatHistory` 对该座位按 `entryVisibleTo` 过滤后的渲染（录下的快照可能多出同一次推进中稍后写入的日志，最多回退 64 条找发出时的前缀），不可见日志的任何一行都不能混入，含 `team:werewolf` 狼刀选票、出局原因和技能目标；记忆摘录引用的日志也必须对该座位可见。
+    - `taskTemplate.context` 中 `seats` / `aliveSeats` / `teammates` 的 `role`、`roleName`、`team`、`position` 只在 `roleVisibleTo` 允许时非空。`teammates` 只发给 `knowsTeammates` 角色，且只含同阵营的其他座位。`me` 是请求者本人。
+    - `context.state` 与 `projectState(game, state, viewer)` 完全一致，`context.legalTargets` 与请求一致。
+    - 上帝视角（`omniscient`）的游戏还要求舞台事件不来自 `host` 频道，`publicRoles` 在揭示与终局之前只含 `publicRole` 角色。
+  - **文本比对**：不可见日志的正文及给 AI 看的整行渲染（含投票明细等结构化字段）、未投影的状态字符串，都不能出现在提示词任何一层；公开模式的舞台事件另查频道与身份。少于 4 个字符的内容不参与比对。
+- 角色名、查验结果（好人/狼人）、阵营标签等短词本身就是规则与公开发言的常用词，降低阈值会大量误报。秘密在于"哪个座位对应它"，这种绑定由上面的结构检查覆盖。所以 `stateExtended.ts` 里底牌名仍用「」包起来，避免长文本比对误报。
+- 混沌模式 `chaosReply(game, snapshot, request)`（`debug/chaosAgent.ts`，由 `@battle/engine` 导出，服务端的混沌调试局也用它）与测试代理 `chaosAgent(game)`（`testing/chaos.ts`）：默认脚本永远合法、从不弃票、从不声明，覆盖不到重试、兜底、弃票、放弃与自爆等分支。混沌脚本按固定概率（`CHAOS_RATES`：传输失败 3%、不合法输出 10%、允许弃票时弃票 30%、可放弃的动作放弃 50%、有权声明时附带声明 25%）做出这些行为，每个决定由对局种子与请求 ID 派生，同一种子可复现。每个游戏另以 30 个种子跑混沌模式，断言终局、不泄露，且至少出现过一次弃票、一次声明（狼人杀为自爆）与一次兜底。狼人杀每个板子另有混沌回合（`packages/games/test/werewolf/boardsChaos.test.ts`）：15 个种子，人数可变的板子跑最少和最多人数，断言终局、不泄露（含结构检查）、至少一次兜底，并用一个种子检查确定性。默认的 `scriptedOutput` 不受影响（服务端的脚本化对局依赖它的精确输出）。
 
 AI 请求携带开局座位快照中的发言设置。发言和点评的建议篇幅仅进入任务提示。引擎会完整保存超过建议字数的有效回复。
 

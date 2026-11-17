@@ -15,7 +15,7 @@ describe('config', () => {
 
   it('loads a valid environment with defaults', () => {
     const config = loadConfig(valid);
-    expect(config).toMatchObject({ env: 'development', port: 3100, database: { schema: 'public' }, bootstrapAdmin: null });
+    expect(config).toMatchObject({ env: 'production', port: 3100, database: { schema: 'public' }, bootstrapAdmin: null });
     expect(config).toMatchObject({ ai: { concurrency: 4, maxAttempts: 3 }, realtime: { pollMs: 2000 }, shutdown: { timeoutMs: 10_000 } });
     expect(config.secretKey).toHaveLength(32);
     expect(loadConfig({ ...valid, AI_TASK_MAX_ATTEMPTS: '5', STREAM_POLL_MS: '500' })).toMatchObject({ ai: { maxAttempts: 5 }, realtime: { pollMs: 500 } });

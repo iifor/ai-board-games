@@ -1,6 +1,7 @@
 import type { AudienceView } from '@battle/shared';
 import { useEffect, useRef, useState } from 'react';
 import { present } from '../playback/media';
+import { playSegment } from '../playback/playSegment';
 import { SegmentControl } from '../playback/segment';
 import type { PlaybackOptions, StreamItem } from '../types';
 
@@ -11,7 +12,7 @@ interface Segment {
 
 /**
  * 依次播放收到的事件（每段怎么播见 playback/media 的 present）；
- * 每个事件播放完才 ack，服务端据此推进下一个。暂停时不再开始新的事件。
+ * 每个事件播放完才 ack，服务端据此推进下一个；播放出错也照常 ack 推进（playSegment），不让舞台停住。暂停时不再开始新的事件。
  * 倍速与静音通过 SegmentControl 实时作用于正在播放的这段。
  */
 export function usePlayback(items: readonly StreamItem[], ack: (seq: number) => void, options: PlaybackOptions) {
@@ -43,8 +44,7 @@ export function usePlayback(items: readonly StreamItem[], ack: (seq: number) => 
     const control = new SegmentControl(optionsRef.current.speed, optionsRef.current.muted);
     controlRef.current = control;
     setPlaying({ item: next, control });
-    void present(next, control).then(() => {
-      if (control.signal.aborted) return;
+    void playSegment(next, control, present, () => {
       ack(next.event.seq);
       setPlaying(null);
       setIndex((value) => value + 1);

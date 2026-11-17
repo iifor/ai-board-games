@@ -6,7 +6,7 @@ import type { AzureVoiceCatalogEntry } from '@battle/shared';
 
 export { createMediaRepository, type LockedAsset, type MediaRepository, type NewMediaAsset } from './repository';
 export { mediaRoutes } from './routes';
-export { assetId, createTtsService, type TtsService, type VoiceChoice } from './service';
+export { assetId, createTtsService, type TtsService, type TtsServiceOptions, type VoiceChoice } from './service';
 export type { TtsProvider, TtsProviders, VoiceSpec } from './types';
 
 export function ttsProvidersFromConfig(config: AppConfig['tts'], azureCatalog?: () => Promise<AzureVoiceCatalogEntry[]>): TtsProviders {

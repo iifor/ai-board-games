@@ -1,12 +1,18 @@
 import type { CompiledGame } from '../compiler/compile';
+import { formatEntry } from '../prompt/history';
 import type { EngineSnapshot, Seat } from '../runtime/types';
 import { audienceMode } from '../visibility/audienceView';
 import { entryVisibleTo } from '../visibility/channels';
 import { roleVisibleTo } from '../visibility/roles';
 import { projectState } from '../visibility/stateProjection';
 import { runToEnd, type RunOptions, type RunRecord } from './harness';
+import { eventRevealed, omniscientStageProblems, requestStructuralProblems } from './structuralLeak';
 
-/** 太短的字符串（如"是""2号"）容易在合法内容中偶然出现，不参与泄露比对 */
+/**
+ * 太短的字符串（如"是""2号"）容易在合法内容中偶然出现，不参与泄露比对。
+ * 角色名、查验结果（"好人""狼人"）、阵营标签等短词本身就是规则与公开发言的常用词，真正的秘密是"哪个座位对应它"；
+ * 这种绑定由 structuralLeak.ts 的结构检查覆盖（上下文身份字段、不可见日志整行），不靠降低这里的阈值。
+ */
 const MIN_SECRET_LENGTH = 4;
 
 function collectStrings(value: unknown, into: Set<string> = new Set()): Set<string> {
@@ -18,7 +24,9 @@ function collectStrings(value: unknown, into: Set<string> = new Set()): Set<stri
   return into;
 }
 
-function entryStrings(entry: EngineSnapshot['log'][number], into: Set<string>): void {
+/** 日志正文，以及给 AI 看的整行渲染（含投票明细、出局原因、技能目标等结构化字段） */
+function entryStrings(game: CompiledGame, snapshot: EngineSnapshot, entry: EngineSnapshot['log'][number], into: Set<string>): void {
+  collectStrings(formatEntry(game, snapshot, entry), into);
   if (entry.kind === 'speech' || entry.kind === 'narration' || entry.kind === 'action' || entry.kind === 'revealed') {
     collectStrings(entry.text, into);
   } else if (entry.kind === 'judgement') {
@@ -32,7 +40,7 @@ function hiddenStrings(game: CompiledGame, snapshot: EngineSnapshot, viewer: Sea
   const visible = collectStrings(projectState(game, snapshot.state, viewer));
   for (const entry of snapshot.log) {
     const canSee = viewer ? entryVisibleTo(entry, viewer) : entry.channel === 'public';
-    entryStrings(entry, canSee ? visible : hidden);
+    entryStrings(game, snapshot, entry, canSee ? visible : hidden);
   }
   collectStrings(snapshot.state, hidden);
   for (const text of visible) hidden.delete(text);
@@ -58,15 +66,12 @@ export function assertDeterministic(game: CompiledGame, options: RunOptions): vo
   }
 }
 
-/** 事件发生时身份是否已被 revealRoles 公开（揭示事件会携带 data.roles） */
-function eventRevealed(run: RunRecord, seq: number): boolean {
-  return run.log.some((entry) => entry.kind === 'revealed' && entry.seq <= seq && 'roles' in entry.data);
-}
-
 /** 每个 AI 请求都不含其不可见的内容；公开视角的舞台事件只来自公开频道且不暴露隐藏身份 */
 export function assertNoLeak(game: CompiledGame, run: RunRecord): void {
   const problems: string[] = [];
-  for (const { request, snapshot } of run.requests) {
+  for (const recorded of run.requests) {
+    problems.push(...requestStructuralProblems(game, recorded));
+    const { request, snapshot } = recorded;
     const viewer = snapshot.seats.find((seat) => seat.seat === request.seat);
     if (!viewer) throw new Error(`请求 ${request.id} 的座位不存在`);
     const prompt = Object.values(request.prompt).join('\n');
@@ -92,5 +97,6 @@ export function assertNoLeak(game: CompiledGame, run: RunRecord): void {
       }
     }
   }
+  problems.push(...omniscientStageProblems(game, run));
   if (problems.length) throw new Error(`信息泄露：\n- ${problems.slice(0, 20).join('\n- ')}`);
 }

@@ -1,0 +1,56 @@
+/* 自动播放被拦截时的开启声音提示：桌面与手机舞台都浮在顶部中间，盖在 HUD 与座位之上 */
+.audio-unlock-prompt {
+  position: fixed;
+  z-index: 60;
+  top: calc(max(10px, env(safe-area-inset-top)) + 72px);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--ui-brand-soft);
+  border-radius: var(--ui-radius-pill);
+  color: var(--ui-on-brand);
+  background: var(--ui-brand);
+  box-shadow: var(--ui-shadow-elevated);
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transform: translateX(-50%);
+  animation: audio-unlock-pulse 1.8s var(--ui-ease-out) infinite;
+}
+
+.audio-unlock-prompt:hover {
+  background: var(--ui-brand-strong);
+}
+
+.audio-unlock-prompt:focus-visible {
+  outline: 2px solid var(--ui-focus-ring);
+  outline-offset: 3px;
+}
+
+/* 喇叭图标：方块 + 三角，纯 CSS */
+.audio-unlock-prompt-icon {
+  position: relative;
+  width: 6px;
+  height: 8px;
+  margin-right: 6px;
+  background: currentColor;
+}
+
+.audio-unlock-prompt-icon::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 4px;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid currentColor;
+}
+
+@keyframes audio-unlock-pulse {
+  0%, 100% { box-shadow: var(--ui-shadow-elevated), 0 0 0 0 var(--ui-brand-soft); }
+  50% { box-shadow: var(--ui-shadow-elevated), 0 0 0 10px transparent; }
+}
