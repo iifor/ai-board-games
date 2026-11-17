@@ -33,11 +33,17 @@ describe('key-action asides', () => {
     expect(prompts.some((prompt) => prompt.includes(ASIDE))).toBe(false);
   });
 
-  it('writes nothing when the aside is blank, and rejects one that is too long', () => {
+  it('writes nothing when the aside is blank, and clips an over-long one without costing the action', () => {
     const blank = play(SEED, seerAside('   '));
     expect(entries(blank, 'speech', 'seer_check')).toHaveLength(0);
-    const long = play(SEED, seerAside('很'.repeat(61)));
-    const retried = requestsIn(long, 'seer_check').filter((request) => request.seat === seer && request.attempt > 1);
-    expect(retried.length).toBeGreaterThan(0);
+    const long = play(SEED, seerAside('很'.repeat(80)));
+    // 多说几个字不算输出不合法：不重问、不兜底，查验照常生效
+    expect(requestsIn(long, 'seer_check').filter((request) => request.seat === seer && request.attempt > 1)).toHaveLength(0);
+    const [aside] = entries(long, 'speech', 'seer_check');
+    expect(Array.from(aside!.text)).toHaveLength(60);
+    expect(aside!.text.endsWith('…')).toBe(true);
+    const [action] = entries(long, 'action', 'seer_check');
+    expect(action).toMatchObject({ seat: seer });
+    expect(action!.targets).toHaveLength(1);
   });
 });

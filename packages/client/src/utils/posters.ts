@@ -1,9 +1,14 @@
 import { playerPortraitKey } from '@battle/shared';
 
-/** poster：完整海报（有背景）；cutout：抠像立绘（透明背景，用于舞台聚光） */
-export type PosterVariant = 'poster' | 'cutout';
+/**
+ * poster：海报（有背景，480×600，只用于各处圆形头像）；cutout：抠像立绘原图（透明背景，舞台中央聚光的大图）；
+ * figure：抠像立绘小图（480×720，圆桌座位上的小人，避免每个座位都下载原图）
+ */
+export type PosterVariant = 'poster' | 'cutout' | 'figure';
 
-const DIRECTORY: Readonly<Record<PosterVariant, string>> = { poster: 'player-posters', cutout: 'player-poster-cutouts' };
+const DIRECTORY: Readonly<Record<PosterVariant, string>> = {
+  poster: 'player-posters', cutout: 'player-poster-cutouts', figure: 'player-poster-cutouts/small',
+};
 
 export const HOST_POSTER = '/player-poster-cutouts/host.webp';
 

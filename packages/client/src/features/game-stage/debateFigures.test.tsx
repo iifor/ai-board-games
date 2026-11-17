@@ -15,7 +15,7 @@ describe('辩论赛人物席位', () => {
     expect(html.match(/data-seat-trigger=/g)).toHaveLength(8 + judges);
     expect(html.match(/class="seat-card-compact"/g)).toHaveLength(8 + judges);
     expect(html.match(/class="seat-spotlight"/g)).toHaveLength(1);
-    expect(html).toContain('/player-poster-cutouts/deepseek.webp');
+    expect(html).toContain('/player-poster-cutouts/small/deepseek.webp');
     expect(html).toContain('反方二辩');
     expect(html).toContain('aria-label="6号 玩家6，正在发言"');
     expect(html).toContain('aria-details="seat-profile"');

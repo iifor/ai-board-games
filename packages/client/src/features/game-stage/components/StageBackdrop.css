@@ -21,14 +21,14 @@
   background-image:
     linear-gradient(90deg, rgba(1, 6, 18, 0.66), transparent 28%, transparent 72%, rgba(1, 6, 18, 0.62)),
     linear-gradient(180deg, rgba(1, 8, 26, 0.02), rgba(1, 6, 20, 0.3)),
-    url('/stage/werewolf-night.png');
+    url('/stage/werewolf-night.webp');
 }
 
 .stage-backdrop-layer.is-day {
   background-image:
     linear-gradient(90deg, rgba(14, 25, 43, 0.48), transparent 28%, transparent 72%, rgba(25, 19, 14, 0.42)),
     linear-gradient(180deg, rgba(246, 206, 137, 0.02), rgba(8, 18, 33, 0.2)),
-    url('/stage/werewolf-day.png');
+    url('/stage/werewolf-day.webp');
   clip-path: circle(0% at 50% 42%);
 }
 
@@ -48,7 +48,7 @@
   background-image:
     linear-gradient(90deg, rgba(3, 6, 14, 0.6), transparent 26%, transparent 74%, rgba(3, 6, 14, 0.6)),
     linear-gradient(180deg, rgba(3, 6, 14, 0.1), rgba(3, 6, 14, 0.5)),
-    url('/stage/debate.png');
+    url('/stage/debate.webp');
 }
 
 .stage-backdrop-layer.is-default {

@@ -35,7 +35,7 @@ C 端通过 `POST /api/toc/matches` 开始游戏，服务端在创建时锁定�
 
 ## 视觉与动效
 
-沿用旧版的"直播间"风格：深海蓝画布、玻璃面板（`.glass-panel`）、金色品牌色，游戏强调色由 `data-game` 覆盖（辩论赛青色、狼人杀紫色），令牌都在 `styles/global.css`。玩家海报（`public/player-posters`、`public/player-poster-cutouts`）与舞台背景（`public/stage/*.png`）取自旧版素材；选人卡展示当前绑定模型的显示名和玩家人设。新对局按玩家的固定立绘标识取图，旧回放沿用已有形象。
+沿用旧版的"直播间"风格：深海蓝画布、玻璃面板（`.glass-panel`）、金色品牌色，游戏强调色由 `data-game` 覆盖（辩论赛青色、狼人杀紫色），令牌都在 `styles/global.css`。玩家海报（`public/player-posters`、`public/player-poster-cutouts`）与舞台背景（`public/stage/*.webp`）取自旧版素材，按实际显示尺寸压缩成 WebP：海报 480×600 只用于各处圆形头像（最大约 160px）；抠像原图 1024×1536 只用于舞台中央的发言大图；圆桌与辩论席位上的小人用 `player-poster-cutouts/small/`（480×720，`posters.ts` 的 `figure` 变体，`PlayerFigure size="figure"`）；背景保持原分辨率。整个 `public/` 约 1.8MB，打开一局狼人杀首屏图片约 0.9MB。新增素材请按同样的尺寸用 `cwebp` 压缩后再放进 `public/`（构建会原样复制到产物）。旧版头像上传原图（`public/resources/uploads/`，约 29MB、无任何引用）已删除，可从 git 历史找回；选人卡展示当前绑定模型的显示名和玩家人设。新对局按玩家的固定立绘标识取图，旧回放沿用已有形象。
 
 动效用 CSS 为主、Web Animations API 为辅（无动画库）。`prefers-reduced-motion` 下 CSS 动画由 `global.css` 统一关闭（组件 CSS 另把自己的错峰延迟归零，避免空白），JS 动效在 `lobby/animations.ts` 里判断后直接不动：
 - 大厅：头图各元素与游戏卡片错峰淡入上浮（`.ui-fade-up` + `--i`，卡片排在头图之后）；游戏卡片悬停 / 键盘聚焦（`:focus-within`）是同一套状态：上浮、一道扫光（`::after` 动画一次）、图标亮起游戏强调色，说明与标签不动；"最近一局"卡片悬停上浮、背景缓慢放大并随指针轻微视差（`useParallax` 把偏移写成 `--px` / `--py`，纯计算 `parallaxOffset`），有最近一局时条幅显示胜方与时间，右侧"去开一局 → / 回放 →"做成胶囊按钮。没有最近对局时，「去开一局」直达默认玩法配置页。大厅重试会重新加载失败的最近对局。板子搜索显示匹配数，方向键可在可见结果中切换，模拟开局区同步显示所选板子及开局人数。

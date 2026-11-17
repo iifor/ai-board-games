@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: url('/stage/lobby.png') center / cover no-repeat;
+  background: url('/stage/lobby.webp') center / cover no-repeat;
   opacity: 0.16;
   pointer-events: none;
   mask-image: linear-gradient(180deg, black 30%, transparent 95%);

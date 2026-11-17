@@ -48,7 +48,7 @@ export function LobbyHero({ primaryGame, history }: LobbyHeroProps) {
           onPointerMove={parallax.onPointerMove}
           onPointerLeave={parallax.onPointerLeave}
         >
-          <img src="/stage/werewolf-night.png" alt="" />
+          <img src="/stage/werewolf-night.webp" alt="" />
           <span className="lobby-hero-strip">
             <span className="lobby-hero-strip-text">
               <span className="lobby-hero-strip-title"><i aria-hidden="true" />{strip.text}</span>

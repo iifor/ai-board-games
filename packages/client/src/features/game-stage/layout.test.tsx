@@ -138,7 +138,7 @@ describe('layouts', () => {
     const wolf = { ...wolfView, seats: [{ ...seat(1, null), name: '02 号模拟玩家' }] };
     const record = <StageRecord items={[]} filter="all" onFilter={() => {}} onClose={() => {}} />;
     const html = renderToStaticMarkup(<Stage layout="circle" view={wolf} current={null} played={[]} record={record} />);
-    expect(html).toContain('class="seat-figure-art" data-art="cutout" src="/player-poster-cutouts/grok.webp"');
+    expect(html).toContain('class="seat-figure-art" data-art="cutout" src="/player-poster-cutouts/small/grok.webp"');
     expect(html).not.toContain('身份未知');
     expect(html).toContain('02 号模拟玩家');
     expect(html).not.toContain('data-team=');

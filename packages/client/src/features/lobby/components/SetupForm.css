@@ -21,8 +21,8 @@
   background-repeat: no-repeat;
 }
 
-[data-game='debate'] .setup-header { --setup-scene: url('/stage/debate.png'); }
-[data-game='werewolf'] .setup-header { --setup-scene: url('/stage/werewolf-night.png'); }
+[data-game='debate'] .setup-header { --setup-scene: url('/stage/debate.webp'); }
+[data-game='werewolf'] .setup-header { --setup-scene: url('/stage/werewolf-night.webp'); }
 .setup-back { color: var(--ui-text-muted); font-size: 13px; text-decoration: none; }
 .setup-back:hover { color: var(--ui-text); text-decoration: underline; }
 
