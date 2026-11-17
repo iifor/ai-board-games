@@ -26,6 +26,13 @@ describe('spoken text shown without delivery tags', () => {
     expect(speechLineParts(judgement)).toEqual({ prefix: '正方胜。【调试】', speaker: '1号 玩家1', body: '论证完整。继续。' });
   });
 
+  it('labels a key-action aside as the speaker\'s inner line, not a public speech', () => {
+    const aside = { ...meta, kind: 'speech', seat: 1, purpose: 'aside', channel: 'spectator', text: '这瓶药我赌他是好人' } as const satisfies StageEvent;
+    expect(speechLineParts(aside).speaker).toContain('心里话');
+    expect(speechLineParts(speech).speaker).not.toContain('心里话');
+    expect(renderToStaticMarkup(<SentenceCaptions item={{ event: aside, audio: null }} control={new SegmentControl(1, false)} />)).toContain('心里话');
+  });
+
   it('cleans the subtitle bar and its screen reader text', () => {
     const html = renderToStaticMarkup(<SubtitleBar item={{ event: speech, audio: null }} view={view} />);
     expect(html).toContain(clean);

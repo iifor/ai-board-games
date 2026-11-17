@@ -4,6 +4,7 @@ import { triggerSeat } from '../rules/death';
 import type { WerewolfState } from '../state';
 import type { WerewolfPhases, WerewolfTriggers } from '../phases/types';
 import type { SpecialDescriptor } from './types';
+import { WEREWOLF_ASIDE } from '../../speechLimits';
 
 // 白狼王：狼人阵营，自爆时可以带走一名玩家（被带走者没有遗言）。
 
@@ -35,6 +36,7 @@ const whiteWolfKingPhases = {
     targets: (ctx, seat) => ctx.seats.alive().except(seat),
     allowNone: true,
     prompt: whiteWolfKingPrompts.whiteWolfKingBlast,
+    aside: WEREWOLF_ASIDE,
     channel: () => 'public',
     describe: (_ctx, _seat, targets) => (targets.length ? `白狼王带走 ${targets[0]}号` : '白狼王没有带人'),
     apply: recordBlast,

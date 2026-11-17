@@ -1,4 +1,4 @@
-import type { AudienceView, MatchSummaryDto, StageEvent } from '@battle/shared';
+import type { AudienceView, MatchSummaryDto } from '@battle/shared';
 import type { StreamConnection } from '../types';
 import { liveBadge, matchMode, stageStatus } from '../hudStatus';
 import './StageHud.css';
@@ -9,14 +9,13 @@ interface StageHudProps {
   readonly connection: StreamConnection;
   readonly ended: boolean;
   readonly replay?: boolean;
-  readonly event?: StageEvent | undefined;
 }
 
-/** 顶部直播条：游戏与板子、LIVE 状态、当前阶段 */
-export function StageHud({ summary, view, event, connection, ended, replay = summary.status === 'completed' }: StageHudProps) {
+/** 顶部直播条：游戏与板子、LIVE 状态、当前进度（狼人杀只报昼夜） */
+export function StageHud({ summary, view, connection, ended, replay = summary.status === 'completed' }: StageHudProps) {
   const live = liveBadge(connection, ended, replay);
   const mode = matchMode(summary, view);
-  const status = stageStatus(view, event);
+  const status = stageStatus(view);
   return (
     <header className="stage-hud glass-panel" aria-label="对局状态">
       <div className="stage-hud-identity">

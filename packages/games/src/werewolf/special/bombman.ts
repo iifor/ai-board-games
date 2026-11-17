@@ -5,6 +5,7 @@ import { isWolf, type WerewolfContext } from '../rules/context';
 import { BOMBED, triggerSeat } from '../rules/death';
 import type { WerewolfState } from '../state';
 import type { SpecialDescriptor } from './types';
+import { WEREWOLF_ASIDE } from '../../speechLimits';
 
 // 炸弹人：神职。被放逐出局时可以翻牌引爆，炸死所有投票放逐他的玩家（以放逐投票的最后一轮选票为准），
 // 被炸死者不能发动技能（猎人不能开枪，见 NO_SHOT_CAUSES）、没有遗言。
@@ -52,6 +53,7 @@ const bombmanPhases = {
     targets: (_ctx, seat) => [seat],
     allowNone: true,
     prompt: bombmanPrompts.bombmanBlast,
+    aside: WEREWOLF_ASIDE,
     describe: (_ctx, _seat, targets) => (targets.length ? '决定引爆' : '决定不引爆'),
     next: 'bombman_resolve',
   },

@@ -25,11 +25,19 @@ export const CHAOS_RATES = {
   decline: 0.5,
   /** 发言时附带一个有权使用的声明（如自爆） */
   declare: 0.25,
+  /** 开了心里话的动作 / 投票附带一句心里话 */
+  aside: 0.3,
 } as const;
 
 export const CHAOS_FAILURE_REASON = '混沌模式：模拟模型调用失败';
 
 type Phase = PhaseSpec<unknown, unknown>;
+
+/** 开了心里话的阶段按概率附带一句（覆盖观战频道的心里话路径） */
+function withAside(phase: Phase, output: Record<string, unknown>, rng: Rng): Record<string, unknown> {
+  if ((phase.kind !== 'act' && phase.kind !== 'vote') || !phase.aside || rng.next() >= CHAOS_RATES.aside) return output;
+  return { ...output, aside: '这一步我赌了，后面见分晓。' };
+}
 
 /** 一定不合法的输出：投票与动作用不存在的 0 号座位（走合法目标校验），发言与判定用错误类型（走 schema 校验） */
 function invalidOutput(phase: Phase): unknown {
@@ -58,11 +66,11 @@ function legalChaosOutput(game: CompiledGame, snapshot: EngineSnapshot, request:
   const legal = pending.legalTargets ?? [];
   switch (phase.kind) {
     case 'vote':
-      if (phase.allowAbstain && rng.next() < CHAOS_RATES.abstain) return { target: null };
-      return { target: rng.pick(legal) };
+      if (phase.allowAbstain && rng.next() < CHAOS_RATES.abstain) return withAside(phase, { target: null }, rng);
+      return withAside(phase, { target: rng.pick(legal) }, rng);
     case 'act':
-      if (phase.allowNone && rng.next() < CHAOS_RATES.decline) return { targets: [] };
-      return { targets: rng.shuffle(legal).slice(0, Math.min(phase.count ?? 1, legal.length)) };
+      if (phase.allowNone && rng.next() < CHAOS_RATES.decline) return withAside(phase, { targets: [] }, rng);
+      return withAside(phase, { targets: rng.shuffle(legal).slice(0, Math.min(phase.count ?? 1, legal.length)) }, rng);
     case 'speak': {
       if (pending.action === 'act') return { targets: rng.next() < CHAOS_RATES.declare ? [pending.seat] : [] };
       const scripted = scriptedOutput(game, snapshot, request);

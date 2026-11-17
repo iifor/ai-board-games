@@ -35,7 +35,7 @@
 
 `StageEvent = StagePayload & StageEventMeta & { view: AudienceView }`。
 
-观战专用频道 `spectator` 用于已经结算的视觉提示，不进入任何 AI 的可见历史。技能结算复用 `revealed`，其 `data` 可携带 `effect`、`title` 和实际受影响的 `target`。上帝视图记录全员身份，以及此刻可以公开的 `publicRoles` 和已经翻牌的 `shownRoles`。服务端使用这两项生成单座位视图。
+观战专用频道 `spectator` 用于已经结算的视觉提示，不进入任何 AI 的可见历史。`speech` 事件可带 `purpose: 'aside'`：关键操作时说给观众的心里话，同样走 `spectator` 频道，`speechOf` 按说话人音色朗读。技能结算复用 `revealed`，其 `data` 可携带 `effect`、`title` 和实际受影响的 `target`。上帝视图记录全员身份，以及此刻可以公开的 `publicRoles` 和已经翻牌的 `shownRoles`。服务端使用这两项生成单座位视图。
 
 | kind | 字段 | 说明 |
 | --- | --- | --- |

@@ -6,9 +6,10 @@ export function visibleOnStage(event: StageEvent): boolean {
     && event.phaseId === 'cupid_bond' && event.channel.startsWith('private:'));
 }
 
-/** 狼人杀的单座位观众可接收法官对本人的通知和本人的私密行动。 */
+/** 狼人杀的单座位观众可接收法官对本人的通知、本人的私密行动，以及本人在关键操作时的心里话。 */
 export function visibleToPlayerSeat(event: StageEvent, viewer: number): boolean {
   if (event.channel === 'public') return true;
+  if (event.kind === 'speech' && event.purpose === 'aside') return event.channel === 'spectator' && event.seat === viewer;
   return event.view.gameKey === 'werewolf' && event.channel === `private:${viewer}` &&
     (event.kind === 'narration' || (event.kind === 'action' && event.seat === viewer));
 }

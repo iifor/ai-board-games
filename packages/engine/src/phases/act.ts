@@ -6,6 +6,7 @@ import type { PendingRequest } from '../runtime/types';
 import type { ActDecision } from '../spec/context';
 import type { ActPhase } from '../spec/phases';
 import { privateChannel } from '../visibility/channels';
+import { asideField, logAside } from './aside';
 import { seatNumber } from './seatNumber';
 import { done, issue, type AiPhaseExecutor, type RequestDraft } from './types';
 
@@ -71,7 +72,8 @@ export const actExecutor: AiPhaseExecutor<Phase> = {
         .refine((list) => list.length === 0 || list.length === count, `只能选择 ${count} 个目标，或输出空数组表示放弃`)
         .describe(`${phase.action}的目标座位号；输出空数组表示放弃`)
       : z.array(seatNumber()).length(count).describe(`${phase.action}的目标座位号`);
-    return z.object({ targets, reason: z.string().max(300).optional().describe('简短理由') });
+    const base = z.object({ targets, reason: z.string().max(300).optional().describe('简短理由') });
+    return phase.aside ? base.extend({ aside: asideField(phase.aside) }) : base;
   },
 
   check(_env, _phase, pending, value) {
@@ -91,6 +93,7 @@ export const actExecutor: AiPhaseExecutor<Phase> = {
   },
 
   store(env, phase, pending, value) {
+    logAside(env, phase.aside, pending, value);
     storeDecision(env, phase, pending.seat, (value as ActOutput).targets);
   },
 };

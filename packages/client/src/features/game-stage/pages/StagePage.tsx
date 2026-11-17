@@ -7,7 +7,6 @@ import { fetchMatch } from '../../../services/matches';
 import { AudioUnlockPrompt } from '../components/AudioUnlockPrompt';
 import { DebateTitle } from '../components/DebateTitle';
 import { StageRecord } from '../components/StageRecord';
-import { PhaseBanner } from '../components/PhaseBanner';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ResultPanel } from '../components/ResultPanel';
 import { SeatPopover } from '../components/SeatPopover';
@@ -110,7 +109,7 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
     <div className="stage-shell" data-game={gameKey} data-layout={layout} data-period={period} data-finished={finished}>
       <StageBackdrop gameKey={gameKey} period={period} />
       {topicTitle && <DebateTitle title={topicTitle} />}
-      <StageHud summary={summary} view={playback.view} event={shown} connection={stream.connection} ended={finished} replay={replay} />
+      <StageHud summary={summary} view={playback.view} connection={stream.connection} ended={finished} replay={replay} />
       <PlaybackControls hideFeedButton compact={!debate} options={options} pending={playback.pending} finished={finished} feedOpen={feedOpen} onChange={setOptions} onToggleFeed={toggleFeed}>
         {perspective}
       </PlaybackControls>
@@ -124,7 +123,6 @@ function StageSession({ summary, seat, start, options, setOptions, switchMode }:
         ) : null}
       </div>
       {!debate && <>
-        <PhaseBanner item={playback.current} />
         {(!subtitleItem || !speechOf(subtitleItem.event)) && !isPlayerSpeech(subtitleItem?.event) &&
           <SubtitleBar quietIdle item={subtitleItem} view={playback.view} control={playback.control} />}
       </>}

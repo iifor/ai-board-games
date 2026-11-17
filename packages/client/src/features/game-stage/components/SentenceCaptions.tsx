@@ -1,7 +1,7 @@
 import { speechOf, stripSpeechTags } from '@battle/shared';
 import { useSentenceCaption } from '../hooks/useSentenceCaption';
 import type { SegmentControl } from '../playback/segment';
-import { isPlayerSpeech } from '../playback/speechTurns';
+import { isPlayerSpeech, withAsideTag } from '../playback/speechTurns';
 import { hostLabel } from '../playback/describe';
 import type { StreamItem } from '../types';
 import { seatOf, speakerLabel } from '../utils';
@@ -19,7 +19,7 @@ function CaptionLine({ item, control, announce = false }: SentenceCaptionsProps 
   const sentence = useSentenceCaption(text, control, item.audio?.captions);
   const speaker = seatOf(item.event.view, speech?.seat ?? null);
   if (!text.trim()) return null;
-  const name = speaker ? speakerLabel(speaker.seat, speaker.name) : hostLabel(item.event);
+  const name = speaker ? withAsideTag(speakerLabel(speaker.seat, speaker.name), item.event) : hostLabel(item.event);
   return <div className="sentence-captions" data-team={speaker?.team} data-seq={item.event.seq} aria-label="逐句字幕">
     {announce && !isPlayerSpeech(item.event) &&
       <span className="subtitle-live-only" aria-live="polite" aria-atomic="true">{item.event.channel.startsWith('private:') ? name + '。' : ''}{text}</span>}

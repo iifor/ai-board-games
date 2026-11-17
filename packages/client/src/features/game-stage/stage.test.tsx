@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { matchStreamUrl } from '../../services/matches';
 import { resolvePoster } from '../../utils/posters';
 import { EventFeed } from './components/EventFeed';
-import { PhaseBanner } from './components/PhaseBanner';
 import { PlaybackControls } from './components/PlaybackControls';
 import { StageError } from './components/StageError';
 import { SpeakerSpotlight } from './components/SpeakerSpotlight';
@@ -195,7 +194,6 @@ describe('stage visuals', () => {
     const html = renderToStaticMarkup(
       <>
         <SubtitleBar item={{ event: phase, audio: null }} view={view} />
-        <PhaseBanner item={{ event: phase, audio: null }} />
         <VoteBoard event={tally} view={view} />
         <PlaybackControls options={{ speed: 1, paused: false, muted: false }} pending={2} finished={false} feedOpen={false} onChange={() => {}} onToggleFeed={() => {}} />
       </>,

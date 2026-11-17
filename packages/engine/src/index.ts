@@ -51,6 +51,7 @@ export type {
 export { DEFAULT_SPEECH_MAX_CHARS, defineGame, definePrompts, speechOutput } from './spec/define';
 export type {
   ActPhase,
+  AsideSpec,
   AnnouncePhase,
   ComputeOutcome,
   ComputePhase,

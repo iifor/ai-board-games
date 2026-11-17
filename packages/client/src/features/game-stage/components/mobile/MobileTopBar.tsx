@@ -1,4 +1,4 @@
-import type { AudienceView, MatchSummaryDto, StageEvent } from '@battle/shared';
+import type { AudienceView, MatchSummaryDto } from '@battle/shared';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { liveBadge, matchMode, stageStatus } from '../../hudStatus';
@@ -8,7 +8,6 @@ import './MobileTopBar.css';
 interface MobileTopBarProps {
   readonly summary: MatchSummaryDto;
   readonly view: AudienceView | null;
-  readonly event: StageEvent | undefined;
   readonly connection: StreamConnection;
   readonly ended: boolean;
   readonly replay: boolean;
@@ -16,11 +15,11 @@ interface MobileTopBarProps {
   readonly children?: ReactNode;
 }
 
-/** 手机顶栏：返回、游戏与板子、直播状态、更多菜单；下一行是当前阶段 */
-export function MobileTopBar({ summary, view, event, connection, ended, replay, children }: MobileTopBarProps) {
+/** 手机顶栏：返回、游戏与板子、直播状态、更多菜单；下一行是当前进度（狼人杀只报昼夜） */
+export function MobileTopBar({ summary, view, connection, ended, replay, children }: MobileTopBarProps) {
   const live = liveBadge(connection, ended, replay);
   const mode = matchMode(summary, view);
-  const status = stageStatus(view, event);
+  const status = stageStatus(view);
   return (
     <header className="mobile-topbar" aria-label="对局状态">
       <Link className="mobile-topbar-back" to="/" aria-label="返回大厅">←</Link>

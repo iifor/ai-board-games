@@ -6,7 +6,7 @@ import { MobileSheet } from './components/mobile/MobileSheet';
 import { MobileStatus } from './components/mobile/MobileStatus';
 import { MobileVersus } from './components/mobile/MobileVersus';
 import { followScrollTop } from './hooks/useFollowSpeech';
-import { phaseTitle } from './hudStatus';
+import { phaseTitle, stageStatus } from './hudStatus';
 import { ringPercents } from './layouts/ringGeometry';
 import { meta, seat, view } from './stage.fixtures';
 import type { StreamItem } from './types';
@@ -62,6 +62,16 @@ describe('phone stage helpers', () => {
   it('never shows an internal phase id as a title', () => {
     expect(phaseTitle({ ...werewolf, phase: { id: 'night_resolve', title: 'night_resolve' } })).toBe('技能结算');
     expect(phaseTitle({ ...werewolf, phase: { id: 'day_speech', title: '白天发言' } })).toBe('白天发言');
+  });
+
+  it('reports only day and night for werewolf, and keeps the stage name for debate', () => {
+    const night = { ...werewolf, round: 2, extra: { ...werewolf.extra, period: 'night' }, phase: { id: 'night_resolve', title: 'night_resolve' } };
+    const day = { ...werewolf, round: 3, extra: { ...werewolf.extra, period: 'day' }, phase: { id: 'day_speech', title: '白天发言' } };
+    expect(stageStatus(night)).toBe('第 2 夜');
+    expect(stageStatus(day)).toBe('第 3 天');
+    expect(stageStatus({ ...day, status: 'completed' })).toBe('对局已结束');
+    expect(stageStatus({ ...day, gameKey: 'debate', round: 1, phase: { id: 'cross', title: '攻辩' } })).toBe('第 1 轮 · 攻辩');
+    expect(stageStatus(null)).toBe('准备中');
   });
 });
 

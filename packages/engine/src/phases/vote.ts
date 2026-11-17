@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ExecEnv } from '../runtime/env';
 import { toSeatNumbers } from '../runtime/seats';
 import type { VotePhase } from '../spec/phases';
+import { asideField, logAside } from './aside';
 import { seatNumber } from './seatNumber';
 import { tallyBallots, type Tally } from './tally';
 import { done, issue, type AiPhaseExecutor, type RequestDraft, type StepOutcome } from './types';
@@ -156,12 +157,13 @@ export const voteExecutor: AiPhaseExecutor<Phase> = {
 
   schema(_env, phase) {
     const seat = seatNumber();
-    return z.object({
+    const base = z.object({
       target: phase.allowAbstain
         ? seat.nullable().describe('投票对象的座位号，必须是合法目标之一；null 表示弃票')
         : seat.describe('投票对象的座位号，必须是合法目标之一'),
       reason: z.string().max(300).optional().describe('简短理由'),
     });
+    return phase.aside ? base.extend({ aside: asideField(phase.aside) }) : base;
   },
 
   check(_env, phase, pending, value) {
@@ -178,7 +180,8 @@ export const voteExecutor: AiPhaseExecutor<Phase> = {
     return abstention;
   },
 
-  store(env, _phase, pending, value) {
+  store(env, phase, pending, value) {
+    logAside(env, phase.aside, pending, value);
     const state = env.phaseState<VoteState>();
     state.ballots[String(pending.seat)] = (value as VoteOutput).target;
     if (env.collectTrace) (state.ballotRequests ??= {})[String(pending.seat)] = pending.id;

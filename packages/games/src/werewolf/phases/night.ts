@@ -23,6 +23,7 @@ import { nightAfter } from '../rules/order';
 import { seerWakesLate } from '../rules/spiritWolfSkills';
 import type { WerewolfParams, WerewolfState } from '../state';
 import type { WerewolfPhases } from './types';
+import { WEREWOLF_ASIDE } from '../../speechLimits';
 
 /** 预言家查验；有灵狼的板子里预言家在灵狼之后睁眼（seer_check_late），两个位置只会启用一个 */
 const seerCheck = {
@@ -32,6 +33,7 @@ const seerCheck = {
   actors: (ctx) => nightActors(ctx, 'seer'),
   targets: (ctx, seat) => ctx.seats.alive().except(seat),
   prompt: prompts.seerCheck,
+  aside: WEREWOLF_ASIDE,
   describe: describeSeerCheck,
   apply: recordSeerCheck,
 } as const satisfies Omit<ActPhase<WerewolfState, WerewolfParams>, 'next'>;
@@ -64,6 +66,7 @@ export const nightPhases = {
     voters: (ctx) => wolvesBlocked(ctx) ? [] : aliveWolves(ctx),
     candidates: wolfKillTargets,
     prompt: prompts.wolfKill,
+    aside: WEREWOLF_ASIDE,
     allowAbstain: true,
     tie: { runoff: 0, then: 'seeded_random' },
     channel: 'team:werewolf',
@@ -80,6 +83,7 @@ export const nightPhases = {
     targets: witchSaveTargets,
     allowNone: true,
     prompt: prompts.witchSave,
+    aside: WEREWOLF_ASIDE,
     decisionNotice: (targets, ctx) => line(ctx, 'witchSave', { 座号: targets[0]! }),
     apply: applyWitchSave,
     next: nightAfter('witch_save'),
@@ -92,6 +96,7 @@ export const nightPhases = {
     targets: witchPoisonTargets,
     allowNone: true,
     prompt: prompts.witchPoison,
+    aside: WEREWOLF_ASIDE,
     decisionNotice: (_targets, ctx) => line(ctx, 'witchPoison'),
     apply: applyWitchPoison,
     next: nightAfter('witch_poison'),

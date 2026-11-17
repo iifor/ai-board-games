@@ -12,9 +12,10 @@ describe('werewolf properties', () => {
     expect(outcomes.size).toBeGreaterThan(1);
   });
 
+  // 100 局逐请求做结构与文本两层检查，空闲时约 3 秒；机器繁忙时留足余量
   it('never leaks wolf chat, seer results, witch decisions or hidden roles', () => {
     for (const run of runs) assertNoLeak(werewolfGame, run);
-  });
+  }, 30_000);
 
   it('keeps hidden roles out of non-wolf prompts', () => {
     for (const run of runs.slice(0, 20)) {
@@ -46,6 +47,10 @@ describe('werewolf properties: chaos mode', () => {
     expect(log.some((entry) => entry.kind === 'seat_eliminated' && entry.reason === '自爆')).toBe(true);
     expect(log.some((entry) => entry.kind === 'fallback')).toBe(true);
     expect(runs.flatMap((run) => run.requests).some(({ request }) => request.attempt > 1)).toBe(true);
+    // 关键操作的心里话只走观战频道（下面的泄露检查保证它不进入任何 AI 的提示词）
+    const asides = log.filter((entry) => entry.kind === 'speech' && entry.purpose === 'aside');
+    expect(asides.length).toBeGreaterThan(0);
+    expect(asides.every((entry) => entry.channel === 'spectator')).toBe(true);
   });
 
   it('never leaks in chaos mode', () => {

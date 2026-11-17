@@ -11,6 +11,7 @@ import {
   triggerSeat,
 } from '../rules/death';
 import type { SpecialDescriptor } from './types';
+import { WEREWOLF_ASIDE } from '../../speechLimits';
 
 // 狼王：狼人阵营，被放逐、被猎人枪杀、被狼人误刀（如魔术师换号后）出局时可以开枪带走一名玩家；
 // 被毒杀可以开枪，摄梦而死、自爆、殉情、被炸死时不能开枪。有狼王的板子里猎人与狼王开枪都不翻牌：
@@ -40,6 +41,7 @@ const wolfKingPhases = {
     targets: (ctx, seat) => ctx.seats.alive().except(seat),
     allowNone: true,
     prompt: wolfKingPrompts.deathShot,
+    aside: WEREWOLF_ASIDE,
     channel: () => 'public',
     describe: describeShot,
     apply: recordShot,

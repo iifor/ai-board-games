@@ -84,11 +84,13 @@ GameSpec 关键字段：
 | --- | --- | --- |
 | `announce` | 用**公开上下文**渲染模板，写入主持播报 | — |
 | `speak` | `actors` 返回座位或 `SpeakTurn[]`（每轮可覆盖模板并带 `turn.*` 变量）；`sequential`（默认，后发言者能看到前面的发言）或 `parallel`；`validate` 做内容校验；`channel` 决定频道（默认 public）；`declarations` 允许有权的座位在发言时附带声明（如自爆），声明的可选 `describe` 回调生成公开动作文本。串行发言配置 `listenerPrompt` 后，首位开口前及每段发言后会向符合 `allowed` 的其他座位发出一批私下 `act` 请求，使用各自的可见上下文。`targets: []` 表示继续听，选择自身座号表示立即声明。同批多人声明时按座号取首个，只公开实际发动的动作 | `output` schema（标准为 `speechOutput({ max })`：`max` 提供阶段默认篇幅；座位有玩家设置时，`turn.maxChars` 取玩家建议字数。使用自定义 `output` 且两者都缺失时取 `DEFAULT_SPEECH_MAX_CHARS`（150））；启用 `allowSkip` 时允许显式返回 `{ speech: null }`，仅推进轮次，调用链保留决定，不生成发言；有权声明的座位额外获得可选的 `declare` 字段，null、空串或纯空白按省略处理，其他未登记的动作按原有规则拒绝 |
-| `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }`，座位号接受 `3` 或 `"3"`（见"AI 管线"） |
-| `vote` | 投票后计票，`weight` 设定票权，`bonus` 给出不属于任何投票者的额外票（如乌鸦诅咒，进入阶段时计算一次，每轮只计给该轮候选人；日志的 `tally` 含额外票、`ballots` 不含，AI 历史中显示为"额外票：5号+1"），`allowAbstain` 控制主动弃票，请求失败一律记为弃票；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者、`ballots` 给出最后一轮的有效选票（不含弃票，规则可据此知道谁投了谁）；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null；座位号接受 `3` 或 `"3"` |
+| `act` | 每个 actor 在 `targets` 中选 `count` 个；`allowNone` 允许输出空数组放弃（兜底默认放弃）；日志默认写入该座位私密频道；`apply` 把全部决定写回状态 | 自动生成 `{ targets, reason? }`，座位号接受 `3` 或 `"3"`（见"AI 管线"）；声明 `aside` 时追加可选的心里话字段（见下） |
+| `vote` | 投票后计票，`weight` 设定票权，`bonus` 给出不属于任何投票者的额外票（如乌鸦诅咒，进入阶段时计算一次，每轮只计给该轮候选人；日志的 `tally` 含额外票、`ballots` 不含，AI 历史中显示为"额外票：5号+1"），`allowAbstain` 控制主动弃票，请求失败一律记为弃票；平票在并列者中复投 `tie.runoff` 次，仍平票按 `tie.then`（`seeded_random` / `none`），结果中的 `tied` 给出最终并列者、`ballots` 给出最后一轮的有效选票（不含弃票，规则可据此知道谁投了谁）；`onResult: 'eliminate'` 淘汰当选者（`eliminateCause` 为触发器用的原因）；`apply` 写回状态 | 自动生成 `{ target, reason? }`，允许弃票时 `target` 可为 null；座位号接受 `3` 或 `"3"`；声明 `aside` 时同样追加心里话字段 |
 | `judge` | 评委依次判定，`verdicts` 定义选项与含义；多数决，无评委或并列时取 `tieVerdict`；`commentMax`（默认 300）提供阶段默认点评篇幅 | 自动生成 `{ verdict, comment }`，选项含义写入 schema 描述；模板从 `turn.maxChars` 读取该评委的篇幅建议 |
 | `compute` | 纯函数结算：返回新状态、`reassign`（改变座位的角色或阵营；阵营改变时座位记录 `teamSince`，见"可见性"）、日志、淘汰列表，按此顺序生效（播报先于出局事件） | — |
 | `reveal` | 写入一条揭示日志；`revealRoles` 向所有玩家与观众公开全部身份，并在日志 `data.roles` 中给出身份表 | — |
+
+心里话（`AsideSpec`，`phases/aside.ts`）：`act` / `vote` 阶段声明 `aside: { maxChars? }`（默认 60）后，输出契约追加可选的 `aside` 字符串，描述引导模型平常省略、觉得此刻有博弈才说。非空时在该座位的行动日志或选票之前写一条 `speech`（`purpose: 'aside'`，频道 `spectator`）：观众可见可朗读，任何 AI 都看不到（包括说话者本人）。超长按输出不合法重问；空白不写。混沌脚本对声明了 `aside` 的阶段按 30% 附带一句，覆盖这条路径的泄露检查。
 
 阶段可声明 `enabled(ctx)`：返回 false 时静默跳过（不记录、不计访问次数），直接按 `next` 跳转（此时 `ctx.result` 为 null），用于本局不存在的角色。跳过的阶段**不保留上一次访问的结果**：`ctx.results[phaseId]` 会被删掉，后续的 `when`、模板与 `findResult` 不会读到上一轮的数据（调试指令 `skip` 同样如此）。
 

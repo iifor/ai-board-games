@@ -61,7 +61,7 @@ describe('speechOf', () => {
     { phaseId: 'sheriff_signup', targets: [2] }, { phaseId: 'sheriff_signup', targets: [] },
     { phaseId: 'sheriff_withdraw', targets: [2] }, { phaseId: 'sheriff_withdraw', targets: [] },
   ])('keeps sheriff choices silent: $phaseId $targets', ({ phaseId, targets }) => {
-    const choice: StageEvent = { ...event({ kind: 'action', seat: 2, action: '竞选选择', targets, text: '2号的竞选选择' }), phaseId };
+    const choice = { ...event({ kind: 'action', seat: 2, action: '竞选选择', targets, text: '2号的竞选选择' }), phaseId } as Extract<StageEvent, { kind: 'action' }>;
     expect(speechOf(choice)).toBeNull();
     expect(speechOf({ ...choice, phaseId: 'sheriff_withdraw' })).toBeNull();
     expect(speechOf({ ...choice, phaseId: 'sheriff_badge_transfer' })).not.toBeNull();

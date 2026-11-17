@@ -1,6 +1,7 @@
 import { isPlayerSpeech, stripSpeechTags } from '@battle/shared';
 import { useEffect, useRef } from 'react';
 import { describeEvent, hostLabel } from '../playback/describe';
+import { withAsideTag } from '../playback/speechTurns';
 import type { StreamItem } from '../types';
 import { speakerLabel } from '../utils';
 import './EventFeed.css';
@@ -33,7 +34,7 @@ export function EventFeed({ items, filter = 'all' }: EventFeedProps) {
         const seat = speaker === null ? null : event.view.seats.find((candidate) => candidate.seat === speaker);
         return (
           <li key={event.seq} className={`event-feed-${event.kind}`}>
-            {event.kind === 'phase_started' ? <strong>{text}</strong> : <><span>{seat ? speakerLabel(seat.seat, seat.name) : hostLabel(event)}</span>{text}</>}
+            {event.kind === 'phase_started' ? <strong>{text}</strong> : <><span>{seat ? withAsideTag(speakerLabel(seat.seat, seat.name), event) : hostLabel(event)}</span>{text}</>}
           </li>
         );
       })}

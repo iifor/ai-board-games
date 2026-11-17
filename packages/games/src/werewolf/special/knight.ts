@@ -5,6 +5,7 @@ import { isWolf, type WerewolfContext } from '../rules/context';
 import { dayAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
 import type { SpecialDescriptor } from './types';
+import { WEREWOLF_ASIDE } from '../../speechLimits';
 
 // 骑士：白天发言结束、放逐投票前可以决斗一名存活玩家（全场一次，可不发动）。
 // 对方是狼人：该狼人出局，当天放逐取消，直接入夜；对方是好人：骑士出局，白天照常进行。决斗出局者没有遗言。
@@ -62,6 +63,7 @@ const knightPhases = {
     targets: (ctx, seat) => ctx.seats.alive().except(seat),
     allowNone: true,
     prompt: knightPrompts.knightDuel,
+    aside: WEREWOLF_ASIDE,
     apply: applyDuel,
     next: [
       { when: (ctx) => duelHitsWolf(ctx) === true, goto: 'knight_hit' },

@@ -6,6 +6,7 @@ import { nightAfter } from '../rules/order';
 import type { WerewolfState } from '../state';
 import type { WerewolfPhases } from '../phases/types';
 import type { SpecialDescriptor } from './types';
+import { WEREWOLF_ASIDE } from '../../speechLimits';
 
 // 守卫：每晚守护一人（可自守、可空守），不能连续两晚守同一人；同守同救则被守护者死亡。
 
@@ -33,6 +34,7 @@ const guardPhases = {
     targets: guardTargets,
     allowNone: true,
     prompt: guardPrompts.guardProtect,
+    aside: WEREWOLF_ASIDE,
     apply: applyGuard,
     next: nightAfter('guard_protect'),
   },

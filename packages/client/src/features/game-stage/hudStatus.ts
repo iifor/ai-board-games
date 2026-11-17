@@ -1,4 +1,4 @@
-import type { AudienceView, MatchSummaryDto, StageEvent } from '@battle/shared';
+import type { AudienceView, MatchSummaryDto } from '@battle/shared';
 import type { StreamConnection } from './types';
 import { periodOf, roundLabel } from './utils';
 
@@ -21,13 +21,15 @@ export function phaseTitle(view: AudienceView | null): string | undefined {
   return phase?.title === phase?.id && /^[a-z_]+$/.test(phase?.id ?? '') ? '技能结算' : phase?.title;
 }
 
-/** 当前阶段文案："第 2 夜 · 狼人请睁眼" / "第 1 轮 · 攻辩"；夜里用公开台词或"法官私讯"代替技术阶段名 */
-export function stageStatus(view: AudienceView | null, event: StageEvent | undefined): string {
+/** 狼人杀只报昼夜（"第 2 夜" / "第 3 天"）：具体阶段由法官台词和舞台交代，顶部不再出现技术阶段名 */
+export function periodStatus(view: AudienceView): string {
+  return periodOf(view) === 'night' ? `第 ${view.round} 夜` : roundLabel(view);
+}
+
+/** 当前进度文案：狼人杀 "第 2 夜"；辩论赛 "第 1 轮 · 攻辩" */
+export function stageStatus(view: AudienceView | null): string {
+  if (view?.status === 'completed') return '对局已结束';
+  if (view?.gameKey === 'werewolf') return periodStatus(view);
   const title = phaseTitle(view);
-  const night = view?.gameKey === 'werewolf' && periodOf(view) === 'night';
-  let step = title;
-  if (night && event?.kind === 'phase_started' && event.channel === 'public' && event.announcement) step = event.announcement.replace(/。$/, '');
-  if (night && event?.kind === 'narration' && event.channel.startsWith('private:')) step = '法官私讯';
-  if (view && step) return `${night ? `第 ${view.round} 夜` : roundLabel(view)} · ${step}`;
-  return view?.status === 'completed' ? '对局已结束' : '准备中';
+  return view && title ? `${roundLabel(view)} · ${title}` : '准备中';
 }

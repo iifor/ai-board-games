@@ -38,7 +38,6 @@ export function MobileStage({ summary, playback, stream, options, onOptions, fin
   const [sheet, setSheet] = useState<{ open: boolean; tab: SheetTab }>({ open: false, tab: 'speech' });
   const [selected, setSelected] = useState<number | null>(null);
   const { view, current, played, control } = playback;
-  const item = current ?? played.at(-1) ?? null;
   const items = current ? [...played, current] : played;
   const seat = seatOf(view, selected);
   const select = (next: number) => {
@@ -50,7 +49,7 @@ export function MobileStage({ summary, playback, stream, options, onOptions, fin
   return (
     <div className="mobile-stage" data-game={summary.gameKey} data-period={periodOf(view)}>
       <StageBackdrop gameKey={summary.gameKey} period={periodOf(view)} />
-      <MobileTopBar summary={summary} view={view} event={item?.event} connection={stream.connection} ended={finished} replay={replay}>
+      <MobileTopBar summary={summary} view={view} connection={stream.connection} ended={finished} replay={replay}>
         {perspective}
       </MobileTopBar>
       {topic ? <p className="mobile-stage-topic">{topic}</p> : null}

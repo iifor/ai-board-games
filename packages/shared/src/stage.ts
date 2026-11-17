@@ -48,6 +48,8 @@ export type StagePayload =
       readonly seat: number;
       /** 系统代发的台词（请求失败后的"过~"），不是玩家本人的发言 */
       readonly source?: 'fallback';
+      /** aside：关键操作时说给观众的心里话，走观战频道，不进入任何 AI 的可见历史 */
+      readonly purpose?: 'aside';
       readonly text: string;
       readonly replyRequests?: readonly { readonly seat: number; readonly task: string }[];
     }

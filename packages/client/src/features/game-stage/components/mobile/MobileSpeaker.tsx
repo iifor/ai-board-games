@@ -1,7 +1,7 @@
 import type { AudienceView } from '@battle/shared';
 import { Avatar } from '../../../../components/Avatar';
 import { HOST_POSTER } from '../../../../utils/posters';
-import { phaseTitle } from '../../hudStatus';
+import { periodStatus, phaseTitle } from '../../hudStatus';
 import { describeEvent } from '../../playback/describe';
 import type { StreamItem } from '../../types';
 import { periodOf, seatOf } from '../../utils';
@@ -36,7 +36,7 @@ export function MobileSpeaker({ view, item }: MobileSpeakerProps) {
   return (
     <div className="mobile-speaker is-idle">
       <span aria-hidden="true">{night ? '☾' : '☀'}</span>
-      <small>{view.status === 'completed' ? '对局结束' : phaseTitle(view) ?? '等待开始'}</small>
+      <small>{view.status === 'completed' ? '对局结束' : view.gameKey === 'werewolf' ? periodStatus(view) : phaseTitle(view) ?? '等待开始'}</small>
     </div>
   );
 }

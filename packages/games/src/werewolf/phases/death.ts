@@ -5,6 +5,7 @@ import { describeShot, recordShot, resolveSelfDestruct, resolveShot, triggerSeat
 import { applyBadgeTransfer, describeBadgeTransfer } from '../rules/sheriff';
 import { announceDawn } from '../rules/dawn';
 import type { WerewolfPhases } from './types';
+import { WEREWOLF_ASIDE } from '../../speechLimits';
 
 /** 由触发器插入的阶段：出局者是 ctx.trigger.seat */
 export const deathPhases = {
@@ -25,6 +26,7 @@ export const deathPhases = {
     targets: (ctx, seat) => ctx.seats.alive().except(seat),
     allowNone: true,
     prompt: prompts.hunterShot,
+    aside: WEREWOLF_ASIDE,
     channel: () => 'public',
     describe: describeShot,
     apply: recordShot,

@@ -24,7 +24,7 @@ POST `/:group/:key/compare` 接受样例引用、模板草稿与模型配置 ID�
 
 `/api/admin/replay-imports` 全部使用后台鉴权。`POST /parse` 接收 multipart 文件和 gameKey，`POST /suggest` 提供选中原文的模型候选，`POST /preview` 返回逐事件视图和播放起点。根路径支持 GET 列表、POST 保存；`/:id` 支持 GET、按 revision 的 PUT；`POST /:id/publish` 锁定草稿，在同一事务写入已结束的对局、座位和事件。迁移 012 新增 `replay_imports` 和 `matches.import_title`。详见[剧本说明](./replay-import.md)。
 
-狼人杀 WebSocket 默认推送上帝视角。连接 `/api/toc/ws/matches/:id?seat=N` 时，服务端校验座位，推送公开事件，以及 `private:N` 中的法官播报和由 N 执行的行动。视图显示自己的身份和已公开翻牌。服务端自动确认其余事件。语音预取按相同范围过滤，字幕和记录使用投影后的事件。进行中与回放使用相同规则。丘比特 `cupid_bond` 阶段的私密情侣通知保留在后台日志及玩家私密认知中，播放流对所有观战视角跳过此类通知、自动确认进度，语音预取也跳过；连线行动与其他私讯仍按原有可见性处理。
+狼人杀 WebSocket 默认推送上帝视角。连接 `/api/toc/ws/matches/:id?seat=N` 时，服务端校验座位，推送公开事件，`private:N` 中的法官播报和由 N 执行的行动，以及 N 自己在关键操作时的心里话（`spectator` 频道、`purpose: 'aside'` 的发言；其他观战频道事件仍只给上帝视角）。视图显示自己的身份和已公开翻牌。服务端自动确认其余事件。语音预取按相同范围过滤，字幕和记录使用投影后的事件。进行中与回放使用相同规则。丘比特 `cupid_bond` 阶段的私密情侣通知保留在后台日志及玩家私密认知中，播放流对所有观战视角跳过此类通知、自动确认进度，语音预取也跳过；连线行动与其他私讯仍按原有可见性处理。
 
 狼人杀旧事件缺少 `publicRoles` 时，玩家视角仍遮住其他座位的暗牌。全员翻牌事件和终局可以显示全员身份。带有公开台词的阶段使用主持人音色。
 

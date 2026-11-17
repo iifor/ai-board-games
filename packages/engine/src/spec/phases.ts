@@ -81,6 +81,15 @@ export interface SpeakPhase<S, P> extends AiPhaseBase<S, P> {
   readonly declarations?: Readonly<Record<string, DeclarationSpec<S, P>>>;
 }
 
+/**
+ * 关键操作的"心里话"：输出契约追加可选的 aside 字段，由模型自己判断要不要说（平常省略，觉得此刻有博弈才说）。
+ * 写入观战频道的发言（purpose: 'aside'），观众可见、可朗读，不进入任何 AI 的可见历史（包括说话者本人）。
+ */
+export interface AsideSpec {
+  /** 字数上限，默认 60 */
+  readonly maxChars?: number;
+}
+
 export interface ActPhase<S, P> extends AiPhaseBase<S, P> {
   readonly kind: 'act';
   /** 动作名，用于日志与提示，如"查验" */
@@ -99,6 +108,8 @@ export interface ActPhase<S, P> extends AiPhaseBase<S, P> {
   channel?(ctx: RuleContext<S, P>, seat: Seat): Channel;
   describe?(ctx: RuleContext<S, P>, seat: Seat, targets: readonly number[]): string;
   apply?(ctx: RuleContext<S, P>, decisions: readonly ActDecision[]): NoInfer<S>;
+  /** 允许行动者附带一句给观众的心里话 */
+  readonly aside?: AsideSpec;
 }
 
 /** 不属于任何投票者的额外票（如乌鸦的诅咒）：计入每一轮计票，只对该轮的候选人有效 */
@@ -129,6 +140,8 @@ export interface VotePhase<S, P> extends AiPhaseBase<S, P> {
   apply?(ctx: RuleContext<S, P>, outcome: VoteOutcome): NoInfer<S>;
   /** 计票结果的公开范围，默认 public */
   readonly channel?: Channel;
+  /** 允许投票者附带一句给观众的心里话 */
+  readonly aside?: AsideSpec;
 }
 
 export interface JudgeFallback {
