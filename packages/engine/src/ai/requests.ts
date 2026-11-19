@@ -18,7 +18,7 @@ export function issueRequest(env: ExecEnv, draft: RequestDraft, attempt = 1, pre
 
   const viewer = env.seat(draft.seat);
   const settings = viewer.profile.speechSettings;
-  const vars = settings && (draft.action === 'speak' || draft.action === 'judge')
+  const vars = settings && !(phase.kind === 'speak' && phase.advanceTurn) && (draft.action === 'speak' || draft.action === 'judge')
     ? { ...draft.vars, maxChars: settings.speechMaxChars }
     : draft.vars;
   const memoryContext = recall(s, viewer, draft.action);

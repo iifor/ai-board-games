@@ -33,7 +33,7 @@ function normalizeTurns(phase: Phase, selection: SeatSelection | readonly SpeakT
   if (Array.isArray(selection) && selection.some(isSpeakTurn)) {
     return (selection as readonly SpeakTurn[]).map((turn) => ({
       seat: typeof turn.seat === 'number' ? turn.seat : turn.seat.seat,
-      vars: withMaxChars(turn.vars ?? {}, maxChars),
+      vars: withMaxChars(turn.vars ?? {}, turn.maxChars ?? maxChars),
       template: (turn.prompt ?? phase.prompt).name,
     }));
   }
@@ -81,6 +81,9 @@ export const speakExecutor: AiPhaseExecutor<Phase> = {
       const drafts = listenerDrafts(env, phase, speaker.seat, state.next);
       if (drafts.length) return issue(drafts);
     }
+    if (phase.advanceTurn && state.next > 0 && state.next === state.turns.length) {
+      state.turns.push(...normalizeTurns(phase, phase.actors(env.ctx())));
+    }
     const turn = state.turns[state.next];
     if (!turn) return result();
     state.issued = true;
@@ -105,6 +108,12 @@ export const speakExecutor: AiPhaseExecutor<Phase> = {
 
   skipFailed(env, phase, pending) {
     if (pending.action === 'act') return { skipped: true, targets: [] };
+    if (phase.advanceTurn) {
+      env.setState(phase.advanceTurn(env.ctx(), env.seat(pending.seat), null));
+      env.phaseState<SpeakState>().next += 1;
+      env.log({ kind: 'narration', text: `${pending.seat}号本轮未能发言。`, channel: phase.channel?.(env.ctx(), env.seat(pending.seat)) ?? 'public' });
+      return { skipped: true };
+    }
     const pass = { speech: '过~' };
     storeSpeech(env, phase, pending, pass, 'fallback');
     return pass;
@@ -132,6 +141,10 @@ function storeSpeech(env: ExecEnv, phase: Phase, pending: PendingRequest, value:
     state.issued = false;
   }
   const text = (value as { speech: string | null }).speech;
+  if (phase.advanceTurn) {
+    env.setState(phase.advanceTurn(env.ctx(), seat, value as { speech: string | null }));
+    if (text === null) env.log({ kind: 'narration', text: `${seat.seat}号主动让过。`, channel: phase.channel?.(env.ctx(), seat) ?? 'public' });
+  }
   if (text === null) return;
   const requests = (value as ReplyOutput).replyRequests;
   const index = turnIndex(pending.slot);

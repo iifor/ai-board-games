@@ -23,5 +23,45 @@
 .versus-layout .seat-card-figure .seat-spotlight { inset: 16px 0 3px; }
 .versus-layout .seat-card-figure .seat-card-stamp { z-index: 2; top: 28px; }
 
-
+@media (min-width: 861px) {
+  .versus-team-seats > .ui-fade-up { display: grid; place-items: center; container-type: inline-size; }
+  .versus-layout .versus-team-seats .seat-card.seat-card-figure {
+    width: min(100%, 210px);
+    height: auto;
+    grid-template-rows: 24px min(clamp(120px, 160cqw, 320px), 26vh) 24px 28px;
+  }
+  .versus-layout .versus-team-seats .ring-seat-head { line-height: 1.2; }
+  .versus-layout .versus-team-seats .ring-seat-name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    text-align: center;
+    font-size: clamp(10px, .75vw, 14px);
+    align-self: start;
+  }
+  .versus-bench .versus-bench-seats {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: clamp(4px, .6vw, 12px);
+    width: min(100%, 680px);
+    margin-inline: auto;
+    align-items: end;
+  }
+  .versus-layout .versus-bench-seats .seat-card.seat-card-figure {
+    width: 100%;
+    height: clamp(140px, 19vh, 260px);
+    grid-template-rows: 20px minmax(0, 1fr) 24px 32px;
+  }
+  .versus-layout .versus-bench-seats .ring-seat-name {
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    text-align: center;
+    font-size: clamp(10px, .72vw, 13px);
+    align-self: start;
+  }
+}
 @media (prefers-reduced-motion: reduce) { .versus-layout .seat-card-figure .seat-figure { transition: none; } }

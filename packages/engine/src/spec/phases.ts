@@ -45,6 +45,7 @@ export interface SpeakTurn {
   readonly prompt?: PromptTemplate;
   /** 模板中以 `turn.*` 访问 */
   readonly vars?: TemplateVars;
+  readonly maxChars?: number;
 }
 
 /** 发言时可附带声明的动作（如狼人自爆）；声明后引擎派发 action_declared 事件 */
@@ -72,6 +73,8 @@ export interface SpeakPhase<S, P> extends AiPhaseBase<S, P> {
   readonly followUp?: { readonly prompt: PromptTemplate; readonly fallbackText: string };
   /** 允许以 { speech: null } 主动跳过该回合，不写发言事件。 */
   readonly allowSkip?: boolean;
+  /** 单席串行循环。每次结算后重新调用 actors，返回空列表即结束。 */
+  advanceTurn?(ctx: RuleContext<S, P>, seat: Seat, output: { speech: string | null } | null): NoInfer<S>;
   readonly output: ZodType<SpeechOutput>;
   /** 返回错误原因表示内容不合格，null 表示通过 */
   validate?(output: SpeechOutput, ctx: RuleContext<S, P>, seat: Seat): string | null;

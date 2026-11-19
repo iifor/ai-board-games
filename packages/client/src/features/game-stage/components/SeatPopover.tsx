@@ -1,6 +1,6 @@
 import type { AudienceSeat } from '@battle/shared';
 import { useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { POPOVER_GAP } from '../constants';
+import { POPOVER_DOCK_LEAVE_DELAY, POPOVER_GAP } from '../constants';
 import { useSeatHover } from '../hooks/useSeatHover';
 import type { SeatSpeech } from '../types';
 import { popoverPlacement, type PopoverPlacement } from '../utils';
@@ -16,6 +16,8 @@ interface SeatPopoverProps {
   /** 弹层所在的舞台区域（.stage-arena），定位基准 */
   readonly arenaRef: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
+  /** 辩论桌面资料占用侧边记录区，避免遮挡中央发言。 */
+  readonly dockSide?: 'left' | 'right' | undefined;
 }
 
 type PopoverStyle = CSSProperties & Record<'--popover-left' | '--popover-top' | '--popover-gap', string>;
@@ -55,17 +57,17 @@ function usePlacement(ref: ElementRef, arenaRef: ElementRef, anchor: HTMLElement
  * 座位资料弹层：内容是 SeatProfile（头像、身份、阵营、存活状态与本局发言，可滚动）。
  * 挂在 .stage-arena 里、贴着座位卡片弹出（右侧放不下翻到左侧，上下夹回舞台内）；同一时间只有一个
  */
-export function SeatPopover({ seat, speeches, anchor, arenaRef, onClose }: SeatPopoverProps) {
+export function SeatPopover({ seat, speeches, anchor, arenaRef, onClose, dockSide }: SeatPopoverProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const placement = usePlacement(ref, arenaRef, anchor, onCloseRef);
-  useSeatHover(anchor, ref, onClose);
+  const placement = usePlacement(ref, arenaRef, dockSide ? null : anchor, onCloseRef);
+  useSeatHover(anchor, ref, onClose, dockSide ? POPOVER_DOCK_LEAVE_DELAY : undefined);
   const style: PopoverStyle | undefined = placement ? {
     '--popover-left': `${placement.left}px`, '--popover-top': `${placement.top}px`, '--popover-gap': `${POPOVER_GAP}px`,
   } : undefined;
   return (
-    <div ref={ref} id="seat-profile" className="seat-popover glass-panel" role="region" aria-labelledby="seat-popover-name" data-team={seat.team ?? undefined} data-side={placement?.side ?? 'right'} style={style}>
+    <div ref={ref} id="seat-profile" className="seat-popover glass-panel" role="region" aria-labelledby="seat-popover-name" data-team={seat.team ?? undefined} data-dock={dockSide} data-side={placement?.side ?? 'right'} style={style}>
       <SeatProfile seat={seat} speeches={speeches} nameId="seat-popover-name" />
     </div>
   );

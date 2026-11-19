@@ -34,6 +34,13 @@ describe.each(GAMES.map((game): [string, CompiledGame] => [game.spec.key, game])
     for (const request of requests) {
       const field = request.action === 'speak' ? 'speech' : 'comment';
       expect(request.outputSchema).not.toHaveProperty(['properties', field, 'maxLength']);
+      if (request.phaseId === 'free_debate') {
+        const cap = Number(request.taskTemplate?.context.turn && (request.taskTemplate.context.turn as Record<string, unknown>).maxChars);
+        expect(cap).toBeGreaterThan(0);
+        expect(cap).toBeLessThanOrEqual(150);
+        expect(request.prompt.instruction).toContain(`本次正文最多 ${cap} 字`);
+        continue;
+      }
       expect(request.prompt.instruction, request.id).toContain(`建议 ${players[request.seat - 1]!.speechSettings.speechMaxChars} 字以内`);
     }
   });

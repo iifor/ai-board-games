@@ -74,7 +74,7 @@ describe('debate flow', () => {
       if (!seat) throw new Error(`缺少 ${side}${position}`);
       return seat.seat;
     };
-    expect(speechLog(run.log).map((entry) => entry.seat)).toEqual([
+    expect(speechLog(run.log).filter(entry => entry.phaseId !== 'free_debate').map((entry) => entry.seat)).toEqual([
       label('pro', 1), label('con', 1),
       label('pro', 2), label('con', 2),
       label('con', 2), label('pro', 3),

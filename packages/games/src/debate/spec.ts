@@ -1,5 +1,6 @@
 import { compileGame, defineGame, speechOutput } from '@battle/engine';
 import { DEBATE_SPEECH_MAX_CHARS } from '../speechLimits';
+import { freeDebateTurn, freeSpeechOutput, settleFreeTurn, validateFreeSpeech } from './freeDebate';
 import { debatePrompts as prompts } from './prompts';
 import { closingSpeakers, crossfireTurns, debateResult, debateSeatLabel, openingSpeakers, pickTopic } from './rules';
 import { debateParamsSchema, debateStateSchema } from './state';
@@ -8,9 +9,9 @@ const holdPosition = () => ({ speech: '我方坚持己方立场，请评委关�
 
 export const debateSpec = defineGame({
   key: 'debate',
-  version: 3,
+  version: 5,
   title: 'AI 辩论赛',
-  description: '正反双方各四名辩手，经立论、攻辩、总结后由评委判定胜负并评选最佳辩手。',
+  description: '正反双方各四名辩手，经立论、攻辩、自由辩论、总结后由评委判定胜负并评选最佳辩手。',
   players: { min: 9, max: 12 },
   params: debateParamsSchema,
   prompts,
@@ -42,7 +43,16 @@ export const debateSpec = defineGame({
       prompt: prompts.crossfireQuestion,
       output: speechOutput({ max: DEBATE_SPEECH_MAX_CHARS }),
       fallback: holdPosition,
-      next: 'closing',
+      next: 'free_start',
+    },
+    free_start: { kind: 'announce', title: '自由辩论开始', text: prompts.freeStart, next: 'free_debate' },
+    free_debate: {
+      kind: 'speak', title: '自由辩论', actors: freeDebateTurn, advanceTurn: settleFreeTurn,
+      prompt: prompts.freeSpeech, output: freeSpeechOutput, validate: validateFreeSpeech,
+      allowSkip: true, fallback: holdPosition, next: 'free_end',
+    },
+    free_end: {
+      kind: 'announce', title: '自由辩论结束', text: prompts.freeEnd, next: 'closing',
     },
     closing: {
       kind: 'speak',
@@ -72,6 +82,11 @@ export const debateSpec = defineGame({
       tie: { runoff: 0, then: 'seeded_random' },
       next: 'end',
     },
+  },
+  debug: {
+    speak: (ctx, _seat, vars) => ctx.phaseId === 'free_debate'
+      ? { speech: '我方认为应当检验这个论点在具体情境中是否成立。'.repeat(5).slice(0, Math.min(100, Number(vars.maxChars))) }
+      : undefined,
   },
   end: debateResult,
   presentation: {

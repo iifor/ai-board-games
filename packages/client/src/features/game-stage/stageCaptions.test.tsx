@@ -32,6 +32,18 @@ function renderPage(event: StageEvent, layout: 'circle' | 'versus', captions?: S
 }
 
 describe('bottom captions in the normal stage page', () => {
+  it.each(['circle', 'versus'] as const)('shows history panels and their buttons only for the circle stage (%s)', layout => {
+    const event: StageEvent = { ...meta, view: { ...view, gameKey: layout === 'circle' ? 'werewolf' : 'debate' }, kind: 'speech', seat: 1, text: '当前发言。' };
+    const html = renderPage(event, layout);
+    expect(html.includes('stage-history-overview')).toBe(layout === 'circle');
+    expect(html.includes('stage-history-speech')).toBe(layout === 'circle');
+    expect(html.includes('>对局记录</button>')).toBe(layout === 'circle');
+    expect(html.includes('>发言记录</button>')).toBe(layout === 'circle');
+    expect(html).toContain('← 返回大厅');
+    expect(html).toContain('class="speech-carousel"');
+    expect(html).toContain('aria-label="逐句字幕"');
+  });
+
   it.each(['circle', 'versus'] as const)('keeps bottom captions beside the central player speech in %s layout', layout => {
     const currentView = { ...view, gameKey: layout === 'circle' ? 'werewolf' : 'debate' };
     const event: StageEvent = { ...meta, view: currentView, kind: 'speech', seat: 1, text: '【冷静】先听理由。【停顿】再决定。' };

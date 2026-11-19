@@ -17,6 +17,23 @@
   animation: ui-pop-in var(--ui-motion-normal) var(--ui-ease-out) both;
 }
 .seat-popover.glass-panel { border: 0; }
+@media (min-width: 861px) {
+  .seat-popover[data-dock] {
+    position: fixed;
+    z-index: 45;
+    top: 50%;
+    left: var(--stage-gutter);
+    width: var(--stage-history-width);
+    height: var(--stage-history-height);
+    max-height: var(--stage-history-height);
+    transform: translateY(-50%);
+    background: rgb(7 17 33 / 96%);
+    animation: none;
+  }
+  .seat-popover[data-dock='right'] { left: auto; right: var(--stage-gutter); }
+  .seat-popover[data-dock]::before { display: none; }
+  .seat-popover[data-dock] .seat-popover-identity strong { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+}
 
 .seat-popover[data-side='left'] {
   transform-origin: right top;

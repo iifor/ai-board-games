@@ -80,6 +80,13 @@ describe('stage shortcuts', () => {
 });
 
 describe('seat popover', () => {
+  it('can dock debate profiles in the side record area instead of positioning beside the seat', () => {
+    const html = renderToStaticMarkup(<SeatPopover seat={seat(2,'pro',2)} speeches={[]} anchor={null}
+      arenaRef={createRef<HTMLDivElement>()} onClose={() => {}} dockSide="left" />);
+    expect(html).toContain('data-dock="left"');
+    expect(html).toContain('aria-label="本局发言" tabindex="0"');
+    expect(html).toContain('玩家2');
+  });
   const item = (event: StageEvent): StreamItem => ({ event, audio: null });
   const later = { ...view, round: 2, phase: { id: 'rebuttal', title: '驳论' } };
   const played: readonly StreamItem[] = [

@@ -38,14 +38,15 @@
 @media (min-width: 861px) {
   .stage-shell[data-layout='circle'] { --stage-subtitle-max-height: clamp(98px, 12vh, 150px); }
   .stage-shell[data-layout='versus'] {
+    --stage-history-height: min(clamp(360px, 76vh, 1100px), calc(100dvh - 288px));
     display: grid;
-    /* 两侧记录面板是网格的首尾两列：展开时占面板宽度、收起为 0，辩手座位不会被盖住 */
-    grid-template: "status status topic controls controls" auto "overview arena arena arena speech" minmax(0, 1fr)
-      / var(--history-left) minmax(0, 1fr) minmax(0, 1.8fr) minmax(0, 1fr) var(--history-right);
+    grid-template: "status topic controls" auto "arena arena arena" minmax(0, 1fr)
+      / minmax(0, 1fr) minmax(0, 1.8fr) minmax(0, 1fr);
     align-items: start;
     gap: clamp(10px, 1.4vh, 22px) 16px;
-    padding: clamp(10px, 1.4vh, 20px) var(--stage-gutter) clamp(112px, 13vh, 172px);
+    padding: clamp(10px, 1.4vh, 20px) var(--stage-gutter) 24px;
   }
+  .stage-shell[data-layout='versus']:has(> .sentence-captions) { padding-bottom: clamp(88px, 10vh, 140px); }
   .stage-shell[data-layout='versus'] > .versus-topic { grid-area: topic; z-index: 4; }
   .stage-shell[data-layout='versus'] > .stage-hud {
     grid-area: status;
@@ -66,26 +67,33 @@
     align-self: stretch;
     min-height: 0;
     inset: auto;
-    margin-inline: clamp(0px, 1.5vw, 80px);
   }
-  .stage-shell[data-layout='versus'] > .stage-history {
-    position: static;
-    width: auto;
-    height: auto;
-    align-self: stretch;
+  .stage-shell[data-layout='versus'] .speech-carousel {
+    --debate-speaker-height: clamp(112px, 20cqw, 220px);
+    --speech-track-top: calc(var(--debate-speaker-height) + 14px);
+  }
+  .stage-shell[data-layout='versus'] .speech-backdrop {
+    inset: 0 0 auto;
+    height: var(--debate-speaker-height);
+    opacity: 1;
+  }
+  .stage-shell[data-layout='versus'] .speech-figure {
+    inset: 0;
+    height: 100%;
     transform: none;
   }
-  .stage-shell[data-layout='versus'] > .stage-history-overview { grid-area: overview; }
-  .stage-shell[data-layout='versus'] > .stage-history-speech { grid-area: speech; }
+  .stage-shell[data-layout='versus'] .speech-track { justify-content: flex-start; }
+  .stage-shell[data-layout='versus'] .speech-turn p { line-height: 1.45; font-weight: 600; }
+  .stage-shell[data-layout='versus'] .speech-paragraph { display: block; margin-top: .55em; }
 }
 @media (min-width: 861px) and (max-width: 1499px) {
   .stage-shell[data-layout='versus'] {
-    grid-template: "status status controls controls" auto "overview arena arena speech" minmax(0, 1fr)
-      / var(--history-left) minmax(0, 1fr) auto var(--history-right);
+    --stage-history-height: min(clamp(360px, 76vh, 1100px), calc(100dvh - 420px));
+    grid-template: "status controls" auto "arena arena" minmax(0, 1fr) / minmax(0, 1fr) auto;
   }
   .stage-shell[data-layout='versus']:has(> .versus-topic) {
     grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas: "topic topic topic topic" "status status controls controls" "overview arena arena speech";
+    grid-template-areas: "topic topic" "status controls" "arena arena";
   }
 }
 

@@ -89,7 +89,7 @@ export function builtInExamples(entry: CatalogEntry, registry: ReadonlyMap<strin
         return { label: g.spec.title, rendered: renderTemplate(template, context), context };
       })
     : [{ label: '固定指令', rendered: template.source, context: {} }];
-  if (item.pilot || (game.spec.key === 'debate' && item.key === 'crossfireAnswer') ||
+  if (item.pilot || (game.spec.key === 'debate' && ['crossfireAnswer', 'freeSpeech'].includes(item.key)) ||
     (game.spec.key === 'werewolf' && ['wolfChat', 'wolfChatReply', 'selfDestructDecision'].includes(item.key))) return turnExamples(game, item.key);
   const conversion = entry.role && convertedRoles.get(entry.role);
   if (game.spec.key === 'werewolf' && entry.role && conversion) {

@@ -44,7 +44,7 @@ function deliveryFor(task: ClaimedTask, tags: readonly string[]): SpeechDelivery
     allowed.length ? `当前音色只可使用：${allowed.map(tag => `[${tag}]`).join('')}。` : '当前没有可用的朗读标记，请直接输出台词。',
     '朗读标记的完整清单以上述列表为准。方括号只用于这些标记，普通引用使用引号，座号如 [3号] 可以保留。',
     '正文表达优先，在语气转折处少量标注，允许整段不使用标记。',
-    '标记计入本次输出字数，请为标记预留字数。',
+    task.request.taskTemplate?.name === 'freeSpeech' ? '本次自由辩论只计算发言正文，朗读标记不计入字数。' : '标记计入本次输出字数，请为标记预留字数。',
     '停顿只发生在标记位置；语速、音调和风格作用至下一个同类标记，且不会延续到下一次发言。',
     ...(allowed.includes('恢复') ? ['[恢复]回到音色默认设置。'] : []),
   ].join('\n');

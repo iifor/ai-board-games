@@ -22,6 +22,23 @@ import { isAsleep } from './utils';
 const wolfView: AudienceView = { ...view, gameKey: 'werewolf', seats: [seat(1, null), seat(2, null), seat(3, null)], extra: { sheriff: 2, board: '预女猎白' } };
 
 describe('layouts', () => {
+  it('keeps every debate paragraph in the current speech while compacting paragraph spacing', () => {
+    const event = {...meta,kind:'speech' as const,seat:1,text:'第一段原话。\n\n第二段论据。\n\n最后一段结论。'};
+    const html = renderToStaticMarkup(<Stage layout="versus" view={view} current={{event,audio:null}} played={[]} />);
+    for(const text of ['第一段原话。','第二段论据。','最后一段结论。']) expect(html).toContain(text);
+    expect(html.match(/class="speech-paragraph"/g)).toHaveLength(2);
+  });
+  it('keeps all four debaters per team and four fully named judges in their own debate sections', () => {
+    const roster = Array.from({length:12},(_,i)=>({...seat(i+1,i<4?'pro':i<8?'con':'judge',i%4+1),name:`完整模型名称-${i+1}`,alive:true}));
+    const html = renderToStaticMarkup(<VersusLayout view={{...view,seats:roster}} speaking={6} center={<p>当前内容</p>} />);
+    const pro = html.slice(html.indexOf('versus-side-pro'),html.indexOf('versus-center'));
+    const con = html.slice(html.indexOf('versus-side-con'),html.indexOf('versus-bench'));
+    const judges = html.slice(html.indexOf('versus-bench'));
+    for (const i of [1,2,3,4]) expect(pro).toContain(`完整模型名称-${i}`);
+    for (const i of [5,6,7,8]) expect(con).toContain(`完整模型名称-${i}`);
+    for (const i of [9,10,11,12]) expect(judges).toContain(`完整模型名称-${i}`);
+    expect(judges.match(/class="ring-seat-name"/g)).toHaveLength(4);
+  });
   it('lights only the current wolf speaker, follows a new speaker and clears for narration', () => {
     const render = (event: import('@battle/shared').StageEvent) => {
       const html = renderToStaticMarkup(<Stage layout="circle" view={wolfView} played={[]}

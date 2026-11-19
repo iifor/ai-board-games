@@ -86,4 +86,5 @@ export type {
 export { privateChannel, teamChannel, seatCanSee } from './visibility/channels';
 export { formatHistoryEntry } from './prompt/history';
 export { evidenceOf, memoryEvidenceEntries, recall as recallPlayerMemory } from './prompt/playerMemory';
+export { stripSpeechTags } from '@battle/shared';
 export { formatAnnouncement, type AnnouncementDefinition } from '@battle/shared';

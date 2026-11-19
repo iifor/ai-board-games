@@ -50,3 +50,5 @@ export const RECORD_PANELS_MIN_WIDTH = { circle: 1280, versus: 1700 } as const;
 
 /** 座位弹层与卡片之间的间距（px） */
 export const POPOVER_GAP = 12;
+/** 侧边资料离席位较远，给指针横移进入资料区留出时间。 */
+export const POPOVER_DOCK_LEAVE_DELAY = 450;

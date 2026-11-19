@@ -20,7 +20,7 @@ function CurrentSpeech({ event, currentRef }: {
 }) {
   return (
     <article className="speech-turn" data-slot="current" data-seq={event.seq}>
-      <p ref={currentRef}><SpeechLine event={event} /></p>
+      <p ref={currentRef}><SpeechLine event={event} compactParagraphs={event.view.gameKey === 'debate'} /></p>
     </article>
   );
 }

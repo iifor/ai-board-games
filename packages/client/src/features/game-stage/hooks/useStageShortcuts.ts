@@ -6,8 +6,8 @@ interface StageShortcutsOptions {
   readonly options: PlaybackOptions;
   readonly finished: boolean;
   readonly onChange: (next: PlaybackOptions) => void;
-  /** L：开合记录侧栏 */
-  readonly onToggleFeed: () => void;
+  /** L：开合记录侧栏；没有记录面板时不传，L 不响应 */
+  readonly onToggleFeed?: (() => void) | undefined;
   /** R：打开 / 关闭终局结果；没有结果时不传，R 不响应 */
   readonly onToggleResult?: (() => void) | undefined;
 }
@@ -36,9 +36,10 @@ export function useStageShortcuts(controls: StageShortcutsOptions): void {
       const current = latest.current;
       if (action === 'toggle-pause' && current.finished) return;
       if (action === 'toggle-result' && !current.onToggleResult) return;
+      if (action === 'toggle-feed' && !current.onToggleFeed) return;
       event.preventDefault();
       if (event.repeat) return;
-      if (action === 'toggle-feed') return current.onToggleFeed();
+      if (action === 'toggle-feed') return current.onToggleFeed?.();
       if (action === 'toggle-result') return current.onToggleResult?.();
       const next = applyShortcut(action, current.options);
       if (next) current.onChange(next);
